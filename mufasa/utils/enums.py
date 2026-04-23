@@ -8,7 +8,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import pkg_resources
+from importlib import metadata as _metadata  # replaces pkg_resources (removed from setuptools >=82, Python 3.12+)
 
 import mufasa
 
@@ -130,8 +130,8 @@ class OS(Enum):
     FORK = 'fork'
     PYTHON_VER = str(f"{sys.version_info.major}.{sys.version_info.minor}")
     try:
-        SIMBA_VERSION = pkg_resources.get_distribution("mufasa-uw-tf-dev").version
-    except pkg_resources.DistributionNotFound:
+        SIMBA_VERSION = _metadata.version("mufasa-uw-tf-dev")
+    except _metadata.PackageNotFoundError:
         SIMBA_VERSION = None
 
 class FontPaths(Enum):
@@ -510,8 +510,8 @@ class Defaults(Enum):
     CHUNK_SIZE = 1
     SPLASH_TIME = 2500
     try:
-        WELCOME_MSG = f'Welcome fellow scientists! \n SimBA v.{pkg_resources.get_distribution("mufasa-uw-tf-dev").version} \n '
-    except pkg_resources.DistributionNotFound:
+        WELCOME_MSG = f'Welcome fellow scientists! \n SimBA v.{_metadata.version("mufasa-uw-tf-dev")} \n '
+    except _metadata.PackageNotFoundError:
         WELCOME_MSG = f'Welcome fellow scientists! \n SimBA v. "dev" \n '
     BROWSE_FOLDER_BTN_TEXT = "Browse Folder"
     BROWSE_FILE_BTN_TEXT = "Browse File"
