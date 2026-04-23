@@ -101,6 +101,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 1
 
     wb = build_workbench(project_config_path=args.project)
+    # Track the workbench on the QApplication so File → New/Open project
+    # (which builds a fresh window and closes the old one) doesn't leak
+    # or GC the replacement before it's shown.
+    refs = app.property("_mufasa_workbenches") or []
+    refs.append(wb)
+    app.setProperty("_mufasa_workbenches", refs)
     wb.show()
     return app.exec()
 
