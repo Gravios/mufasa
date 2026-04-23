@@ -39,7 +39,7 @@ from urllib.parse import urlparse
 import cv2
 import numpy as np
 import pandas as pd
-import pkg_resources
+from importlib import metadata as _metadata  # replaces pkg_resources
 import pyarrow as pa
 from numba import njit, prange
 from pyarrow import csv
@@ -2172,8 +2172,8 @@ def get_pkg_version(pkg: str, raise_error: Optional[bool] = False):
     check_str(name=get_pkg_version.__name__, value=pkg, allow_blank=False)
     check_valid_boolean(value=raise_error, source=get_pkg_version.__name__, raise_error=True)
     try:
-        return pkg_resources.get_distribution(pkg).version
-    except pkg_resources.DistributionNotFound:
+        return _metadata.version(pkg)
+    except _metadata.PackageNotFoundError:
         if raise_error:
             raise SimBAPAckageVersionError(msg=f'Package not found: {pkg}', source=get_pkg_version.__name__)
         else:
