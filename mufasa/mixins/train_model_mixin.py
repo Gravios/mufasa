@@ -33,7 +33,11 @@ from sklearn.model_selection import ShuffleSplit, learning_curve
 from sklearn.preprocessing import (MinMaxScaler, QuantileTransformer,
                                    StandardScaler)
 from sklearn.tree import export_graphviz
-from sklearn.utils import parallel_backend
+# parallel_backend was removed from sklearn.utils in scikit-learn 1.7
+# (deprecated in 1.5, see sklearn release notes). Since sklearn only
+# ever re-exported joblib's function, use joblib directly — this works
+# on all sklearn versions.
+from joblib import parallel_backend
 
 from mufasa.mixins import cuRF
 
