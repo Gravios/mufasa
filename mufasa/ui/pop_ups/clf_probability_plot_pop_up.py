@@ -33,7 +33,7 @@ OPACITY_OPTIONS = [round(x * 0.1, 1) for x in range(1, 11)]
 
 class VisualizeClassificationProbabilityPopUp(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     :example:
     >>> _ = VisualizeClassificationProbabilityPopUp(config_path=r'C:\troubleshooting\RAT_NOR\project_folder\project_config.ini')
     """

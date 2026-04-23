@@ -12,7 +12,7 @@ from mufasa.utils.read_write import read_df, write_df
 
 
 class MitraStyleAnnotationAppender(ConfigReader):
-    """
+    r"""
     Append Mitra-style annotations to SimBA featurized datasets.
 
     :param Union[str, os.PathLike] config_path: path to SimBA project config file in Configparser format

@@ -21,7 +21,7 @@ from mufasa.utils.read_write import (clean_superanimal_topview_filename,
 
 class SuperAnimalTopViewImporter(PoseImporterMixin, ConfigReader):
 
-    """
+    r"""
     Import SuperAnimal-TopView mouse data to SimBA
 
     .. note::

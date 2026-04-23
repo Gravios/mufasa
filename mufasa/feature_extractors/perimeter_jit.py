@@ -28,7 +28,7 @@ def process(S, P, a, b):
 
 @njit("(float32[:, :, :], types.unicode_type)", fastmath=True)
 def jitted_hull(points: np.ndarray, target: str = "perimeter") -> np.ndarray:
-    """
+    r"""
     Convex hull perimeter or area per frame from body-part (x,y) coordinates.
 
     For each frame, builds the 2D convex hull (quickhull), then:

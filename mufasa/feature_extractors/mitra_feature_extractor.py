@@ -38,7 +38,7 @@ class MitraFeatureExtractor(ConfigReader,
                             AbstractFeatureExtraction):
 
 
-    """
+    r"""
     Feature extractor used for grooming and rearing classifications. A subset is of created features are further used for straub-tail classifications.
 
 

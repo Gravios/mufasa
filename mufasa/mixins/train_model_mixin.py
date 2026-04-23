@@ -852,7 +852,7 @@ class TrainModelMixin(object):
                         save_dir: Optional[Union[str, os.PathLike]] = None,
                         save_file_suffix: Optional[int] = None) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, Dict[str, pd.DataFrame], np.ndarray]]:
 
-        """
+        r"""
         Compute SHAP values for a random forest classifier.
         This method computes SHAP (SHapley Additive exPlanations) values for a given random forest classifier.
         The SHAP value for feature 'i' in the context of a prediction 'f' and input 'x' is calculated using the following formula:

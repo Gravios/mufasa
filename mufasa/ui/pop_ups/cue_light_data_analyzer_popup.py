@@ -15,7 +15,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 
 class CueLightDataAnalyzerPopUp(ConfigReader, PopUpMixin):
 
-    """
+    r"""
     :example:
     >>> CueLightDataAnalyzerPopUp(config_path=r"C:\troubleshooting\cue_light\t1\project_folder\project_config.ini", cue_light_names=['cl'])
     """

@@ -1802,7 +1802,7 @@ class InitiateClipMultipleVideosByFrameNumbersPopUp(PopUpMixin):
 
 
 class ClipMultipleVideosByTimestamps(PopUpMixin):
-    """
+    r"""
     :example:
     >>> ClipMultipleVideosByTimestamps(data_dir=r"C:\troubleshooting\RAT_NOR\project_folder\videos\test", save_dir=r"C:\troubleshooting\RAT_NOR\project_folder\videos\test\out")
     >>> ClipMultipleVideosByTimestamps(data_dir=r"C:\troubleshooting\mitra\project_folder\videos", save_dir=r"C:\troubleshooting\mitra\project_folder\videos\temp_3")

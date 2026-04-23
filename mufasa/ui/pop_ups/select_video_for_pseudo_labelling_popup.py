@@ -16,7 +16,7 @@ from mufasa.utils.read_write import get_video_meta_data, read_df
 
 class SelectPseudoLabellingVideoPupUp(ConfigReader, PopUpMixin):
 
-    """
+    r"""
     Launch PopUp to select video for labelling
 
     :example:

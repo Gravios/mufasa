@@ -27,7 +27,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 
 class SamInference():
 
-    """
+    r"""
     :example:
     >>> i = SamInference(video_path=r"MyVideo",
     >>>                 labels=[[1]],

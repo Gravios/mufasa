@@ -8,7 +8,7 @@ from mufasa.utils.enums import Formats
 
 
 class GetTreeView(PopUpMixin):
-    """
+    r"""
     Create a hierarchical TreeView widget for displaying nested dictionary data in a popup window.
 
     This class creates a TreeView interface that displays nested dictionary data in an expandable tree format.

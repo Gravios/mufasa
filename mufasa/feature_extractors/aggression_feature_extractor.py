@@ -27,7 +27,7 @@ ANIMAL_NAMES = ['resident', 'intruder']
 TIME_WINDOWS = np.array([0.1, 0.25, 0.5, 1.0])
 
 class AgressionFeatureExtractor(ConfigReader, AbstractFeatureExtraction):
-    """
+    r"""
     Extracts behavioral features from pose estimation data for aggression analysis between two animals (resident and intruder).
 
     .. note::

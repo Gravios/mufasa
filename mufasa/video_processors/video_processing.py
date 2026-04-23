@@ -871,7 +871,7 @@ def video_to_greyscale(file_path: Union[str, os.PathLike],
                        verbose: bool = True,
                        quality: int = 23,
                        save_path: Optional[Union[str, os.PathLike]] = None) -> None:
-    """
+    r"""
     Convert a video file to greyscale mp4 format.
 
     .. image:: _static/img/to_greyscale.gif
@@ -930,7 +930,7 @@ def batch_video_to_greyscale(path: Union[str, os.PathLike, List[Union[str, os.Pa
                              save_dir: Optional[Union[str, os.PathLike]] = None,
                              quality: Optional[int] = None,
                              gpu: Optional[bool] = False) -> None:
-    """
+    r"""
     Convert a directory of video file to greyscale mp4 format.
 
     .. image:: _static/img/to_greyscale.gif
@@ -5033,7 +5033,7 @@ def get_video_slic(video_path: Union[str, os.PathLike],
                    sigma: Optional[int] = 1,
                    core_cnt: Optional[int] = -1) -> None:
 
-    """
+    r"""
     Apply SLIC superpixel segmentation to all frames of a video and save the output as a new video.
 
     .. video:: _static/img/get_video_slic.webm

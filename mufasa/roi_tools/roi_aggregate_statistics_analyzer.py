@@ -38,7 +38,7 @@ OUTSIDE_ROI = 'OUTSIDE REGIONS OF INTEREST'
 
 
 class ROIAggregateStatisticsAnalyzer(ConfigReader, FeatureExtractionMixin):
-    """
+    r"""
     Analyzes region-of-interest (ROI) data from video tracking experiments.
 
     This class computes various statistics related to body-part movements inside defined ROIs, including entry counts, total time spent, and bout durations.

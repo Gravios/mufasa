@@ -44,7 +44,7 @@ CENTER_X, CENTER_Y = "Center_X", "Center_Y"
 
 
 class ROIClfCalculator(ConfigReader):
-    """
+    r"""
     Compute aggregate statistics of classification results within user-defined ROIs.
     Results are stored in `project_folder/logs` directory of the SimBA project.
 

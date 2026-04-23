@@ -337,7 +337,7 @@ def img_stack_brightness(x: np.ndarray,
                          ignore_black: bool = True,
                          verbose: bool = False,
                          batch_size: int = 2500) -> np.ndarray:
-    """
+    r"""
     Calculate the average brightness of a stack of images using a specified method.
 
     Useful for analyzing light cues or brightness changes over time. For example, compute brightness in images containing a light cue ROI, then perform clustering (e.g., k-means) on brightness values to identify frames when the light cue is on vs off.

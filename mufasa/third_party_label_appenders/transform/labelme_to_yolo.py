@@ -23,7 +23,7 @@ from mufasa.utils.warnings import ROIWarning
 
 
 class LabelmeBoundingBoxes2YoloBoundingBoxes:
-    """
+    r"""
     Convert LabelMe annotations in json to YOLO format and save the corresponding images and labels in txt format.
 
     .. note::

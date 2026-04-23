@@ -29,7 +29,7 @@ from mufasa.utils.yolo import keypoint_array_to_yolo_annotation_str
 
 
 class Sleap2Yolo:
-    """
+    r"""
     Convert SLEAP pose estimation CSV data and corresponding videos into YOLO keypoint dataset format.
 
     .. note::

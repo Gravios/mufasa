@@ -27,7 +27,7 @@ INVALID_CLR = 'lightsalmon'
 
 
 class VideoInfoTable(ConfigReader, PopUpMixin):
-    """
+    r"""
     Create GUI that allows users to modify resolutions, fps, and pixels-per-mm
     interactively of videos within the SimBA project. Data is stored within the project_folder/logs/video_info.csv
     file in the SimBA project.

@@ -31,7 +31,7 @@ from mufasa.utils.warnings import NoDataFoundWarning
 
 
 class SimBA2YoloSegmentation(ConfigReader):
-    """
+    r"""
     Convert pose estimation data from a SimBA project into the YOLO keypoint format, including frame sampling,
     image-label pair creation, bounding box computation, and train/validation splitting.
 

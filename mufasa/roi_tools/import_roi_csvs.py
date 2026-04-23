@@ -25,7 +25,7 @@ EXPECTED_POLY_COLS = ['Video', 'Shape_type', 'Name', 'Color name', 'Color BGR', 
 #EXPECTED_RECT_COLS, EXPECTED_CIRC_COLS, EXPECTED_POLY_COLS = get_rectangle_df_headers(), get_circle_df_headers(), get_polygon_df_headers()
 
 class ROIDefinitionsCSVImporter(ConfigReader):
-    """
+    r"""
     Import ROI definitions from CSV files into SimBA H5 format.
 
     Converts human-readable CSV files containing ROI definitions (rectangles, circles, and/or polygons)

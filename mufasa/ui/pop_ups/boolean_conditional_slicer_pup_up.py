@@ -14,7 +14,7 @@ from mufasa.utils.read_write import read_df
 
 class BooleanConditionalSlicerPopUp(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     :example:
     >>> roi_featurizer = BooleanConditionalSlicerPopUp(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini")
     """

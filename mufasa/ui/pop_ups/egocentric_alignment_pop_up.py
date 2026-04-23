@@ -17,7 +17,7 @@ from mufasa.utils.read_write import (find_all_videos_in_directory,
 
 
 class EgocentricAlignPopUp(ConfigReader, PopUpMixin):
-    """
+    r"""
 
     :example:
     >>> _ = EgocentricAlignPopUp(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")

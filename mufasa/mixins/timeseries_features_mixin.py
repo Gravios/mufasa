@@ -74,7 +74,7 @@ class TimeseriesFeatureMixin(object):
     #@njit("(float32[:],)")
     @dynamic_numba_decorator(dtypes="(float32[:],)", cache=True, fastmath=False)
     def hjort_parameters(data: np.ndarray) -> Tuple[np.float64, np.float64, np.float64]:
-        """
+        r"""
         Jitted compute of Hjorth parameters for a given time series data. Hjorth parameters describe
         mobility, complexity, and activity of a time series.
 
@@ -798,7 +798,7 @@ class TimeseriesFeatureMixin(object):
     @dynamic_numba_decorator(dtypes="(float32[:],)", cache=True, fastmath=True)
 
     def line_length(data: np.ndarray) -> float:
-        """
+        r"""
         Calculate the line length of a 1D array.
 
         Line length is a measure of signal complexity and is computed by summing the absolute
@@ -1349,7 +1349,7 @@ class TimeseriesFeatureMixin(object):
     def sliding_benford_correlation(
         data: np.ndarray, time_windows: np.ndarray, sample_rate: int
     ) -> np.ndarray:
-        """
+        r"""
         Calculate the sliding Benford's Law correlation coefficient for a given dataset within
         specified time windows.
 

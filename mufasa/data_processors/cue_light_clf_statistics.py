@@ -20,7 +20,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 
 
 class CueLightClfAnalyzer(ConfigReader):
-    """
+    r"""
     Compute aggregate statistics when classified behaviors are occurring in relation to the cue light
     ON and OFF states.
 

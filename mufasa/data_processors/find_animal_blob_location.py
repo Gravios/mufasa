@@ -250,7 +250,7 @@ def get_blob_vertices_from_imgs(frm_idxs: Tuple[int, List[int]],
                                 window_size: Optional[int] = None,
                                 convex_hull: bool = False,
                                 vertice_cnt: int = 50) -> Dict[int, Dict[str, Union[int, np.ndarray]]]:
-    """
+    r"""
     Helper to find the largest connected component in binary image. E.g., Use to find a "blob" (i.e., animal) within a background subtracted image.
 
     .. seealso::
@@ -332,7 +332,7 @@ def get_blob_vertices_from_video(video_path: Union[str, os.PathLike],
                                  convex_hull: bool = False,
                                  vertice_cnt: int = 50) -> np.ndarray:
 
-    """
+    r"""
     Detects the location of the largest blob in each frame of a video. Processes frames in batches and optionally uses GPU for acceleration. Returns a NumPy array with blob vertices.
 
     .. seealso::

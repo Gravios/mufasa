@@ -16,7 +16,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 
 
 class FaceMapImporter(ConfigReader):
-    """
+    r"""
     :example:
     >>> r = FaceMapImporter(config_path=r"C:\troubleshooting\facemap_project\project_folder\project_config.ini", data_path=r'C:\troubleshooting\facemap_project\data', smoothing_settings={'method': 'savitzky-golay', 'time_window': 100})
     >>> r.run()

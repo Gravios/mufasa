@@ -24,7 +24,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 
 
 class LabelMe2DataFrame:
-    """
+    r"""
     Convert a directory of labelme .json files into a pandas dataframe.
 
     .. note::

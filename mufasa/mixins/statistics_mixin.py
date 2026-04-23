@@ -912,7 +912,7 @@ class Statistics(FeatureExtractionMixin):
             Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"]
         ] = "auto",
     ):
-        """
+        r"""
         Calculate the total variation distance between two probability distributions.
 
         :param np.ndarray x: A 1-D array representing the first sample.
@@ -2574,7 +2574,7 @@ class Statistics(FeatureExtractionMixin):
     @dynamic_numba_decorator(dtypes="(int64[:, :],)", cache=True, fastmath=False)
 
     def phi_coefficient(data: np.ndarray) -> float:
-        """
+        r"""
         Compute the phi coefficient for a Nx2 array of binary data.
 
         The phi coefficient (a.k.a Matthews Correlation Coefficient (MCC)), is a measure of association for binary data in a 2x2 contingency table. It quantifies the
@@ -2843,7 +2843,7 @@ class Statistics(FeatureExtractionMixin):
     @dynamic_numba_decorator(dtypes="int64[:], int64[:],", cache=True, fastmath=False)
 
     def cohens_h(sample_1: np.ndarray, sample_2: np.ndarray) -> float:
-        """
+        r"""
         Jitted compute Cohen's h effect size for two samples of binary [0, 1] values. Cohen's h is a measure of effect size
         for comparing two independent samples based on the differences in proportions of the two samples.
 
@@ -3075,7 +3075,7 @@ class Statistics(FeatureExtractionMixin):
     def yule_coef(
         x: np.ndarray, y: np.ndarray, w: Optional[np.ndarray] = None
     ) -> float64:
-        """
+        r"""
         Jitted calculate of the yule coefficient between two binary vectors (e.g., to classified behaviors). 0 represent independence, 2 represents
         complete interdependence.
 
@@ -3128,7 +3128,7 @@ class Statistics(FeatureExtractionMixin):
     @dynamic_numba_decorator(dtypes=[(int8[:], int8[:], types.misc.Omitted(None)), (int8[:], int8[:], float32[:])], cache=True, fastmath=False)
 
     def sokal_sneath(x: np.ndarray, y: np.ndarray, w: Optional[np.ndarray] = None) -> float64:
-        """
+        r"""
         Jitted calculate of the sokal sneath coefficient between two binary vectors (e.g., to classified behaviors). 0 represent independence, 1 represents complete interdependence.
 
         .. math::
@@ -3460,7 +3460,7 @@ class Statistics(FeatureExtractionMixin):
     @dynamic_numba_decorator(dtypes="(int64[:], int64[:])", cache=True, fastmath=False)
 
     def cohens_kappa(sample_1: np.ndarray, sample_2: np.ndarray):
-        """
+        r"""
         Jitted compute Cohen's Kappa coefficient for two binary samples.
 
         Cohen's Kappa coefficient measures the agreement between two sets of binary ratings, taking into account agreement occurring by chance.

@@ -645,7 +645,7 @@ def _sliding_angular_diff(data, strides, results):
 def sliding_angular_diff(x: np.ndarray,
                          time_windows: np.ndarray,
                          fps: float) -> np.ndarray:
-    """
+    r"""
     Calculate the sliding angular differences for a given time window using GPU acceleration.
 
 

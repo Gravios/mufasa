@@ -20,7 +20,7 @@ COLUMN_NAMES = ['EVENT', 'START TIME (S)', 'END TIME (S)', 'START FRAME', 'END F
 OUT_COL_NAMES= ['VIDEO', 'BODY-PART', 'EVENT', 'START TIME (S)', 'END TIME (S)', 'START FRAME', 'END FRAME', 'DURATION (S)']
 
 class LightDarkBoxAnalyzer():
-    """
+    r"""
     Perform light–dark box analysis using DeepLabCut pose estimation data.
 
     .. note::

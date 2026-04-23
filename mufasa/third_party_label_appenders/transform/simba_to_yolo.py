@@ -32,7 +32,7 @@ from mufasa.utils.yolo import keypoint_array_to_yolo_annotation_str
 
 
 class SimBA2Yolo:
-    """
+    r"""
     Convert pose estimation data from a SimBA project into the YOLO keypoint format, including frame sampling,
     image-label pair creation, bounding box computation, and train/validation splitting.
 
