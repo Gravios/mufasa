@@ -41,11 +41,17 @@ from joblib import parallel_backend
 
 from mufasa.mixins import cuRF
 
-try:
-    from dtreeviz.trees import dtreeviz, tree
-except:
-    from dtreeviz import dtreeviz
-    from dtreeviz.trees import tree
+# dtreeviz 2.0 (Feb 2023) reorganised its API. The old top-level
+# dtreeviz() function is still available via ``from dtreeviz import *``
+# for backward compatibility (see dtreeviz 2.0.0 release notes).
+#
+# `tree` in this file is actually ``sklearn.tree`` — the old code
+# imported it from dtreeviz.trees, which used to re-export it but no
+# longer does in dtreeviz >=1.4. Fix by importing from sklearn.tree
+# directly, which is where it's actually used from (see
+# tree.DecisionTreeClassifier call downstream).
+from dtreeviz import *  # noqa: F401,F403 — re-exports dtreeviz() for back-compat
+from sklearn import tree
 
 import functools
 import multiprocessing
