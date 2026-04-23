@@ -23,7 +23,7 @@ CIRCLING = 'CIRCLING'
 
 class CirclingDetector(ConfigReader):
 
-    """
+    r"""
     Detect circling using heuristic rules.
 
     .. important::

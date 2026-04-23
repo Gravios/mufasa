@@ -20,7 +20,7 @@ MEASURES = ('TOTAL BEHAVIOR TIME IN ROI (S)', 'STARTED BEHAVIOR BOUTS IN ROI (CO
 
 class ClfByROIPopUp(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     :example:
     >>> _ = ClfByROIPopUp(config_path=r"C:\troubleshooting\open_field_below\project_folder\project_config.ini")
     """

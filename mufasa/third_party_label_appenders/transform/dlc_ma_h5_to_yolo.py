@@ -29,7 +29,7 @@ from mufasa.utils.yolo import keypoint_array_to_yolo_annotation_str
 H5_EXT = ['.H5', '.h5']
 
 class MADLCH52Yolo:
-    """
+    r"""
     Convert multi-animal DeepLabCut pose estimation H5 data and corresponding videos into YOLO keypoint dataset format.
 
     .. note::

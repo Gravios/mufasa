@@ -44,7 +44,7 @@ FILE_TYPES = {'CSV (DLC/DeepPoseKit)': '*.csv', 'MAT (DANNCE 3D)': '*.mat', 'JSO
 
 
 class ImportPoseFrame(ConfigReader, PopUpMixin):
-    """
+    r"""
     .. image:: _static/img/ImportPoseFrame.webp
        :width: 500
        :align: center

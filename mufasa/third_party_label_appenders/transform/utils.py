@@ -62,7 +62,7 @@ def scale_pose_img_sizes(pose_data: np.ndarray,
                          size: Union[Literal['min', 'max'], Tuple[int, int]],
                          interpolation: Optional[int] = cv2.INTER_CUBIC ) -> Tuple[np.ndarray, Iterable[Union[np.ndarray, str]]]:
 
-    """
+    r"""
     Resizes images and scales corresponding pose-estimation data to match the new image sizes.
 
     .. image:: _static/img/scale_pose_img_sizes.webp
@@ -190,7 +190,7 @@ def create_yolo_keypoint_yaml(path: Union[str, os.PathLike],
                               flip_idx: Optional[Tuple[int, ...]] = None,
                               save_path: Optional[Union[str, os.PathLike]] = None,
                               use_wsl_paths: bool = False) -> Union[None, dict]:
-    """
+    r"""
     Given a set of paths to directories, create a model.yaml file for yolo pose model training though ultralytics wrappers.
 
     .. seealso::
@@ -308,7 +308,7 @@ def merge_coco_keypoints_files(data_dir: Union[str, os.PathLike],
                                save_path: Union[str, os.PathLike],
                                max_width: Optional[int] = None,
                                max_height: Optional[int] = None):
-    """
+    r"""
     Merges multiple annotation COCO-format keypoint JSON files into a single file.
 
     .. note::
@@ -506,7 +506,7 @@ def downsample_coco_dataset(json_path: Union[str, os.PathLike],
     if verbose: print(f'New COCO data stored in {save_dir} (elapsed time: {timer.elapsed_time_str}s)')
 
 def concatenate_dlc_annotations(data_dir: Union[str, os.PathLike], save_dir: Union[str, os.PathLike], annotator: str = 'SN'):
-    """
+    r"""
     Concatenate DeepLabCut annotation files from multiple directories into a single CSV file.
 
     This function searches for DeepLabCut 'CollectedData_*.csv' files in the specified data directory,

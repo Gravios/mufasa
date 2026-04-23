@@ -20,7 +20,7 @@ OPACITY_OPTIONS = [round(x, 2) for x in __import__('numpy').arange(0.05, 1.05, 0
 
 class GanttPlotPopUp(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     :example:
     >>>  _ = GanttPlotPopUp(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini")
     """

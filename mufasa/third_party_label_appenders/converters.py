@@ -74,7 +74,7 @@ def geometries_to_coco(geometries: Dict[str, np.ndarray],
                        version: Optional[int] = 1,
                        description: Optional[str] = None,
                        licences: Optional[str] = None):
-    """
+    r"""
     Convert a dictionary of geometries (keypoints or polygons) into COCO format annotations and save images
     extracted from a video to a specified directory.
 
@@ -134,7 +134,7 @@ def geometries_to_yolo(geometries: Dict[Union[str, int], np.ndarray],
                        sample: Optional[int] = None,
                        obb: Optional[bool] = False,
                        map: Optional[Dict[int, str]] = None) -> None:
-    """
+    r"""
     Converts geometrical shapes (like polygons) into YOLO format annotations and saves them along with corresponding video frames as images.
 
     :param Dict[Union[str, int], np.ndarray geometries: A dictionary where the keys represent category IDs (either string or int), and the values are NumPy arrays of shape `(n_frames, n_points, 2)`. Each entry in the array represents the geometry of an object in a particular frame (e.g., keypoints or polygons).
@@ -247,7 +247,7 @@ def create_yolo_yaml(path: Union[str, os.PathLike],
                      save_path: Optional[Union[str, os.PathLike]] = None,
                      test_path: Optional[Union[str, os.PathLike]] = None,
                      reverse_ids: Optional[bool] = True) -> Union[None, dict]:
-    """
+    r"""
     Given a set of paths to directories, create a model.yaml file for model training though ultralytics wrappers.
 
     :param Union[str, os.PathLike] path: Parent directory holding both an images and a labels directory.
@@ -364,7 +364,7 @@ def dlc_to_labelme(dlc_dir: Union[str, os.PathLike],
                    flags: Optional[Dict[Any, Any]] = None,
                    verbose: Optional[bool] = True) -> None:
 
-    """
+    r"""
     Convert a folder of DLC annotations into labelme json format.
 
     :param Union[str, os.PathLike] dlc_dir: Folder with DLC annotations. I.e., directory inside
@@ -437,7 +437,7 @@ def dlc_to_labelme(dlc_dir: Union[str, os.PathLike],
 
 
 def b64_dict_to_imgs(x: Dict[str, np.ndarray]):
-    """
+    r"""
     Helper to convert a dictionary of images in byte64 format to a dictionary of images in array format.
 
     :example:
@@ -496,7 +496,7 @@ def labelme_to_df(labelme_dir: Union[str, os.PathLike],
                   save_path: Optional[Union[str, os.PathLike]] = None,
                   verbose: bool = True) -> Union[None, pd.DataFrame]:
 
-    """
+    r"""
     Convert a directory of labelme .json files into a pandas dataframe.
 
     .. note::
@@ -583,7 +583,7 @@ def scale_pose_img_sizes(pose_data: np.ndarray,
                          size: Union[Literal['min', 'max'], Tuple[int, int]],
                          interpolation: Optional[int] = cv2.INTER_CUBIC ) -> Tuple[np.ndarray, Iterable[Union[np.ndarray, str]]]:
 
-    """
+    r"""
     Resizes images and scales corresponding pose-estimation data to match the new image sizes.
 
     .. image:: _static/img/scale_pose_img_sizes.webp
@@ -737,7 +737,7 @@ def simba_rois_to_yolo(config_path: Optional[Union[str, os.PathLike]] = None,
                        obb: Optional[bool] = False,
                        greyscale: Optional[bool] = True,
                        verbose: Optional[bool] = False) -> None:
-    """
+    r"""
     Converts SimBA roi definitions into annotations and images for training yolo network.
 
     :param Optional[Union[str, os.PathLike]] config_path: Optional path to the project config file in SimBA project.
@@ -912,7 +912,7 @@ def labelme_to_img_dir(labelme_dir: Union[str, os.PathLike],
                        verbose: bool = True,
                        greyscale: bool = False) -> None:
 
-    """
+    r"""
     Given a directory of labelme JSON annotations, extract the images from the JSONs in b64 format and store them as images in a directory
 
     :param labelme_dir: Directory containing labelme json annotations.
@@ -1038,7 +1038,7 @@ def create_yolo_keypoint_yaml(path: Union[str, os.PathLike],
                               flip_idx: Optional[Tuple[int, ...]] = None,
                               save_path: Optional[Union[str, os.PathLike]] = None,
                               use_wsl_paths: bool = False) -> Union[None, dict]:
-    """
+    r"""
     Given a set of paths to directories, create a model.yaml file for yolo pose model training though ultralytics wrappers.
 
     .. seealso::
@@ -1103,7 +1103,7 @@ def coco_keypoints_to_yolo(coco_path: Union[str, os.PathLike],
                            train_size: float = 0.7,
                            flip_idx: Tuple[int, ...] = (0, 2, 1, 3, 5, 4, 6),
                            verbose: bool = True):
-    """
+    r"""
     Convert COCO Keypoints version 1.0 data format into a YOLO keypoints training set.
 
     .. note::
@@ -1293,7 +1293,7 @@ def sleap_to_yolo_keypoints(data_dir: Union[str, os.PathLike],
                             greyscale: bool = False,
                             padding: float = 0.00):
 
-    """
+    r"""
     Convert SLEAP pose estimation CSV data and corresponding videos into YOLO keypoint dataset format.
 
     .. note::
@@ -1485,7 +1485,7 @@ def dlc_to_yolo_keypoints(dlc_dir: Union[str, os.PathLike],
                           greyscale: bool = False,
                           bp_id_idx: Optional[Dict[int, Union[Tuple[int], List[int]]]] = None) -> None:
 
-    """
+    r"""
     Converts DLC annotations into YOLO keypoint format formatted for model training.
 
     .. note::
@@ -1628,7 +1628,7 @@ def dlc_multi_animal_h5_to_yolo_keypoints(data_dir: Union[str, os.PathLike],
                                           greyscale: bool = False,
                                           padding: float = 0.00):
 
-    """
+    r"""
     Convert SLEAP pose estimation CSV data and corresponding videos into YOLO keypoint dataset format.
 
     .. note::
@@ -1764,7 +1764,7 @@ def simba_to_yolo_keypoints(config_path: Union[str, os.PathLike],
                             sample_size: Optional[int] = None,
                             bp_id_idx: Optional[Dict[int, Union[Tuple[int], List[int]]]] = None) -> None:
 
-    """
+    r"""
     Convert pose estimation data from a SimBA project into the YOLO keypoint format, including frame sampling,
     image-label pair creation, bounding box computation, and train/validation splitting.
 

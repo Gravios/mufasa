@@ -20,7 +20,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 
 
 class CueLightMovementAnalyzer(ConfigReader):
-    """
+    r"""
     Compute aggregate statistics of animal movement in relation to the cue light
     ON and OFF states.
 

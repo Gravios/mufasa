@@ -31,7 +31,7 @@ def read_bento_files(data_paths: Union[List[str], str, os.PathLike],
                      error_setting: Literal[Union[None, Methods.ERROR.value, Methods.WARNING.value]] = None,
                      log_setting: Optional[bool] = False) -> Dict[str, pd.DataFrame]:
 
-    """
+    r"""
     Reads multiple BENTO annotation files and processes them into a dictionary of DataFrames, each representing the
     combined annotations for a corresponding video. The function verifies that all files exist and that the file names
     match the video information provided.
@@ -102,7 +102,7 @@ def read_boris_annotation_files(data_paths: Union[List[str], str, os.PathLike],
                                 error_setting: Literal[Union[None, Methods.ERROR.value, Methods.WARNING.value]] = None,
                                 orient: Literal['index', 'columns'] = 'columns',
                                 log_setting: Optional[bool] = False) -> Dict[str, pd.DataFrame]:
-    """
+    r"""
     Reads multiple BORIS behavioral annotation files and compiles the data into a dictionary of dataframes.
 
     :param Union[List[str], str, os.PathLike] data_paths: Paths to the BORIS annotation files. This can be a list of file paths, a single directory containing the files, or a single file path.

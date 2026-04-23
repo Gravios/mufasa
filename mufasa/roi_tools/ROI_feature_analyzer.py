@@ -26,7 +26,7 @@ from mufasa.utils.warnings import DuplicateNamesWarning, ROIWarning
 
 
 class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
-    """
+    r"""
     Compute features based on the relationships between the location of the animals and the location of
     user-defined ROIs. This includes the distance to the ROIs, if the animals are inside the ROIs, and if the
     animals are directing towards the ROIs (if viable)

@@ -444,7 +444,7 @@ def multiply_ROIs(filename: Union[str, os.PathLike],
                   roi_coordinates_path: Optional[Union[str, os.PathLike]] = None,
                   videos_dir: Optional[Union[str, os.PathLike]] = None) -> None:
 
-    """
+    r"""
     Reproduce ROIs in one video to all other videos in SimBA project.
 
     :param Union[str, os.PathLike] config_path: Path to SimBA project config file.
@@ -527,7 +527,7 @@ def multiply_ROIs(filename: Union[str, os.PathLike],
 def reset_video_ROIs(config_path: Union[str, os.PathLike],
                      filename: Union[str, os.PathLike]) -> None:
 
-    """
+    r"""
     Delete drawn ROIs for a single video in a SimBA project.
 
     :param Union[str, os.PathLike] config_path: Path to SimBA project config file.

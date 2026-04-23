@@ -12,7 +12,7 @@ from mufasa.utils.read_write import str_2_bool
 
 
 class ROIDefinitionsCSVImporterPopUp(ConfigReader, PopUpMixin):
-    """
+    r"""
     :example:
     >>> ROIDefinitionsCSVImporterPopUp(config_path=r"C:\troubleshooting\mouse_open_field\project_folder\project_config.ini")
     """

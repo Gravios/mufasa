@@ -2288,7 +2288,7 @@ class PlottingMixin(object):
                           bouts: Optional[bool] = False,
                           seconds: Optional[bool] = False) -> None:
 
-        """
+        r"""
 
         Generates and saves a cumulative count plot of a specified classifier's occurrences over video frames or time.
 

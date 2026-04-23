@@ -30,7 +30,7 @@ HEATMAP_BG_OPTIONS = ['NONE', VIDEO, VIDEO_FRM]
 
 class HeatmapLocationPopup(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     :example:
     >>> _ = HeatmapLocationPopup(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini")
     >>> _ = HeatmapLocationPopup(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")

@@ -30,7 +30,7 @@ from mufasa.utils.read_write import (concatenate_videos_in_folder,
 
 
 class BlobPlotter(PlottingMixin):
-    """
+    r"""
      Plot the results of animal tracking based on blob.
 
      .. seealso::

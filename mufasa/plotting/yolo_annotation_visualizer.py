@@ -27,7 +27,7 @@ BBOX_VALUE_CNT = 4
 KPT_DIM = 3
 
 class YOLOAnnotationVisualizer(object):
-    """
+    r"""
     Visualize YOLO annotation label files overlaid on their source images.
 
     .. seealso::

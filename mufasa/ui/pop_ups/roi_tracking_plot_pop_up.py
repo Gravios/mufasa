@@ -29,7 +29,7 @@ BP_SIZE_OPTIONS.insert(0, 'AUTO')
 
 class VisualizeROITrackingPopUp(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     Pop-up UI for visualizing ROI tracking overlays on videos.
 
     The interface lets users configure how tracked body-parts, animal names, bounding boxes,

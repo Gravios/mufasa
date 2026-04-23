@@ -18,7 +18,7 @@ from mufasa.utils.errors import NoDataError
 
 
 class MovementAnalysisTimeBinsPopUp(ConfigReader, PopUpMixin):
-    """
+    r"""
     Tkinter pop-up for defining parameters when computing movements in time-bins.
 
     :example:

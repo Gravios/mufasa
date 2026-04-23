@@ -35,7 +35,7 @@ GANTT_OPTIONS = {'NO GANTT': None, 'Static Gantt (final frame, faster)': 1, 'Dyn
 
 class SklearnVisualizationPopUp(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     :example:
     >>> _ = SklearnVisualizationPopUp(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini")
     """

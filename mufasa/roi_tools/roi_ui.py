@@ -25,7 +25,7 @@ SHOW_GRID_OVERLAY = 'SHOW_GRID_OVERLAY'
 
 class ROI_ui(ROI_mixin, ConfigReader):
 
-    """
+    r"""
     Main entry-point for drawing ROIs on videos.
 
     .. note::

@@ -24,7 +24,7 @@ from mufasa.utils.warnings import (
 
 BEHAVIOR = 'BEHAVIOR'
 class BorisAppender(ConfigReader):
-    """
+    r"""
     Append BORIS human annotations onto featurized pose-estimation data.
 
     :param str config_path: path to SimBA project config file in Configparser format

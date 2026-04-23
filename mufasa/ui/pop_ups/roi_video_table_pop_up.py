@@ -27,7 +27,7 @@ WINDOW_SIZE = (720, 960)
 
 class ROIVideoTable(ConfigReader, PopUpMixin):
 
-    """
+    r"""
     Crates a tkinter video table listing all videos in project together with buttons associated with ROI drawing, deletaing, and duplicating shapes.
 
     :example:

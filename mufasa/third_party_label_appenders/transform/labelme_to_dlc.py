@@ -25,7 +25,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 
 class Labelme2DLC:
 
-    """
+    r"""
     Convert labels from labelme format to DLC annotation format.
 
     .. note::

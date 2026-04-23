@@ -34,7 +34,7 @@ OUTSIDE_ROI = 'OUTSIDE REGIONS OF INTEREST'
 
 
 class ROIPlotter(ConfigReader):
-    """
+    r"""
     Visualize the ROI data (number of entries/exits, time-spent in ROIs etc).
 
     .. note::

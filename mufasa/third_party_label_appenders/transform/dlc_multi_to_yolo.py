@@ -28,7 +28,7 @@ COLLECTED_DATA = 'CollectedData'
 
 
 class MultiDLC2Yolo:
-    """
+    r"""
 
     :example:
     >>> DLC_DIR = r'E:\deeplabcut_projects\resident_intruder_white_black-SN-2025-09-30\labeled-data'

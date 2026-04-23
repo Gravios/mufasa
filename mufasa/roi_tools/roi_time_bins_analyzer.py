@@ -41,7 +41,7 @@ OUTSIDE_ROI = 'OUTSIDE REGIONS OF INTEREST'
 
 
 class ROITimebinAnalyzer(ConfigReader):
-    """
+    r"""
     Analyzes region-of-interest (ROI) data from video tracking experiments conditioned on time-bin.
 
     This class computes various statistics related to body-part movements inside defined ROIs,

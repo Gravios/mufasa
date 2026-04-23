@@ -58,7 +58,7 @@ class CircularStatisticsMixin(object):
     @staticmethod
     @njit("(float32[:],)")
     def mean_resultant_vector_length(data: np.ndarray) -> float:
-        """
+        r"""
         Jitted compute of the mean resultant vector length of a single sample. Captures the overall "pull" or "tendency" of the
         data points towards a central direction on the circle with a range between 0 and 1.
 
@@ -966,7 +966,7 @@ class CircularStatisticsMixin(object):
     @staticmethod
     @njit("(float32[:], float32[:])")
     def kuipers_two_sample_test(sample_1: np.ndarray, sample_2: np.ndarray) -> float:
-        """
+        r"""
         Compute the Kuiper's two-sample test statistic for circular distributions.
 
         Kuiper's two-sample test is a non-parametric test used to determine if two samples are drawn from the same circular distribution. It is particularly useful for circular data, such as angles or directions.

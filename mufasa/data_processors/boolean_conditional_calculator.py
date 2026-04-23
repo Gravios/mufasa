@@ -20,7 +20,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 
 
 class BooleanConditionalCalculator(ConfigReader):
-    """
+    r"""
     Compute descriptive statistics (e.g., the time in seconds and number of frames) of multiple Boolean fields fullfilling user-defined conditions.
 
     For example, computedescriptive statistics for when Animal 1 is inside the shape Rectangle_1 while at the same time directing towards shape Polygon_1,

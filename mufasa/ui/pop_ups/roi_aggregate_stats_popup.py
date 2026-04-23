@@ -20,7 +20,7 @@ from mufasa.utils.read_write import find_core_cnt
 OUTSIDE_ROI = 'OUTSIDE REGIONS OF INTEREST'
 
 class ROIAggregateDataAnalyzerPopUp(PopUpMixin, ConfigReader):
-    """
+    r"""
     :example:
     >>> analyzer = ROIAggregateDataAnalyzerPopUp(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")
     """

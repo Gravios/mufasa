@@ -22,7 +22,7 @@ THICKNESS_OPTIONS = list(range(0, 11))
 
 class DataPlotterPopUp(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     :example:
     >>> _ = DataPlotterPopUp(config_path=r'C:\troubleshooting\RAT_NOR\project_folder\project_config.ini')
     """

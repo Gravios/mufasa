@@ -10,7 +10,7 @@ from mufasa.utils.read_write import read_config_file, remove_files
 
 
 def delete_all_rois_pop_up(config_path: Union[str, os.PathLike], roi_table_frm: Optional[Any] = None) -> None:
-    """
+    r"""
     Launches a pop-up asking if to delete all SimBA roi definitions. If click yes, then the ``/project_folder/logs/measures/ROI_definitions.h5`` of the SimBA project is deleted.
 
     :param Union[str, os.PathLike] config_path: Path to SimBA project config file (e.g. project_config.ini).

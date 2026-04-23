@@ -13,7 +13,7 @@ from mufasa.utils.read_write import read_df, write_df
 
 def convert_dlc_annotation_format(input_dir: Union[str, os.PathLike],
                                   output_dir: Union[str, os.PathLike]):
-    """
+    r"""
     Converts DeepLabCut annotation files from format without individuals row to format with individuals row.
 
     Takes annotation files where bodyparts include individual identifiers as suffixes (e.g., Ear_left_1, Nose_2)

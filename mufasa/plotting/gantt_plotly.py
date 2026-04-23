@@ -31,7 +31,7 @@ def gantt_plotly(bouts_df: pd.DataFrame,
                  tick_angle: Optional[int] = 45,
                  font: Optional[str] = 'Georgia') -> np.ndarray:
 
-    """
+    r"""
     Generates a Gantt chart using Plotly to visualize bout events over time.
 
     Creates a horizontal bar chart where each row represents an event (e.g., animal behavior) over time, with estensive customization options.

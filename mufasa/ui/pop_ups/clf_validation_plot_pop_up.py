@@ -19,7 +19,7 @@ from mufasa.utils.read_write import get_file_name_info_in_directory, get_fn_ext
 
 class ClassifierValidationPopUp(PopUpMixin, ConfigReader):
 
-    """
+    r"""
     :example:
     >>> _ = ClassifierValidationPopUp(config_path=r'C:\troubleshooting\RAT_NOR\project_folder\project_config.ini')
 

@@ -23,9 +23,9 @@ NAME = 'NAME'
 
 
 class SamVisualizer():
-    """
+    r"""
     :example:
-    >>> r = SamVisualizer(data_path=r"C:\troubleshooting\sam_results\10B_Mouse_5-choice_MustTouchTrainingNEWFINAL_a7_clipped_3.csv", video_path=r"D:\platea\platea_videos\videos\clipped\10B_Mouse_5-choice_MustTouchTrainingNEWFINAL_a7_clipped_3.mp4", save_dir='D:\cvat_annotations\sam_videos', color=[(255, 255, 1)])
+    >>> r = SamVisualizer(data_path=r"C:\troubleshooting\sam_results\10B_Mouse_5-choice_MustTouchTrainingNEWFINAL_a7_clipped_3.csv", video_path=r"D:\platea\platea_videos\videos\clipped\10B_Mouse_5-choice_MustTouchTrainingNEWFINAL_a7_clipped_3.mp4", save_dir=r'D:\cvat_annotations\sam_videos', color=[(255, 255, 1)])
     >>> r.run()
     """
 
@@ -110,5 +110,5 @@ f'Running SAM visualization for {len(list(self.data_paths.keys()))} video(s) (st
 r = SamVisualizer(
     data_path=r"D:\cvat_annotations\sam_yolo_data\s34-drinking.csv",
     video_path=r"D:\cvat_annotations\videos\mp4_20250624155703\s34-drinking.mp4",
-    save_dir='D:\cvat_annotations\sam_videos', color=[(255, 255, 1)])
+    save_dir=r'D:\cvat_annotations\sam_videos', color=[(255, 255, 1)])
 r.run()

@@ -35,7 +35,7 @@ class YoloTrackCleaner:
                  randomize_order: bool = False,
                  overwrite: bool = False):
 
-        """
+        r"""
         Merge fragmented YOLO tracks that likely belong to the same animal based on spatial and temporal proximity.
         Uses a union-find algorithm to group track fragments while preventing temporal overlap conflicts.
 

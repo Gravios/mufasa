@@ -455,7 +455,7 @@ class NetworkMixin(object):
     @staticmethod
     @jit(nopython=True)
     def simpson_index(x: np.ndarray) -> float:
-        """
+        r"""
         Calculate Simpson's diversity index for a given array of values.
 
         Simpson's diversity index is a measure of diversity that takes into account the number of different categories
@@ -488,7 +488,7 @@ class NetworkMixin(object):
 
     @staticmethod
     def berger_parker(x: np.ndarray) -> float:
-        """
+        r"""
         Berger-Parker index for the given one-dimensional array.
         The Berger-Parker index is a measure of category dominance, calculated as the ratio of
         the frequency of the most abundant category to the total number of observations. Answer how dominated a cluster or community is
@@ -522,7 +522,7 @@ class NetworkMixin(object):
     @staticmethod
     @jit(nopython=True)
     def shannon_diversity_index(x: np.ndarray) -> float:
-        """
+        r"""
         Calculate the Shannon Diversity Index for a given array of categories. The Shannon Diversity Index is a measure of diversity in a
         categorical feature, taking into account both the number of different categories (richness)
         and their relative abundances (evenness). Answer how homogenous a cluster or community is
@@ -557,7 +557,7 @@ class NetworkMixin(object):
 
     @staticmethod
     def margalef_diversification_index(x: np.array) -> float:
-        """
+        r"""
         Calculate the Margalef Diversification Index for a given array of values.
 
         The Margalef Diversification Index is a measure of category diversity. It quantifies the richness of a community/cluster
@@ -594,7 +594,7 @@ class NetworkMixin(object):
 
     @staticmethod
     def menhinicks_index(x: np.array) -> float:
-        """
+        r"""
         Calculate the Menhinick's Index for a given array of values.
 
         Menhinick's Index is a measure of category richness. It quantifies the number of categories relative to the square root of the total number of observations.
@@ -629,7 +629,7 @@ class NetworkMixin(object):
 
     @staticmethod
     def brillouins_index(x: np.array) -> float:
-        """
+        r"""
         Calculate Brillouin's Diversity Index for a given array of values.
 
         Brillouin's Diversity Index is a measure of cluster/community diversity that accounts for both richness
@@ -677,7 +677,7 @@ class NetworkMixin(object):
 
     @staticmethod
     def sorensen_dice_coefficient(x: np.ndarray, y: np.ndarray) -> float:
-        """
+        r"""
         Calculate Sørensen's Similarity Index between two communities/clusters.
 
         The Sørensen similarity index, also known as the overlap index, quantifies the overlap between two populations by comparing the number of shared categories to the total number of categories in both populations. It ranges from zero, indicating no overlap, to one, representing perfect overlap

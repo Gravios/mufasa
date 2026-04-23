@@ -379,7 +379,7 @@ def select_labelling_video(config_path: Union[str, os.PathLike],
     video_dir = os.path.join(project_path, 'videos')
     video_dir = None if not os.path.isdir(video_dir) else video_dir
 
-    if setting is not "pseudo":
+    if setting != "pseudo":
         video_file_path = filedialog.askopenfilename(filetypes=[("Video files", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)], initialdir=video_dir)
     else:
         threshold_dict_values = {}

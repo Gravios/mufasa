@@ -32,7 +32,7 @@ from mufasa.utils.read_write import (find_video_of_file, get_all_clf_names,
 
 
 class CueLightMainPopUp(ConfigReader, PopUpMixin):
-    """
+    r"""
     Launch cue light analysis GUI in SimBA.
 
     :parameter str config_path: path to SimBA project config file in Configparser format

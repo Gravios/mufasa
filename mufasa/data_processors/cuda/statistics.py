@@ -388,7 +388,7 @@ def sliding_spearmans_rank(x: np.ndarray,
                            sample_rate: Union[float, int],
                            batch_size: Optional[int] = int(1.6e+7),
                            verbose: bool = False) -> np.ndarray:
-    """
+    r"""
     Computes the Spearman's rank correlation coefficient between two 1D arrays `x` and `y`
     over sliding windows of size `time_window * sample_rate`. The computation is performed
     in batches to optimize memory usage, leveraging GPU acceleration with CuPy.
@@ -811,7 +811,7 @@ def xie_beni(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def i_index(x: np.ndarray, y: np.ndarray, verbose: bool = False) -> float:
-    """
+    r"""
     Calculate the I-Index for evaluating clustering quality.
 
     The I-Index is a metric that measures the compactness and separation of clusters.

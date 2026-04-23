@@ -137,7 +137,13 @@ def read_df(file_path: Union[str, os.PathLike],
                 df = df.to_pandas()
                 has_index = True
             else:
-                df = df.to_pandas().iloc[:, 1:]
+                df = df.to_pandas()
+                # Strip the leading pad column that write_df inserts
+                # (SimBA convention: unnamed column 0 with stringified
+                # row numbers). External CSVs have no such column and
+                # callers can pass has_index=False to keep col 0.
+                if has_index:
+                    df = df.iloc[:, 1:]
             if check_multiindex:
                 header_col_cnt = get_number_of_header_columns_in_df(df=df)
                 if multi_index_headers_to_keep is not None:
@@ -645,7 +651,7 @@ def concatenate_videos_in_folder(in_folder: Union[str, os.PathLike, bytes],
                 sliced_paths.append(file_path)
         check_if_filepath_list_is_empty(filepaths=sliced_paths, error_msg=f"SIMBA ERROR: Cannot join videos in directory {in_folder}. The directory contain ZERO files in format {video_format} with substring {substring}")
         files = sliced_paths
-    files.sort(key=lambda f: int(re.sub("\D", "", f)))
+    files.sort(key=lambda f: int(re.sub(r"\D", "", f)))
     temp_txt_path = Path(in_folder, "files.txt")
     if os.path.isfile(temp_txt_path):
         os.remove(temp_txt_path)

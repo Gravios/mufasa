@@ -20,7 +20,7 @@ from mufasa.utils.read_write import get_fn_ext, read_df
 
 
 class HeatMapperClfSingleCore(ConfigReader, PlottingMixin):
-    """
+    r"""
     Create heatmaps representing the locations of the classified behavior.
 
     .. note::

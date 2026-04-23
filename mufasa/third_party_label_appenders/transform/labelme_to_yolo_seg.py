@@ -32,7 +32,7 @@ class LabelmeKeypoints2YoloSeg:
                  clahe: Optional[bool] = True,
                  verbose: Optional[bool] = True):
 
-        """
+        r"""
         Converts LabelMe points into YOLO keypoint format formatted for model training.
 
         .. seealso:

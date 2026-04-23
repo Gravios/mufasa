@@ -18,7 +18,7 @@ from mufasa.utils.read_write import (create_directory, get_fn_ext, read_img,
 
 
 class LitPose2YOLOBbox:
-    """
+    r"""
     Convert LitPose keypoint annotations into a YOLO bounding-box dataset.
 
     :param Union[str, os.PathLike] litpose_dir: Path to LitPose directory containing annotation CSV files and the ``labeled-data`` image folder.

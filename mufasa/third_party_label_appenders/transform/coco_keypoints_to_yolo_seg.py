@@ -31,7 +31,7 @@ class COCOKeypoints2YoloSeg:
                  clahe: bool = False,
                  bbox_pad: Optional[int] = None):
 
-        """
+        r"""
         Convert COCO keypoint annotations to YOLO segmentation format.
 
         .. image:: _static/img/cocokp_to_yolo_seg.webp

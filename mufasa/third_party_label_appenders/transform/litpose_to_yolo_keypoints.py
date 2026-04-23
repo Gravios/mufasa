@@ -20,7 +20,7 @@ from mufasa.utils.yolo import keypoint_array_to_yolo_annotation_str
 
 
 class LitPose2YOLO:
-    """
+    r"""
     Convert LitPose keypoint annotations into a YOLO keypoint dataset.
 
     :param Union[str, os.PathLike] litpose_dir: Path to LitPose directory containing annotation CSV files and the ``labeled-data`` image folder.

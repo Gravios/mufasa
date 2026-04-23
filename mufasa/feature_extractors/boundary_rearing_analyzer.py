@@ -55,7 +55,7 @@ RECTANGLE = 'rectangle'
 class BoundaryRearingFeaturizer(ConfigReader,
                                 AbstractFeatureExtraction):
 
-    """
+    r"""
     :example:
     >>> x = BoundaryRearingFeaturizer(config_path=r"C:\troubleshooting\open_field_rearing\project_folder\project_config.ini")
     >>> x.run()

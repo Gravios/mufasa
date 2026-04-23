@@ -1044,7 +1044,7 @@ class ImageMixin(object):
                 img_2: Optional[np.ndarray] = None,
                 lower_bound: Optional[float] = 0.5,
                 verbose: Optional[bool] = False):
-        """
+        r"""
         Compute Wasserstein distance between two images represented as numpy arrays.
 
         .. math::
@@ -2069,7 +2069,7 @@ class ImageMixin(object):
                           size: Optional[int] = None,
                           crop_ratio: int = 50) -> np.ndarray:
 
-        """
+        r"""
         Creates timelapse image from video.
 
         .. image:: _static/img/get_timelapse_img.png
