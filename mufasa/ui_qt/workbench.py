@@ -44,11 +44,11 @@ from typing import Callable, Optional, Type
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QLabel, QListWidget,
-                               QListWidgetItem, QMainWindow, QMessageBox,
-                               QPushButton, QScrollArea, QSplitter,
-                               QStackedWidget, QStatusBar, QToolBox,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
+                               QListWidget, QListWidgetItem, QMainWindow,
+                               QMessageBox, QPushButton, QScrollArea,
+                               QSplitter, QStackedWidget, QStatusBar,
+                               QToolBox, QVBoxLayout, QWidget)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.icon_cache import icon
@@ -365,7 +365,10 @@ class MufasaWorkbench(QMainWindow):
     def _on_new_project(self) -> None:
         from mufasa.ui_qt.create_project_dialog import CreateProjectDialog
         dlg = CreateProjectDialog(self)
-        if dlg.exec() == dlg.Accepted and dlg.config_path:
+        # QDialog.exec() returns QDialog.DialogCode.Accepted (1) on OK,
+        # Rejected (0) on Cancel. In PySide6 the enum lives on the class,
+        # not the instance — ``dlg.Accepted`` raises AttributeError.
+        if dlg.exec() == QDialog.Accepted and dlg.config_path:
             self._switch_to_project(dlg.config_path)
 
     def _on_open_project(self) -> None:
