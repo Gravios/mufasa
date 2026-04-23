@@ -44,7 +44,7 @@ from typing import Callable, Optional, Type
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QListWidget,
+from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QLabel, QListWidget,
                                QListWidgetItem, QMainWindow, QMessageBox,
                                QPushButton, QScrollArea, QSplitter,
                                QStackedWidget, QStatusBar, QToolBox,
@@ -195,12 +195,20 @@ class WorkflowPage(QWidget):
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
+        self._outer = outer
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         self.toolbox = QToolBox(scroll)
         scroll.setWidget(self.toolbox)
         outer.addWidget(scroll)
         self.toolbox.currentChanged.connect(self._on_section_changed)
+
+    def add_banner(self, widget: QWidget) -> None:
+        """Insert a banner widget at the top of the page, above the
+        toolbox. Used for no-project notices, warnings, etc."""
+        # Insert at index 0 so the banner sits above the scroll area
+        # regardless of when add_banner is called relative to add_section.
+        self._outer.insertWidget(0, widget)
 
     def add_section(self, section_title: str,
                     forms: list[tuple[Type[OperationForm], dict]]) -> None:
@@ -321,6 +329,19 @@ class MufasaWorkbench(QMainWindow):
     def _build_menus(self) -> None:
         mb = self.menuBar()
         self._file_menu = mb.addMenu("&File")
+
+        a_new = QAction("New project…", self)
+        a_new.setShortcut(QKeySequence.New)
+        a_new.triggered.connect(self._on_new_project)
+        self._file_menu.addAction(a_new)
+
+        a_open = QAction("Open project…", self)
+        a_open.setShortcut(QKeySequence.Open)
+        a_open.triggered.connect(self._on_open_project)
+        self._file_menu.addAction(a_open)
+
+        self._file_menu.addSeparator()
+
         a_quit = QAction("Quit", self)
         a_quit.setShortcut(QKeySequence.Quit)
         a_quit.triggered.connect(self.close)
@@ -332,6 +353,43 @@ class MufasaWorkbench(QMainWindow):
         a_about = QAction("About Mufasa", self)
         a_about.triggered.connect(self._about)
         self._help_menu.addAction(a_about)
+
+    # ------------------------------------------------------------------ #
+    # Project switching
+    # ------------------------------------------------------------------ #
+    # Building a workbench binds all sub-pages to one config_path at
+    # construction. Switching projects therefore means building a fresh
+    # workbench window pointing at the new path and retiring the old
+    # one. The import is deferred to avoid a circular dependency with
+    # workbench_app, which imports MufasaWorkbench.
+    def _on_new_project(self) -> None:
+        from mufasa.ui_qt.create_project_dialog import CreateProjectDialog
+        dlg = CreateProjectDialog(self)
+        if dlg.exec() == dlg.Accepted and dlg.config_path:
+            self._switch_to_project(dlg.config_path)
+
+    def _on_open_project(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open Mufasa project_config.ini", "",
+            "Project config (*.ini);;All files (*)",
+        )
+        if path:
+            self._switch_to_project(path)
+
+    def _switch_to_project(self, config_path: str) -> None:
+        from mufasa.ui_qt.workbench_app import build_workbench
+        new_wb = build_workbench(project_config_path=config_path)
+        new_wb.show()
+        # Keep a reference on the QApplication so it's not GC'd, then
+        # close this window. Using the QApplication's property bag lets
+        # multiple opens coexist if the user hasn't closed them yet.
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        refs = app.property("_mufasa_workbenches") or []
+        refs = [w for w in refs if w is not None]
+        refs.append(new_wb)
+        app.setProperty("_mufasa_workbenches", refs)
+        self.close()
 
     def add_tools_action(self, label: str,
                          callback: Callable[[], None],
