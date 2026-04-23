@@ -475,6 +475,10 @@ class AnalysisForm(OperationForm):
             kwargs.setdefault("core_cnt", cores)
         else:
             backend = route.backend_sp
+        # Defensive signature filter (see _backend_dispatch.py). Keeps
+        # user-facing UX resilient to small backend signature drifts.
+        from mufasa.ui_qt.forms._backend_dispatch import filter_kwargs
+        kwargs = filter_kwargs(backend, kwargs)
         runner = backend(**kwargs)
         if runner is not None and hasattr(runner, "run"):
             runner.run()

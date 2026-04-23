@@ -563,6 +563,14 @@ class ConverterForm(OperationForm):
         # can preprocess here in future; for now one-to-one works.
         kwargs.update(extras)
         kwargs.update(flags)
+        # Defensive signature filter: drop kwargs the backend doesn't
+        # accept. Some form extras (e.g. ``sample_size`` on the YOLO
+        # converters) exist across a family of backends but aren't in
+        # every one's signature. Without this, the user gets a
+        # TypeError on Run instead of the form silently ignoring the
+        # unused control. The canary surfaces any drift as WARN.
+        from mufasa.ui_qt.forms._backend_dispatch import filter_kwargs
+        kwargs = filter_kwargs(route.backend, kwargs)
         runner = route.backend(**kwargs)
         # Class-based runners expose .run(); function-based just return.
         if runner is not None and hasattr(runner, "run"):

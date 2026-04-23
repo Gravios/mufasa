@@ -73,6 +73,21 @@ class CreateProjectDialog(QDialog):
         self._preset_combo.addItems(self._preset_names)
         self._preset_combo.currentIndexChanged.connect(self._preset_changed)
 
+        # Autodetect-from-DLC path: populates self._autodetected_bps.
+        # While set, the preset dropdown is disabled and the animal-
+        # count spinner is forced to 1. Accept handler uses user_defined.
+        self._autodetected_bps: list[str] = []
+        self._autodetect_label = QLabel("—")
+        self._autodetect_label.setStyleSheet("color: palette(mid);")
+        autodetect_btn = QPushButton("Auto-detect from DLC file…")
+        autodetect_btn.clicked.connect(self._autodetect_from_dlc)
+        clear_btn = QPushButton("Clear")
+        clear_btn.clicked.connect(self._clear_autodetect)
+        autodetect_row = QWidget()
+        ar = QHBoxLayout(autodetect_row); ar.setContentsMargins(0, 0, 0, 0)
+        ar.addWidget(self._autodetect_label, 1)
+        ar.addWidget(autodetect_btn); ar.addWidget(clear_btn)
+
         self._animal_count = QSpinBox()
         self._animal_count.setRange(1, 100)
         self._animal_count.setValue(self._preset_animal_counts[0])
@@ -94,6 +109,7 @@ class CreateProjectDialog(QDialog):
         form.addRow("Project parent directory:", dir_row)
         form.addRow("Project name:", self._name_edit)
         form.addRow("Body-part preset:", self._preset_combo)
+        form.addRow("Or auto-detect:", autodetect_row)
         form.addRow("Animal count:", self._animal_count)
         form.addRow("Classifier names:", self._clf_edit)
         form.addRow("Workflow file type:", self._file_type_combo)
@@ -134,11 +150,55 @@ class CreateProjectDialog(QDialog):
         except (IndexError, ValueError):
             pass
 
+    def _autodetect_from_dlc(self) -> None:
+        """Pick a DLC file and pre-populate the body-part list. When
+        this path is used, the preset dropdown is ignored and the new
+        project is created with ``user_defined`` + detected bps."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Pick a DLC output file", "",
+            "DLC output (*.h5 *.csv);;All files (*)",
+        )
+        if not path:
+            return
+        # Deferred import: the autodetect module imports pandas, which
+        # we shouldn't load unless the user actually uses this path.
+        from mufasa.pose_importers.dlc_autodetect import (
+            DLCAutodetectError, extract_bodyparts,
+        )
+        try:
+            bps = extract_bodyparts(path)
+        except DLCAutodetectError as exc:
+            QMessageBox.warning(
+                self, "Could not read DLC file", str(exc),
+            )
+            return
+        except Exception as exc:
+            QMessageBox.critical(
+                self, "Unexpected error reading DLC file",
+                f"{type(exc).__name__}: {exc}",
+            )
+            return
+
+        self._autodetected_bps = bps
+        self._autodetect_label.setText(
+            f"{len(bps)} body-parts from {Path(path).name}"
+        )
+        # When autodetect wins, preset selection is irrelevant.
+        self._preset_combo.setEnabled(False)
+        self._animal_count.setValue(1)
+        self._animal_count.setEnabled(False)
+
+    def _clear_autodetect(self) -> None:
+        self._autodetected_bps = []
+        self._autodetect_label.setText("—")
+        self._preset_combo.setEnabled(True)
+        self._animal_count.setEnabled(True)
+        # Restore the preset's default animal count
+        self._preset_changed(self._preset_combo.currentIndex())
+
     def _accept(self) -> None:
         parent_dir = self._dir_edit.text().strip()
         name = self._name_edit.text().strip()
-        preset = self._preset_combo.currentText()
-        animal_cnt = int(self._animal_count.value())
         file_type = self._file_type_combo.currentText()
         classifiers = [
             line.strip()
@@ -146,7 +206,7 @@ class CreateProjectDialog(QDialog):
             if line.strip()
         ]
 
-        # Validation
+        # Common validation
         if not parent_dir:
             QMessageBox.warning(self, "Missing field",
                                 "Pick a parent directory.")
@@ -181,15 +241,32 @@ class CreateProjectDialog(QDialog):
                                 "Enter at least one classifier name.")
             return
 
-        config_code = self._preset_codes.get(preset)
-        if config_code is None:
-            QMessageBox.critical(
-                self, "Unknown preset",
-                f"Preset {preset!r} has no associated config code. "
-                "This is a Mufasa bug — file an issue.",
-            )
-            return
-        preset_idx = self._preset_names.index(preset)
+        # Branch on autodetect vs preset. We still go through
+        # ProjectConfigCreator for both paths (it builds the directory
+        # tree etc.), then for autodetect we reconfigure the freshly-
+        # created project to user_defined + our detected bps.
+        if self._autodetected_bps:
+            # Pick an arbitrary 1-animal preset just to get the tree
+            # created; we'll overwrite the pose_estimation fields right
+            # after. '1 animal; 7 body-parts' is first, exists in all
+            # forks — doesn't matter which, it's getting overwritten.
+            preset = "1 animal; 7 body-parts"
+            config_code = self._preset_codes.get(preset, "7")
+            preset_idx = (self._preset_names.index(preset)
+                          if preset in self._preset_names else 1)
+            animal_cnt = 1
+        else:
+            preset = self._preset_combo.currentText()
+            animal_cnt = int(self._animal_count.value())
+            config_code = self._preset_codes.get(preset)
+            if config_code is None:
+                QMessageBox.critical(
+                    self, "Unknown preset",
+                    f"Preset {preset!r} has no associated config code. "
+                    "This is a Mufasa bug — file an issue.",
+                )
+                return
+            preset_idx = self._preset_names.index(preset)
 
         # Actually create it
         from mufasa.utils.config_creator import ProjectConfigCreator
@@ -209,6 +286,32 @@ class CreateProjectDialog(QDialog):
                 f"{type(exc).__name__}: {exc}",
             )
             return
+
+        # If autodetect was used, immediately reconfigure the fresh
+        # project to user_defined + detected body parts. This keeps
+        # the two paths (create + reconfigure) sharing the same
+        # reconfigure helper, which has its own tests.
+        if self._autodetected_bps:
+            from mufasa.utils.project_reconfigure import (
+                ProjectReconfigureError,
+                reconfigure_project_user_defined,
+            )
+            try:
+                reconfigure_project_user_defined(
+                    config_path=creator.config_path,
+                    body_parts=self._autodetected_bps,
+                    animal_cnt=1,
+                )
+            except ProjectReconfigureError as exc:
+                QMessageBox.critical(
+                    self, "Autodetect reconfigure failed",
+                    f"Project directory was created, but body-part "
+                    f"reconfigure failed: {exc}. You can still open the "
+                    f"project and run File → Reconfigure project from "
+                    f"DLC file… to retry.",
+                )
+                # Still accept — the project exists, it's just on a
+                # preset that doesn't match the data.
 
         self.config_path = creator.config_path
         self.accept()

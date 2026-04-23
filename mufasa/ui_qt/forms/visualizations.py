@@ -838,32 +838,11 @@ class VisualizationForm(OperationForm):
                 f"No backend defined for {route.label!r}."
             )
 
-        # Defensive signature filter: drop kwargs the backend doesn't
-        # accept. Some form extras (sliders, toggles) exist for UX but
-        # don't map cleanly onto backend params. Without this, passing
-        # e.g. `heatmap_opacity` to a backend that doesn't accept it
-        # would TypeError out before the runner starts.
-        try:
-            import inspect
-            f_name = getattr(backend, "__name__", "")
-            if "." in f_name:
-                mod_path, _, cls_name = f_name.rpartition(".")
-                mod = __import__(mod_path, fromlist=[cls_name])
-                cls = getattr(mod, cls_name, None)
-                if cls is not None:
-                    sig = inspect.signature(cls.__init__)
-                    accepts = set(sig.parameters) - {"self"}
-                    has_varkw = any(
-                        p.kind == inspect.Parameter.VAR_KEYWORD
-                        for p in sig.parameters.values()
-                    )
-                    if not has_varkw:
-                        kwargs = {k: v for k, v in kwargs.items()
-                                  if k in accepts}
-        except Exception:
-            # Best-effort — if anything in the filter fails, pass
-            # everything and let the backend raise naturally.
-            pass
+        # Defensive signature filter — delegated to the shared helper
+        # so data_import and analysis forms all get the same behaviour.
+        # See _backend_dispatch.py for the "why".
+        from mufasa.ui_qt.forms._backend_dispatch import filter_kwargs
+        kwargs = filter_kwargs(backend, kwargs)
 
         runner = backend(**kwargs)
         if runner is not None and hasattr(runner, "run"):

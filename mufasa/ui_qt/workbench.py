@@ -342,6 +342,16 @@ class MufasaWorkbench(QMainWindow):
 
         self._file_menu.addSeparator()
 
+        # Only meaningful when a project is loaded; disabled otherwise.
+        self._a_reconfigure = QAction(
+            "Reconfigure project from DLC file…", self
+        )
+        self._a_reconfigure.setEnabled(bool(self.project_config_path))
+        self._a_reconfigure.triggered.connect(self._on_reconfigure_project)
+        self._file_menu.addAction(self._a_reconfigure)
+
+        self._file_menu.addSeparator()
+
         a_quit = QAction("Quit", self)
         a_quit.setShortcut(QKeySequence.Quit)
         a_quit.triggered.connect(self.close)
@@ -378,6 +388,22 @@ class MufasaWorkbench(QMainWindow):
         )
         if path:
             self._switch_to_project(path)
+
+    def _on_reconfigure_project(self) -> None:
+        """Reconfigure the current project to ``user_defined`` with
+        body parts auto-detected from a DLC output file."""
+        if not self.project_config_path:
+            # Defensive; the action should be disabled in this state.
+            return
+        from mufasa.ui_qt.reconfigure_dialog import ReconfigureProjectDialog
+        dlg = ReconfigureProjectDialog(
+            config_path=self.project_config_path, parent=self,
+        )
+        if dlg.exec() == QDialog.Accepted:
+            # Rebuild the workbench so ConfigReader picks up the new
+            # pose_estimation_body_parts and animal_no values — pages
+            # cache these at construction time.
+            self._switch_to_project(self.project_config_path)
 
     def _switch_to_project(self, config_path: str) -> None:
         from mufasa.ui_qt.workbench_app import build_workbench
