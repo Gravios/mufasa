@@ -1,0 +1,14 @@
+import os
+from tkinter import Toplevel
+from typing import Union
+
+from mufasa.ui.pop_ups.roi_video_table_pop_up import ROIVideoTable
+from mufasa.utils.checks import check_file_exist_and_readable, check_instance
+
+
+def restart_roi_video_table(roi_video_table_popup: Toplevel, config_path: Union[str, os.PathLike]):
+    valid_frm = check_instance(source=f'{restart_roi_video_table.__name__} roi_table_popup', instance=roi_video_table_popup, accepted_types=(Toplevel,), raise_error=False)
+    check_file_exist_and_readable(file_path=config_path)
+    if valid_frm:
+        roi_video_table_popup.destroy()
+        ROIVideoTable(config_path=config_path)
