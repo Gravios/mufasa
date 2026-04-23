@@ -1,0 +1,58 @@
+__author__ = "Simon Nilsson; sronilsson@gmail.com"
+
+import os
+from tkinter import *
+from typing import Union
+
+from mufasa.mixins.config_reader import ConfigReader
+from mufasa.mixins.pop_up_mixin import PopUpMixin
+from mufasa.mixins.unsupervised_mixin import UMLMixin
+from mufasa.ui.tkinter_functions import FileSelect
+from mufasa.unsupervised.enums import Clustering, Unsupervised
+from mufasa.utils.checks import (check_file_exist_and_readable,
+                                check_if_keys_exist_in_dict)
+from mufasa.utils.enums import Formats
+from mufasa.utils.read_write import read_pickle
+
+
+class PrintEmBeddingInfoPopUp(PopUpMixin, ConfigReader, UMLMixin):
+    def __init__(self, config_path: Union[str, os.PathLike]):
+        PopUpMixin.__init__(self, title="PRINT EMBEDDING MODEL INFO")
+        ConfigReader.__init__(self, config_path=config_path)
+        UMLMixin.__init__(self)
+        self.data_frm = LabelFrame(
+            self.main_frm,
+            text="DATA",
+            font=Formats.LABELFRAME_HEADER_FORMAT.value,
+            fg="black",
+        )
+        self.dataset_file_selected = FileSelect(
+            self.data_frm,
+            "DATASET (PICKLE): ",
+            lblwidth=25,
+            initialdir=self.project_path,
+            file_types=[("SimBA model", f"*.{Formats.PICKLE.value}")],
+        )
+        self.data_frm.grid(row=0, column=0, sticky=NW)
+        self.dataset_file_selected.grid(row=0, column=0, sticky=NW)
+        self.create_run_frm(run_function=self.run)
+        self.main_frm.mainloop()
+
+    def run(self):
+        check_file_exist_and_readable(file_path=self.dataset_file_selected.file_path)
+        data = read_pickle(data_path=self.dataset_file_selected.file_path)
+        if Unsupervised.DR_MODEL.value in data.keys():
+            print("UMAP PARAMETERS")
+            parameters = {
+                **data[Unsupervised.DR_MODEL.value][Unsupervised.PARAMETERS.value]
+            }
+            print(parameters)
+        if Clustering.CLUSTER_MODEL.value in data.keys():
+            print("HDBSCAN PARAMETERS")
+            parameters = {
+                **data[Clustering.CLUSTER_MODEL.value][Unsupervised.PARAMETERS.value]
+            }
+            print(parameters)
+
+
+# _ = PrintEmBeddingInfoPopUp(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/NG_Unsupervised/project_folder/project_config.ini')

@@ -1,0 +1,94 @@
+__author__ = "Simon Nilsson; sronilsson@gmail.com"
+
+import os
+from copy import deepcopy
+from tkinter import *
+from typing import Union
+
+from mufasa.data_processors.smoothing import Smoothing
+from mufasa.mixins.config_reader import ConfigReader
+from mufasa.mixins.pop_up_mixin import PopUpMixin
+from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
+                                        FileSelect, FolderSelect, SimbaButton,
+                                        SimBADropDown, SimBALabel)
+from mufasa.utils.checks import (check_file_exist_and_readable,
+                                check_if_dir_exists, check_int)
+from mufasa.utils.enums import Formats, Options
+from mufasa.utils.read_write import str_2_bool
+
+SMOOTHING_OPTION = {'Savitzky Golay': "savitzky-golay", "Gaussian": "gaussian"}
+
+INSTRUCTIONS_LBL_1 = 'NOTE: The chosen data will be overwritten with the smoothened data. \n The original, un-smoothened, data - if saved - is placed in a timestamped \n sub-directory of the original data with the "pre" prefix.'
+INSTRUCTIONS_LBL_2 = 'Chose a file inside a subdirectory of the "project_folder/csv" directory'
+INSTRUCTIONS_LBL_3 = 'Chose a directory inside the "project_folder/csv" directory'
+
+class SmoothingPopUp(PopUpMixin, ConfigReader):
+
+    """
+    :example:
+    >>> SmoothingPopUp(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
+    """
+    def __init__(self, config_path: Union[str, os.PathLike]):
+        PopUpMixin.__init__(self, title="SMOOTH POSE-ESTIMATION DATA", icon='smooth')
+        ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
+        self.config_path = config_path
+
+        self.settings_frm= CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings')
+        instruction_lbl = SimBALabel(parent=self.settings_frm, txt=INSTRUCTIONS_LBL_1, font=Formats.FONT_REGULAR_ITALICS.value)
+        self.time_window = Entry_Box(self.settings_frm, "TIME WINDOW (MILLISECONDS):", "35", validation="numeric", entry_box_width=35, value=100, justify='center', img='timer', tooltip_key='SMOOTH_TIME_WINDOW')
+        self.method_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=Options.SMOOTHING_OPTIONS.value, label="SMOOTHING METHOD:", label_width=35, dropdown_width=35, value=Options.SMOOTHING_OPTIONS.value[0], img='equation_small', tooltip_key='SMOOTH_METHOD')
+        self.save_originals_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label="SAVE ORIGINALS:", label_width=35, dropdown_width=35, value='TRUE', img='save', tooltip_key='SMOOTH_SAVE_ORIGINALS')
+
+        self.settings_frm.grid(row=0, column=0, sticky=NW)
+        instruction_lbl.grid(row=0, column=0, sticky=NW)
+        self.time_window.grid(row=1, column=0, sticky=NW)
+        self.method_dropdown.grid(row=2, column=0, sticky=NW)
+        self.save_originals_dropdown.grid(row=3, column=0, sticky=NW)
+
+        self.single_file_frm = LabelFrame(self.main_frm, text="SMOOTH SINGLE DATA FILE", font=Formats.FONT_HEADER.value)
+        self.selected_file = FileSelect(self.single_file_frm, "DATA PATH:", lblwidth=35, file_types=[("VIDEO FILE", ".csv .parquet")], initialdir=self.project_path, tooltip_key='SMOOTH_DATA_PATH')
+        instruction_lbl_single = SimBALabel(parent=self.single_file_frm, txt=INSTRUCTIONS_LBL_2, font=Formats.FONT_REGULAR_ITALICS.value, justify='center')
+
+        self.run_btn_single = SimbaButton(parent=self.single_file_frm, txt="RUN SINGLE DATA FILE SMOOTHING", img='rocket', txt_clr="blue", font=Formats.FONT_REGULAR.value, cmd=self.run, cmd_kwargs={'multiple': False})
+        self.single_file_frm.grid(row=1, column=0, sticky=NW)
+        instruction_lbl_single.grid(row=0, column=0, sticky=NW)
+        self.selected_file.grid(row=1, column=0, sticky=NW)
+        self.run_btn_single.grid(row=2, column=0, sticky=NW)
+
+        self.multiple_file_frm = LabelFrame(self.main_frm, text="SMOOTH DIRECTORY OF DATA", font=Formats.FONT_HEADER.value)
+        self.selected_dir = FolderSelect(self.multiple_file_frm, "SELECT DIRECTORY OF DATA FILES:", lblwidth=35, initialdir=self.project_path, tooltip_key='SMOOTH_DATA_DIR')
+        instruction_lbl_multiple = SimBALabel(parent=self.multiple_file_frm, txt=INSTRUCTIONS_LBL_3, font=Formats.FONT_REGULAR_ITALICS.value, justify='center')
+        self.run_btn_multiple = SimbaButton(parent=self.multiple_file_frm, txt="RUN DATA DIRECTORY SMOOTHING", img='rocket', txt_clr="blue", font=Formats.FONT_REGULAR.value, cmd=self.run, cmd_kwargs={'multiple': True})
+        self.multiple_file_frm.grid(row=2, column=0, sticky=NW)
+        instruction_lbl_multiple.grid(row=0, column=0, sticky=NW)
+        self.selected_dir.grid(row=1, column=0, sticky=NW)
+        self.run_btn_multiple.grid(row=2, column=0, sticky=NW)
+        self.main_frm.mainloop()
+
+    def run(self, multiple):
+        smooth_time = self.time_window.entry_get
+        smooth_method = SMOOTHING_OPTION[self.method_dropdown.getChoices()]
+        copy_originals = str_2_bool(self.save_originals_dropdown.getChoices())
+        check_int(name='TIME WINDOW (MILLISECONDS)', value=smooth_time, min_value=1)
+
+        if not multiple:
+            data_path = self.selected_file.file_path
+            check_file_exist_and_readable(file_path=data_path)
+            data_dir = os.path.dirname(data_path)
+        else:
+            data_path = self.selected_dir.folder_path
+            check_if_dir_exists(in_dir=data_path)
+            data_dir = deepcopy(data_path)
+        multi_index_df_headers = False
+        if data_dir == self.input_csv_dir: multi_index_df_headers = True
+
+        smoothing = Smoothing(config_path=self.config_path,
+                              data_path=data_path,
+                              time_window=int(smooth_time),
+                              method=smooth_method,
+                              multi_index_df_headers=multi_index_df_headers,
+                              copy_originals=copy_originals)
+        smoothing.run()
+
+
+#SmoothingPopUp(config_path=r"E:\troubleshooting\mitra_emergence_hour\project_folder\project_config.ini")

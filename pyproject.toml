@@ -1,0 +1,229 @@
+# ============================================================================
+# SimBA — modernised packaging for Python >= 3.11
+# ============================================================================
+#
+# This pyproject.toml replaces:
+#   * setup.py
+#   * requirements.txt        (dual-pinned for Python 3.6 and ≥3.9)
+#   * requirements_arm.txt
+#   * requirements_gpu.txt
+#   * requirements_wsl.txt
+#
+# Changes from the legacy requirements.txt:
+#   - Python 3.6 pins dropped (EOL 2021-12).
+#   - Python 3.9–3.10 also dropped: scientific stack (numpy 2.x, numba
+#     0.60+, scikit-image 0.23+) moved to >=3.10-only wheels.
+#   - xgboost bumped 0.90 → >=2.1 (0.90 was 2019, incompatible with
+#     modern sklearn and numpy >=2).
+#   - xlrd dropped (only needed for .xls; openpyxl handles .xlsx).
+#   - cefpython3 dropped (abandoned 2021; was for the killed dash_app).
+#   - dash, dash_core_components, dash_html_components, dash_color_picker,
+#     dash_colorscales dropped (dash 1.x packages; subsystem removed).
+#   - eli5 dropped (zero live imports).
+#   - yellowbrick dropped (zero live imports).
+#   - shap dropped (imports were only in sandbox/, now removed).
+#   - geos (the Python package, last release 2012) dropped — shapely
+#     provides what we need.
+#   - imgaug (unmaintained since 2020) flagged for replacement by
+#     albumentations — kept pinned for now.
+# ============================================================================
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "mufasa"
+version         = "6.0.0.dev0"
+description     = "Mufasa — behavioural analysis toolkit for experimental animals (fork of SimBA; Qt 6.8, Linux-only)"
+readme          = "README.md"
+requires-python = ">=3.11"
+license         = { text = "Modified BSD 3-Clause License" }
+authors = [
+    { name = "Simon Nilsson",  email = "sronilsson@gmail.com" },
+    { name = "Jia Jie Choong" },
+    { name = "Sophia Hwang" },
+]
+keywords = [
+    "behavior", "classification", "neuroscience", "animal-tracking",
+    "pose-estimation", "machine-learning",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Environment :: X11 Applications :: Qt",
+]
+
+dependencies = [
+    # --- Core scientific stack --------------------------------------------
+    "numpy>=1.26,<3.0",
+    "pandas>=2.2,<3.0",
+    "scipy>=1.13",
+    "scikit-learn>=1.4,<2.0",
+    "scikit-image>=0.23",
+    "statsmodels>=0.14",
+    "numba>=0.60",                   # Blackwell-compat requires >=0.60
+    "numexpr>=2.10",
+    "joblib>=1.4",
+    # --- Tabular / IO -----------------------------------------------------
+    "h5py>=3.11",
+    "tables>=3.9",                    # PyTables, needed by DeepLabCut h5
+    "pyarrow>=13.0",
+    "openpyxl>=3.1",
+    # --- Geometry / image / video ----------------------------------------
+    "shapely>=2.0,<3.0",
+    "opencv-python>=4.8,<5.0",
+    "Pillow>=10.3",
+    "imutils>=0.5",
+    "imgaug>=0.4",                    # TODO: migrate to albumentations
+    "ffmpeg-python>=0.2",
+    # --- Plotting ---------------------------------------------------------
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "plotly>=5.0",
+    "kaleido",
+    # --- ML-aux / tree viz -----------------------------------------------
+    "xgboost>=2.1",
+    "imbalanced-learn>=0.12",
+    "dtreeviz>=2.2",
+    "graphviz>=0.20",
+    # --- Utilities --------------------------------------------------------
+    "psutil>=5.9",
+    "tqdm>=4.67",
+    "tabulate>=0.9",
+    "PyYAML>=6.0",
+    "python-dotenv>=1.0",
+    "trafaret>=2.1",
+    "osfclient>=0.0.5",
+    "pyglet>=2.0",                    # used by lookups.load_simba_fonts
+]
+
+[project.optional-dependencies]
+# ------------------------------------------------------------------------ #
+# SimBA targets Linux-only from 6.0 onward. The previous Windows/macOS
+# requirements_*.txt files have been dropped — they existed to work
+# around platform-specific wheel availability (shapely, numba, cv2) that
+# no longer differs meaningfully on Python >=3.11. Running on non-Linux
+# is unsupported; many performance paths (fork start method, NVENC,
+# CUDA, inotify, /dev/shm, sched_getaffinity) are Linux-specific.
+# ------------------------------------------------------------------------ #
+# Qt front-end. During the Tk→Qt migration, this is an extra so the
+# legacy Tk path still installs with just ``pip install simba-uw-tf-dev``.
+# Once Qt parity is reached, move PySide6 into base dependencies.
+qt = [
+    "PySide6>=6.8,<7.0",
+]
+
+# GPU acceleration via CUDA 12.x. Requires matching NVIDIA driver (see
+# LINUX_DEPLOYMENT.md). For RTX 5070 Ti / Blackwell workstations (CC 12.0)
+# ensure driver >=570 and nvidia-open kernel modules.
+gpu = [
+    "cupy-cuda12x>=13.0",
+    # numba >=0.60 is already in base deps; its CUDA backend is what this
+    # extra mainly "activates". Kept here as a marker so ``pip install
+    # .[gpu]`` documents the intent.
+]
+
+# Hardware video encoding via FFmpeg's NVENC. Routes heatmap / path /
+# classifier-validation video output through the Turing+/Ampere+/Blackwell
+# NVENC block, ~10× faster than software x264.
+# Requires system FFmpeg built with --enable-nvenc. On Ubuntu 24.04 the
+# default apt ffmpeg is NOT nvenc-enabled; use the Nvidia PPA or build.
+nvenc = [
+    # No Python package deps — pure system-level capability. Kept here
+    # as a pip extra so ``pip install .[nvenc]`` can at least surface a
+    # no-op check step if we add a post-install verifier.
+]
+
+# Development tooling.
+dev = [
+    "pytest>=8.0",
+    "pytest-qt>=4.4",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pre-commit>=3.8",
+    "libcst>=1.4",
+]
+
+all = [
+    "mufasa[qt,gpu,dev]",
+]
+
+[project.urls]
+Homepage      = "https://github.com/sgoldenlab/simba"
+Documentation = "https://simba-docs.readthedocs.io"
+Issues        = "https://github.com/sgoldenlab/simba/issues"
+
+[project.scripts]
+mufasa-tk        = "mufasa.SimBA:main"          # legacy Tk entry point
+mufasa           = "mufasa.ui_qt.app:main"      # new Qt entry point (placeholder
+mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # consolidated sidebar UI
+                                        # until simba/ui_qt/app.py lands)
+
+# ============================================================================
+# Setuptools config (namespaced package discovery)
+# ============================================================================
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["mufasa*"]
+exclude = [
+    "tests*",
+    "*.tests",
+    "*.tests.*",
+    "pose_configurations_archive",
+    "pose_configurations_archive.*",
+]
+
+[tool.setuptools.package-data]
+mufasa = [
+    "assets/**/*",
+    "pose_configurations/**/*",
+    "*.ico",
+]
+
+# ============================================================================
+# Ruff — linting + formatting
+# ============================================================================
+[tool.ruff]
+target-version = "py311"
+line-length    = 100
+# ``simba/ui/`` uses ``from tkinter import *`` extensively; the codemod
+# (see tools/codemod_tk_wildcards.py) converts these one package at a
+# time. Until then, allow F403/F405 in the Tk UI dir only.
+extend-exclude = [
+    "mufasa/ui",                       # legacy Tk UI — temporary
+    "build",
+    "dist",
+    ".venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",                    # pycodestyle, pyflakes
+    "I",                              # isort
+    "UP",                             # pyupgrade
+    "B",                              # bugbear
+    "SIM",                            # simplify
+]
+ignore = [
+    "E501",                           # line length handled by formatter
+]
+
+# ============================================================================
+# pytest
+# ============================================================================
+[tool.pytest.ini_options]
+minversion     = "8.0"
+testpaths      = ["tests"]
+addopts        = "-v --strict-markers"
+qt_api         = "pyside6"

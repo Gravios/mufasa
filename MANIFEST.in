@@ -1,0 +1,20 @@
+recursive-include mufasa *
+prune mufasa/sandbox
+recursive-exclude mufasa/sandbox *
+prune */__pycache__
+recursive-exclude */__pycache__ *
+global-exclude __pycache__/*
+global-exclude */__pycache__/*
+prune */pose_configurations_archive
+recursive-exclude */pose_configurations_archive *
+global-exclude pose_configurations_archive/*
+global-exclude */pose_configurations_archive/*
+prune mufasa/.claude
+recursive-exclude mufasa/.claude *
+prune docs
+prune misc
+prune images
+prune tests
+prune output
+prune lightning_logs
+recursive-include scripts *.py

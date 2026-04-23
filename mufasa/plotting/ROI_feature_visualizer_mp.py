@@ -1,0 +1,470 @@
+__author__ = "Simon Nilsson; sronilsson@gmail.com"
+
+import functools
+import itertools
+import multiprocessing
+import os
+import platform
+from copy import deepcopy
+from typing import Dict, List, Optional, Tuple, Union
+
+try:
+    from typing import Literal
+except:
+    from typing_extensions import Literal
+
+import cv2
+import numpy as np
+import pandas as pd
+
+from mufasa.mixins.config_reader import ConfigReader
+from mufasa.mixins.geometry_mixin import GeometryMixin
+from mufasa.mixins.plotting_mixin import PlottingMixin
+from mufasa.roi_tools.ROI_feature_analyzer import ROIFeatureCreator
+from mufasa.utils.checks import (check_file_exist_and_readable,
+                                check_if_string_value_is_valid_video_timestamp,
+                                check_if_valid_rgb_tuple, check_int, check_str,
+                                check_that_hhmmss_start_is_before_end,
+                                check_valid_boolean, check_valid_dict,
+                                check_valid_lst,
+                                check_video_and_data_frm_count_align)
+from mufasa.utils.data import (find_frame_numbers_from_time_stamp, get_cpu_pool,
+                              slice_roi_dict_for_video, terminate_cpu_pool)
+from mufasa.utils.enums import Formats, Options, TextOptions
+from mufasa.utils.errors import BodypartColumnNotFoundError, NoFilesFoundError
+from mufasa.utils.printing import stdout_information, stdout_success
+from mufasa.utils.read_write import (concatenate_videos_in_folder,
+                                    find_core_cnt, get_fn_ext,
+                                    get_video_meta_data, read_df,
+                                    remove_a_folder, seconds_to_timestamp)
+from mufasa.utils.warnings import DuplicateNamesWarning
+
+START_TIME, END_TIME = 'start_time', 'end_time'
+
+def _roi_feature_visualizer_mp(frm_range: Tuple[int, np.ndarray],
+                               data_df: pd.DataFrame,
+                               text_locations: dict,
+                               font_size: float,
+                               circle_size: Union[float, int],
+                               save_temp_dir: str,
+                               video_meta_data: dict,
+                               shape_info: dict,
+                               shape_names: list,
+                               video_path: str,
+                               animal_names: list,
+                               roi_dict: dict,
+                               bp_lk: dict,
+                               bbox: Optional[str],
+                               animal_bp_names: List[str],
+                               animal_bp_dict: dict,
+                               roi_features_df: pd.DataFrame,
+                               directing_data: Union[pd.DataFrame, None],
+                               border_bg_color: tuple,
+                               show_pose: bool,
+                               show_roi_ear_tags: bool,
+                               show_roi_centers: bool,
+                               show_animal_names: bool,
+                               direction: Union[None, str]):
+    def __insert_texts(shape_info: dict, img: np.ndarray):
+        for shape_name, shape_info in shape_info.items():
+            shape_color = shape_info["Color BGR"]
+            for cnt, animal_data in bp_lk.items():
+                animal, animal_bp, _ = animal_data
+                animal_name = f"{animal} {animal_bp}"
+                cv2.putText(img, text_locations[animal_name][shape_name]["in_zone_text"], text_locations[animal_name][shape_name]["in_zone_text_loc"], font, font_size, shape_color, 1)
+                cv2.putText(img, text_locations[animal_name][shape_name]["distance_text"], text_locations[animal_name][shape_name]["distance_text_loc"], font, font_size, shape_color, 1)
+                if directing_data is not None and direction is not None:
+                    cv2.putText(img, text_locations[animal][shape_name]["directing_text"], text_locations[animal][shape_name]["directing_text_loc"], font, font_size, shape_color, 1)
+        return img
+
+    fourcc = cv2.VideoWriter_fourcc(*Formats.MP4_CODEC.value)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    group_cnt, frm_range = frm_range[0], frm_range[1]
+    start_frm, current_frm, end_frm = frm_range[0], frm_range[0], frm_range[-1]
+    save_path = os.path.join(save_temp_dir, f"{group_cnt}.mp4")
+    writer = cv2.VideoWriter(save_path, fourcc, video_meta_data["fps"], (video_meta_data["width"] * 2, video_meta_data["height"]))
+    cap = cv2.VideoCapture(video_path)
+    cap.set(1, current_frm)
+    while current_frm <= end_frm:
+        ret, img = cap.read()
+        if ret:
+            img = cv2.copyMakeBorder(img, 0, 0, 0, int(video_meta_data["width"]), borderType=cv2.BORDER_CONSTANT, value=border_bg_color)
+            img = __insert_texts(shape_info=shape_info, img=img)
+            if show_pose:
+                for animal_name, bp_data in animal_bp_dict.items():
+                    for bp_cnt, bp in enumerate(zip(bp_data["X_bps"], bp_data["Y_bps"])):
+                        bp_cords = data_df.loc[current_frm, list(bp)].values.astype(np.int64)
+                        cv2.circle(img, (bp_cords[0], bp_cords[1]), 0, animal_bp_dict[animal_name]["colors"][bp_cnt], circle_size)
+            if show_animal_names:
+                for animal_name, bp_data in animal_bp_dict.items():
+                    headers = [bp_data["X_bps"][-1], bp_data["Y_bps"][-1]]
+                    bp_cords = data_df.loc[current_frm, headers].values.astype(np.int64)
+                    cv2.putText(img, animal_name, (bp_cords[0], bp_cords[1]), font, font_size, animal_bp_dict[animal_name]["colors"][0], 1)
+            if bbox is not None:
+                for animal_name, bp_data in animal_bp_dict.items():
+                    x_cols, y_cols = animal_bp_dict[animal_name]['X_bps'], animal_bp_dict[animal_name]['Y_bps']
+                    animal_cols = [x for pair in zip(x_cols, y_cols) for x in pair]
+                    bp_cords = data_df.loc[current_frm, animal_cols].fillna(0.0).values.astype(np.int32).reshape(-1, 2)
+                    try:
+                        if bbox == Options.AXIS_ALIGNED.value:
+                            animal_bbox = GeometryMixin().keypoints_to_axis_aligned_bounding_box(keypoints=bp_cords.reshape(-1, len(bp_cords), 2).astype(np.int32))
+                        else:
+                            animal_bbox = GeometryMixin().minimum_rotated_rectangle(shape=bp_cords, buffer=None, return_type='array')
+                        img = cv2.polylines(img, [animal_bbox], True, animal_bp_dict[animal_name]["colors"][0], thickness=max(1, int(circle_size/1.5)), lineType=cv2.LINE_AA)
+                    except Exception as e:
+                        print(e.args)
+                        pass
+
+            img = PlottingMixin.roi_dict_onto_img(img=img, roi_dict=roi_dict, circle_size=circle_size, show_tags=show_roi_ear_tags, show_center=show_roi_centers)
+
+            for animal_name, shape_name in itertools.product(animal_bp_names, shape_names):
+                in_zone_col_name = f"{shape_name} {animal_name} in zone"
+                distance_col_name = f"{shape_name} {animal_name} distance"
+                in_zone_value = str(bool(roi_features_df.loc[current_frm, in_zone_col_name]))
+                distance_value = round(roi_features_df.loc[current_frm, distance_col_name], 2)
+                cv2.putText(img, in_zone_value, text_locations[animal_name][shape_name]["in_zone_data_loc"], font, font_size, shape_info[shape_name]["Color BGR"], 1)
+                cv2.putText(img, str(distance_value), text_locations[animal_name][shape_name]["distance_data_loc"], font, font_size, shape_info[shape_name]["Color BGR"], 1)
+            if (directing_data is not None) and direction is not None:
+                for animal_name, shape_name in itertools.product(animal_names, shape_names):
+                    facing_col_name = f"{shape_name} {animal_name} facing"
+                    facing_value = roi_features_df.loc[current_frm, facing_col_name]
+                    cv2.putText(img, str(bool(facing_value)), text_locations[animal_name][shape_name]["directing_data_loc"], font, font_size, shape_info[shape_name]["Color BGR"], 1)
+                    if facing_value:
+                        img = PlottingMixin.insert_directing_line(directing_df=directing_data,
+                                                                  img=img,
+                                                                  shape_name=shape_name,
+                                                                  animal_name=animal_name,
+                                                                  frame_id=current_frm,
+                                                                  color=shape_info[shape_name]["Color BGR"],
+                                                                  thickness=shape_info[shape_name]["Thickness"],
+                                                                  style=direction)
+            writer.write(np.uint8(img))
+            seconds = seconds_to_timestamp(seconds=current_frm/video_meta_data['fps'])
+            stdout_information(msg=f"Multiprocessing frame: {current_frm}, time-stamp: {seconds}  on core {group_cnt}...")
+            current_frm += 1
+        else:
+            break
+    writer.release()
+    return group_cnt
+
+
+class ROIfeatureVisualizerMultiprocess(ConfigReader):
+    """
+    Visualize features that depend on the relationships between the location of the animals and user-defined
+    ROIs. E.g., distances to centroids of ROIs, cumulative time spent in ROIs, if animals are directing towards ROIs
+    etc. Uses multiprocessing for faster rendering.
+
+    :param Union[str, os.PathLike] config_path: Path to SimBA project config file in Configparser format.
+    :param Union[str, os.PathLike] video_path: Path to video file to overlay ROI features on.
+    :param List[str] body_parts: List of body-parts to use as proxy for animal location(s). One per animal.
+    :param bool show_roi_centers: If True, draw the center point of each ROI on the video. Default True.
+    :param bool show_roi_eartags: If True, draw ear-tag labels on ROI shapes. Default False.
+    :param bool show_animal_names: If True, display animal names on the video. Default False.
+    :param Tuple[int, int, int] border_bg_clr: RGB tuple for the background color of the border panel where ROI stats are shown. Default (0, 0, 0).
+    :param Optional[Literal['funnel', 'lines']] direction: If not None, draw directionality (animal directing towards ROI). ``'funnel'`` or ``'lines'`` style. Default None (no directionality).
+    :param Optional[Literal['axis-aligned', 'animal-aligned']] bbox: If not None, draw bounding boxes around each animal. ``'axis-aligned'`` = rectangle aligned with video axes; ``'animal-aligned'`` = minimum rotated rectangle. Default None (no bounding boxes).
+    :param Optional[Union[str, os.PathLike]] roi_coordinates_path: Optional path to ROI definitions file. If None, uses project default from config. Default None.
+    :param bool show_pose: If True, draw pose-estimation keypoints (circles) on the video. Default True.
+    :param int core_cnt: Number of CPU cores for multiprocessing. -1 uses all available. Default -1.
+    :param bool gpu: If True, use GPU for video concatenation when available. Default False.
+
+    .. note::
+       `Tutorials <https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#part-5-visualizing-roi-features>`__.
+       See :meth:`mufasa.ROI_feature_visualizer.ROIfeatureVisualizer` for single process class. Would be slower but potentially more reliable.
+
+    .. image:: _static/img/ROIfeatureVisualizer_1.png
+       :width: 700
+       :align: center
+
+    .. image:: _static/img/ROIfeatureVisualizer_2.png
+       :width: 700
+       :align: center
+
+    :example:
+    >>> test = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project_folder/project_config.ini',
+    ...     video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project_folder/videos/NOR ENCODING FExMP8.mp4',
+    ...     body_parts=['Center'],
+    ...     show_roi_centers=True,
+    ...     show_roi_eartags=False,
+    ...     direction='funnel',
+    ...     show_pose=True,
+    ...     show_animal_names=True,
+    ...     core_cnt=-1)
+    >>> test.run()
+    """
+
+    def __init__(self,
+                 config_path: Union[str, os.PathLike],
+                 video_path: Union[str, os.PathLike],
+                 body_parts: List[str],
+                 show_roi_centers: bool = True,
+                 show_roi_eartags: bool = False,
+                 show_animal_names: bool = False,
+                 border_bg_clr: Tuple[int, int, int] = (0, 0, 0),
+                 direction: Optional[Literal['funnel', 'lines']] = None,
+                 time_slice: Optional[Dict[str, str]] = None,
+                 bbox: Optional[Literal['axis-aligned', 'animal-aligned']] = None,
+                 roi_coordinates_path: Optional[Union[str, os.PathLike]] = None,
+                 show_pose: bool = True,
+                 core_cnt: int = -1,
+                 gpu: bool = False):
+
+        check_int(name=f"{self.__class__.__name__} core_cnt", value=core_cnt, min_value=-1, unaccepted_vals=[0])
+        self.core_cnt = find_core_cnt()[0] if core_cnt == -1 or core_cnt > find_core_cnt()[0] else core_cnt
+        check_file_exist_and_readable(file_path=video_path)
+        ConfigReader.__init__(self, config_path=config_path)
+        PlottingMixin.__init__(self)
+        check_valid_boolean(value=gpu, source=f"{self.__class__.__name__} gpu", raise_error=True)
+        check_valid_boolean(value=show_roi_centers, source=f"{self.__class__.__name__} show_roi_centers", raise_error=True)
+        check_valid_boolean(value=show_roi_eartags, source=f"{self.__class__.__name__} show_roi_eartags", raise_error=True)
+        check_valid_boolean(value=show_animal_names, source=f"{self.__class__.__name__} show_animal_names", raise_error=True)
+        check_valid_boolean(value=show_pose, source=f"{self.__class__.__name__} show_pose", raise_error=True)
+        check_if_valid_rgb_tuple(data=border_bg_clr, source=f"{self.__class__.__name__} border_bg_clr", raise_error=True)
+        if direction is not None:
+            check_str(name=f"{self.__class__.__name__} show_direction", value=direction, options=['funnel', 'lines'], raise_error=True)
+        if bbox is not None:
+            check_str(name=f'{self.__class__.__name__} bbox', value=bbox, options=Options.BBOX_OPTIONS.value, allow_blank=False, raise_error=True)
+        if time_slice is not None:
+            check_valid_dict(x=time_slice, valid_key_dtypes=(str,), valid_values_dtypes=(str,), valid_keys=(START_TIME, END_TIME), required_keys=(START_TIME, END_TIME),)
+            check_if_string_value_is_valid_video_timestamp(value=time_slice[START_TIME], name='START TIME', raise_error=True)
+            check_if_string_value_is_valid_video_timestamp(value=time_slice[END_TIME], name='END TIME', raise_error=True)
+            check_that_hhmmss_start_is_before_end(start_time=time_slice[START_TIME], end_time=time_slice[END_TIME], name=f'TIME SLICE', raise_error=True)
+
+
+        self.gpu, self.show_roi_centers, self.show_roi_eartags, self.show_animal_names = gpu, show_roi_centers, show_roi_eartags, show_animal_names
+        self.show_pose, self.border_bg_clr, self.direction, self.bbox, self.time_slice = show_pose, border_bg_clr, direction, bbox, time_slice
+        if roi_coordinates_path is not None:
+            check_file_exist_and_readable(file_path=roi_coordinates_path, raise_error=True)
+            self.roi_coordinates_path = deepcopy(roi_coordinates_path)
+        self.read_roi_data()
+        _, self.video_name, _ = get_fn_ext(video_path)
+        self.roi_dict, self.shape_names = slice_roi_dict_for_video(data=self.roi_dict, video_name=self.video_name)
+        self.save_path = os.path.join(self.roi_features_save_dir, f"{self.video_name}.mp4")
+        if not os.path.exists(self.roi_features_save_dir): os.makedirs(self.roi_features_save_dir)
+        self.save_temp_dir = os.path.join(self.roi_features_save_dir, "temp")
+        if os.path.exists(self.save_temp_dir): remove_a_folder(folder_dir=self.save_temp_dir)
+        os.makedirs(self.save_temp_dir)
+        self.data_path = os.path.join(self.outlier_corrected_dir, f"{self.video_name}.{self.file_type}")
+        if not os.path.isfile(self.data_path):
+            raise NoFilesFoundError(msg=f"SIMBA ERROR: Could not find the file at path {self.data_path}. Make sure the data file exist to create ROI visualizations", source=self.__class__.__name__,)
+        check_valid_lst(data=body_parts, source=f"{self.__class__.__name__} body-parts", valid_dtypes=(str,), min_len=1,)
+        for bp in body_parts:
+            if bp not in self.body_parts_lst:
+                raise BodypartColumnNotFoundError(msg=f"The body-part {bp} is not a valid body-part in the SimBA project. Options: {self.body_parts_lst}",source=self.__class__.__name__,)
+        self.roi_feature_creator = ROIFeatureCreator(config_path=config_path, body_parts=body_parts, append_data=False, data_path=self.data_path)
+        self.roi_feature_creator.run()
+        self.bp_lk = self.roi_feature_creator.bp_lk
+        self.animal_names = [v[0] for v in self.bp_lk.values()]
+        self.animal_bp_names = [f"{v[0]} {v[1]}" for v in self.bp_lk.values()]
+        self.video_meta_data = get_video_meta_data(video_path, fps_as_int=False)
+        self.fourcc = cv2.VideoWriter_fourcc(*Formats.MP4_CODEC.value)
+        self.cap = cv2.VideoCapture(video_path)
+        check_video_and_data_frm_count_align(video=video_path, data=self.data_path, name=video_path, raise_error=False)
+        self.direct_viable = self.roi_feature_creator.roi_directing_viable
+        self.data_df = read_df(file_path=self.data_path, file_type=self.file_type)
+        self.shape_dicts = self.__create_shape_dicts()
+        self.directing_df = self.roi_feature_creator.dr
+        self.video_path = video_path
+        self.roi_features_df = self.roi_feature_creator.out_df
+        # [Linux-only] Darwin spawn-force removed.
+    def __create_shape_dicts(self):
+        shape_dicts = {}
+        for shape, df in self.roi_dict.items():
+            if not df["Name"].is_unique:
+                df = df.drop_duplicates(subset=["Name"], keep="first")
+                DuplicateNamesWarning(msg=f'Some of your ROIs with the same shape ({shape}) has the same names for video {self.video_name}. E.g., you have two rectangles named "My rectangle". SimBA prefers ROI shapes with unique names. SimBA will keep one of the unique shape names and drop the rest.', source=self.__class__.__name__,)
+            d = df.set_index("Name").to_dict(orient="index")
+            shape_dicts = {**shape_dicts, **d}
+        return shape_dicts
+
+    def __calc_text_locs(self):
+        add_spacer = TextOptions.FIRST_LINE_SPACING.value
+        self.loc_dict = {}
+        txt_strs = []
+        for animal_cnt, animal_bp_name in enumerate(self.animal_bp_names):
+            for shape in self.shape_names:
+                txt_strs.append(animal_bp_name + ' ' + shape + ' center distance')
+        longest_text_str = str(max(txt_strs, key=len))
+        self.font_size, x_spacer, y_spacer = PlottingMixin().get_optimal_font_scales(text=longest_text_str, accepted_px_width=int(self.video_meta_data["width"] / 2), accepted_px_height=int(self.video_meta_data["height"] / 15), text_thickness=3)
+        self.circle_size = PlottingMixin().get_optimal_circle_size(frame_size=(int(self.video_meta_data["height"]), int(self.video_meta_data["height"])), circle_frame_ratio=100)
+        for animal_cnt, animal_data in self.bp_lk.items():
+            animal, animal_bp, _ = animal_data
+            animal_name = f"{animal} {animal_bp}"
+            self.loc_dict[animal_name] = {}
+            self.loc_dict[animal] = {}
+            for shape in self.shape_names:
+                self.loc_dict[animal_name][shape] = {}
+                self.loc_dict[animal_name][shape]["in_zone_text"] = f"{shape} {animal_name} in zone"
+                self.loc_dict[animal_name][shape]["distance_text"] = f"{shape} {animal_name} distance"
+                self.loc_dict[animal_name][shape]["in_zone_text_loc"] = ((self.video_meta_data["width"] + TextOptions.BORDER_BUFFER_X.value), (self.video_meta_data["height"] - (self.video_meta_data["height"] + 10) + y_spacer * add_spacer))
+                self.loc_dict[animal_name][shape]["in_zone_data_loc"] = (int(self.video_meta_data["width"] + x_spacer + TextOptions.BORDER_BUFFER_X.value), (self.video_meta_data["height"] - (self.video_meta_data["height"] + 10) + y_spacer * add_spacer))
+                add_spacer += 1
+                self.loc_dict[animal_name][shape]["distance_text_loc"] = ((self.video_meta_data["width"] + TextOptions.BORDER_BUFFER_X.value), (self.video_meta_data["height"] - (self.video_meta_data["height"] + 10) + y_spacer * add_spacer))
+                self.loc_dict[animal_name][shape]["distance_data_loc"] = (int(self.video_meta_data["width"] + x_spacer + TextOptions.BORDER_BUFFER_X.value), (self.video_meta_data["height"] - (self.video_meta_data["height"] + 10) + y_spacer * add_spacer))
+                add_spacer += 1
+                if self.direct_viable and self.direction is not None:
+                    self.loc_dict[animal][shape] = {}
+                    self.loc_dict[animal][shape]["directing_text"] = f"{shape} {animal} facing"
+                    self.loc_dict[animal][shape]["directing_text_loc"] = ((self.video_meta_data["width"] + TextOptions.BORDER_BUFFER_X.value), (self.video_meta_data["height"] - (self.video_meta_data["height"] + 10) + y_spacer * add_spacer))
+                    self.loc_dict[animal][shape]["directing_data_loc"] = (int(self.video_meta_data["width"] + x_spacer + TextOptions.BORDER_BUFFER_X.value), (self.video_meta_data["height"] - (self.video_meta_data["height"] + 10) + y_spacer * add_spacer))
+                    add_spacer += 1
+
+    def __get_border_img_size(self, video_path: Union[str, os.PathLike]):
+        cap = cv2.VideoCapture(video_path)
+        cap.set(1, 1)
+        _, img = self.cap.read()
+        bordered_img = cv2.copyMakeBorder(img, 0, 0, 0, int(self.video_meta_data["width"]), borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+        cap.release()
+        return bordered_img.shape[0], bordered_img.shape[1]
+
+    def run(self):
+        self.img_w_border_h, self.img_w_border_w = self.__get_border_img_size(video_path=self.video_path)
+        self.__calc_text_locs()
+        if self.time_slice is not None:
+            check_if_string_value_is_valid_video_timestamp(value=self.time_slice[START_TIME], name=f'START TIME {START_TIME}')
+            check_if_string_value_is_valid_video_timestamp(value=self.time_slice[END_TIME], name=f'END TIME {END_TIME}')
+            frm_ids = find_frame_numbers_from_time_stamp(start_time=self.time_slice[START_TIME], end_time=self.time_slice[END_TIME], fps=int(self.video_meta_data['fps']))
+            self.data_df = self.data_df.loc[frm_ids].reset_index(drop=True)
+        frm_lst = np.arange(0, len(self.data_df))
+        frm_lst = np.array_split(frm_lst, self.core_cnt)
+        frame_range = []
+        for i in range(len(frm_lst)): frame_range.append((i, frm_lst[i]))
+        stdout_information(msg=f"Creating ROI feature images, multiprocessing (chunksize: {self.multiprocess_chunksize}, cores: {self.core_cnt})...")
+        pool = get_cpu_pool(core_cnt=self.core_cnt, verbose=True, source=self.__class__.__name__)
+        constants = functools.partial(_roi_feature_visualizer_mp,
+                                      data_df=self.data_df.reset_index(drop=True),
+                                      text_locations=self.loc_dict,
+                                      font_size=self.font_size,
+                                      circle_size=self.circle_size,
+                                      video_meta_data=self.video_meta_data,
+                                      shape_info=self.shape_dicts,
+                                      roi_dict=self.roi_dict,
+                                      save_temp_dir=self.save_temp_dir,
+                                      directing_data=self.directing_df,
+                                      shape_names=self.shape_names,
+                                      animal_bp_names=self.animal_bp_names,
+                                      video_path=self.video_path,
+                                      animal_names=self.animal_names,
+                                      animal_bp_dict=self.animal_bp_dict,
+                                      bp_lk=self.bp_lk,
+                                      roi_features_df=self.roi_features_df.reset_index(drop=True),
+                                      border_bg_color=self.border_bg_clr,
+                                      show_pose=self.show_pose,
+                                      bbox=self.bbox,
+                                      show_roi_ear_tags=self.show_roi_eartags,
+                                      show_roi_centers=self.show_roi_centers,
+                                      show_animal_names=self.show_animal_names,
+                                      direction=self.direction)
+
+        for cnt, result in enumerate(pool.imap(constants, frame_range, chunksize=self.multiprocess_chunksize)):
+            stdout_information(msg=f"Batch core {result+1}/{self.core_cnt} complete...")
+        stdout_information(f"Joining {self.video_name} multi-processed video...")
+        concatenate_videos_in_folder(in_folder=self.save_temp_dir, save_path=self.save_path, video_format="mp4", remove_splits=True, gpu=self.gpu)
+        self.timer.stop_timer()
+        terminate_cpu_pool(pool=pool, force=False, verbose=True, source=self.__class__.__name__)
+        stdout_success(msg=f"Video {self.video_name} complete. Video saved in directory {self.roi_features_save_dir}.", elapsed_time=self.timer.elapsed_time_str)
+
+
+
+
+
+
+
+
+# if __name__ == '__main__':
+#     x = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/project_config.ini',
+#                                      video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/videos/592_MA147_Gq_Saline_0516.mp4',
+#                                      body_parts=['Nose'],
+#                                      show_pose=True,
+#                                      show_roi_centers=True,
+#                                      core_cnt=4,
+#                                      bbox='animal-aligned',
+#                                      time_slice={START_TIME: '00:00:00', END_TIME: '00:00:30'})
+#     x.run()
+
+
+
+
+# if __name__ == '__main__':
+#     style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': False, 'directionality_style': 'funnel', 'border_color': (0, 0, 0), 'pose_estimation': True, 'animal_names': False}
+#     test = ROIfeatureVisualizerMultiprocess(config_path=r"C:\troubleshooting\roi_feature_issue\project_folder\project_config.ini",
+#                                                 video_path=r"C:\troubleshooting\roi_feature_issue\project_folder\videos\20250130_Oxyipn_Vls_D4_Sst-107.avi",
+#                                                 style_attr=style_attr,
+#                                                 body_parts=['nose'],
+#                                                 core_cnt=-1)
+#     test.run()
+
+
+
+
+# if __name__ == '__main__':
+#     style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': True, 'directionality_style': 'funnel', 'border_color': (0, 0, 0), 'pose_estimation': True, 'animal_names': True}
+#     test = ROIfeatureVisualizerMultiprocess(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini",
+#                                                 video_path=r"C:\troubleshooting\mitra\project_folder\videos\503_MA109_Gi_CNO_0514.mp4",
+#                                                 style_attr=style_attr,
+#                                                 body_parts=['Center'],
+#                                                 core_cnt=-1)
+#     test.run()
+#
+
+
+
+
+
+
+# if __name__ == '__main__':
+#     style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': True, 'directionality_style': 'funnel', 'border_color': (0, 0, 0), 'pose_estimation': True, 'animal_names': False}
+#     test = ROIfeatureVisualizerMultiprocess(config_path=r"C:\troubleshooting\platea\project_folder\project_config.ini",
+#                               video_path=r"C:\troubleshooting\platea\project_folder\videos\Video_1.mp4",
+#                               body_parts=['NOSE'],
+#                               style_attr=style_attr)
+#     test.run()
+
+
+
+# style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': True, 'directionality_style': 'funnel', 'border_color': (0, 0, 0), 'pose_estimation': True, 'animal_names': True}
+# test = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project_folder/project_config.ini',
+#                             video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project_folder/videos/NOR ENCODING FExMP8.mp4',
+#                             style_attr=style_attr,
+#                             body_parts=['Center'], core_cnt=-1)
+# test.run()
+
+
+# style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': True, 'directionality_style': 'funnel', 'border_color': (0, 0, 0), 'pose_estimation': True, 'animal_names': True}
+# test = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/project_config.ini',
+#                             video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/2022-06-20_NOB_DOT_4.mp4',
+#                             style_attr=style_attr,
+#                             body_parts=['Nose'], core_cnt=-1)
+# test.run()
+#
+
+# style_attr = {'ROI_centers': True,
+#               'ROI_ear_tags': True,
+#               'Directionality': True,
+#               'Directionality_style': 'Funnel',
+#               'Border_color': (0, 128, 0),
+#               'Pose_estimation': True,
+#               'Directionality_roi_subset': ['My_polygon']}
+
+# roi_feature_visualizer = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+#                                                           video_name='Together_1.avi',
+#                                                           style_attr=style_attr,
+#                                                           core_cnt=3)
+# roi_feature_visualizer.run()
+
+
+# style_attr = {'ROI_centers': True,
+#               'ROI_ear_tags': True,
+#               'Directionality': True,
+#               'Directionality_style': 'Funnel',
+#               'Border_color': (0, 128, 0),
+#               'Pose_estimation': True}
+# roi_feature_visualizer = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/simba_dev/tests/test_data/mouse_open_field/project_folder/project_config.ini',
+#                                                           video_name='Video1.mp4',
+#                                                           style_attr=style_attr,
+#                                                           core_cnt=3)
+# roi_feature_visualizer.create_visualization()
+#
+# style_attr = {'ROI_centers': True, 'ROI_ear_tags': True, 'Directionality': True, 'Directionality_style': 'Funnel', 'Border_color': (0, 128, 0), 'Pose_estimation': True}
+# test = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/simba_dev/tests/test_data/mouse_open_field/project_folder/project_config.ini', video_name='Video1.mp4', style_attr=style_attr, core_cnt=5)
+# test.create_visualization()

@@ -1,0 +1,921 @@
+__author__ = "Simon Nilsson; sronilsson@gmail.com"
+
+import os
+import platform
+import sys
+from enum import Enum
+from pathlib import Path
+
+import cv2
+import numpy as np
+import pkg_resources
+
+import mufasa
+
+
+class ConfigKey(Enum):
+    GENERAL_SETTINGS = "General settings"
+    PROJECT_PATH = "project_path"
+    SML_SETTINGS = "SML settings"
+    VIDEO_INFO_CSV = "video_info.csv"
+    FOLDER_PATH = "folder_path"
+    FILE_TYPE = "workflow_file_type"
+    TARGET_CNT = "no_targets"
+    ANIMAL_CNT = "animal_no"
+    PROJECT_NAME = "project_name"
+    OS = "OS_system"
+    MODEL_DIR = "model_dir"
+    THRESHOLD_SETTINGS = "threshold_settings"
+    MIN_BOUT_LENGTH = "Minimum_bout_lengths"
+    FRAME_SETTINGS = "Frame settings"
+    LINE_PLOT_SETTINGS = "Line plot settings"
+    PATH_PLOT_SETTINGS = "Path plot settings"
+    DISTANCE_PLOT_SETTINGS = "Distance plot"
+    HEATMAP_SETTINGS = "Heatmap settings"
+    ROI_SETTINGS = "ROI settings"
+    DIRECTIONALITY_SETTINGS = "Directionality settings"
+    BODYPART_DIRECTION_VALUE = "bodypart_direction"
+    PROBABILITY_THRESHOLD = "probability_threshold"
+    PROCESS_MOVEMENT_SETTINGS = "process movements"
+    CREATE_ENSEMBLE_SETTINGS = "create ensemble settings"
+    VALIDATION_SETTINGS = "validation/run model"
+    MULTI_ANIMAL_ID_SETTING = "Multi animal IDs"
+    MULTI_ANIMAL_IDS = "ID_list"
+    OUTLIER_SETTINGS = "Outlier settings"
+    POSE_SETTING = "pose_estimation_body_parts"
+    RF_JOBS = "RF_n_jobs"
+    VALIDATION_VIDEO = "generate_validation_video"
+    MOVEMENT_CRITERION = "movement_criterion"
+    LOCATION_CRITERION = "location_criterion"
+    ROI_ANIMAL_CNT = "no_of_animals"
+    DISTANCE_MM = "distance_mm"
+    SKLEARN_BP_PROB_THRESH = "bp_threshold_sklearn"
+    DISPLAY_SETTINGS = 'DISPLAY SETTINGS'
+    MIN_ROI_DISPLAY_HEIGHT = 'min_roi_draw_display_ratio_height'
+    MIN_ROI_DISPLAY_WIDTH = 'min_roi_draw_display_ratio_width'
+    MAX_ROI_DISPLAY_HEIGHT = 'max_roi_draw_display_ratio_height'
+    MAX_ROI_DISPLAY_WIDTH = 'max_roi_draw_display_ratio_width'
+
+
+class Paths(Enum):
+    ENV_PATH = Path("assets/.env")
+    RECENT_PROJECTS_PATHS = Path("assets/.recent_projects.txt")
+    INPUT_CSV = Path("csv/input_csv/")
+    LINE_PLOT_DIR = Path("frames/output/line_plot/")
+    VIDEO_INFO = Path("logs/video_info.csv")
+    OUTLIER_CORRECTED = Path("csv/outlier_corrected_movement_location/")
+    OUTLIER_CORRECTED_MOVEMENT = Path("csv/outlier_corrected_movement/")
+    MACHINE_RESULTS_DIR = Path("csv/machine_results/")
+    SKLEARN_RESULTS = Path("frames/output/sklearn_results/")
+    CLUSTER_EXAMPLES = Path("frames/output/cluster_examples/")
+    CLF_VALIDATION_DIR = Path("frames/output/classifier_validation/")
+    CLF_DATA_VALIDATION_DIR = Path("csv/validation/")
+    TEST_PATH = "/Users/simon/Desktop/envs/simba_dev/mufasa/"
+    BLOB_POSITION_PATH = Path("csv/output/blob_positions/")
+    CUE_LIGHTS_PATH = Path("csv/cue_lights/")
+    SINGLE_CLF_VALIDATION = Path("frames/output/validation/")
+    INPUT_FRAMES_DIR = Path("frames/input/")
+    ICON_ASSETS = Path("assets/icons/")
+    DATA_TABLE = Path("frames/output/live_data_table/")
+    ROI_FEATURES = Path("frames/output/ROI_features/")
+    ROI_ANALYSIS = Path("frames/output/ROI_analysis/")
+    ANNOTATED_FRAMES_DIR = Path("frames/output/annotated_frames/")
+    SPONTANEOUS_ALTERNATION_VIDEOS_DIR = Path("frames/output/spontanous_alternation")
+    DIRECTIONALITY_DF_DIR = Path("logs/directionality_dataframes/")
+    BODY_PART_DIRECTIONALITY_DF_DIR = Path("logs/body_part_directionality_dataframes/")
+    DIRECTING_ANIMALS_OUTPUT_PATH = Path("frames/output/ROI_directionality_visualize/")
+    DIRECTING_BETWEEN_ANIMALS_OUTPUT_PATH = Path("frames/output/Directing_animals/")
+    DIRECTING_BETWEEN_ANIMAL_BODY_PART_OUTPUT_PATH = Path("frames/output/Body_part_directing_animals/")
+    BP_NAMES = Path("logs/measures/pose_configs/bp_names/project_bp_names.csv")
+    SIMBA_BP_CONFIG_PATH = Path("pose_configurations/bp_names/bp_names.csv")
+    SIMBA_SHAP_CATEGORIES_PATH = Path("assets/shap/feature_categories/shap_feature_categories.csv")
+    SIMBA_FEATURE_EXTRACTION_COL_NAMES_PATH = Path("assets/lookups/feature_extraction_headers.csv")
+    SIMBA_NO_ANIMALS_PATH = Path("pose_configurations/no_animals/no_animals.csv")
+    SIMBA_SHAP_IMG_PATH = Path("assets/shap/")
+    SCHEMATICS = Path("pose_configurations/schematics/")
+    PROJECT_POSE_CONFIG_NAMES = Path("pose_configurations/configuration_names/pose_config_names.csv")
+    CONCAT_VIDEOS_DIR = Path("frames/output/merged/")
+    GANTT_PLOT_DIR = Path("frames/output/gantt_plots/")
+    HEATMAP_CLF_LOCATION_DIR = Path("frames/output/heatmaps_classifier_locations/")
+    HEATMAP_LOCATION_DIR = Path("frames/output/heatmaps_locations/")
+    FRAMES_OUTPUT_DIR = Path("frames/output/")
+    FEATURES_EXTRACTED_DIR = Path("csv/features_extracted/")
+    TARGETS_INSERTED_DIR = Path("csv/targets_inserted/")
+    PATH_PLOT_DIR = Path("frames/output/path_plots")
+    ABOUT_ME = Path("assets/img/about_me.png")
+    PROBABILITY_PLOTS_DIR = Path("frames/output/probability_plots/")
+    ROI_DEFINITIONS = Path("measures/ROI_definitions.h5")
+    DETAILED_ROI_DATA_DIR = Path("logs/Detailed_ROI_data/")
+    SHAP_LOGS = Path("logs/shap/")
+    SPLASH_PATH_WINDOWS = Path("assets/img/splash.png")
+    SPLASH_PATH_LINUX = Path("assets/img/splash.PNG")
+    SPLASH_PATH_MOVIE = Path("assets/img/splash_2024.mp4")
+    SIMON_SMALL_IMG = Path("assets/img/simon_n.webp")
+    LANDING_MOVIE = Path("assets/img/landing.mp4")
+    BG_IMG_PATH = Path("assets/img/bg_2024.png")
+    LOGO_ICON_WINDOWS_PATH = Path("assets/icons/SimBA_logo_3.ico")
+    LOGO_ICON_DARWIN_PATH = Path("assets/icons/SimBA_logo_3.png")
+    UNSUPERVISED_MODEL_NAMES = Path("assets/lookups/model_names.parquet")
+    CRITICAL_VALUES = Path("mufasa/assets/lookups/critical_values_05.pickle")
+    BLOB_EXECUTOR_PATH = Path("video_processors/blob_tracking_executor.py")
+    YOLO_SCHEMATICS_DIR = Path("assets/lookups/yolo_schematics/")
+    TOOLTIPS = Path("assets/lookups/tooptips.json")
+    KALEIDO_PATH = os.path.join(os.path.dirname(mufasa.__file__), 'kaleido', 'executable', 'bin', 'kaleido.exe')
+
+class OS(Enum):
+    WINDOWS = "Windows"
+    LINUX = "Linux"
+    MAC = "Darwin"
+    SPAWN = 'spawn'
+    FORK = 'fork'
+    PYTHON_VER = str(f"{sys.version_info.major}.{sys.version_info.minor}")
+    try:
+        SIMBA_VERSION = pkg_resources.get_distribution("mufasa-uw-tf-dev").version
+    except pkg_resources.DistributionNotFound:
+        SIMBA_VERSION = None
+
+class FontPaths(Enum):
+    POPPINS_REGULAR = Path("assets/fonts/Poppins Regular.ttf")
+    POPPINS_BOLD = Path("assets/fonts/Poppins Bold.ttf")
+    PLAYWRIGHT = Path("assets/fonts/Playwrite ES Deco.ttf")
+
+class Formats(Enum):
+    MP4_CODEC = "mp4v"
+    AVI_CODEC = "XVID"
+    BATCH_CODEC = "libx264"
+
+    NUMERIC_DTYPES = (np.float32, np.float64, np.int64, np.int32, np.int8, np.uint8, int, float, np.integer)
+    INTEGER_DTYPES = (np.int64, np.int32, np.int8, np.uint8, int, np.integer)
+    LABELFRAME_HEADER_FORMAT = ("Helvetica", 12, "bold")
+    LABELFRAME_HEADER_CLICKABLE_FORMAT = ("Helvetica", 12, "bold", "underline")
+    LABELFRAME_HEADER_CLICKABLE_COLOR = f"#{5:02x}{99:02x}{193:02x}"
+    CSV = "csv"
+    PARQUET = "parquet"
+    PICKLE = "pickle"
+    XLXS = "xlsx"
+    PERIMETER = "perimeter"
+    AREA = "area"
+    H5 = "h5"
+    ROOT_WINDOW_SIZE = "750x750"
+    FONT = cv2.FONT_HERSHEY_TRIPLEX
+    LABELFRAME_GREY = '#DCDCDC'
+    BTN_HOVER_CLR = '#d1e0e0'
+    if (platform.system() == OS.MAC.value):
+        FONT_SMALL = ('Poppins Regular', 10)
+        FONT_REGULAR = ('Poppins Regular', 13)
+        FONT_REGULAR_ITALICS = ('Poppins Regular', 13, "italic")
+        FONT_HEADER = ('Poppins Regular', 13, "bold")
+        FONT_REGULAR_BOLD = ('Poppins Bold', 13)
+        FONT_LARGE = ('Poppins Regular', 15, "bold")
+        FONT_LARGE_ITALICS = ('Poppins Regular', 15, "italic")
+        FONT_LARGE_BOLD = ('Poppins Regular', 15, "bold")
+        FONT_PLAYWRITE = ('Playwrite ES Deco', 8)
+        BUTTON_WIDTH_XS = 105
+        BUTTON_WIDTH_S = 135
+        BUTTON_WIDTH_L = 310
+        BUTTON_WIDTH_XL = 370
+        BUTTON_WIDTH_XXL = 380
+    elif (platform.system() == OS.WINDOWS.value):
+        FONT_SMALL = ('Poppins Regular', 6)
+        FONT_REGULAR = ('Poppins Regular', 8)
+        FONT_REGULAR_ITALICS = ('Poppins Regular', 8, "italic")
+        FONT_REGULAR_BOLD = ('Poppins Bold', 8)
+        FONT_HEADER = ('Poppins Regular', 10, "bold")
+        FONT_LARGE = ('Poppins Regular', 13, "bold")
+        FONT_LARGE_ITALICS = ('Poppins Regular', 13, "italic")
+        FONT_LARGE_BOLD = ('Poppins Regular', 13, "bold")
+        FONT_PLAYWRITE = ('Playwrite ES Deco', 8)
+        BUTTON_WIDTH_XS = 75
+        BUTTON_WIDTH_S = 100
+        BUTTON_WIDTH_L = 275
+        BUTTON_WIDTH_XL = 300
+        BUTTON_WIDTH_XXL = 325
+    else:
+        FONT_SMALL = ('DejaVu Sans', 6)
+        FONT_REGULAR = ('DejaVu Sans', 8)
+        FONT_REGULAR_ITALICS = ('DejaVu Sans', 8, "italic")
+        FONT_REGULAR_BOLD = ('DejaVu Sans', 8, "bold")
+        FONT_HEADER = ('DejaVu Sans', 10, "bold")
+        FONT_LARGE = ('DejaVu Sans', 13, "bold")
+        FONT_LARGE_ITALICS = ('DejaVu Sans', 13, "italic")
+        FONT_LARGE_BOLD = ('DejaVu Sans', 13, "bold")
+        BUTTON_WIDTH_XS = 105
+        BUTTON_WIDTH_S = 135
+        BUTTON_WIDTH_L = 310
+        BUTTON_WIDTH_XL = 340
+        BUTTON_WIDTH_XXL = 360
+    DLC_NETWORK_FILE_NAMES = [
+        "dlc_resnet50",
+        "dlc_resnet_50",
+        "dlc_dlcrnetms5",
+        "dlc_effnet_b0",
+        "dlc_resnet101",
+    ]
+    DLC_FILETYPES = {
+        "skeleton": ["sk.h5", "sk_filtered.h5"],
+        "box": ["bx.h5", "bx_filtered.h5"],
+        "ellipse": ["el.h5", "el_filtered.h5"],
+    }
+    EXPECTED_VIDEO_INFO_COLS = ["Video", "fps", "Resolution_width", "Resolution_height", "Distance_in_mm", "pixels/mm"]
+
+    SUPERANIMAL_TOPVIEW_BP_NAMES = ["nose",
+                                    "left_ear",
+                                    "right_ear",
+                                    "left_ear_tip",
+                                    "right_ear_tip",
+                                    "left_eye",
+                                    "right_eye",
+                                    "neck",
+                                    "mid_back",
+                                    "mouse_center",
+                                    "mid_backend",
+                                    "mid_backend2",
+                                    "mid_backend3",
+                                    "tail_base",
+                                    "tail1",
+                                    "tail2",
+                                    "tail3",
+                                    "tail4",
+                                    "tail5",
+                                    "left_shoulder",
+                                    "left_midside",
+                                    "left_hip",
+                                    "right_shoulder",
+                                    "right_midside",
+                                    "right_hip",
+                                    "tail_end",
+                                    "head_midpoint"]
+
+
+    VALID_TABLEFMT = ( "plain", "simple", "github", "grid", "simple_grid", "rounded_grid", "heavy_grid", "mixed_grid", "double_grid", "fancy_grid", "outline", "simple_outline", "rounded_outline", "heavy_outline", "mixed_outline", "double_outline", "fancy_outline", "pipe", "orgtbl", "jira", "presto", "pretty", "psql", "rst", "mediawiki", "moinmoin", "youtrack", "html", "unsafehtml", "latex", "latex_raw", "latex_booktabs", "latex_longtable", "textile", "tsv",)
+    TXT_LOCATIONS = ('top_left', 'top_middle', 'top_right', 'bottom_left', 'bottom_middle', 'bottom_right')
+
+class Options(Enum):
+    ROLLING_WINDOW_DIVISORS = [2, 5, 6, 7.5, 15]
+    CLF_MODELS = ["RF", "GBC", "XGBoost"]
+    CLF_MAX_FEATURES = ["sqrt", "log2", "None"]
+    CLF_CRITERION = ["gini", "entropy"]
+    UNDERSAMPLE_OPTIONS = ["None", "random undersample"]
+    OVERSAMPLE_OPTIONS = ["None", "SMOTE", "SMOTEENN"]
+    CLASS_WEIGHT_OPTIONS = ["None", "balanced", "balanced_subsample", "custom"]
+    BUCKET_METHODS = [
+        "fd",
+        "doane",
+        "auto",
+        "scott",
+        "stone",
+        "rice",
+        "sturges",
+        "sqrt",
+    ]
+    CLF_TEST_SIZE_OPTIONS = [
+        "0.1",
+        "0.2",
+        "0.3",
+        "0.4",
+        "0.5",
+        "0.6",
+        "0.7",
+        "0.8",
+        "0.9",
+    ]
+    PALETTE_OPTIONS = [
+        "magma",
+        "jet",
+        "inferno",
+        "plasma",
+        "viridis",
+        "gnuplot2",
+        "RdBu",
+        "winter",
+        "coolwarm"
+    ]
+    PALETTE_OPTIONS_CATEGORICAL = [
+        "Pastel1",
+        "Pastel2",
+        "Paired",
+        "Accent",
+        "Dark2",
+        "Set1",
+        "Set2",
+        "Set3",
+        "tab10",
+        "tab20",
+    ]
+    RESOLUTION_OPTIONS = [
+        "320×240",
+        "640×480",
+        "720×480",
+        "800×640",
+        "960×800",
+        "1120×960",
+        "1280×720",
+        "1980×1080",
+    ]
+    DPI_OPTIONS = [100, 200, 400, 800, 1600, 3200]
+    RESOLUTION_OPTIONS_2 = ["AUTO", 240, 320, 480, 640, 720, 800, 960, 1120, 1080, 1980, 2560, 3024, 5120, 6400, 7680, 8192]
+    SPEED_OPTIONS = [round(x, 1) for x in list(np.arange(0.1, 2.1, 0.1))]
+    PERFORM_FLAGS = ["yes", True, "True"]
+    RUN_OPTIONS_FLAGS = ["yes", True, "True", "False", "no", False, "true", "false"]
+    SCALER_NAMES = ["MIN-MAX", "STANDARD", "QUANTILE"]
+    HEATMAP_SHADING_OPTIONS = ["gouraud", "flat"]
+    HEATMAP_BIN_SIZE_OPTIONS = [
+        "10×10",
+        "20×20",
+        "40×40",
+        "80×80",
+        "100×100",
+        "160×160",
+        "320×320",
+        "640×640",
+        "1280×1280",
+    ]
+    INTERPOLATION_OPTIONS = [
+        "Animal(s): Nearest",
+        "Animal(s): Linear",
+        "Animal(s): Quadratic",
+        "Body-parts: Nearest",
+        "Body-parts: Linear",
+        "Body-parts: Quadratic",
+    ]
+    INTERPOLATION_OPTIONS_W_NONE = [
+        "None",
+        "Animal(s): Nearest",
+        "Animal(s): Linear",
+        "Animal(s): Quadratic",
+        "Body-parts: Nearest",
+        "Body-parts: Linear",
+        "Body-parts: Quadratic",
+    ]
+    IMPORT_TYPE_OPTIONS = [
+        "CSV (DLC/DeepPoseKit)",
+        "CSV (SimBA BLOB)",
+        "CSV (SimBA YOLO)",
+        "CSV (SLEAP)",
+        "H5 (FaceMap)",
+        "H5 (multi-animal DLC)",
+        "H5 (SLEAP)",
+        "H5 (SuperAnimal-TopView)",
+        "JSON (BENTO)",
+        "MAT (DANNCE 3D)",
+        "SLP (SLEAP)",
+        "TRK (multi-animal APT)",
+    ]
+    SMOOTHING_OPTIONS = ["Gaussian", "Savitzky Golay"]
+    MULTI_DLC_TYPE_IMPORT_OPTION = ["skeleton", "box", "ellipse"]
+    FEATURE_SUBSET_OPTIONS = [
+        "Two-point body-part distances (mm)",
+        "Within-animal three-point body-part angles (degrees)",
+        "Within-animal three-point convex hull perimeters (mm)",
+        "Within-animal four-point convex hull perimeters (mm)",
+        "Entire animal convex hull perimeters (mm)",
+        "Entire animal convex hull area (mm2)",
+        "Frame-by-frame body-part movements (mm)",
+        "Frame-by-frame body-part distances to ROI centers (mm)",
+        "Frame-by-frame body-parts inside ROIs (Boolean)",
+    ]
+    SMOOTHING_OPTIONS_W_NONE = ["None", "Gaussian", "Savitzky Golay"]
+    VIDEO_FORMAT_OPTIONS = ["mp4", "avi"]
+    ALL_VIDEO_FORMAT_OPTIONS = (".avi", ".mp4", ".mov", ".flv", ".m4v", ".webm", ".h264")
+    ALL_VIDEO_FORMAT_OPTIONS_2 = ("avi", "mp4", "mov", "flv", "m4v", "webm", "h264")
+    ALL_IMAGE_FORMAT_OPTIONS = (".bmp", ".png", ".jpeg", ".jpg", ".webp")
+    ALL_IMAGE_FORMAT_STR_OPTIONS = ".bmp .png .jpeg .jpg"
+    ALL_VIDEO_FORMAT_STR_OPTIONS = ".avi .mp4 .mov .flv .m4v .webm .h264"
+    ALL_YOLO_MODEL_FORMAT_STR_OPTIONS = ".onnx .engine .jit .onnx .mlmodel .xml .pb .pb .tflite .pt"
+    WORKFLOW_FILE_TYPE_OPTIONS = ["csv", "parquet"]
+    WORKFLOW_FILE_TYPE_STR_OPTIONS = ".csv .parquet"
+    TRACKING_TYPE_OPTIONS = ["Classic tracking", "Multi tracking", "3D tracking"]
+    UNSUPERVISED_FEATURE_OPTIONS = [
+        "INCLUDE FEATURE DATA (ORIGINAL)",
+        "INCLUDE FEATURES (SCALED)",
+        "EXCLUDE FEATURE DATA",
+    ]
+    TIMEBINS_MEASURMENT_OPTIONS = [
+        "First occurrence (s)",
+        "Event count",
+        "Total event duration (s)",
+        "Mean event duration (s)",
+        "Median event duration (s)",
+        "Mean event interval (s)",
+        "Median event interval (s)",
+    ]
+    CLF_DESCRIPTIVES_OPTIONS = [
+        "Bout count",
+        "Total event duration (s)",
+        "Mean event bout duration (s)",
+        "Median event bout duration (s)",
+        "First event occurrence (s)",
+        "Mean event bout interval duration (s)",
+        "Median event bout interval duration (s)",
+    ]
+    CLASSICAL_TRACKING_OPTIONS = [
+        "1 animal; 4 body-parts",
+        "1 animal; 7 body-parts",
+        "1 animal; 8 body-parts",
+        "1 animal; 9 body-parts",
+        "2 animals; 8 body-parts",
+        "2 animals; 14 body-parts",
+        "2 animals; 16 body-parts",
+        "MARS",
+        "SimBA BLOB Tracking",
+        "FaceMap"
+    ]
+    MULTI_ANIMAL_TRACKING_OPTIONS = [
+        "Multi-animals; 4 body-parts",
+        "Multi-animals; 7 body-parts",
+        "Multi-animals; 8 body-parts",
+        "AMBER",
+        "SuperAnimal-TopView"
+    ]
+    THREE_DIM_TRACKING_OPTIONS = ["3D tracking"]
+    TRAIN_TEST_SPLIT = ["FRAMES", "BOUTS"]
+    BOOL_STR_OPTIONS = ["TRUE", "FALSE"]
+    GANTT_VALIDATION_OPTIONS = [
+        "None",
+        "Gantt chart: final frame only (slightly faster)",
+        "Gantt chart: video",
+    ]
+    THIRD_PARTY_ANNOTATION_APPS_OPTIONS = [
+        "BORIS",
+        "ETHOVISION",
+        "OBSERVER",
+        "SOLOMON",
+        "DEEPETHOGRAM",
+        "BENTO",
+    ]
+    THIRD_PARTY_ANNOTATION_ERROR_OPTIONS = [
+        "INVALID annotations file data format",
+        "ADDITIONAL third-party behavior detected",
+        "Annotations OVERLAP conflict",
+        "ZERO third-party video behavior annotations found",
+        "Annotations and pose FRAME COUNT conflict",
+        "Annotations EVENT COUNT conflict",
+        "Annotations data file NOT FOUND",
+    ]
+    SCALER_OPTIONS = ["MIN-MAX", "STANDARD", "QUANTILE"]
+    MIN_MAX_SCALER = "MIN-MAX"
+    STANDARD_SCALER = "STANDARD"
+    QUANTILE_SCALER = "QUANTILE"
+
+    CV2_FONTS = [cv2.FONT_HERSHEY_SIMPLEX,
+                 cv2.FONT_HERSHEY_PLAIN,
+                 cv2.FONT_HERSHEY_DUPLEX,
+                 cv2.FONT_HERSHEY_COMPLEX,
+                 cv2.FONT_HERSHEY_TRIPLEX,
+                 cv2.FONT_HERSHEY_COMPLEX_SMALL,
+                 cv2.FONT_HERSHEY_SCRIPT_SIMPLEX,
+                 cv2.FONT_HERSHEY_SCRIPT_COMPLEX]
+
+    VALID_YOLO_FORMATS = ["onnx", "engine", "torchscript", "onnxsimplify", "coreml", "openvino", "pb", "tf", "tflite", "torch"]
+    AXIS_ALIGNED = 'axis-aligned'
+    ANIMAL_ALIGNED = 'animal-aligned'
+    BBOX_OPTIONS = ['axis-aligned', 'animal-aligned']
+    HHMMSSSSSS = 'HH:MM:SS.SSSS'
+    SECONDS = 'SECONDS'
+    TIMER_OPTIONS = ['HH:MM:SS.SSSS', 'seconds']
+
+class TextOptions(Enum):
+    FIRST_LINE_SPACING = (
+        2  # DISTANCE MULTIPLIER BETWEEN FIRST PRINTED ROW AND THE TOP OF THE IMAGE.
+    )
+    LINE_SPACING = 1  # DISTANCE MULTIPLIER BETWEEN 2nd AND THIRD, THIRD AND FOURTH ETC. PRINTED ROWS.
+    BORDER_BUFFER_X = 5  # ADDITIONAL PIXEL BUFFER DISTANCE BETWEEN THE START OF THE IMAGE AND FIRST PRINTED CHARACTER ON X AXIS
+    BORDER_BUFFER_Y = 10  # ADDITIONAL PIXEL BUFFER DISTANCE BETWEEN THE START OF THE IMAGE AND FIRST PRINTED CHARACTER ON Y AXIS
+    FONT_SCALER = 0.8  # CONSTANT USED TO SCALE FONT ACCORDING TO RESOLUTION. INCREASING VALUE WILL RESULT IN LARGER TEXT.
+    RESOLUTION_SCALER = 1500  # CONSTANT USED TO SCALE SPACINGS, FONT, AND RADIUS OF CIRCLES. LARGER NUMBER WILL RESULT IN SMALLER SPACINGS, FONT, AND RADIUS OF CIRCLES.
+    RADIUS_SCALER = 10  # CONSTANT USED TO SCALE CIRCLES. INCREASING VALUE WILL RESULT IN LARGER CIRCLES.
+    SPACE_SCALER = 25  # CONSTANT USED TO SCALE SPACE BETWEEN PRINTED ROWS. INCREASING VALUE WILL RESULT IN LARGER PIXEL DISTANCES BETWEEN SEQUENTIAL ROWS.
+    TEXT_THICKNESS = 1  # THE THICKNESS OR "BOLDNESS" OF THE FONT IN PIXELS.
+    LINE_THICKNESS = (
+        2  # THICKNESS OF LINES IN CIRCLES, BOUNDING BOXES AND OTHER GEOMETRIES
+    )
+    COLOR = (
+        147,
+        20,
+        255,
+    )  # THE COLOR OF THE TEXT IN BGR. (147, 20, 255)  REPRESENT DEEP PINK: TYPICALLY NOT A COLOR IN ANIMAL ARENA.
+    FLAMINGO = (172, 142, 252)
+
+
+
+    FONT = cv2.FONT_HERSHEY_SIMPLEX
+    WHITE = (255, 255, 255)
+
+
+class Defaults(Enum):
+    MAX_TASK_PER_CHILD = 10
+    LARGE_MAX_TASK_PER_CHILD = 1000
+    MAXIMUM_MAX_TASK_PER_CHILD = 8000
+    THREADSAFE_CORE_COUNT = 61
+    CHUNK_SIZE = 1
+    SPLASH_TIME = 2500
+    try:
+        WELCOME_MSG = f'Welcome fellow scientists! \n SimBA v.{pkg_resources.get_distribution("mufasa-uw-tf-dev").version} \n '
+    except pkg_resources.DistributionNotFound:
+        WELCOME_MSG = f'Welcome fellow scientists! \n SimBA v. "dev" \n '
+    BROWSE_FOLDER_BTN_TEXT = "Browse Folder"
+    BROWSE_FILE_BTN_TEXT = "Browse File"
+    NO_FILE_SELECTED_TEXT = "No file selected"
+    STR_SPLIT_DELIMITER = "\t"
+
+
+class TagNames(Enum):
+    GREETING = "greeting"
+    COMPLETE = "complete"
+    WARNING = "warning"
+    INFORMATION = "information"
+    ERROR = "error"
+    TRASH = "trash"
+    STANDARD = "standard"
+    CLASS_INIT = "CLASS_INIT"
+
+
+class DirNames(Enum):
+    PROJECT = "project_folder"
+    MODEL = "models"
+    CONFIGS = "configs"
+    CSV = "csv"
+    FRAMES = "frames"
+    LOGS = "logs"
+    MEASURES = "measures"
+    POSE_CONFIGS = "pose_configs"
+    BP_NAMES = "bp_names"
+    VIDEOS = "videos"
+    FEATURES_EXTRACTED = "features_extracted"
+    INPUT_CSV = "input_csv"
+    MACHINE_RESULTS = "machine_results"
+    OUTLIER_MOVEMENT = "outlier_corrected_movement"
+    OUTLIER_MOVEMENT_LOCATION = "outlier_corrected_movement_location"
+    TARGETS_INSERTED = "targets_inserted"
+    INPUT = "input"
+    OUTPUT = "output"
+
+
+class Keys(Enum):
+    ROI_RECTANGLES = "rectangles"
+    ROI_CIRCLES = "circleDf"
+    ROI_POLYGONS = "polygons"
+    DOCUMENTATION = "documentation"
+    FRAME_COUNT = "frame_count"
+    EAR_LEFT = 'Ear_left'
+    EAR_RIGHT = 'Ear_right'
+    NOSE = 'Nose'
+    X_BPS = 'X_bps'
+    Y_BPS = 'Y_bps'
+
+
+class UMAPParam(Enum):
+    N_NEIGHBORS = "n_neighbors"
+    MIN_DISTANCE = "min_distance"
+    SPREAD = "spread"
+    VARIANCE = "variance"
+    SCALER = "scaler"
+    HYPERPARAMETERS = [N_NEIGHBORS, MIN_DISTANCE, SPREAD, SCALER, VARIANCE]
+
+
+class Dtypes(Enum):
+    NAN = "NaN"
+    STR = "str"
+    INT = "int"
+    FLOAT = "float"
+    FOLDER = "folder_path"
+    NONE = "None"
+    SQRT = "sqrt"
+    ENTROPY = "entropy"
+
+
+class Methods(Enum):
+    USER_DEFINED = "user_defined"
+    CLASSIC_TRACKING = "Classic tracking"
+    THREE_D_TRACKING = "3D tracking"
+    MULTI_TRACKING = "Multi tracking"
+    CREATE_POSE_CONFIG = "Create pose config..."
+    RANDOM_UNDERSAMPLE = "random undersample"
+    SMOTE = "SMOTE"
+    SMOTEENN = "SMOTEENN"
+    GAUSSIAN = "Gaussian"
+    SAVITZKY_GOLAY = "Savitzky Golay"
+    SPLIT_TYPE_FRAMES = "FRAMES"
+    SPLIT_TYPE_BOUTS = "BOUTS"
+    BORIS = "BORIS"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    ANOVA = "ANOVA"
+    SIMBA_BLOB = 'simba_blob'
+    FACEMAP = 'facemap'
+    SUPER_ANIMAL_TOPVIEW = 'superanimal_topview'
+    AGG_METHODS = ('mean', 'median')
+    INVALID_THIRD_PARTY_APPENDER_FILE = "INVALID annotations file data format"
+    ADDITIONAL_THIRD_PARTY_CLFS = "ADDITIONAL third-party behavior detected"
+    ZERO_THIRD_PARTY_VIDEO_ANNOTATIONS = "ZERO third-party video annotations found"
+    THIRD_PARTY_FPS_CONFLICT = "Annotations and pose FPS conflict"
+    THIRD_PARTY_EVENT_COUNT_CONFLICT = "Annotations EVENT COUNT conflict"
+    THIRD_PARTY_EVENT_OVERLAP = "Annotations OVERLAP inaccuracy"
+    ZERO_THIRD_PARTY_VIDEO_BEHAVIOR_ANNOTATIONS = ("ZERO third-party video behavior annotations found")
+    THIRD_PARTY_FRAME_COUNT_CONFLICT = "Annotations and pose FRAME COUNT conflict"
+    THIRD_PARTY_ANNOTATION_FILE_NOT_FOUND = "Annotations data file NOT FOUND"
+
+
+
+
+class Links(Enum):
+    FEATURE_SUBSETS = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/feature_subsets.md"
+    )
+    HEATMAP_LOCATION = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#heatmaps"
+    )
+    HEATMAP_CLF = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#visualizing-classification-heatmaps"
+    DATA_TABLES = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#visualizing-data-tables"
+    CONCAT_VIDEOS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#merging-concatenating-videos"
+    DISTANCE_PLOTS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#visualizing-distance-plots"
+    PATH_PLOTS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#visualizing-path-plots"
+    VISUALIZE_CLF_PROBABILITIES = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#visualizing-classification-probabilities"
+    GANTT_PLOTS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#visualizing-gantt-charts"
+    SKLEARN_PLOTS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#visualizing-classifications"
+    ANALYZE_ML_RESULTS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#part-4--analyze-machine-results"
+    FSTTC = "https://github.com/sgoldenlab/mufasa/blob/master/docs/FSTTC.md"
+    KLEINBERG = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/kleinberg_filter.md"
+    )
+    DOWNSAMPLE = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Tutorial_tools.md#downsample-video"
+    VIDEO_TOOLS = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/Tutorial_tools.md"
+    )
+    SET_RUN_ML_PARAMETERS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#part-3-run-the-classifier-on-new-data"
+    OULIERS = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/misc/Outlier_settings.pdf"
+    )
+    REMOVE_CLF = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#step-2-optional-step--import-more-dlc-tracking-data-or-videos"
+    ROI_FEATURES_PLOT = "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#part-5-visualizing-roi-features"
+    ROI_DATA_PLOT = "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#part-4-visualizing-roi-data"
+    DIRECTING_ANIMALS_PLOTS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/directionality_between_animals.md"
+    CLF_VALIDATION = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/classifier_validation.md"
+    )
+    BATCH_PREPROCESS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/tutorial_process_videos.md"
+    THIRD_PARTY_ANNOTATION_NEW = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/third_party_annot_new.md"
+    )
+    OUT_OF_SAMPLE_VALIDATION = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#step-8-evaluating-the-model-on-new-out-of-sample-data"
+    ROI = "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial_new.md"
+    ROI_FEATURES = "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#part-3-generating-features-from-roi-data"
+    ROI_DATA_ANALYSIS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#part-2-analyzing-roi-data"
+    DATA_ANALYSIS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#part-4--analyze-machine-results"
+    ANALYZE_ROI = "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#part-2-analyzing-roi-data"
+    EXTRACT_FEATURES = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#step-5-extract-features"
+    USER_DEFINED_FEATURE_EXTRACTION = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/extractFeatures.md"
+    )
+    APPEND_ROI_FEATURES = "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#part-3-generating-features-from-roi-data"
+    LABEL_BEHAVIOR = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/label_behavior.md"
+    )
+    THIRD_PARTY_ANNOTATION = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/third_party_annot.md"
+    )
+    PSEUDO_LBL = "https://github.com/sgoldenlab/mufasa/blob/master/docs/pseudoLabel.md"
+    ADVANCED_LBL = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/advanced_labelling.md"
+    )
+    TRAIN_ML_MODEL = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#step-7-train-machine-model"
+    VISUALIZATION = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#part-5--visualizing-results"
+    PLOTLY = "https://github.com/sgoldenlab/mufasa/blob/master/docs/plotly_dash.md"
+    VIDEO_PARAMETERS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#step-3-set-video-parameters"
+    OUTLIERS_DOC = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#step-4-outlier-correction"
+    CREATE_PROJECT = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#step-1-generate-project-config"
+    LOAD_PROJECT = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#part-2-load-project-1"
+    SCENARIO_2 = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md"
+    SCENARIO_4 = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario4_new.md"
+    BBOXES = "https://github.com/sgoldenlab/mufasa/blob/master/docs/anchored_rois.md"
+    CUE_LIGHTS = (
+        "https://github.com/sgoldenlab/mufasa/blob/master/docs/cue_light_tutorial.md"
+    )
+    ADDITIONAL_IMPORTS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario1.md#step-2-optional-step--import-more-dlc-tracking-data-or-videos"
+    AGGREGATE_BOOL_STATS = "https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial.md#compute-aggregate-conditional-statistics-from-boolean-fields"
+    GITHUB_REPO = "https://github.com/sgoldenlab/mufasa"
+    OSF_REPO = "https://osf.io/tmu6y/"
+    GITTER = "https://gitter.im/SimBA-Resource/community"
+    SIMON_WEBSITE = "https://sronilsson.netlify.app/"
+    COUNT_ANNOTATIONS_IN_PROJECT = "https://github.com/sgoldenlab/mufasa/blob/master/docs/label_behavior.md#count-annotations-in-mufasa-project"
+    COUNT_ANNOTATIONS_OUTSIDE_PROJECT = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Tutorial_tools.md#extract-project-annotation-counts"
+    CIRCLE_CROP = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Tutorial_tools.md#circle-crop"
+    SIMBA_PIP_URL = 'https://pypi.org/pypi/mufasa-uw-tf-dev/json'
+    YOLO_11_WEIGHTS = {'yolo11n-pose': "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n-pose.pt",
+                       'yolo11s-pose': "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11s-pose.pt",
+                       'yolo11m-pose': "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11s-pose.pt",
+                       'yolo11l-pose': "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11l-pose.pt",
+                       'yolo11x-pose': "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11x-pose.pt"}
+    BLOB_TRACKING = "https://github.com/sgoldenlab/mufasa/blob/master/docs/blob_track.md"
+
+class Labelling(Enum):
+    PADDING = 5
+    MAX_FRM_SIZE = (1280, 650)
+    VIDEO_FRAME_SIZE = (700, 500)
+    PLAY_VIDEO_SCRIPT_PATH = os.path.join(
+        os.path.dirname(mufasa.__file__), "labelling", "play_annotation_video.py"
+    )
+    VALID_ANNOTATIONS_ADVANCED = [0, 1, 2]
+
+
+class GeometryEnum(Enum):
+    CAP_STYLE_MAP = {"round": 1, "square": 2, "flat": 3}
+    HISTOGRAM_COMPARISON_MAP = {
+        "correlation": 0,
+        "chi_square": 1,
+        "intersection": 2,
+        "bhattacharyya": 3,
+        "hellinger": 4,
+        "chi_square_alternative": 5,
+    }
+    CONTOURS_MODE_MAP = {"exterior": 0, "all": 1, "interior": 3}
+    CONTOURS_RETRIEVAL_MAP = {"simple": 2, "none": 0, "l1": 3, "kcos": 4}
+    RANKING_METHODS = [
+        "area",
+        "min_distance",
+        "max_distance",
+        "mean_distance",
+        "left_to_right",
+        "top_to_bottom",
+    ]
+
+
+class MLParamKeys(Enum):
+    CLASSIFIER = "classifier"
+    RF_META_DATA = 'RF_meta_data'
+    CLASSIFIER_NAME = "classifier_name"
+    RF_ESTIMATORS = "rf_n_estimators"
+    RF_CRITERION = "rf_criterion"
+    TT_SIZE = "train_test_size"
+    MIN_LEAF = "rf_min_sample_leaf"
+    RF_METADATA = "generate_rf_model_meta_data_file"
+    EX_DECISION_TREE = "generate_example_decision_tree"
+    CLF_REPORT = "generate_classification_report"
+    IMPORTANCE_LOG = "generate_features_importance_log"
+    IMPORTANCE_BAR_CHART = "generate_features_importance_bar_graph"
+    PERMUTATION_IMPORTANCE = "compute_feature_permutation_importance"
+    LEARNING_CURVE = "generate_sklearn_learning_curves"
+    PRECISION_RECALL = "generate_precision_recall_curves"
+    RF_MAX_FEATURES = "rf_max_features"
+    RF_MAX_DEPTH = "rf_max_depth"
+    LEARNING_CURVE_K_SPLITS = "learning_curve_k_splits"
+    LEARNING_CURVE_DATA_SPLITS = "learning_curve_data_splits"
+    N_FEATURE_IMPORTANCE_BARS = "n_feature_importance_bars"
+    SHAP_SCORES = "generate_shap_scores"
+    SHAP_PRESENT = "shap_target_present_no"
+    SHAP_ABSENT = "shap_target_absent_no"
+    SHAP_SAVE_ITERATION = "shap_save_iteration"
+    PARTIAL_DEPENDENCY = "partial_dependency"
+    TRAIN_TEST_SPLIT_TYPE = "train_test_split_type"
+    UNDERSAMPLE_SETTING = "under_sample_setting"
+    UNDERSAMPLE_RATIO = "under_sample_ratio"
+    OVERSAMPLE_SETTING = "over_sample_setting"
+    OVERSAMPLE_RATIO = "over_sample_ratio"
+    CLASS_WEIGHTS = "class_weights"
+    CLASS_CUSTOM_WEIGHTS = "class_custom_weights"
+    EX_DECISION_TREE_FANCY = "generate_example_decision_tree_fancy"
+    IMPORTANCE_BARS_N = "N_feature_importance_bars"
+    LEARNING_DATA_SPLITS = "LearningCurve_shuffle_data_splits"
+    MODEL_TO_RUN = "model_to_run"
+    SAVE_TRAIN_TEST_FRM_IDX = "save_train_test_frm_idx"
+    SHAP_MULTIPROCESS = "shap_multiprocess"
+    CLASSIFIER_MAP = "classifier_map"
+    CUDA = "cuda"
+
+class TestPaths(Enum):
+    CRITICAL_VALUES = "../mufasa/assets/lookups/critical_values_05.pickle"
+
+
+
+
+class UML(Enum):
+    FIT_KEYS = ("n_neighbors", "min_distance", "spread")
+    ALL_FEATURES_EX_POSE = "ALL FEATURES (EXCLUDING POSE)"
+    DATA_SLICE_SELECTION = "data_slice"
+    CLF_SLICE_SELECTION = "clf_slice"
+    ALL_FEATURES_EXCLUDING_POSE = "ALL FEATURES (EXCLUDING POSE)"
+    ALL_FEATURES_INCLUDING_POSE = "ALL FEATURES (INCLUDING POSE)"
+    USER_DEFINED_SET = "USER-DEFINED FEATURE SET"
+    NAMES = "NAMES"
+    START_FRAME = "START_FRAME"
+    END_FRAME = "END_FRAME"
+    CLASSIFIER = "CLASSIFIER"
+    PROBABILITY = "PROBABILITY"
+    FRAME = "FRAME"
+    VIDEO = "VIDEO"
+    FEATURES = 'FEATURES'
+    FEATURE_PATH = "feature_path"
+    BOUT_AGGREGATION_TYPE = "bout_aggregation_type"
+    MIN_BOUT_LENGTH = "min_bout_length"
+    N_NEIGHBORS = "n_neighbors"
+    HASHED_NAME = "HASH"
+    DATA = "DATA"
+    RAW = "RAW"
+    UMAP = "UMAP"
+    HDBSCAN = "HDBSCAN"
+    TSNE = "TSNE"
+    SCALER_TYPE = "SCALER_TYPE"
+    CSV = "CSV"
+    MULTICOLLINEARITY = "multicollinearity"
+    COLLINEAR_FIELDS = 'COLLINEAR_FIELDS'
+    VARIANCE_THRESHOLD = 'VARIANCE_THRESHOLD'
+    MULTICOLLINEARITY_THRESHOLD = 'MULTICOLLINEARITY_THRESHOLD'
+    FORMAT = "format"
+    SCALED_DATA = "SCALED_DATA"
+    PARAMETERS = "PARAMETERS"
+    METHODS = "METHODS"
+    DR_MODEL = "DR_MODEL"
+    MODEL = "MODEL"
+    TRAIN_DATA = "TRAIN_DATA"
+    SCALED_TRAIN_DATA = 'SCALED_TRAIN_DATA'
+    UNSCALED_TRAIN_DATA = 'UNSCALED_TRAIN_DATA'
+    CLUSTER_MODEL = 'CLUSTER_MODEL'
+    MIN_DISTANCE = "min_distance"
+    EUCLIDEAN = "euclidean"
+    FEATURE_NAMES = "FEATURE_NAMES"
+    SPREAD = "spread"
+    SCALER = "scaler"
+    SCALED = "scaled"
+    VARIANCE = "variance"
+    HYPERPARAMETERS = [N_NEIGHBORS, MIN_DISTANCE, SPREAD, SCALER, VARIANCE]
+    FRAME_FEATURES = "FRAME_FEATURES"
+    FRAME_POSE = "FRAME_POSE"
+    FRAME_TARGETS = "FRAME_TARGETS"
+    BOUTS_FEATURES = "BOUTS_FEATURES"
+    BOUTS_TARGETS = "BOUTS_TARGETS"
+    DATASET_DATA_FIELDS = [
+        FRAME_FEATURES,
+        FRAME_POSE,
+        FRAME_TARGETS,
+        BOUTS_FEATURES,
+        BOUTS_TARGETS,
+    ]
+    MIN_MAX = "MIN-MAX"
+    STANDARD = "STANDARD"
+    QUANTILE = "QUANTILE"
+    LOW_VARIANCE_FIELDS = "LOW_VARIANCE_FIELDS"
+    ALPHA = "alpha"
+    MIN_CLUSTER_SIZE = "min_cluster_size"
+    MIN_SAMPLES = "min_samples"
+    EPSILON = "cluster_selection_epsilon"
+
+
+
+class ROI_SETTINGS(Enum):
+    POLYGON_TOLERANCE = 2
+    SELECT_COLOR = "red"
+    UNSELECT_COLOR = "black"
+    CLICK_SENSITIVITY = 10
+    TEXT_THICKNESS = 2
+    DUPLICATION_JUMP_SIZE = 20
+    LINE_TYPE = -1
+    SHAPE_THICKNESS_OPTIONS = list(range(1, 26))
+    EAR_TAG_SIZE_OPTIONS = list(range(1, 31))
+    LINE_TYPE_OPTIONS = [4, 8, 16, -1]
+    FONT = cv2.FONT_HERSHEY_SIMPLEX
+    ROI_SELECT_CLR = (105, 105, 105) # BGR
+    GREY_CLR = (128, 128, 128)
+    CIRCLE = 'circle'
+    POLYGON = 'polygon'
+    RECTANGLE = 'rectangle'
+    OUTSIDE_ROI = 'OUTSIDE REGIONS OF INTEREST'
+    ROI_TRACKING_STYLE = 'FALSE' #bbox, keypoints, obb, keypoints & obb
+    SHOW_GRID_OVERLAY = 'FALSE'
+    OVERLAY_GRID_COLOR = (192, 192, 192)
+    KEYBOARD_SENSITIVITY = 3
+
+
+class PackageNames(Enum):
+    ULTRALYTICS = 'ultralytics'
+
+
+
+
+class TkBinds(Enum):
+    UP = "<Up>"
+    DOWN = "<Down>"
+    LEFT = "<Left>"
+    RIGHT = "<Right>"
+    B1_PRESS = "<ButtonPress-1>"
+    B1_RELEASE = "<ButtonRelease-1>"
+    B1_MOTION = "<B1-Motion>"
+    CTRL_LEFT_PRESS = '<KeyPress-Control_L>'
+    CTRL_RIGHT_PRESS = '<KeyPress-Control_R>'
+    CTRL_LEFT_RELEASE = '<KeyRelease-Control_L>'
+    CTRL_RIGHT_RELEASE = '<KeyPress-Control_R>'
+    SHIFT_LEFT_PRESS = '<KeyPress-Shift_L>'
+    SHIFT_RIGHT_PRESS = '<KeyPress-Shift_R>'
+    SHIFT_LEFT_RELEASE = '<KeyRelease-Shift_L>'
+    SHIFT_RIGHT_RELEASE = '<KeyRelease-Shift_R>'
+    ESCAPE = "<Escape>"
+    ENTER = "<Enter>"
+    LEAVE = "<Leave>"
+class ENV_VARS(Enum):
+    PRINT_EMOJIS = 'PRINT_EMOJIS'
+    UNSUPERVISED_INTERFACE = 'UNSUPERVISED_INTERFACE'
+    NUMBA_PRECOMPILE = 'NUMBA_PRECOMPILE'
+    CUML = 'CUML'
+
+
+
+

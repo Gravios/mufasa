@@ -1,0 +1,115 @@
+import os
+from copy import deepcopy
+from tkinter import *
+from typing import Union
+
+from mufasa.data_processors.movement_calculator import MovementCalculator
+from mufasa.mixins.config_reader import ConfigReader
+from mufasa.mixins.pop_up_mixin import PopUpMixin
+from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
+                                        SimbaCheckbox, SimBADropDown)
+from mufasa.utils.checks import check_float
+from mufasa.utils.enums import ConfigKey, Keys, Links
+from mufasa.utils.errors import InvalidInputError, NoDataError
+
+
+class MovementAnalysisPopUp(ConfigReader, PopUpMixin):
+    """
+    **ANALYZE MOVEMENT / VELOCITY: AGGREGATES** UI. **SETTINGS** can add **VIDEO FRAME COUNT** and **VIDEO LENGTH (HH:MM:SS)** rows to ``Movement_log_*.csv`` (see Scenario 2 and ``ROI_tutorial`` — *Distances / velocity*).
+    """
+
+    def __init__(self,
+                 config_path: Union[str, os.PathLike]):
+
+        ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
+        if len(self.outlier_corrected_paths) == 0:
+            raise NoDataError(msg=f'No data files found in {self.outlier_corrected_dir} directory, cannot compute movement statistics.', source=self.__class__.__name__)
+        PopUpMixin.__init__(self, title="ANALYZE MOVEMENT", size=(500, 500), icon='run')
+
+        self.animal_cnt_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT NUMBER OF ANIMALS", icon_name='mouse_head', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
+        self.animal_cnt_dropdown = SimBADropDown(parent=self.animal_cnt_frm, label="# OF ANIMALS", label_width=20, dropdown_width=20, value=1, dropdown_options=list(range(1, self.animal_cnt + 1)), command=self.create_settings_frm, img='abacus', tooltip_key='TIMEBINS_MOVEMENT_NUMBER_OF_ANIMALS')
+        self.animal_cnt_frm.grid(row=0, column=0, sticky=NW)
+        self.animal_cnt_dropdown.grid(row=0, column=0, sticky=NW)
+
+        self.choose_threshold_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT BODY-PART THRESHOLD", icon_name='green_dice', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
+        self.probability_entry = Entry_Box(parent=self.choose_threshold_frm, fileDescription='THRESHOLD: ', labelwidth=20, entry_box_width=20, value=0.0, justify='center', img='green_dice', trace=self._entrybox_bg_check_float, tooltip_key='MOVEMENT_PROBABILITY_THRESHOLD')
+        self.choose_threshold_frm.grid(row=1, column=0, sticky=NW)
+        self.probability_entry.grid(row=0, column=0, sticky=NW)
+
+        self.body_part_options = deepcopy(self.body_parts_lst)
+        for i in self.multi_animal_id_list: self.body_part_options.append(f"{i} CENTER OF GRAVITY")
+        self.create_settings_frm(animal_cnt=1)
+
+        self.measurments_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="MEASUREMENTS", icon_name='ruler', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
+        distance_cb, self.distance_var = SimbaCheckbox(parent=self.measurments_frm, txt='DISTANCE (CM)', txt_img='distance', val=True, tooltip_key='MOVEMENT_DISTANCE')
+        velocity_cb, self.velocity_var = SimbaCheckbox(parent=self.measurments_frm, txt='VELOCITY (CM/S)', txt_img='run', val=True, tooltip_key='MOVEMENT_VELOCITY')
+        self.measurments_frm.grid(row=3, column=0, sticky=NW)
+        distance_cb.grid(row=0, column=0, sticky=NW)
+        velocity_cb.grid(row=1, column=0, sticky=NW)
+
+        self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
+        transpose_cb, self.transpose_var = SimbaCheckbox(parent=self.settings_frm, txt='TRANSPOSE OUTPUT CSV', txt_img='rotate', val=True, tooltip_key='MOVEMENT_TRANSPOSE')
+        frm_cnt_cb, self.frm_cnt_var = SimbaCheckbox(parent=self.settings_frm, txt='INCLUDE VIDEO FRAME COUNT', txt_img='abacus', val=False, tooltip_key='MOVEMENT_INCLUDE_FRAME_COUNT')
+        video_len_cb, self.video_len_var = SimbaCheckbox(parent=self.settings_frm, txt='INCLUDE VIDEO LENGTH (HH:MM:SS)', txt_img='timer', val=False, tooltip_key='MOVEMENT_INCLUDE_VIDEO_LENGTH')
+        self.settings_frm.grid(row=4, column=0, sticky=NW)
+        transpose_cb.grid(row=0, column=0, sticky=NW)
+        frm_cnt_cb.grid(row=1, column=0, sticky=NW)
+        video_len_cb.grid(row=2, column=0, sticky=NW)
+
+        self.create_run_frm(run_function=self.run)
+        self.main_frm.mainloop()
+
+
+    def _entrybox_bg_check_float(self, entry_box: Entry_Box, valid_clr: str = 'white', invalid_clr: str = 'lightsalmon'):
+        valid_value = check_float(name='', allow_negative=False, allow_zero=True, value=entry_box.entry_get, raise_error=False, min_value=0.0, max_value=1.0)[0]
+        entry_box.set_bg_clr(clr=valid_clr if valid_value else invalid_clr)
+
+
+    def create_settings_frm(self, animal_cnt):
+        if hasattr(self, "bp_frm"):
+            self.bp_frm.destroy()
+            for k, v in self.body_parts_dropdowns.items():
+                v.destroy()
+
+        self.bp_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT BODY-PARTS", icon_name='pose', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
+        self.body_parts_dropdowns = {}
+        for cnt, i in enumerate(range(int(animal_cnt))):
+            self.body_parts_dropdowns[cnt] = SimBADropDown(parent=self.bp_frm, label=f"Animal {cnt+1}", label_width=20, dropdown_width=20, value=self.body_part_options[cnt], dropdown_options=self.body_part_options, img='circle_black', tooltip_key='TIMEBINS_MOVEMENT_BODY_PART')
+            self.body_parts_dropdowns[cnt].grid(row=cnt, column=0, sticky=NW)
+        self.bp_frm.grid(row=2, column=0, sticky=NW)
+
+    def run(self):
+        # Audit A2 fix: previously this method mutated the project config
+        # (PROCESS_MOVEMENT_SETTINGS/ROI_ANIMAL_CNT/PROBABILITY_THRESHOLD)
+        # as a side effect of running analysis. This silently overwrote
+        # the user's project defaults with whatever values they'd typed
+        # into this one-off popup — confusing and data-corrupting. The
+        # values are passed to MovementCalculator below via kwargs
+        # regardless, so the config writes did nothing useful for THIS
+        # run; they only persisted state. Removed.
+        check_float(name="Probability threshold", value=self.probability_entry.entry_get, min_value=0.00, max_value=1.00)
+        body_parts = []
+        threshold = float(self.probability_entry.entry_get)
+        for cnt, dropdown in self.body_parts_dropdowns.items():
+            body_parts.append(dropdown.getChoices())
+        distance, velocity, transpose = self.distance_var.get(), self.velocity_var.get(), self.transpose_var.get()
+        if not distance and not velocity:
+            raise InvalidInputError(msg='distance AND velocity are both un-checked. To compute movement metrics, check at least one value.', source=self.__class__.__name__)
+
+        frame_count = self.frm_cnt_var.get()
+        video_length = self.video_len_var.get()
+
+        movement_processor = MovementCalculator(config_path=self.config_path,
+                                                threshold=threshold,
+                                                body_parts=body_parts,
+                                                distance=distance,
+                                                velocity=velocity,
+                                                transpose=transpose,
+                                                video_length=video_length,
+                                                frame_count=frame_count)
+        movement_processor.run()
+        movement_processor.save()
+
+#_ = MovementAnalysisPopUp(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project_config.ini")
+# MovementAnalysisPopUp(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")
+#_ = MovementAnalysisPopUp(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')

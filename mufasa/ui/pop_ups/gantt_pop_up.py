@@ -1,0 +1,164 @@
+__author__ = "Simon Nilsson; sronilsson@gmail.com"
+
+import os
+from tkinter import *
+from typing import Union
+
+from mufasa.mixins.config_reader import ConfigReader
+from mufasa.mixins.pop_up_mixin import PopUpMixin
+from mufasa.plotting.gantt_creator import GanttCreatorSingleProcess
+from mufasa.plotting.gantt_creator_mp import GanttCreatorMultiprocess
+from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, SimbaButton,
+                                        SimbaCheckbox, SimBADropDown)
+from mufasa.utils.checks import check_if_filepath_list_is_empty
+from mufasa.utils.enums import Formats, Links, Options
+from mufasa.utils.errors import NoSpecifiedOutputError
+from mufasa.utils.lookups import get_fonts
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory
+
+OPACITY_OPTIONS = [round(x, 2) for x in __import__('numpy').arange(0.05, 1.05, 0.05)]
+
+class GanttPlotPopUp(PopUpMixin, ConfigReader):
+
+    """
+    :example:
+    >>>  _ = GanttPlotPopUp(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini")
+    """
+    def __init__(self,
+                 config_path: Union[str, os.PathLike]):
+
+        ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
+        check_if_filepath_list_is_empty(filepaths=self.machine_results_paths,error_msg=f"SIMBA ERROR: Zero files found in the {self.machine_results_dir} directory. Create classification results before visualizing gantt charts",)
+        palettes = Options.PALETTE_OPTIONS_CATEGORICAL.value + Options.PALETTE_OPTIONS.value
+        self.data_paths = find_files_of_filetypes_in_directory(directory=self.machine_results_dir, extensions=[f'.{self.file_type}'], as_dict=True)
+        max_file_name_len, fonts = max(len(k) for k in self.data_paths) + 5, list(get_fonts(sort_alphabetically=True).keys())
+        fonts.insert(0, 'AUTO')
+        default_font = 'Arial' if 'Arial' in fonts else 'AUTO'
+        PopUpMixin.__init__(self, config_path=config_path, title="VISUALIZE GANTT PLOTS", icon='gantt_small')
+
+        self.style_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="STYLE SETTINGS", icon_name='settings', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
+        self.resolution_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='GANTT PLOT RESOLUTION: ', label_width=30, dropdown_width=30, value='640×480', img='monitor', tooltip_key='GANTT_RESOLUTION')
+        self.font_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(range(1, 26)), label='TEXT SIZE: ', label_width=30, dropdown_width=30, value=8, img='text', tooltip_key='GANTT_TEXT_SIZE')
+        self.font_rotation_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(range(0, 182, 2)), label='TEXT ROTATION (°): ', label_width=30, dropdown_width=30, value=0, img='rotate', tooltip_key='GANTT_TEXT_ROTATION')
+        self.palette_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=palettes, label='COLOR PALETTE: ', label_width=30, dropdown_width=30, value='Set1', img='palette_small', tooltip_key='GANTT_PALETTE')
+        self.time_format_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=['SECONDS', 'HH:MM:SS'], label='X-AXIS TIME FORMAT: ', label_width=30, dropdown_width=30, value='SECONDS', img='timer_2', tooltip_key='GANTT_TIME_FORMAT')
+        self.opacity_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=OPACITY_OPTIONS, label='BAR OPACITY (%): ', label_width=30, dropdown_width=30, value=0.85, img='opacity', tooltip_key='GANTT_BAR_OPACITY')
+        self.core_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(range(2, self.cpu_cnt+1)), label='CPU CORES: ', label_width=30, dropdown_width=30, value=int(self.cpu_cnt/2), img='cpu_small', tooltip_key='GANTT_CPU_CORES')
+        self.font_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=fonts, label='FONT: ', label_width=30, dropdown_width=30, value=default_font, img='font', tooltip_key='GANTT_FONT')
+
+
+        self.clf_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="BEHAVIORS", icon_name='forest', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
+        self.clf_choices = {}
+        for cnt, clf_name in enumerate(self.clf_names):
+            gantt_frames_cb, self.gantt_frames_var = SimbaCheckbox(parent=self.clf_frm, txt=clf_name, val=True, tooltip_key='GANTT_BEHAVIOR')
+            self.clf_choices[clf_name] = self.gantt_frames_var
+            gantt_frames_cb.grid(row=cnt, column=0, sticky=NW)
+
+        self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="VISUALIZATION SETTINGS", icon_name='eye', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
+        gantt_frames_cb, self.gantt_frames_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE FRAMES', txt_img='frames', val=False, tooltip_key='GANTT_CREATE_FRAMES')
+        gantt_videos_cb, self.gantt_videos_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE VIDEOS', txt_img='video', val=False, tooltip_key='GANTT_CREATE_VIDEOS')
+        gantt_last_frame_cb, self.gantt_last_frame_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE LAST FRAME', txt_img='finish', val=True, tooltip_key='GANTT_CREATE_LAST_FRAME')
+        last_frame_as_svg_cb, self.last_frame_as_svg_var = SimbaCheckbox(parent=self.settings_frm, txt='LAST FRAME AS SVG', txt_img='svg', val=False, tooltip_key='LAST_FRAME_AS_SVG')
+
+        self.run_single_video_frm= CreateLabelFrameWithIcon(parent=self.main_frm, header="SINGLE VIDEO", icon_name='video', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
+        self.run_single_video_btn = SimbaButton(parent=self.run_single_video_frm, txt="VIDEO", txt_clr="blue", img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.__create_gantt_plots, cmd_kwargs={'multiple': False})
+        self.single_video_dropdown = SimBADropDown(parent=self.run_single_video_frm, dropdown_options=list(self.data_paths.keys()), label='VIDEO', label_width=20, dropdown_width=max_file_name_len, value=list(self.data_paths.keys())[0], tooltip_key='GANTT_SINGLE_VIDEO')
+
+        self.run_multiple_videos = CreateLabelFrameWithIcon(parent=self.main_frm, header="MULTIPLE VIDEO(S)", icon_name='stack', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
+        self.run_multiple_video_btn = SimbaButton(parent=self.run_multiple_videos, txt=f"Create multiple videos ({len(list(self.data_paths.keys()))} video(s) found)", txt_clr="blue", img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.__create_gantt_plots, cmd_kwargs={'multiple': True})
+        self.style_settings_frm.grid(row=0, sticky=NW, padx=10, pady=10)
+        self.resolution_dropdown.grid(row=0, sticky=NW)
+        self.font_size_dropdown.grid(row=1, sticky=NW)
+        self.font_rotation_dropdown.grid(row=2, sticky=NW)
+        self.palette_dropdown.grid(row=3, sticky=NW)
+        self.opacity_dropdown.grid(row=4, sticky=NW)
+        self.time_format_dropdown.grid(row=5, sticky=NW)
+        self.font_dropdown.grid(row=6, sticky=NW)
+        self.core_dropdown.grid(row=7, sticky=NW)
+
+        self.clf_frm.grid(row=1, sticky=NW, padx=10, pady=10)
+        self.settings_frm.grid(row=2, sticky=NW, padx=10, pady=10)
+        gantt_videos_cb.grid(row=0, sticky=NW)
+        gantt_frames_cb.grid(row=1, sticky=W)
+        gantt_last_frame_cb.grid(row=2, sticky=NW)
+        last_frame_as_svg_cb.grid(row=3, sticky=NW)
+
+        self.run_single_video_frm.grid(row=3, sticky=NW)
+        self.run_single_video_btn.grid(row=0, sticky=NW)
+        self.single_video_dropdown.grid(row=0, column=1, sticky=NW)
+
+        self.run_multiple_videos.grid(row=4, sticky=NW)
+        self.run_multiple_video_btn.grid(row=0, sticky=NW)
+
+        self.main_frm.mainloop()
+
+    def __create_gantt_plots(self,
+                             multiple: bool):
+
+        width = int(self.resolution_dropdown.getChoices().split("×")[0])
+        height = int(self.resolution_dropdown.getChoices().split("×")[1])
+        font_size = int(self.font_size_dropdown.get_value())
+        font_rotation = int(self.font_rotation_dropdown.get_value())
+        core_cnt = int(self.core_dropdown.get_value())
+        frame_setting = self.gantt_frames_var.get()
+        video_setting = self.gantt_videos_var.get()
+        last_frm_setting = self.gantt_last_frame_var.get()
+        as_svg = self.last_frame_as_svg_var.get()
+        palette = self.palette_dropdown.get_value()
+        bar_opacity = float(self.opacity_dropdown.get_value())
+        font = self.font_dropdown.get_value()
+        font = None if font == 'AUTO' else font
+        hhmmss = True if self.time_format_dropdown.get_value() == 'HH:MM:SS' else False
+        clf_names = []
+        for clf_name, clf_val in self.clf_choices.items():
+            if clf_val.get(): clf_names.append(clf_name)
+        if len(clf_names) < 1:
+            raise NoSpecifiedOutputError(msg="Select AT LEAST one behavior name.")
+        if not frame_setting and not video_setting and not last_frm_setting:
+            raise NoSpecifiedOutputError(msg="SIMBA ERROR: Please select gantt videos, frames, and/or last frame.")
+
+        if multiple:
+            data_paths = list(self.data_paths.values())
+        else:
+            data_paths = [self.data_paths[self.single_video_dropdown.getChoices()]]
+
+        if core_cnt > 1:
+            gantt_creator = GanttCreatorMultiprocess(config_path=self.config_path,
+                                                     frame_setting=frame_setting,
+                                                     video_setting=video_setting,
+                                                     last_frm_setting=last_frm_setting,
+                                                     data_paths=data_paths,
+                                                     width=width,
+                                                     height=height,
+                                                     bar_opacity=bar_opacity,
+                                                     font=font,
+                                                     clf_names=clf_names,
+                                                     font_size=font_size,
+                                                     last_frame_as_svg=as_svg,
+                                                     font_rotation=font_rotation,
+                                                     core_cnt=core_cnt,
+                                                     palette=palette,
+                                                     hhmmss=hhmmss)
+
+        else:
+            gantt_creator = GanttCreatorSingleProcess(config_path=self.config_path,
+                                                      frame_setting=frame_setting,
+                                                      video_setting=video_setting,
+                                                      last_frm_setting=last_frm_setting,
+                                                      data_paths=data_paths,
+                                                      width=width,
+                                                      font=font,
+                                                      last_frame_as_svg=as_svg,
+                                                      height=height,
+                                                      clf_names=clf_names,
+                                                      font_size=font_size,
+                                                      font_rotation=font_rotation,
+                                                      palette=palette)
+        gantt_creator.run()
+
+
+#_ = GanttPlotPopUp(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project_config.ini")
+#_ = GanttPlotPopUp(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")
+# _ = GanttPlotPopUp(config_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini")
+
+ # _ = GanttPlotPopUp(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini")
