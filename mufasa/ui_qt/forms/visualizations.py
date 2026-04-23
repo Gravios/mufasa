@@ -108,6 +108,7 @@ class _ExtrasFormBuilder:
     * ``"choice"`` — QComboBox; extras: list-of-options
     * ``"color"`` — _ColorButton
     * ``"str"`` — QLineEdit; extras: (placeholder,)
+    * ``"file"`` — _PathField (file picker); extras: (file_filter, placeholder)
 
     Label text is derived from the backend kwarg name by replacing
     underscores with spaces and title-casing.
@@ -157,6 +158,14 @@ class _ExtrasFormBuilder:
             if default:
                 w.setText(str(default))
             self._form.addRow(self._label(name), w)
+        elif kind == "file":
+            file_filter = extra[0] if extra else ""
+            placeholder  = extra[1] if len(extra) > 1 else ""
+            w = _PathField(is_file=True, file_filter=file_filter,
+                           placeholder=placeholder)
+            if default:
+                w.set_path(str(default))
+            self._form.addRow(self._label(name), w)
         else:
             raise ValueError(f"Unknown field kind: {kind!r}")
         self._widgets[name] = w
@@ -178,6 +187,8 @@ class _ExtrasFormBuilder:
                 out[name] = w.color
             elif kind == "str":
                 out[name] = w.text().strip()
+            elif kind == "file":
+                out[name] = w.path
         return out
 
 
@@ -389,6 +400,13 @@ ROUTES: list[_VizRoute] = [
                                  "PlotSklearnResultsMultiProcess"),
         backend_sp=_lazy_factory("mufasa.plotting.plot_clf_results",
                                  "PlotSklearnResultsSingleCore"),
+        # sp and mp backends have slightly different signatures:
+        #   sp: show_bbox (bool), print_timers (plural); no gpu
+        #   mp: bbox (Literal['axis-aligned','animal-aligned']),
+        #       print_timer (singular), has gpu
+        # Form names default to sp-compatible (they're more common);
+        # the runtime signature filter silently drops them when mp runs.
+        # Users who need gpu/axis-aligned bboxes should pick mp explicitly.
         common_toggles={"frame", "video", "gpu"},
         extras=[
             ("rotate",          "bool",  False),
@@ -398,8 +416,8 @@ ROUTES: list[_VizRoute] = [
             ("show_gantt",      "bool",  False),
             ("font_size",       "float", 0.7, 0.1, 5.0, 0.1),
             ("circle_size",     "int",   5, 1, 50),
-            ("print_timer",     "bool",  True),
-            ("bbox",            "bool",  False),
+            ("print_timers",    "bool",  True),
+            ("show_bbox",       "bool",  False),
         ],
     ),
     _VizRoute(
@@ -443,7 +461,18 @@ ROUTES: list[_VizRoute] = [
         backend_sp=_lazy_factory("mufasa.plotting.single_run_model_validation_video",
                                  "ValidateModelOneVideo"),
         common_toggles={},
+        # This route differs from the other viz routes: instead of iterating
+        # per-video project CSVs (data_paths_source), it takes one
+        # features_extracted CSV and one classifier .sav as required inputs.
+        # We surface them as file pickers rather than auto-scanning because
+        # the user needs to pick *which* model to validate.
         extras=[
+            ("feature_path",             "file",  "",
+             "CSV files (*.csv);;Parquet files (*.parquet);;All files (*)",
+             "Select a features_extracted CSV from your project"),
+            ("model_path",               "file",  "",
+             "Model files (*.sav);;All files (*)",
+             "Select a classifier .sav from models/generated_models/"),
             ("discrimination_threshold", "float", 0.5, 0.0, 1.0, 0.01),
             ("shortest_bout",            "int",   1, 0, 10000),
             ("show_pose",                "bool",  True),
