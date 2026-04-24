@@ -29,11 +29,15 @@ Public API:
     apply_likelihood_threshold(df, threshold)
         -> (masked_df, counts_per_bp)
 
-The input df is expected to have DLC's flat bp_header layout, i.e.
-columns named ``<bp>_x``, ``<bp>_y``, ``<bp>_likelihood`` (in any
-order, though DLC always writes them grouped by bp). No column-level
-validation is performed here — the caller is responsible for having
-flattened the DLC MultiIndex before calling this.
+The input df is expected to have columns named with the patterns:
+
+* DLC native: ``<bp>_x``, ``<bp>_y``, ``<bp>_likelihood``
+* Mufasa bp_headers: ``<bp>_x``, ``<bp>_y``, ``<bp>_p``
+
+Either works. Both conventions are recognized so the mask can run
+either before or after the DLC→Mufasa column rename. No other
+column-level validation is performed — the caller is responsible
+for having flattened any MultiIndex columns before calling this.
 """
 from __future__ import annotations
 
@@ -80,13 +84,29 @@ def apply_likelihood_threshold(
     counts: Dict[str, int] = {}
 
     # Group columns by body-part stem. A column's body-part stem is
-    # its name with the trailing _x / _y / _likelihood removed.
+    # its name with the trailing _x / _y / _likelihood / _p removed.
+    # Both DLC-native columns (<bp>_likelihood) and Mufasa-renamed
+    # columns (<bp>_p, via ConfigReader.bp_headers) are supported —
+    # the mask can therefore be applied before OR after the
+    # flat-column rename that the DLC H5 importer performs.
     bps: Dict[str, Dict[str, str]] = {}
+    _suffix_to_role = {
+        "_likelihood": "likelihood",
+        "_p":          "likelihood",
+        "_x":          "x",
+        "_y":          "y",
+    }
+    # Longest suffix first so "_likelihood" wins over "_p" if a
+    # column name happens to end in both (impossible in practice, but
+    # defensive — a body-part literally named 'myli' with suffix
+    # '_p' has column 'myli_p' which matches "_p" after the longer
+    # suffixes fail to match).
+    suffix_order = sorted(_suffix_to_role.keys(), key=len, reverse=True)
     for col in out.columns:
-        for suffix in ("_likelihood", "_x", "_y"):
+        for suffix in suffix_order:
             if col.endswith(suffix):
                 stem = col[: -len(suffix)]
-                bps.setdefault(stem, {})[suffix[1:]] = col
+                bps.setdefault(stem, {})[_suffix_to_role[suffix]] = col
                 break
 
     for stem, parts in bps.items():

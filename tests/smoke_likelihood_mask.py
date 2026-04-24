@@ -139,7 +139,49 @@ def main() -> int:
     assert out8["a_x"].tolist() == [0.0, 0.0]  # both < 1.0
     assert counts8 == {"a": 2}
 
-    print("smoke_likelihood_mask: 8/8 cases passed")
+    # ------------------------------------------------------------------ #
+    # Case 9: Mufasa _p suffix convention works identically to DLC
+    # _likelihood. This is the regression case that actually shipped
+    # broken in the first likelihood_threshold_fix iteration — the
+    # DLC H5 importer applies df.columns = self.bp_headers BEFORE
+    # calling the mask, and bp_headers uses _p not _likelihood. The
+    # mask silently produced zero counts because no triplet matched.
+    # ------------------------------------------------------------------ #
+    df9 = pd.DataFrame({
+        "nose_x": [100.0, 200.0, 300.0],
+        "nose_y": [10.0, 20.0, 30.0],
+        "nose_p": [0.1, 0.5, 0.99],      # <-- _p, not _likelihood
+        "tail_x": [1.0, 2.0, 3.0],
+        "tail_y": [4.0, 5.0, 6.0],
+        "tail_p": [0.99, 0.99, 0.1],
+    })
+    out9, counts9 = apply_likelihood_threshold(df9, threshold=0.5)
+    # strict less-than: nose[0] (p=0.1) masked, nose[1] (p=0.5) kept
+    assert out9["nose_x"].tolist() == [0.0, 200.0, 300.0]
+    assert out9["nose_y"].tolist() == [0.0, 20.0, 30.0]
+    assert out9["nose_p"].tolist() == [0.1, 0.5, 0.99], (
+        "likelihood (_p) column must not be modified"
+    )
+    assert out9["tail_x"].tolist() == [1.0, 2.0, 0.0]
+    assert counts9 == {"nose": 1, "tail": 1}, f"case 9: {counts9}"
+
+    # ------------------------------------------------------------------ #
+    # Case 10: mixed conventions in the same frame are supported.
+    # Not expected in practice but the suffix ambiguity shouldn't
+    # cause silent data loss if it ever happens.
+    # ------------------------------------------------------------------ #
+    df10 = pd.DataFrame({
+        "a_x": [1.0, 2.0],
+        "a_y": [1.0, 2.0],
+        "a_likelihood": [0.1, 0.9],
+        "b_x": [1.0, 2.0],
+        "b_y": [1.0, 2.0],
+        "b_p": [0.1, 0.9],
+    })
+    out10, counts10 = apply_likelihood_threshold(df10, threshold=0.5)
+    assert counts10 == {"a": 1, "b": 1}, f"case 10: {counts10}"
+
+    print("smoke_likelihood_mask: 10/10 cases passed")
     return 0
 
 
