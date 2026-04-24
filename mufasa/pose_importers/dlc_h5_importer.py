@@ -85,9 +85,14 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
         data_folder: Union[str, os.PathLike],
         interpolation_settings: Optional[Dict[str, str]] = None,
         smoothing_settings: Optional[Dict[str, Any]] = None,
+        p_threshold: float = 0.0,
     ) -> None:
         check_file_exist_and_readable(file_path=config_path)
         check_if_dir_exists(in_dir=data_folder)
+        if not (0.0 <= float(p_threshold) <= 1.0):
+            raise ValueError(
+                f"p_threshold must be in [0.0, 1.0], got {p_threshold}"
+            )
         if interpolation_settings is not None:
             check_if_keys_exist_in_dict(
                 data=interpolation_settings, key=['method', 'type'],
@@ -123,6 +128,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
         PoseImporterMixin.__init__(self)
         self.interpolation_settings = interpolation_settings
         self.smoothing_settings = smoothing_settings
+        self.p_threshold = float(p_threshold)
         self.data_folder = data_folder
         self.import_log_path = os.path.join(
             self.logs_path, f"data_import_log_{self.datetime}.csv"
@@ -193,6 +199,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
     def run(self) -> None:
         """Import every ``.h5`` found in ``self.data_folder``."""
         import_log_rows = []
+        mask_totals: Dict[str, Dict[str, int]] = {}
         for cnt, h5_path in enumerate(self.input_data_paths):
             video_timer = SimbaTimer(start=True)
             raw_stem = get_fn_ext(filepath=h5_path)[1]
@@ -250,6 +257,24 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
             # IMPORTED_POSE multi-index. This is the shape write_df's
             # multi_idx_header=True path expects.
             df.columns = self.bp_headers
+
+            # Likelihood masking: zero out (x, y) for points below the
+            # confidence threshold so downstream interpolation picks
+            # them up as the (0, 0) sentinel. Likelihood column itself
+            # is preserved. This is where DLC's confidence signal
+            # becomes actionable in Mufasa.
+            if self.p_threshold > 0.0:
+                from mufasa.pose_importers.likelihood_mask import (
+                    apply_likelihood_threshold, summarize_mask_counts,
+                )
+                df, counts = apply_likelihood_threshold(
+                    df, threshold=self.p_threshold,
+                )
+                summary = summarize_mask_counts(counts, n_frames=len(df))
+                if summary:
+                    print(summary)
+                mask_totals[video_name] = counts
+
             out_df = self.insert_multi_idx_columns(df=df.fillna(0))
 
             save_path = os.path.join(
@@ -276,10 +301,13 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
                 smoother.run()
 
             video_timer.stop_timer()
+            total_masked = sum(mask_totals.get(video_name, {}).values())
             import_log_rows.append({
                 "VIDEO": video_name,
                 "IMPORT_TIME": video_timer.elapsed_time_str,
                 "IMPORT_SOURCE": h5_path,
+                "P_THRESHOLD": self.p_threshold,
+                "MASKED_POINTS": total_masked,
                 "INTERPOLATION_SETTING": str(self.interpolation_settings),
                 "SMOOTHING_SETTING": str(self.smoothing_settings),
             })

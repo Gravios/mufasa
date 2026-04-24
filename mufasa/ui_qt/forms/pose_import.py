@@ -23,7 +23,8 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
+                               QFileDialog, QFormLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QVBoxLayout, QWidget)
 
@@ -96,6 +97,34 @@ class PoseImportForm(OperationForm):
         sl.addWidget(self._source_edit, 1)
         sl.addWidget(browse)
         form.addRow("Source directory:", source_row)
+
+        # Likelihood threshold (optional — default off = 0.0).
+        # Points with DLC confidence below this value get their (x, y)
+        # zeroed; the likelihood column itself is preserved. Combined
+        # with interpolation, this is the primary tool for dealing
+        # with bad DLC frames. Default 0.0 (no mask) to keep behaviour
+        # unchanged for users who don't know about this.
+        self._p_threshold = QDoubleSpinBox()
+        self._p_threshold.setRange(0.0, 1.0)
+        self._p_threshold.setSingleStep(0.05)
+        self._p_threshold.setDecimals(2)
+        self._p_threshold.setValue(0.0)
+        self._p_threshold.setToolTip(
+            "Body-parts with DLC likelihood strictly below this value "
+            "are marked as missing (x=y=0). Enable interpolation below "
+            "to fill them in. 0.0 disables the filter (all points kept "
+            "verbatim). Typical starting value: 0.5."
+        )
+        form.addRow("Likelihood threshold:", self._p_threshold)
+        thresh_hint = QLabel(
+            "If you set a threshold &gt; 0, <b>enable interpolation</b> "
+            "below — masked points are left at (0, 0) otherwise, which "
+            "corrupts movement features."
+        )
+        thresh_hint.setTextFormat(Qt.RichText)
+        thresh_hint.setWordWrap(True)
+        thresh_hint.setStyleSheet("color: palette(mid); padding: 4px;")
+        form.addRow("", thresh_hint)
 
         # Interpolation (optional)
         self._interp_enable = QCheckBox("Enable interpolation")
@@ -185,6 +214,7 @@ class PoseImportForm(OperationForm):
             "source_path": source,
             "interpolation_settings": interpolation_settings,
             "smoothing_settings": smoothing_settings,
+            "p_threshold": float(self._p_threshold.value()),
         }
 
     # ------------------------------------------------------------------ #
@@ -192,15 +222,19 @@ class PoseImportForm(OperationForm):
     # ------------------------------------------------------------------ #
     def target(self, *, route: dict, config_path: str, source_path: str,
                interpolation_settings: Optional[dict],
-               smoothing_settings: Optional[dict]) -> None:
+               smoothing_settings: Optional[dict],
+               p_threshold: float) -> None:
         km = route["kwargs_map"]
         kwargs = {
             "config_path": config_path,
             km.get("source_path", "source_path"): source_path,
             "interpolation_settings": interpolation_settings,
             "smoothing_settings": smoothing_settings,
+            "p_threshold": p_threshold,
         }
         # Defensive filter — same reasoning as the other forms.
+        # Backends that don't accept p_threshold (e.g. future CSV /
+        # SLEAP routes) will silently drop it via the filter.
         from mufasa.ui_qt.forms._backend_dispatch import filter_kwargs
         kwargs = filter_kwargs(route["backend"], kwargs)
         runner = route["backend"](**kwargs)
