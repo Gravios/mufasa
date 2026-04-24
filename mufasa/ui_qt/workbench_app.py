@@ -76,6 +76,12 @@ def build_workbench(project_config_path: Optional[str] = None
     from mufasa.ui_qt.pages.addons_page import build_addons_page
     build_addons_page(wb, config_path=project_config_path)
 
+    # Tools: project-independent utilities (converters, etc.). Bottom
+    # of the sidebar because nothing above depends on it, and it's
+    # reached occasionally rather than every session.
+    from mufasa.ui_qt.pages.tools_page import build_tools_page
+    build_tools_page(wb, config_path=project_config_path)
+
     return wb
 
 

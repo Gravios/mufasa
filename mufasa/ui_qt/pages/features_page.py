@@ -3,6 +3,12 @@ mufasa.ui_qt.pages.features_page
 ================================
 
 Features workbench page. Hosts the feature-subsets extractor.
+
+Previous iterations carried an empty "Full feature extraction (full
+project)" placeholder section pending an inline-form port. Empty
+sections in the UI look like broken features rather than
+unimplemented ones, so it was removed. When the full-project
+extractor is wired inline it can be appended here.
 """
 from __future__ import annotations
 
@@ -17,10 +23,6 @@ def build_features_page(workbench,
     page = workbench.add_page("Features", icon_name="features")
     page.add_section("Compute feature subsets",
                      [(FeatureSubsetExtractorForm, {})])
-    # Placeholder — the full feature-extractor run lives elsewhere
-    # (usually launched from the project-setup flow); a dedicated form
-    # can be added here if/when wanted.
-    page.add_section("Full feature extraction (full project)", [])
     return page
 
 
