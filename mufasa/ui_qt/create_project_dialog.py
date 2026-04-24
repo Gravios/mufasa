@@ -94,7 +94,8 @@ class CreateProjectDialog(QDialog):
 
         self._clf_edit = QPlainTextEdit()
         self._clf_edit.setPlaceholderText(
-            "One classifier per line, e.g.:\n"
+            "Optional — one classifier per line. You can add these "
+            "later from the Classifier page. Examples:\n"
             "Attack\n"
             "Groom\n"
             "Rear"
@@ -111,7 +112,7 @@ class CreateProjectDialog(QDialog):
         form.addRow("Body-part preset:", self._preset_combo)
         form.addRow("Or auto-detect:", autodetect_row)
         form.addRow("Animal count:", self._animal_count)
-        form.addRow("Classifier names:", self._clf_edit)
+        form.addRow("Classifier names (optional):", self._clf_edit)
         form.addRow("Workflow file type:", self._file_type_combo)
 
         buttons = QDialogButtonBox(
@@ -236,10 +237,10 @@ class CreateProjectDialog(QDialog):
                 "parent directory.",
             )
             return
-        if not classifiers:
-            QMessageBox.warning(self, "Missing field",
-                                "Enter at least one classifier name.")
-            return
+        # Classifier names are optional: user can add them later from
+        # the Classifier page. ProjectConfigCreator tolerates an empty
+        # target_list — all clf-settings loops become no-ops and
+        # TARGET_CNT is set to "0".
 
         # Branch on autodetect vs preset. We still go through
         # ProjectConfigCreator for both paths (it builds the directory

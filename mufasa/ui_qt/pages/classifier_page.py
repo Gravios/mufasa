@@ -2,17 +2,18 @@
 mufasa.ui_qt.pages.classifier_page
 ==================================
 
-Classifier workbench page — second worked example of the workbench
-pattern outside Video Processing.
+Classifier workbench page.
 
 Sections
 --------
-
 * **Manage** — :class:`ClassifierManageForm`: add / remove / print
-  (3 legacy popups folded into one form).
-* **Train**, **Run**, **Validate** — placeholder sections pending
-  inline-form ports of RunMachineModels, Kleinberg, ValidationClips,
-  ClassifierValidation.
+  classifier names (3 legacy popups folded into one form).
+
+Previous iterations carried empty "Train", "Run inference", and
+"Validate" placeholder sections pending inline-form ports. Empty
+sections in the UI look like broken features rather than unimplemented
+ones, so they were removed. When the train/infer/validate backends
+are wired inline they can be appended here.
 """
 from __future__ import annotations
 
@@ -27,9 +28,6 @@ def build_classifier_page(workbench,
                           ) -> WorkflowPage:
     page = workbench.add_page("Classifier", icon_name="clf")
     page.add_section("Manage classifiers", [(ClassifierManageForm, {})])
-    page.add_section("Train", [])
-    page.add_section("Run inference", [])
-    page.add_section("Validate", [])
     return page
 
 
