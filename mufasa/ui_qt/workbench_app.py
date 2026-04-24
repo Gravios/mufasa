@@ -38,16 +38,19 @@ def build_workbench(project_config_path: Optional[str] = None
     """Assemble a workbench with all currently-ported pages.
 
     Pages are added via ``build_<stage>_page(workbench, config_path)``
-    helpers from :mod:`mufasa.ui_qt.pages`. As more pages are ported,
-    add them here.
+    helpers from :mod:`mufasa.ui_qt.pages`. Order below follows the
+    canonical pipeline top-to-bottom: setup → data in → clean → extract
+    → label → classify → analyze → visualize. Video Processing is a
+    utility used opportunistically (re-encoding, trimming), so it sits
+    in the utility-adjacent zone at the bottom alongside Add-ons and
+    Tools rather than in the pipeline's step-2 slot. As more pages are
+    ported, add them in the position the pipeline demands.
     """
     wb = MufasaWorkbench(project_config_path=project_config_path)
 
-    # --- Pages, in sidebar order -------------------------------------- #
+    # --- Pages, in sidebar order (pipeline progression) --------------- #
     from mufasa.ui_qt.pages.project_setup_page import build_project_setup_page
     build_project_setup_page(wb, config_path=project_config_path)
-
-    build_video_processing_page(wb, config_path=project_config_path)
 
     from mufasa.ui_qt.pages.data_import_page import build_data_import_page
     build_data_import_page(wb, config_path=project_config_path)
@@ -72,6 +75,12 @@ def build_workbench(project_config_path: Optional[str] = None
 
     from mufasa.ui_qt.pages.visualizations_page import build_visualizations_page
     build_visualizations_page(wb, config_path=project_config_path)
+
+    # --- Utility-adjacent tail --------------------------------------- #
+    # Video Processing: re-encode / trim / crop / rotate. Not part of
+    # the pipeline, used ad-hoc when a video needs munging before or
+    # after import.
+    build_video_processing_page(wb, config_path=project_config_path)
 
     from mufasa.ui_qt.pages.addons_page import build_addons_page
     build_addons_page(wb, config_path=project_config_path)
