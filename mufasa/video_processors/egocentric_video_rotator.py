@@ -51,14 +51,39 @@ def egocentric_video_aligner(frm_range: np.ndarray,
         frm_batches = np.array_split(frm_range, (len(frm_range) + 30 - 1) // 30)
         for frm_batch_cnt, frm_ids in enumerate(frm_batches):
             frms = read_img_batch_from_video_gpu(video_path=video_path, start_frm=frm_ids[0], end_frm=frm_ids[-1])
+            # Guard: read_img_batch_from_video_gpu returns an empty dict
+            # on an FFmpeg short-read (e.g. CUDA decoder fails on a
+            # time-range seek). np.stack([]) would raise "need at least
+            # one array to stack" and crash the worker silently from
+            # the user's perspective. Fall back to per-frame CPU read
+            # for this batch instead — slower but never breaks.
+            if not frms:
+                if verbose:
+                    print(f'GPU read returned 0 frames for batch '
+                          f'{frm_ids[0]}-{frm_ids[-1]} of {video_name}; '
+                          f'falling back to CPU read for this batch.')
+                cap_fallback = cv2.VideoCapture(video_path)
+                for frm_id in frm_ids:
+                    img = read_frm_of_video(video_path=cap_fallback, frame_index=int(frm_id))
+                    rotated_frame = cv2.warpAffine(img, m_rotates[img_counter], (video_meta['width'], video_meta['height']), borderValue=fill_clr)
+                    final_frame = cv2.warpAffine(rotated_frame, m_translations[img_counter], (video_meta['width'], video_meta['height']), borderValue=fill_clr)
+                    writer.write(final_frame)
+                    if verbose:
+                        print(f'Creating frame {frm_id}/{video_meta["frame_count"]} ({video_name}, GPU core: {batch + 1}, CPU fallback).')
+                    img_counter += 1
+                cap_fallback.release()
+                continue
             frms = np.stack(list(frms.values()), axis=0)
             for img_cnt, img in enumerate(frms):
-                frame_id = img_counter * (batch+1)
+                # frame_id = img_counter * (batch+1) was wrong (made
+                # frame numbers like 6438 instead of 2146). Use the
+                # actual source frame index for clear logs.
+                frame_id = int(frm_ids[img_cnt])
                 rotated_frame = cv2.warpAffine(img, m_rotates[img_counter], (video_meta['width'], video_meta['height']), borderValue=fill_clr)
                 final_frame = cv2.warpAffine(rotated_frame, m_translations[img_counter],(video_meta['width'], video_meta['height']), borderValue=fill_clr)
                 writer.write(final_frame)
                 if verbose:
-                    print(f'Creating frame {frame_id}/{video_meta["frame_count"]} ({video_name}, CPU core: {batch + 1}).')
+                    print(f'Creating frame {frame_id}/{video_meta["frame_count"]} ({video_name}, GPU core: {batch + 1}).')
                 img_counter+=1
     else:
         cap = cv2.VideoCapture(video_path)
