@@ -95,7 +95,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         ).astype(int)
 
     @staticmethod
-    @jit(nopython=True, cache=True)
+    @jit(nopython=True)
     def peak_ratio(data: np.ndarray, bin_size_s: int, fps: int):
         """
         Compute the ratio of peak values relative to number of values within each seqential
