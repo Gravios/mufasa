@@ -629,7 +629,7 @@ class ImageMixin(object):
             return np.ascontiguousarray(~cv2.threshold(img, lower_thresh, upper_thresh, cv2.THRESH_BINARY)[1])
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def img_stack_to_bw(imgs: np.ndarray, lower_thresh: int, upper_thresh: int, invert: bool):
         """
         Convert a stack of color images into black and white format.
@@ -718,7 +718,7 @@ class ImageMixin(object):
             return img[:sliced_height, :]
 
     @staticmethod
-    @jit(nopython=True, parallel=True)
+    @jit(nopython=True, parallel=True, cache=True)
     def segment_img_stack_horizontal(imgs: np.ndarray, pct: int, lower: bool, both: bool) -> np.ndarray:
         """
         Segment a horizontal part of all images in stack.
@@ -889,7 +889,7 @@ class ImageMixin(object):
         return imgs
 
     @staticmethod
-    @njit([(uint8[:, :, :, :], uint8[:, :, :, :]), (uint8[:, :, :], uint8[:, :, :])])
+    @njit([(uint8[:, :, :, :], uint8[:, :, :, :]), (uint8[:, :, :], uint8[:, :, :])], cache=True)
     def img_stack_mse(imgs_1: np.ndarray, imgs_2: np.ndarray) -> np.ndarray:
         """
         Jitted pairwise comparison of images in two stacks of equal length using mean squared errors.
@@ -927,7 +927,7 @@ class ImageMixin(object):
         return results.astype(np.int64)
 
     @staticmethod
-    @njit([(uint8[:, :, :, :], float64, float64), (uint8[:, :, :], float64, float64)])
+    @njit([(uint8[:, :, :, :], float64, float64), (uint8[:, :, :], float64, float64)], cache=True)
     def img_sliding_mse(imgs: np.ndarray,
                         slide_length: Optional[float] = 1.0,
                         sample_rate: Optional[float] = 1.0) -> np.ndarray:
@@ -1136,7 +1136,7 @@ class ImageMixin(object):
             return img
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def img_matrix_mse(imgs: np.ndarray) -> np.ndarray:
         """
         Compute the mean squared error (MSE) matrix table for a stack of images.
@@ -1241,7 +1241,7 @@ class ImageMixin(object):
         return np.where(gray_diff > threshold, 255, 0).astype(np.uint8)
 
     @staticmethod
-    @njit("(uint8[:, :, :, :],)", fastmath=True)
+    @njit("(uint8[:, :, :, :],)", fastmath=True, cache=True)
     def img_stack_to_greyscale(imgs: np.ndarray):
         """
         Jitted conversion of a 4D stack of color images (RGB format) to grayscale.
@@ -1643,7 +1643,7 @@ class ImageMixin(object):
 
     @staticmethod
     @njit(["(uint8[:, :], uint8[:, :])",
-           "(uint8[:, :, :], uint8[:, :, :])"])
+           "(uint8[:, :, :], uint8[:, :, :])"], cache=True)
     def cross_correlation_similarity(img_1: np.ndarray, img_2: np.ndarray) -> float:
         """
         Computes the Normalized Cross-Correlation (NCC) similarity between two images.
@@ -1677,7 +1677,7 @@ class ImageMixin(object):
 
     @staticmethod
     @njit(["(uint8[:, :, :], int64)",
-           "(uint8[:, :, :, :], int64)"])
+           "(uint8[:, :, :, :], int64)"], cache=True)
     def sliding_cross_correlation_similarity(imgs: np.ndarray,
                                              stride: int) -> np.ndarray:
         """
@@ -1715,7 +1715,7 @@ class ImageMixin(object):
 
     @staticmethod
     @njit(["(uint8[:, :, :],)",
-           "(uint8[:, :, :, :],)"])
+           "(uint8[:, :, :, :],)"], cache=True)
     def cross_correlation_matrix(imgs: np.array) -> np.ndarray:
         """
         Computes the cross-correlation matrix for a given array of images.
@@ -1894,7 +1894,7 @@ class ImageMixin(object):
         return False
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def resize_img_stack(imgs: np.ndarray,
                          scale_factor: float = 0.5) -> np.ndarray:
         """

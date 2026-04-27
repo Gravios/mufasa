@@ -101,7 +101,7 @@ class OutlierCorrecterLocationAdvanced(ConfigReader, FeatureExtractionMixin):
         self.settings = new_settings
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def three_dim_cdist(data: np.ndarray) -> np.ndarray:
         results = np.full((data.shape[0], data.shape[1], data.shape[1]), np.nan)
         for i in prange(data.shape[0]):

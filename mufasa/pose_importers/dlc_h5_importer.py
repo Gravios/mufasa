@@ -182,13 +182,15 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
         DLC output filenames look like::
 
             mouse01DLC_Resnet50_myproj_shuffle1_snapshot_best-150
+            mouse01DLC_HrnetW32_myproj_shuffle21_snapshot_1760
+            mouse01DeepCut_resnet50_myproj_iteration0
 
         We want ``mouse01`` so the pose file joins to ``mouse01.mp4``.
-        The delimiter casing varies (``DLC`` vs ``DeepCut`` across
-        DLC versions) so we split on either.
+        Different DLC versions / backbones / DLC-style fork tools
+        write different suffix prefixes; we split on any of the known
+        delimiters at the first occurrence.
         """
-        for delim in ("DLC_", "DLC_resnet", "DLC_Resnet", "DLC_dlc",
-                      "DeepCut"):
+        for delim in ("DLC_", "DeepCut"):
             if delim in stem:
                 return stem.split(delim)[0]
         return stem

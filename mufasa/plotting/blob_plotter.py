@@ -102,7 +102,7 @@ class BlobPlotter(PlottingMixin):
         self.circle_color = circle_color
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def __insert_group_idx_column(data: np.array, group: int):
         group_col = np.full((data.shape[0], 1), group)
         return np.hstack((group_col, data))

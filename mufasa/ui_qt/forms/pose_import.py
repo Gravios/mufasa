@@ -57,6 +57,13 @@ POSE_IMPORT_ROUTES: dict = {
             "source_path": "data_folder",
         },
     ),
+    "DLC CSV (single animal)": dict(
+        backend=_lazy("mufasa.pose_importers.dlc_csv_importer",
+                      "DLCSingleAnimalCSVImporter"),
+        kwargs_map={
+            "source_path": "data_folder",
+        },
+    ),
 }
 
 

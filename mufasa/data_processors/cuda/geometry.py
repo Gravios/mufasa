@@ -232,7 +232,7 @@ def _convex_hull_kernel(pts: np.ndarray, results: np.ndarray) -> np.ndarray:
 
 
 #@jit(nopython=True)
-@njit("(int32[:, :, :], int32[:, :])")
+@njit("(int32[:, :, :], int32[:, :])", cache=True)
 def _slice_hull_idx(points: np.ndarray, point_idx: np.ndarray):
     results = np.zeros_like(points)
     for i in range(point_idx.shape[0]):

@@ -453,7 +453,7 @@ class NetworkMixin(object):
             return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def simpson_index(x: np.ndarray) -> float:
         r"""
         Calculate Simpson's diversity index for a given array of values.
@@ -520,7 +520,7 @@ class NetworkMixin(object):
         return get_mode(x=x) / x.shape[0]
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def shannon_diversity_index(x: np.ndarray) -> float:
         r"""
         Calculate the Shannon Diversity Index for a given array of categories. The Shannon Diversity Index is a measure of diversity in a

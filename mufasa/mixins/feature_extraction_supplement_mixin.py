@@ -41,7 +41,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         FeatureExtractionMixin.__init__(self)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def _helper_euclidean_distance_timeseries_change(
         distances: np.ndarray, time_windows: np.ndarray, fps: int
     ):
@@ -95,7 +95,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         ).astype(int)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def peak_ratio(data: np.ndarray, bin_size_s: int, fps: int):
         """
         Compute the ratio of peak values relative to number of values within each seqential
@@ -140,7 +140,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def rolling_peak_count_ratio(data: np.ndarray, time_windows: np.ndarray, fps: int) -> np.ndarray:
         """
         Computes the ratio of peak counts within rolling windows over time for a given dataset.
@@ -177,7 +177,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         return results.astype(np.float32)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def rolling_categorical_switches_ratio(data: np.ndarray, time_windows: np.ndarray, fps: int) -> np.ndarray:
         """
         Compute the ratio of in categorical feature switches within rolling windows.
@@ -219,7 +219,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def consecutive_time_series_categories_count(data: np.ndarray, fps: int) -> np.ndarray:
         """
         Compute the count of consecutive milliseconds the feature value has remained static. For example,
@@ -254,7 +254,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         return results / fps
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def rolling_horizontal_vs_vertical_movement(data: np.ndarray, pixels_per_mm: float, time_windows: np.ndarray, fps: int) -> np.ndarray:
         """
         Compute the movement along the x-axis relative to the y-axis in rolling time bins.
@@ -304,7 +304,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def border_distances(data: np.ndarray,
                          pixels_per_mm: float,
                          img_resolution: np.ndarray,
@@ -352,7 +352,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         return results.astype(np.int32)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def img_edge_distances(data: np.ndarray,
                            pixels_per_mm: float,
                            img_resolution: np.ndarray,

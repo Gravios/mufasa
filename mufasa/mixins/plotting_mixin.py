@@ -967,7 +967,7 @@ class PlottingMixin(object):
         )
 
     @staticmethod
-    @njit([(uint8[:, :, :], bool_)])
+    @njit([(uint8[:, :, :], bool_)], cache=True)
     def rotate_img(img: np.ndarray, right: bool) -> np.ndarray:
         """
         Flip a color image 90 degrees to the left or right

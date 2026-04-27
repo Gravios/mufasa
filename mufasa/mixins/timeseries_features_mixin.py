@@ -1477,7 +1477,7 @@ class TimeseriesFeatureMixin(object):
 
     # @njit("(float32[:], types.List(types.Array(types.int64, 1, 'C')), int64, float64, float64)", fastmath=True)
     @staticmethod
-    @jit(nopython=True, fastmath=True)
+    @jit(nopython=True, fastmath=True, cache=True)
     def spike_train_finder(
         data: np.ndarray,
         spike_idx: list,
@@ -2545,7 +2545,7 @@ class TimeseriesFeatureMixin(object):
         return y
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def sliding_avg_kinetic_energy(x: np.ndarray, mass: np.ndarray, sample_rate: float, time_window: float) -> np.ndarray:
         """
         Calculate the sliding average kinetic energy of an object over a specified time window.
@@ -2603,7 +2603,7 @@ class TimeseriesFeatureMixin(object):
         return mass * speed
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def sliding_momentum_magnitude(x: np.ndarray, mass: np.ndarray, sample_rate: float, time_window: float) -> np.ndarray:
         """
         Compute the sliding window momentum magnitude for 2D positional data.

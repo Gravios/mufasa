@@ -342,7 +342,7 @@ class PoseImporterMixin(object):
         f.close()
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def transpose_multi_animal_table(data: np.array, idx: np.array, animal_cnt: int) -> np.array:
         unique_tracks = np.unique(idx[:, 0]).flatten()
         unique_tracks = np.sort(unique_tracks)

@@ -2486,7 +2486,7 @@ def read_data_paths(path: Union[str, os.PathLike, None],
         raise NoFilesFoundError(msg=f"{type(path)} is not a valid type for path", source=read_data_paths.__name__)
     return data_paths
 
-@njit("(uint8[:, :, :, :],)", fastmath=True, parallel=True)
+@njit("(uint8[:, :, :, :],)", fastmath=True, parallel=True, cache=True)
 def img_stack_to_greyscale(imgs: np.ndarray):
     """
     Jitted conversion of a 4D stack of color images (RGB format) to grayscale.
@@ -2510,7 +2510,7 @@ def img_stack_to_greyscale(imgs: np.ndarray):
     return results
 
 
-@njit("(uint8[:, :, :, :],)", fastmath=True, parallel=True)
+@njit("(uint8[:, :, :, :],)", fastmath=True, parallel=True, cache=True)
 def img_stack_to_bw(imgs: np.ndarray):
     """
     Jitted conversion of a 4D stack of color images (RGB format) to black and white.
@@ -2533,7 +2533,7 @@ def img_stack_to_bw(imgs: np.ndarray):
         results[i] = np.where(vals > 127, 255, 0).astype(np.uint8)
     return results
 
-@njit(fastmath=True)
+@njit(fastmath=True, cache=True)
 def img_to_bw(img: np.ndarray) -> np.ndarray:
     """
     Jitted conversion of a single image (grayscale or RGB) to black and white.

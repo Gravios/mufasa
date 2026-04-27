@@ -812,11 +812,11 @@ def freedman_diaconis(data: np.ndarray) -> Tuple[float, int]:
     return bin_width, bin_count
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def hist_1d(data: np.ndarray, bins: int, range: np.ndarray):
     return np.histogram(data, bins, (range[0], range[1]))[0]
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def hist_1d_mp(data: np.ndarray, bin_counts: np.ndarray, bin_widths: np.ndarray, normalize: Optional[bool] = False) -> typed.List:
     """
     Jitted helper to compute 1D histograms with counts or rations (if normalize is True) for a 2D dataset
@@ -915,7 +915,7 @@ def bucket_data_mp(data: np.ndarray,
 
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def fast_minimum_rank(data: np.ndarray, descending: Optional[bool] = True) -> np.ndarray:
     """
     Jitted helper to rank values in 1D array using ``minimum`` method.
@@ -956,7 +956,7 @@ def fast_minimum_rank(data: np.ndarray, descending: Optional[bool] = True) -> np
     return result
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def fast_mean_rank(data: np.ndarray, descending: Optional[bool] = True) -> np.ndarray:
     """
     Jitted helper to rank values in 1D array using ``mean`` method.
@@ -1556,7 +1556,7 @@ def egocentrically_align_pose(data: np.ndarray,
     return results, centers, rotation_vectors
 
 
-@njit("(int32[:, :, :], int64, int64, int64, int64[:])")
+@njit("(int32[:, :, :], int64, int64, int64, int64[:])", cache=True)
 def egocentrically_align_pose_numba(data: np.ndarray,
                                     anchor_1_idx: int,
                                     anchor_2_idx: int,
@@ -1632,7 +1632,7 @@ def egocentrically_align_pose_numba(data: np.ndarray,
     return results, centers, rotation_vectors
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def center_rotation_warpaffine_vectors(rotation_vectors: np.ndarray, centers: np.ndarray):
     """
     Create WarpAffine vectors for rotating a video around the center. These are used for egocentric alignment of video.
@@ -1651,7 +1651,7 @@ def center_rotation_warpaffine_vectors(rotation_vectors: np.ndarray, centers: np
     return results
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def align_target_warpaffine_vectors(centers: np.ndarray, target: np.ndarray):
     """
     Create WarpAffine for placing original center at new target position. These are used for egocentric alignment of video.
@@ -1684,7 +1684,7 @@ def _bilinear_interpolate(image: np.ndarray, x: int, y: int):
     I10, I11 = image[y0+1, x0], image[y0+1, x0+1]
     return (I00 * (1 - dx) * (1 - dy) + I01 * dx * (1 - dy) + I10 * (1 - dx) * dy + I11 * dx * dy)
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def egocentric_frm_rotator(frames: np.ndarray,
                            rotation_matrices: np.ndarray,
                            interpolate: Optional[bool] = True) -> np.ndarray:

@@ -20,7 +20,7 @@ from mufasa.utils.read_write import get_fn_ext, read_df, write_df
         (float64[:, :], float64[:, :], float64),
         (float64[:, :], float32[:, :], float64),
     ]
-)
+, cache=True)
 def calculate_weighted_avg(
     bp: np.ndarray, p: Union[np.ndarray, None], threshold: float
 ):
@@ -44,7 +44,7 @@ def calculate_weighted_avg(
     return results
 
 
-@njit([(float32[:, :], float32[:, :], float32[:, :], float64)])
+@njit([(float32[:, :], float32[:, :], float32[:, :], float64)], cache=True)
 def polygon_fill(
     x_bps: np.ndarray, y_bps: np.ndarray, p_bps: np.ndarray, threshold: float
 ):

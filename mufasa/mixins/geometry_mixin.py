@@ -1833,7 +1833,7 @@ class GeometryMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:,:,:], float64[:])")
+    @njit("(float32[:,:,:], float64[:])", cache=True)
     def static_point_lineside(lines: np.ndarray, point: np.ndarray) -> np.ndarray:
         """
         Determine the relative position (left vs right) of a static point with respect to multiple lines.
@@ -1871,7 +1871,7 @@ class GeometryMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:,:,:], float32[:, :])")
+    @njit("(float32[:,:,:], float32[:, :])", cache=True)
     def point_lineside(lines: np.ndarray, points: np.ndarray) -> np.ndarray:
         """
         Determine the relative position of a point (left vs right) with respect to a lines in each frame.
@@ -1906,7 +1906,7 @@ class GeometryMixin(object):
         return results
 
     @staticmethod
-    @njit("(int64[:,:], int64[:])")
+    @njit("(int64[:,:], int64[:])", cache=True)
     def extend_line_to_bounding_box_edges(line_points: np.ndarray, bounding_box: np.ndarray) -> np.ndarray:
         """
         Jitted extend a line segment defined by two points to fit within a bounding box.
@@ -3856,7 +3856,7 @@ class GeometryMixin(object):
         }
 
     @staticmethod
-    @njit("(float32[:,:], float32[:,:], int64)")
+    @njit("(float32[:,:], float32[:,:], int64)", cache=True)
     def linear_frechet_distance(x: np.ndarray, y: np.ndarray, sample: int = 100) -> float:
         """
         Jitted compute the Linear Fréchet Distance between two trajectories.
@@ -4077,7 +4077,7 @@ class GeometryMixin(object):
         return np.ascontiguousarray(np.array(results)).astype(np.int32)
 
     @staticmethod
-    @njit("(int32[:, :, :],)", parallel=True)
+    @njit("(int32[:, :, :],)", parallel=True, cache=True)
     def keypoints_to_axis_aligned_bounding_box(keypoints: np.ndarray) -> np.ndarray:
         """
         Computes the axis-aligned bounding box for each set of keypoints.
@@ -4110,7 +4110,7 @@ class GeometryMixin(object):
         return results
 
     @staticmethod
-    @jit(nopython=True, parallel=True)
+    @jit(nopython=True, parallel=True, cache=True)
     def points_in_polygon(x: typed.List) -> types.List:
         """
         Finds the points that fall inside the respective polygons.

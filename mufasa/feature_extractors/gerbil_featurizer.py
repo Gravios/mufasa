@@ -53,7 +53,7 @@ class GerbilFeaturizer(object):
             raise FileNotFoundError('{} is not readable.'.format(file_path))
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def calc_individual_animal_movements_in_time_windows(input_array=np.ndarray, frm_windows=List[int]) -> (np.ndarray, np.ndarray, np.ndarray):
         '''
         Jitted compute of individual frame-by-frame pixel movement and aggregate movement statistics (mean, sum) in rolling time-windows for each animal.
@@ -82,7 +82,7 @@ class GerbilFeaturizer(object):
         return single_frm_move, agg_frm_move_mean, agg_frm_move_sum
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def calc_animal_distances_in_time_windows(input_array=np.ndarray, frm_windows=List[int]) -> (np.ndarray, np.ndarray, np.ndarray):
 
         """
@@ -112,7 +112,7 @@ class GerbilFeaturizer(object):
         return single_frm_dists, agg_frm_dists_mean, agg_frm_dists_sum
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def calc_relative_data_in_time_windows(input_array=np.ndarray, frm_windows=List[int]) -> np.ndarray:
         """
         Jitted compute of individual frame-by-frame pixel distances and aggregate distance statistics (mean, sum) in rolling time-windows between the two animals.

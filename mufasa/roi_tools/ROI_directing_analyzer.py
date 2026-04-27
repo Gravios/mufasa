@@ -85,7 +85,7 @@ class DirectingROIAnalyzer(ConfigReader, FeatureExtractionMixin):
         return bp_data
 
     @staticmethod
-    @jit(nopython=True, fastmath=True)
+    @jit(nopython=True, fastmath=True, cache=True)
     def ccw(roi_lines: np.array, eye_lines: np.array, shape_type: str):
         def calc(A, B, C):
             return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
