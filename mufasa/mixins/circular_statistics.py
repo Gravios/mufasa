@@ -1123,7 +1123,7 @@ class CircularStatisticsMixin(object):
         return n * (1 - np.abs(mean_vector))
 
     @staticmethod
-    @njit("(float32[:],)", cache=True)
+    @njit("(float32[:],)")
     def circular_range(data: np.ndarray) -> float:
         r"""
         Jitted compute of circular range in degrees. The range is defined as the angular span of the
