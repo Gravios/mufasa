@@ -134,9 +134,14 @@ class EgocentricVideoRotator():
         else: self.core_cnt = core_cnt
         if pool is not None:
             check_valid_cpu_pool(value=pool, source=self.__class__.__name__, max_cores=find_core_cnt()[0], min_cores=2, raise_error=True)
-            self.pool_termination_flag = True
-        else:
+            # Caller-supplied pool: caller owns its lifecycle. Don't
+            # terminate after one video — the same pool gets reused
+            # for every video in the batch.
             self.pool_termination_flag = False
+        else:
+            # We created the pool; we own its lifecycle and terminate
+            # it after our single run.
+            self.pool_termination_flag = True
         self.pool = get_cpu_pool(core_cnt=self.core_cnt, source=self.__class__.__name__) if pool is None else pool
         video_dir, self.video_name, _ = get_fn_ext(filepath=video_path)
         if save_path is not None:
