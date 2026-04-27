@@ -180,7 +180,7 @@ class DistancePlotterMultiCore(ConfigReader, PlottingMixin):
         self.color_names = get_color_dict()
         # [Linux-only] Darwin spawn-force removed.
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def __insert_group_idx_column(data: np.array, group: int):
         group_col = np.full((data.shape[0], 1), group)
         return np.hstack((group_col, data))

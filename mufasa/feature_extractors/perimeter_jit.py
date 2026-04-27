@@ -9,7 +9,7 @@ from mufasa.utils.checks import check_float, check_str, check_valid_array
 from mufasa.utils.enums import Formats
 
 
-@njit("(float32[:,:], int64[:], int64, int64)")
+@njit("(float32[:,:], int64[:], int64, int64)", cache=True)
 def process(S, P, a, b):
     """
     One step of the quickhull algorithm: partition points by signed distance to line (a,b), recurse on the subset above the line.
@@ -26,7 +26,7 @@ def process(S, P, a, b):
     return process(S, K, a, c)[:-1] + process(S, K, c, b)
 
 
-@njit("(float32[:, :, :], types.unicode_type)", fastmath=True)
+@njit("(float32[:, :, :], types.unicode_type)", fastmath=True, cache=True)
 def jitted_hull(points: np.ndarray, target: str = "perimeter") -> np.ndarray:
     r"""
     Convex hull perimeter or area per frame from body-part (x,y) coordinates.
@@ -81,7 +81,7 @@ def jitted_hull(points: np.ndarray, target: str = "perimeter") -> np.ndarray:
     return results
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def jitted_centroid(points: np.ndarray) -> np.ndarray:
     """
     Centroid of the convex hull per frame (mean of hull vertex coordinates).

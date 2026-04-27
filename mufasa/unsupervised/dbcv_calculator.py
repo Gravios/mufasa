@@ -146,7 +146,7 @@ class DBCVCalculator(UMLMixin, ConfigReader):
         return self._clustering_validity_index(mst, ordered_labels), warning
 
     @staticmethod
-    @njit("(float32[:,:], int64[:])")
+    @njit("(float32[:,:], int64[:])", cache=True)
     def _mutual_reach_dist_graph(X: np.ndarray, labels: np.ndarray):
         """
         :param np.ndarray X: 2D array of shape len(observations) x len(dimensionality reduced dimensions)
@@ -174,7 +174,7 @@ class DBCVCalculator(UMLMixin, ConfigReader):
         return arrays_by_cluster, ordered_labels
 
     @staticmethod
-    @jit(nopython=True, fastmath=True)
+    @jit(nopython=True, fastmath=True, cache=True)
     def calculate_dists(
         X: np.ndarray, arrays_by_cluster: types.List
     ) -> Tuple[np.ndarray, bool]:
@@ -253,7 +253,7 @@ class DBCVCalculator(UMLMixin, ConfigReader):
         return self.transpose_np(mst.astype(np.float32))
 
     @staticmethod
-    @njit("(float32[:,:]),")
+    @njit("(float32[:,:]),", cache=True)
     def transpose_np(mst):
         return mst + np.transpose(mst)
 
@@ -301,7 +301,7 @@ class DBCVCalculator(UMLMixin, ConfigReader):
         return density_separation
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def _cluster_density_sparseness(MST, labels, cluster):
         indices = np.where(labels == cluster)[0]
         cluster_MST = MST[indices][:, indices]

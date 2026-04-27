@@ -172,7 +172,7 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
         return angle_cos
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def count_values_in_range(data: np.array, ranges: np.array):
         results = np.full((data.shape[0], ranges.shape[0]), 0)
         for i in prange(data.shape[0]):
@@ -199,12 +199,12 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
         return 0
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def euclidian_distance_calc(bp1xVals, bp1yVals, bp2xVals, bp2yVals):
         return np.sqrt((bp1xVals - bp2xVals) ** 2 + (bp1yVals - bp2yVals) ** 2)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def angular_dispersion(cumsum_cos_np, cumsum_sin_np):
         out_array = np.empty((cumsum_cos_np.shape))
         for index in range(cumsum_cos_np.shape[0]):
@@ -273,7 +273,7 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
         ).round(4)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def consecutive_frames_in_same_compass_direction(direction: np.array):
         results = np.full((direction.shape[0], 1), -1)
         cnt, results[0], last_direction = 0, 0, direction[0]
@@ -287,7 +287,7 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
         return results.flatten()
 
     @staticmethod
-    @jit(nopython=True, fastmath=True)
+    @jit(nopython=True, fastmath=True, cache=True)
     def framewise_degree_shift(clockwise_angle: np.array):
         degree_shift = np.full((clockwise_angle.shape[0], 1), np.nan)
         cnt, degree_shift[0], last_angle = 0, 0, clockwise_angle[0]

@@ -48,7 +48,7 @@ class SeverityCalculator(ConfigReader):
         self.results = {}
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def __euclidean_distance(bp_1_x_vals, bp_2_x_vals, bp_1_y_vals, bp_2_y_vals):
         return np.sqrt(
             (bp_1_x_vals - bp_2_x_vals) ** 2 + (bp_1_y_vals - bp_2_y_vals) ** 2

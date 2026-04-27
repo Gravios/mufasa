@@ -29,7 +29,7 @@ def _movement_outlier_corrector(data_path: str,
                                 criterion: float):
 
 
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def _corrector(data: np.ndarray, criterion: float):
         results, current_value, cnt = np.full(data.shape, np.nan), data[0, :], 0
         for i in range(data.shape[0]):

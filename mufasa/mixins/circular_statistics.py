@@ -56,7 +56,7 @@ class CircularStatisticsMixin(object):
         pass
 
     @staticmethod
-    @njit("(float32[:],)")
+    @njit("(float32[:],)", cache=True)
     def mean_resultant_vector_length(data: np.ndarray) -> float:
         r"""
         Jitted compute of the mean resultant vector length of a single sample. Captures the overall "pull" or "tendency" of the
@@ -92,7 +92,7 @@ class CircularStatisticsMixin(object):
         return np.sqrt(np.sum(np.cos(data - mean_angles)) ** 2 + np.sum(np.sin(data - mean_angles)) ** 2) / len(data)
 
     @staticmethod
-    @njit("(float32[:], float64, float64[:])")
+    @njit("(float32[:], float64, float64[:])", cache=True)
     def sliding_mean_resultant_vector_length(data: np.ndarray, fps: float, time_windows: np.ndarray) -> np.ndarray:
 
         """
@@ -136,7 +136,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:],)")
+    @njit("(float32[:],)", cache=True)
     def circular_mean(data: np.ndarray) -> float:
 
         r"""
@@ -182,7 +182,7 @@ class CircularStatisticsMixin(object):
         return np.abs(np.round(m, 4))
 
     @staticmethod
-    @njit("(float32[:], float64[:], float64)")
+    @njit("(float32[:], float64[:], float64)", cache=True)
     def sliding_circular_mean(data: np.ndarray, time_windows: np.ndarray, fps: int) -> np.ndarray:
         """
         Compute the circular mean in degrees within sliding temporal windows.
@@ -223,7 +223,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:],)")
+    @njit("(float32[:],)", cache=True)
     def circular_std(data: np.ndarray) -> float:
         """
         Jitted compute of the circular standard deviation from a single distribution of angles in degrees.
@@ -259,7 +259,7 @@ class CircularStatisticsMixin(object):
         )
 
     @staticmethod
-    @njit("(float32[:], int64, float64[:])", parallel=True)
+    @njit("(float32[:], int64, float64[:])", parallel=True, cache=True)
     def sliding_circular_std(
         data: np.ndarray, fps: int, time_windows: np.ndarray
     ) -> np.ndarray:
@@ -299,7 +299,7 @@ class CircularStatisticsMixin(object):
         return results.astype(np.float32)
 
     @staticmethod
-    @njit("(float32[:], int64)")
+    @njit("(float32[:], int64)", cache=True)
     def instantaneous_angular_velocity(data: np.ndarray, bin_size: int) -> np.ndarray:
         """
         Jitted compute of absolute angular change in the smallest possible time bin.
@@ -345,7 +345,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:],)")
+    @njit("(float32[:],)", cache=True)
     def degrees_to_cardinal(data: np.ndarray) -> List[str]:
         """
         Convert degree angles to cardinal direction bucket e.g., 0 -> "N", 180 -> "S"
@@ -377,7 +377,7 @@ class CircularStatisticsMixin(object):
         return results[1:]
 
     @staticmethod
-    @njit("(int32[:,:], float64, float64)")
+    @njit("(int32[:,:], float64, float64)", cache=True)
     def sliding_bearing(x: np.ndarray, lag: float, fps: float) -> np.ndarray:
         """
         Calculates the sliding bearing (direction) of movement in degrees for a sequence of 2D points representing a single body-part.
@@ -414,7 +414,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:,:], float32[:, :], float32[:, :])")
+    @njit("(float32[:,:], float32[:, :], float32[:, :])", cache=True)
     def direction_three_bps(nose_loc: np.ndarray, left_ear_loc: np.ndarray, right_ear_loc: np.ndarray) -> np.ndarray:
         """
         Jitted helper to compute the degree angle from three body-parts. Computes the angle in degrees left_ear <-> nose
@@ -508,7 +508,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit("float32[:](float32[:, :], float32[:, :])", fastmath=True, parallel=True)
+    @njit("float32[:](float32[:, :], float32[:, :])", fastmath=True, parallel=True, cache=True)
     def direction_two_bps(anterior_loc: np.ndarray, posterior_loc: np.ndarray) -> np.ndarray:
         """
         Compute directional angle from two body parts using numba acceleration.
@@ -581,7 +581,7 @@ class CircularStatisticsMixin(object):
 
 
     @staticmethod
-    @njit("(float32[:],)")
+    @njit("(float32[:],)", cache=True)
     def rayleigh(data: np.ndarray) -> Tuple[float, float]:
 
         r"""
@@ -625,7 +625,7 @@ class CircularStatisticsMixin(object):
         return len(data) * R**2, p
 
     @staticmethod
-    @njit("(float32[:], float64[:], float64)", parallel=True)
+    @njit("(float32[:], float64[:], float64)", parallel=True, cache=True)
     def sliding_rayleigh_z(data: np.ndarray, time_windows: np.ndarray, fps: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         Jitted compute of Rayleigh Z (test of non-uniformity) of circular data within sliding time-window.
@@ -660,7 +660,7 @@ class CircularStatisticsMixin(object):
         return Z_results, P_results
 
     @staticmethod
-    @njit("(float32[:], float32[:],)")
+    @njit("(float32[:], float32[:],)", cache=True)
     def circular_correlation(sample_1: np.ndarray, sample_2: np.ndarray) -> float:
 
         r"""
@@ -711,7 +711,7 @@ class CircularStatisticsMixin(object):
         return np.abs(np.sum(sin_1 * sin_2) / np.sqrt(np.sum(sin_1 * sin_1) * np.sum(sin_2 * sin_2)))
 
     @staticmethod
-    @njit("(float32[:], float32[:], float64[:], int64)")
+    @njit("(float32[:], float32[:], float64[:], int64)", cache=True)
     def sliding_circular_correlation(sample_1: np.ndarray, sample_2: np.ndarray, time_windows: np.ndarray, fps: float) -> np.ndarray:
 
         r"""
@@ -769,7 +769,7 @@ class CircularStatisticsMixin(object):
         return results.astype(np.float32)
 
     @staticmethod
-    @njit("(float32[:], float64[:], int64)")
+    @njit("(float32[:], float64[:], int64)", cache=True)
     def sliding_angular_diff(data: np.ndarray, time_windows: np.ndarray, fps: float) -> np.ndarray:
 
         """
@@ -809,7 +809,7 @@ class CircularStatisticsMixin(object):
         return results.astype(np.int64)
 
     @staticmethod
-    @njit("(float32[:], float64[:], int64)")
+    @njit("(float32[:], float64[:], int64)", cache=True)
     def agg_angular_diff_timebins(
         data: np.ndarray, time_windows: np.ndarray, fps: int
     ) -> np.ndarray:
@@ -861,7 +861,7 @@ class CircularStatisticsMixin(object):
         return np.rint(results)
 
     @staticmethod
-    @njit("(float32[:],)", parallel=True)
+    @njit("(float32[:],)", parallel=True, cache=True)
     def rao_spacing(data: np.array):
         """
         Jitted compute of Rao's spacing for angular data.
@@ -910,7 +910,7 @@ class CircularStatisticsMixin(object):
         return U
 
     @staticmethod
-    @njit("(float32[:], float64[:], int64)", parallel=True)
+    @njit("(float32[:], float64[:], int64)", parallel=True, cache=True)
     def sliding_rao_spacing(data: np.ndarray, time_windows: np.ndarray, fps: int) -> np.ndarray:
         """
         Jitted compute of the uniformity of a circular dataset in sliding windows.
@@ -964,7 +964,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:], float32[:])")
+    @njit("(float32[:], float32[:])", cache=True)
     def kuipers_two_sample_test(sample_1: np.ndarray, sample_2: np.ndarray) -> float:
         r"""
         Compute the Kuiper's two-sample test statistic for circular distributions.
@@ -1005,7 +1005,7 @@ class CircularStatisticsMixin(object):
         return np.amax(cdfv1 - np.arange(len(sample_1)) / float(len(sample_1))) + np.amax(cdfv2 - np.arange(len(sample_2)) / float(len(sample_2)))
 
     @staticmethod
-    @njit("(float32[:], float32[:], float64[:], int64)")
+    @njit("(float32[:], float32[:], float64[:], int64)", cache=True)
     def sliding_kuipers_two_sample_test(sample_1: np.ndarray, sample_2: np.ndarray, time_windows: np.ndarray, fps: int) -> np.ndarray:
         """
         Jitted compute of Kuipers two-sample test comparing two distributions with sliding time window.
@@ -1105,7 +1105,7 @@ class CircularStatisticsMixin(object):
         return H
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def watson_williams_test(sample_1: np.ndarray, sample_2: np.ndarray):
 
         variance1 = 1 - np.abs(np.mean(np.exp(1j * sample_1)))
@@ -1123,7 +1123,7 @@ class CircularStatisticsMixin(object):
         return n * (1 - np.abs(mean_vector))
 
     @staticmethod
-    @njit("(float32[:],)")
+    @njit("(float32[:],)", cache=True)
     def circular_range(data: np.ndarray) -> float:
         r"""
         Jitted compute of circular range in degrees. The range is defined as the angular span of the
@@ -1164,7 +1164,7 @@ class CircularStatisticsMixin(object):
         return np.ceil(np.rad2deg(min(2 * np.pi - circular_range, data[-1] - data[0])))
 
     @staticmethod
-    @njit("(float32[:], float64[:], int64)")
+    @njit("(float32[:], float64[:], int64)", cache=True)
     def sliding_circular_range(data: np.ndarray, time_windows: np.ndarray, fps: int ) -> np.ndarray:
         """
         Jitted compute of sliding circular range for a time series of circular data. The range is defined as the angular span of the
@@ -1205,7 +1205,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:], int64[:, :],)")
+    @njit("(float32[:], int64[:, :],)", cache=True)
     def circular_hotspots(data: np.ndarray, bins: np.ndarray) -> np.ndarray:
         """
         Calculate the proportion of data points falling within circular bins.
@@ -1249,7 +1249,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit("(float32[:], int64[:, :], float64, float64)")
+    @njit("(float32[:], int64[:, :], float64, float64)", cache=True)
     def sliding_circular_hotspots(data: np.ndarray, bins: np.ndarray, time_window: float, fps: float) -> np.ndarray:
         """
         Jitted compute of sliding circular hotspots in a dataset. Calculates circular hotspots in a time-series dataset by sliding a time window
@@ -1316,7 +1316,7 @@ class CircularStatisticsMixin(object):
         return results
 
     @staticmethod
-    @njit([(float32[:], int64), (float32[:], types.misc.Omitted(value=1))])
+    @njit([(float32[:], int64), (float32[:], types.misc.Omitted(value=1))], cache=True)
     def rotational_direction(data: np.ndarray, stride: int = 1) -> np.ndarray:
         """
         Jitted compute of frame-by-frame rotational direction within a 1D timeseries array of angular data.
@@ -1373,7 +1373,7 @@ class CircularStatisticsMixin(object):
     @staticmethod
     @njit(
         [(float64[:, :, :], int64), (float64[:, :, :], types.misc.Omitted(value=400))]
-    )
+    , cache=True)
     def fit_circle(data: np.ndarray, max_iterations: Optional[int] = 400) -> np.ndarray:
         """
         Fit a circle to a dataset using the least squares method.

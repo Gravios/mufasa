@@ -1242,7 +1242,7 @@ class TrainModelMixin(object):
         return x_train, x_test, y_train, y_test
 
     @staticmethod
-    @njit("(float32[:, :], float64, types.ListType(types.unicode_type))")
+    @njit("(float32[:, :], float64, types.ListType(types.unicode_type))", cache=True)
     def find_highly_correlated_fields(data: np.ndarray,threshold: float, field_names: types.ListType(types.unicode_type)) -> List[str]:
 
         """

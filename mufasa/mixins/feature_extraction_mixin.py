@@ -71,7 +71,7 @@ class FeatureExtractionMixin(object):
             self.col_headers_shifted = [bp + "_shifted" for bp in self.col_headers]
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def euclidean_distance(bp_1_x: np.ndarray,
                            bp_2_x: np.ndarray,
                            bp_1_y: np.ndarray,
@@ -133,7 +133,7 @@ class FeatureExtractionMixin(object):
         return ang + 360 if ang < 0 else ang
 
     @staticmethod
-    @jit(nopython=True, fastmath=True)
+    @jit(nopython=True, fastmath=True, cache=True)
     def angle3pt_vectorized(data: np.ndarray) -> np.ndarray:
         """
         Numba accelerated compute of frame-wise 3-point angles.
@@ -259,7 +259,7 @@ class FeatureExtractionMixin(object):
         return FeatureExtractionMixin.angle3pt_vectorized(data=np.concatenate([bp_1, bp_2, bp_3], axis=1).astype(np.float32))
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def count_values_in_range(data: np.ndarray, ranges: np.ndarray) -> np.ndarray:
         """
         Jitted helper finding count of values that falls within ranges. E.g., count number of pose-estimated
@@ -296,7 +296,7 @@ class FeatureExtractionMixin(object):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def framewise_euclidean_distance_roi(location_1: np.ndarray,
                                          location_2: np.ndarray,
                                          px_per_mm: float,
@@ -338,7 +338,7 @@ class FeatureExtractionMixin(object):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def framewise_inside_rectangle_roi(bp_location: np.ndarray, roi_coords: np.ndarray) -> np.ndarray:
         """
         Frame-wise analysis if animal is inside static rectangular ROI.
@@ -377,7 +377,7 @@ class FeatureExtractionMixin(object):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def is_inside_circle(bp: np.ndarray, roi_center: np.ndarray, roi_radius: int) -> np.ndarray:
         """
         Determines whether each body part in `bp` is inside or outside a given circular region.
@@ -407,7 +407,7 @@ class FeatureExtractionMixin(object):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def framewise_inside_polygon_roi(bp_location: np.ndarray, roi_coords: np.ndarray) -> np.ndarray:
         """
         Jitted helper for frame-wise detection if animal is inside static polygon ROI.
@@ -562,7 +562,7 @@ class FeatureExtractionMixin(object):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def cdist_3d(data: np.ndarray) -> np.ndarray:
         """
         Jitted analogue of meth:`scipy.cdist` for 3D array. Use to calculate Euclidean distances between
@@ -736,7 +736,7 @@ class FeatureExtractionMixin(object):
         return [x for x in bps if str(x) != "nan"]
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def jitted_line_crosses_to_nonstatic_targets(left_ear_array: np.ndarray,
                                                  right_ear_array: np.ndarray,
                                                  nose_array: np.ndarray,
@@ -797,7 +797,7 @@ class FeatureExtractionMixin(object):
         return results_array
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def jitted_line_crosses_to_static_targets(left_ear_array: np.ndarray,
                                               right_ear_array: np.ndarray,
                                               nose_array: np.ndarray,
@@ -1310,7 +1310,7 @@ class FeatureExtractionMixin(object):
             return False, coord
 
     @staticmethod
-    @njit("(int64[:,:], int64[:,:], float64)")
+    @njit("(int64[:,:], int64[:,:], float64)", cache=True)
     def find_midpoints(bp_1: np.ndarray,
                        bp_2: np.ndarray,
                        percentile: float) -> np.ndarray:

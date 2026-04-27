@@ -78,7 +78,7 @@ class Statistics(FeatureExtractionMixin):
         FeatureExtractionMixin.__init__(self)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def _hist_1d(data: np.ndarray,
                   bin_count: int,
                   range: np.ndarray,
@@ -399,7 +399,7 @@ class Statistics(FeatureExtractionMixin):
         return (ks, significance_bool)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def one_way_anova(
         sample_1: np.ndarray,
         sample_2: np.ndarray,
@@ -453,7 +453,7 @@ class Statistics(FeatureExtractionMixin):
         return (f, significance_bool)
 
     @staticmethod
-    @njit("(float32[:], )")
+    @njit("(float32[:], )", cache=True)
     def sliding_cumulative_mean(x: np.ndarray):
 
         """
@@ -2403,7 +2403,7 @@ class Statistics(FeatureExtractionMixin):
             return x[np.argsort(x[:, 0])][:, -1]
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def _hbos_compute(
         data: np.ndarray, histograms: typed.Dict, histogram_edges: typed.Dict
     ) -> np.ndarray:
@@ -2670,7 +2670,7 @@ class Statistics(FeatureExtractionMixin):
             return (sum_square_between / (sum_square_between + sum_square_within)) ** .5
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def sliding_eta_squared(x: np.ndarray, y: np.ndarray, window_sizes: np.ndarray, sample_rate: int) -> np.ndarray:
         """
         Calculate sliding window eta-squared, a measure of effect size for between-subjects designs,
@@ -2807,7 +2807,7 @@ class Statistics(FeatureExtractionMixin):
             return (np.sum(x) / x.shape[0]) / (np.sum(y) / y.shape[0])
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def sliding_relative_risk(x: np.ndarray, y: np.ndarray, window_sizes: np.ndarray, sample_rate: int) -> np.ndarray:
         """
         Calculate sliding relative risk values between two binary arrays using different window sizes.
@@ -2929,7 +2929,7 @@ class Statistics(FeatureExtractionMixin):
         return results
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def kmeans_1d(data: np.ndarray, k: int, max_iters: int, calc_medians: bool) -> Tuple[np.ndarray, np.ndarray, Union[None, types.DictType]]:
         """
         Perform k-means clustering on a 1-dimensional dataset.
@@ -4988,7 +4988,7 @@ class Statistics(FeatureExtractionMixin):
         return adjusted_mutual_info_score(labels_true=x, labels_pred=y)
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def czebyshev_distance(sample_1: np.ndarray, sample_2: np.ndarray) -> float:
 
         r"""

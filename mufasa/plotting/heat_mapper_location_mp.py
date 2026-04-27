@@ -217,7 +217,7 @@ class HeatMapperLocationMultiprocess(ConfigReader, PlottingMixin):
         if self.verbose: stdout_information(msg=f"Processing {len(self.data_paths)} video(s)...")
 
     @staticmethod
-    @jit(nopython=True)
+    @jit(nopython=True, cache=True)
     def __insert_group_idx_column(data: np.array, group: int, last_frm_idx: int):
         results = np.full((data.shape[0], data.shape[1], data.shape[2] + 2), np.nan)
         group_col = np.full((data.shape[1], 1), group)
