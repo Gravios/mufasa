@@ -829,20 +829,70 @@ def get_monitor_info() -> Tuple[Dict[int, Dict[str, Union[int, bool]]], Tuple[in
     """
     Helper to get main monitor / display resolution.
 
+    Uses :mod:`screeninfo` — a small dedicated library that does
+    exactly this, on every platform, with a stable API.
+
+    Falls back gracefully if ``screeninfo`` is unavailable or fails
+    (e.g. headless environment, locked-down container). Caller code
+    treats the return value as advisory (max display dimensions for
+    a draw canvas, etc.), so a 1920×1080 fallback is fine when
+    real values can't be obtained.
+
     .. note::
-       Returns dict containing the resolution of each available monitor. To get the virtual geometry, see :func:`mufasa.utils.lookups.get_display_resolution`, and tuple of main monitor width and height.
+       Returns dict containing the resolution of each available
+       monitor. To get the virtual geometry, see
+       :func:`mufasa.utils.lookups.get_display_resolution`, and a
+       tuple of main monitor width and height.
     """
-    monitors = pyglet.canvas.get_display().get_screens()
+    fallback_w, fallback_h = 1920, 1080
+    try:
+        from screeninfo import get_monitors
+        monitors = get_monitors()
+    except Exception:
+        # Either screeninfo isn't installed, or it failed to
+        # enumerate (no DISPLAY, locked container, etc.). Return a
+        # single-monitor stub at standard 1080p.
+        results = {0: {"width": fallback_w, "height": fallback_h,
+                       "primary": True}}
+        return results, (fallback_w, fallback_h)
+
+    if not monitors:
+        results = {0: {"width": fallback_w, "height": fallback_h,
+                       "primary": True}}
+        return results, (fallback_w, fallback_h)
+
     results = {}
     for monitor_cnt, monitor_info in enumerate(monitors):
-        primary = True if monitor_info.x == 0 and monitor_info.y == 0 else False
-        results[monitor_cnt] = {'width': monitor_info.width,
-                                 'height': monitor_info.height,
-                                 'primary': primary}
+        # screeninfo exposes is_primary directly when the platform
+        # reports it. If the attribute is *missing entirely* (older
+        # screeninfo, or an unsupported platform), fall back to the
+        # (x, y) == (0, 0) heuristic the original pyglet path used.
+        # When the attribute is present but False, trust it — this
+        # platform/screeninfo combo knows which monitor is primary
+        # and just told us it's not this one.
+        if hasattr(monitor_info, "is_primary"):
+            is_primary = bool(monitor_info.is_primary)
+        else:
+            x = getattr(monitor_info, "x", None)
+            y = getattr(monitor_info, "y", None)
+            is_primary = (x == 0 and y == 0)
+        results[monitor_cnt] = {
+            "width":   int(monitor_info.width),
+            "height":  int(monitor_info.height),
+            "primary": is_primary,
+        }
 
-    main_monitor = next(({'width': v['width'], 'height': v['height']} for v in results.values() if v.get('primary')), {'width': next(iter(results.values()))['width'], 'height': next(iter(results.values()))['height']})
+    # Pick the primary monitor; if none is flagged primary (rare),
+    # fall back to the first monitor in the list.
+    main_monitor = next(
+        ({"width": v["width"], "height": v["height"]}
+         for v in results.values() if v.get("primary")),
+        {"width":  next(iter(results.values()))["width"],
+         "height": next(iter(results.values()))["height"]},
+    )
 
-    return results, (int(main_monitor['width']), int(main_monitor['height']))
+    return results, (int(main_monitor["width"]),
+                     int(main_monitor["height"]))
 
 
 

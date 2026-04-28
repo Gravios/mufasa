@@ -368,38 +368,40 @@ class ROIVideoTableDialog(QDialog):
     # Row actions
     # ------------------------------------------------------------------ #
     def _draw(self, video_path: str) -> None:
-        """Spawn the OpenCV-based ROI drawing canvas in a subprocess.
+        """Open the Qt-native ROI definition panel for this video.
 
-        The drawing canvas (mufasa.roi_tools.roi_ui.ROI_ui) is a Tk
-        + OpenCV widget with its own event loop. Run it in a separate
-        process so it doesn't deadlock the Qt main loop, and so the
-        user can keep interacting with this dialog (open multiple
-        drawing windows, switch between them, etc.).
+        Replaces the previous subprocess-launched ROI_ui (which used
+        Tk + OpenCV with a clunky giant-icon SimBA panel). The new
+        panel is :class:`mufasa.ui_qt.dialogs.roi_define_panel.ROIDefinePanel`
+        — a GIMP-style compact Qt widget that runs in-process and shares
+        the workbench's event loop. The actual mouse-driven shape
+        drawing still happens in OpenCV (via ROISelector running in a
+        QThread inside the panel), but the surrounding controls are
+        all native Qt.
 
-        ROI_ui writes to the project's ROI_definitions.h5 on save, and
-        the QFileSystemWatcher will refresh this dialog's status
-        column automatically.
+        Multiple panels can be open simultaneously — one per video.
+        Each saves to the same project_folder/logs/measures/
+        ROI_definitions.h5; the QFileSystemWatcher on this dialog
+        refreshes the status column when any of them save.
         """
-        import subprocess
-        launcher = (
-            "import sys\n"
-            "from mufasa.roi_tools.roi_ui import ROI_ui\n"
-            "ROI_ui(config_path=sys.argv[1], video_path=sys.argv[2])\n"
-        )
         try:
-            proc = subprocess.Popen(
-                [sys.executable, "-c", launcher, self.config_path,
-                 video_path],
-                stdin=subprocess.DEVNULL,
+            from mufasa.ui_qt.dialogs.roi_define_panel import (
+                ROIDefinePanel,
             )
-            self._child_procs.append(proc)
-            print(f"ROI drawing window launched for {Path(video_path).stem} "
-                  f"(PID {proc.pid}). Save and close the window to "
-                  f"persist your ROIs.")
+            panel = ROIDefinePanel(
+                config_path=self.config_path, video_path=video_path,
+                parent=self,
+            )
+            # Connect the panel's saved signal to our refresh, so the
+            # status column updates immediately on save (in addition to
+            # the QFileSystemWatcher's debounced callback).
+            panel.saved.connect(lambda _name: self._populate_table())
+            panel.show()
+            self._child_procs.append(panel)   # keep ref so it isn't GC'd
         except Exception as exc:
             QMessageBox.critical(
-                self, "Launch failed",
-                f"Could not launch ROI drawing canvas: "
+                self, "Panel open failed",
+                f"Could not open ROI definition panel: "
                 f"{type(exc).__name__}: {exc}"
             )
 
