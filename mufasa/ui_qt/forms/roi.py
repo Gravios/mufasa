@@ -17,7 +17,7 @@ legacy popups:
 
 * :class:`ROIDefinitionsCSVImporterPopUp`
 * :class:`ROISizeStandardizerPopUp`
-* (Tk) :class:`ROIVideoTable` for interactive drawing
+* (Tk) :class:`ROIVideoTable` for video selection
       → :class:`ROIManageForm` (3 popups → 1, action dropdown:
         Draw / Import / Standardise)
 
@@ -25,11 +25,18 @@ legacy popups:
 * :class:`VisualizeROIFeaturesPopUp`
       → :class:`ROIVisualizeForm` (2 popups → 1, target dropdown)
 
-The interactive ROI drawing canvas is launched via the Draw action
-in ROIManageForm. We launch the existing Tk-based ROIVideoTable in
-a subprocess (mixing Tk and Qt event loops in one process is
-unreliable), so the workbench stays responsive while the user
-draws ROIs.
+When the user picks the Draw action and clicks Run, the form opens
+:class:`mufasa.ui_qt.dialogs.roi_video_table.ROIVideoTableDialog`
+on the Qt main thread (overrides the OperationForm's default
+worker-thread dispatch via ``on_run``). The dialog is a native Qt
+replacement for the legacy Tk video-table picker — earlier versions
+spawned the Tk popup in a subprocess but it was reported broken on
+recent Tk + Wayland combinations.
+
+The actual ROI-drawing canvas (rectangles / circles / polygons drawn
+on a frame with the mouse) is still the OpenCV-based ``ROI_ui``,
+which the new dialog spawns per-row in subprocesses so each drawing
+window runs independently and the Qt picker stays responsive.
 
 Design notes
 ------------
@@ -480,6 +487,42 @@ class ROIManageForm(OperationForm):
     def _on_action_changed(self, idx: int) -> None:
         self.stack.setCurrentIndex(idx)
 
+    # ------------------------------------------------------------------ #
+    # Override on_run so the 'draw' action opens a Qt dialog on the
+    # main thread instead of dispatching to a worker. Import and
+    # Standardise still use the default worker-thread runner via the
+    # base-class on_run.
+    # ------------------------------------------------------------------ #
+    def on_run(self) -> None:
+        try:
+            kwargs = self.collect_args()
+        except Exception as exc:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, f"{self.title}: invalid input", str(exc))
+            return
+        if kwargs.get("action") == "draw":
+            # Open the native Qt video-table dialog on the main thread.
+            # We bypass run_with_progress entirely — there's no work
+            # to do here, just bringing up a modal-but-not-blocking
+            # window. The user does the actual ROI-drawing inside the
+            # dialog (which spawns ROI_ui in subprocesses per video).
+            from mufasa.ui_qt.dialogs.roi_video_table import (
+                ROIVideoTableDialog,
+            )
+            top = self.window()   # the MufasaWorkbench
+            dlg = ROIVideoTableDialog(
+                config_path=kwargs["config_path"], parent=top,
+            )
+            dlg.show()
+            # Stash on the workbench so it isn't GC'd. Use the same
+            # _dialog_refs list that launch_dialog() uses, since the
+            # workbench's lifecycle clean-up already understands it.
+            top._dialog_refs = getattr(top, "_dialog_refs", [])
+            top._dialog_refs.append(dlg)
+            return
+        # All other actions go through the standard worker-thread path.
+        super().on_run()
+
     def collect_args(self) -> dict:
         if not self.config_path:
             raise RuntimeError("No project loaded.")
@@ -510,36 +553,10 @@ class ROIManageForm(OperationForm):
 
     def target(self, *, config_path: str, action: str, **params) -> None:
         if action == "draw":
-            # Launch ROIVideoTable in a subprocess. Tk + Qt in the
-            # same process is unreliable: the Tk mainloop blocks the
-            # Qt event loop, and shared global state (e.g. matplotlib
-            # backend) can get corrupted. A subprocess is also the
-            # right boundary for "this opens an OpenCV window the
-            # user controls" — closing the Tk window naturally
-            # terminates the child without affecting the workbench.
-            import subprocess
-            import sys
-            launcher_script = (
-                "import sys\n"
-                "from mufasa.ui.pop_ups.roi_video_table_pop_up import ROIVideoTable\n"
-                "ROIVideoTable(config_path=sys.argv[1])\n"
-            )
-            print(f"Launching ROI drawing window for project {config_path}...")
-            print("Close the ROI window when you're done; saved ROI "
-                  "definitions will appear in "
-                  "project_folder/logs/measures/ROI_definitions.h5")
-            proc = subprocess.Popen(
-                [sys.executable, "-c", launcher_script, config_path],
-                # Detach from the workbench's stdio so the child
-                # doesn't get killed if the runner pipes get closed.
-                stdin=subprocess.DEVNULL,
-            )
-            # Don't wait — let the user close the Tk window when ready.
-            # We return immediately so the workbench's runner sees the
-            # operation as 'launched OK' and the user can continue
-            # interacting with the workbench.
-            print(f"ROI drawing window launched (PID {proc.pid}). "
-                  "You can keep using the workbench while it's open.")
+            # The 'draw' action is intercepted in on_run() before this
+            # worker-thread method is invoked — it opens a Qt dialog
+            # on the main thread. If we somehow reach this branch, do
+            # nothing rather than crash.
             return
         if action == "import":
             from mufasa.roi_tools.import_roi_csvs import ROIDefinitionsCSVImporter
