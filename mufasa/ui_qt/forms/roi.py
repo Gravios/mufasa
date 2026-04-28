@@ -17,17 +17,19 @@ legacy popups:
 
 * :class:`ROIDefinitionsCSVImporterPopUp`
 * :class:`ROISizeStandardizerPopUp`
-      → :class:`ROIManageForm` (2 popups → 1, action dropdown)
+* (Tk) :class:`ROIVideoTable` for interactive drawing
+      → :class:`ROIManageForm` (3 popups → 1, action dropdown:
+        Draw / Import / Standardise)
 
 * :class:`VisualizeROITrackingPopUp`
 * :class:`VisualizeROIFeaturesPopUp`
       → :class:`ROIVisualizeForm` (2 popups → 1, target dropdown)
 
-Kept as a dedicated dialog:
-
-* ROI drawing/definition itself (the canvas where rectangles/circles/
-  polygons get placed on frames) — inherently interactive, opens its
-  own OpenCV window. Left alone by the port.
+The interactive ROI drawing canvas is launched via the Draw action
+in ROIManageForm. We launch the existing Tk-based ROIVideoTable in
+a subprocess (mixing Tk and Qt event loops in one process is
+unreliable), so the workbench stays responsive while the user
+draws ROIs.
 
 Design notes
 ------------
@@ -383,13 +385,15 @@ class ROIManageForm(OperationForm):
     :class:`QStackedWidget`.
     """
 
-    title = "ROI definitions — import / standardise"
-    description = ("Import previously-saved ROI definitions from CSV, "
-                   "or re-scale all ROIs to match a reference video's "
+    title = "ROI definitions — draw / import / standardise"
+    description = ("Draw ROIs interactively on each video, import "
+                   "previously-saved ROI definitions from CSV, or "
+                   "re-scale all ROIs to match a reference video's "
                    "pixels-per-mm calibration.")
 
-    ACTIONS = [("Import from CSV",   "import"),
-               ("Standardise sizes", "standardize")]
+    ACTIONS = [("Draw ROIs (interactive)", "draw"),
+               ("Import from CSV",         "import"),
+               ("Standardise sizes",       "standardize")]
 
     def build(self) -> None:
         form = QFormLayout()
@@ -402,6 +406,30 @@ class ROIManageForm(OperationForm):
         form.addRow("Action:", self.action_cb)
 
         self.stack = QStackedWidget(self)
+
+        # --- Draw panel --- #
+        # The drawing canvas is an OpenCV window driven by the Tk
+        # ROIVideoTable picker (project_folder/videos listing → click
+        # a row → draw on the frame). Mixing Tk and Qt event loops in
+        # the same process is fragile, so we launch it as a separate
+        # python subprocess. The user closes the Tk window when done;
+        # ROI definitions get saved to project_folder/logs/measures/
+        # ROI_definitions.h5 and are immediately picked up by the rest
+        # of the ROI page on next access.
+        draw_host = QWidget()
+        draw_form = QFormLayout(draw_host); draw_form.setContentsMargins(0, 0, 0, 0)
+        draw_note = QLabel(
+            "Click <b>Run</b> to open the ROI drawing window. It will "
+            "list every video in <code>project_folder/videos</code>; "
+            "click a row to launch the OpenCV canvas, draw rectangles, "
+            "circles, or polygons with the mouse, save, and close. "
+            "ROI definitions persist in <code>logs/measures/"
+            "ROI_definitions.h5</code>."
+        )
+        draw_note.setTextFormat(Qt.RichText)
+        draw_note.setWordWrap(True)
+        draw_form.addRow("", draw_note)
+        self.stack.addWidget(draw_host)
 
         # --- Import-from-CSV panel --- #
         imp_host = QWidget()
@@ -418,6 +446,21 @@ class ROIManageForm(OperationForm):
         self.append_existing = QCheckBox("Append to existing ROI definitions", self)
         self.append_existing.setChecked(True)
         imp_form.addRow("", self.append_existing)
+        # Format hint — saves users from chasing 'missing column' errors.
+        fmt_hint = QLabel(
+            "<b>CSV format:</b> see column lists in "
+            "<code>mufasa.roi_tools.import_roi_csvs</code> "
+            "(EXPECTED_RECT_COLS / EXPECTED_CIRC_COLS / "
+            "EXPECTED_POLY_COLS). Easiest way to get a correct file "
+            "is: draw ROIs once on one video, then export the "
+            "auto-generated CSV from "
+            "<code>logs/measures/ROI_definitions.h5</code> and adapt "
+            "it for other videos."
+        )
+        fmt_hint.setTextFormat(Qt.RichText)
+        fmt_hint.setWordWrap(True)
+        fmt_hint.setStyleSheet("color: palette(mid); padding: 4px;")
+        imp_form.addRow("", fmt_hint)
         self.stack.addWidget(imp_host)
 
         # --- Standardize panel --- #
@@ -441,6 +484,8 @@ class ROIManageForm(OperationForm):
         if not self.config_path:
             raise RuntimeError("No project loaded.")
         action = self.ACTIONS[self.action_cb.currentIndex()][1]
+        if action == "draw":
+            return {"config_path": self.config_path, "action": "draw"}
         if action == "import":
             rect = self.rect_csv.path or None
             circ = self.circle_csv.path or None
@@ -464,6 +509,38 @@ class ROIManageForm(OperationForm):
                 "reference_video": ref}
 
     def target(self, *, config_path: str, action: str, **params) -> None:
+        if action == "draw":
+            # Launch ROIVideoTable in a subprocess. Tk + Qt in the
+            # same process is unreliable: the Tk mainloop blocks the
+            # Qt event loop, and shared global state (e.g. matplotlib
+            # backend) can get corrupted. A subprocess is also the
+            # right boundary for "this opens an OpenCV window the
+            # user controls" — closing the Tk window naturally
+            # terminates the child without affecting the workbench.
+            import subprocess
+            import sys
+            launcher_script = (
+                "import sys\n"
+                "from mufasa.ui.pop_ups.roi_video_table_pop_up import ROIVideoTable\n"
+                "ROIVideoTable(config_path=sys.argv[1])\n"
+            )
+            print(f"Launching ROI drawing window for project {config_path}...")
+            print("Close the ROI window when you're done; saved ROI "
+                  "definitions will appear in "
+                  "project_folder/logs/measures/ROI_definitions.h5")
+            proc = subprocess.Popen(
+                [sys.executable, "-c", launcher_script, config_path],
+                # Detach from the workbench's stdio so the child
+                # doesn't get killed if the runner pipes get closed.
+                stdin=subprocess.DEVNULL,
+            )
+            # Don't wait — let the user close the Tk window when ready.
+            # We return immediately so the workbench's runner sees the
+            # operation as 'launched OK' and the user can continue
+            # interacting with the workbench.
+            print(f"ROI drawing window launched (PID {proc.pid}). "
+                  "You can keep using the workbench while it's open.")
+            return
         if action == "import":
             from mufasa.roi_tools.import_roi_csvs import ROIDefinitionsCSVImporter
             ROIDefinitionsCSVImporter(
