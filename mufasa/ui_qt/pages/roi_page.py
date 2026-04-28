@@ -2,18 +2,27 @@
 mufasa.ui_qt.pages.roi_page
 ===========================
 
-The ROI workbench page. Accordion sections:
+The ROI workbench page. Sections ordered by workflow precedence:
 
+* **Definitions**      — :class:`ROIManageForm` (2 popups). Comes
+  first because nothing else on this page works without ROIs to
+  reference.
 * **Analyze**          — :class:`ROIAnalysisForm` (3 popups).
-* **Features**         — :class:`ROIFeaturesForm` (3 popups).
-* **Definitions**      — :class:`ROIManageForm` (2 popups).
+  Aggregates / time-bins / etc. — what the typical user does next.
 * **Visualize**        — :class:`ROIVisualizeForm` (2 popups).
-* **Draw ROIs**        — placeholder; the ROI-drawing canvas opens an
-  OpenCV window and is handled by a Tools-menu action.
+  Inspect the analysis output by overlaying tracking / features
+  on the source video.
+* **Features**         — :class:`ROIFeaturesForm` (3 popups).
+  Append per-frame ROI features to an already-extracted feature CSV.
+  Last because it requires both ROIs and an existing feature file.
 
-Draw-ROIs menu action uses the existing
-:class:`mufasa.roi_tools.roi_selector.ROISelector` which already
-renders via OpenCV — Qt is the wrong layer to reimplement it.
+The order matches SimBA's left-to-right ROI tab layout (Definitions
+→ Analyze → Visualize → extras), with the Mufasa-specific 'Features'
+section sitting in the extras position.
+
+Draw-ROIs canvas opens an OpenCV window via
+:class:`mufasa.roi_tools.roi_selector.ROISelector` — Qt is the wrong
+layer to reimplement that.
 """
 from __future__ import annotations
 
@@ -27,10 +36,10 @@ from mufasa.ui_qt.workbench import WorkflowPage
 def build_roi_page(workbench, config_path: Optional[str] = None
                    ) -> WorkflowPage:
     page = workbench.add_page("ROI", icon_name="roi")
-    page.add_section("Analyze",        [(ROIAnalysisForm, {})])
-    page.add_section("Features",       [(ROIFeaturesForm, {})])
     page.add_section("Definitions",    [(ROIManageForm, {})])
+    page.add_section("Analyze",        [(ROIAnalysisForm, {})])
     page.add_section("Visualize",      [(ROIVisualizeForm, {})])
+    page.add_section("Features",       [(ROIFeaturesForm, {})])
     return page
 
 
