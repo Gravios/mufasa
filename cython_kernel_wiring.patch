@@ -1,0 +1,669 @@
+From 44c18eae68ff44b741c10bd80d946b46814d701a Mon Sep 17 00:00:00 2001
+From: Gravio <gravio@uni-muenster.de>
+Date: Thu, 30 Apr 2026 04:00:00 +0000
+Subject: [PATCH] cython kernel wiring: route production through _native
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Wires the validated Cython kernels into the production feature
+extraction pipeline. After this patch, running feature subsets
+extraction uses the AOT-compiled C kernels rather than numba.
+
+Workstation verification (user, on nphy-069 9800X3D 16-thread)
+showed all 9 kernels byte-equivalent to numba reference and
+median 6.15× speedup, with hull (parallel rewrite) achieving
+13-110× and border_distances achieving 320-345×.
+
+Strategy: local-alias rebinding
+-------------------------------
+
+Each kernel is imported under a local alias prefixed _kern_*
+inside a try/except block. The production code calls the alias.
+On import failure (Cython extensions not compiled), the except
+branch rebinds each alias to the corresponding numba kernel,
+emits a RuntimeWarning, and feature extraction continues with
+degraded performance instead of crashing.
+
+This pattern was chosen over alternatives:
+- Direct import + 11 individual call-site swaps: more diff
+  noise, no fallback path
+- Module-level monkey-patch of FeatureExtractionMixin methods:
+  surprising to readers, affects callers outside this file
+- Replacing FeatureExtractionMixin.* in-place: would also
+  affect roi_tools/ and other extractors that call these
+  kernels — not in scope; those modules can be wired in
+  follow-up patches
+
+Deliberate non-changes
+----------------------
+
+1. ``bodypart_distance``: pure-Python wrapper that does input
+   validation (check_valid_array, check_float, check_valid_boolean),
+   converts dtypes, and returns float32. Replacing the call here
+   would either lose validation or require duplicating it. Left
+   as-is — the validation is real value, and the underlying
+   Euclidean distance computation isn't a major cost since this
+   call path uses numba already.
+
+2. ``create_shifted_df``: pandas operation, not a numba kernel.
+   No Cython equivalent needed.
+
+3. _NATIVE_AVAILABLE module-level flag: set True/False based on
+   whether Cython extensions imported successfully. Useful for
+   diagnostics; tests can introspect it to know whether the
+   speedup path is active.
+
+Defensive fallback rationale
+----------------------------
+
+If a user pulls new code without re-running ``pip install -e .``,
+the Cython .so files won't exist. A hard ImportError would
+break feature extraction entirely. The try/except graceful
+fallback:
+
+- Emits warnings.warn(RuntimeWarning) with the fix:
+    "Run `pip install -e .` from the repo root to rebuild the
+     Cython extensions for full performance."
+- Rebinds aliases to numba kernels so feature extraction
+  continues working
+- Sets _NATIVE_AVAILABLE = False for diagnostics
+
+The warning is emitted at module load (stacklevel=2) so the
+user sees it once per process, not on every kernel call.
+
+What changed
+------------
+
+1. MODIFIED: mufasa/feature_extractors/feature_subset_kernels.py
+   - Renames numba ``jitted_hull`` import to ``_numba_jitted_hull``
+     (avoids clash with new ``_kern_hull`` alias)
+   - Adds try/except wiring block with 8 _kern_* aliases:
+       _kern_angle3pt, _kern_border_distances, _kern_euclid,
+       _kern_euclid_roi, _kern_hull, _kern_inside_circle,
+       _kern_inside_polygon, _kern_inside_rectangle
+   - Swaps 11 production call sites to use the aliases:
+       1× angle3pt
+       4× hull (perimeter ×3, area ×1)
+       1× framewise_euclidean_distance
+       1× framewise_euclidean_distance_roi
+       1× border_distances
+       1× framewise_inside_rectangle_roi
+       1× is_inside_circle
+       1× framewise_inside_polygon_roi
+   - Leaves bodypart_distance and create_shifted_df calls
+     unchanged (rationale above)
+
+2. MODIFIED: tests/smoke_cython_full_port_structure.py
+   - Old assertion "_native NOT in feature_subset_kernels"
+     was correct AT THE TIME of the port patch but is
+     invalidated by this wiring patch. Flipped to assert
+     _native IS imported, plus checks that the _kern_*
+     aliases land and _NATIVE_AVAILABLE is exposed.
+
+3. MODIFIED: tests/smoke_cython_poc_structure.py
+   - Same flip. POC's "must NOT yet route to Cython" was
+     correct AT THE TIME OF THE POC; this patch is the
+     "now route to Cython" moment.
+
+4. NEW: tests/smoke_cython_kernel_wiring.py — 8 cases:
+   - try/except import block exists with all 8 kernels
+   - Each alias resolves to its numba fallback in except
+   - Each alias is INVOKED (not just imported) at least once
+     in production call sites — guards against half-wiring
+   - _NATIVE_AVAILABLE flag exposed (True/False both present)
+   - Fallback emits RuntimeWarning mentioning `pip install`
+   - bodypart_distance and create_shifted_df remain unwired
+     by design
+   - No orphan FeatureExtractionMixin.* / FeatureExtractionSupplemental
+     calls outside the fallback block (catches incomplete wiring)
+   - jitted_hull import is renamed to _numba_jitted_hull to
+     avoid clash with _kern_hull
+
+USER ACTIONS:
+
+1. Apply patch
+2. pip install -e .  (no new compilation; the kernel .so files
+   from earlier patches are reused)
+3. Run a feature extraction job and observe:
+   - At process start, no RuntimeWarning means Cython kernels
+     are active
+   - If you see "Cython kernels unavailable; falling back to
+     numba" — extensions need recompiling
+4. Compare end-to-end runtime: previously ~hours, now should be
+   substantially faster on workloads dominated by border_distances
+   or hull. ROI-dominated workloads benefit from inside_rectangle's
+   O(N) fix (already in production via patch 50).
+
+Performance expectations on typical 67-video × 50K-frame workload:
+- If border_distances or hull is in the feature set, expect
+  10-50× total feature-extraction speedup
+- If only ROI tests + simple distances, expect ~3-5×
+  (limited by per-video overhead: parquet I/O, dataframe ops)
+
+Verified in sandbox:
+- All 21 smoke tests pass (3 new + 18 existing)
+- AST audit reports zero errors
+- compile clean
+
+Cannot be verified in sandbox:
+- That the wired kernels produce correct output on real data
+  (the sandbox can't run numba or compile Cython)
+- The exact end-to-end speedup on the user's workload
+
+Stack now at 53 patches:
+  52. hull_parallel_rewrite      (parallel nogil hull)
+  53. cython_kernel_wiring       (this patch)
+---
+ .../feature_subset_kernels.py                 | 113 +++++++---
+ tests/smoke_cython_full_port_structure.py     |  33 ++-
+ tests/smoke_cython_kernel_wiring.py           | 196 ++++++++++++++++++
+ tests/smoke_cython_poc_structure.py           |  29 ++-
+ 4 files changed, 325 insertions(+), 46 deletions(-)
+ create mode 100644 tests/smoke_cython_kernel_wiring.py
+
+diff --git a/mufasa/feature_extractors/feature_subset_kernels.py b/mufasa/feature_extractors/feature_subset_kernels.py
+index 5c85103..44a6bf4 100644
+--- a/mufasa/feature_extractors/feature_subset_kernels.py
++++ b/mufasa/feature_extractors/feature_subset_kernels.py
+@@ -61,7 +61,7 @@ from typing import Dict, Iterable, Mapping, Tuple
+ import numpy as np
+ import pandas as pd
+ 
+-from mufasa.feature_extractors.perimeter_jit import jitted_hull
++from mufasa.feature_extractors.perimeter_jit import jitted_hull as _numba_jitted_hull
+ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
+ from mufasa.mixins.feature_extraction_supplement_mixin import \
+     FeatureExtractionSupplemental
+@@ -69,6 +69,73 @@ from mufasa.utils.checks import check_valid_dataframe
+ from mufasa.utils.enums import ROI_SETTINGS, Formats
+ 
+ 
++# ---------------------------------------------------------------------- #
++# Cython kernel wiring
++# ---------------------------------------------------------------------- #
++# All seven hot kernels in this module have ahead-of-time-compiled
++# Cython equivalents in mufasa._native, validated byte-equivalent
++# against the numba reference (see tests/smoke_native_all_kernels.py
++# for the verification suite). Speedups vs numba on a 9800X3D:
++#   border_distances:                 ~340×
++#   hull (perimeter/area):            ~13-110× (parallel)
++#   framewise_euclidean_distance_roi: ~50×
++#   framewise_euclidean_distance:     ~5-10×
++#   inside_circle:                    ~1.8×
++#   inside_polygon, inside_rectangle: ~1.0-1.2×
++#   angle3pt_vectorized:              ~0.9× (slight regression;
++#                                            numba's fastmath atan2
++#                                            beats libc atan2)
++#
++# The angle3pt regression is small (~7% slower on a kernel that
++# itself takes ~17ms at 500K frames) and the Cython version is
++# preferred anyway for consistency.
++#
++# Defensive fallback: if any Cython kernel fails to import (e.g.
++# user pulled new code without re-running `pip install -e .`,
++# or the build failed silently), we fall back to the numba
++# version. This keeps feature extraction working — degraded
++# perf, never broken behavior.
++try:
++    from mufasa._native.angle3pt import angle3pt_vectorized as _kern_angle3pt
++    from mufasa._native.border_distances import border_distances as _kern_border_distances
++    from mufasa._native.euclidean_distance import (
++        framewise_euclidean_distance as _kern_euclid,
++        framewise_euclidean_distance_roi as _kern_euclid_roi,
++    )
++    from mufasa._native.hull import jitted_hull as _kern_hull
++    from mufasa._native.inside_circle import is_inside_circle as _kern_inside_circle
++    from mufasa._native.inside_polygon import (
++        framewise_inside_polygon_roi as _kern_inside_polygon,
++    )
++    from mufasa._native.inside_rectangle import (
++        framewise_inside_rectangle_roi as _kern_inside_rectangle,
++    )
++    _NATIVE_AVAILABLE = True
++except ImportError as _native_import_error:
++    # Fall back to numba for every kernel. A missing _native is
++    # almost always "user updated the source but didn't reinstall
++    # the package" — print a hint so they know how to fix it.
++    import warnings
++    warnings.warn(
++        f"mufasa._native Cython kernels unavailable "
++        f"({_native_import_error}); falling back to numba "
++        f"implementations. Run `pip install -e .` from the "
++        f"repo root to rebuild the Cython extensions for full "
++        f"performance.",
++        RuntimeWarning,
++        stacklevel=2,
++    )
++    _kern_angle3pt = FeatureExtractionMixin.angle3pt_vectorized
++    _kern_border_distances = FeatureExtractionSupplemental.border_distances
++    _kern_euclid = FeatureExtractionMixin.framewise_euclidean_distance
++    _kern_euclid_roi = FeatureExtractionMixin.framewise_euclidean_distance_roi
++    _kern_hull = _numba_jitted_hull
++    _kern_inside_circle = FeatureExtractionMixin.is_inside_circle
++    _kern_inside_polygon = FeatureExtractionMixin.framewise_inside_polygon_roi
++    _kern_inside_rectangle = FeatureExtractionMixin.framewise_inside_rectangle_roi
++    _NATIVE_AVAILABLE = False
++
++
+ SHAPE_TYPE = "Shape_type"
+ 
+ 
+@@ -153,7 +220,7 @@ def compute_three_point_angles(
+             col_names = _flat_xy_column_names(point)
+             out[
+                 f"Angle (degrees) {point[0]}-{point[1]}-{point[2]}"
+-            ] = FeatureExtractionMixin.angle3pt_vectorized(
++            ] = _kern_angle3pt(
+                 data=df[col_names].values,
+             )
+     return out
+@@ -192,7 +259,7 @@ def compute_three_point_hulls(
+                 f"{point[0]}-{point[1]}-{point[2]}"
+             )
+             out[col] = (
+-                jitted_hull(points=arr, target=Formats.PERIMETER.value)
++                _kern_hull(points=arr, target=Formats.PERIMETER.value)
+                 / px_per_mm
+             )
+     return out
+@@ -216,7 +283,7 @@ def compute_four_point_hulls(
+                 f"{point[0]}-{point[1]}-{point[2]}-{point[3]}"
+             )
+             out[col] = (
+-                jitted_hull(points=arr, target=Formats.PERIMETER.value)
++                _kern_hull(points=arr, target=Formats.PERIMETER.value)
+                 / px_per_mm
+             )
+     return out
+@@ -244,12 +311,12 @@ def compute_animal_convex_hulls(
+         arr = _reshape_for_hull(df, bps)
+         if method == "perimeter":
+             out[f"{animal} convex hull perimeter (mm)"] = (
+-                jitted_hull(points=arr, target=Formats.PERIMETER.value)
++                _kern_hull(points=arr, target=Formats.PERIMETER.value)
+                 / px_per_mm
+             )
+         else:
+             out[f"{animal} convex hull area (mm2)"] = (
+-                jitted_hull(points=arr, target=Formats.AREA.value)
++                _kern_hull(points=arr, target=Formats.AREA.value)
+                 / px_per_mm
+             )
+     return out
+@@ -278,7 +345,7 @@ def compute_framewise_movement(
+             ).values
+             x, y = bp_arr[:, 0:2], bp_arr[:, 2:4]
+             out[f"{animal} movement {bp} (mm)"] = (
+-                FeatureExtractionMixin.framewise_euclidean_distance(
++                _kern_euclid(
+                     location_1=x.astype(np.float64),
+                     location_2=y.astype(np.float64),
+                     px_per_mm=np.float64(px_per_mm),
+@@ -319,7 +386,7 @@ def compute_roi_center_distances(
+                 ).astype(np.int32)
+                 out[
+                     f"{animal} {bp} to {roi_name} center distance (mm)"
+-                ] = FeatureExtractionMixin.framewise_euclidean_distance_roi(
++                ] = _kern_euclid_roi(
+                     location_1=bp_arr,
+                     location_2=center_point,
+                     px_per_mm=px_per_mm,
+@@ -352,7 +419,7 @@ def compute_distances_to_frame_edge(
+                 required_fields=[x_col, y_col],
+             )
+             bp_arr = df[[x_col, y_col]].values.astype(np.float32)
+-            distance = FeatureExtractionSupplemental().border_distances(
++            distance = _kern_border_distances(
+                 data=bp_arr,
+                 pixels_per_mm=px_per_mm,
+                 img_resolution=img_resolution,
+@@ -407,12 +474,9 @@ def compute_inside_roi(
+                     out[
+                         f"{animal} {bp} inside rectangle "
+                         f"{roi_name} (Boolean)"
+-                    ] = (
+-                        FeatureExtractionMixin
+-                        .framewise_inside_rectangle_roi(
+-                            bp_location=bp_arr,
+-                            roi_coords=roi_coords,
+-                        )
++                    ] = _kern_inside_rectangle(
++                        bp_location=bp_arr,
++                        roi_coords=roi_coords,
+                     )
+                 elif shape == ROI_SETTINGS.CIRCLE.value:
+                     circle_center = np.array(
+@@ -421,24 +485,19 @@ def compute_inside_roi(
+                     out[
+                         f"{animal} {bp} inside circle "
+                         f"{roi_name} (Boolean)"
+-                    ] = (
+-                        FeatureExtractionMixin.is_inside_circle(
+-                            bp=bp_arr,
+-                            roi_center=circle_center,
+-                            roi_radius=roi_data["radius"],
+-                        )
++                    ] = _kern_inside_circle(
++                        bp=bp_arr,
++                        roi_center=circle_center,
++                        roi_radius=roi_data["radius"],
+                     )
+                 elif shape == ROI_SETTINGS.POLYGON.value:
+                     vertices = roi_data["vertices"].astype(np.int32)
+                     out[
+                         f"{animal} {bp} inside polygon "
+                         f"{roi_name} (Boolean)"
+-                    ] = (
+-                        FeatureExtractionMixin
+-                        .framewise_inside_polygon_roi(
+-                            bp_location=bp_arr,
+-                            roi_coords=vertices,
+-                        )
++                    ] = _kern_inside_polygon(
++                        bp_location=bp_arr,
++                        roi_coords=vertices,
+                     )
+     return out
+ 
+diff --git a/tests/smoke_cython_full_port_structure.py b/tests/smoke_cython_full_port_structure.py
+index b110a82..f2250f0 100644
+--- a/tests/smoke_cython_full_port_structure.py
++++ b/tests/smoke_cython_full_port_structure.py
+@@ -145,18 +145,35 @@ def main() -> int:
+     )
+ 
+     # ------------------------------------------------------------------ #
+-    # Case 7: kernel chain (feature_subset_kernels.py) still uses
+-    # the numba imports — Cython kernels exist but aren't yet wired
+-    # into production.
++    # Case 7: kernel chain (feature_subset_kernels.py) IS wired to
++    # the Cython kernels via the cython_kernel_wiring patch. Earlier
++    # patches in the stack required this to be additive (Cython
++    # alongside numba); after wiring, feature_subset_kernels imports
++    # from mufasa._native AND retains the numba fallback.
+     # ------------------------------------------------------------------ #
+     kernels = Path(
+         "mufasa/feature_extractors/feature_subset_kernels.py"
+     ).read_text()
+-    assert "_native" not in kernels, (
+-        "feature_subset_kernels.py imports from mufasa._native — "
+-        "Cython kernels are not yet supposed to be wired into "
+-        "production. Wire them in a follow-up patch only after "
+-        "smoke_native_all_kernels.py validates byte-equivalence."
++    assert "_native" in kernels, (
++        "feature_subset_kernels.py should import from "
++        "mufasa._native (the wiring patch routes production "
++        "calls through the Cython kernels). If the wiring was "
++        "intentionally rolled back, also revert this assertion."
++    )
++    # Specifically, the wiring imports rebind to local names like
++    # _kern_angle3pt etc. Verify a few of those landed.
++    for kern in ["_kern_angle3pt", "_kern_hull",
++                 "_kern_inside_polygon", "_kern_border_distances"]:
++        assert kern in kernels, (
++            f"Wiring incomplete: {kern} not bound in "
++            f"feature_subset_kernels.py"
++        )
++    # And the numba fallback path must still exist for safety
++    # when Cython extensions aren't compiled.
++    assert "_NATIVE_AVAILABLE" in kernels, (
++        "feature_subset_kernels.py should expose a _NATIVE_AVAILABLE "
++        "flag so callers/tests can introspect whether Cython kernels "
++        "are in use"
+     )
+ 
+     # ------------------------------------------------------------------ #
+diff --git a/tests/smoke_cython_kernel_wiring.py b/tests/smoke_cython_kernel_wiring.py
+new file mode 100644
+index 0000000..e9330f2
+--- /dev/null
++++ b/tests/smoke_cython_kernel_wiring.py
+@@ -0,0 +1,196 @@
++"""Structural test for Cython kernel wiring in feature_subset_kernels.
++
++Verifies that production calls in mufasa/feature_extractors/feature_subset_kernels.py
++are routed through the _native (Cython) kernels via local aliases,
++and that a numba fallback is preserved for environments where
++the Cython extensions aren't compiled.
++
++Sandbox-runnable — no Cython compilation needed.
++
++    PYTHONPATH=. python tests/smoke_cython_kernel_wiring.py
++"""
++from __future__ import annotations
++
++import ast
++import re
++import sys
++from pathlib import Path
++
++
++# Map of Cython kernel local-alias names → expected production
++# callers. Each alias should be:
++#   1. defined in the import block (try: ... from mufasa._native...)
++#   2. assigned to a numba fallback in the except block
++#   3. invoked at least once in the body of the file
++EXPECTED_ALIASES = {
++    "_kern_angle3pt":          "angle3pt_vectorized",
++    "_kern_border_distances":  "border_distances",
++    "_kern_euclid":            "framewise_euclidean_distance",
++    "_kern_euclid_roi":        "framewise_euclidean_distance_roi",
++    "_kern_hull":              "jitted_hull",
++    "_kern_inside_circle":     "is_inside_circle",
++    "_kern_inside_polygon":    "framewise_inside_polygon_roi",
++    "_kern_inside_rectangle":  "framewise_inside_rectangle_roi",
++}
++
++
++def main() -> int:
++    src = Path(
++        "mufasa/feature_extractors/feature_subset_kernels.py"
++    ).read_text()
++
++    # ------------------------------------------------------------------ #
++    # Case 1: try/except import block exists with all 8 kernels
++    # ------------------------------------------------------------------ #
++    tree = ast.parse(src)
++    found_try = None
++    for node in tree.body:
++        if isinstance(node, ast.Try):
++            try_src = ast.unparse(node)
++            if "mufasa._native" in try_src:
++                found_try = node
++                break
++    assert found_try is not None, (
++        "feature_subset_kernels.py should have a try/except block "
++        "importing from mufasa._native with a numba fallback"
++    )
++    try_src = ast.unparse(found_try)
++    for alias in EXPECTED_ALIASES:
++        assert alias in try_src, (
++            f"alias {alias} must appear in the try/except wiring block"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 2: each alias resolves to the matching numba fallback in
++    # the except branch. This protects users when _native is
++    # unavailable (e.g. they pulled new code without reinstalling).
++    # ------------------------------------------------------------------ #
++    # Get the except-handler body source
++    handler_srcs = []
++    for handler in found_try.handlers:
++        handler_srcs.append(ast.unparse(handler))
++    fallback_src = "\n".join(handler_srcs)
++    for alias, kernel_name in EXPECTED_ALIASES.items():
++        # The fallback should contain `_kern_X = ...kernel_name...`
++        # E.g. `_kern_angle3pt = FeatureExtractionMixin.angle3pt_vectorized`
++        assert (
++            f"{alias} = " in fallback_src
++            and kernel_name in fallback_src
++        ), (
++            f"Fallback path missing assignment for {alias} → "
++            f"a numba kernel with name {kernel_name!r}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 3: each alias is INVOKED at least once in the production
++    # call sites (not just imported — actually used)
++    # ------------------------------------------------------------------ #
++    # Strip the try/except block by line range. ast.unparse produces
++    # a normalized form that doesn't byte-match the source, so we
++    # use line numbers to slice the original source instead.
++    src_lines = src.splitlines(keepends=True)
++    try_start = found_try.lineno - 1
++    try_end = found_try.end_lineno  # exclusive
++    src_no_try = "".join(
++        src_lines[:try_start] + src_lines[try_end:]
++    )
++    for alias in EXPECTED_ALIASES:
++        # Must appear as a call: alias(
++        # Allow for line breaks: alias\n( or alias (
++        pattern = re.compile(
++            rf"{re.escape(alias)}\s*\("
++        )
++        assert pattern.search(src_no_try), (
++            f"{alias} is wired in imports but never called from "
++            f"production code paths — wiring is incomplete"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 4: _NATIVE_AVAILABLE flag exposed for introspection
++    # ------------------------------------------------------------------ #
++    assert "_NATIVE_AVAILABLE" in src, (
++        "feature_subset_kernels.py should expose _NATIVE_AVAILABLE "
++        "so callers/tests can check whether Cython kernels are in use"
++    )
++    # Set to True in the try-success path
++    assert "_NATIVE_AVAILABLE = True" in src, (
++        "_NATIVE_AVAILABLE = True should be set when Cython imports "
++        "succeed"
++    )
++    # Set to False in fallback
++    assert "_NATIVE_AVAILABLE = False" in src, (
++        "_NATIVE_AVAILABLE = False should be set in the numba "
++        "fallback path"
++    )
++
++    # ------------------------------------------------------------------ #
++    # Case 5: when _native is unavailable, a warning is emitted so
++    # the user knows they need to reinstall
++    # ------------------------------------------------------------------ #
++    assert "warnings.warn" in fallback_src, (
++        "Fallback path should emit warnings.warn so the user knows "
++        "Cython kernels aren't being used"
++    )
++    assert "pip install" in fallback_src, (
++        "Warning message should mention `pip install` as the fix"
++    )
++    # RuntimeWarning is the appropriate category — it's
++    # actionable, not a deprecation
++    assert "RuntimeWarning" in fallback_src
++
++    # ------------------------------------------------------------------ #
++    # Case 6: bodypart_distance and create_shifted_df remain unwired.
++    # bodypart_distance has input validation we don't replicate;
++    # create_shifted_df is pandas, not a numba kernel.
++    # ------------------------------------------------------------------ #
++    assert "FeatureExtractionMixin.bodypart_distance(" in src_no_try, (
++        "bodypart_distance call should be retained — it has "
++        "validation we don't replicate at the call site"
++    )
++    assert "create_shifted_df" in src_no_try, (
++        "create_shifted_df call should be retained — pandas operation, "
++        "not a numba kernel"
++    )
++
++    # ------------------------------------------------------------------ #
++    # Case 7: no orphan calls. Every previously-numba kernel call in
++    # the body should now use the alias. We check by ensuring
++    # specific old patterns no longer appear in the production body.
++    # ------------------------------------------------------------------ #
++    forbidden_patterns_in_body = [
++        # These were the old direct numba calls; should be gone
++        # from the production body (they remain only in the fallback
++        # block, which we excluded via src_no_try).
++        "FeatureExtractionMixin.framewise_inside_polygon_roi",
++        "FeatureExtractionMixin.framewise_inside_rectangle_roi",
++        "FeatureExtractionMixin.is_inside_circle",
++        "FeatureExtractionMixin.framewise_euclidean_distance(",
++        "FeatureExtractionMixin.framewise_euclidean_distance_roi",
++        "FeatureExtractionMixin.angle3pt_vectorized",
++        "FeatureExtractionSupplemental().border_distances",
++        "FeatureExtractionSupplemental.border_distances",
++    ]
++    for pat in forbidden_patterns_in_body:
++        assert pat not in src_no_try, (
++            f"Old direct numba call {pat!r} still appears in the "
++            f"production body — wiring is incomplete (should use "
++            f"_kern_* alias instead)"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 8: jitted_hull alias chain works — `jitted_hull` import
++    # is renamed to `_numba_jitted_hull` so it doesn't clash with
++    # `_kern_hull`
++    # ------------------------------------------------------------------ #
++    assert "jitted_hull as _numba_jitted_hull" in src, (
++        "Original numba jitted_hull import should be renamed to "
++        "_numba_jitted_hull to avoid colliding with the Cython "
++        "kernel local alias _kern_hull"
++    )
++
++    print("smoke_cython_kernel_wiring: 8/8 cases passed")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tests/smoke_cython_poc_structure.py b/tests/smoke_cython_poc_structure.py
+index 4e95b09..66d13f6 100644
+--- a/tests/smoke_cython_poc_structure.py
++++ b/tests/smoke_cython_poc_structure.py
+@@ -145,25 +145,32 @@ def main() -> int:
+     )
+ 
+     # ------------------------------------------------------------------ #
+-    # Case 8: kernel chain (feature_subset_kernels.py) still calls
+-    # the numba version (NOT the Cython version) — so production
+-    # behavior is unchanged by the POC
++    # Case 8: kernel chain (feature_subset_kernels.py) still
++    # references the polygon kernel name. After the wiring patch,
++    # it now calls _native via local _kern_* aliases AND retains
++    # the numba versions in the fallback path. The POC's "must
++    # NOT yet route to Cython" assertion was correct AT THE TIME
++    # OF THE POC but is invalidated by the later wiring patch.
+     # ------------------------------------------------------------------ #
+     kernels = Path(
+         "mufasa/feature_extractors/feature_subset_kernels.py"
+     ).read_text()
+     assert "framewise_inside_polygon_roi" in kernels, (
+-        "feature_subset_kernels should still call the polygon kernel"
++        "feature_subset_kernels should still reference the polygon "
++        "kernel name (in fallback path or as part of import alias)"
+     )
++    # FeatureExtractionMixin is still referenced in the fallback
++    # path (when _native is unavailable). Verify it's there.
+     assert "FeatureExtractionMixin" in kernels, (
+-        "feature_subset_kernels should still call via the numba "
+-        "FeatureExtractionMixin (not _native) until POC validates"
++        "feature_subset_kernels should retain numba fallback via "
++        "FeatureExtractionMixin"
+     )
+-    assert "_native" not in kernels, (
+-        "feature_subset_kernels must NOT yet route to the Cython "
+-        "version — it's a proof of concept, not a production "
+-        "swap. Wire it in only after the workstation benchmark "
+-        "shows byte-equivalence and acceptable speed."
++    # After wiring, _native IS imported. This used to be a
++    # negative assertion; now it's positive.
++    assert "_native" in kernels, (
++        "After the wiring patch, feature_subset_kernels.py must "
++        "import from mufasa._native. If wiring was rolled back, "
++        "update this assertion."
+     )
+ 
+     print("smoke_cython_poc_structure: 8/8 cases passed")
+-- 
+2.43.0
+
