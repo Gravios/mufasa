@@ -173,15 +173,31 @@ def main() -> int:
     assert "numpy" in bs.lower()
 
     # ------------------------------------------------------------------ #
-    # Case 9: hull.pyx implements both perimeter and area branches
+    # Case 9: hull.pyx implements both perimeter and area branches.
+    # The parallel rewrite uses an int flag (target_is_perimeter)
+    # rather than string comparison inside the nogil section, so
+    # the literal `target == "area"` no longer appears in the
+    # dispatch — only `!= "area"` in input validation. Verify the
+    # branch logic exists via the flag-based dispatch.
     # ------------------------------------------------------------------ #
     hull = Path("mufasa/_native/hull.pyx").read_text()
-    assert 'target == "perimeter"' in hull
-    assert 'target == "area"' in hull
-    assert "_perimeter(" in hull
-    assert "_area(" in hull
-    # Has the QuickHull recursive helper
-    assert "_process(" in hull
+    assert 'target == "perimeter"' in hull, (
+        "hull.pyx must distinguish target='perimeter'"
+    )
+    assert '"area"' in hull, (
+        "hull.pyx must reference area mode somewhere"
+    )
+    assert "target_is_perimeter" in hull, (
+        "hull.pyx should use a perimeter/area flag inside the "
+        "nogil section (string comparison can't be done nogil)"
+    )
+    assert "_compute_hull_metric" in hull, (
+        "hull.pyx should have a _compute_hull_metric helper"
+    )
+    # Has the QuickHull (formerly recursive, now iterative)
+    assert "_quickhull(" in hull, (
+        "hull.pyx should have a _quickhull helper"
+    )
 
     # ------------------------------------------------------------------ #
     # Case 10: angle3pt uses libc.math (atan2) for byte-equivalence,
