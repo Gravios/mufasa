@@ -13,19 +13,20 @@ except:
 
 from itertools import combinations
 
-from mufasa.feature_extractors.perimeter_jit import jitted_hull
+from mufasa.feature_extractors.feature_subset_kernels import (
+    compute_animal_convex_hulls, compute_distances_to_frame_edge,
+    compute_four_point_hulls, compute_framewise_movement,
+    compute_inside_roi, compute_roi_center_distances,
+    compute_three_point_angles, compute_three_point_hulls,
+    compute_two_point_distances)
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
 from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.roi_tools.roi_utils import get_roi_dict_from_dfs
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
     check_file_exist_and_readable, check_if_dir_exists,
     check_same_files_exist_in_all_directories, check_valid_boolean,
-    check_valid_dataframe, check_valid_lst, check_video_has_rois)
-from mufasa.utils.enums import ROI_SETTINGS, Formats
+    check_valid_lst, check_video_has_rois)
 from mufasa.utils.errors import (DuplicationError, InvalidInputError,
                                 NoFilesFoundError, NoROIDataError)
 from mufasa.utils.printing import SimbaTimer, stdout_success
@@ -33,6 +34,9 @@ from mufasa.utils.read_write import (copy_files_in_directory,
                                     find_files_of_filetypes_in_directory,
                                     get_fn_ext, read_df, remove_a_folder,
                                     remove_multiple_folders, write_df)
+
+# Constants below are kept (not moved to kernels module) because they
+# define the public API for `feature_families` parameter values.
 
 SHAPE_TYPE = "Shape_type"
 TWO_POINT_BP_DISTANCES = 'TWO-POINT BODY-PART DISTANCES (MM)'
@@ -134,11 +138,105 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         if (FRAME_BP_TO_ROI_CENTER in feature_families) or (FRAME_BP_INSIDE_ROI in feature_families):
             if not os.path.isfile(self.roi_coordinates_path):
                 raise NoROIDataError(msg=f'Cannot compute ROI features: The SimBA project has no ROI data defined.')
-            self.read_roi_data(); check_video_has_rois(roi_dict=self.roi_dict)
+            self.read_roi_data()
+            # Identify videos that are missing some of the ROIs the
+            # feature pipeline expects. Default behavior of
+            # check_video_has_rois unions every ROI name across every
+            # labeled video — so if you defined "platform" on one
+            # video, every other video is required to have "platform"
+            # too. That's strict-by-default but matches how downstream
+            # ROI-feature columns are laid out (one column per
+            # (video × ROI) pair).
+            #
+            # Earlier versions raised NoROIDataError on the first
+            # missing combination, dumping a giant dict to the user's
+            # screen and aborting the whole 67-video run. The honest
+            # research workflow is: label ROIs on the videos you care
+            # about, run feature extraction on those, leave the rest
+            # for later. So now we collect the missing list, skip
+            # those videos, log what got skipped, and proceed with
+            # the videos that have complete ROI coverage.
+            check_result = check_video_has_rois(roi_dict=self.roi_dict,
+                                                  raise_error=False)
+            videos_with_complete_rois: set[str] = set()
+            videos_skipped: dict[str, list[str]] = {}
+            if check_result is True:
+                videos_with_complete_rois = set(self.video_names)
+            else:
+                # check_video_has_rois returned (False, missing_rois)
+                _, missing_rois = check_result
+                for vname, missing_list in missing_rois.items():
+                    if not missing_list:
+                        videos_with_complete_rois.add(vname)
+                    else:
+                        videos_skipped[vname] = list(missing_list)
+
             self.roi_dict = get_roi_dict_from_dfs(rectangle_df=self.rectangles_df, circle_df=self.circles_df, polygon_df=self.polygon_df, video_name_nesting=True)
-            missing_roi_videos = [x for x in self.video_names if x not in list(self.roi_dict.keys())]
-            if len(missing_roi_videos) > 0:
-                raise NoROIDataError(msg=f'Cannot compute ROI features: The following videos have no ROIs: {missing_roi_videos}')
+            # Also catch videos that have ZERO ROIs (don't appear in
+            # the ROI dataframe at all). check_video_has_rois only
+            # reports videos that ARE in the dataframe.
+            videos_with_no_rois_at_all = [
+                v for v in self.video_names
+                if v not in self.roi_dict
+            ]
+            for v in videos_with_no_rois_at_all:
+                videos_skipped[v] = ["(no ROIs defined for this video)"]
+
+            # Filter data_paths / video_names down to the videos that
+            # have complete ROI coverage. Keep both lists in sync.
+            target_video_names = [
+                v for v in self.video_names
+                if v in self.roi_dict and v in videos_with_complete_rois
+            ]
+            if not target_video_names:
+                raise NoROIDataError(
+                    msg=(
+                        "Cannot compute ROI features: none of the "
+                        f"{len(self.video_names)} videos have all "
+                        "required ROIs defined. Define ROIs on at "
+                        "least one video before running ROI features."
+                    ),
+                    source=self.__class__.__name__,
+                )
+
+            # Surface the skip decisions: stdout for the workbench
+            # log, plus a CSV in the temp dir for permanent record.
+            if videos_skipped:
+                n_skip = len(videos_skipped)
+                n_run = len(target_video_names)
+                print(
+                    f"WARNING: ROI feature extraction will SKIP "
+                    f"{n_skip} of {len(self.video_names)} videos that "
+                    f"are missing one or more required ROIs; "
+                    f"continuing with {n_run} videos that have "
+                    f"complete ROI coverage."
+                )
+                # Write a CSV so the user can see exactly what got
+                # skipped and which ROIs were missing for each.
+                try:
+                    import csv
+                    skip_log_path = os.path.join(
+                        self.temp_dir, "skipped_videos_missing_rois.csv",
+                    )
+                    with open(skip_log_path, "w", newline="") as fh:
+                        writer = csv.writer(fh)
+                        writer.writerow(["video", "missing_rois"])
+                        for v, missing in sorted(videos_skipped.items()):
+                            writer.writerow([v, ";".join(missing)])
+                    print(f"Skipped-video details: {skip_log_path}")
+                except Exception as exc:
+                    # Don't let a logging failure abort the run.
+                    print(f"(Could not write skip log: "
+                          f"{type(exc).__name__}: {exc})")
+
+            # Apply the filter to data_paths and video_names so the
+            # main run() loop only processes the kept videos.
+            kept = set(target_video_names)
+            self.data_paths = [
+                p for p in self.data_paths
+                if get_fn_ext(filepath=p)[1] in kept
+            ]
+            self.video_names = target_video_names
         self.__get_bp_combinations()
 
     def __get_bp_combinations(self):
@@ -154,90 +252,95 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             self.within_animal_four_point_combs[animal] = np.array(list(combinations(animal_bps, 4)))
 
     def _get_two_point_bp_distances(self):
-        for cnt, c in enumerate(self.two_point_combs):
-            x1, y1, x2, y2 = list(sum([(f"{x}_x", f"{y}_y") for (x, y) in zip(c, c)], ()))
-            bp1 = self.data_df[[x1, y1]].values
-            bp2 = self.data_df[[x2, y2]].values
-            self.results[f"Distance (mm) {c[0]}-{c[1]}"] = FeatureExtractionMixin.bodypart_distance(bp1_coords=bp1.astype(np.int32), bp2_coords=bp2.astype(np.int32), px_per_mm=np.float64(self.px_per_mm), in_centimeters=False)
+        # Delegated to mufasa.feature_extractors.feature_subset_kernels.
+        # The kernel is a pure function — easier to test in isolation
+        # and a building block for future per-video parallelization.
+        cols = compute_two_point_distances(
+            df=self.data_df,
+            two_point_combs=self.two_point_combs,
+            px_per_mm=self.px_per_mm,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __get_three_point_angles(self):
-        for animal, points in self.within_animal_three_point_combs.items():
-            for point in points:
-                col_names = list(sum([(f"{x}_x", f"{y}_y") for (x, y) in zip(point, point)], ()))
-                self.results[f"Angle (degrees) {point[0]}-{point[1]}-{point[2]}"] = (FeatureExtractionMixin.angle3pt_vectorized(data=self.data_df[col_names].values))
+        cols = compute_three_point_angles(
+            df=self.data_df,
+            within_animal_three_point_combs=self.within_animal_three_point_combs,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __get_three_point_hulls(self):
-        for animal, points in self.within_animal_three_point_combs.items():
-            for point in points:
-                col_names = list(sum([(f"{x}_x", f"{y}_y") for (x, y) in zip(point, point)], ()))
-                three_point_arr = np.reshape(self.data_df[col_names].values, (len(self.data_df / 2), -1, 2)).astype(np.float32)
-                self.results[f"{animal} three-point convex hull perimeter (mm) {point[0]}-{point[1]}-{point[2]}"] = (jitted_hull(points=three_point_arr, target=Formats.PERIMETER.value) / self.px_per_mm)
+        cols = compute_three_point_hulls(
+            df=self.data_df,
+            within_animal_three_point_combs=self.within_animal_three_point_combs,
+            px_per_mm=self.px_per_mm,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __get_four_point_hulls(self):
-        for animal, points in self.within_animal_four_point_combs.items():
-            for point in points:
-                col_names = list(sum([(f"{x}_x", f"{y}_y") for (x, y) in zip(point, point)], ()))
-                four_point_arr = np.reshape(self.data_df[col_names].values, (len(self.data_df / 2), -1, 2) ).astype(np.float32)
-                self.results[f"{animal} four-point convex perimeter (mm) {point[0]}-{point[1]}-{point[2]}-{point[3]}"] = (jitted_hull(points=four_point_arr, target=Formats.PERIMETER.value) / self.px_per_mm)
-
+        cols = compute_four_point_hulls(
+            df=self.data_df,
+            within_animal_four_point_combs=self.within_animal_four_point_combs,
+            px_per_mm=self.px_per_mm,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __get_convex_hulls(self, method: str):
-        for animal, point in self.animal_bps.items():
-            col_names = list(sum([(f"{x}_x", f"{y}_y") for (x, y) in zip(point, point)], ()))
-            animal_point_arr = np.reshape(self.data_df[col_names].values, (len(self.data_df / 2), -1, 2)).astype(np.float32)
-            if method == 'perimeter':
-                self.results[f"{animal} convex hull perimeter (mm)"] = (jitted_hull(points=animal_point_arr, target=Formats.PERIMETER.value)/ self.px_per_mm)
-            else:
-                self.results[f"{animal} convex hull area (mm2)"] = (jitted_hull(points=animal_point_arr, target=Formats.AREA.value) / self.px_per_mm)
-
+        cols = compute_animal_convex_hulls(
+            df=self.data_df,
+            animal_bps=self.animal_bps,
+            px_per_mm=self.px_per_mm,
+            method=method,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __get_framewise_movement(self):
-        for animal, animal_bps in self.animal_bps.items():
-            for bp in animal_bps:
-                check_valid_dataframe(df=self.data_df, source=self.file_path, required_fields=[f"{bp}_x", f"{bp}_y"])
-                bp_arr = FeatureExtractionMixin.create_shifted_df(df=self.data_df[[f"{bp}_x", f"{bp}_y"]]).values
-                x, y = bp_arr[:, 0:2], bp_arr[:, 2:4]
-                self.results[f"{animal} movement {bp} (mm)"] = FeatureExtractionMixin.framewise_euclidean_distance(location_1=x.astype(np.float64), location_2=y.astype(np.float64), px_per_mm=np.float64(self.px_per_mm), centimeter=False)
+        cols = compute_framewise_movement(
+            df=self.data_df,
+            animal_bps=self.animal_bps,
+            px_per_mm=self.px_per_mm,
+            source=self.file_path,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __get_roi_center_distances(self):
-        for animal, animal_bps in self.animal_bps.items():
-            for bp in animal_bps:
-                check_valid_dataframe(df=self.data_df, source=self.file_path, required_fields=[f"{bp}_x", f"{bp}_y"])
-                bp_arr = self.data_df[[f"{bp}_x", f"{bp}_y"]].values.astype(np.float32)
-                for roi_name, roi_data in self.roi_dict[self.video_name].items():
-                    center_point = np.array([roi_data['Center_X'], roi_data['Center_Y']]).astype(np.int32)
-                    distance = FeatureExtractionMixin.framewise_euclidean_distance_roi(location_1=bp_arr, location_2=center_point, px_per_mm=self.px_per_mm)
-                    self.results[f"{animal} {bp} to {roi_name} center distance (mm)"] = distance
+        cols = compute_roi_center_distances(
+            df=self.data_df,
+            animal_bps=self.animal_bps,
+            px_per_mm=self.px_per_mm,
+            video_roi_dict=self.roi_dict[self.video_name],
+            source=self.file_path,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __get_distances_to_frm_edge(self):
-        for animal, animal_bps in self.animal_bps.items():
-            for bp in animal_bps:
-                check_valid_dataframe(df=self.data_df, source=self.file_path, required_fields=[f"{bp}_x", f"{bp}_y"])
-                bp_arr = self.data_df[[f"{bp}_x", f"{bp}_y"]].values.astype(np.float32)
-                distance = FeatureExtractionSupplemental().border_distances(data=bp_arr, pixels_per_mm=self.px_per_mm, img_resolution=np.array([self.video_width, self.video_height], dtype=np.int32), time_window=1, fps=1)
-                self.results[f"{animal} {bp} to left video edge distance (mm)"] = distance[:, 0]
-                self.results[f"{animal} {bp} to right video edge distance (mm)"] = distance[:, 1]
-                self.results[f"{animal} {bp} to top video edge distance (mm)"] = distance[:, 2]
-                self.results[f"{animal} {bp} to bottom video edge distance (mm)"] = distance[:, 3]
+        cols = compute_distances_to_frame_edge(
+            df=self.data_df,
+            animal_bps=self.animal_bps,
+            px_per_mm=self.px_per_mm,
+            video_width=self.video_width,
+            video_height=self.video_height,
+            source=self.file_path,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __get_inside_roi(self):
-        for animal, animal_bps in self.animal_bps.items():
-            for bp in animal_bps:
-                check_valid_dataframe(df=self.data_df, source=self.file_path, required_fields=[f"{bp}_x", f"{bp}_y"])
-                bp_arr = self.data_df[[f"{bp}_x", f"{bp}_y"]].values.astype(np.float32)
-                for roi_name, roi_data in self.roi_dict[self.video_name].items():
-                    if roi_data[SHAPE_TYPE] == ROI_SETTINGS.RECTANGLE.value:
-                        roi_coords = np.array([[roi_data['topLeftX'], roi_data['topLeftY']], [roi_data['Bottom_right_X'], roi_data['Bottom_right_Y']]])
-                        r = FeatureExtractionMixin.framewise_inside_rectangle_roi(bp_location=bp_arr, roi_coords=roi_coords)
-                        self.results[f"{animal} {bp} inside rectangle {roi_name} (Boolean)"] = r
-                    elif roi_data[SHAPE_TYPE] == ROI_SETTINGS.CIRCLE.value:
-                        circle_center = np.array([roi_data['Center_X'], roi_data['Center_Y']]).astype(np.int32)
-                        r = FeatureExtractionMixin.is_inside_circle(bp=bp_arr, roi_center=circle_center, roi_radius=roi_data['radius'])
-                        self.results[f"{animal} {bp} inside circle {roi_name} (Boolean)"] = r
-                    elif roi_data[SHAPE_TYPE] == ROI_SETTINGS.POLYGON.value:
-                        vertices = roi_data['vertices'].astype(np.int32)
-                        r = FeatureExtractionMixin.framewise_inside_polygon_roi(bp_location=bp_arr, roi_coords=vertices)
-                        self.results[f"{animal} {bp} inside polygon {roi_name} (Boolean)"] = r
+        cols = compute_inside_roi(
+            df=self.data_df,
+            animal_bps=self.animal_bps,
+            video_roi_dict=self.roi_dict[self.video_name],
+            source=self.file_path,
+        )
+        for name, values in cols.items():
+            self.results[name] = values
 
     def __check_files(self, x: pd.DataFrame, y: pd.DataFrame, path_x: str, path_y: str):
         if len(x) != len(y):
@@ -299,6 +402,33 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             self.video_info, self.px_per_mm, self.fps = self.read_video_info(video_name=self.video_name)
             self.video_width, self.video_height = self.video_info['Resolution_width'].values[0], self.video_info['Resolution_height'].values[0]
             self.data_df = read_df(file_path=file_path, file_type=self.file_type)
+            # Clip out-of-frame coordinates. Body parts are by
+            # definition inside the video frame (x ∈ [0, width],
+            # y ∈ [0, height]). Negative or beyond-frame values can
+            # come from:
+            #   - DLC predictions that extrapolate outside the trained
+            #     region for low-likelihood predictions
+            #   - Cubic-spline interpolation overshooting near edges
+            #   - Outlier-correction extrapolations
+            # Whatever the cause, a coordinate of -4 or 1924 (in a
+            # 1920-wide frame) breaks every downstream geometric
+            # feature (distances become negative, hulls degenerate,
+            # angle computations get NaN) AND trips the input
+            # validation in FeatureExtractionMixin.bodypart_distance.
+            #
+            # Identify x and y coordinate columns by their suffix.
+            # Likelihood/probability columns end with '_p' (Mufasa) or
+            # '_likelihood' (DLC) and must NOT be clipped.
+            for col in self.data_df.columns:
+                cl = str(col).lower()
+                if cl.endswith("_x"):
+                    self.data_df[col] = self.data_df[col].clip(
+                        lower=0, upper=int(self.video_width),
+                    )
+                elif cl.endswith("_y"):
+                    self.data_df[col] = self.data_df[col].clip(
+                        lower=0, upper=int(self.video_height),
+                    )
             for family_cnt, feature_family in enumerate(self.feature_families):
                 print(f"Analyzing {self.video_name} and {feature_family} (Video {file_cnt + 1}/{len(self.outlier_corrected_paths)}, Family {family_cnt + 1}/{len(self.feature_families)})...")
                 if feature_family == TWO_POINT_BP_DISTANCES:

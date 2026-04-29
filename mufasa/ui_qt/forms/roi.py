@@ -501,22 +501,38 @@ class ROIManageForm(OperationForm):
             QMessageBox.warning(self, f"{self.title}: invalid input", str(exc))
             return
         if kwargs.get("action") == "draw":
-            # Open the native Qt video-table dialog on the main thread.
-            # We bypass run_with_progress entirely — there's no work
-            # to do here, just bringing up a modal-but-not-blocking
-            # window. The user does the actual ROI-drawing inside the
-            # dialog (which spawns ROI_ui in subprocesses per video).
-            from mufasa.ui_qt.dialogs.roi_video_table import (
-                ROIVideoTableDialog,
+            # Open the unified Qt ROI definition panel on the main
+            # thread. We bypass run_with_progress entirely — there's
+            # no work to do here, just bringing up a modal-but-not-
+            # blocking window. The user does the actual ROI-drawing
+            # inside the panel (which calls the OpenCV selectors
+            # synchronously in-process — see roi_define_panel.py for
+            # the rationale).
+            #
+            # Earlier versions opened a separate "ROI Definitions —
+            # Project Videos" table dialog first, then a per-video
+            # drawing window from there. That two-window flow was
+            # awkward (user had to alt-tab between the table and the
+            # canvas, the table couldn't easily move between videos).
+            # The unified panel has both in one window with PgUp/PgDn
+            # navigation between videos.
+            from mufasa.ui_qt.dialogs.roi_define_panel import (
+                ROIDefinePanel,
             )
             top = self.window()   # the MufasaWorkbench
-            dlg = ROIVideoTableDialog(
-                config_path=kwargs["config_path"], parent=top,
-            )
+            try:
+                dlg = ROIDefinePanel(
+                    config_path=kwargs["config_path"], parent=top,
+                )
+            except Exception as exc:
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.critical(
+                    self, "Could not open ROI panel",
+                    f"{type(exc).__name__}: {exc}",
+                )
+                return
             dlg.show()
-            # Stash on the workbench so it isn't GC'd. Use the same
-            # _dialog_refs list that launch_dialog() uses, since the
-            # workbench's lifecycle clean-up already understands it.
+            # Stash on the workbench so it isn't GC'd.
             top._dialog_refs = getattr(top, "_dialog_refs", [])
             top._dialog_refs.append(dlg)
             return

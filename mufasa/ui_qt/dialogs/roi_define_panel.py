@@ -2,72 +2,77 @@
 mufasa.ui_qt.dialogs.roi_define_panel
 =====================================
 
-GIMP-style Qt panel for defining ROIs on a single video.
+Unified Qt panel for defining ROIs across all videos in a project.
 
-Layout (top to bottom)
-----------------------
+Layout
+------
 
-1. **Tool palette** — three small toggle buttons: Rectangle / Circle /
-   Polygon. Mutually exclusive. Compact icons (24x24), like GIMP's
-   tool dock.
-2. **Tool options** — color, line thickness, vertex marker size,
-   shape name. Single row of compact controls.
-3. **Frame navigation** — slider with -1s / +1s / -1f / +1f /
-   first / last buttons. The slider scrubs the underlying video.
-4. **Image preview** — current frame with all defined ROIs overlaid.
-   Self-updates as user adds / deletes ROIs and changes frame.
-5. **Shape list** — table of currently-defined ROIs with delete-row
-   and rename-on-doubleclick. Click row → highlight in preview.
-6. **Save bar** — sticky bottom: Save / Save & Close / Cancel.
+::
 
-Differences from the legacy Tk panel
-------------------------------------
+    ┌─────────────────────────────────────────────────────────────┐
+    │ Tools: [▭][◯][△]  Color:[Red ▾]  Thickness:3  Marker:8       │
+    │        Name:[___________]  [Draw →]                          │
+    ├──────────────────┬──────────────────────────────────────────┤
+    │ Project videos   │ [⏮][−1s][−1f] ━━●━━ [+1f][+1s][⏭] 47/60  │
+    │                  ├──────────────────────────────────────────┤
+    │ vid_01           │                                          │
+    │ vid_02 ✓         │   [video frame with ROI overlays]        │
+    │ vid_03 ✓ ←       │                                          │
+    │ vid_04 ✓         │                                          │
+    │ vid_05           │                                          │
+    │ ...              │                                          │
+    │                  ├──────────────────────────────────────────┤
+    │                  │ # Type     Name        Color    ✕        │
+    │                  │ 1 Rectangle center_zone Red     ✕        │
+    │                  │ 2 Circle   left_obj    Blue     ✕        │
+    ├──────────────────┴──────────────────────────────────────────┤
+    │ status flash    [Reset] [Apply to all] [Save] [Save&close]   │
+    └─────────────────────────────────────────────────────────────┘
 
-* No "ear_tag_size" dropdown (auto-derived from thickness)
-* No "polygon tolerance" knob (uses sensible default)
-* No buried "apply from other video" dropdown — that's now a separate
-  action in the parent video-table dialog
-* No status bar (status messages flash inline near the action that
-  produced them)
-* No info / move / ruler buttons (interaction is direct: click a row
-  to select; resize via OpenCV canvas if needed)
+Differences from the previous version
+-------------------------------------
 
-The actual mouse-driven shape drawing still happens in OpenCV via the
-existing :class:`mufasa.video_processors.roi_selector.ROISelector`
-classes — running as a :class:`QThread` so the panel stays responsive
-during drawing.
+* **Single window**. The video table dialog is gone; the panel
+  contains a project-wide video list as a left sidebar.
+* **Page Up / Page Down** step between videos.
+* **Auto-save on video switch**. Switching videos with unsaved
+  changes saves them silently before loading the next video.
+* **Synchronous OpenCV drawing**. The selector runs on the main
+  thread (cv2.imshow / cv2.waitKey are not thread-safe on Linux/X11
+  — running them in a QThread caused a black canvas in earlier
+  versions). The Qt panel is briefly frozen during drawing, but the
+  user is interacting with the OpenCV window during that time
+  anyway.
 
-Lifecycle
----------
+Compatibility
+-------------
 
-The panel owns one :class:`mufasa.roi_tools.roi_logic.ROILogic`
-instance per video. UI events translate to logic-method calls;
-``rendered_frame()`` is queried after every state change to refresh
-the preview.
-
-Save persists via :meth:`ROILogic.save` to the project's
-``ROI_definitions.h5``. Reads/writes are compatible with all
-downstream Mufasa tools.
+* Same H5 file format as the previous version (``project_folder/
+  logs/measures/ROI_definitions.h5``).
+* Same shape constants and ROILogic backend.
 """
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
-import cv2
-import numpy as np
-from PySide6.QtCore import (QObject, Qt, QThread, Signal)
-from PySide6.QtGui import (QColor, QImage, QKeySequence, QPixmap, QShortcut)
-from PySide6.QtWidgets import (QButtonGroup, QComboBox, QDialog, QFrame,
-                               QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QMessageBox, QPushButton,
-                               QSizePolicy, QSlider, QSpinBox,
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QKeySequence, QShortcut
+from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox,
+                               QDialog, QHBoxLayout, QHeaderView,
+                               QLabel, QLineEdit, QListWidget,
+                               QListWidgetItem, QMessageBox, QPushButton,
+                               QSizePolicy, QSlider, QSpinBox, QSplitter,
                                QTableWidget, QTableWidgetItem, QToolButton,
                                QVBoxLayout, QWidget)
 
 from mufasa.roi_tools.roi_logic import (CIRCLE, POLYGON, RECTANGLE,
                                         ROILogic)
+from mufasa.ui_qt.dialogs.roi_canvas import ROICanvas
+from mufasa.ui_qt.dialogs.roi_video_table import (_list_project_videos,
+                                                  _project_path_from_config,
+                                                  _videos_with_rois)
 
 
 # Standard color palette (BGR for OpenCV consistency).
@@ -89,178 +94,59 @@ def _bgr_to_qcolor(bgr: tuple[int, int, int]) -> QColor:
     return QColor(r, g, b)
 
 
-class _SelectorThread(QThread):
-    """Run an OpenCV ROI selector in a background thread so the Qt
-    panel stays responsive while the user click-drags on the OpenCV
-    canvas. Emits ``finished_with_attrs`` carrying the selector's
-    captured attributes (or None if cancelled)."""
-
-    finished_with_attrs = Signal(object)   # Optional[dict]
-
-    def __init__(self, selector_kind: str, image: np.ndarray,
-                 thickness: int, bgr: tuple[int, int, int],
-                 ear_tag_size: int = 15,
-                 parent: Optional[QObject] = None) -> None:
-        super().__init__(parent)
-        self.selector_kind = selector_kind
-        self.image = image.copy()
-        self.thickness = thickness
-        self.bgr = bgr
-        self.ear_tag_size = ear_tag_size
-
-    def run(self) -> None:
-        result: Optional[dict] = None
-        try:
-            if self.selector_kind == RECTANGLE:
-                from mufasa.video_processors.roi_selector import ROISelector
-                sel = ROISelector(path=self.image, thickness=self.thickness,
-                                  clr=self.bgr,
-                                  title="Draw rectangle — drag with mouse, "
-                                        "ESC to confirm")
-                sel.run()
-                # Rectangle's run_checks() sets self.complete=True after
-                # clamping roi_start/roi_end into self.top_left/
-                # self.bottom_right. Use the clamped values, not the raw
-                # mouse positions (which may be off-canvas).
-                if (getattr(sel, "complete", False)
-                        and getattr(sel, "top_left", None) is not None
-                        and getattr(sel, "bottom_right", None) is not None
-                        and getattr(sel, "width", 0) > 0
-                        and getattr(sel, "height", 0) > 0):
-                    result = {
-                        "kind": RECTANGLE,
-                        "top_left": tuple(sel.top_left),
-                        "bottom_right": tuple(sel.bottom_right),
-                    }
-            elif self.selector_kind == CIRCLE:
-                from mufasa.video_processors.roi_selector_circle import (
-                    ROISelectorCircle,
-                )
-                sel = ROISelectorCircle(
-                    path=self.image, thickness=self.thickness, clr=self.bgr,
-                    title="Draw circle — click center, drag radius, "
-                          "ESC to confirm",
-                )
-                sel.run()
-                # Circle has no `complete` attribute. Success indicator:
-                # terminate=True (the run loop only breaks via that flag
-                # AFTER run_checks() returns True), AND a non-zero
-                # radius. Geometry is in `circle_center` / `circle_radius`.
-                if (getattr(sel, "terminate", False)
-                        and getattr(sel, "circle_radius", 0) > 0
-                        and getattr(sel, "circle_center", (-1, -1))[0] >= 0):
-                    cx, cy = sel.circle_center
-                    result = {
-                        "kind": CIRCLE,
-                        "center": (int(cx), int(cy)),
-                        "radius": int(sel.circle_radius),
-                    }
-            elif self.selector_kind == POLYGON:
-                from mufasa.video_processors.roi_selector_polygon import (
-                    ROISelectorPolygon,
-                )
-                sel = ROISelectorPolygon(
-                    path=self.image, thickness=self.thickness, clr=self.bgr,
-                    vertice_size=self.ear_tag_size,
-                    title="Draw polygon — click vertices, "
-                          "ESC / Q / Space to close",
-                )
-                sel.run()
-                # Polygon also has no `complete` attribute. Success:
-                # terminate=True (set after run_checks() returns True,
-                # i.e. >= 3 unique vertices). After run_checks(),
-                # self.polygon_vertices is replaced with the simplified
-                # numpy array, and self.polygon_arr holds the int32
-                # version ready for cv2 drawing.
-                verts_attr = (getattr(sel, "polygon_arr", None)
-                              if hasattr(sel, "polygon_arr")
-                              else getattr(sel, "polygon_vertices", None))
-                if (getattr(sel, "terminate", False)
-                        and verts_attr is not None
-                        and len(verts_attr) >= 3):
-                    result = {
-                        "kind": POLYGON,
-                        "vertices": [(int(v[0]), int(v[1]))
-                                     for v in verts_attr],
-                    }
-        except Exception as exc:
-            print(f"ROI selector raised {type(exc).__name__}: {exc}")
-        self.finished_with_attrs.emit(result)
-
-
-class _PreviewLabel(QLabel):
-    """Label that shows the current frame with ROI overlays. Aspect-
-    preserving scaling — adjusts as the dialog resizes."""
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self.setAlignment(Qt.AlignCenter)
-        self.setMinimumSize(640, 360)
-        self.setStyleSheet(
-            "background: #1a1a1a; border: 1px solid palette(mid);"
-        )
-        self._pix: Optional[QPixmap] = None
-
-    def set_frame(self, bgr: Optional[np.ndarray]) -> None:
-        if bgr is None:
-            self.clear()
-            self._pix = None
-            return
-        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-        h, w = rgb.shape[:2]
-        qimg = QImage(rgb.data, w, h, w * 3, QImage.Format_RGB888).copy()
-        self._pix = QPixmap.fromImage(qimg)
-        self._refresh_scaled()
-
-    def _refresh_scaled(self) -> None:
-        if self._pix is None:
-            return
-        scaled = self._pix.scaled(
-            self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation,
-        )
-        self.setPixmap(scaled)
-
-    def resizeEvent(self, ev) -> None:
-        super().resizeEvent(ev)
-        self._refresh_scaled()
-
-
 class ROIDefinePanel(QDialog):
-    """The Qt-native ROI definition panel.
+    """Unified Qt panel for ROI definition across an entire project.
 
-    Construct with a config_path + video_path and call ``.show()``.
-    The dialog stays open until the user closes it; ROIs are saved
-    to the project's ROI_definitions.h5 when the user clicks Save.
+    Open with ``ROIDefinePanel(config_path, video_path=None)`` to start
+    on the first video, or pass a specific ``video_path`` to start
+    there.
+
+    Page Up / Page Down step between videos. Switching videos with
+    unsaved changes auto-saves them first.
     """
 
-    saved = Signal(str)   # video name when save completes
+    rois_modified = Signal()   # emitted when any save / reset happens
 
-    def __init__(self, config_path: str, video_path: str,
+    def __init__(self, config_path: str,
+                 video_path: Optional[str] = None,
                  parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.logic = ROILogic(config_path=config_path, video_path=video_path)
-        self.video_name = self.logic.video_name
+        self.config_path = config_path
+        self.project_path = _project_path_from_config(config_path) or ""
 
-        self.setWindowTitle(f"ROI Definitions — {self.video_name}")
-        self.setWindowFlags(self.windowFlags() | Qt.Window)
-        self.resize(1100, 800)
+        # Discover videos
+        self._videos: list[str] = _list_project_videos(self.project_path)
+        if not self._videos:
+            raise RuntimeError(
+                f"No videos found in {self.project_path}/videos/"
+            )
+        # Pick starting video
+        if video_path is not None and video_path in self._videos:
+            self._cur_idx = self._videos.index(video_path)
+        else:
+            self._cur_idx = 0
 
-        # State for the active drawing operation
-        self._selector_thread: Optional[_SelectorThread] = None
+        # Logic for the currently-selected video. Created lazily —
+        # _load_video() initializes it.
+        self.logic: Optional[ROILogic] = None
         self._dirty = False
 
+        self.setWindowFlags(self.windowFlags() | Qt.Window)
+        self.resize(1300, 850)
+
         self._build_ui()
-        self._sync_preview()
-        self._sync_table()
+        self._refresh_video_list()
+        self._load_video(self._cur_idx)
 
     # ------------------------------------------------------------------ #
-    # UI construction — top to bottom
+    # UI construction
     # ------------------------------------------------------------------ #
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
         outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(6)
 
-        # ---- 1. Tool palette ---- #
+        # ---- Tool palette + options (top row, full width) ---- #
         tool_row = QHBoxLayout()
         tool_row.setSpacing(2)
         self._tool_buttons: dict[str, QToolButton] = {}
@@ -287,7 +173,6 @@ class ROIDefinePanel(QDialog):
         self._tool_buttons[RECTANGLE].setChecked(True)
         tool_row.addSpacing(20)
 
-        # Tool options inline with the palette
         tool_row.addWidget(QLabel("Color:"))
         self.color_cb = QComboBox(self)
         for name, _ in _COLORS:
@@ -318,60 +203,67 @@ class ROIDefinePanel(QDialog):
         self.name_edit.setMinimumWidth(160)
         tool_row.addWidget(self.name_edit)
 
-        # The DRAW button is the action — kicks off the OpenCV canvas
         self.draw_btn = QPushButton("Draw  →", self)
         self.draw_btn.setStyleSheet("font-weight: bold; padding: 4px 12px;")
         self.draw_btn.clicked.connect(self._on_draw_clicked)
         tool_row.addWidget(self.draw_btn)
-
         outer.addLayout(tool_row)
 
-        # ---- thin separator ---- #
-        sep = QFrame(self)
-        sep.setFrameShape(QFrame.HLine)
-        sep.setFrameShadow(QFrame.Sunken)
-        outer.addWidget(sep)
+        # ---- Splitter: video list (left) | preview/table (right) ---- #
+        splitter = QSplitter(Qt.Horizontal, self)
+        splitter.setChildrenCollapsible(False)
 
-        # ---- 2. Frame nav ---- #
+        # Left: video list
+        left_panel = QWidget(self)
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(2)
+        left_label = QLabel("Project videos (PgUp/PgDn to nav)")
+        left_label.setStyleSheet("font-weight: bold; padding: 2px 4px;")
+        left_layout.addWidget(left_label)
+        self.video_list = QListWidget(self)
+        self.video_list.setAlternatingRowColors(True)
+        self.video_list.currentRowChanged.connect(self._on_video_picked)
+        left_layout.addWidget(self.video_list)
+        splitter.addWidget(left_panel)
+
+        # Right: frame nav + preview + shape table
+        right_panel = QWidget(self)
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(4)
+
+        # Frame nav
         nav_row = QHBoxLayout()
         nav_row.setSpacing(2)
 
         self.first_btn = QToolButton(self); self.first_btn.setText("⏮")
         self.first_btn.setToolTip("First frame")
-        self.first_btn.clicked.connect(self.logic.first_frame)
-        self.first_btn.clicked.connect(self._sync_preview_and_slider)
+        self.first_btn.clicked.connect(self._first_frame)
         nav_row.addWidget(self.first_btn)
 
         self.back_s_btn = QToolButton(self); self.back_s_btn.setText("−1s")
-        self.back_s_btn.setToolTip("Back 1 second")
         self.back_s_btn.clicked.connect(lambda: self._step_seconds(-1.0))
         nav_row.addWidget(self.back_s_btn)
 
         self.back_f_btn = QToolButton(self); self.back_f_btn.setText("−1f")
-        self.back_f_btn.setToolTip("Back 1 frame")
         self.back_f_btn.clicked.connect(lambda: self._step_frames(-1))
         nav_row.addWidget(self.back_f_btn)
 
         self.frame_slider = QSlider(Qt.Horizontal, self)
-        self.frame_slider.setRange(0, max(0, self.logic.frame_count - 1))
-        self.frame_slider.setValue(0)
         self.frame_slider.valueChanged.connect(self._on_slider_changed)
         nav_row.addWidget(self.frame_slider, 1)
 
         self.fwd_f_btn = QToolButton(self); self.fwd_f_btn.setText("+1f")
-        self.fwd_f_btn.setToolTip("Forward 1 frame")
         self.fwd_f_btn.clicked.connect(lambda: self._step_frames(1))
         nav_row.addWidget(self.fwd_f_btn)
 
         self.fwd_s_btn = QToolButton(self); self.fwd_s_btn.setText("+1s")
-        self.fwd_s_btn.setToolTip("Forward 1 second")
         self.fwd_s_btn.clicked.connect(lambda: self._step_seconds(1.0))
         nav_row.addWidget(self.fwd_s_btn)
 
         self.last_btn = QToolButton(self); self.last_btn.setText("⏭")
-        self.last_btn.setToolTip("Last frame")
-        self.last_btn.clicked.connect(self.logic.last_frame)
-        self.last_btn.clicked.connect(self._sync_preview_and_slider)
+        self.last_btn.clicked.connect(self._last_frame)
         nav_row.addWidget(self.last_btn)
 
         self.frame_label = QLabel("Frame 0", self)
@@ -379,14 +271,19 @@ class ROIDefinePanel(QDialog):
         self.frame_label.setStyleSheet("color: palette(mid);")
         nav_row.addWidget(self.frame_label)
 
-        outer.addLayout(nav_row)
+        right_layout.addLayout(nav_row)
 
-        # ---- 3. Preview ---- #
-        self.preview = _PreviewLabel(self)
-        self.preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        outer.addWidget(self.preview, 1)
+        # Canvas — native Qt. Replaces the OpenCV subprocess approach.
+        # The canvas displays the current frame, overlays existing
+        # ROIs, and accepts mouse/keyboard input for drawing new ROIs.
+        self.preview = ROICanvas(self)
+        self.preview.setSizePolicy(QSizePolicy.Expanding,
+                                   QSizePolicy.Expanding)
+        self.preview.shape_committed.connect(self._on_shape_committed)
+        self.preview.shape_cancelled.connect(self._on_shape_cancelled)
+        right_layout.addWidget(self.preview, 1)
 
-        # ---- 4. Shape list ---- #
+        # Shape table
         self.shape_table = QTableWidget(self)
         self.shape_table.setColumnCount(5)
         self.shape_table.setHorizontalHeaderLabels(
@@ -402,68 +299,192 @@ class ROIDefinePanel(QDialog):
         h.setSectionResizeMode(2, QHeaderView.Stretch)
         h.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         h.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        outer.addWidget(self.shape_table)
+        right_layout.addWidget(self.shape_table)
 
-        # ---- 5. Save bar ---- #
-        save_row = QHBoxLayout()
-        save_row.addStretch(1)
+        splitter.addWidget(right_panel)
+        splitter.setSizes([260, 1040])   # left:right = 1:4
+        outer.addWidget(splitter, 1)
+
+        # ---- Bottom action bar ---- #
+        bot = QHBoxLayout()
+
+        self.reset_btn = QPushButton("Reset video", self)
+        self.reset_btn.setToolTip("Delete all ROIs from the current video")
+        self.reset_btn.clicked.connect(self._on_reset_clicked)
+        bot.addWidget(self.reset_btn)
+
+        self.apply_all_btn = QPushButton("Apply to all", self)
+        self.apply_all_btn.setToolTip(
+            "Copy this video's ROIs to every other video in the project"
+        )
+        self.apply_all_btn.clicked.connect(self._on_apply_all_clicked)
+        bot.addWidget(self.apply_all_btn)
+
+        bot.addStretch(1)
+
         self.save_status = QLabel("", self)
         self.save_status.setStyleSheet("color: palette(mid);")
-        save_row.addWidget(self.save_status)
-        save_row.addSpacing(20)
+        bot.addWidget(self.save_status)
+        bot.addSpacing(20)
 
         cancel_btn = QPushButton("Close", self)
         cancel_btn.clicked.connect(self._on_close_clicked)
-        save_row.addWidget(cancel_btn)
+        bot.addWidget(cancel_btn)
 
         self.save_btn = QPushButton("Save", self)
         self.save_btn.clicked.connect(self._on_save_clicked)
-        save_row.addWidget(self.save_btn)
+        bot.addWidget(self.save_btn)
 
         save_close_btn = QPushButton("Save && close", self)
         save_close_btn.setDefault(True)
         save_close_btn.clicked.connect(self._on_save_and_close)
-        save_row.addWidget(save_close_btn)
-        outer.addLayout(save_row)
+        bot.addWidget(save_close_btn)
+        outer.addLayout(bot)
 
-        # Keyboard shortcuts: R/C/P switch tools
+        # Keyboard shortcuts: R/C/P switch tools; PgUp/PgDn nav videos
         QShortcut(QKeySequence("R"), self,
                   activated=lambda: self._tool_buttons[RECTANGLE].setChecked(True))
         QShortcut(QKeySequence("C"), self,
                   activated=lambda: self._tool_buttons[CIRCLE].setChecked(True))
         QShortcut(QKeySequence("P"), self,
                   activated=lambda: self._tool_buttons[POLYGON].setChecked(True))
+        QShortcut(QKeySequence("PgUp"), self,
+                  activated=self._prev_video)
+        QShortcut(QKeySequence("PgDown"), self,
+                  activated=self._next_video)
 
     # ------------------------------------------------------------------ #
-    # State synchronization
+    # Video list
+    # ------------------------------------------------------------------ #
+    def _refresh_video_list(self) -> None:
+        """Rebuild the left-side video list with current ROI status."""
+        self.video_list.blockSignals(True)
+        self.video_list.clear()
+        roi_h5 = os.path.join(
+            self.project_path, "logs", "measures", "ROI_definitions.h5",
+        )
+        videos_with_rois = _videos_with_rois(roi_h5)
+        for vpath in self._videos:
+            stem = Path(vpath).stem
+            has_rois = stem in videos_with_rois
+            mark = "✓ " if has_rois else "  "
+            item = QListWidgetItem(f"{mark}{stem}")
+            if has_rois:
+                f = item.font(); f.setBold(True); item.setFont(f)
+                item.setForeground(Qt.darkGreen)
+            self.video_list.addItem(item)
+        self.video_list.setCurrentRow(self._cur_idx)
+        self.video_list.blockSignals(False)
+
+    def _on_video_picked(self, row: int) -> None:
+        if row < 0 or row >= len(self._videos) or row == self._cur_idx:
+            return
+        # Auto-save before switching
+        if self._dirty and self.logic is not None:
+            try:
+                self.logic.save()
+                self._dirty = False
+                self._flash_status("Auto-saved.")
+            except Exception as exc:
+                # Save failed — abort the switch and keep the user on
+                # the current video so their work isn't silently lost.
+                QMessageBox.critical(
+                    self, "Auto-save failed",
+                    f"Could not save current video before switching: "
+                    f"{type(exc).__name__}: {exc}\n\n"
+                    f"Staying on the current video.",
+                )
+                self.video_list.blockSignals(True)
+                self.video_list.setCurrentRow(self._cur_idx)
+                self.video_list.blockSignals(False)
+                return
+        self._cur_idx = row
+        self._load_video(row)
+
+    def _load_video(self, idx: int) -> None:
+        """Construct a fresh ROILogic for video[idx] and rebuild the
+        preview / table."""
+        vpath = self._videos[idx]
+        try:
+            self.logic = ROILogic(config_path=self.config_path,
+                                  video_path=vpath)
+        except Exception as exc:
+            QMessageBox.critical(
+                self, "Load failed",
+                f"Could not load {Path(vpath).name}: "
+                f"{type(exc).__name__}: {exc}",
+            )
+            return
+        self._dirty = False
+        self.setWindowTitle(
+            f"ROI Definitions — {self.logic.video_name}"
+        )
+        # Update slider range for this video
+        self.frame_slider.blockSignals(True)
+        self.frame_slider.setRange(0, max(0, self.logic.frame_count - 1))
+        self.frame_slider.setValue(0)
+        self.frame_slider.blockSignals(False)
+        self._sync_preview()
+        self._sync_table()
+
+    def _prev_video(self) -> None:
+        if self._cur_idx > 0:
+            self.video_list.setCurrentRow(self._cur_idx - 1)
+
+    def _next_video(self) -> None:
+        if self._cur_idx < len(self._videos) - 1:
+            self.video_list.setCurrentRow(self._cur_idx + 1)
+
+    # ------------------------------------------------------------------ #
+    # Preview / shape table sync
     # ------------------------------------------------------------------ #
     def _sync_preview(self) -> None:
-        self.preview.set_frame(self.logic.rendered_frame())
+        if self.logic is None:
+            return
+        # The canvas now renders ROIs natively; pass the RAW frame
+        # (no overlays) and let the canvas draw the ROIs on top via
+        # set_existing_rois.
+        if self.logic.current_frame is not None:
+            self.preview.set_frame(self.logic.current_frame)
+        # Build the overlay list for the canvas
+        overlay_rois = []
+        for kind, d in self.logic.defs.items():
+            for name, roi in d.items():
+                overlay_rois.append({
+                    "kind": kind,
+                    "color_bgr": roi.color_bgr,
+                    "thickness": roi.thickness,
+                    "geometry": roi.geometry,
+                })
+        self.preview.set_existing_rois(overlay_rois)
         self.frame_label.setText(
-            f"Frame {self.logic.frame_idx} / {self.logic.frame_count - 1}"
+            f"Frame {self.logic.frame_idx} / "
+            f"{self.logic.frame_count - 1}"
         )
 
     def _sync_preview_and_slider(self) -> None:
-        # Block signals to avoid recursion
+        if self.logic is None:
+            return
         self.frame_slider.blockSignals(True)
         self.frame_slider.setValue(self.logic.frame_idx)
         self.frame_slider.blockSignals(False)
         self._sync_preview()
 
     def _sync_table(self) -> None:
+        if self.logic is None:
+            self.shape_table.setRowCount(0)
+            return
         all_rois = []
         for kind, d in self.logic.defs.items():
             for name, roi in d.items():
                 all_rois.append((kind, name, roi))
         self.shape_table.setRowCount(len(all_rois))
         for i, (kind, name, roi) in enumerate(all_rois):
-            idx = QTableWidgetItem(str(i + 1))
-            idx.setTextAlignment(Qt.AlignCenter)
-            self.shape_table.setItem(i, 0, idx)
-            type_item = QTableWidgetItem(kind.capitalize())
-            self.shape_table.setItem(i, 1, type_item)
-            name_item = QTableWidgetItem(name)
-            self.shape_table.setItem(i, 2, name_item)
+            idx_item = QTableWidgetItem(str(i + 1))
+            idx_item.setTextAlignment(Qt.AlignCenter)
+            self.shape_table.setItem(i, 0, idx_item)
+            self.shape_table.setItem(i, 1, QTableWidgetItem(kind.capitalize()))
+            self.shape_table.setItem(i, 2, QTableWidgetItem(name))
             clr_item = QTableWidgetItem(roi.color_name)
             clr_item.setForeground(_bgr_to_qcolor(roi.color_bgr))
             self.shape_table.setItem(i, 3, clr_item)
@@ -471,27 +492,40 @@ class ROIDefinePanel(QDialog):
             del_btn.setFixedWidth(28)
             del_btn.setToolTip(f"Delete {name}")
             del_btn.clicked.connect(
-                lambda _=False, n=name: self._on_delete_roi(n)
+                lambda _=False, n=name: self._on_delete_roi(n),
             )
             self.shape_table.setCellWidget(i, 4, del_btn)
 
     # ------------------------------------------------------------------ #
-    # Frame nav handlers
+    # Frame nav
     # ------------------------------------------------------------------ #
     def _step_frames(self, n: int) -> None:
+        if self.logic is None: return
         self.logic.advance_frame(n)
         self._sync_preview_and_slider()
 
     def _step_seconds(self, s: float) -> None:
+        if self.logic is None: return
         self.logic.jump_seconds(s)
         self._sync_preview_and_slider()
 
+    def _first_frame(self) -> None:
+        if self.logic is None: return
+        self.logic.first_frame()
+        self._sync_preview_and_slider()
+
+    def _last_frame(self) -> None:
+        if self.logic is None: return
+        self.logic.last_frame()
+        self._sync_preview_and_slider()
+
     def _on_slider_changed(self, val: int) -> None:
+        if self.logic is None: return
         self.logic.goto_frame(val)
         self._sync_preview()
 
     # ------------------------------------------------------------------ #
-    # Drawing
+    # Drawing — synchronous on the main thread
     # ------------------------------------------------------------------ #
     def _selected_kind(self) -> str:
         for kind, btn in self._tool_buttons.items():
@@ -505,11 +539,7 @@ class ROIDefinePanel(QDialog):
         return name, bgr
 
     def _on_draw_clicked(self) -> None:
-        if self._selector_thread is not None and self._selector_thread.isRunning():
-            QMessageBox.information(
-                self, "Drawing in progress",
-                "Finish or cancel the current drawing before starting a new one."
-            )
+        if self.logic is None:
             return
         name = self.name_edit.text().strip()
         if not name:
@@ -522,56 +552,74 @@ class ROIDefinePanel(QDialog):
                 error=True,
             )
             return
+        if self.preview.is_drawing():
+            self._flash_status(
+                "A draw is already in progress. Press ESC to cancel "
+                "the current one before starting a new shape.",
+                error=True,
+            )
+            return
         kind = self._selected_kind()
         clr_name, bgr = self._selected_color()
         thickness = self.thickness_spin.value()
-        marker = self.marker_spin.value()
-        # Pass the current rendered frame so the user sees existing ROIs
-        # while drawing.
-        img = self.logic.rendered_frame()
-        if img is None:
-            self._flash_status("Cannot read current frame.", error=True)
-            return
 
-        self._selector_thread = _SelectorThread(
-            selector_kind=kind, image=img,
-            thickness=thickness, bgr=bgr, ear_tag_size=marker,
-            parent=self,
-        )
-        self._selector_thread.finished_with_attrs.connect(
-            lambda attrs: self._on_selector_done(name, clr_name, bgr,
-                                                  thickness, marker, attrs),
-        )
-        self._flash_status(f"Drawing {kind}: {name}…")
-        self.draw_btn.setEnabled(False)
-        self._selector_thread.start()
+        # Stash params for the commit callback to consume
+        self._pending_shape = {
+            "name": name, "kind": kind,
+            "color_name": clr_name, "bgr": bgr,
+            "thickness": thickness,
+            "ear_tag_size": self.marker_spin.value(),
+        }
 
-    def _on_selector_done(self, name: str, clr_name: str,
-                          bgr: tuple[int, int, int], thickness: int,
-                          marker: int, attrs: Optional[dict]) -> None:
-        self.draw_btn.setEnabled(True)
-        self._selector_thread = None
-        if attrs is None:
-            self._flash_status("Drawing cancelled.")
+        # Hand off to the canvas. The next mouse interaction starts
+        # capturing the shape; ESC/Q/Space cancel/commit per shape
+        # type. shape_committed (or shape_cancelled) fires when done.
+        self.preview.start_draw(kind=kind, color_bgr=bgr,
+                                thickness=thickness)
+        self._flash_status(
+            {
+                RECTANGLE: f"Drawing rectangle: {name} — "
+                           f"drag to define, ESC to cancel",
+                CIRCLE: f"Drawing circle: {name} — "
+                        f"click center, drag radius, ESC to cancel",
+                POLYGON: f"Drawing polygon: {name} — "
+                         f"click vertices, ESC/Q/Space to close",
+            }.get(kind, f"Drawing {kind}: {name}…"),
+        )
+
+    def _on_shape_committed(self, kind: str, geom: dict) -> None:
+        """Slot for ROICanvas.shape_committed. Adds the captured shape
+        to the logic, refreshes preview + table."""
+        params = getattr(self, "_pending_shape", None)
+        if params is None:
+            self._flash_status(
+                "Got a shape but had no pending request — ignoring.",
+                error=True,
+            )
             return
+        name = params["name"]
+        clr_name = params["color_name"]
+        bgr = params["bgr"]
+        thickness = params["thickness"]
+        marker = params["ear_tag_size"]
         try:
-            if attrs["kind"] == RECTANGLE:
+            if kind == RECTANGLE:
                 self.logic.add_rectangle(
-                    name=name, top_left=attrs["top_left"],
-                    bottom_right=attrs["bottom_right"],
+                    name=name, top_left=geom["top_left"],
+                    bottom_right=geom["bottom_right"],
                     color_name=clr_name, bgr=bgr,
                     thickness=thickness, ear_tag_size=marker,
                 )
-            elif attrs["kind"] == CIRCLE:
+            elif kind == CIRCLE:
                 self.logic.add_circle(
-                    name=name, center=attrs["center"],
-                    radius=attrs["radius"],
+                    name=name, center=geom["center"],
+                    radius=geom["radius"],
                     color_name=clr_name, bgr=bgr,
                     thickness=thickness, ear_tag_size=marker,
                 )
-            elif attrs["kind"] == POLYGON:
+            elif kind == POLYGON:
                 self.logic.add_polygon(
-                    name=name, vertices=attrs["vertices"],
+                    name=name, vertices=geom["vertices"],
                     color_name=clr_name, bgr=bgr,
                     thickness=thickness, ear_tag_size=marker,
                 )
@@ -580,11 +628,19 @@ class ROIDefinePanel(QDialog):
             return
         self._dirty = True
         self.name_edit.clear()
+        self._pending_shape = None
         self._sync_preview()
         self._sync_table()
-        self._flash_status(f"Added {attrs['kind']}: {name}")
+        self._flash_status(f"Added {kind}: {name}")
+
+    def _on_shape_cancelled(self) -> None:
+        """Slot for ROICanvas.shape_cancelled."""
+        self._pending_shape = None
+        self._flash_status("Drawing cancelled.")
 
     def _on_delete_roi(self, name: str) -> None:
+        if self.logic is None:
+            return
         if QMessageBox.question(
             self, "Delete ROI", f"Delete ROI {name!r}?",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
@@ -597,18 +653,64 @@ class ROIDefinePanel(QDialog):
         self._flash_status(f"Deleted {name}.")
 
     # ------------------------------------------------------------------ #
+    # Bottom-bar actions
+    # ------------------------------------------------------------------ #
+    def _on_reset_clicked(self) -> None:
+        if self.logic is None:
+            return
+        if QMessageBox.question(
+            self, "Reset video",
+            f"Delete every ROI for <b>{self.logic.video_name}</b>?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        ) != QMessageBox.Yes:
+            return
+        self.logic.delete_all()
+        self._dirty = True
+        self._sync_preview()
+        self._sync_table()
+        self._flash_status("All ROIs cleared.")
+
+    def _on_apply_all_clicked(self) -> None:
+        if self.logic is None:
+            return
+        if not self.logic.all_roi_names:
+            self._flash_status("No ROIs to apply.", error=True)
+            return
+        # Save first so the H5 has the source ROIs, then call the
+        # existing multiply_ROIs backend (it reads the H5).
+        try:
+            self.logic.save()
+            self._dirty = False
+            self._flash_status("Saved — applying to all videos…")
+            QApplication.processEvents()
+            from mufasa.roi_tools.roi_utils import multiply_ROIs
+            multiply_ROIs(config_path=self.config_path,
+                          filename=self._videos[self._cur_idx])
+            self._refresh_video_list()
+            self.rois_modified.emit()
+            self._flash_status("Applied ROIs to every video.")
+        except Exception as exc:
+            QMessageBox.critical(
+                self, "Apply-all failed",
+                f"Could not apply ROIs: {type(exc).__name__}: {exc}",
+            )
+
+    # ------------------------------------------------------------------ #
     # Save / close
     # ------------------------------------------------------------------ #
     def _on_save_clicked(self) -> None:
+        if self.logic is None:
+            return
         try:
             self.logic.save()
             self._dirty = False
             self._flash_status("Saved.")
-            self.saved.emit(self.video_name)
+            self._refresh_video_list()
+            self.rois_modified.emit()
         except Exception as exc:
             QMessageBox.critical(
                 self, "Save failed",
-                f"Could not save ROIs: {type(exc).__name__}: {exc}"
+                f"Could not save ROIs: {type(exc).__name__}: {exc}",
             )
 
     def _on_save_and_close(self) -> None:
@@ -620,26 +722,19 @@ class ROIDefinePanel(QDialog):
         if self._dirty:
             ans = QMessageBox.question(
                 self, "Unsaved changes",
-                "You have unsaved ROI changes. Save before closing?",
+                "You have unsaved ROI changes for the current video. "
+                "Save before closing?",
                 QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
                 QMessageBox.Save,
             )
             if ans == QMessageBox.Save:
                 self._on_save_clicked()
                 if self._dirty:
-                    return  # save failed
+                    return
             elif ans == QMessageBox.Cancel:
                 return
         self.close()
 
-    def closeEvent(self, ev) -> None:
-        if self._selector_thread is not None and self._selector_thread.isRunning():
-            self._selector_thread.wait(2000)
-        super().closeEvent(ev)
-
-    # ------------------------------------------------------------------ #
-    # Status flash
-    # ------------------------------------------------------------------ #
     def _flash_status(self, msg: str, error: bool = False) -> None:
         if error:
             self.save_status.setStyleSheet("color: #c44;")
