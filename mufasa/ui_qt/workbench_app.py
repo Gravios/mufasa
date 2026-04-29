@@ -98,7 +98,59 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="mufasa-workbench")
     p.add_argument("--project", type=str, default=None,
                    help="auto-load a project_config.ini on launch")
+    p.add_argument("--no-auto-discover", action="store_true",
+                   help="disable auto-discovery of project_config.ini "
+                        "in the current directory or its ancestors")
     return p.parse_args(argv)
+
+
+# Number of parent directories to walk when auto-discovering a
+# project config. 3 levels covers the common cases: user cd'd into
+# project_folder/, project_folder/csv/, or project_folder/csv/<stage>/.
+# Going higher risks picking up unrelated projects from sibling trees.
+_AUTO_DISCOVER_MAX_DEPTH = 3
+_PROJECT_CONFIG_FILENAME = "project_config.ini"
+# Mufasa creates projects with a hardcoded "project_folder" subdirectory
+# (DirNames.PROJECT.value). The config file lives inside there, NOT at
+# the project root. So when walking up from CWD, we also probe each
+# level's "project_folder/" subdirectory — that catches the common case
+# where the user is one level above project_folder/ (e.g. cd'd into the
+# named project directory itself, not its project_folder subdir).
+_PROJECT_FOLDER_NAME = "project_folder"
+
+
+def _auto_discover_project(start: Path) -> Optional[Path]:
+    """Walk up from ``start`` looking for a ``project_config.ini``.
+
+    At each level checks two locations:
+      1. ``<level>/project_config.ini`` — user is inside project_folder/
+         or one of its descendants.
+      2. ``<level>/project_folder/project_config.ini`` — user is in
+         the parent directory (the named project root) and hasn't
+         entered project_folder/ yet.
+
+    Returns the closest match (deepest path) or None if nothing found
+    within the depth cap. The depth cap exists because walking all the
+    way to ``/`` could pick up unrelated projects in sibling trees —
+    typical Mufasa users cd into the project_folder, the project root,
+    or one of project_folder's immediate subdirectories, so 3 levels
+    covers everything.
+    """
+    current = start.resolve()
+    for _ in range(_AUTO_DISCOVER_MAX_DEPTH + 1):
+        # Direct hit: config in the current level
+        candidate = current / _PROJECT_CONFIG_FILENAME
+        if candidate.is_file():
+            return candidate
+        # Sideways hit: user is one above project_folder/
+        sibling = current / _PROJECT_FOLDER_NAME / _PROJECT_CONFIG_FILENAME
+        if sibling.is_file():
+            return sibling
+        if current.parent == current:
+            # Reached filesystem root.
+            break
+        current = current.parent
+    return None
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -111,11 +163,28 @@ def main(argv: Optional[list[str]] = None) -> int:
     app.setApplicationName("Mufasa")
     app.setOrganizationName("Mufasa")
 
-    if args.project and not Path(args.project).is_file():
-        print(f"project not found: {args.project}", file=sys.stderr)
-        return 1
+    project_config_path: Optional[str] = None
+    if args.project:
+        # User specified an explicit path — respect it. Don't auto-search.
+        if not Path(args.project).is_file():
+            print(f"project not found: {args.project}", file=sys.stderr)
+            return 1
+        project_config_path = args.project
+    elif not args.no_auto_discover:
+        # Walk up from CWD looking for a project_config.ini.
+        # Tell the user what we found so the auto-load is never
+        # silent (avoids surprise "wait, why did it open *that*
+        # project?" confusion when working across multiple
+        # projects on one machine).
+        discovered = _auto_discover_project(Path.cwd())
+        if discovered is not None:
+            print(
+                f"Auto-loading project config: {discovered}",
+                file=sys.stderr,
+            )
+            project_config_path = str(discovered)
 
-    wb = build_workbench(project_config_path=args.project)
+    wb = build_workbench(project_config_path=project_config_path)
     # Track the workbench on the QApplication so File → New/Open project
     # (which builds a fresh window and closes the old one) doesn't leak
     # or GC the replacement before it's shown.
