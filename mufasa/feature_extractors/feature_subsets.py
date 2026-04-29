@@ -2,7 +2,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from enum import Enum
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -139,7 +139,8 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                  append_to_features_extracted: bool = False,
                  append_to_targets_inserted: bool = False,
                  n_workers: int = 1,
-                 raise_on_error: bool = False):
+                 raise_on_error: bool = False,
+                 overwrite_existing: bool = False):
 
         check_file_exist_and_readable(file_path=config_path)
         ConfigReader.__init__(self, config_path=config_path)
@@ -148,6 +149,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         check_valid_boolean(value=append_to_features_extracted, source=f'{self.__class__.__name__} append_to_features_extracted', raise_error=True)
         check_valid_boolean(value=append_to_targets_inserted, source=f'{self.__class__.__name__} append_to_targets_inserted', raise_error=True)
         check_valid_boolean(value=raise_on_error, source=f'{self.__class__.__name__} raise_on_error', raise_error=True)
+        check_valid_boolean(value=overwrite_existing, source=f'{self.__class__.__name__} overwrite_existing', raise_error=True)
         if not isinstance(n_workers, int) or n_workers < 1:
             raise InvalidInputError(
                 msg=f'n_workers must be a positive integer, got {n_workers!r}',
@@ -161,6 +163,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         self.append_to_targets_inserted = append_to_targets_inserted
         self.n_workers = n_workers
         self.raise_on_error = raise_on_error
+        self.overwrite_existing = overwrite_existing
         # Refuse to start without an explicit save destination. Pre-fix
         # behavior: if save_dir was None and neither append flag was
         # set, run() would compute features into temp_dir and then
@@ -363,9 +366,24 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             remove_multiple_folders(folders=[self.temp_append_dir, self.temp_dir], raise_error=False)
             raise InvalidInputError(msg=f'The files at {path_x} and {path_y} do not contain the same number of rows: {len(x)} vs {len(y)}', source=self.__class__.__name__)
         duplicated_x_cols = [i for i in x.columns if i in y.columns]
-        if len(duplicated_x_cols) > 0:
+        if len(duplicated_x_cols) > 0 and not self.overwrite_existing:
+            # Hard fail unless the caller explicitly opted in to
+            # overwrite. Pre-fix this raised unconditionally — which
+            # was correct (silent overwrite is bad) but caused users
+            # to lose hours of compute when they hit a column
+            # collision at the very end of a run. The new
+            # preflight_check (called at run() start) catches this
+            # case BEFORE compute, with a clear error message that
+            # tells the user to either pass overwrite_existing=True
+            # or pick different feature families.
             remove_multiple_folders(folders=[self.temp_append_dir, self.temp_dir], raise_error=False)
             raise DuplicationError(msg=f'Cannot append the new features to {path_y}. This file already has the following columns: {duplicated_x_cols}', source=self.__class__.__name__)
+        # If we DO have overlap and overwrite is allowed, the caller
+        # of __check_files (the append helpers below) is responsible
+        # for actually dropping the conflicting columns from y before
+        # the concat. We don't mutate y here because pandas semantics
+        # (column-name duplicates in concat result) are clearer when
+        # the drop is explicit at the call site.
 
     def __append_to_data_in_dir(self, dir: Union[str, os.PathLike]):
         temp_files = find_files_of_filetypes_in_directory(directory=self.temp_dir, extensions=[f'.{self.file_type}'], as_dict=True)
@@ -377,6 +395,16 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             new_features_df = read_df(file_path=file_path, file_type=self.file_type).reset_index(drop=True)
             if self.file_checks:
                 self.__check_files(x=new_features_df, y=old_df, path_x=file_path, path_y=os.path.join(dir, f'{file_name}.{self.file_type}'))
+            # When overwrite_existing is set, drop any columns from
+            # the existing file that the new features will replace.
+            # Without this, pd.concat would produce duplicate column
+            # names in the output DataFrame, which downstream code
+            # handles unpredictably.
+            if self.overwrite_existing:
+                conflicts = [c for c in new_features_df.columns if c in old_df.columns]
+                if conflicts:
+                    print(f'  Overwriting {len(conflicts)} existing column(s): {conflicts}')
+                    old_df = old_df.drop(columns=conflicts)
             save_path = os.path.join(self.temp_append_dir, f'{file_name}.{self.file_type}')
             out_df = pd.concat([old_df, new_features_df], axis=1)
             write_df(df=out_df, file_type=self.file_type, save_path=save_path)
@@ -395,6 +423,14 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             new_features_df = read_df(file_path=file_path, file_type=self.file_type).reset_index(drop=True)
             if self.file_checks:
                 self.__check_files(x=new_features_df, y=old_df, path_x=file_path, path_y=os.path.join(dir, f'{file_name}.{self.file_type}'))
+            # Drop conflicting columns from the existing file when
+            # overwrite_existing is set. Same rationale as in
+            # __append_to_data_in_dir; see comment there.
+            if self.overwrite_existing:
+                conflicts = [c for c in new_features_df.columns if c in old_df.columns]
+                if conflicts:
+                    print(f'  Overwriting {len(conflicts)} existing column(s): {conflicts}')
+                    old_df = old_df.drop(columns=conflicts)
             save_path = os.path.join(self.temp_append_dir, f'{file_name}.{self.file_type}')
             clf_cols = [x for x in self.clf_names if x in list(old_df.columns)]
             clf_df, old_df = old_df[clf_cols], old_df.drop(clf_cols, axis=1)
@@ -431,6 +467,119 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             ) else None,
             video_info_df=self.video_info_df,
         )
+
+    def preflight_check(self) -> Dict[str, List[str]]:
+        """Discover whether the planned run would produce columns
+        that already exist in the target append-destination files.
+
+        Returns a dict mapping ``filename → [conflicting_column_names]``
+        for every file in the append destination(s) that has at
+        least one collision. An empty dict means no conflicts.
+
+        The check works by running the full feature-extraction
+        pipeline on the FIRST video only, in a scratch directory,
+        to enumerate the column names this run would produce. The
+        per-video work is fast (sub-second to a few seconds for
+        typical projects); the cost is dwarfed by the multi-hour
+        full run that this check is meant to protect.
+
+        This method returns the conflict dict instead of raising,
+        so the caller (typically the Qt form) can choose to prompt
+        the user before deciding whether to set
+        ``overwrite_existing=True`` and re-run.
+
+        If neither append flag is set (i.e. output goes only to a
+        new ``save_dir``), the method returns an empty dict — there
+        are no existing files to collide with.
+        """
+        # If output goes only to save_dir (a fresh directory), there
+        # are no append targets to check.
+        if not self.append_to_features_extracted and not self.append_to_targets_inserted:
+            return {}
+
+        # Run setup if it hasn't been run yet. Idempotent.
+        if not hasattr(self, 'temp_dir') or not os.path.isdir(getattr(self, 'temp_dir', '')):
+            self._setup_run()
+
+        # Run the orchestration on the first video, but redirect its
+        # output to a separate scratch directory so we don't pollute
+        # self.temp_dir (which the real run will populate).
+        from mufasa.feature_extractors.feature_subset_orchestration import (
+            process_one_video,
+        )
+        scratch_dir = os.path.join(
+            self.data_dir, f"preflight_scratch_{self.datetime}",
+        )
+        os.makedirs(scratch_dir, exist_ok=True)
+        try:
+            # Build a VideoProcessingConfig with temp_dir pointing
+            # at the scratch dir.
+            config = self._build_video_processing_config()
+            # Replace temp_dir on the dataclass via dataclasses.replace
+            # since VideoProcessingConfig is frozen.
+            from dataclasses import replace
+            scratch_config = replace(config, temp_dir=scratch_dir)
+            # Probe with the first video. This produces a written file
+            # in scratch_dir which we then read to enumerate columns.
+            process_one_video(
+                file_path=self.data_paths[0],
+                config=scratch_config,
+                file_idx=0,
+                n_total_files=1,
+                print_progress=False,
+            )
+            scratch_files = find_files_of_filetypes_in_directory(
+                directory=scratch_dir,
+                extensions=[f'.{self.file_type}'],
+                as_dict=True,
+            )
+            if not scratch_files:
+                # Probe didn't produce a file — surprising but not
+                # fatal. Skip the check.
+                return {}
+            probe_path = next(iter(scratch_files.values()))
+            probe_df = read_df(file_path=probe_path, file_type=self.file_type)
+            new_columns = set(probe_df.columns)
+        finally:
+            # Always clean up the scratch directory, even if probe
+            # raised. The real run still owns self.temp_dir.
+            try:
+                remove_a_folder(folder_dir=scratch_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+        # Determine which directories to check based on append flags.
+        targets: list[tuple[str, str]] = []  # (label, dir_path)
+        if self.append_to_features_extracted:
+            targets.append(('features_extracted', self.features_dir))
+        if self.append_to_targets_inserted:
+            targets.append(('targets_inserted', self.targets_folder))
+
+        # For each target file, read just the columns and intersect.
+        conflicts: Dict[str, List[str]] = {}
+        for label, dir_path in targets:
+            for video_name in self.video_names:
+                file_path = os.path.join(
+                    dir_path, f'{video_name}.{self.file_type}',
+                )
+                if not os.path.isfile(file_path):
+                    # No corresponding file in this destination —
+                    # nothing to collide with for this video. Common
+                    # when only one of the two append flags is set
+                    # but a video exists in only one destination.
+                    continue
+                # Reading columns is cheap. For parquet it's
+                # essentially metadata-only; for CSV pandas needs
+                # to parse the first row. Either way: fast.
+                existing_df = read_df(
+                    file_path=file_path, file_type=self.file_type,
+                )
+                existing_cols = set(existing_df.columns)
+                overlap = sorted(new_columns & existing_cols)
+                if overlap:
+                    conflicts[f'{label}/{video_name}'] = overlap
+
+        return conflicts
 
     def _run_sequential(self, config, process_one_video):
         """Run the per-video loop in the current process.
@@ -554,6 +703,51 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         # Idempotent within a single run.
         self._setup_run()
         check_all_file_names_are_represented_in_video_log(video_info_df=self.video_info_df, data_paths=self.data_paths)
+
+        # Preflight: detect column collisions in the append targets
+        # BEFORE doing the multi-hour compute. If conflicts exist
+        # and the caller hasn't opted into overwrite, fail fast with
+        # a clear error message. The Qt form catches this earlier
+        # (synchronous preflight + confirm dialog), but headless
+        # callers (scripts, tests) get the same protection here.
+        if not self.overwrite_existing:
+            conflicts = self.preflight_check()
+            if conflicts:
+                # Build a compact summary: how many files, sample of
+                # conflicting columns (capped to avoid wall-of-text).
+                sample_file = next(iter(conflicts))
+                sample_cols = conflicts[sample_file]
+                cols_preview = sample_cols[:5]
+                more = ""
+                if len(sample_cols) > 5:
+                    more = f" (and {len(sample_cols) - 5} more)"
+                # Clean up temp_dir from _setup_run since we're
+                # bailing out before the real compute starts. The
+                # error here means we created temp_dir but won't use it.
+                try:
+                    remove_a_folder(folder_dir=self.temp_dir, ignore_errors=True)
+                except Exception:
+                    pass
+                raise DuplicationError(
+                    msg=(
+                        f"{len(conflicts)} file(s) in the append "
+                        f"destination(s) already contain feature "
+                        f"columns this run would produce. Example: "
+                        f"{sample_file} has {len(sample_cols)} "
+                        f"conflicting columns including {cols_preview}"
+                        f"{more}.\n\n"
+                        f"To proceed, either:\n"
+                        f"  1. Pass overwrite_existing=True to "
+                        f"     overwrite the existing columns with "
+                        f"     the new values\n"
+                        f"  2. Pick different feature families that "
+                        f"     don't overlap\n"
+                        f"  3. Use save_dir=<new path> to write to "
+                        f"     a fresh directory instead of appending"
+                    ),
+                    source=self.__class__.__name__,
+                )
+
         config = self._build_video_processing_config()
         if self.n_workers <= 1:
             self._run_sequential(config=config, process_one_video=process_one_video)

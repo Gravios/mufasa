@@ -183,12 +183,134 @@ class FeatureSubsetExtractorForm(OperationForm):
             "append_features":  append_features,
             "append_targets":   append_targets,
             "n_workers":        int(self.n_workers.value()),
+            "overwrite_existing": False,  # default; on_run may flip
         }
+
+    def on_run(self) -> None:
+        """Override OperationForm.on_run to run a preflight check
+        for column collisions before kicking off the multi-hour
+        compute job. If conflicts found, prompt the user and
+        either abort or proceed with overwrite_existing=True.
+
+        The preflight runs synchronously and freezes the UI for a
+        few seconds (it processes the first video to discover
+        what columns this run would produce). Acceptable trade
+        — preflight cost is sub-1% of total run time, and the
+        user just clicked Run so a few seconds of "checking..."
+        is expected.
+        """
+        from PySide6.QtWidgets import QMessageBox
+        from mufasa.ui_qt.progress import run_with_progress
+
+        try:
+            kwargs = self.collect_args()
+        except Exception as exc:
+            QMessageBox.warning(
+                self, f"{self.title}: invalid input", str(exc),
+            )
+            return
+
+        # Skip preflight if no append destination is set — only
+        # save_dir mode, no existing files to collide with.
+        needs_preflight = (
+            kwargs["append_features"] or kwargs["append_targets"]
+        )
+
+        if needs_preflight:
+            # Run preflight synchronously. This blocks the UI for a
+            # few seconds; show a busy cursor so it's obvious
+            # something is happening.
+            from PySide6.QtCore import Qt as _Qt
+            from PySide6.QtGui import QGuiApplication, QCursor
+            QGuiApplication.setOverrideCursor(QCursor(_Qt.WaitCursor))
+            try:
+                conflicts = self._run_preflight(kwargs)
+            except Exception as exc:
+                QGuiApplication.restoreOverrideCursor()
+                QMessageBox.critical(
+                    self, f"{self.title}: preflight failed",
+                    f"Could not check for column conflicts before "
+                    f"starting the run.\n\n"
+                    f"{type(exc).__name__}: {exc}\n\n"
+                    f"You can still proceed (the run itself will "
+                    f"detect conflicts at the end and either fail "
+                    f"or skip them depending on overwrite_existing), "
+                    f"but the early-warning safety net is unavailable.",
+                )
+                return
+            finally:
+                QGuiApplication.restoreOverrideCursor()
+
+            if conflicts:
+                # Build a user-friendly summary
+                n_files = len(conflicts)
+                sample_file = next(iter(conflicts))
+                sample_cols = conflicts[sample_file]
+                cols_preview = "\n  ".join(sample_cols[:8])
+                more = ""
+                if len(sample_cols) > 8:
+                    more = (
+                        f"\n  ... ({len(sample_cols) - 8} more columns)"
+                    )
+                msg = (
+                    f"<b>{n_files} file(s) in the destination "
+                    f"already contain feature columns this run "
+                    f"would produce.</b><br><br>"
+                    f"Example: <code>{sample_file}</code> has "
+                    f"<b>{len(sample_cols)}</b> conflicting column(s):"
+                    f"<pre>  {cols_preview}{more}</pre><br>"
+                    f"Overwrite the existing columns with the new "
+                    f"values?"
+                )
+                response = QMessageBox.question(
+                    self, "Confirm overwrite",
+                    msg,
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,  # safer default
+                )
+                if response != QMessageBox.Yes:
+                    # User said no — abort cleanly without raising
+                    return
+                kwargs["overwrite_existing"] = True
+
+        # Dispatch as the parent OperationForm would
+        def _work() -> None:
+            self.target(**kwargs)
+
+        run_with_progress(
+            parent=self.window(),
+            title=f"{self.title}…",
+            target=_work,
+            on_success=lambda: (
+                self.completed.emit(),
+                QMessageBox.information(self, self.title, "Done."),
+            ),
+        )
+
+    def _run_preflight(self, kwargs: dict) -> dict:
+        """Build a FeatureSubsetsCalculator and call its preflight
+        check. Lives in the form so the UI can prompt before
+        target() (which dispatches into a worker) is invoked."""
+        from mufasa.feature_extractors.feature_subsets import (
+            FeatureSubsetsCalculator,
+        )
+        calc = FeatureSubsetsCalculator(
+            config_path=kwargs["config_path"],
+            feature_families=kwargs["feature_families"],
+            file_checks=kwargs["file_checks"],
+            save_dir=kwargs["save_dir"],
+            data_dir=None,
+            append_to_features_extracted=kwargs["append_features"],
+            append_to_targets_inserted=kwargs["append_targets"],
+            n_workers=kwargs["n_workers"],
+            overwrite_existing=False,  # preflight runs in non-overwrite mode
+        )
+        return calc.preflight_check()
 
     def target(self, *, config_path: str, feature_families: list[str],
                file_checks: bool, save_dir: Optional[str],
                append_features: bool, append_targets: bool,
-               n_workers: int) -> None:
+               n_workers: int, overwrite_existing: bool = False) -> None:
         from mufasa.feature_extractors.feature_subsets import (
             FeatureSubsetsCalculator,
         )
@@ -201,6 +323,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             append_to_features_extracted=append_features,
             append_to_targets_inserted=append_targets,
             n_workers=n_workers,
+            overwrite_existing=overwrite_existing,
         ).run()
 
 
