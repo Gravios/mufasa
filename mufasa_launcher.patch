@@ -1,0 +1,526 @@
+From 1c082bccf2c48fd9ee145e7e9006607166ab34e2 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Wed, 29 Apr 2026 21:00:00 +0000
+Subject: [PATCH] mufasa launcher: smart workbench entry point
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Adds a Linux-native launcher for the workbench so typing `mufasa`
+in a terminal produces useful behavior and useful diagnostics
+when something is misconfigured.
+
+Why a launcher (vs just repointing the existing console script):
+
+A bare `console_scripts` entry like `mufasa = "mufasa.ui_qt.workbench_app:main"`
+works fine inside an active conda env but fails opaquely in a few
+real-world scenarios:
+
+- User types `mufasa` from a fresh terminal where the conda env
+  isn't active. Without the launcher, the user sees a bare
+  ImportError traceback or "command not found". With the
+  launcher, they get a diagnostic that explicitly compares
+  sys.executable, sys.prefix, CONDA_PREFIX, and CONDA_DEFAULT_ENV
+  and tells them what to do.
+
+- Wayland / ThinLinc / Xvnc display-server quirks. The launcher
+  consults mufasa.ui_qt.linux_env.recommended_qpa_platform() and
+  sets QT_QPA_PLATFORM if the user hasn't already chosen one.
+
+The launcher itself is a Python entry point. pip's
+console_scripts mechanism rewrites the shebang to point at the
+correct interpreter at install time, so:
+
+- Moving the codebase to a different workstation and re-running
+  `pip install -e .` adapts the path automatically — no
+  hardcoded paths in shell scripts.
+- The shebang always uses the env that was active at install
+  time. The launcher can then verify nothing has drifted.
+
+What changed:
+
+1. NEW: mufasa/cli/__init__.py
+   Empty package init for the new mufasa.cli sub-package.
+
+2. NEW: mufasa/cli/workbench_launcher.py
+   Three functions:
+
+   - main(argv) — try-imports workbench_app.main, runs it
+     with whatever args were passed, returns its exit code.
+   - _set_qt_platform_default() — sets QT_QPA_PLATFORM from
+     linux_env.recommended_qpa_platform() if not already set.
+     Respects the user's explicit choice.
+   - _diagnose_env(exc) — formats a multi-line error message
+     showing sys.executable, sys.prefix, CONDA_PREFIX,
+     CONDA_DEFAULT_ENV, and the recommended fix steps
+     (conda activate / pip install -e .).
+
+3. MODIFIED: pyproject.toml
+   [project.scripts] table updated:
+     - mufasa            → cli.workbench_launcher:main  (NEW default)
+     - mufasa-workbench  → ui_qt.workbench_app:main     (unchanged)
+     - mufasa-tk         → SimBA:main                   (unchanged)
+     - mufasa-chooser    → ui_qt.app:main               (NEW alias)
+
+   Note: pre-patch, `mufasa` pointed at ui_qt.app:main (the Qt
+   chooser). To preserve that behavior for any existing scripts
+   that hard-coded it, I added `mufasa-chooser` as an alias. The
+   default `mufasa` command now launches the workbench, which is
+   what humans want.
+
+4. NEW: tests/smoke_workbench_launcher.py — 10 cases:
+   - Required functions exist (main, _diagnose_env,
+     _set_qt_platform_default)
+   - main() takes Optional[list[str]] argv defaulting to None
+   - main() forwards workbench_main(argv) return value
+   - workbench_app import is wrapped in try/except for
+     diagnostic
+   - _set_qt_platform_default reads QT_QPA_PLATFORM and
+     returns early if set
+   - Diagnostic mentions sys.executable, sys.prefix,
+     CONDA_PREFIX, CONDA_DEFAULT_ENV, conda activate,
+     pip install -e
+   - pyproject.toml's `mufasa` script points at
+     workbench_launcher
+   - Existing entry points (mufasa-workbench, mufasa-tk)
+     preserved
+   - mufasa-chooser alias added
+   - Actually invoke main() with stubbed workbench → return
+     value forwarded
+   - Actually invoke main() with broken import → returns 2,
+     diagnostic on stderr
+
+Linux-only: no Windows/macOS branches, no .bat files, no
+platform module imports. The project targets Linux.
+
+Verified in sandbox:
+- All 3 .py files compile
+- 10/10 launcher smoke tests pass
+- All 16 smoke tests pass (no regression)
+- AST audit reports zero errors
+
+Verified ON USER'S WORKSTATION (TODO):
+- After applying patches and `pip install -e .`, typing `mufasa`
+  in a fresh terminal (with env active) launches the workbench
+- Typing `mufasa` in a terminal where the env is broken
+  produces a clear diagnostic instead of a stack trace
+- Typing `mufasa-workbench` still works as before (leaner direct
+  launch path)
+
+Stack now at 46 patches:
+  45. qt_n_workers_spinbox       (parallel-workers UI)
+  46. mufasa_launcher            (this patch)
+---
+ mufasa/cli/__init__.py            |   6 +
+ mufasa/cli/workbench_launcher.py  | 147 ++++++++++++++++++++
+ pyproject.toml                    |   5 +-
+ tests/smoke_workbench_launcher.py | 214 ++++++++++++++++++++++++++++++
+ 4 files changed, 370 insertions(+), 2 deletions(-)
+ create mode 100644 mufasa/cli/__init__.py
+ create mode 100644 mufasa/cli/workbench_launcher.py
+ create mode 100644 tests/smoke_workbench_launcher.py
+
+diff --git a/mufasa/cli/__init__.py b/mufasa/cli/__init__.py
+new file mode 100644
+index 0000000..80a11d5
+--- /dev/null
++++ b/mufasa/cli/__init__.py
+@@ -0,0 +1,6 @@
++"""mufasa.cli — console script entry points.
++
++Modules here are wired into the ``[project.scripts]`` table in
++``pyproject.toml`` and become user-facing commands after
++``pip install``.
++"""
+diff --git a/mufasa/cli/workbench_launcher.py b/mufasa/cli/workbench_launcher.py
+new file mode 100644
+index 0000000..bc9f617
+--- /dev/null
++++ b/mufasa/cli/workbench_launcher.py
+@@ -0,0 +1,147 @@
++"""
++mufasa.cli.workbench_launcher
++=============================
++
++Entry point for the ``mufasa`` console script. Delegates to the
++workbench UI (``mufasa.ui_qt.workbench_app:main``) while handling
++Linux runtime quirks that the bare console script doesn't.
++
++Linux-only by design — the project targets Linux exclusively.
++
++What this layer does
++--------------------
++
++A bare ``console_scripts`` entry point works fine when the user
++is already inside the active conda env. It can misbehave when:
++
++* The user types ``mufasa`` from a fresh terminal where the
++  conda env isn't active. The shim might resolve to a different
++  Python or fail with ``command not found``.
++* Display server detection picks the wrong Qt platform plugin
++  (Wayland sessions where the wayland plugin isn't bundled,
++  ThinLinc/Xvnc sessions that need software rendering, etc.)
++
++This launcher:
++
++1. Verifies the import chain works under the current Python.
++   If anything is broken, prints a clear diagnostic about the
++   conda env and exits non-zero.
++2. Sets ``QT_QPA_PLATFORM`` from
++   :func:`mufasa.ui_qt.linux_env.recommended_qpa_platform` if
++   the user hasn't already set it.
++3. Forwards all args to the workbench's ``main()``.
++
++The launcher itself is a Python entry point. ``pip install``
++rewrites the shebang to the correct interpreter at install time,
++so moving the codebase to a different workstation and reinstalling
++adapts the path automatically — no hardcoded paths in shell
++scripts.
++
++Usage
++-----
++
++After ``pip install -e .``::
++
++    mufasa                    # launches the workbench
++    mufasa --project /p.ini   # opens a project on launch
++    mufasa --help             # forwards to workbench's argparse
++
++Existing entry points remain available:
++
++* ``mufasa-workbench`` — leaner direct launch (no env diagnostics)
++* ``mufasa-tk`` — legacy tkinter UI
++
++Why a separate ``mufasa-workbench`` entry point coexists with
++``mufasa``: scripts and CI that want a deterministic minimal
++launch path skip the env-diagnostic step. Day-to-day humans use
++``mufasa``.
++"""
++from __future__ import annotations
++
++import os
++import sys
++from typing import Optional
++
++
++def _diagnose_env(exc: BaseException) -> str:
++    """Build a human-readable diagnostic message for an import
++    failure. Tells the user which Python is in use and what conda
++    env (if any) appears active, so they can spot mismatches.
++
++    Common scenario this diagnoses: user types ``mufasa`` from a
++    fresh terminal where conda hasn't been activated. The shebang
++    on the entry-point shim points to the env's Python, which
++    works — but if the env was rebuilt or the codebase was
++    re-installed, the shebang might be stale. The diagnostic
++    surfaces the exact paths so the user can compare.
++    """
++    py = sys.executable
++    prefix = sys.prefix
++    conda_prefix = os.environ.get("CONDA_PREFIX", "<not set>")
++    conda_env = os.environ.get("CONDA_DEFAULT_ENV", "<not set>")
++    venv = os.environ.get("VIRTUAL_ENV", "<not set>")
++
++    lines = [
++        f"mufasa launcher: failed to import workbench backend.",
++        f"  Reason: {type(exc).__name__}: {exc}",
++        f"",
++        f"Python in use:",
++        f"  sys.executable: {py}",
++        f"  sys.prefix:     {prefix}",
++        f"",
++        f"Active environment markers:",
++        f"  CONDA_PREFIX:        {conda_prefix}",
++        f"  CONDA_DEFAULT_ENV:   {conda_env}",
++        f"  VIRTUAL_ENV:         {venv}",
++        f"",
++        f"If sys.prefix differs from CONDA_PREFIX, the conda env",
++        f"isn't actually active for this Python. Try:",
++        f"  conda activate <your-mufasa-env>",
++        f"  mufasa",
++        f"",
++        f"If you recently rebuilt the env or moved the repo, reinstall:",
++        f"  pip install -e .",
++    ]
++    return "\n".join(lines)
++
++
++def _set_qt_platform_default() -> None:
++    """Set ``QT_QPA_PLATFORM`` from
++    :func:`mufasa.ui_qt.linux_env.recommended_qpa_platform`
++    if the user hasn't already chosen one.
++
++    Only sets, never overrides. If the user exports
++    ``QT_QPA_PLATFORM=xcb`` to force X11 (e.g. to work around a
++    Wayland-specific Qt bug), we respect that.
++    """
++    if os.environ.get("QT_QPA_PLATFORM"):
++        return  # respect user's explicit choice
++    try:
++        from mufasa.ui_qt import linux_env
++        recommended = linux_env.recommended_qpa_platform()
++        if recommended:
++            os.environ["QT_QPA_PLATFORM"] = recommended
++    except Exception:
++        # If linux_env can't be imported, the workbench import
++        # will fail next and produce a more useful error anyway.
++        pass
++
++
++def main(argv: Optional[list[str]] = None) -> int:
++    """Console-script entry. Forwards to ``workbench_app.main``."""
++    # Try the import upfront so we can produce a helpful error
++    # message instead of a bare ImportError traceback if something
++    # is misconfigured.
++    try:
++        from mufasa.ui_qt.workbench_app import main as workbench_main
++    except Exception as exc:
++        print(_diagnose_env(exc), file=sys.stderr)
++        return 2
++
++    _set_qt_platform_default()
++
++    return workbench_main(argv)
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/pyproject.toml b/pyproject.toml
+index 36d90d3..a502cde 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -164,8 +164,9 @@ Issues        = "https://github.com/sgoldenlab/simba/issues"
+ 
+ [project.scripts]
+ mufasa-tk        = "mufasa.SimBA:main"          # legacy Tk entry point
+-mufasa           = "mufasa.ui_qt.app:main"      # new Qt entry point (placeholder
+-mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # consolidated sidebar UI
++mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench (default; env diagnostics)
++mufasa-chooser   = "mufasa.ui_qt.app:main"      # legacy Qt chooser / standalone popups
++mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench launch (no env diagnostics)
+                                         # until simba/ui_qt/app.py lands)
+ 
+ # ============================================================================
+diff --git a/tests/smoke_workbench_launcher.py b/tests/smoke_workbench_launcher.py
+new file mode 100644
+index 0000000..2175fec
+--- /dev/null
++++ b/tests/smoke_workbench_launcher.py
+@@ -0,0 +1,214 @@
++"""Tests for mufasa.cli.workbench_launcher.
++
++The launcher is a Linux-only thin wrapper that:
++1. Forwards args to mufasa.ui_qt.workbench_app:main
++2. Sets QT_QPA_PLATFORM if not already set
++3. Emits a diagnostic when the import chain fails
++
++We can test (1) and (3) by mocking. (2) is verified by AST
++inspection — actually setting it would pollute the test process
++env.
++
++    PYTHONPATH=. python tests/smoke_workbench_launcher.py
++"""
++from __future__ import annotations
++
++import ast
++import os
++import sys
++from pathlib import Path
++from unittest import mock
++
++
++def main() -> int:
++    src_path = "mufasa/cli/workbench_launcher.py"
++    src = Path(src_path).read_text()
++    tree = ast.parse(src)
++
++    # ------------------------------------------------------------------ #
++    # Case 1: file structure — main(), _diagnose_env, _set_qt_platform_default
++    # ------------------------------------------------------------------ #
++    fn_names = {
++        n.name for n in tree.body if isinstance(n, ast.FunctionDef)
++    }
++    expected = {"main", "_diagnose_env", "_set_qt_platform_default"}
++    missing = expected - fn_names
++    assert not missing, f"Launcher missing functions: {sorted(missing)}"
++
++    # ------------------------------------------------------------------ #
++    # Case 2: main() takes Optional[list[str]] argv (matches workbench_app)
++    # ------------------------------------------------------------------ #
++    main_fn = next(
++        n for n in tree.body
++        if isinstance(n, ast.FunctionDef) and n.name == "main"
++    )
++    arg_names = [a.arg for a in main_fn.args.args]
++    assert arg_names == ["argv"], (
++        f"main() should take a single 'argv' parameter, got {arg_names}"
++    )
++    # Default of None
++    if main_fn.args.defaults:
++        d = main_fn.args.defaults[0]
++        assert isinstance(d, ast.Constant) and d.value is None, (
++            "argv should default to None"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 3: main() forwards return value of workbench_main
++    # ------------------------------------------------------------------ #
++    main_src = ast.unparse(main_fn)
++    assert "workbench_main(argv)" in main_src, (
++        "main() should call workbench_main(argv)"
++    )
++    assert "return workbench_main" in main_src, (
++        "main() should return what workbench_main returns "
++        "(propagates exit code)"
++    )
++
++    # ------------------------------------------------------------------ #
++    # Case 4: import is wrapped in try/except so a broken env produces
++    # a diagnostic instead of an opaque traceback
++    # ------------------------------------------------------------------ #
++    has_try = False
++    for sub in ast.walk(main_fn):
++        if isinstance(sub, ast.Try):
++            # Body should contain the workbench_app import
++            body_src = "\n".join(ast.unparse(s) for s in sub.body)
++            if "workbench_app" in body_src:
++                has_try = True
++    assert has_try, (
++        "workbench_app import should be wrapped in try/except for "
++        "diagnostic"
++    )
++
++    # ------------------------------------------------------------------ #
++    # Case 5: _set_qt_platform_default respects user's existing
++    # QT_QPA_PLATFORM
++    # ------------------------------------------------------------------ #
++    qt_fn = next(
++        n for n in tree.body
++        if isinstance(n, ast.FunctionDef) and n.name == "_set_qt_platform_default"
++    )
++    qt_src = ast.unparse(qt_fn)
++    # Should check for existing QT_QPA_PLATFORM and return early
++    assert "QT_QPA_PLATFORM" in qt_src
++    assert "os.environ" in qt_src
++    # Should NOT use os.environ[...] = ... assignment when var is set
++    # (i.e. there should be a guard before any assignment).
++    # Just check the flow has an early-return idiom.
++    assert "return" in qt_src
++
++    # ------------------------------------------------------------------ #
++    # Case 6: diagnostic mentions the practical fix steps
++    # ------------------------------------------------------------------ #
++    diag_fn = next(
++        n for n in tree.body
++        if isinstance(n, ast.FunctionDef) and n.name == "_diagnose_env"
++    )
++    diag_src = ast.unparse(diag_fn)
++    for required_token in [
++        "sys.executable", "sys.prefix",
++        "CONDA_PREFIX", "CONDA_DEFAULT_ENV",
++        "conda activate", "pip install -e",
++    ]:
++        assert required_token in diag_src, (
++            f"_diagnose_env should mention {required_token!r}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 7: pyproject.toml's [project.scripts] points `mufasa` at
++    # the new launcher, not the old chooser
++    # ------------------------------------------------------------------ #
++    pyproject = Path("pyproject.toml").read_text()
++    # Find the line for `mufasa = ...`
++    mufasa_line = None
++    for line in pyproject.splitlines():
++        stripped = line.strip()
++        if stripped.startswith("mufasa") and "=" in stripped:
++            # Could be mufasa, mufasa-tk, mufasa-workbench, or mufasa-chooser
++            name = stripped.split("=")[0].strip()
++            if name == "mufasa":
++                mufasa_line = stripped
++                break
++    assert mufasa_line is not None, (
++        "Couldn't find `mufasa = ...` line in [project.scripts]"
++    )
++    assert "workbench_launcher" in mufasa_line, (
++        f"`mufasa` script should point at workbench_launcher, "
++        f"got: {mufasa_line!r}"
++    )
++
++    # ------------------------------------------------------------------ #
++    # Case 8: existing entry points are preserved
++    # ------------------------------------------------------------------ #
++    for required in ["mufasa-workbench", "mufasa-tk"]:
++        assert required in pyproject, (
++            f"Existing entry point {required!r} should be preserved"
++        )
++    # And mufasa-chooser was added as alias for the old `mufasa` behavior
++    assert "mufasa-chooser" in pyproject, (
++        "mufasa-chooser alias should preserve old `mufasa` (chooser) "
++        "behavior for any scripts that depended on it"
++    )
++
++    # ------------------------------------------------------------------ #
++    # Case 9: actually invoke main() with a stubbed workbench_main and
++    # verify the return value is forwarded
++    # ------------------------------------------------------------------ #
++    # Stub: when main() tries to import workbench_app, give it a fake
++    # one whose .main returns a known value.
++    fake_module = type(sys)("mufasa.ui_qt.workbench_app")
++    fake_module.main = lambda argv=None: 42
++    sys.modules["mufasa.ui_qt.workbench_app"] = fake_module
++    # And stub linux_env to avoid Qt detection side effects
++    fake_linux_env = type(sys)("mufasa.ui_qt.linux_env")
++    fake_linux_env.recommended_qpa_platform = lambda: ""
++    sys.modules["mufasa.ui_qt.linux_env"] = fake_linux_env
++    # We need mufasa.ui_qt to exist as a package shim
++    if "mufasa" not in sys.modules:
++        sys.modules["mufasa"] = type(sys)("mufasa")
++        sys.modules["mufasa"].__path__ = []
++    if "mufasa.cli" not in sys.modules:
++        sys.modules["mufasa.cli"] = type(sys)("mufasa.cli")
++    if "mufasa.ui_qt" not in sys.modules:
++        sys.modules["mufasa.ui_qt"] = type(sys)("mufasa.ui_qt")
++
++    # Load the launcher module and run main()
++    import importlib.util
++    spec = importlib.util.spec_from_file_location(
++        "mufasa.cli.workbench_launcher",
++        src_path,
++    )
++    launcher = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(launcher)
++
++    rv = launcher.main([])
++    assert rv == 42, (
++        f"main() should return whatever workbench_main returns, "
++        f"got {rv}"
++    )
++
++    # ------------------------------------------------------------------ #
++    # Case 10: when the import fails, main() returns 2 and prints
++    # the diagnostic to stderr
++    # ------------------------------------------------------------------ #
++    # Reset by removing workbench_app
++    sys.modules["mufasa.ui_qt.workbench_app"] = None
++    import io
++    import contextlib
++    buf = io.StringIO()
++    with contextlib.redirect_stderr(buf):
++        rv = launcher.main([])
++    assert rv == 2, (
++        f"main() should return 2 on import failure, got {rv}"
++    )
++    err = buf.getvalue()
++    assert "mufasa launcher" in err
++    assert "conda activate" in err
++
++    print("smoke_workbench_launcher: 10/10 cases passed")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+-- 
+2.43.0
+

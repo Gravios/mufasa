@@ -164,8 +164,9 @@ Issues        = "https://github.com/sgoldenlab/simba/issues"
 
 [project.scripts]
 mufasa-tk        = "mufasa.SimBA:main"          # legacy Tk entry point
-mufasa           = "mufasa.ui_qt.app:main"      # new Qt entry point (placeholder
-mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # consolidated sidebar UI
+mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench (default; env diagnostics)
+mufasa-chooser   = "mufasa.ui_qt.app:main"      # legacy Qt chooser / standalone popups
+mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench launch (no env diagnostics)
                                         # until simba/ui_qt/app.py lands)
 
 # ============================================================================
