@@ -39,6 +39,42 @@ _EXTENSIONS = [
         # floating-point ops in ways that diverge.
         extra_compile_args=["-O3", "-Wall"],
     ),
+    Extension(
+        name="mufasa._native.inside_rectangle",
+        sources=["mufasa/_native/inside_rectangle.pyx"],
+        include_dirs=[np.get_include()],
+        extra_compile_args=["-O3", "-Wall"],
+    ),
+    Extension(
+        name="mufasa._native.inside_circle",
+        sources=["mufasa/_native/inside_circle.pyx"],
+        include_dirs=[np.get_include()],
+        extra_compile_args=["-O3", "-Wall"],
+    ),
+    Extension(
+        name="mufasa._native.euclidean_distance",
+        sources=["mufasa/_native/euclidean_distance.pyx"],
+        include_dirs=[np.get_include()],
+        extra_compile_args=["-O3", "-Wall"],
+    ),
+    Extension(
+        name="mufasa._native.angle3pt",
+        sources=["mufasa/_native/angle3pt.pyx"],
+        include_dirs=[np.get_include()],
+        extra_compile_args=["-O3", "-Wall"],
+    ),
+    Extension(
+        name="mufasa._native.border_distances",
+        sources=["mufasa/_native/border_distances.pyx"],
+        include_dirs=[np.get_include()],
+        extra_compile_args=["-O3", "-Wall"],
+    ),
+    Extension(
+        name="mufasa._native.hull",
+        sources=["mufasa/_native/hull.pyx"],
+        include_dirs=[np.get_include()],
+        extra_compile_args=["-O3", "-Wall"],
+    ),
 ]
 
 
