@@ -1,0 +1,454 @@
+From 975474b12132795c682255657d91fb6cedc53581 Mon Sep 17 00:00:00 2001
+From: Gravio <gravio@uni-muenster.de>
+Date: Thu, 30 Apr 2026 05:00:00 +0000
+Subject: [PATCH] workbench: auto-load project_config.ini from CWD if found
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+When `mufasa` (or `mufasa-workbench`) is launched without an
+explicit `--project` flag, walk up from the current working
+directory looking for a `project_config.ini`. If found, auto-load
+it. This eliminates the friction of typing the full path every
+time you cd into a project to work on it.
+
+Search behavior
+---------------
+
+Mufasa projects are laid out as:
+
+  <project_path>/<project_name>/project_folder/project_config.ini
+
+So discovery has to handle both cases:
+  - User cd'd into project_folder/ or one of its subdirs (csv/,
+    videos/, etc.) — config is in CWD or an ancestor
+  - User cd'd into <project_name>/ but not project_folder/ —
+    config is in CWD/project_folder/ (i.e. a subdir, not an
+    ancestor)
+
+At each level walking up, the helper probes BOTH `<level>/project_config.ini`
+AND `<level>/project_folder/project_config.ini`. First hit wins.
+Walk-up terminates after 3 levels to avoid picking up unrelated
+projects from sibling trees in deep directory structures.
+
+User-visible behavior
+---------------------
+
+- `mufasa` from inside a project_folder: auto-loads the project,
+  prints `Auto-loading project config: <path>` to stderr so the
+  user knows what happened (silent magic is bad UX, especially
+  with multiple projects on one machine).
+- `mufasa --project /explicit/path`: respects the explicit flag,
+  no search.
+- `mufasa --no-auto-discover`: skips the search even when CWD
+  has a config. Useful for CI runners or wrapper scripts that
+  want deterministic launch.
+- `mufasa` with no config anywhere in the search range: behaves
+  exactly as before (launches with no project loaded).
+
+Why a depth cap of 3
+--------------------
+
+The plausible "deepest user CWD" is project_folder/csv/<some-stage>/
+(e.g. `csv/features_extracted/`), which is 2 levels below the
+config. Adding a level of safety margin gives 3. Going to 5 or 10
+risks finding a sibling project's config when working in a deep
+directory structure unrelated to mufasa.
+
+Why announce to stderr instead of a popup
+-----------------------------------------
+
+Popups interrupt; stderr informs without blocking. The Qt event
+loop hasn't started by the time discovery runs, and the user
+will see the workbench window open with the project loaded —
+the stderr line lets them double-check WHICH project if they
+have multiple cd'd into recently.
+
+What changed
+------------
+
+1. MODIFIED: mufasa/ui_qt/workbench_app.py
+   - Adds _auto_discover_project(start) helper. Pure-stdlib,
+     uses pathlib. Returns the closest project_config.ini
+     found within _AUTO_DISCOVER_MAX_DEPTH (=3) levels up,
+     or None.
+   - Adds two module-level constants:
+       _AUTO_DISCOVER_MAX_DEPTH (= 3)
+       _PROJECT_CONFIG_FILENAME (= "project_config.ini")
+       _PROJECT_FOLDER_NAME (= "project_folder")
+   - Adds --no-auto-discover argparse flag (off by default)
+   - main() routes through the helper when args.project is
+     None and --no-auto-discover wasn't given. Prints
+     `Auto-loading project config: <path>` to stderr on hit.
+
+2. NEW: tests/smoke_workbench_auto_discover.py — 10 cases:
+   - Config in CWD
+   - User one level above project_folder/, config inside
+   - User in project_folder/csv/ (config one up)
+   - User 2 levels deep (e.g. csv/features_extracted/)
+   - Discovery exactly at max_depth (boundary)
+   - Does NOT discover beyond max_depth
+   - Returns None when no config anywhere
+   - Closest match wins when multiple ancestors have configs
+   - Filesystem-root walk terminates cleanly (no crash)
+   - main() in workbench_app correctly wires up the helper
+     (--no-auto-discover flag, dispatch logic, stderr output)
+
+Verified in sandbox:
+- All 22 smoke tests pass (1 new + 21 existing)
+- compile clean on workbench_app.py
+- _auto_discover_project extracted via AST and exec'd into a
+  pure-stdlib namespace (no PySide6 dependency for the test)
+
+Cannot be verified in sandbox:
+- That the auto-load actually works end-to-end via the running
+  workbench (would need PySide6 + a real project tree)
+
+Stack now at 54 patches:
+  53. cython_kernel_wiring       (route production through _native)
+  54. workbench_auto_discover    (this patch)
+---
+ mufasa/ui_qt/workbench_app.py          |  79 ++++++++-
+ tests/smoke_workbench_auto_discover.py | 230 +++++++++++++++++++++++++
+ 2 files changed, 304 insertions(+), 5 deletions(-)
+ create mode 100644 tests/smoke_workbench_auto_discover.py
+
+diff --git a/mufasa/ui_qt/workbench_app.py b/mufasa/ui_qt/workbench_app.py
+index 9167453..c9fdc28 100644
+--- a/mufasa/ui_qt/workbench_app.py
++++ b/mufasa/ui_qt/workbench_app.py
+@@ -98,9 +98,61 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+     p = argparse.ArgumentParser(prog="mufasa-workbench")
+     p.add_argument("--project", type=str, default=None,
+                    help="auto-load a project_config.ini on launch")
++    p.add_argument("--no-auto-discover", action="store_true",
++                   help="disable auto-discovery of project_config.ini "
++                        "in the current directory or its ancestors")
+     return p.parse_args(argv)
+ 
+ 
++# Number of parent directories to walk when auto-discovering a
++# project config. 3 levels covers the common cases: user cd'd into
++# project_folder/, project_folder/csv/, or project_folder/csv/<stage>/.
++# Going higher risks picking up unrelated projects from sibling trees.
++_AUTO_DISCOVER_MAX_DEPTH = 3
++_PROJECT_CONFIG_FILENAME = "project_config.ini"
++# Mufasa creates projects with a hardcoded "project_folder" subdirectory
++# (DirNames.PROJECT.value). The config file lives inside there, NOT at
++# the project root. So when walking up from CWD, we also probe each
++# level's "project_folder/" subdirectory — that catches the common case
++# where the user is one level above project_folder/ (e.g. cd'd into the
++# named project directory itself, not its project_folder subdir).
++_PROJECT_FOLDER_NAME = "project_folder"
++
++
++def _auto_discover_project(start: Path) -> Optional[Path]:
++    """Walk up from ``start`` looking for a ``project_config.ini``.
++
++    At each level checks two locations:
++      1. ``<level>/project_config.ini`` — user is inside project_folder/
++         or one of its descendants.
++      2. ``<level>/project_folder/project_config.ini`` — user is in
++         the parent directory (the named project root) and hasn't
++         entered project_folder/ yet.
++
++    Returns the closest match (deepest path) or None if nothing found
++    within the depth cap. The depth cap exists because walking all the
++    way to ``/`` could pick up unrelated projects in sibling trees —
++    typical Mufasa users cd into the project_folder, the project root,
++    or one of project_folder's immediate subdirectories, so 3 levels
++    covers everything.
++    """
++    current = start.resolve()
++    for _ in range(_AUTO_DISCOVER_MAX_DEPTH + 1):
++        # Direct hit: config in the current level
++        candidate = current / _PROJECT_CONFIG_FILENAME
++        if candidate.is_file():
++            return candidate
++        # Sideways hit: user is one above project_folder/
++        sibling = current / _PROJECT_FOLDER_NAME / _PROJECT_CONFIG_FILENAME
++        if sibling.is_file():
++            return sibling
++        if current.parent == current:
++            # Reached filesystem root.
++            break
++        current = current.parent
++    return None
++
++
+ def main(argv: Optional[list[str]] = None) -> int:
+     """Workbench entry — invoked by the ``mufasa-workbench`` console script."""
+     args = _parse_args(argv)
+@@ -111,11 +163,28 @@ def main(argv: Optional[list[str]] = None) -> int:
+     app.setApplicationName("Mufasa")
+     app.setOrganizationName("Mufasa")
+ 
+-    if args.project and not Path(args.project).is_file():
+-        print(f"project not found: {args.project}", file=sys.stderr)
+-        return 1
+-
+-    wb = build_workbench(project_config_path=args.project)
++    project_config_path: Optional[str] = None
++    if args.project:
++        # User specified an explicit path — respect it. Don't auto-search.
++        if not Path(args.project).is_file():
++            print(f"project not found: {args.project}", file=sys.stderr)
++            return 1
++        project_config_path = args.project
++    elif not args.no_auto_discover:
++        # Walk up from CWD looking for a project_config.ini.
++        # Tell the user what we found so the auto-load is never
++        # silent (avoids surprise "wait, why did it open *that*
++        # project?" confusion when working across multiple
++        # projects on one machine).
++        discovered = _auto_discover_project(Path.cwd())
++        if discovered is not None:
++            print(
++                f"Auto-loading project config: {discovered}",
++                file=sys.stderr,
++            )
++            project_config_path = str(discovered)
++
++    wb = build_workbench(project_config_path=project_config_path)
+     # Track the workbench on the QApplication so File → New/Open project
+     # (which builds a fresh window and closes the old one) doesn't leak
+     # or GC the replacement before it's shown.
+diff --git a/tests/smoke_workbench_auto_discover.py b/tests/smoke_workbench_auto_discover.py
+new file mode 100644
+index 0000000..f581486
+--- /dev/null
++++ b/tests/smoke_workbench_auto_discover.py
+@@ -0,0 +1,230 @@
++"""Tests for project_config.ini auto-discovery in workbench_app.
++
++Mufasa projects are laid out as:
++    <project_path>/
++    └── <project_name>/
++        └── project_folder/        ← DirNames.PROJECT.value
++            ├── project_config.ini ← THE FILE
++            ├── csv/
++            ├── videos/
++            └── ...
++
++So discovery has to handle both "user is in project_folder/ or
++deeper" and "user is in <project_name>/" (one level above).
++
++Sandbox-runnable; the helper is pure-stdlib so we extract and
++exec it without importing PySide6.
++
++    PYTHONPATH=. python tests/smoke_workbench_auto_discover.py
++"""
++from __future__ import annotations
++
++import ast
++import os
++import sys
++import tempfile
++from pathlib import Path
++from typing import Optional
++
++
++def _load_helper():
++    """Extract _auto_discover_project + supporting constants from
++    workbench_app.py and exec into a namespace. We can't import the
++    module directly because PySide6 isn't available in the sandbox.
++    """
++    src = Path("mufasa/ui_qt/workbench_app.py").read_text()
++    tree = ast.parse(src)
++    wanted = {
++        "_AUTO_DISCOVER_MAX_DEPTH",
++        "_PROJECT_CONFIG_FILENAME",
++        "_PROJECT_FOLDER_NAME",
++        "_auto_discover_project",
++    }
++    pieces = []
++    for node in tree.body:
++        if isinstance(node, ast.Assign):
++            for target in node.targets:
++                if isinstance(target, ast.Name) and target.id in wanted:
++                    pieces.append(ast.unparse(node))
++        elif isinstance(node, ast.FunctionDef) and node.name in wanted:
++            pieces.append(ast.unparse(node))
++    assert len(pieces) >= 4, (
++        f"Expected to find 4 names ({wanted}); found {len(pieces)}"
++    )
++    ns = {"Path": Path, "Optional": Optional}
++    exec("\n".join(pieces), ns)
++    return ns
++
++
++def main() -> int:
++    ns = _load_helper()
++    auto_discover = ns["_auto_discover_project"]
++    max_depth: int = ns["_AUTO_DISCOVER_MAX_DEPTH"]
++    config_name: str = ns["_PROJECT_CONFIG_FILENAME"]
++    folder_name: str = ns["_PROJECT_FOLDER_NAME"]
++    assert config_name == "project_config.ini"
++    assert folder_name == "project_folder"
++
++    # ------------------------------------------------------------------ #
++    # Case 1: config in CWD (user cd'd into project_folder/)
++    # ------------------------------------------------------------------ #
++    with tempfile.TemporaryDirectory() as td:
++        td_path = Path(td).resolve()
++        config = td_path / config_name
++        config.write_text("[General]\nproject_name = test\n")
++        result = auto_discover(td_path)
++        assert result is not None and result.resolve() == config.resolve(), (
++            f"Should find config in CWD; got {result}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 2: user one level above project_folder/, config inside
++    # (this is the case where user cd'd into <project_name>/)
++    # ------------------------------------------------------------------ #
++    with tempfile.TemporaryDirectory() as td:
++        td_path = Path(td).resolve()
++        pf = td_path / folder_name
++        pf.mkdir()
++        config = pf / config_name
++        config.write_text("[General]\n")
++        result = auto_discover(td_path)
++        assert result is not None and result.resolve() == config.resolve(), (
++            f"Should find config in project_folder/ subdir; got {result}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 3: user inside project_folder/csv/ — config one up
++    # ------------------------------------------------------------------ #
++    with tempfile.TemporaryDirectory() as td:
++        td_path = Path(td).resolve()
++        pf = td_path / folder_name
++        pf.mkdir()
++        config = pf / config_name
++        config.write_text("[General]\n")
++        csv_sub = pf / "csv"
++        csv_sub.mkdir()
++        result = auto_discover(csv_sub)
++        assert result is not None and result.resolve() == config.resolve(), (
++            f"Should find config one level up; got {result}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 4: user 2 levels deep inside project_folder/
++    # (e.g. project_folder/csv/features_extracted/)
++    # ------------------------------------------------------------------ #
++    with tempfile.TemporaryDirectory() as td:
++        td_path = Path(td).resolve()
++        pf = td_path / folder_name
++        pf.mkdir()
++        config = pf / config_name
++        config.write_text("[General]\n")
++        deep = pf / "csv" / "features_extracted"
++        deep.mkdir(parents=True)
++        result = auto_discover(deep)
++        assert result is not None and result.resolve() == config.resolve()
++
++    # ------------------------------------------------------------------ #
++    # Case 5: discovery exactly at max_depth (boundary)
++    # ------------------------------------------------------------------ #
++    with tempfile.TemporaryDirectory() as td:
++        td_path = Path(td).resolve()
++        config = td_path / config_name
++        config.write_text("[General]\n")
++        deep = td_path
++        for i in range(max_depth):
++            deep = deep / f"level_{i}"
++        deep.mkdir(parents=True)
++        result = auto_discover(deep)
++        assert result is not None and result.resolve() == config.resolve(), (
++            f"Should find config at exactly max_depth; got {result}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 6: does NOT discover beyond max_depth (avoids picking up
++    # unrelated projects from sibling trees)
++    # ------------------------------------------------------------------ #
++    with tempfile.TemporaryDirectory() as td:
++        td_path = Path(td).resolve()
++        config = td_path / config_name
++        config.write_text("[General]\n")
++        # One level deeper than max_depth
++        deep = td_path
++        for i in range(max_depth + 1):
++            deep = deep / f"level_{i}"
++        deep.mkdir(parents=True)
++        result = auto_discover(deep)
++        assert result is None, (
++            f"Should NOT find config beyond max_depth; got {result}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 7: returns None when no config anywhere
++    # ------------------------------------------------------------------ #
++    with tempfile.TemporaryDirectory() as td:
++        td_path = Path(td).resolve()
++        sub = td_path / "some" / "deep" / "directory"
++        sub.mkdir(parents=True)
++        result = auto_discover(sub)
++        assert result is None, (
++            f"Should return None when no config anywhere; got {result}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 8: closest match wins when multiple configs exist (an
++    # outer ancestor has one AND a closer one has another). The
++    # walk-up returns at the first hit, which is the closest.
++    # ------------------------------------------------------------------ #
++    with tempfile.TemporaryDirectory() as td:
++        td_path = Path(td).resolve()
++        outer_config = td_path / config_name
++        outer_config.write_text("[outer]\n")
++        inner_dir = td_path / "inner"
++        inner_dir.mkdir()
++        inner_config = inner_dir / config_name
++        inner_config.write_text("[inner]\n")
++        # User is in inner_dir → should pick inner config
++        result = auto_discover(inner_dir)
++        assert result is not None and result.resolve() == inner_config.resolve(), (
++            f"Closest match should win; got {result}"
++        )
++
++    # ------------------------------------------------------------------ #
++    # Case 9: filesystem-root behavior — doesn't crash when called
++    # near root
++    # ------------------------------------------------------------------ #
++    # Walk up from /tmp itself; root has no config (presumably).
++    # This just verifies the function terminates and returns
++    # without raising.
++    result = auto_discover(Path("/tmp"))
++    assert result is None or isinstance(result, Path), (
++        "Walk-up to root should terminate cleanly"
++    )
++
++    # ------------------------------------------------------------------ #
++    # Case 10: structural — main() in workbench_app routes through
++    # _auto_discover_project when --project is not given AND
++    # --no-auto-discover is not set
++    # ------------------------------------------------------------------ #
++    src = Path("mufasa/ui_qt/workbench_app.py").read_text()
++    assert "no_auto_discover" in src, (
++        "main() should support a --no-auto-discover flag for users "
++        "who want to disable the magic"
++    )
++    assert "_auto_discover_project" in src
++    # The dispatch logic: if args.project else if not args.no_auto_discover
++    assert "args.no_auto_discover" in src, (
++        "main() should check args.no_auto_discover before invoking "
++        "the helper"
++    )
++    # User-visible feedback: print to stderr so the load isn't silent
++    assert "Auto-loading project config" in src, (
++        "main() should announce the auto-load so users aren't "
++        "surprised which project opened"
++    )
++
++    print("smoke_workbench_auto_discover: 10/10 cases passed")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+-- 
+2.43.0
+
