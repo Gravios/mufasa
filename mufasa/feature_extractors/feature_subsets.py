@@ -126,10 +126,30 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                 raise NoFilesFoundError(msg=f'Cannot append feature subset to files in {self.targets_folder} directory: To proceed, the files in the {self.targets_folder} and the {self.data_dir} directories has to contain the same number of files with the same filenames.', source=self.__class__.__name__)
         self.video_names = [get_fn_ext(filepath=x)[1] for x in self.data_paths]
         for file_path in self.data_paths: check_file_exist_and_readable(file_path=file_path)
+        # Heavy setup (temp_dir creation, ROI loading, video
+        # filtering, bp combinations) is deferred to _setup_run() —
+        # called by run() rather than the constructor. This makes
+        # the class cheap to instantiate (e.g. for inspection or
+        # testing) without committing to filesystem side effects.
+        # Pre-step-4 behavior: __init__ created temp_data_<datetime>
+        # directories on every instantiation, which accumulated as
+        # cruft if run() was never called (Bug C in
+        # AUDIT_feature_subsets_calculator.md).
+
+    def _setup_run(self):
+        """Per-run setup: create temp_dir, load ROI data if needed,
+        filter videos with missing ROIs, build body-part combinations.
+
+        Called by run() before the per-video loop. Idempotent within
+        a single run; not safe to call concurrently from two
+        instances against the same data_dir (the temp_dir uses the
+        instance's datetime, so two calls in the same second from
+        the same process could collide — unlikely in practice).
+        """
         self.temp_dir = os.path.join(self.data_dir, f"temp_data_{self.datetime}")
         if not os.path.isdir(self.temp_dir):
             os.makedirs(self.temp_dir)
-        if (FRAME_BP_TO_ROI_CENTER in feature_families) or (FRAME_BP_INSIDE_ROI in feature_families):
+        if (FRAME_BP_TO_ROI_CENTER in self.feature_families) or (FRAME_BP_INSIDE_ROI in self.feature_families):
             if not os.path.isfile(self.roi_coordinates_path):
                 raise NoROIDataError(msg=f'Cannot compute ROI features: The SimBA project has no ROI data defined.')
             self.read_roi_data()
@@ -324,6 +344,9 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         from mufasa.feature_extractors.feature_subset_orchestration import (
             process_one_video,
         )
+        # Heavy setup deferred from __init__ — see _setup_run docstring.
+        # Idempotent within a single run.
+        self._setup_run()
         check_all_file_names_are_represented_in_video_log(video_info_df=self.video_info_df, data_paths=self.data_paths)
         config = self._build_video_processing_config()
         for file_cnt, file_path in enumerate(self.data_paths):
