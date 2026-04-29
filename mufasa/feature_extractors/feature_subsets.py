@@ -469,33 +469,85 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         )
 
     def preflight_check(self) -> Dict[str, List[str]]:
-        """Discover whether the planned run would produce columns
-        that already exist in the target append-destination files.
+        """Discover whether the planned run would clobber existing
+        output. Returns a dict mapping
+        ``destination/filename → [reason_strings]``
+        for every collision. An empty dict means no conflicts.
 
-        Returns a dict mapping ``filename → [conflicting_column_names]``
-        for every file in the append destination(s) that has at
-        least one collision. An empty dict means no conflicts.
+        Two collision types are detected:
 
-        The check works by running the full feature-extraction
-        pipeline on the FIRST video only, in a scratch directory,
-        to enumerate the column names this run would produce. The
-        per-video work is fast (sub-second to a few seconds for
-        typical projects); the cost is dwarfed by the multi-hour
-        full run that this check is meant to protect.
+        1. **Append-mode column collisions**: when
+           ``append_to_features_extracted`` or
+           ``append_to_targets_inserted`` is set, and an existing
+           file in the target directory already has columns this
+           run would produce. Reason strings are the offending
+           column names.
 
-        This method returns the conflict dict instead of raising,
-        so the caller (typically the Qt form) can choose to prompt
+        2. **save_dir filename collisions**: when ``save_dir`` is
+           set and files with the same names as the videos in
+           this run already exist in that directory. Pre-fix
+           behavior: ``copy_files_in_directory`` (via
+           ``shutil.copy``) silently overwrote these. Reason
+           string is ``"file exists"``.
+
+        The append-mode check probes column names by running the
+        full kernel pipeline on the FIRST video in a scratch
+        directory (sub-second to a few seconds; dwarfed by the
+        multi-hour full run). The save_dir check is just a stat
+        of the target directory.
+
+        Returns dict instead of raising so the caller can prompt
         the user before deciding whether to set
         ``overwrite_existing=True`` and re-run.
-
-        If neither append flag is set (i.e. output goes only to a
-        new ``save_dir``), the method returns an empty dict — there
-        are no existing files to collide with.
         """
-        # If output goes only to save_dir (a fresh directory), there
-        # are no append targets to check.
+        conflicts: Dict[str, List[str]] = {}
+
+        # Diagnostic: emits a single line on stderr/stdout when
+        # preflight is actually invoked. Distinguishes "preflight
+        # ran but found nothing" from "preflight wasn't called at
+        # all" (e.g. stale __pycache__, on_run override missing).
+        # If you don't see this line in the console, preflight
+        # didn't run.
+        print(
+            f"[preflight] starting check: "
+            f"save_dir={'set' if self.save_dir else 'unset'}, "
+            f"append_features={self.append_to_features_extracted}, "
+            f"append_targets={self.append_to_targets_inserted}"
+        )
+
+        # ------------------------------------------------------------ #
+        # Pre-check 1: save_dir filename collisions
+        # ------------------------------------------------------------ #
+        # Cheap — just stat per video filename. Do this FIRST so we
+        # detect this case even when only save_dir is set (skipping
+        # the more expensive column-discovery probe below).
+        if self.save_dir is not None and os.path.isdir(self.save_dir):
+            # Need data_paths to know the filenames. Run setup first
+            # if not done.
+            if not hasattr(self, 'data_paths'):
+                self._setup_run()
+            for file_path in self.data_paths:
+                video_name = get_fn_ext(filepath=file_path)[1]
+                target_path = os.path.join(
+                    self.save_dir, f'{video_name}.{self.file_type}',
+                )
+                if os.path.isfile(target_path):
+                    conflicts[f'save_dir/{video_name}'] = ['file exists']
+            n_save_dir_collisions = sum(
+                1 for k in conflicts if k.startswith('save_dir/')
+            )
+            print(
+                f"[preflight] save_dir check: "
+                f"{n_save_dir_collisions} file(s) already exist in "
+                f"{self.save_dir}"
+            )
+
+        # ------------------------------------------------------------ #
+        # Pre-check 2: append-mode column collisions (only when at
+        # least one append flag is set)
+        # ------------------------------------------------------------ #
         if not self.append_to_features_extracted and not self.append_to_targets_inserted:
-            return {}
+            return conflicts
 
         # Run setup if it hasn't been run yet. Idempotent.
         if not hasattr(self, 'temp_dir') or not os.path.isdir(getattr(self, 'temp_dir', '')):
@@ -512,15 +564,9 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         )
         os.makedirs(scratch_dir, exist_ok=True)
         try:
-            # Build a VideoProcessingConfig with temp_dir pointing
-            # at the scratch dir.
             config = self._build_video_processing_config()
-            # Replace temp_dir on the dataclass via dataclasses.replace
-            # since VideoProcessingConfig is frozen.
             from dataclasses import replace
             scratch_config = replace(config, temp_dir=scratch_dir)
-            # Probe with the first video. This produces a written file
-            # in scratch_dir which we then read to enumerate columns.
             process_one_video(
                 file_path=self.data_paths[0],
                 config=scratch_config,
@@ -532,17 +578,32 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                 directory=scratch_dir,
                 extensions=[f'.{self.file_type}'],
                 as_dict=True,
+                raise_warning=False,
             )
             if not scratch_files:
-                # Probe didn't produce a file — surprising but not
-                # fatal. Skip the check.
-                return {}
+                # Probe didn't write a file. Most likely cause:
+                # process_one_video raised an exception (which the
+                # caller's try/except will surface) OR the kernel
+                # chain did nothing. Either way, we can't compare
+                # column names — log it and skip the column check.
+                # The save_dir check above (if any) still applies.
+                print(
+                    f"[preflight] WARNING: probe of "
+                    f"{self.data_paths[0]} produced no output file "
+                    f"in {scratch_dir}. Column-collision check "
+                    f"SKIPPED for this run. Existing append-target "
+                    f"files will not be checked for column conflicts."
+                )
+                return conflicts
             probe_path = next(iter(scratch_files.values()))
             probe_df = read_df(file_path=probe_path, file_type=self.file_type)
             new_columns = set(probe_df.columns)
+            print(
+                f"[preflight] probe produced {len(new_columns)} "
+                f"column(s) from "
+                f"{os.path.basename(self.data_paths[0])}"
+            )
         finally:
-            # Always clean up the scratch directory, even if probe
-            # raised. The real run still owns self.temp_dir.
             try:
                 remove_a_folder(folder_dir=scratch_dir, ignore_errors=True)
             except Exception:
@@ -556,21 +617,20 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             targets.append(('targets_inserted', self.targets_folder))
 
         # For each target file, read just the columns and intersect.
-        conflicts: Dict[str, List[str]] = {}
+        # NOTE: we ADD to `conflicts` here rather than rebuilding it,
+        # because save_dir collisions may already have been recorded
+        # at the top of this method.
         for label, dir_path in targets:
+            files_checked = 0
+            files_missing = 0
             for video_name in self.video_names:
                 file_path = os.path.join(
                     dir_path, f'{video_name}.{self.file_type}',
                 )
                 if not os.path.isfile(file_path):
-                    # No corresponding file in this destination —
-                    # nothing to collide with for this video. Common
-                    # when only one of the two append flags is set
-                    # but a video exists in only one destination.
+                    files_missing += 1
                     continue
-                # Reading columns is cheap. For parquet it's
-                # essentially metadata-only; for CSV pandas needs
-                # to parse the first row. Either way: fast.
+                files_checked += 1
                 existing_df = read_df(
                     file_path=file_path, file_type=self.file_type,
                 )
@@ -578,6 +638,13 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                 overlap = sorted(new_columns & existing_cols)
                 if overlap:
                     conflicts[f'{label}/{video_name}'] = overlap
+            print(
+                f"[preflight] {label}: checked {files_checked} "
+                f"file(s) in {dir_path}, found "
+                f"{sum(1 for k in conflicts if k.startswith(label + '/'))} "
+                f"with column conflicts; "
+                f"{files_missing} video(s) had no corresponding file"
+            )
 
         return conflicts
 
@@ -704,46 +771,72 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         self._setup_run()
         check_all_file_names_are_represented_in_video_log(video_info_df=self.video_info_df, data_paths=self.data_paths)
 
-        # Preflight: detect column collisions in the append targets
-        # BEFORE doing the multi-hour compute. If conflicts exist
-        # and the caller hasn't opted into overwrite, fail fast with
-        # a clear error message. The Qt form catches this earlier
-        # (synchronous preflight + confirm dialog), but headless
-        # callers (scripts, tests) get the same protection here.
+        # Preflight: detect collisions in destinations BEFORE doing
+        # the multi-hour compute. If conflicts exist and the caller
+        # hasn't opted into overwrite, fail fast with a clear error
+        # message. The Qt form catches this earlier (synchronous
+        # preflight + confirm dialog), but headless callers (scripts,
+        # tests) get the same protection here.
+        #
+        # Two collision types are detected (see preflight_check):
+        # 1. save_dir/<video> = ['file exists'] — pre-fix this was
+        #    silently overwritten by shutil.copy
+        # 2. <append_dest>/<video> = [list of column names] — pre-fix
+        #    this would explode at the END of the run via
+        #    __check_files DuplicationError
         if not self.overwrite_existing:
             conflicts = self.preflight_check()
             if conflicts:
-                # Build a compact summary: how many files, sample of
-                # conflicting columns (capped to avoid wall-of-text).
                 sample_file = next(iter(conflicts))
-                sample_cols = conflicts[sample_file]
-                cols_preview = sample_cols[:5]
-                more = ""
-                if len(sample_cols) > 5:
-                    more = f" (and {len(sample_cols) - 5} more)"
+                sample_reasons = conflicts[sample_file]
+                # Categorize: file-exists (save_dir) vs columns (append)
+                save_dir_collisions = [
+                    f for f, r in conflicts.items()
+                    if r == ['file exists']
+                ]
+                column_collisions = {
+                    f: r for f, r in conflicts.items()
+                    if r != ['file exists']
+                }
+                # Build adaptive message.
+                summary_parts = []
+                if save_dir_collisions:
+                    summary_parts.append(
+                        f"{len(save_dir_collisions)} file(s) already "
+                        f"exist in save_dir (would be silently "
+                        f"overwritten by shutil.copy)"
+                    )
+                if column_collisions:
+                    n_files = len(column_collisions)
+                    sample = next(iter(column_collisions))
+                    sample_cols = column_collisions[sample]
+                    cols_preview = sample_cols[:5]
+                    more = ""
+                    if len(sample_cols) > 5:
+                        more = f" (and {len(sample_cols) - 5} more)"
+                    summary_parts.append(
+                        f"{n_files} append-destination file(s) "
+                        f"already contain feature columns this run "
+                        f"would produce; e.g. {sample} has columns "
+                        f"{cols_preview}{more}"
+                    )
                 # Clean up temp_dir from _setup_run since we're
-                # bailing out before the real compute starts. The
-                # error here means we created temp_dir but won't use it.
+                # bailing out before the real compute starts.
                 try:
                     remove_a_folder(folder_dir=self.temp_dir, ignore_errors=True)
                 except Exception:
                     pass
                 raise DuplicationError(
                     msg=(
-                        f"{len(conflicts)} file(s) in the append "
-                        f"destination(s) already contain feature "
-                        f"columns this run would produce. Example: "
-                        f"{sample_file} has {len(sample_cols)} "
-                        f"conflicting columns including {cols_preview}"
-                        f"{more}.\n\n"
-                        f"To proceed, either:\n"
-                        f"  1. Pass overwrite_existing=True to "
-                        f"     overwrite the existing columns with "
-                        f"     the new values\n"
-                        f"  2. Pick different feature families that "
-                        f"     don't overlap\n"
-                        f"  3. Use save_dir=<new path> to write to "
-                        f"     a fresh directory instead of appending"
+                        "Run would overwrite existing output:\n  - "
+                        + "\n  - ".join(summary_parts)
+                        + "\n\nTo proceed, either:\n"
+                        + "  1. Pass overwrite_existing=True to "
+                        + "overwrite\n"
+                        + "  2. Pick different feature families that "
+                        + "don't overlap (for column collisions)\n"
+                        + "  3. Use save_dir=<new path> to write to a "
+                        + "fresh directory instead"
                     ),
                     source=self.__class__.__name__,
                 )

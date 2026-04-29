@@ -210,10 +210,30 @@ class FeatureSubsetExtractorForm(OperationForm):
             )
             return
 
-        # Skip preflight if no append destination is set — only
-        # save_dir mode, no existing files to collide with.
+        # Diagnostic: confirms the form's on_run override is being
+        # called at all. If the user reports no preflight prompt
+        # AND doesn't see this line in the console, the override
+        # isn't taking effect (most likely cause: stale __pycache__
+        # — `find . -name __pycache__ -exec rm -rf {} +` then
+        # `pip install -e .` to fix).
+        print(
+            f"[on_run] FeatureSubsetExtractorForm dispatching: "
+            f"save_dir={kwargs['save_dir']!r}, "
+            f"append_features={kwargs['append_features']}, "
+            f"append_targets={kwargs['append_targets']}, "
+            f"families={len(kwargs['feature_families'])}"
+        )
+
+        # Run preflight whenever any destination is set. The
+        # preflight checks both save_dir filename collisions AND
+        # append-mode column collisions — both are real ways to
+        # silently destroy previous run output. Pre-fix: this only
+        # ran for append flags, missing the save_dir-overwrite case
+        # where shutil.copy silently overwrote files from a prior run.
         needs_preflight = (
-            kwargs["append_features"] or kwargs["append_targets"]
+            kwargs["save_dir"] is not None
+            or kwargs["append_features"]
+            or kwargs["append_targets"]
         )
 
         if needs_preflight:
@@ -242,25 +262,56 @@ class FeatureSubsetExtractorForm(OperationForm):
                 QGuiApplication.restoreOverrideCursor()
 
             if conflicts:
-                # Build a user-friendly summary
-                n_files = len(conflicts)
-                sample_file = next(iter(conflicts))
-                sample_cols = conflicts[sample_file]
-                cols_preview = "\n  ".join(sample_cols[:8])
-                more = ""
-                if len(sample_cols) > 8:
-                    more = (
-                        f"\n  ... ({len(sample_cols) - 8} more columns)"
+                # Categorize conflicts: file-exists in save_dir vs
+                # column collisions in append destinations. Different
+                # wording for each.
+                save_dir_collisions = [
+                    f for f, r in conflicts.items()
+                    if r == ['file exists']
+                ]
+                column_collisions = {
+                    f: r for f, r in conflicts.items()
+                    if r != ['file exists']
+                }
+                msg_parts = []
+                if save_dir_collisions:
+                    sample_files = save_dir_collisions[:5]
+                    more = ""
+                    if len(save_dir_collisions) > 5:
+                        more = (
+                            f"<br>  ... ({len(save_dir_collisions) - 5} "
+                            f"more files)"
+                        )
+                    msg_parts.append(
+                        f"<b>{len(save_dir_collisions)} file(s) "
+                        f"already exist in <code>save_dir</code></b> "
+                        f"and would be overwritten:"
+                        f"<pre>  " + "\n  ".join(sample_files) + more
+                        + "</pre>"
+                    )
+                if column_collisions:
+                    n_files = len(column_collisions)
+                    sample_file = next(iter(column_collisions))
+                    sample_cols = column_collisions[sample_file]
+                    cols_preview = "\n  ".join(sample_cols[:8])
+                    col_more = ""
+                    if len(sample_cols) > 8:
+                        col_more = (
+                            f"\n  ... ({len(sample_cols) - 8} more "
+                            f"columns)"
+                        )
+                    msg_parts.append(
+                        f"<b>{n_files} file(s) in the append "
+                        f"destination already contain feature columns "
+                        f"this run would produce.</b><br>"
+                        f"Example: <code>{sample_file}</code> has "
+                        f"<b>{len(sample_cols)}</b> conflicting "
+                        f"column(s):"
+                        f"<pre>  {cols_preview}{col_more}</pre>"
                     )
                 msg = (
-                    f"<b>{n_files} file(s) in the destination "
-                    f"already contain feature columns this run "
-                    f"would produce.</b><br><br>"
-                    f"Example: <code>{sample_file}</code> has "
-                    f"<b>{len(sample_cols)}</b> conflicting column(s):"
-                    f"<pre>  {cols_preview}{more}</pre><br>"
-                    f"Overwrite the existing columns with the new "
-                    f"values?"
+                    "<br><br>".join(msg_parts)
+                    + "<br>Overwrite the existing output?"
                 )
                 response = QMessageBox.question(
                     self, "Confirm overwrite",
