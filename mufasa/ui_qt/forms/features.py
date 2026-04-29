@@ -68,7 +68,9 @@ class FeatureSubsetExtractorForm(OperationForm):
         form.setLabelAlignment(Qt.AlignRight)
 
         self.save_dir = _PathField(
-            is_file=False, placeholder="Save directory (blank = project log dir)…",
+            is_file=False,
+            placeholder=("Save directory (required unless an "
+                         "append checkbox below is checked)…"),
         )
         form.addRow("Save to:", self.save_dir)
 
@@ -114,13 +116,32 @@ class FeatureSubsetExtractorForm(OperationForm):
                     for it in self.families.selectedItems()]
         if not selected:
             raise ValueError("Select at least one feature family.")
+        save_dir_value = self.save_dir.path or None
+        append_features = bool(self.append_features.isChecked())
+        append_targets = bool(self.append_targets.isChecked())
+        # Match the backend strict-mode validation: refuse to start
+        # without an explicit destination. Before this check landed
+        # in the backend, the form's old placeholder text claimed
+        # "blank = project log dir" — incorrect; blank meant the
+        # output was silently discarded after compute. Surfacing the
+        # error here (rather than in the backend) gives the user a
+        # nicer dialog than a stack trace.
+        if save_dir_value is None and not append_features and not append_targets:
+            raise ValueError(
+                "Specify a save destination: either set 'Save to:' "
+                "to a directory, or check 'Append to existing "
+                "features_extracted CSVs' / 'Append to existing "
+                "targets_inserted CSVs'. Without one of these, "
+                "the computed features would be discarded after "
+                "the run completes."
+            )
         return {
             "config_path":      self.config_path,
             "feature_families": selected,
             "file_checks":      bool(self.file_checks.isChecked()),
-            "save_dir":         self.save_dir.path or None,
-            "append_features":  bool(self.append_features.isChecked()),
-            "append_targets":   bool(self.append_targets.isChecked()),
+            "save_dir":         save_dir_value,
+            "append_features":  append_features,
+            "append_targets":   append_targets,
         }
 
     def target(self, *, config_path: str, feature_families: list[str],
