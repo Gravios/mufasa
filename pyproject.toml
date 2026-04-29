@@ -29,7 +29,14 @@
 # ============================================================================
 
 [build-system]
-requires = ["setuptools>=70", "wheel"]
+requires = [
+    "setuptools>=70",
+    "wheel",
+    # Cython kernels in mufasa/_native/ are compiled at install time.
+    # numpy headers are needed for `cimport numpy` in the .pyx files.
+    "Cython>=3.0",
+    "numpy>=1.24",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
