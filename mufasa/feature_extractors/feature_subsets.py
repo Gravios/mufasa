@@ -161,6 +161,30 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         self.append_to_targets_inserted = append_to_targets_inserted
         self.n_workers = n_workers
         self.raise_on_error = raise_on_error
+        # Refuse to start without an explicit save destination. Pre-fix
+        # behavior: if save_dir was None and neither append flag was
+        # set, run() would compute features into temp_dir and then
+        # delete temp_dir at the end — silently discarding hours of
+        # compute. The Qt form's placeholder text "blank = project log
+        # dir" was misleading: blank meant `None` meant discard.
+        # This check fails fast before any work happens.
+        if (self.save_dir is None
+                and not self.append_to_features_extracted
+                and not self.append_to_targets_inserted):
+            raise InvalidInputError(
+                msg=(
+                    "No save destination specified. Feature output "
+                    "would be silently discarded after compute. "
+                    "Pass one of:\n"
+                    "  - save_dir=<path>  (writes per-video files to "
+                    "<path>)\n"
+                    "  - append_to_features_extracted=True  (appends "
+                    f"into {self.features_dir})\n"
+                    "  - append_to_targets_inserted=True  (appends "
+                    f"into {self.targets_folder})"
+                ),
+                source=self.__class__.__name__,
+            )
         if data_dir is None:
             self.data_dir = self.outlier_corrected_dir
             self.data_paths = self.outlier_corrected_paths
@@ -199,6 +223,24 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         self.temp_dir = os.path.join(self.data_dir, f"temp_data_{self.datetime}")
         if not os.path.isdir(self.temp_dir):
             os.makedirs(self.temp_dir)
+        # Announce the save destination(s) upfront so the user can
+        # see them BEFORE the run starts (and before potentially
+        # hours of compute). Pre-fix behavior: the only output line
+        # mentioning destinations was "Storing new features in X..."
+        # at the very end of run(), after all the compute had already
+        # happened.
+        destinations = []
+        if self.save_dir is not None:
+            destinations.append(f"save_dir → {self.save_dir}")
+        if self.append_to_features_extracted:
+            destinations.append(f"append into {self.features_dir}")
+        if self.append_to_targets_inserted:
+            destinations.append(f"append into {self.targets_folder}")
+        print(
+            f"Feature subsets will be written to:\n  - "
+            + "\n  - ".join(destinations)
+        )
+        print(f"  (intermediate work: {self.temp_dir})")
         if (FRAME_BP_TO_ROI_CENTER in self.feature_families) or (FRAME_BP_INSIDE_ROI in self.feature_families):
             if not os.path.isfile(self.roi_coordinates_path):
                 raise NoROIDataError(msg=f'Cannot compute ROI features: The SimBA project has no ROI data defined.')
@@ -517,16 +559,84 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             self._run_sequential(config=config, process_one_video=process_one_video)
         else:
             self._run_parallel(config=config, process_one_video=process_one_video)
+
+        # Track whether output made it to its final destination.
+        # If any destination step failed, we must NOT delete temp_dir
+        # — that would silently destroy hours of compute. Instead,
+        # leave temp_dir on disk and tell the user where to find it
+        # for manual recovery.
+        output_persisted = False
+        save_errors: list[str] = []
+
         if self.append_to_features_extracted:
             print(f'Appending new feature to files in {self.features_dir}...')
-            self.__append_to_data_in_dir(dir=self.features_dir)
+            try:
+                self.__append_to_data_in_dir(dir=self.features_dir)
+                output_persisted = True
+            except Exception as exc:
+                save_errors.append(
+                    f"append_to_features_extracted failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
         if self.append_to_targets_inserted:
             print(f'Appending new feature to files in {self.targets_folder}...')
-            self.__append_to_targets_inserted(dir=self.targets_folder)
+            try:
+                self.__append_to_targets_inserted(dir=self.targets_folder)
+                output_persisted = True
+            except Exception as exc:
+                save_errors.append(
+                    f"append_to_targets_inserted failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
         if self.save_dir is not None:
             print(f"Storing new features in {self.save_dir}...")
-            copy_files_in_directory(in_dir=self.temp_dir, out_dir=self.save_dir, filetype=self.file_type, raise_error=True)
-        remove_a_folder(folder_dir=self.temp_dir, ignore_errors=False)
+            try:
+                copy_files_in_directory(in_dir=self.temp_dir, out_dir=self.save_dir, filetype=self.file_type, raise_error=True)
+                output_persisted = True
+            except Exception as exc:
+                save_errors.append(
+                    f"copy to save_dir failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+        # Cleanup logic. ONLY delete temp_dir if at least one
+        # destination succeeded. If all destinations failed, keep
+        # temp_dir so the user can recover manually.
+        if output_persisted:
+            try:
+                remove_a_folder(folder_dir=self.temp_dir, ignore_errors=False)
+            except Exception as exc:
+                # Cleanup failed but compute completed and at least
+                # one save succeeded. Don't bubble up — the data is
+                # already safe at the destination(s). Just inform.
+                print(
+                    f"Note: failed to remove temp directory "
+                    f"{self.temp_dir} ({type(exc).__name__}: {exc}). "
+                    f"Output was successfully written; you may delete "
+                    f"the temp directory manually."
+                )
+        if save_errors:
+            print(
+                "\nERROR: one or more save destinations failed:\n  - "
+                + "\n  - ".join(save_errors)
+            )
+            print(
+                f"\nIntermediate output preserved in: {self.temp_dir}"
+            )
+            print(
+                "Recover with: "
+                f"cp {self.temp_dir}/*.{self.file_type} "
+                f"<your-target-dir>/"
+            )
+            # Surface as an exception so callers (UI form, scripts)
+            # know the run did not complete its save phase. compute
+            # is intact in temp_dir; this isn't catastrophic but the
+            # user must know.
+            raise RuntimeError(
+                f"Feature extraction compute completed but {len(save_errors)} "
+                f"save destination(s) failed. See messages above. "
+                f"Output preserved in {self.temp_dir}."
+            )
         self.timer.stop_timer()
         stdout_success(msg="Feature sub-sets calculations complete!", elapsed_time=self.timer.elapsed_time_str)
 
