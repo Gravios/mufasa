@@ -208,26 +208,13 @@ def main() -> int:
             )
 
     # ------------------------------------------------------------------ #
-    # Case 7: legacy class methods now delegate (do NOT re-implement
-    # the kernel logic). Verify by checking that the class methods are
-    # short — each should be roughly a kernel call + result loop.
+    # Case 7 (post step-3): per-family methods on the class are GONE.
+    # The class run() loop now delegates to module-level
+    # process_one_video. Verify that no per-family method exists on
+    # the class.
     # ------------------------------------------------------------------ #
     legacy_tree = ast.parse(legacy_src)
-    target_methods = {
-        "_get_two_point_bp_distances",
-        "_FeatureSubsetsCalculator__get_three_point_angles",
-        "_FeatureSubsetsCalculator__get_three_point_hulls",
-        "_FeatureSubsetsCalculator__get_four_point_hulls",
-        "_FeatureSubsetsCalculator__get_convex_hulls",
-        "_FeatureSubsetsCalculator__get_framewise_movement",
-        "_FeatureSubsetsCalculator__get_roi_center_distances",
-        "_FeatureSubsetsCalculator__get_distances_to_frm_edge",
-        "_FeatureSubsetsCalculator__get_inside_roi",
-    }
-    # Note: name-mangled class methods ("__name" inside class) keep
-    # their unmangled name in AST FunctionDef nodes — we look for the
-    # plain double-underscore name + the single _get_* one.
-    method_unmangled_names = {
+    removed_method_names = {
         "_get_two_point_bp_distances",
         "__get_three_point_angles",
         "__get_three_point_hulls",
@@ -238,19 +225,58 @@ def main() -> int:
         "__get_distances_to_frm_edge",
         "__get_inside_roi",
     }
+    found = set()
     for node in ast.walk(legacy_tree):
         if (isinstance(node, ast.FunctionDef)
-                and node.name in method_unmangled_names):
-            # Should be short — kernel call + result-update loop.
-            # Heuristic: <= 14 lines of body. The legacy versions
-            # were 4-12 lines; the new versions are 8-12.
-            n_lines = node.end_lineno - node.lineno + 1
-            assert n_lines <= 16, (
-                f"Method {node.name} is {n_lines} lines — should "
-                f"delegate to a kernel and be short"
+                and node.name in removed_method_names):
+            found.add(node.name)
+    assert not found, (
+        f"Step 3 should have removed these dead methods, but found: "
+        f"{sorted(found)}"
+    )
+
+    # ------------------------------------------------------------------ #
+    # Case 8: orchestration module exists with required exports
+    # ------------------------------------------------------------------ #
+    orch_src = Path(
+        "mufasa/feature_extractors/feature_subset_orchestration.py"
+    ).read_text()
+    orch_tree = ast.parse(orch_src)
+    expected = {
+        "VideoProcessingConfig",   # dataclass
+        "process_one_video",        # function
+    }
+    found = set()
+    for node in orch_tree.body:
+        if isinstance(node, ast.ClassDef) and node.name in expected:
+            found.add(node.name)
+        if isinstance(node, ast.FunctionDef) and node.name in expected:
+            found.add(node.name)
+    missing = expected - found
+    assert not missing, (
+        f"Orchestration module is missing: {missing}"
+    )
+
+    # ------------------------------------------------------------------ #
+    # Case 9: process_one_video doesn't have side effects on a class
+    # instance — verify by checking it's a top-level function (not a
+    # method) with a config parameter
+    # ------------------------------------------------------------------ #
+    for node in orch_tree.body:
+        if (isinstance(node, ast.FunctionDef)
+                and node.name == "process_one_video"):
+            arg_names = [a.arg for a in node.args.args]
+            assert "self" not in arg_names, (
+                "process_one_video must not be a method"
+            )
+            assert "config" in arg_names, (
+                "process_one_video must take a config parameter"
+            )
+            assert "file_path" in arg_names, (
+                "process_one_video must take a file_path parameter"
             )
 
-    print("smoke_feature_kernels: 7/7 cases passed")
+    print("smoke_feature_kernels: 9/9 cases passed")
     return 0
 
 
