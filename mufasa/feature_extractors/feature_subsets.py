@@ -137,7 +137,9 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                  save_dir: Optional[Union[str, os.PathLike]] = None,
                  data_dir: Optional[Union[str, os.PathLike]] = None,
                  append_to_features_extracted: bool = False,
-                 append_to_targets_inserted: bool = False):
+                 append_to_targets_inserted: bool = False,
+                 n_workers: int = 1,
+                 raise_on_error: bool = False):
 
         check_file_exist_and_readable(file_path=config_path)
         ConfigReader.__init__(self, config_path=config_path)
@@ -145,12 +147,20 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         check_valid_boolean(value=file_checks, source=f'{self.__class__.__name__} file_checks', raise_error=True)
         check_valid_boolean(value=append_to_features_extracted, source=f'{self.__class__.__name__} append_to_features_extracted', raise_error=True)
         check_valid_boolean(value=append_to_targets_inserted, source=f'{self.__class__.__name__} append_to_targets_inserted', raise_error=True)
+        check_valid_boolean(value=raise_on_error, source=f'{self.__class__.__name__} raise_on_error', raise_error=True)
+        if not isinstance(n_workers, int) or n_workers < 1:
+            raise InvalidInputError(
+                msg=f'n_workers must be a positive integer, got {n_workers!r}',
+                source=self.__class__.__name__,
+            )
         if save_dir is not None:
             check_if_dir_exists(in_dir=save_dir)
         check_valid_lst(data=feature_families, source=f'{self.__class__.__name__} feature_families', valid_dtypes=(str,), valid_values=FEATURE_FAMILIES, min_len=1, raise_error=True)
         self.file_checks, self.feature_families, self.save_dir = file_checks, feature_families, save_dir
         self.append_to_features_extracted = append_to_features_extracted
         self.append_to_targets_inserted = append_to_targets_inserted
+        self.n_workers = n_workers
+        self.raise_on_error = raise_on_error
         if data_dir is None:
             self.data_dir = self.outlier_corrected_dir
             self.data_paths = self.outlier_corrected_paths
@@ -380,6 +390,120 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             video_info_df=self.video_info_df,
         )
 
+    def _run_sequential(self, config, process_one_video):
+        """Run the per-video loop in the current process.
+
+        This is the path used when n_workers <= 1 (default).
+        Behavior is byte-equivalent to pre-step-6 code: each video
+        is processed in order, prints interleave naturally,
+        exceptions abort the loop (and bubble up).
+        """
+        for file_cnt, file_path in enumerate(self.data_paths):
+            process_one_video(
+                file_path=file_path, config=config,
+                file_idx=file_cnt, n_total_files=len(self.data_paths),
+                print_progress=True,
+            )
+
+    def _run_parallel(self, config, process_one_video):
+        """Run the per-video loop across worker processes.
+
+        Each worker receives the same VideoProcessingConfig (which
+        is small, ~few KB serialized — not a concern). Workers
+        compute features for their assigned video and write the
+        result to ``config.temp_dir`` exactly as the sequential
+        version does. Output files are byte-identical to the
+        sequential path.
+
+        Failure handling depends on self.raise_on_error:
+        * raise_on_error=False (default): per-video failures are
+          logged to stderr but do not abort the batch. The batch
+          completes for all videos that succeeded; failed videos
+          have no output file in temp_dir. A summary is printed
+          at the end.
+        * raise_on_error=True: the first failure cancels remaining
+          futures and re-raises the exception in the main process.
+
+        Worker count rationale: defaults to whatever the user
+        passed to n_workers. On Ryzen 9800X3D (8 physical cores,
+        16 SMT threads), a good value is 6-8 (leaves headroom for
+        the OS, IO, and the main process). Going above n_workers=
+        physical_cores tends to hurt because the kernels are
+        compute-bound and SMT threads contend.
+
+        Numba JIT cache: each worker re-JITs feature kernels on
+        first use. Cost is ~5-10 seconds per worker, paid once.
+        For the user's typical 67-video batch (~4 hours sequential)
+        this is amortized to invisibility.
+        """
+        # Local import keeps the cost out of the import path for
+        # callers who only ever use sequential mode.
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        n_videos = len(self.data_paths)
+        n_workers = min(self.n_workers, n_videos)
+        print(
+            f"Running feature extraction on {n_videos} videos "
+            f"across {n_workers} workers..."
+        )
+        failures: list[tuple[str, str]] = []  # (video_name, error_msg)
+        with ProcessPoolExecutor(max_workers=n_workers) as pool:
+            futures = {
+                pool.submit(
+                    process_one_video,
+                    file_path,
+                    config,
+                    idx,
+                    n_videos,
+                    False,  # print_progress=False to avoid interleaved output
+                ): (idx, file_path)
+                for idx, file_path in enumerate(self.data_paths)
+            }
+            n_done = 0
+            for fut in as_completed(futures):
+                idx, file_path = futures[fut]
+                video_name = get_fn_ext(filepath=file_path)[1]
+                try:
+                    fut.result()
+                    n_done += 1
+                    print(
+                        f"  [{n_done}/{n_videos}] ✓ {video_name}"
+                    )
+                except Exception as exc:
+                    msg = f"{type(exc).__name__}: {exc}"
+                    failures.append((video_name, msg))
+                    print(
+                        f"  [{n_done}/{n_videos}] ✗ {video_name}: "
+                        f"{msg}"
+                    )
+                    if self.raise_on_error:
+                        # Cancel pending and re-raise. Note: as_completed
+                        # in conjunction with the context manager will
+                        # wait for in-flight workers to finish before
+                        # re-raising the exception in the outer scope.
+                        for f in futures:
+                            f.cancel()
+                        raise
+        if failures:
+            print(
+                f"\n{len(failures)} of {n_videos} videos FAILED "
+                f"during parallel feature extraction:"
+            )
+            for video_name, msg in failures:
+                print(f"  - {video_name}: {msg}")
+            print(
+                f"Output files for the {n_videos - len(failures)} "
+                f"successful videos are in {self.temp_dir}."
+            )
+            # Surface as a hard error if every video failed —
+            # likely indicates a systematic problem rather than
+            # per-video flakes.
+            if len(failures) == n_videos:
+                raise RuntimeError(
+                    "All videos failed during parallel feature "
+                    "extraction. See per-video errors above."
+                )
+
     def run(self):
         from mufasa.feature_extractors.feature_subset_orchestration import (
             process_one_video,
@@ -389,19 +513,10 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         self._setup_run()
         check_all_file_names_are_represented_in_video_log(video_info_df=self.video_info_df, data_paths=self.data_paths)
         config = self._build_video_processing_config()
-        for file_cnt, file_path in enumerate(self.data_paths):
-            # Per-video work is now in a module-level function. The
-            # class no longer holds intermediate state (self.data_df,
-            # self.results, self.video_info, etc.) during the loop —
-            # those live on the local stack of process_one_video.
-            #
-            # Step 6 of the refactor will wrap this loop in a
-            # ProcessPoolExecutor for parallel execution.
-            process_one_video(
-                file_path=file_path, config=config,
-                file_idx=file_cnt, n_total_files=len(self.data_paths),
-                print_progress=True,
-            )
+        if self.n_workers <= 1:
+            self._run_sequential(config=config, process_one_video=process_one_video)
+        else:
+            self._run_parallel(config=config, process_one_video=process_one_video)
         if self.append_to_features_extracted:
             print(f'Appending new feature to files in {self.features_dir}...')
             self.__append_to_data_in_dir(dir=self.features_dir)

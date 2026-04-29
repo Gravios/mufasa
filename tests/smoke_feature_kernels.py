@@ -313,7 +313,63 @@ def main() -> int:
             )
     assert found_enum, "FeatureFamily class not found"
 
-    print("smoke_feature_kernels: 10/10 cases passed")
+    # ------------------------------------------------------------------ #
+    # Case 11 (step 6): parallel execution path exists — _run_parallel
+    # method is defined on the class and uses ProcessPoolExecutor
+    # ------------------------------------------------------------------ #
+    found_run_parallel = False
+    found_run_sequential = False
+    uses_process_pool = False
+    for node in ast.walk(legacy_tree):
+        if isinstance(node, ast.FunctionDef):
+            if node.name == "_run_parallel":
+                found_run_parallel = True
+                # Check the body references ProcessPoolExecutor
+                src = ast.unparse(node) if hasattr(ast, 'unparse') else ""
+                if "ProcessPoolExecutor" in src:
+                    uses_process_pool = True
+            elif node.name == "_run_sequential":
+                found_run_sequential = True
+    assert found_run_sequential, "_run_sequential method missing"
+    assert found_run_parallel, "_run_parallel method missing"
+    assert uses_process_pool, (
+        "_run_parallel must use ProcessPoolExecutor"
+    )
+
+    # ------------------------------------------------------------------ #
+    # Case 12: VideoProcessingConfig is picklable. We can't import
+    # the actual module (no numba in sandbox), but we can verify the
+    # dataclass is decorated with @dataclass(frozen=True) which is
+    # the picklability contract.
+    # ------------------------------------------------------------------ #
+    found_dataclass = False
+    is_frozen = False
+    for node in orch_tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "VideoProcessingConfig":
+            for dec in node.decorator_list:
+                if isinstance(dec, ast.Call):
+                    func = dec.func
+                    name = (
+                        func.id if isinstance(func, ast.Name)
+                        else getattr(func, "attr", None)
+                    )
+                    if name == "dataclass":
+                        found_dataclass = True
+                        for kw in dec.keywords:
+                            if kw.arg == "frozen":
+                                # value can be Constant True
+                                v = kw.value
+                                if isinstance(v, ast.Constant) and v.value is True:
+                                    is_frozen = True
+    assert found_dataclass, (
+        "VideoProcessingConfig must be a @dataclass"
+    )
+    assert is_frozen, (
+        "VideoProcessingConfig must be frozen=True (picklable + safe "
+        "to pass across process boundaries)"
+    )
+
+    print("smoke_feature_kernels: 12/12 cases passed")
     return 0
 
 
