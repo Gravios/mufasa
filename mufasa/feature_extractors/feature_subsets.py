@@ -13,12 +13,6 @@ except:
 
 from itertools import combinations
 
-from mufasa.feature_extractors.feature_subset_kernels import (
-    compute_animal_convex_hulls, compute_distances_to_frame_edge,
-    compute_four_point_hulls, compute_framewise_movement,
-    compute_inside_roi, compute_roi_center_distances,
-    compute_three_point_angles, compute_three_point_hulls,
-    compute_two_point_distances)
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.roi_tools.roi_utils import get_roi_dict_from_dfs
@@ -29,7 +23,7 @@ from mufasa.utils.checks import (
     check_valid_lst, check_video_has_rois)
 from mufasa.utils.errors import (DuplicationError, InvalidInputError,
                                 NoFilesFoundError, NoROIDataError)
-from mufasa.utils.printing import SimbaTimer, stdout_success
+from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import (copy_files_in_directory,
                                     find_files_of_filetypes_in_directory,
                                     get_fn_ext, read_df, remove_a_folder,
@@ -251,96 +245,6 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             self.within_animal_three_point_combs[animal] = np.array(list(combinations(animal_bps, 3)))
             self.within_animal_four_point_combs[animal] = np.array(list(combinations(animal_bps, 4)))
 
-    def _get_two_point_bp_distances(self):
-        # Delegated to mufasa.feature_extractors.feature_subset_kernels.
-        # The kernel is a pure function — easier to test in isolation
-        # and a building block for future per-video parallelization.
-        cols = compute_two_point_distances(
-            df=self.data_df,
-            two_point_combs=self.two_point_combs,
-            px_per_mm=self.px_per_mm,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
-
-    def __get_three_point_angles(self):
-        cols = compute_three_point_angles(
-            df=self.data_df,
-            within_animal_three_point_combs=self.within_animal_three_point_combs,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
-
-    def __get_three_point_hulls(self):
-        cols = compute_three_point_hulls(
-            df=self.data_df,
-            within_animal_three_point_combs=self.within_animal_three_point_combs,
-            px_per_mm=self.px_per_mm,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
-
-    def __get_four_point_hulls(self):
-        cols = compute_four_point_hulls(
-            df=self.data_df,
-            within_animal_four_point_combs=self.within_animal_four_point_combs,
-            px_per_mm=self.px_per_mm,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
-
-    def __get_convex_hulls(self, method: str):
-        cols = compute_animal_convex_hulls(
-            df=self.data_df,
-            animal_bps=self.animal_bps,
-            px_per_mm=self.px_per_mm,
-            method=method,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
-
-    def __get_framewise_movement(self):
-        cols = compute_framewise_movement(
-            df=self.data_df,
-            animal_bps=self.animal_bps,
-            px_per_mm=self.px_per_mm,
-            source=self.file_path,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
-
-    def __get_roi_center_distances(self):
-        cols = compute_roi_center_distances(
-            df=self.data_df,
-            animal_bps=self.animal_bps,
-            px_per_mm=self.px_per_mm,
-            video_roi_dict=self.roi_dict[self.video_name],
-            source=self.file_path,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
-
-    def __get_distances_to_frm_edge(self):
-        cols = compute_distances_to_frame_edge(
-            df=self.data_df,
-            animal_bps=self.animal_bps,
-            px_per_mm=self.px_per_mm,
-            video_width=self.video_width,
-            video_height=self.video_height,
-            source=self.file_path,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
-
-    def __get_inside_roi(self):
-        cols = compute_inside_roi(
-            df=self.data_df,
-            animal_bps=self.animal_bps,
-            video_roi_dict=self.roi_dict[self.video_name],
-            source=self.file_path,
-        )
-        for name, values in cols.items():
-            self.results[name] = values
 
     def __check_files(self, x: pd.DataFrame, y: pd.DataFrame, path_x: str, path_y: str):
         if len(x) != len(y):
@@ -390,73 +294,51 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         copy_files_in_directory(in_dir=self.temp_append_dir, out_dir=dir, filetype=self.file_type, raise_error=True)
         remove_a_folder(folder_dir=self.temp_append_dir, ignore_errors=False)
 
-    def run(self):
-        check_all_file_names_are_represented_in_video_log(video_info_df=self.video_info_df, data_paths=self.data_paths)
-        for file_cnt, file_path in enumerate(self.data_paths):
-            self.file_path = file_path
-            self.video_name = get_fn_ext(filepath=file_path)[1]
-            video_timer = SimbaTimer(start=True)
-            save_path = os.path.join(self.temp_dir, f'{self.video_name}.{self.file_type}')
-            self.results = pd.DataFrame()
-            print(f'Analyzing video {self.video_name}... ({file_cnt+1}/{len(self.data_paths)})')
-            self.video_info, self.px_per_mm, self.fps = self.read_video_info(video_name=self.video_name)
-            self.video_width, self.video_height = self.video_info['Resolution_width'].values[0], self.video_info['Resolution_height'].values[0]
-            self.data_df = read_df(file_path=file_path, file_type=self.file_type)
-            # Clip out-of-frame coordinates. Body parts are by
-            # definition inside the video frame (x ∈ [0, width],
-            # y ∈ [0, height]). Negative or beyond-frame values can
-            # come from:
-            #   - DLC predictions that extrapolate outside the trained
-            #     region for low-likelihood predictions
-            #   - Cubic-spline interpolation overshooting near edges
-            #   - Outlier-correction extrapolations
-            # Whatever the cause, a coordinate of -4 or 1924 (in a
-            # 1920-wide frame) breaks every downstream geometric
-            # feature (distances become negative, hulls degenerate,
-            # angle computations get NaN) AND trips the input
-            # validation in FeatureExtractionMixin.bodypart_distance.
-            #
-            # Identify x and y coordinate columns by their suffix.
-            # Likelihood/probability columns end with '_p' (Mufasa) or
-            # '_likelihood' (DLC) and must NOT be clipped.
-            for col in self.data_df.columns:
-                cl = str(col).lower()
-                if cl.endswith("_x"):
-                    self.data_df[col] = self.data_df[col].clip(
-                        lower=0, upper=int(self.video_width),
-                    )
-                elif cl.endswith("_y"):
-                    self.data_df[col] = self.data_df[col].clip(
-                        lower=0, upper=int(self.video_height),
-                    )
-            for family_cnt, feature_family in enumerate(self.feature_families):
-                print(f"Analyzing {self.video_name} and {feature_family} (Video {file_cnt + 1}/{len(self.outlier_corrected_paths)}, Family {family_cnt + 1}/{len(self.feature_families)})...")
-                if feature_family == TWO_POINT_BP_DISTANCES:
-                    self._get_two_point_bp_distances()
-                elif feature_family == WITHIN_ANIMAL_THREE_POINT_ANGLES:
-                    self.__get_three_point_angles()
-                elif feature_family == WITHIN_ANIMAL_THREE_POINT_HULL:
-                    self.__get_three_point_hulls()
-                elif feature_family == WITHIN_ANIMAL_FOUR_POINT_HULL:
-                    self.__get_four_point_hulls()
-                elif feature_family == ANIMAL_CONVEX_HULL_PERIMETER:
-                    self.__get_convex_hulls(method='perimeter')
-                elif feature_family == ANIMAL_CONVEX_HULL_AREA:
-                    self.__get_convex_hulls(method='area')
-                elif feature_family == FRAME_BP_MOVEMENT:
-                    self.__get_framewise_movement()
-                elif feature_family == FRAME_BP_TO_ROI_CENTER:
-                    self.__get_roi_center_distances()
-                elif feature_family == FRAME_BP_INSIDE_ROI:
-                    self.__get_inside_roi()
-                elif feature_family == ARENA_EDGE:
-                    self.__get_distances_to_frm_edge()
+    def _build_video_processing_config(self):
+        """Build a VideoProcessingConfig from the current self state.
 
-            self.results = self.results.add_suffix('_FEATURE_SUBSET')
-            self.results = self.results[sorted(self.results.columns)]
-            write_df(df=self.results.fillna(-1), file_type=self.file_type, save_path=save_path)
-            video_timer.stop_timer()
-            print(f"Feature subsets computed for {self.video_name} complete (elapsed time {video_timer.elapsed_time_str}s)...")
+        Used by run() to hand off per-video work to process_one_video.
+        Single source of truth for what state crosses the (currently
+        in-process; in step 6, cross-process) boundary into the
+        per-video worker.
+        """
+        from mufasa.feature_extractors.feature_subset_orchestration import (
+            VideoProcessingConfig,
+        )
+        return VideoProcessingConfig(
+            feature_families=list(self.feature_families),
+            file_type=self.file_type,
+            temp_dir=self.temp_dir,
+            two_point_combs=self.two_point_combs,
+            within_animal_three_point_combs=self.within_animal_three_point_combs,
+            within_animal_four_point_combs=self.within_animal_four_point_combs,
+            animal_bps=self.animal_bps,
+            roi_dict=getattr(self, "roi_dict", None) if (
+                FRAME_BP_TO_ROI_CENTER in self.feature_families
+                or FRAME_BP_INSIDE_ROI in self.feature_families
+            ) else None,
+            video_info_df=self.video_info_df,
+        )
+
+    def run(self):
+        from mufasa.feature_extractors.feature_subset_orchestration import (
+            process_one_video,
+        )
+        check_all_file_names_are_represented_in_video_log(video_info_df=self.video_info_df, data_paths=self.data_paths)
+        config = self._build_video_processing_config()
+        for file_cnt, file_path in enumerate(self.data_paths):
+            # Per-video work is now in a module-level function. The
+            # class no longer holds intermediate state (self.data_df,
+            # self.results, self.video_info, etc.) during the loop —
+            # those live on the local stack of process_one_video.
+            #
+            # Step 6 of the refactor will wrap this loop in a
+            # ProcessPoolExecutor for parallel execution.
+            process_one_video(
+                file_path=file_path, config=config,
+                file_idx=file_cnt, n_total_files=len(self.data_paths),
+                print_progress=True,
+            )
         if self.append_to_features_extracted:
             print(f'Appending new feature to files in {self.features_dir}...')
             self.__append_to_data_in_dir(dir=self.features_dir)
