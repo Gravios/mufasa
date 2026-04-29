@@ -30,6 +30,42 @@ from mufasa.utils.read_write import (copy_files_in_directory,
                                     get_fn_ext, read_df, remove_a_folder,
                                     remove_multiple_folders, write_df)
 
+
+def _read_columns_only(file_path: str, file_type: str) -> set:
+    """Return the column names of a tabular file WITHOUT reading
+    its full contents. Significantly faster than ``read_df`` for
+    the preflight check, where we only care about column names.
+
+    For 67 multi-MB CSV files, this drops the cost from ~minutes
+    to ~milliseconds because we read only the header line instead
+    of every row. For parquet, we read just the schema metadata
+    (no row data at all).
+
+    Falls back to read_df on unknown file types or if the
+    fast path raises.
+    """
+    if file_type == "csv":
+        # pd.read_csv with nrows=0 reads only the header row.
+        try:
+            import pandas as pd
+            df = pd.read_csv(file_path, nrows=0)
+            return set(df.columns)
+        except Exception:
+            # Some malformed CSVs trip pandas but not pyarrow.
+            # Fall through to the safe slow path.
+            pass
+    elif file_type == "parquet":
+        try:
+            import pyarrow.parquet as pq
+            schema = pq.read_schema(file_path)
+            return set(schema.names)
+        except Exception:
+            pass
+    # Slow but always works.
+    df = read_df(file_path=file_path, file_type=file_type)
+    return set(df.columns)
+
+
 # Constants below are kept (not moved to kernels module) because they
 # define the public API for `feature_families` parameter values.
 
@@ -620,6 +656,9 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         # NOTE: we ADD to `conflicts` here rather than rebuilding it,
         # because save_dir collisions may already have been recorded
         # at the top of this method.
+        # Uses _read_columns_only (header-only read) instead of
+        # read_df: ~3 orders of magnitude faster for CSV. For 67
+        # multi-MB CSVs this drops preflight from minutes to seconds.
         for label, dir_path in targets:
             files_checked = 0
             files_missing = 0
@@ -631,10 +670,9 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                     files_missing += 1
                     continue
                 files_checked += 1
-                existing_df = read_df(
+                existing_cols = _read_columns_only(
                     file_path=file_path, file_type=self.file_type,
                 )
-                existing_cols = set(existing_df.columns)
                 overlap = sorted(new_columns & existing_cols)
                 if overlap:
                     conflicts[f'{label}/{video_name}'] = overlap

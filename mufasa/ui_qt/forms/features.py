@@ -68,26 +68,82 @@ class FeatureSubsetExtractorForm(OperationForm):
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight)
 
+        # Destination radio group. Pre-fix: three independent
+        # widgets (save_dir field + two checkboxes) made it
+        # possible to accidentally configure dual destinations
+        # — output went to BOTH save_dir AND the project's
+        # features_extracted/. Most users didn't intend that.
+        # Radio buttons enforce a single choice and make each
+        # mode's behavior explicit in the label.
+        from PySide6.QtWidgets import QRadioButton, QButtonGroup
+        dest_label = QLabel("<b>Destination:</b>", self)
+        form.addRow("", dest_label)
+
+        # Mode 1: save_dir — write standalone files containing
+        # ONLY the new feature columns. Doesn't modify project files.
+        self.dest_save_dir = QRadioButton(
+            "Save standalone files (new columns only) to:", self,
+        )
+        form.addRow("", self.dest_save_dir)
         self.save_dir = _PathField(
             is_file=False,
-            placeholder=("Save directory (required unless an "
-                         "append checkbox below is checked)…"),
+            placeholder="…directory for the standalone CSVs/parquets",
         )
-        form.addRow("Save to:", self.save_dir)
+        form.addRow("", self.save_dir)
+
+        # Mode 2: append to features_extracted — merge new columns
+        # into project's per-video files in csv/features_extracted/.
+        # Existing data preserved; new columns added side-by-side.
+        self.dest_append_features = QRadioButton(
+            "Append new columns to project files in "
+            "csv/features_extracted/", self,
+        )
+        form.addRow("", self.dest_append_features)
+
+        # Mode 3: append to targets_inserted — same as features
+        # mode but writes to csv/targets_inserted/. Used when the
+        # project has classifier targets already inserted and you
+        # want the new features alongside them.
+        self.dest_append_targets = QRadioButton(
+            "Append new columns to project files in "
+            "csv/targets_inserted/", self,
+        )
+        form.addRow("", self.dest_append_targets)
+
+        # Group enforces single-choice. Default to save_dir mode
+        # (safest — doesn't touch project tree). User must pick a
+        # path explicitly to actually run.
+        self._dest_group = QButtonGroup(self)
+        self._dest_group.addButton(self.dest_save_dir, 0)
+        self._dest_group.addButton(self.dest_append_features, 1)
+        self._dest_group.addButton(self.dest_append_targets, 2)
+        self.dest_save_dir.setChecked(True)
+
+        # Disable the path field unless save_dir mode is selected.
+        # Visual feedback that the field is only relevant in that
+        # mode. Connect to update enabled state on toggle.
+        def _update_save_dir_enabled() -> None:
+            self.save_dir.setEnabled(self.dest_save_dir.isChecked())
+        self.dest_save_dir.toggled.connect(lambda _: _update_save_dir_enabled())
+        self.dest_append_features.toggled.connect(lambda _: _update_save_dir_enabled())
+        self.dest_append_targets.toggled.connect(lambda _: _update_save_dir_enabled())
+        _update_save_dir_enabled()
+
+        # Aliases for backward compat with the old attribute names.
+        # collect_args / on_run / preflight / target all still
+        # reference these. Rather than renaming everywhere, expose
+        # property-like accessors that derive from the radio state.
+        # (Plain attributes pointing at the radios; the .isChecked()
+        # API is the same as the old QCheckBox.)
+        self.append_features = self.dest_append_features
+        self.append_targets = self.dest_append_targets
+
+        # Spacer after destination block before checks/workers
+        form.addRow("", QLabel("", self))
 
         self.file_checks = QCheckBox("Run file checks before computing", self)
         self.file_checks.setChecked(True)
         form.addRow("", self.file_checks)
-
-        self.append_features = QCheckBox(
-            "Append to existing features_extracted CSVs", self,
-        )
-        form.addRow("", self.append_features)
-
-        self.append_targets = QCheckBox(
-            "Append to existing targets_inserted CSVs", self,
-        )
-        form.addRow("", self.append_targets)
 
         # Parallel workers — sits as the last row in the form so it's
         # visually adjacent to the Run button row (which the parent
@@ -156,25 +212,38 @@ class FeatureSubsetExtractorForm(OperationForm):
                     for it in self.families.selectedItems()]
         if not selected:
             raise ValueError("Select at least one feature family.")
-        save_dir_value = self.save_dir.path or None
-        append_features = bool(self.append_features.isChecked())
-        append_targets = bool(self.append_targets.isChecked())
-        # Match the backend strict-mode validation: refuse to start
-        # without an explicit destination. Before this check landed
-        # in the backend, the form's old placeholder text claimed
-        # "blank = project log dir" — incorrect; blank meant the
-        # output was silently discarded after compute. Surfacing the
-        # error here (rather than in the backend) gives the user a
-        # nicer dialog than a stack trace.
-        if save_dir_value is None and not append_features and not append_targets:
+
+        # Derive backend kwargs from radio button state. Single-
+        # choice radio means at most one of the three is True at
+        # any time. The save_dir backend param is only set when
+        # the save_dir radio is selected; the two append flags
+        # mirror the other radios.
+        if self.dest_save_dir.isChecked():
+            save_dir_value = self.save_dir.path or None
+            append_features = False
+            append_targets = False
+            if save_dir_value is None:
+                raise ValueError(
+                    "Save destination is required: pick a directory "
+                    "in the 'Save standalone files' field, or switch "
+                    "the destination to one of the append modes."
+                )
+        elif self.dest_append_features.isChecked():
+            save_dir_value = None
+            append_features = True
+            append_targets = False
+        elif self.dest_append_targets.isChecked():
+            save_dir_value = None
+            append_features = False
+            append_targets = True
+        else:
+            # Shouldn't happen — QButtonGroup forces a selection
+            # since one is checked by default. But defensive.
             raise ValueError(
-                "Specify a save destination: either set 'Save to:' "
-                "to a directory, or check 'Append to existing "
-                "features_extracted CSVs' / 'Append to existing "
-                "targets_inserted CSVs'. Without one of these, "
-                "the computed features would be discarded after "
-                "the run completes."
+                "Internal error: no destination radio is selected. "
+                "Please select a destination."
             )
+
         return {
             "config_path":      self.config_path,
             "feature_families": selected,

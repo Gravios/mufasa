@@ -158,7 +158,12 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # Case 7: Qt form validates save destination in collect_args
+    # Case 7: Qt form validates save destination in collect_args.
+    # Post-radio-button refactor: collect_args branches on radio
+    # state and raises if save_dir radio is selected without a path.
+    # The old "save_dir_value is None and not append_features and
+    # not append_targets" check was replaced with explicit radio
+    # branching since the radios make multi-destination impossible.
     # ------------------------------------------------------------------ #
     qt_src = Path("mufasa/ui_qt/forms/features.py").read_text()
     qt_tree = ast.parse(qt_src)
@@ -169,11 +174,17 @@ def main() -> int:
             break
     assert collect_args is not None, "Qt form's collect_args missing"
     collect_src = ast.unparse(collect_args)
-    assert "save_dir_value is None" in collect_src, (
-        "Qt form's collect_args must check save_dir_value is None"
+    # Radio-button form: collect_args raises if save_dir radio is
+    # picked but no path is given. The error message references
+    # the radio-button label.
+    assert "Save destination is required" in collect_src, (
+        "Qt form's collect_args should raise a clear error when "
+        "save_dir radio is selected but no path is provided"
     )
-    assert "discarded" in collect_src.lower(), (
-        "Qt form's error message should warn about discard"
+    # The form now also validates via radio-state branching, not
+    # by checking all three destination fields.
+    assert "self.dest_save_dir.isChecked()" in collect_src, (
+        "Qt form's collect_args should branch on the radio state"
     )
 
     # ------------------------------------------------------------------ #
@@ -181,6 +192,11 @@ def main() -> int:
     # "blank = project log dir" string. Look for the placeholder= kwarg
     # specifically rather than substring-matching the whole file
     # (a comment can legitimately reference the old text for context).
+    # The radio-button refactor changed the placeholder; the field
+    # is now adjacent to the "Save standalone files" radio so the
+    # placeholder is shorter ("…directory for the standalone
+    # CSVs/parquets"). What matters is that the misleading
+    # "blank = project log dir" string is gone.
     # ------------------------------------------------------------------ #
     placeholders = []
     for node in ast.walk(qt_tree):
@@ -188,19 +204,22 @@ def main() -> int:
             for kw in node.keywords:
                 if kw.arg == "placeholder" and isinstance(kw.value, ast.Constant):
                     placeholders.append(kw.value.value)
-    save_dir_placeholder = None
+    # No placeholder anywhere should contain the misleading old text.
     for p in placeholders:
-        if "Save directory" in (p or ""):
-            save_dir_placeholder = p
-    assert save_dir_placeholder is not None, (
-        "Couldn't find the 'Save directory' placeholder string"
-    )
-    assert "blank = project log dir" not in save_dir_placeholder, (
-        f"Placeholder still misleading: {save_dir_placeholder!r}"
-    )
-    assert "required" in save_dir_placeholder.lower() or "append" in save_dir_placeholder.lower(), (
-        f"Placeholder should mention requirement or alternative: "
-        f"{save_dir_placeholder!r}"
+        if p:
+            assert "blank = project log dir" not in p, (
+                f"Placeholder still misleading: {p!r}"
+            )
+    # AT LEAST ONE placeholder should be related to the save_dir
+    # field (mentioning directory). This is a loose check —
+    # the goal is to confirm the field still has SOME placeholder,
+    # not pin down the exact wording.
+    save_dir_related = [
+        p for p in placeholders
+        if p and ("directory" in p.lower() or "dir" in p.lower())
+    ]
+    assert save_dir_related, (
+        f"No save-dir-related placeholder found among: {placeholders}"
     )
 
     print("smoke_save_destination_validation: 8/8 cases passed")
