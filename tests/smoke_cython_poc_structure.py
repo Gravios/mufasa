@@ -145,25 +145,32 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # Case 8: kernel chain (feature_subset_kernels.py) still calls
-    # the numba version (NOT the Cython version) — so production
-    # behavior is unchanged by the POC
+    # Case 8: kernel chain (feature_subset_kernels.py) still
+    # references the polygon kernel name. After the wiring patch,
+    # it now calls _native via local _kern_* aliases AND retains
+    # the numba versions in the fallback path. The POC's "must
+    # NOT yet route to Cython" assertion was correct AT THE TIME
+    # OF THE POC but is invalidated by the later wiring patch.
     # ------------------------------------------------------------------ #
     kernels = Path(
         "mufasa/feature_extractors/feature_subset_kernels.py"
     ).read_text()
     assert "framewise_inside_polygon_roi" in kernels, (
-        "feature_subset_kernels should still call the polygon kernel"
+        "feature_subset_kernels should still reference the polygon "
+        "kernel name (in fallback path or as part of import alias)"
     )
+    # FeatureExtractionMixin is still referenced in the fallback
+    # path (when _native is unavailable). Verify it's there.
     assert "FeatureExtractionMixin" in kernels, (
-        "feature_subset_kernels should still call via the numba "
-        "FeatureExtractionMixin (not _native) until POC validates"
+        "feature_subset_kernels should retain numba fallback via "
+        "FeatureExtractionMixin"
     )
-    assert "_native" not in kernels, (
-        "feature_subset_kernels must NOT yet route to the Cython "
-        "version — it's a proof of concept, not a production "
-        "swap. Wire it in only after the workstation benchmark "
-        "shows byte-equivalence and acceptable speed."
+    # After wiring, _native IS imported. This used to be a
+    # negative assertion; now it's positive.
+    assert "_native" in kernels, (
+        "After the wiring patch, feature_subset_kernels.py must "
+        "import from mufasa._native. If wiring was rolled back, "
+        "update this assertion."
     )
 
     print("smoke_cython_poc_structure: 8/8 cases passed")

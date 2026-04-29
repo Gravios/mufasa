@@ -145,18 +145,35 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # Case 7: kernel chain (feature_subset_kernels.py) still uses
-    # the numba imports — Cython kernels exist but aren't yet wired
-    # into production.
+    # Case 7: kernel chain (feature_subset_kernels.py) IS wired to
+    # the Cython kernels via the cython_kernel_wiring patch. Earlier
+    # patches in the stack required this to be additive (Cython
+    # alongside numba); after wiring, feature_subset_kernels imports
+    # from mufasa._native AND retains the numba fallback.
     # ------------------------------------------------------------------ #
     kernels = Path(
         "mufasa/feature_extractors/feature_subset_kernels.py"
     ).read_text()
-    assert "_native" not in kernels, (
-        "feature_subset_kernels.py imports from mufasa._native — "
-        "Cython kernels are not yet supposed to be wired into "
-        "production. Wire them in a follow-up patch only after "
-        "smoke_native_all_kernels.py validates byte-equivalence."
+    assert "_native" in kernels, (
+        "feature_subset_kernels.py should import from "
+        "mufasa._native (the wiring patch routes production "
+        "calls through the Cython kernels). If the wiring was "
+        "intentionally rolled back, also revert this assertion."
+    )
+    # Specifically, the wiring imports rebind to local names like
+    # _kern_angle3pt etc. Verify a few of those landed.
+    for kern in ["_kern_angle3pt", "_kern_hull",
+                 "_kern_inside_polygon", "_kern_border_distances"]:
+        assert kern in kernels, (
+            f"Wiring incomplete: {kern} not bound in "
+            f"feature_subset_kernels.py"
+        )
+    # And the numba fallback path must still exist for safety
+    # when Cython extensions aren't compiled.
+    assert "_NATIVE_AVAILABLE" in kernels, (
+        "feature_subset_kernels.py should expose a _NATIVE_AVAILABLE "
+        "flag so callers/tests can introspect whether Cython kernels "
+        "are in use"
     )
 
     # ------------------------------------------------------------------ #

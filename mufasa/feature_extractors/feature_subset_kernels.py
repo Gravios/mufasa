@@ -61,12 +61,79 @@ from typing import Dict, Iterable, Mapping, Tuple
 import numpy as np
 import pandas as pd
 
-from mufasa.feature_extractors.perimeter_jit import jitted_hull
+from mufasa.feature_extractors.perimeter_jit import jitted_hull as _numba_jitted_hull
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.mixins.feature_extraction_supplement_mixin import \
     FeatureExtractionSupplemental
 from mufasa.utils.checks import check_valid_dataframe
 from mufasa.utils.enums import ROI_SETTINGS, Formats
+
+
+# ---------------------------------------------------------------------- #
+# Cython kernel wiring
+# ---------------------------------------------------------------------- #
+# All seven hot kernels in this module have ahead-of-time-compiled
+# Cython equivalents in mufasa._native, validated byte-equivalent
+# against the numba reference (see tests/smoke_native_all_kernels.py
+# for the verification suite). Speedups vs numba on a 9800X3D:
+#   border_distances:                 ~340×
+#   hull (perimeter/area):            ~13-110× (parallel)
+#   framewise_euclidean_distance_roi: ~50×
+#   framewise_euclidean_distance:     ~5-10×
+#   inside_circle:                    ~1.8×
+#   inside_polygon, inside_rectangle: ~1.0-1.2×
+#   angle3pt_vectorized:              ~0.9× (slight regression;
+#                                            numba's fastmath atan2
+#                                            beats libc atan2)
+#
+# The angle3pt regression is small (~7% slower on a kernel that
+# itself takes ~17ms at 500K frames) and the Cython version is
+# preferred anyway for consistency.
+#
+# Defensive fallback: if any Cython kernel fails to import (e.g.
+# user pulled new code without re-running `pip install -e .`,
+# or the build failed silently), we fall back to the numba
+# version. This keeps feature extraction working — degraded
+# perf, never broken behavior.
+try:
+    from mufasa._native.angle3pt import angle3pt_vectorized as _kern_angle3pt
+    from mufasa._native.border_distances import border_distances as _kern_border_distances
+    from mufasa._native.euclidean_distance import (
+        framewise_euclidean_distance as _kern_euclid,
+        framewise_euclidean_distance_roi as _kern_euclid_roi,
+    )
+    from mufasa._native.hull import jitted_hull as _kern_hull
+    from mufasa._native.inside_circle import is_inside_circle as _kern_inside_circle
+    from mufasa._native.inside_polygon import (
+        framewise_inside_polygon_roi as _kern_inside_polygon,
+    )
+    from mufasa._native.inside_rectangle import (
+        framewise_inside_rectangle_roi as _kern_inside_rectangle,
+    )
+    _NATIVE_AVAILABLE = True
+except ImportError as _native_import_error:
+    # Fall back to numba for every kernel. A missing _native is
+    # almost always "user updated the source but didn't reinstall
+    # the package" — print a hint so they know how to fix it.
+    import warnings
+    warnings.warn(
+        f"mufasa._native Cython kernels unavailable "
+        f"({_native_import_error}); falling back to numba "
+        f"implementations. Run `pip install -e .` from the "
+        f"repo root to rebuild the Cython extensions for full "
+        f"performance.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    _kern_angle3pt = FeatureExtractionMixin.angle3pt_vectorized
+    _kern_border_distances = FeatureExtractionSupplemental.border_distances
+    _kern_euclid = FeatureExtractionMixin.framewise_euclidean_distance
+    _kern_euclid_roi = FeatureExtractionMixin.framewise_euclidean_distance_roi
+    _kern_hull = _numba_jitted_hull
+    _kern_inside_circle = FeatureExtractionMixin.is_inside_circle
+    _kern_inside_polygon = FeatureExtractionMixin.framewise_inside_polygon_roi
+    _kern_inside_rectangle = FeatureExtractionMixin.framewise_inside_rectangle_roi
+    _NATIVE_AVAILABLE = False
 
 
 SHAPE_TYPE = "Shape_type"
@@ -153,7 +220,7 @@ def compute_three_point_angles(
             col_names = _flat_xy_column_names(point)
             out[
                 f"Angle (degrees) {point[0]}-{point[1]}-{point[2]}"
-            ] = FeatureExtractionMixin.angle3pt_vectorized(
+            ] = _kern_angle3pt(
                 data=df[col_names].values,
             )
     return out
@@ -192,7 +259,7 @@ def compute_three_point_hulls(
                 f"{point[0]}-{point[1]}-{point[2]}"
             )
             out[col] = (
-                jitted_hull(points=arr, target=Formats.PERIMETER.value)
+                _kern_hull(points=arr, target=Formats.PERIMETER.value)
                 / px_per_mm
             )
     return out
@@ -216,7 +283,7 @@ def compute_four_point_hulls(
                 f"{point[0]}-{point[1]}-{point[2]}-{point[3]}"
             )
             out[col] = (
-                jitted_hull(points=arr, target=Formats.PERIMETER.value)
+                _kern_hull(points=arr, target=Formats.PERIMETER.value)
                 / px_per_mm
             )
     return out
@@ -244,12 +311,12 @@ def compute_animal_convex_hulls(
         arr = _reshape_for_hull(df, bps)
         if method == "perimeter":
             out[f"{animal} convex hull perimeter (mm)"] = (
-                jitted_hull(points=arr, target=Formats.PERIMETER.value)
+                _kern_hull(points=arr, target=Formats.PERIMETER.value)
                 / px_per_mm
             )
         else:
             out[f"{animal} convex hull area (mm2)"] = (
-                jitted_hull(points=arr, target=Formats.AREA.value)
+                _kern_hull(points=arr, target=Formats.AREA.value)
                 / px_per_mm
             )
     return out
@@ -278,7 +345,7 @@ def compute_framewise_movement(
             ).values
             x, y = bp_arr[:, 0:2], bp_arr[:, 2:4]
             out[f"{animal} movement {bp} (mm)"] = (
-                FeatureExtractionMixin.framewise_euclidean_distance(
+                _kern_euclid(
                     location_1=x.astype(np.float64),
                     location_2=y.astype(np.float64),
                     px_per_mm=np.float64(px_per_mm),
@@ -319,7 +386,7 @@ def compute_roi_center_distances(
                 ).astype(np.int32)
                 out[
                     f"{animal} {bp} to {roi_name} center distance (mm)"
-                ] = FeatureExtractionMixin.framewise_euclidean_distance_roi(
+                ] = _kern_euclid_roi(
                     location_1=bp_arr,
                     location_2=center_point,
                     px_per_mm=px_per_mm,
@@ -352,7 +419,7 @@ def compute_distances_to_frame_edge(
                 required_fields=[x_col, y_col],
             )
             bp_arr = df[[x_col, y_col]].values.astype(np.float32)
-            distance = FeatureExtractionSupplemental().border_distances(
+            distance = _kern_border_distances(
                 data=bp_arr,
                 pixels_per_mm=px_per_mm,
                 img_resolution=img_resolution,
@@ -407,12 +474,9 @@ def compute_inside_roi(
                     out[
                         f"{animal} {bp} inside rectangle "
                         f"{roi_name} (Boolean)"
-                    ] = (
-                        FeatureExtractionMixin
-                        .framewise_inside_rectangle_roi(
-                            bp_location=bp_arr,
-                            roi_coords=roi_coords,
-                        )
+                    ] = _kern_inside_rectangle(
+                        bp_location=bp_arr,
+                        roi_coords=roi_coords,
                     )
                 elif shape == ROI_SETTINGS.CIRCLE.value:
                     circle_center = np.array(
@@ -421,24 +485,19 @@ def compute_inside_roi(
                     out[
                         f"{animal} {bp} inside circle "
                         f"{roi_name} (Boolean)"
-                    ] = (
-                        FeatureExtractionMixin.is_inside_circle(
-                            bp=bp_arr,
-                            roi_center=circle_center,
-                            roi_radius=roi_data["radius"],
-                        )
+                    ] = _kern_inside_circle(
+                        bp=bp_arr,
+                        roi_center=circle_center,
+                        roi_radius=roi_data["radius"],
                     )
                 elif shape == ROI_SETTINGS.POLYGON.value:
                     vertices = roi_data["vertices"].astype(np.int32)
                     out[
                         f"{animal} {bp} inside polygon "
                         f"{roi_name} (Boolean)"
-                    ] = (
-                        FeatureExtractionMixin
-                        .framewise_inside_polygon_roi(
-                            bp_location=bp_arr,
-                            roi_coords=vertices,
-                        )
+                    ] = _kern_inside_polygon(
+                        bp_location=bp_arr,
+                        roi_coords=vertices,
                     )
     return out
 
