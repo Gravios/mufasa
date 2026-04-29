@@ -103,6 +103,12 @@ def main() -> int:
             ARENA_EDGE,
         ],
     )
+    # As of step 4 of the refactor, heavy setup (temp_dir, ROI
+    # filtering, body-part combinations) is deferred from __init__
+    # to a _setup_run() helper that run() calls. We're using calc
+    # for inspection (its two_point_combs etc.), so call it
+    # explicitly here.
+    calc._setup_run()
 
     # Pick a video
     if args.video_name:
