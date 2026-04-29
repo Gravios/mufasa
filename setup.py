@@ -73,7 +73,10 @@ _EXTENSIONS = [
         name="mufasa._native.hull",
         sources=["mufasa/_native/hull.pyx"],
         include_dirs=[np.get_include()],
-        extra_compile_args=["-O3", "-Wall"],
+        # OpenMP for the prange in the per-frame loop.
+        # On Linux, gcc/clang use -fopenmp for both compile and link.
+        extra_compile_args=["-O3", "-Wall", "-fopenmp"],
+        extra_link_args=["-fopenmp"],
     ),
 ]
 
