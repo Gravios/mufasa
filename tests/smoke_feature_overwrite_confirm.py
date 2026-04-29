@@ -221,7 +221,39 @@ def main() -> int:
         "dict so on_run has a key to update after the prompt"
     )
 
-    print("smoke_feature_overwrite_confirm: 8/8 cases passed")
+    # ------------------------------------------------------------------ #
+    # Case 9: preflight_check ALSO catches save_dir filename
+    # collisions (the common case where user picks an existing
+    # directory that already has output from a prior run).
+    # Pre-fix the preflight only ran for append flags.
+    # ------------------------------------------------------------------ #
+    pf_src_full = ast.unparse(pf)
+    assert "save_dir" in pf_src_full, (
+        "preflight_check must also check save_dir for filename "
+        "collisions, not just append-destination column collisions"
+    )
+    assert "file exists" in pf_src_full, (
+        "preflight_check should mark save_dir collisions with "
+        "'file exists' reason string so the caller can distinguish "
+        "them from column collisions"
+    )
+
+    # ------------------------------------------------------------------ #
+    # Case 10: Form on_run runs preflight when ANY destination is
+    # set, not just append. Pre-fix it skipped preflight for save_dir-
+    # only mode, which let users silently overwrite previous output.
+    # ------------------------------------------------------------------ #
+    on_run_full_src = ast.unparse(form_methods["on_run"])
+    # ast.unparse may normalize quotes; check both forms
+    assert (
+        'kwargs["save_dir"] is not None' in on_run_full_src
+        or "kwargs['save_dir'] is not None" in on_run_full_src
+    ), (
+        "on_run must include save_dir in needs_preflight check "
+        "(not just the append flags)"
+    )
+
+    print("smoke_feature_overwrite_confirm: 10/10 cases passed")
     return 0
 
 
