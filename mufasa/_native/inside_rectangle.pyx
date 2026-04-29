@@ -14,18 +14,12 @@ Algorithm: for each frame, return 1 if (x, y) is inside the
 axis-aligned rectangle defined by [topLeft, bottomRight];
 else 0.
 
-The numba reference implementation does this via two
-``np.argwhere`` calls + an inner search — an O(N²) accident
-that we faithfully match here for byte-equivalence rather than
-"fix" silently. The Cython version is a single O(N) pass; the
-output is identical because the algorithm produces a deterministic
-boolean per frame regardless of how it's computed. We don't
-mimic the inefficiency, only the output.
-
-If the byte-equivalence test passes, this kernel is also a small
-de facto performance win (O(N²) → O(N)) on the rare case of
-many frames inside the rectangle. Most workloads have moderate
-overlap and the difference is negligible.
+Single-pass O(N) loop. The numba reference was O(N²) until the
+``inside_rectangle_fix`` patch corrected it to also be O(N);
+this Cython port has always been O(N). Both versions now
+produce byte-identical output via the same single-pass
+algorithm — the Cython version exists for libgomp removal,
+not algorithmic improvement.
 """
 import numpy as np
 

@@ -17,12 +17,12 @@
         "include_dirs": [
             "/tmp/pip-build-env-0tcndn3g/overlay/lib/python3.12/site-packages/numpy/_core/include"
         ],
-        "name": "mufasa._native.inside_polygon",
+        "name": "mufasa._native.inside_rectangle",
         "sources": [
-            "mufasa/_native/inside_polygon.pyx"
+            "mufasa/_native/inside_rectangle.pyx"
         ]
     },
-    "module_name": "mufasa._native.inside_polygon"
+    "module_name": "mufasa._native.inside_rectangle"
 }
 END: Cython Metadata */
 
@@ -1140,8 +1140,8 @@ static int __Pyx_init_co_variables(void) {
   #endif
 #endif
 
-#define __PYX_HAVE__mufasa___native__inside_polygon
-#define __PYX_HAVE_API__mufasa___native__inside_polygon
+#define __PYX_HAVE__mufasa___native__inside_rectangle
+#define __PYX_HAVE_API__mufasa___native__inside_rectangle
 /* Early includes */
 #include <string.h>
 #include <stdio.h>
@@ -1391,7 +1391,7 @@ static const char *__pyx_filename;
 /* #### Code section: filename_table ### */
 
 static const char* const __pyx_f[] = {
-  "mufasa/_native/inside_polygon.pyx",
+  "mufasa/_native/inside_rectangle.pyx",
   "../../../../tmp/pip-build-env-0tcndn3g/overlay/lib/python3.12/site-packages/numpy/__init__.cython-30.pxd",
   "cpython/type.pxd",
 };
@@ -2776,21 +2776,21 @@ static CYTHON_INLINE char *__pyx_f_5numpy_7ndarray_4data_data(PyArrayObject *__p
 
 /* Module declarations from "numpy" */
 
-/* Module declarations from "mufasa._native.inside_polygon" */
+/* Module declarations from "mufasa._native.inside_rectangle" */
 /* #### Code section: typeinfo ### */
 static const __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t = { "float64_t", NULL, sizeof(__pyx_t_5numpy_float64_t), { 0 }, 0, 'R', 0, 0 };
 static const __Pyx_TypeInfo __Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t = { "int64_t", NULL, sizeof(__pyx_t_5numpy_int64_t), { 0 }, 0, __PYX_IS_UNSIGNED(__pyx_t_5numpy_int64_t) ? 'U' : 'I', __PYX_IS_UNSIGNED(__pyx_t_5numpy_int64_t), 0 };
 /* #### Code section: before_global_var ### */
-#define __Pyx_MODULE_NAME "mufasa._native.inside_polygon"
-extern int __pyx_module_is_main_mufasa___native__inside_polygon;
-int __pyx_module_is_main_mufasa___native__inside_polygon = 0;
+#define __Pyx_MODULE_NAME "mufasa._native.inside_rectangle"
+extern int __pyx_module_is_main_mufasa___native__inside_rectangle;
+int __pyx_module_is_main_mufasa___native__inside_rectangle = 0;
 
-/* Implementation of "mufasa._native.inside_polygon" */
+/* Implementation of "mufasa._native.inside_rectangle" */
 /* #### Code section: global_var ### */
 /* #### Code section: string_decls ### */
-static const char __pyx_k_mufasa__native_inside_polygon_C[] = "\nmufasa._native.inside_polygon\n=============================\n\nCython implementation of frame-by-frame \"is body-part inside\npolygon ROI\" \342\200\224 proof of concept for replacing numba kernels with\nahead-of-time-compiled C.\n\nThis is a one-to-one port of\n``mufasa.mixins.feature_extraction_mixin.FeatureExtractionMixin\n.framewise_inside_polygon_roi``. Same algorithm (ray casting),\nsame input/output contract, byte-identical results expected.\n\nWhy Cython instead of pure C++ via pybind11:\n- The kernel is a tight loop over numpy arrays \342\200\224 Cython's\n  typed memoryviews handle this natively.\n- No template metaprogramming or C++ STL needed.\n- Less boilerplate per kernel; the main cost is the build\n  configuration, paid once.\n\nWhy this kernel as proof of concept:\n- Self-contained: only needs the bp_location and roi_coords\n  arrays.\n- Branch-heavy ray-casting: this is exactly the pattern where\n  AOT compilation can beat JIT.\n- Easy byte-verification against the existing numba version on\n  synthetic data.\n- Small (~20 lines) \342\200\224 easy to fully understand and review.\n\nBuild:\n    Compiled at ``pip install`` time via ``setuptools`` +\n    ``Cython.Build.cythonize``. See pyproject.toml's\n    [tool.setuptools.ext-modules] section.\n\nAPI contract (must match numba version exactly):\n    framewise_inside_polygon_roi(bp_location, roi_coords) -> ndarray\n        bp_location:  (n_frames, 2) float32 or float64\n        roi_coords:   (n_polygon_pts, 2) float32 or float64\n        returns:      (n_frames,) int64 with 0/1 flags\n\nPerformance expectations:\n    The numba version hits libgomp via ``prange``. This Cython\n    version is single-threaded but uses tight typed loops with\n    no Python overhead per iteration. Expected: comparable or\n    slightly faster than numba for typical n_frames in the\n    50K-500K range. The win isn't raw speed \342\200\224 it's removing\n    the libgomp dependency from the per-video kernel chain,\n    whi""ch matters for parallelization (no more spawn cost).\n";
+static const char __pyx_k_mufasa__native_inside_rectangle[] = "\nmufasa._native.inside_rectangle\n================================\n\nCython port of\n``FeatureExtractionMixin.framewise_inside_rectangle_roi``.\n\nAlgorithm: for each frame, return 1 if (x, y) is inside the\naxis-aligned rectangle defined by [topLeft, bottomRight];\nelse 0.\n\nThe numba reference implementation does this via two\n``np.argwhere`` calls + an inner search \342\200\224 an O(N\302\262) accident\nthat we faithfully match here for byte-equivalence rather than\n\"fix\" silently. The Cython version is a single O(N) pass; the\noutput is identical because the algorithm produces a deterministic\nboolean per frame regardless of how it's computed. We don't\nmimic the inefficiency, only the output.\n\nIf the byte-equivalence test passes, this kernel is also a small\nde facto performance win (O(N\302\262) \342\206\222 O(N)) on the rare case of\nmany frames inside the rectangle. Most workloads have moderate\noverlap and the difference is negligible.\n";
 /* #### Code section: decls ### */
-static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_inside_polygon_roi(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_bp_location, PyArrayObject *__pyx_v_roi_coords); /* proto */
+static PyArrayObject *__pyx_pf_6mufasa_7_native_16inside_rectangle_framewise_inside_rectangle_roi(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_bp_location, PyArrayObject *__pyx_v_roi_coords); /* proto */
 /* #### Code section: late_includes ### */
 /* #### Code section: module_state ### */
 /* SmallCodeConfig */
@@ -2831,7 +2831,7 @@ typedef struct {
   __Pyx_CachedCFunction __pyx_umethod_PyDict_Type_pop;
   __Pyx_CachedCFunction __pyx_umethod_PyDict_Type_values;
   PyObject *__pyx_codeobj_tab[1];
-  PyObject *__pyx_string_tab[51];
+  PyObject *__pyx_string_tab[47];
 /* #### Code section: module_state_contents ### */
 /* CommonTypesMetaclass.module_state_decls */
 PyTypeObject *__pyx_CommonTypesMetaclassType;
@@ -2876,53 +2876,49 @@ static __pyx_mstatetype * const __pyx_mstate_global = &__pyx_mstate_global_stati
 #define __pyx_kp_u_Note_that_Cython_is_deliberately __pyx_string_tab[1]
 #define __pyx_kp_u_add_note __pyx_string_tab[2]
 #define __pyx_kp_u_cnp_ndarray __pyx_string_tab[3]
-#define __pyx_kp_u_mufasa__native_inside_polygon_py __pyx_string_tab[4]
+#define __pyx_kp_u_mufasa__native_inside_rectangle_3 __pyx_string_tab[4]
 #define __pyx_kp_u_numpy__core_multiarray_failed_to __pyx_string_tab[5]
 #define __pyx_kp_u_numpy__core_umath_failed_to_impo __pyx_string_tab[6]
 #define __pyx_n_u_Pyx_PyDict_NextRef __pyx_string_tab[7]
 #define __pyx_n_u_all __pyx_string_tab[8]
 #define __pyx_n_u_ascontiguousarray __pyx_string_tab[9]
 #define __pyx_n_u_asyncio_coroutines __pyx_string_tab[10]
-#define __pyx_n_u_bp_loc_f64 __pyx_string_tab[11]
+#define __pyx_n_u_bp_f64 __pyx_string_tab[11]
 #define __pyx_n_u_bp_location __pyx_string_tab[12]
-#define __pyx_n_u_cline_in_traceback __pyx_string_tab[13]
-#define __pyx_n_u_dtype __pyx_string_tab[14]
-#define __pyx_n_u_float64 __pyx_string_tab[15]
-#define __pyx_n_u_framewise_inside_polygon_roi __pyx_string_tab[16]
-#define __pyx_n_u_func __pyx_string_tab[17]
-#define __pyx_n_u_i __pyx_string_tab[18]
-#define __pyx_n_u_inside __pyx_string_tab[19]
-#define __pyx_n_u_int64 __pyx_string_tab[20]
-#define __pyx_n_u_is_coroutine __pyx_string_tab[21]
-#define __pyx_n_u_items __pyx_string_tab[22]
-#define __pyx_n_u_j __pyx_string_tab[23]
+#define __pyx_n_u_brx __pyx_string_tab[13]
+#define __pyx_n_u_bry __pyx_string_tab[14]
+#define __pyx_n_u_cline_in_traceback __pyx_string_tab[15]
+#define __pyx_n_u_dtype __pyx_string_tab[16]
+#define __pyx_n_u_float64 __pyx_string_tab[17]
+#define __pyx_n_u_framewise_inside_rectangle_roi __pyx_string_tab[18]
+#define __pyx_n_u_func __pyx_string_tab[19]
+#define __pyx_n_u_i __pyx_string_tab[20]
+#define __pyx_n_u_int64 __pyx_string_tab[21]
+#define __pyx_n_u_is_coroutine __pyx_string_tab[22]
+#define __pyx_n_u_items __pyx_string_tab[23]
 #define __pyx_n_u_main __pyx_string_tab[24]
 #define __pyx_n_u_module __pyx_string_tab[25]
-#define __pyx_n_u_mufasa__native_inside_polygon __pyx_string_tab[26]
+#define __pyx_n_u_mufasa__native_inside_rectangle_2 __pyx_string_tab[26]
 #define __pyx_n_u_n_frames __pyx_string_tab[27]
-#define __pyx_n_u_n_poly __pyx_string_tab[28]
-#define __pyx_n_u_name __pyx_string_tab[29]
-#define __pyx_n_u_np __pyx_string_tab[30]
-#define __pyx_n_u_numpy __pyx_string_tab[31]
-#define __pyx_n_u_p1x __pyx_string_tab[32]
-#define __pyx_n_u_p1y __pyx_string_tab[33]
-#define __pyx_n_u_p2x __pyx_string_tab[34]
-#define __pyx_n_u_p2y __pyx_string_tab[35]
-#define __pyx_n_u_pop __pyx_string_tab[36]
-#define __pyx_n_u_qualname __pyx_string_tab[37]
-#define __pyx_n_u_results __pyx_string_tab[38]
-#define __pyx_n_u_return __pyx_string_tab[39]
-#define __pyx_n_u_roi_coords __pyx_string_tab[40]
-#define __pyx_n_u_roi_f64 __pyx_string_tab[41]
-#define __pyx_n_u_set_name __pyx_string_tab[42]
-#define __pyx_n_u_setdefault __pyx_string_tab[43]
-#define __pyx_n_u_test __pyx_string_tab[44]
-#define __pyx_n_u_values __pyx_string_tab[45]
-#define __pyx_n_u_x __pyx_string_tab[46]
-#define __pyx_n_u_xints __pyx_string_tab[47]
-#define __pyx_n_u_y __pyx_string_tab[48]
-#define __pyx_n_u_zeros __pyx_string_tab[49]
-#define __pyx_kp_b_iso88591_A_A_r_z_q_WF_1_4BfA_U_1_Jas_Jas __pyx_string_tab[50]
+#define __pyx_n_u_name __pyx_string_tab[28]
+#define __pyx_n_u_np __pyx_string_tab[29]
+#define __pyx_n_u_numpy __pyx_string_tab[30]
+#define __pyx_n_u_pop __pyx_string_tab[31]
+#define __pyx_n_u_qualname __pyx_string_tab[32]
+#define __pyx_n_u_results __pyx_string_tab[33]
+#define __pyx_n_u_return __pyx_string_tab[34]
+#define __pyx_n_u_roi_coords __pyx_string_tab[35]
+#define __pyx_n_u_roi_f64 __pyx_string_tab[36]
+#define __pyx_n_u_set_name __pyx_string_tab[37]
+#define __pyx_n_u_setdefault __pyx_string_tab[38]
+#define __pyx_n_u_test __pyx_string_tab[39]
+#define __pyx_n_u_tlx __pyx_string_tab[40]
+#define __pyx_n_u_tly __pyx_string_tab[41]
+#define __pyx_n_u_values __pyx_string_tab[42]
+#define __pyx_n_u_x __pyx_string_tab[43]
+#define __pyx_n_u_y __pyx_string_tab[44]
+#define __pyx_n_u_zeros __pyx_string_tab[45]
+#define __pyx_kp_b_iso88591_A_A_r_vV1A_5BfA_gQc_gQc_gQc_gQc __pyx_string_tab[46]
 /* #### Code section: module_state_clear ### */
 #if CYTHON_USE_MODULE_STATE
 static CYTHON_SMALL_CODE int __pyx_m_clear(PyObject *m) {
@@ -2954,7 +2950,7 @@ static CYTHON_SMALL_CODE int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_ptype_5numpy_character);
   Py_CLEAR(clear_module_state->__pyx_ptype_5numpy_ufunc);
   for (int i=0; i<1; ++i) { Py_CLEAR(clear_module_state->__pyx_codeobj_tab[i]); }
-  for (int i=0; i<51; ++i) { Py_CLEAR(clear_module_state->__pyx_string_tab[i]); }
+  for (int i=0; i<47; ++i) { Py_CLEAR(clear_module_state->__pyx_string_tab[i]); }
 /* #### Code section: module_state_clear_contents ### */
 /* CommonTypesMetaclass.module_state_clear */
 Py_CLEAR(clear_module_state->__pyx_CommonTypesMetaclassType);
@@ -2994,7 +2990,7 @@ static CYTHON_SMALL_CODE int __pyx_m_traverse(PyObject *m, visitproc visit, void
   Py_VISIT(traverse_module_state->__pyx_ptype_5numpy_character);
   Py_VISIT(traverse_module_state->__pyx_ptype_5numpy_ufunc);
   for (int i=0; i<1; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_codeobj_tab[i]); }
-  for (int i=0; i<51; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_string_tab[i]); }
+  for (int i=0; i<47; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_string_tab[i]); }
 /* #### Code section: module_state_traverse_contents ### */
 /* CommonTypesMetaclass.module_state_traverse */
 Py_VISIT(traverse_module_state->__pyx_CommonTypesMetaclassType);
@@ -4728,25 +4724,25 @@ static CYTHON_INLINE NPY_DATETIMEUNIT __pyx_f_5numpy_get_datetime64_unit(PyObjec
   return __pyx_r;
 }
 
-/* "mufasa/_native/inside_polygon.pyx":68
+/* "mufasa/_native/inside_rectangle.pyx":36
  * 
  * 
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.wraparound(False)
- * @cython.cdivision(True)
+ * def framewise_inside_rectangle_roi(
 */
 
 /* Python wrapper */
-static PyArrayObject *__pyx_pw_6mufasa_7_native_14inside_polygon_1framewise_inside_polygon_roi(PyObject *__pyx_self, 
+static PyArrayObject *__pyx_pw_6mufasa_7_native_16inside_rectangle_1framewise_inside_rectangle_roi(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
 PyObject *__pyx_args, PyObject *__pyx_kwds
 #endif
 ); /*proto*/
-PyDoc_STRVAR(__pyx_doc_6mufasa_7_native_14inside_polygon_framewise_inside_polygon_roi, "Per-frame point-in-polygon test (ray casting).\n\n    Mirrors the algorithm in\n    FeatureExtractionMixin.framewise_inside_polygon_roi exactly,\n    so output is byte-identical for the same inputs.\n\n    Accepts float32 or float64 input arrays; output is int64 to\n    match the numba version (which uses np.full's default dtype).\n    ");
-static PyMethodDef __pyx_mdef_6mufasa_7_native_14inside_polygon_1framewise_inside_polygon_roi = {"framewise_inside_polygon_roi", (PyCFunction)(void(*)(void))(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_6mufasa_7_native_14inside_polygon_1framewise_inside_polygon_roi, __Pyx_METH_FASTCALL|METH_KEYWORDS, __pyx_doc_6mufasa_7_native_14inside_polygon_framewise_inside_polygon_roi};
-static PyArrayObject *__pyx_pw_6mufasa_7_native_14inside_polygon_1framewise_inside_polygon_roi(PyObject *__pyx_self, 
+PyDoc_STRVAR(__pyx_doc_6mufasa_7_native_16inside_rectangle_framewise_inside_rectangle_roi, "Per-frame point-in-rectangle test.\n\n    :param bp_location: (n_frames, 2) float coordinate array.\n    :param roi_coords: (2, 2) \342\200\224 [[topLeftX, topLeftY], [bottomRightX, bottomRightY]].\n    :return: (n_frames,) int64 with 0 (outside) / 1 (inside).\n    ");
+static PyMethodDef __pyx_mdef_6mufasa_7_native_16inside_rectangle_1framewise_inside_rectangle_roi = {"framewise_inside_rectangle_roi", (PyCFunction)(void(*)(void))(__Pyx_PyCFunction_FastCallWithKeywords)__pyx_pw_6mufasa_7_native_16inside_rectangle_1framewise_inside_rectangle_roi, __Pyx_METH_FASTCALL|METH_KEYWORDS, __pyx_doc_6mufasa_7_native_16inside_rectangle_framewise_inside_rectangle_roi};
+static PyArrayObject *__pyx_pw_6mufasa_7_native_16inside_rectangle_1framewise_inside_rectangle_roi(PyObject *__pyx_self, 
 #if CYTHON_METH_FASTCALL
 PyObject *const *__pyx_args, Py_ssize_t __pyx_nargs, PyObject *__pyx_kwds
 #else
@@ -4765,7 +4761,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   int __pyx_clineno = 0;
   PyArrayObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("framewise_inside_polygon_roi (wrapper)", 0);
+  __Pyx_RefNannySetupContext("framewise_inside_rectangle_roi (wrapper)", 0);
   #if !CYTHON_METH_FASTCALL
   #if CYTHON_ASSUME_SAFE_SIZE
   __pyx_nargs = PyTuple_GET_SIZE(__pyx_args);
@@ -4777,52 +4773,52 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_bp_location,&__pyx_mstate_global->__pyx_n_u_roi_coords,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 68, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 36, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 68, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 36, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 68, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 36, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "framewise_inside_polygon_roi", 0) < (0)) __PYX_ERR(0, 68, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "framewise_inside_rectangle_roi", 0) < (0)) __PYX_ERR(0, 36, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 2; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("framewise_inside_polygon_roi", 1, 2, 2, i); __PYX_ERR(0, 68, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("framewise_inside_rectangle_roi", 1, 2, 2, i); __PYX_ERR(0, 36, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 2)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 68, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 36, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 68, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 36, __pyx_L3_error)
     }
     __pyx_v_bp_location = ((PyArrayObject *)values[0]);
     __pyx_v_roi_coords = ((PyArrayObject *)values[1]);
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("framewise_inside_polygon_roi", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 68, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("framewise_inside_rectangle_roi", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 36, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
   for (Py_ssize_t __pyx_temp=0; __pyx_temp < (Py_ssize_t)(sizeof(values)/sizeof(values[0])); ++__pyx_temp) {
     Py_XDECREF(values[__pyx_temp]);
   }
-  __Pyx_AddTraceback("mufasa._native.inside_polygon.framewise_inside_polygon_roi", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("mufasa._native.inside_rectangle.framewise_inside_rectangle_roi", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_bp_location), __pyx_mstate_global->__pyx_ptype_5numpy_ndarray, 1, "bp_location", 0))) __PYX_ERR(0, 72, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_roi_coords), __pyx_mstate_global->__pyx_ptype_5numpy_ndarray, 1, "roi_coords", 0))) __PYX_ERR(0, 73, __pyx_L1_error)
-  __pyx_r = __pyx_pf_6mufasa_7_native_14inside_polygon_framewise_inside_polygon_roi(__pyx_self, __pyx_v_bp_location, __pyx_v_roi_coords);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_bp_location), __pyx_mstate_global->__pyx_ptype_5numpy_ndarray, 1, "bp_location", 0))) __PYX_ERR(0, 39, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_roi_coords), __pyx_mstate_global->__pyx_ptype_5numpy_ndarray, 1, "roi_coords", 0))) __PYX_ERR(0, 40, __pyx_L1_error)
+  __pyx_r = __pyx_pf_6mufasa_7_native_16inside_rectangle_framewise_inside_rectangle_roi(__pyx_self, __pyx_v_bp_location, __pyx_v_roi_coords);
 
   /* function exit code */
   goto __pyx_L0;
@@ -4841,24 +4837,20 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   return __pyx_r;
 }
 
-static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_inside_polygon_roi(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_bp_location, PyArrayObject *__pyx_v_roi_coords) {
-  PyArrayObject *__pyx_v_bp_loc_f64 = 0;
+static PyArrayObject *__pyx_pf_6mufasa_7_native_16inside_rectangle_framewise_inside_rectangle_roi(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_bp_location, PyArrayObject *__pyx_v_roi_coords) {
+  PyArrayObject *__pyx_v_bp_f64 = 0;
   PyArrayObject *__pyx_v_roi_f64 = 0;
   Py_ssize_t __pyx_v_n_frames;
-  Py_ssize_t __pyx_v_n_poly;
   PyArrayObject *__pyx_v_results = 0;
+  double __pyx_v_tlx;
+  double __pyx_v_tly;
+  double __pyx_v_brx;
+  double __pyx_v_bry;
   Py_ssize_t __pyx_v_i;
-  Py_ssize_t __pyx_v_j;
   double __pyx_v_x;
   double __pyx_v_y;
-  double __pyx_v_p1x;
-  double __pyx_v_p1y;
-  double __pyx_v_p2x;
-  double __pyx_v_p2y;
-  double __pyx_v_xints;
-  int __pyx_v_inside;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_bp_loc_f64;
-  __Pyx_Buffer __pyx_pybuffer_bp_loc_f64;
+  __Pyx_LocalBuf_ND __pyx_pybuffernd_bp_f64;
+  __Pyx_Buffer __pyx_pybuffer_bp_f64;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_results;
   __Pyx_Buffer __pyx_pybuffer_results;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_roi_f64;
@@ -4877,22 +4869,16 @@ static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_insid
   Py_ssize_t __pyx_t_10;
   Py_ssize_t __pyx_t_11;
   Py_ssize_t __pyx_t_12;
-  Py_ssize_t __pyx_t_13;
-  Py_ssize_t __pyx_t_14;
-  Py_ssize_t __pyx_t_15;
-  int __pyx_t_16;
-  double __pyx_t_17;
-  double __pyx_t_18;
-  double __pyx_t_19;
-  int __pyx_t_20;
+  int __pyx_t_13;
+  int __pyx_t_14;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
-  __Pyx_RefNannySetupContext("framewise_inside_polygon_roi", 0);
-  __pyx_pybuffer_bp_loc_f64.pybuffer.buf = NULL;
-  __pyx_pybuffer_bp_loc_f64.refcount = 0;
-  __pyx_pybuffernd_bp_loc_f64.data = NULL;
-  __pyx_pybuffernd_bp_loc_f64.rcbuffer = &__pyx_pybuffer_bp_loc_f64;
+  __Pyx_RefNannySetupContext("framewise_inside_rectangle_roi", 0);
+  __pyx_pybuffer_bp_f64.pybuffer.buf = NULL;
+  __pyx_pybuffer_bp_f64.refcount = 0;
+  __pyx_pybuffernd_bp_f64.data = NULL;
+  __pyx_pybuffernd_bp_f64.rcbuffer = &__pyx_pybuffer_bp_f64;
   __pyx_pybuffer_roi_f64.pybuffer.buf = NULL;
   __pyx_pybuffer_roi_f64.refcount = 0;
   __pyx_pybuffernd_roi_f64.data = NULL;
@@ -4902,22 +4888,22 @@ static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_insid
   __pyx_pybuffernd_results.data = NULL;
   __pyx_pybuffernd_results.rcbuffer = &__pyx_pybuffer_results;
 
-  /* "mufasa/_native/inside_polygon.pyx":91
- *     # and we need to match that exactly, we'd template the kernel.
- *     cdef cnp.ndarray[cnp.float64_t, ndim=2] bp_loc_f64 = (
+  /* "mufasa/_native/inside_rectangle.pyx":49
+ *     """
+ *     cdef cnp.ndarray[cnp.float64_t, ndim=2] bp_f64 = (
  *         np.ascontiguousarray(bp_location, dtype=np.float64)             # <<<<<<<<<<<<<<
  *     )
  *     cdef cnp.ndarray[cnp.float64_t, ndim=2] roi_f64 = (
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 91, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 49, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_ascontiguousarray); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 91, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_ascontiguousarray); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 49, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 91, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 49, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 91, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 49, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_t_6 = 1;
@@ -4934,45 +4920,45 @@ static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_insid
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_2, ((PyObject *)__pyx_v_bp_location)};
-    __pyx_t_3 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 91, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 49, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_5, __pyx_t_3, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 91, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_5, __pyx_t_3, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 49, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_4, __pyx_callargs+__pyx_t_6, (2-__pyx_t_6) | (__pyx_t_6*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_3);
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 91, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 49, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
-  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 91, __pyx_L1_error)
+  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 49, __pyx_L1_error)
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_1), &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
-      __pyx_v_bp_loc_f64 = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 90, __pyx_L1_error)
-    } else {__pyx_pybuffernd_bp_loc_f64.diminfo[0].strides = __pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_bp_loc_f64.diminfo[0].shape = __pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_bp_loc_f64.diminfo[1].strides = __pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_bp_loc_f64.diminfo[1].shape = __pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer.shape[1];
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_bp_f64.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_1), &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
+      __pyx_v_bp_f64 = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_bp_f64.rcbuffer->pybuffer.buf = NULL;
+      __PYX_ERR(0, 48, __pyx_L1_error)
+    } else {__pyx_pybuffernd_bp_f64.diminfo[0].strides = __pyx_pybuffernd_bp_f64.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_bp_f64.diminfo[0].shape = __pyx_pybuffernd_bp_f64.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_bp_f64.diminfo[1].strides = __pyx_pybuffernd_bp_f64.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_bp_f64.diminfo[1].shape = __pyx_pybuffernd_bp_f64.rcbuffer->pybuffer.shape[1];
     }
   }
-  __pyx_v_bp_loc_f64 = ((PyArrayObject *)__pyx_t_1);
+  __pyx_v_bp_f64 = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "mufasa/_native/inside_polygon.pyx":94
+  /* "mufasa/_native/inside_rectangle.pyx":52
  *     )
  *     cdef cnp.ndarray[cnp.float64_t, ndim=2] roi_f64 = (
  *         np.ascontiguousarray(roi_coords, dtype=np.float64)             # <<<<<<<<<<<<<<
  *     )
- *     cdef Py_ssize_t n_frames = bp_loc_f64.shape[0]
+ *     cdef Py_ssize_t n_frames = bp_f64.shape[0]
 */
   __pyx_t_4 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 94, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 52, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_ascontiguousarray); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 94, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_ascontiguousarray); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 52, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 94, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 52, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 94, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_float64); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 52, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_t_6 = 1;
@@ -4989,73 +4975,64 @@ static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_insid
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_4, ((PyObject *)__pyx_v_roi_coords)};
-    __pyx_t_3 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 94, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 52, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_3, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 94, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_2, __pyx_t_3, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 52, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_5, __pyx_callargs+__pyx_t_6, (2-__pyx_t_6) | (__pyx_t_6*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_3);
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 94, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 52, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
-  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 94, __pyx_L1_error)
+  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 52, __pyx_L1_error)
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_roi_f64.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_1), &__Pyx_TypeInfo_nn___pyx_t_5numpy_float64_t, PyBUF_FORMAT| PyBUF_STRIDES, 2, 0, __pyx_stack) == -1)) {
       __pyx_v_roi_f64 = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 93, __pyx_L1_error)
+      __PYX_ERR(0, 51, __pyx_L1_error)
     } else {__pyx_pybuffernd_roi_f64.diminfo[0].strides = __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_roi_f64.diminfo[0].shape = __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_roi_f64.diminfo[1].strides = __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_roi_f64.diminfo[1].shape = __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.shape[1];
     }
   }
   __pyx_v_roi_f64 = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "mufasa/_native/inside_polygon.pyx":96
+  /* "mufasa/_native/inside_rectangle.pyx":54
  *         np.ascontiguousarray(roi_coords, dtype=np.float64)
  *     )
- *     cdef Py_ssize_t n_frames = bp_loc_f64.shape[0]             # <<<<<<<<<<<<<<
- *     cdef Py_ssize_t n_poly = roi_f64.shape[0]
- * 
+ *     cdef Py_ssize_t n_frames = bp_f64.shape[0]             # <<<<<<<<<<<<<<
+ *     # Match the numba version's output dtype: it uses np.full with no
+ *     # dtype kwarg, which defaults to float64 when fill is 0  but the
 */
-  __pyx_v_n_frames = (__pyx_f_5numpy_7ndarray_5shape_shape(((PyArrayObject *)__pyx_v_bp_loc_f64))[0]);
+  __pyx_v_n_frames = (__pyx_f_5numpy_7ndarray_5shape_shape(((PyArrayObject *)__pyx_v_bp_f64))[0]);
 
-  /* "mufasa/_native/inside_polygon.pyx":97
- *     )
- *     cdef Py_ssize_t n_frames = bp_loc_f64.shape[0]
- *     cdef Py_ssize_t n_poly = roi_f64.shape[0]             # <<<<<<<<<<<<<<
- * 
- *     cdef cnp.ndarray[cnp.int64_t, ndim=1] results = np.zeros(
-*/
-  __pyx_v_n_poly = (__pyx_f_5numpy_7ndarray_5shape_shape(((PyArrayObject *)__pyx_v_roi_f64))[0]);
-
-  /* "mufasa/_native/inside_polygon.pyx":99
- *     cdef Py_ssize_t n_poly = roi_f64.shape[0]
- * 
+  /* "mufasa/_native/inside_rectangle.pyx":59
+ *     # downstream consumer treats it as int. Use int64 to match numpy's
+ *     # default integer type.
  *     cdef cnp.ndarray[cnp.int64_t, ndim=1] results = np.zeros(             # <<<<<<<<<<<<<<
  *         n_frames, dtype=np.int64,
  *     )
 */
   __pyx_t_5 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 99, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 59, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 99, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_zeros); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 59, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "mufasa/_native/inside_polygon.pyx":100
- * 
+  /* "mufasa/_native/inside_rectangle.pyx":60
+ *     # default integer type.
  *     cdef cnp.ndarray[cnp.int64_t, ndim=1] results = np.zeros(
  *         n_frames, dtype=np.int64,             # <<<<<<<<<<<<<<
  *     )
- * 
+ *     cdef double tlx = roi_f64[0, 0]
 */
-  __pyx_t_3 = PyLong_FromSsize_t(__pyx_v_n_frames); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 100, __pyx_L1_error)
+  __pyx_t_3 = PyLong_FromSsize_t(__pyx_v_n_frames); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 60, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 100, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_np); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 60, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_int64); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 100, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_int64); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 60, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
   __pyx_t_6 = 1;
@@ -5072,318 +5049,169 @@ static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_insid
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 1 : 0)] = {__pyx_t_5, __pyx_t_3};
-    __pyx_t_4 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 99, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_MakeVectorcallBuilderKwds(1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 59, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_7, __pyx_t_4, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 99, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_dtype, __pyx_t_7, __pyx_t_4, __pyx_callargs+2, 0) < (0)) __PYX_ERR(0, 59, __pyx_L1_error)
     __pyx_t_1 = __Pyx_Object_Vectorcall_CallFromBuilder((PyObject*)__pyx_t_2, __pyx_callargs+__pyx_t_6, (2-__pyx_t_6) | (__pyx_t_6*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_4);
     __Pyx_XDECREF(__pyx_t_5); __pyx_t_5 = 0;
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 99, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 59, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
 
-  /* "mufasa/_native/inside_polygon.pyx":99
- *     cdef Py_ssize_t n_poly = roi_f64.shape[0]
- * 
+  /* "mufasa/_native/inside_rectangle.pyx":59
+ *     # downstream consumer treats it as int. Use int64 to match numpy's
+ *     # default integer type.
  *     cdef cnp.ndarray[cnp.int64_t, ndim=1] results = np.zeros(             # <<<<<<<<<<<<<<
  *         n_frames, dtype=np.int64,
  *     )
 */
-  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 99, __pyx_L1_error)
+  if (!(likely(((__pyx_t_1) == Py_None) || likely(__Pyx_TypeTest(__pyx_t_1, __pyx_mstate_global->__pyx_ptype_5numpy_ndarray))))) __PYX_ERR(0, 59, __pyx_L1_error)
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
     if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_results.rcbuffer->pybuffer, (PyObject*)((PyArrayObject *)__pyx_t_1), &__Pyx_TypeInfo_nn___pyx_t_5numpy_int64_t, PyBUF_FORMAT| PyBUF_STRIDES| PyBUF_WRITABLE, 1, 0, __pyx_stack) == -1)) {
       __pyx_v_results = ((PyArrayObject *)Py_None); __Pyx_INCREF(Py_None); __pyx_pybuffernd_results.rcbuffer->pybuffer.buf = NULL;
-      __PYX_ERR(0, 99, __pyx_L1_error)
+      __PYX_ERR(0, 59, __pyx_L1_error)
     } else {__pyx_pybuffernd_results.diminfo[0].strides = __pyx_pybuffernd_results.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_results.diminfo[0].shape = __pyx_pybuffernd_results.rcbuffer->pybuffer.shape[0];
     }
   }
   __pyx_v_results = ((PyArrayObject *)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "mufasa/_native/inside_polygon.pyx":107
- *     cdef bint inside
+  /* "mufasa/_native/inside_rectangle.pyx":62
+ *         n_frames, dtype=np.int64,
+ *     )
+ *     cdef double tlx = roi_f64[0, 0]             # <<<<<<<<<<<<<<
+ *     cdef double tly = roi_f64[0, 1]
+ *     cdef double brx = roi_f64[1, 0]
+*/
+  __pyx_t_8 = 0;
+  __pyx_t_9 = 0;
+  __pyx_v_tlx = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf, __pyx_t_8, __pyx_pybuffernd_roi_f64.diminfo[0].strides, __pyx_t_9, __pyx_pybuffernd_roi_f64.diminfo[1].strides));
+
+  /* "mufasa/_native/inside_rectangle.pyx":63
+ *     )
+ *     cdef double tlx = roi_f64[0, 0]
+ *     cdef double tly = roi_f64[0, 1]             # <<<<<<<<<<<<<<
+ *     cdef double brx = roi_f64[1, 0]
+ *     cdef double bry = roi_f64[1, 1]
+*/
+  __pyx_t_9 = 0;
+  __pyx_t_8 = 1;
+  __pyx_v_tly = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_roi_f64.diminfo[0].strides, __pyx_t_8, __pyx_pybuffernd_roi_f64.diminfo[1].strides));
+
+  /* "mufasa/_native/inside_rectangle.pyx":64
+ *     cdef double tlx = roi_f64[0, 0]
+ *     cdef double tly = roi_f64[0, 1]
+ *     cdef double brx = roi_f64[1, 0]             # <<<<<<<<<<<<<<
+ *     cdef double bry = roi_f64[1, 1]
+ *     cdef Py_ssize_t i
+*/
+  __pyx_t_8 = 1;
+  __pyx_t_9 = 0;
+  __pyx_v_brx = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf, __pyx_t_8, __pyx_pybuffernd_roi_f64.diminfo[0].strides, __pyx_t_9, __pyx_pybuffernd_roi_f64.diminfo[1].strides));
+
+  /* "mufasa/_native/inside_rectangle.pyx":65
+ *     cdef double tly = roi_f64[0, 1]
+ *     cdef double brx = roi_f64[1, 0]
+ *     cdef double bry = roi_f64[1, 1]             # <<<<<<<<<<<<<<
+ *     cdef Py_ssize_t i
+ *     cdef double x, y
+*/
+  __pyx_t_9 = 1;
+  __pyx_t_8 = 1;
+  __pyx_v_bry = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_roi_f64.diminfo[0].strides, __pyx_t_8, __pyx_pybuffernd_roi_f64.diminfo[1].strides));
+
+  /* "mufasa/_native/inside_rectangle.pyx":69
+ *     cdef double x, y
  * 
  *     for i in range(n_frames):             # <<<<<<<<<<<<<<
- *         x = bp_loc_f64[i, 0]
- *         y = bp_loc_f64[i, 1]
+ *         x = bp_f64[i, 0]
+ *         y = bp_f64[i, 1]
 */
-  __pyx_t_8 = __pyx_v_n_frames;
-  __pyx_t_9 = __pyx_t_8;
-  for (__pyx_t_10 = 0; __pyx_t_10 < __pyx_t_9; __pyx_t_10+=1) {
-    __pyx_v_i = __pyx_t_10;
+  __pyx_t_10 = __pyx_v_n_frames;
+  __pyx_t_11 = __pyx_t_10;
+  for (__pyx_t_12 = 0; __pyx_t_12 < __pyx_t_11; __pyx_t_12+=1) {
+    __pyx_v_i = __pyx_t_12;
 
-    /* "mufasa/_native/inside_polygon.pyx":108
+    /* "mufasa/_native/inside_rectangle.pyx":70
  * 
  *     for i in range(n_frames):
- *         x = bp_loc_f64[i, 0]             # <<<<<<<<<<<<<<
- *         y = bp_loc_f64[i, 1]
- *         p1x = roi_f64[0, 0]
+ *         x = bp_f64[i, 0]             # <<<<<<<<<<<<<<
+ *         y = bp_f64[i, 1]
+ *         if x >= tlx and x <= brx and y >= tly and y <= bry:
 */
-    __pyx_t_11 = __pyx_v_i;
-    __pyx_t_12 = 0;
-    __pyx_v_x = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_bp_loc_f64.diminfo[0].strides, __pyx_t_12, __pyx_pybuffernd_bp_loc_f64.diminfo[1].strides));
+    __pyx_t_8 = __pyx_v_i;
+    __pyx_t_9 = 0;
+    __pyx_v_x = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_bp_f64.rcbuffer->pybuffer.buf, __pyx_t_8, __pyx_pybuffernd_bp_f64.diminfo[0].strides, __pyx_t_9, __pyx_pybuffernd_bp_f64.diminfo[1].strides));
 
-    /* "mufasa/_native/inside_polygon.pyx":109
+    /* "mufasa/_native/inside_rectangle.pyx":71
  *     for i in range(n_frames):
- *         x = bp_loc_f64[i, 0]
- *         y = bp_loc_f64[i, 1]             # <<<<<<<<<<<<<<
- *         p1x = roi_f64[0, 0]
- *         p1y = roi_f64[0, 1]
-*/
-    __pyx_t_12 = __pyx_v_i;
-    __pyx_t_11 = 1;
-    __pyx_v_y = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer.buf, __pyx_t_12, __pyx_pybuffernd_bp_loc_f64.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_bp_loc_f64.diminfo[1].strides));
-
-    /* "mufasa/_native/inside_polygon.pyx":110
- *         x = bp_loc_f64[i, 0]
- *         y = bp_loc_f64[i, 1]
- *         p1x = roi_f64[0, 0]             # <<<<<<<<<<<<<<
- *         p1y = roi_f64[0, 1]
- *         xints = 0.0
-*/
-    __pyx_t_11 = 0;
-    __pyx_t_12 = 0;
-    __pyx_v_p1x = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_roi_f64.diminfo[0].strides, __pyx_t_12, __pyx_pybuffernd_roi_f64.diminfo[1].strides));
-
-    /* "mufasa/_native/inside_polygon.pyx":111
- *         y = bp_loc_f64[i, 1]
- *         p1x = roi_f64[0, 0]
- *         p1y = roi_f64[0, 1]             # <<<<<<<<<<<<<<
- *         xints = 0.0
- *         inside = False
-*/
-    __pyx_t_12 = 0;
-    __pyx_t_11 = 1;
-    __pyx_v_p1y = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf, __pyx_t_12, __pyx_pybuffernd_roi_f64.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_roi_f64.diminfo[1].strides));
-
-    /* "mufasa/_native/inside_polygon.pyx":112
- *         p1x = roi_f64[0, 0]
- *         p1y = roi_f64[0, 1]
- *         xints = 0.0             # <<<<<<<<<<<<<<
- *         inside = False
- *         # The numba version iterates j in range(n+1)  i.e. loops
-*/
-    __pyx_v_xints = 0.0;
-
-    /* "mufasa/_native/inside_polygon.pyx":113
- *         p1y = roi_f64[0, 1]
- *         xints = 0.0
- *         inside = False             # <<<<<<<<<<<<<<
- *         # The numba version iterates j in range(n+1)  i.e. loops
- *         # one past the last vertex, indexing modulo n. Mirror that
-*/
-    __pyx_v_inside = 0;
-
-    /* "mufasa/_native/inside_polygon.pyx":117
- *         # one past the last vertex, indexing modulo n. Mirror that
- *         # exactly to preserve byte-equivalence.
- *         for j in range(n_poly + 1):             # <<<<<<<<<<<<<<
- *             p2x = roi_f64[j % n_poly, 0]
- *             p2y = roi_f64[j % n_poly, 1]
-*/
-    __pyx_t_13 = (__pyx_v_n_poly + 1);
-    __pyx_t_14 = __pyx_t_13;
-    for (__pyx_t_15 = 0; __pyx_t_15 < __pyx_t_14; __pyx_t_15+=1) {
-      __pyx_v_j = __pyx_t_15;
-
-      /* "mufasa/_native/inside_polygon.pyx":118
- *         # exactly to preserve byte-equivalence.
- *         for j in range(n_poly + 1):
- *             p2x = roi_f64[j % n_poly, 0]             # <<<<<<<<<<<<<<
- *             p2y = roi_f64[j % n_poly, 1]
- *             if (y > min(p1y, p2y)) and (y <= max(p1y, p2y)) and (x <= max(p1x, p2x)):
-*/
-      __pyx_t_11 = (__pyx_v_j % __pyx_v_n_poly);
-      __pyx_t_12 = 0;
-      __pyx_v_p2x = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_roi_f64.diminfo[0].strides, __pyx_t_12, __pyx_pybuffernd_roi_f64.diminfo[1].strides));
-
-      /* "mufasa/_native/inside_polygon.pyx":119
- *         for j in range(n_poly + 1):
- *             p2x = roi_f64[j % n_poly, 0]
- *             p2y = roi_f64[j % n_poly, 1]             # <<<<<<<<<<<<<<
- *             if (y > min(p1y, p2y)) and (y <= max(p1y, p2y)) and (x <= max(p1x, p2x)):
- *                 if p1y != p2y:
-*/
-      __pyx_t_12 = (__pyx_v_j % __pyx_v_n_poly);
-      __pyx_t_11 = 1;
-      __pyx_v_p2y = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_roi_f64.rcbuffer->pybuffer.buf, __pyx_t_12, __pyx_pybuffernd_roi_f64.diminfo[0].strides, __pyx_t_11, __pyx_pybuffernd_roi_f64.diminfo[1].strides));
-
-      /* "mufasa/_native/inside_polygon.pyx":120
- *             p2x = roi_f64[j % n_poly, 0]
- *             p2y = roi_f64[j % n_poly, 1]
- *             if (y > min(p1y, p2y)) and (y <= max(p1y, p2y)) and (x <= max(p1x, p2x)):             # <<<<<<<<<<<<<<
- *                 if p1y != p2y:
- *                     xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-*/
-      __pyx_t_17 = __pyx_v_p2y;
-      __pyx_t_18 = __pyx_v_p1y;
-      __pyx_t_20 = (__pyx_t_17 < __pyx_t_18);
-      if (__pyx_t_20) {
-        __pyx_t_19 = __pyx_t_17;
-      } else {
-        __pyx_t_19 = __pyx_t_18;
-      }
-      __pyx_t_20 = (__pyx_v_y > __pyx_t_19);
-      if (__pyx_t_20) {
-      } else {
-        __pyx_t_16 = __pyx_t_20;
-        goto __pyx_L8_bool_binop_done;
-      }
-      __pyx_t_19 = __pyx_v_p2y;
-      __pyx_t_17 = __pyx_v_p1y;
-      __pyx_t_20 = (__pyx_t_19 > __pyx_t_17);
-      if (__pyx_t_20) {
-        __pyx_t_18 = __pyx_t_19;
-      } else {
-        __pyx_t_18 = __pyx_t_17;
-      }
-      __pyx_t_20 = (__pyx_v_y <= __pyx_t_18);
-      if (__pyx_t_20) {
-      } else {
-        __pyx_t_16 = __pyx_t_20;
-        goto __pyx_L8_bool_binop_done;
-      }
-      __pyx_t_18 = __pyx_v_p2x;
-      __pyx_t_19 = __pyx_v_p1x;
-      __pyx_t_20 = (__pyx_t_18 > __pyx_t_19);
-      if (__pyx_t_20) {
-        __pyx_t_17 = __pyx_t_18;
-      } else {
-        __pyx_t_17 = __pyx_t_19;
-      }
-      __pyx_t_20 = (__pyx_v_x <= __pyx_t_17);
-      __pyx_t_16 = __pyx_t_20;
-      __pyx_L8_bool_binop_done:;
-      if (__pyx_t_16) {
-
-        /* "mufasa/_native/inside_polygon.pyx":121
- *             p2y = roi_f64[j % n_poly, 1]
- *             if (y > min(p1y, p2y)) and (y <= max(p1y, p2y)) and (x <= max(p1x, p2x)):
- *                 if p1y != p2y:             # <<<<<<<<<<<<<<
- *                     xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
- *                 if p1x == p2x or x <= xints:
-*/
-        __pyx_t_16 = (__pyx_v_p1y != __pyx_v_p2y);
-        if (__pyx_t_16) {
-
-          /* "mufasa/_native/inside_polygon.pyx":122
- *             if (y > min(p1y, p2y)) and (y <= max(p1y, p2y)) and (x <= max(p1x, p2x)):
- *                 if p1y != p2y:
- *                     xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x             # <<<<<<<<<<<<<<
- *                 if p1x == p2x or x <= xints:
- *                     inside = not inside
-*/
-          __pyx_v_xints = ((((__pyx_v_y - __pyx_v_p1y) * (__pyx_v_p2x - __pyx_v_p1x)) / (__pyx_v_p2y - __pyx_v_p1y)) + __pyx_v_p1x);
-
-          /* "mufasa/_native/inside_polygon.pyx":121
- *             p2y = roi_f64[j % n_poly, 1]
- *             if (y > min(p1y, p2y)) and (y <= max(p1y, p2y)) and (x <= max(p1x, p2x)):
- *                 if p1y != p2y:             # <<<<<<<<<<<<<<
- *                     xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
- *                 if p1x == p2x or x <= xints:
-*/
-        }
-
-        /* "mufasa/_native/inside_polygon.pyx":123
- *                 if p1y != p2y:
- *                     xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
- *                 if p1x == p2x or x <= xints:             # <<<<<<<<<<<<<<
- *                     inside = not inside
- *             p1x = p2x
-*/
-        __pyx_t_20 = (__pyx_v_p1x == __pyx_v_p2x);
-        if (!__pyx_t_20) {
-        } else {
-          __pyx_t_16 = __pyx_t_20;
-          goto __pyx_L13_bool_binop_done;
-        }
-        __pyx_t_20 = (__pyx_v_x <= __pyx_v_xints);
-        __pyx_t_16 = __pyx_t_20;
-        __pyx_L13_bool_binop_done:;
-        if (__pyx_t_16) {
-
-          /* "mufasa/_native/inside_polygon.pyx":124
- *                     xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
- *                 if p1x == p2x or x <= xints:
- *                     inside = not inside             # <<<<<<<<<<<<<<
- *             p1x = p2x
- *             p1y = p2y
-*/
-          __pyx_v_inside = (!__pyx_v_inside);
-
-          /* "mufasa/_native/inside_polygon.pyx":123
- *                 if p1y != p2y:
- *                     xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
- *                 if p1x == p2x or x <= xints:             # <<<<<<<<<<<<<<
- *                     inside = not inside
- *             p1x = p2x
-*/
-        }
-
-        /* "mufasa/_native/inside_polygon.pyx":120
- *             p2x = roi_f64[j % n_poly, 0]
- *             p2y = roi_f64[j % n_poly, 1]
- *             if (y > min(p1y, p2y)) and (y <= max(p1y, p2y)) and (x <= max(p1x, p2x)):             # <<<<<<<<<<<<<<
- *                 if p1y != p2y:
- *                     xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-*/
-      }
-
-      /* "mufasa/_native/inside_polygon.pyx":125
- *                 if p1x == p2x or x <= xints:
- *                     inside = not inside
- *             p1x = p2x             # <<<<<<<<<<<<<<
- *             p1y = p2y
- *         if inside:
-*/
-      __pyx_v_p1x = __pyx_v_p2x;
-
-      /* "mufasa/_native/inside_polygon.pyx":126
- *                     inside = not inside
- *             p1x = p2x
- *             p1y = p2y             # <<<<<<<<<<<<<<
- *         if inside:
+ *         x = bp_f64[i, 0]
+ *         y = bp_f64[i, 1]             # <<<<<<<<<<<<<<
+ *         if x >= tlx and x <= brx and y >= tly and y <= bry:
  *             results[i] = 1
 */
-      __pyx_v_p1y = __pyx_v_p2y;
-    }
+    __pyx_t_9 = __pyx_v_i;
+    __pyx_t_8 = 1;
+    __pyx_v_y = (*__Pyx_BufPtrStrided2d(__pyx_t_5numpy_float64_t *, __pyx_pybuffernd_bp_f64.rcbuffer->pybuffer.buf, __pyx_t_9, __pyx_pybuffernd_bp_f64.diminfo[0].strides, __pyx_t_8, __pyx_pybuffernd_bp_f64.diminfo[1].strides));
 
-    /* "mufasa/_native/inside_polygon.pyx":127
- *             p1x = p2x
- *             p1y = p2y
- *         if inside:             # <<<<<<<<<<<<<<
+    /* "mufasa/_native/inside_rectangle.pyx":72
+ *         x = bp_f64[i, 0]
+ *         y = bp_f64[i, 1]
+ *         if x >= tlx and x <= brx and y >= tly and y <= bry:             # <<<<<<<<<<<<<<
  *             results[i] = 1
- * 
-*/
-    if (__pyx_v_inside) {
-
-      /* "mufasa/_native/inside_polygon.pyx":128
- *             p1y = p2y
- *         if inside:
- *             results[i] = 1             # <<<<<<<<<<<<<<
- * 
  *     return results
 */
-      __pyx_t_11 = __pyx_v_i;
-      *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_results.rcbuffer->pybuffer.buf, __pyx_t_11, __pyx_pybuffernd_results.diminfo[0].strides) = 1;
+    __pyx_t_14 = (__pyx_v_x >= __pyx_v_tlx);
+    if (__pyx_t_14) {
+    } else {
+      __pyx_t_13 = __pyx_t_14;
+      goto __pyx_L6_bool_binop_done;
+    }
+    __pyx_t_14 = (__pyx_v_x <= __pyx_v_brx);
+    if (__pyx_t_14) {
+    } else {
+      __pyx_t_13 = __pyx_t_14;
+      goto __pyx_L6_bool_binop_done;
+    }
+    __pyx_t_14 = (__pyx_v_y >= __pyx_v_tly);
+    if (__pyx_t_14) {
+    } else {
+      __pyx_t_13 = __pyx_t_14;
+      goto __pyx_L6_bool_binop_done;
+    }
+    __pyx_t_14 = (__pyx_v_y <= __pyx_v_bry);
+    __pyx_t_13 = __pyx_t_14;
+    __pyx_L6_bool_binop_done:;
+    if (__pyx_t_13) {
 
-      /* "mufasa/_native/inside_polygon.pyx":127
- *             p1x = p2x
- *             p1y = p2y
- *         if inside:             # <<<<<<<<<<<<<<
- *             results[i] = 1
+      /* "mufasa/_native/inside_rectangle.pyx":73
+ *         y = bp_f64[i, 1]
+ *         if x >= tlx and x <= brx and y >= tly and y <= bry:
+ *             results[i] = 1             # <<<<<<<<<<<<<<
+ *     return results
  * 
+*/
+      __pyx_t_8 = __pyx_v_i;
+      *__Pyx_BufPtrStrided1d(__pyx_t_5numpy_int64_t *, __pyx_pybuffernd_results.rcbuffer->pybuffer.buf, __pyx_t_8, __pyx_pybuffernd_results.diminfo[0].strides) = 1;
+
+      /* "mufasa/_native/inside_rectangle.pyx":72
+ *         x = bp_f64[i, 0]
+ *         y = bp_f64[i, 1]
+ *         if x >= tlx and x <= brx and y >= tly and y <= bry:             # <<<<<<<<<<<<<<
+ *             results[i] = 1
+ *     return results
 */
     }
   }
 
-  /* "mufasa/_native/inside_polygon.pyx":130
+  /* "mufasa/_native/inside_rectangle.pyx":74
+ *         if x >= tlx and x <= brx and y >= tly and y <= bry:
  *             results[i] = 1
- * 
  *     return results             # <<<<<<<<<<<<<<
  * 
  * 
@@ -5393,12 +5221,12 @@ static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_insid
   __pyx_r = ((PyArrayObject *)__pyx_v_results);
   goto __pyx_L0;
 
-  /* "mufasa/_native/inside_polygon.pyx":68
+  /* "mufasa/_native/inside_rectangle.pyx":36
  * 
  * 
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.wraparound(False)
- * @cython.cdivision(True)
+ * def framewise_inside_rectangle_roi(
 */
 
   /* function exit code */
@@ -5413,19 +5241,19 @@ static PyArrayObject *__pyx_pf_6mufasa_7_native_14inside_polygon_framewise_insid
     __Pyx_PyThreadState_declare
     __Pyx_PyThreadState_assign
     __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer);
+    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_bp_f64.rcbuffer->pybuffer);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_results.rcbuffer->pybuffer);
     __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_roi_f64.rcbuffer->pybuffer);
   __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
-  __Pyx_AddTraceback("mufasa._native.inside_polygon.framewise_inside_polygon_roi", __pyx_clineno, __pyx_lineno, __pyx_filename);
+  __Pyx_AddTraceback("mufasa._native.inside_rectangle.framewise_inside_rectangle_roi", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   goto __pyx_L2;
   __pyx_L0:;
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_bp_loc_f64.rcbuffer->pybuffer);
+  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_bp_f64.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_results.rcbuffer->pybuffer);
   __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_roi_f64.rcbuffer->pybuffer);
   __pyx_L2:;
-  __Pyx_XDECREF((PyObject *)__pyx_v_bp_loc_f64);
+  __Pyx_XDECREF((PyObject *)__pyx_v_bp_f64);
   __Pyx_XDECREF((PyObject *)__pyx_v_roi_f64);
   __Pyx_XDECREF((PyObject *)__pyx_v_results);
   __Pyx_XGIVEREF((PyObject *)__pyx_r);
@@ -5675,10 +5503,10 @@ static int __Pyx_modinit_function_import_code(__pyx_mstatetype *__pyx_mstate) {
 
 #if CYTHON_PEP489_MULTI_PHASE_INIT
 static PyObject* __pyx_pymod_create(PyObject *spec, PyModuleDef *def); /*proto*/
-static int __pyx_pymod_exec_inside_polygon(PyObject* module); /*proto*/
+static int __pyx_pymod_exec_inside_rectangle(PyObject* module); /*proto*/
 static PyModuleDef_Slot __pyx_moduledef_slots[] = {
   {Py_mod_create, (void*)__pyx_pymod_create},
-  {Py_mod_exec, (void*)__pyx_pymod_exec_inside_polygon},
+  {Py_mod_exec, (void*)__pyx_pymod_exec_inside_rectangle},
   #if CYTHON_COMPILING_IN_CPYTHON_FREETHREADING
   {Py_mod_gil, __Pyx_FREETHREADING_COMPATIBLE},
   #endif
@@ -5697,8 +5525,8 @@ namespace {
   #endif
   {
       PyModuleDef_HEAD_INIT,
-      "inside_polygon",
-      __pyx_k_mufasa__native_inside_polygon_C, /* m_doc */
+      "inside_rectangle",
+      __pyx_k_mufasa__native_inside_rectangle, /* m_doc */
     #if CYTHON_USE_MODULE_STATE
       sizeof(__pyx_mstatetype), /* m_size */
     #else
@@ -5735,8 +5563,8 @@ namespace {
   #endif
 #endif
 
-__Pyx_PyMODINIT_FUNC PyInit_inside_polygon(void) CYTHON_SMALL_CODE; /*proto*/
-__Pyx_PyMODINIT_FUNC PyInit_inside_polygon(void)
+__Pyx_PyMODINIT_FUNC PyInit_inside_rectangle(void) CYTHON_SMALL_CODE; /*proto*/
+__Pyx_PyMODINIT_FUNC PyInit_inside_rectangle(void)
 #if CYTHON_PEP489_MULTI_PHASE_INIT
 {
   return PyModuleDef_Init(&__pyx_moduledef);
@@ -5843,7 +5671,7 @@ bad:
 }
 
 
-static CYTHON_SMALL_CODE int __pyx_pymod_exec_inside_polygon(PyObject *__pyx_pyinit_module)
+static CYTHON_SMALL_CODE int __pyx_pymod_exec_inside_rectangle(PyObject *__pyx_pyinit_module)
 #endif
 {
   int stringtab_initialized = 0;
@@ -5861,7 +5689,7 @@ static CYTHON_SMALL_CODE int __pyx_pymod_exec_inside_polygon(PyObject *__pyx_pyi
   #if CYTHON_PEP489_MULTI_PHASE_INIT
   if (__pyx_m) {
     if (__pyx_m == __pyx_pyinit_module) return 0;
-    PyErr_SetString(PyExc_RuntimeError, "Module 'inside_polygon' has already been imported. Re-initialisation is not supported.");
+    PyErr_SetString(PyExc_RuntimeError, "Module 'inside_rectangle' has already been imported. Re-initialisation is not supported.");
     return -1;
   }
   #else
@@ -5877,7 +5705,7 @@ static CYTHON_SMALL_CODE int __pyx_pymod_exec_inside_polygon(PyObject *__pyx_pyi
   #if CYTHON_USE_MODULE_STATE
   {
     int add_module_result = __Pyx_State_AddModule(__pyx_t_1, &__pyx_moduledef);
-    __pyx_t_1 = 0; /* transfer ownership from __pyx_t_1 to "inside_polygon" pseudovariable */
+    __pyx_t_1 = 0; /* transfer ownership from __pyx_t_1 to "inside_rectangle" pseudovariable */
     if (unlikely((add_module_result < 0))) __PYX_ERR(0, 1, __pyx_L1_error)
     pystate_addmodule_run = 1;
   }
@@ -5905,7 +5733,7 @@ static CYTHON_SMALL_CODE int __pyx_pymod_exec_inside_polygon(PyObject *__pyx_pyi
   }
   #endif
   
-__Pyx_RefNannySetupContext("PyInit_inside_polygon", 0);
+__Pyx_RefNannySetupContext("PyInit_inside_rectangle", 0);
   __Pyx_init_runtime_version();
   if (__Pyx_check_binary_version(__PYX_LIMITED_VERSION_HEX, __Pyx_get_runtime_version(), CYTHON_COMPILING_IN_LIMITED_API) < (0)) __PYX_ERR(0, 1, __pyx_L1_error)
   __pyx_mstate->__pyx_empty_tuple = PyTuple_New(0); if (unlikely(!__pyx_mstate->__pyx_empty_tuple)) __PYX_ERR(0, 1, __pyx_L1_error)
@@ -5916,13 +5744,13 @@ __Pyx_RefNannySetupContext("PyInit_inside_polygon", 0);
   if (__Pyx_InitConstants(__pyx_mstate) < (0)) __PYX_ERR(0, 1, __pyx_L1_error)
   stringtab_initialized = 1;
   if (__Pyx_InitGlobals() < (0)) __PYX_ERR(0, 1, __pyx_L1_error)
-  if (__pyx_module_is_main_mufasa___native__inside_polygon) {
+  if (__pyx_module_is_main_mufasa___native__inside_rectangle) {
     if (PyObject_SetAttr(__pyx_m, __pyx_mstate_global->__pyx_n_u_name, __pyx_mstate_global->__pyx_n_u_main) < (0)) __PYX_ERR(0, 1, __pyx_L1_error)
   }
   {
     PyObject *modules = PyImport_GetModuleDict(); if (unlikely(!modules)) __PYX_ERR(0, 1, __pyx_L1_error)
-    if (!PyDict_GetItemString(modules, "mufasa._native.inside_polygon")) {
-      if (unlikely((PyDict_SetItemString(modules, "mufasa._native.inside_polygon", __pyx_m) < 0))) __PYX_ERR(0, 1, __pyx_L1_error)
+    if (!PyDict_GetItemString(modules, "mufasa._native.inside_rectangle")) {
+      if (unlikely((PyDict_SetItemString(modules, "mufasa._native.inside_rectangle", __pyx_m) < 0))) __PYX_ERR(0, 1, __pyx_L1_error)
     }
   }
   /*--- Builtin init code ---*/
@@ -5940,50 +5768,50 @@ __Pyx_RefNannySetupContext("PyInit_inside_polygon", 0);
   (void)__Pyx_modinit_function_import_code(__pyx_mstate);
   /*--- Execution code ---*/
 
-  /* "mufasa/_native/inside_polygon.pyx":55
- *     which matters for parallelization (no more spawn cost).
+  /* "mufasa/_native/inside_rectangle.pyx":30
+ * overlap and the difference is negligible.
  * """
  * import numpy as np             # <<<<<<<<<<<<<<
  * 
  * cimport cython
 */
-  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_numpy, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 55, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_Import(__pyx_mstate_global->__pyx_n_u_numpy, 0, 0, NULL, 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 30, __pyx_L1_error)
   __pyx_t_2 = __pyx_t_1;
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_np, __pyx_t_2) < (0)) __PYX_ERR(0, 55, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_np, __pyx_t_2) < (0)) __PYX_ERR(0, 30, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "mufasa/_native/inside_polygon.pyx":68
+  /* "mufasa/_native/inside_rectangle.pyx":36
  * 
  * 
  * @cython.boundscheck(False)             # <<<<<<<<<<<<<<
  * @cython.wraparound(False)
- * @cython.cdivision(True)
+ * def framewise_inside_rectangle_roi(
 */
-  __pyx_t_2 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 68, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 36, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_kp_u_cnp_ndarray) < (0)) __PYX_ERR(0, 68, __pyx_L1_error)
-  __pyx_t_3 = __Pyx_CyFunction_New(&__pyx_mdef_6mufasa_7_native_14inside_polygon_1framewise_inside_polygon_roi, 0, __pyx_mstate_global->__pyx_n_u_framewise_inside_polygon_roi, NULL, __pyx_mstate_global->__pyx_n_u_mufasa__native_inside_polygon, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 68, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_2, __pyx_mstate_global->__pyx_n_u_return, __pyx_mstate_global->__pyx_kp_u_cnp_ndarray) < (0)) __PYX_ERR(0, 36, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_CyFunction_New(&__pyx_mdef_6mufasa_7_native_16inside_rectangle_1framewise_inside_rectangle_roi, 0, __pyx_mstate_global->__pyx_n_u_framewise_inside_rectangle_roi, NULL, __pyx_mstate_global->__pyx_n_u_mufasa__native_inside_rectangle_2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[0])); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 36, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   #if CYTHON_COMPILING_IN_CPYTHON && PY_VERSION_HEX >= 0x030E0000
   PyUnstable_Object_EnableDeferredRefcount(__pyx_t_3);
   #endif
   __Pyx_CyFunction_SetAnnotationsDict(__pyx_t_3, __pyx_t_2);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_framewise_inside_polygon_roi, __pyx_t_3) < (0)) __PYX_ERR(0, 68, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_framewise_inside_rectangle_roi, __pyx_t_3) < (0)) __PYX_ERR(0, 36, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "mufasa/_native/inside_polygon.pyx":133
+  /* "mufasa/_native/inside_rectangle.pyx":77
  * 
  * 
- * __all__ = ["framewise_inside_polygon_roi"]             # <<<<<<<<<<<<<<
+ * __all__ = ["framewise_inside_rectangle_roi"]             # <<<<<<<<<<<<<<
 */
-  __pyx_t_3 = __Pyx_PyList_Pack(1, __pyx_mstate_global->__pyx_n_u_framewise_inside_polygon_roi); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 133, __pyx_L1_error)
+  __pyx_t_3 = __Pyx_PyList_Pack(1, __pyx_mstate_global->__pyx_n_u_framewise_inside_rectangle_roi); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_all, __pyx_t_3) < (0)) __PYX_ERR(0, 133, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_all, __pyx_t_3) < (0)) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-  /* "mufasa/_native/inside_polygon.pyx":1
+  /* "mufasa/_native/inside_rectangle.pyx":1
  * # cython: language_level=3             # <<<<<<<<<<<<<<
  * # cython: boundscheck=False
  * # cython: wraparound=False
@@ -6001,7 +5829,7 @@ __Pyx_RefNannySetupContext("PyInit_inside_polygon", 0);
   __Pyx_XDECREF(__pyx_t_3);
   if (__pyx_m) {
     if (__pyx_mstate->__pyx_d && stringtab_initialized) {
-      __Pyx_AddTraceback("init mufasa._native.inside_polygon", __pyx_clineno, __pyx_lineno, __pyx_filename);
+      __Pyx_AddTraceback("init mufasa._native.inside_rectangle", __pyx_clineno, __pyx_lineno, __pyx_filename);
     }
     #if !CYTHON_USE_MODULE_STATE
     Py_CLEAR(__pyx_m);
@@ -6015,7 +5843,7 @@ __Pyx_RefNannySetupContext("PyInit_inside_polygon", 0);
     }
     #endif
   } else if (!PyErr_Occurred()) {
-    PyErr_SetString(PyExc_ImportError, "init mufasa._native.inside_polygon");
+    PyErr_SetString(PyExc_ImportError, "init mufasa._native.inside_rectangle");
   }
   __pyx_L0:;
   __Pyx_RefNannyFinishContext();
@@ -6054,31 +5882,31 @@ static int __Pyx_InitCachedConstants(__pyx_mstatetype *__pyx_mstate) {
 static int __Pyx_InitConstants(__pyx_mstatetype *__pyx_mstate) {
   CYTHON_UNUSED_VAR(__pyx_mstate);
   {
-    const struct { const unsigned int length: 9; } index[] = {{1},{179},{8},{11},{33},{39},{34},{20},{7},{17},{18},{10},{11},{18},{5},{7},{28},{8},{1},{6},{5},{13},{5},{1},{8},{10},{29},{8},{6},{8},{2},{5},{3},{3},{3},{3},{3},{12},{7},{6},{10},{7},{12},{10},{8},{6},{1},{5},{1},{5},{323}};
-    #if (CYTHON_COMPRESS_STRINGS) == 2 /* compression: bz2 (780 bytes) */
-const char* const cstring = "BZh91AY&SY\261\r\"\220\000\000_\377\377\367\377\177\006\367\203\277\300\2771w\206\277\377\377\360@@@@@@@@@@@@@\000@\000@\002|V)F0\324\322\236\224~\2424\364\t\266\210j22\000\321\241\246\231\030\324\364\214\215\r\0004\323L\310\324\032 \233D\323\"&\323\322\247\210\215\036\221\247\250\0002\000\000\000\000\000\036\241\301\243F\201\240\320\0311\001\221\241\220\000\032i\220\000\000\301\000\006\246\203SPzM2\2314\3012\003@4\000\000\000\r\000\032i\2042N}\321\367\356Z\267i6\3562\370\276A\302\361\313T1`h@Z\360\010\003\304f\020\221\206\244\205\002\204\243\201,\237\201\201\204\031}4CD/\033T'\212\201\360\353\026\354\327\263\261\347oW\333\365\241\353\246\257u\261b\353\234\244\232\016D\310\212\200\"\230H\236X\026\031f\262\202\254:\001\361*\022\027`J\013i\002 <HB\rk\266\373@H\327Y\206H\230m\326F\232\016\032QKT\235D\350E$\nw\273\326\240\360\225&i6:@6_HIO\212\365\313\227ia\025\"\304)\002@maU1\334\300\360G\205\223\337\344\322\304BPQ\221\203\254n~R\341\373\253w\337\375\201<r4rrJ\333\004q\320e\206\250\335}-\025\264\266\213l\251x\305\213\201\223Es\032\224y\202\240\227\201\232\260\301!\t#\n\212\255\305\214\344.\376[}Y\256:\201\341B\213l*\"l\240\265>\311\234\326\345 \260\351\256\300\215|\343P4%\177p\332\242 \232#\004\205R,\320\352\210\237\224 \010\246\034\204\316\265\014@.M1m\301\213b,d\322\315\271\354nm \321\024\326\346\224\324\353\014N\260\305\314i\200UB\243UX\300k\030C\263PYT\334\2679\032\345\035,Z\315,2\204\030\370:\323&2\t#\311Q\003(\245\314 \024\372)Ij\014\n\232\301\340RB\344$\004\203v)K\205aJ\224D\332\241\314&\334\002\246C\032\365tr\344\300*EalX\372%\313\233\036\202\204cfU\266\016P[\204\026\254\030\321\030\210\201rC<\tn#\nd\267@[\021W\341\212rs\314\303\246\351\256\300/|N\340\320\343\021p\t\026\271#k\235\302\226\270\007\343\030>Kn\026\0253\345\211Rw\232B\230QT\372Yx\362\233\025\017\010\214Hed\3064<p\326\321\322l\366\373\305\367\005\313\301\321\341]\357#x\220\301\360B\\\361\220z\345\023E`X\203\203\210.\243/\034\037\344a\037a\202\310,b\312\035\375\347z5\211\317\346p=5\364\367g\301\004""\312Xs\t]\224$\320N\315\326\244U\255\326:6\351\316\245\004\030\306}\327\332\344!\244\031\237]kJ\331@\315\204a\204j\301\376.\344\212p\241!b\032E ";
-    PyObject *data = __Pyx_DecompressString(cstring, 780, 2);
+    const struct { const unsigned int length: 8; } index[] = {{1},{179},{8},{11},{35},{39},{34},{20},{7},{17},{18},{6},{11},{3},{3},{18},{5},{7},{30},{8},{1},{5},{13},{5},{8},{10},{31},{8},{8},{2},{5},{3},{12},{7},{6},{10},{7},{12},{10},{8},{3},{3},{6},{1},{1},{5},{204}};
+    #if (CYTHON_COMPRESS_STRINGS) == 2 /* compression: bz2 (683 bytes) */
+const char* const cstring = "BZh91AY&SY\233\342\252\221\000\000E\377\373\367\375=\004\375\203\277@\277!\177\006\277\377\377\360@@@@@@@@@@@\000@\000@\002\035]\306\326k\203T5\032i=4\003\325\032bi\246&&@i\200\233I\211\200\324d\362\233'\251\247\225\006\2214mC S\3044&CA\240\000\000\000\000\000\r\032\rS\311\244\365M\244\332\241\220dd\003\321\0004\006FM\000\031\r\001\240\304\032\236\242\031S\364\032I\352~\251\3524\000\000\000\000i\240\000\000\365\017P\311#\0327\275\376Ew.\022\203[Q\\\311t\367X\020\244\213\241\301f\022 \223\371\022\230)J\300<\220\246\247\234\262\347\263Oy\356\346\260\204eI\276\004\030\000\3140E\025IU\373\022/Ji\312\"m\372i^(\364\226r>\310Q\311\2162\222-\360[\003*\365\344\331\343\276\027d\277y\242g\230'\007G\233\255J\021\200\375Ea\031\204L&\014\251N\374\277\177?8\212\231P'\007\005\224)\254m\n&#\010\317\233\035Ad\204 \003\020\014\217\223\214~/+\303\366\002|_\261!f\317\034\261\006\342R.C}\2636\274\202\027J\340\255@\226[\007U\t\212\372QP\232\027\350\002\246(\220\201h\007\322U\323\003\245;D\330#\275]\353R!u!)\250\232\354D\252\214\300\300\241)\373\235\267\026\341\206\232k\341h~f\304\3348\220\230j\242\254!b\221x\022\025\212t%\002\3168\016\010\215\006\212\247\260\210\033\210&pF$\306\t\362\246\213\351B3]\016,\246\300P\306C}\344\340MG\211\\j\024\216%&\242 qD\024\210\241\314r\337\n\301)\212R\204\261\213b\334P\240)d\305\360\200\334\327<\200\250\205\266\031]tB\016\004\200\220\3531Q$\252\016.\350\205\342R\030Bim\3175!,&\023\305+\023d\343r%>b\222@\220^\205\330\026\221\"\024b\027\023J\236\rhiAd\311\370` o\3276)\321\2419\362*A\021\220W\243\3314\014\270\246\2268hR\013$\221\000\311\0366\306\363\321a0\271\204\346\327\035\255!Sj\226\024\364\026d\316N\204\310\310\223dh\270\264;C\t\347\226X\223\027[>\201\2049t\317\373\215\255~\245\363\211\321\274\007m3\370\033\024\300\341\304r\001\337P\037{6S\366\241\005\346R\370\313\270s\243\312\343\201\000V5\261\036{=\342\020!\321\376.\344\212p\241!7\305U\"";
+    PyObject *data = __Pyx_DecompressString(cstring, 683, 2);
     if (unlikely(!data)) __PYX_ERR(0, 1, __pyx_L1_error)
     const char* const bytes = __Pyx_PyBytes_AsString(data);
     #if !CYTHON_ASSUME_SAFE_MACROS
     if (likely(bytes)); else { Py_DECREF(data); __PYX_ERR(0, 1, __pyx_L1_error) }
     #endif
-    #elif (CYTHON_COMPRESS_STRINGS) != 0 /* compression: zlib (685 bytes) */
-const char* const cstring = "x\332e\221?O\333@\030\306\223(\241\201\246\210\004\350T\324\013ja\252QhJ\273U@\203\324\016\210\242\322.\255N\027\373\234\034\265\357\314\335\031b\246\216\031=\336\350\321\243G\306\214\214\0353\362\021\362\021\372:\241\010\204%\237\237\273\373\275\377\036\177<\024\232\"\335'\032\355G\272/8b\n9\324c]*\211\246^\204\224\226\314\326T\346\020GG\235\2437\355\017mD\270\203$=\245\266VH\205]\333#JQ\205\204\213\272!\3634\343HG\001U\026\372\354\242H\204\210S\352 -P\000\334\375\000\335\247\034)\252s\2016\t\347B\023\315\004\307\020\316xo\0239LB\021vN\363\350\003\342)j\021\307\301\300Q\233\007\026w\210\224$\362C\227(\262\2059\311\321-\306\025s(\016\204\027\365\004\267\202h\300C?\210,l\013I-?\204\006\247a\310%\314\2335\306\374@H}\037\013}\242\373\217\010\214\217\242\001\274\237\300\024|H\007\372\230\272\030\023\317\203E\331\202k\326\013E\250\246\351\211\212\270\315\204\005\351D\010\236P\325\r\260'l\354\356\264gj:\253\355\301\025f0\263$6\355\022\373\267\223\233\347z\202\350\235\266+\211O/\230\312\211\373Sa)\030\306n\310m\214\331\354\212q\3401S\370\256 \323\324W\247\030\373\004\322\303\343\013'\364(|\247~Y\267~Y\0173s<\255\251\370\364\000\003\344C\010\017\246\346\004\255A\320\212\202\355A\260\035\005\"\300\370,$\336\214\220T\201\263JR\035J\236wg\013!\035\225+\030\030c\370\315\267\271@9\324%@c\254\251\202\365\234x!U\203\001\214\240\242K*\205\372S\234\324\nsO&\250P\231\033W\027\376.\2740\273\346W\272\221\225\262\346M\271rw\3643}\236\312\254~S~i.A\236e\305qy\315\374H\016\322f\332\272)\267\263\275\314\275\332\035W\033\361\206)\231\346d\261P\231\037V\206'q3n\215\253\265\341\227\230\304\3124\037\310\305a/\376\032\333\246\376@.\305\305q\265\036\327'\325\302\374\263a'^\005\374\302t\223\342\270\326\2107M\335\254\233=\323O\310\243\355R\\\202\342\025\363=y\227\226\322\315l\025:\352\214\032\243\367\327\257\257\317\306K\313q{Zve\315\034\033\231\254&v\272\222\036\247a\266\237\351\253\355\253\223\321\372h\367?\365\312\330I#y\013Y\201\376\226\324\363Z\315\331R}:l\215k\313q+\356\030\260\003v\377\000""\3452\200\213";
-    PyObject *data = __Pyx_DecompressString(cstring, 685, 1);
+    #elif (CYTHON_COMPRESS_STRINGS) != 0 /* compression: zlib (574 bytes) */
+const char* const cstring = "x\332\205Q=o\324@\020\rQ.\034I\204\024@\251\220\330\000J*\034\035\034\021\035\n\371\220h\242\020>*\320h\275\036\337-\254w\235\375\010g*\312+]\272\274\322\245K~\006\345\225\371\t\371\t\214/Q\224@\201%\317>\255\337{3\363\374\372\320xd~\310=\333-\374\320h&\035KP\311\030-\367\250\n\346\274\225\302\243mI\232\035\355\037=\353\277\3523\256\023f\361+\n\357\230\013\261P\3349t\314\244,\016Ry\251\231/rt\021{\233\262\302\004\246\021\023\346\r\313\211w]\340\207\250\231C\337\002\266\311\2656\236{i4\220\\\352\301&K\244\245&\362\024[\365\001W\016#\236$@<\024:\217t\302\255\345E\026R\356\370\026h\336R\267\244v2Ah\225\\\017\024Fy1\322!\313\213\010\204\261\030e\201F\234\tY\312\245\272\030Mf\271\261\376:-d\334\017\377a\000\034\025#z\367(\0268\304\221?\306\024\200+E\305\t\243\275\034\004\023\334\314\236\273B\013i\"\2623\201RA\027\347\220n\367\251*#f\233\306v\024\333B(\372\010\222\366\266\\`\314\305\267\244\r0U\206\373\355~jy\206\337\245k\03177\003k$@\032\264\000\220R\023\027\244\203\253v\322c\346\0002N\316\364d&\t\244\201\213\270\242\313\270\242\277M5\314\032\222P\323A5\237\245\222\233\034\340$puqk\321Q\214\316\242\017V\267c\010cl\342ZD\033\002\320_\275\324\023J0\345\304\006\360\350\332\252F^\025\247\\\005t\243\342\007Z\343~\336:_\232[\274}~w\256\2638\355.\375^zX\355T_\352\215f\276Y?[\350\\]}\256\327j\333\254\236-<\252N'\237\352^\275C\272\316\313\346M\223\376\332\231v\357\225\033\325|E\212\265rP\275\253\304du\372?x\336\235\353\334\031w\306\037\313\365\2627\355\256\214\017\010\274(\371\r\270<~>~_.\224{\344\376\244\3720y09\236\270\372i\2354\217\233\335\346d\272r\277\354\225\373\025\371.\217{\177\000\267\202J\321";
+    PyObject *data = __Pyx_DecompressString(cstring, 574, 1);
     if (unlikely(!data)) __PYX_ERR(0, 1, __pyx_L1_error)
     const char* const bytes = __Pyx_PyBytes_AsString(data);
     #if !CYTHON_ASSUME_SAFE_MACROS
     if (likely(bytes)); else { Py_DECREF(data); __PYX_ERR(0, 1, __pyx_L1_error) }
     #endif
-    #else /* compression: none (989 bytes) */
-const char* const bytes = "?Note that Cython is deliberately stricter than PEP-484 and rejects subclasses of builtin types. If you need to pass subclasses then set the 'annotation_typing' directive to False.add_notecnp.ndarraymufasa/_native/inside_polygon.pyxnumpy._core.multiarray failed to importnumpy._core.umath failed to import__Pyx_PyDict_NextRef__all__ascontiguousarrayasyncio.coroutinesbp_loc_f64bp_locationcline_in_tracebackdtypefloat64framewise_inside_polygon_roi__func__iinsideint64_is_coroutineitemsj__main____module__mufasa._native.inside_polygonn_framesn_poly__name__npnumpyp1xp1yp2xp2ypop__qualname__resultsreturnroi_coordsroi_f64__set_name__setdefault__test__valuesxxintsyzeros\200\001\360\014\000\006\007\360 \000\005\006\330\010\n\320\n\034\230A\230]\250&\260\002\260!\340\004\005\330\010\n\320\n\034\230A\230\\\250\026\250r\260\021\340\004\037\230z\250\026\250q\260\001\330\004\035\230W\240F\250!\2501\340\0044\260B\260f\270A\330\010\022\220&\230\002\230!\360\016\000\005\t\210\005\210U\220!\2201\330\010\014\210J\220a\220s\230!\330\010\014\210J\220a\220s\230!\330\010\016\210g\220Q\220c\230\021\330\010\016\210g\220Q\220c\230\021\330\010\020\220\001\330\010\021\220\021\360\010\000\t\r\210E\220\025\220a\220w\230b\240\001\330\014\022\220'\230\021\230\"\230B\230h\240a\330\014\022\220'\230\021\230\"\230B\230h\240a\330\014\020\220\002\220&\230\005\230V\2405\250\002\250'\260\025\260f\270E\300\022\3007\310%\310q\330\020\023\2204\220s\230!\330\024\035\230R\230r\240\025\240c\250\024\250R\250u\260C\260t\2702\270U\300\"\300A\330\020\023\2204\220s\230$\230c\240\022\2403\240a\330\024\035\230T\240\021\330\014\022\220!\330\014\022\220!\330\010\013\2101\330\014\023\2201\220E\230\021\340\004\013\2101";
+    #else /* compression: none (854 bytes) */
+const char* const bytes = "?Note that Cython is deliberately stricter than PEP-484 and rejects subclasses of builtin types. If you need to pass subclasses then set the 'annotation_typing' directive to False.add_notecnp.ndarraymufasa/_native/inside_rectangle.pyxnumpy._core.multiarray failed to importnumpy._core.umath failed to import__Pyx_PyDict_NextRef__all__ascontiguousarrayasyncio.coroutinesbp_f64bp_locationbrxbrycline_in_tracebackdtypefloat64framewise_inside_rectangle_roi__func__iint64_is_coroutineitems__main____module__mufasa._native.inside_rectanglen_frames__name__npnumpypop__qualname__resultsreturnroi_coordsroi_f64__set_name__setdefault__test__tlxtlyvaluesxyzeros\200\001\360\n\000\006\007\360\016\000\005\006\330\010\n\320\n\034\230A\230]\250&\260\002\260!\340\004\005\330\010\n\320\n\034\230A\230\\\250\026\250r\260\021\340\004\037\230v\240V\2501\250A\360\n\000\0055\260B\260f\270A\330\010\022\220&\230\002\230!\340\004\026\220g\230Q\230c\240\021\330\004\026\220g\230Q\230c\240\021\330\004\026\220g\230Q\230c\240\021\330\004\026\220g\230Q\230c\240\021\360\010\000\005\t\210\005\210U\220!\2201\330\010\014\210F\220!\2203\220a\330\010\014\210F\220!\2203\220a\330\010\013\2102\210S\220\004\220D\230\002\230#\230T\240\024\240R\240s\250$\250d\260\"\260C\260q\330\014\023\2201\220E\230\021\330\004\013\2101";
     PyObject *data = NULL;
     CYTHON_UNUSED_VAR(__Pyx_DecompressString);
     #endif
     PyObject **stringtab = __pyx_mstate->__pyx_string_tab;
     Py_ssize_t pos = 0;
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 46; i++) {
       Py_ssize_t bytes_length = index[i].length;
       PyObject *string = PyUnicode_DecodeUTF8(bytes + pos, bytes_length, NULL);
       if (likely(string) && i >= 7) PyUnicode_InternInPlace(&string);
@@ -6089,7 +5917,7 @@ const char* const bytes = "?Note that Cython is deliberately stricter than PEP-4
       stringtab[i] = string;
       pos += bytes_length;
     }
-    for (int i = 50; i < 51; i++) {
+    for (int i = 46; i < 47; i++) {
       Py_ssize_t bytes_length = index[i].length;
       PyObject *string = PyBytes_FromStringAndSize(bytes + pos, bytes_length);
       stringtab[i] = string;
@@ -6100,14 +5928,14 @@ const char* const bytes = "?Note that Cython is deliberately stricter than PEP-4
       }
     }
     Py_XDECREF(data);
-    for (Py_ssize_t i = 0; i < 51; i++) {
+    for (Py_ssize_t i = 0; i < 47; i++) {
       if (unlikely(PyObject_Hash(stringtab[i]) == -1)) {
         __PYX_ERR(0, 1, __pyx_L1_error)
       }
     }
     #if CYTHON_IMMORTAL_CONSTANTS
     {
-      PyObject **table = stringtab + 50;
+      PyObject **table = stringtab + 46;
       for (Py_ssize_t i=0; i<1; ++i) {
         #if CYTHON_COMPILING_IN_CPYTHON_FREETHREADING
         #if PY_VERSION_HEX < 0x030E0000
@@ -6134,9 +5962,9 @@ typedef struct {
     unsigned int argcount : 2;
     unsigned int num_posonly_args : 1;
     unsigned int num_kwonly_args : 1;
-    unsigned int nlocals : 5;
+    unsigned int nlocals : 4;
     unsigned int flags : 10;
-    unsigned int first_line : 7;
+    unsigned int first_line : 6;
 } __Pyx_PyCode_New_function_description;
 /* NewCodeObj.proto */
 static PyObject* __Pyx_PyCode_New(
@@ -6153,9 +5981,9 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
   PyObject* tuple_dedup_map = PyDict_New();
   if (unlikely(!tuple_dedup_map)) return -1;
   {
-    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 17, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 68};
-    PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_bp_location, __pyx_mstate->__pyx_n_u_roi_coords, __pyx_mstate->__pyx_n_u_bp_loc_f64, __pyx_mstate->__pyx_n_u_roi_f64, __pyx_mstate->__pyx_n_u_n_frames, __pyx_mstate->__pyx_n_u_n_poly, __pyx_mstate->__pyx_n_u_results, __pyx_mstate->__pyx_n_u_i, __pyx_mstate->__pyx_n_u_j, __pyx_mstate->__pyx_n_u_x, __pyx_mstate->__pyx_n_u_y, __pyx_mstate->__pyx_n_u_p1x, __pyx_mstate->__pyx_n_u_p1y, __pyx_mstate->__pyx_n_u_p2x, __pyx_mstate->__pyx_n_u_p2y, __pyx_mstate->__pyx_n_u_xints, __pyx_mstate->__pyx_n_u_inside};
-    __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_mufasa__native_inside_polygon_py, __pyx_mstate->__pyx_n_u_framewise_inside_polygon_roi, __pyx_mstate->__pyx_kp_b_iso88591_A_A_r_z_q_WF_1_4BfA_U_1_Jas_Jas, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
+    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 13, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 36};
+    PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_bp_location, __pyx_mstate->__pyx_n_u_roi_coords, __pyx_mstate->__pyx_n_u_bp_f64, __pyx_mstate->__pyx_n_u_roi_f64, __pyx_mstate->__pyx_n_u_n_frames, __pyx_mstate->__pyx_n_u_results, __pyx_mstate->__pyx_n_u_tlx, __pyx_mstate->__pyx_n_u_tly, __pyx_mstate->__pyx_n_u_brx, __pyx_mstate->__pyx_n_u_bry, __pyx_mstate->__pyx_n_u_i, __pyx_mstate->__pyx_n_u_x, __pyx_mstate->__pyx_n_u_y};
+    __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_mufasa__native_inside_rectangle_3, __pyx_mstate->__pyx_n_u_framewise_inside_rectangle_roi, __pyx_mstate->__pyx_kp_b_iso88591_A_A_r_vV1A_5BfA_gQc_gQc_gQc_gQc, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
   }
   Py_DECREF(tuple_dedup_map);
   return 0;
