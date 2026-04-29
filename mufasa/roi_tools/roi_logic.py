@@ -218,6 +218,17 @@ class ROILogic:
     def last_frame(self) -> None:
         self.goto_frame(self.frame_count - 1)
 
+    @property
+    def current_frame(self) -> Optional[np.ndarray]:
+        """The currently-displayed frame as a raw BGR ndarray (no
+        ROI overlays). Returns None if the frame couldn't be read.
+
+        Use this when the caller wants to render ROIs themselves
+        (e.g. the Qt canvas does its own painting). For the
+        OpenCV-rendered version with ROIs already burned in, see
+        :meth:`rendered_frame`."""
+        return self._cur_frame
+
     # ------------------------------------------------------------------ #
     # ROI state
     # ------------------------------------------------------------------ #
