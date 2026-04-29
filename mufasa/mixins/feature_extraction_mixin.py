@@ -361,19 +361,24 @@ class FeatureExtractionMixin(object):
         >>> FeatureExtractionMixin.framewise_inside_rectangle_roi(bp_location=bp_loc, roi_coords=roi_coords)
         >>> [0, 0, 0, 0, 0, 0]
         """
-        results = np.full((bp_location.shape[0]), 0)
-        within_x_idx = np.argwhere(
-            (bp_location[:, 0] <= roi_coords[1][0])
-            & (bp_location[:, 0] >= roi_coords[0][0])
-        ).flatten()
-        within_y_idx = np.argwhere(
-            (bp_location[:, 1] <= roi_coords[1][1])
-            & (bp_location[:, 1] >= roi_coords[0][1])
-        ).flatten()
-        for i in prange(within_x_idx.shape[0]):
-            match = np.argwhere(within_y_idx == within_x_idx[i])
-            if match.shape[0] > 0:
-                results[within_x_idx[i]] = 1
+        # Single-pass O(N) implementation. Pre-fix used two
+        # ``np.argwhere`` calls plus an inner ``np.argwhere(within_y
+        # == within_x[i])`` search per frame in within_x — O(N×M)
+        # in the worst case, where M ≈ min(|within_x_idx|, |within_y_idx|).
+        # For 50K-frame videos with most points inside the ROI, the
+        # inner search dominated the runtime even though the
+        # mathematical operation is conjunction of two boolean masks.
+        # Output is byte-identical to the previous version.
+        results = np.zeros(bp_location.shape[0], dtype=np.int64)
+        tlx = roi_coords[0][0]
+        tly = roi_coords[0][1]
+        brx = roi_coords[1][0]
+        bry = roi_coords[1][1]
+        for i in prange(bp_location.shape[0]):
+            x = bp_location[i, 0]
+            y = bp_location[i, 1]
+            if x >= tlx and x <= brx and y >= tly and y <= bry:
+                results[i] = 1
         return results
 
     @staticmethod
