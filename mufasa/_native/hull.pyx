@@ -194,19 +194,31 @@ cdef double _area(
     cnp.ndarray[cnp.float64_t, ndim=1] y,
 ):
     """Polygon area via the shoelace formula. Matches the numba
-    reference: 0.5 * |dot(x, np.roll(y, 1)) - dot(y, np.roll(x, 1))|."""
+    reference: 0.5 * |dot(x, np.roll(y, 1)) - dot(y, np.roll(x, 1))|.
+
+    Critical: with cdivision=True (set at module level), C's
+    ``%`` operator is sign-preserving — ``(-1) % n`` returns
+    ``-1``, NOT ``n - 1`` like Python's ``%``. Combined with
+    ``wraparound=False`` (also set at module level), reading
+    ``y[-1]`` would be undefined behavior. We update ``prev``
+    explicitly each iteration instead, starting it at ``n - 1``
+    so the first iteration reads the wrap element correctly.
+    Pre-fix code used ``prev = (i - 1) % n`` and produced
+    1e6-magnitude errors from out-of-bounds reads on i=0.
+    """
     cdef Py_ssize_t n = x.shape[0]
     cdef Py_ssize_t i, prev
     cdef double sum1 = 0.0
     cdef double sum2 = 0.0
     if n == 0:
         return 0.0
-    # np.roll(y, 1) shifts y right by 1: roll[i] = y[i - 1]
-    # so dot(x, roll(y, 1)) = sum_i x[i] * y[i-1]
+    # Start prev at n-1 so iteration 0 reads y[n-1] / x[n-1] for
+    # the wrap edge. Subsequent iterations advance prev to i-1.
+    prev = n - 1
     for i in range(n):
-        prev = (i - 1) % n
         sum1 += x[i] * y[prev]
         sum2 += y[i] * x[prev]
+        prev = i  # for next iteration, prev = current i
     return 0.5 * fabs(sum1 - sum2)
 
 
