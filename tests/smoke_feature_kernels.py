@@ -276,7 +276,44 @@ def main() -> int:
                 "process_one_video must take a file_path parameter"
             )
 
-    print("smoke_feature_kernels: 9/9 cases passed")
+    # ------------------------------------------------------------------ #
+    # Case 10 (step 5): FeatureFamily enum exists and its values
+    # match the legacy string constants exactly. This means external
+    # code passing the legacy strings into feature_families=[...]
+    # continues to work.
+    # ------------------------------------------------------------------ #
+    found_enum = False
+    for node in legacy_tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == "FeatureFamily":
+            found_enum = True
+            # Get all the enum member names
+            member_names = set()
+            for item in node.body:
+                if isinstance(item, ast.Assign):
+                    for tgt in item.targets:
+                        if isinstance(tgt, ast.Name):
+                            member_names.add(tgt.id)
+            # Each legacy string constant should have a matching
+            # enum member
+            expected_members = {
+                "TWO_POINT_BP_DISTANCES",
+                "WITHIN_ANIMAL_THREE_POINT_ANGLES",
+                "WITHIN_ANIMAL_THREE_POINT_HULL",
+                "WITHIN_ANIMAL_FOUR_POINT_HULL",
+                "ANIMAL_CONVEX_HULL_PERIMETER",
+                "ANIMAL_CONVEX_HULL_AREA",
+                "FRAME_BP_MOVEMENT",
+                "FRAME_BP_TO_ROI_CENTER",
+                "FRAME_BP_INSIDE_ROI",
+                "ARENA_EDGE",
+            }
+            missing = expected_members - member_names
+            assert not missing, (
+                f"FeatureFamily missing members: {missing}"
+            )
+    assert found_enum, "FeatureFamily class not found"
+
+    print("smoke_feature_kernels: 10/10 cases passed")
     return 0
 
 

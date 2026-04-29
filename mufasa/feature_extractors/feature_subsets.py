@@ -1,6 +1,7 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
+from enum import Enum
 from typing import List, Optional, Union
 
 import numpy as np
@@ -33,6 +34,10 @@ from mufasa.utils.read_write import (copy_files_in_directory,
 # define the public API for `feature_families` parameter values.
 
 SHAPE_TYPE = "Shape_type"
+
+# Feature family display strings. These are the public API — UI
+# code passes them as-is into `feature_families=[...]`. They appear
+# in saved CSV column suffixes and in user-facing log lines.
 TWO_POINT_BP_DISTANCES = 'TWO-POINT BODY-PART DISTANCES (MM)'
 WITHIN_ANIMAL_THREE_POINT_ANGLES = 'WITHIN-ANIMAL THREE-POINT BODY-PART ANGLES (DEGREES)'
 WITHIN_ANIMAL_THREE_POINT_HULL = "WITHIN-ANIMAL THREE-POINT CONVEX HULL PERIMETERS (MM)"
@@ -43,6 +48,41 @@ FRAME_BP_MOVEMENT = "FRAME-BY-FRAME BODY-PART MOVEMENTS (MM)"
 FRAME_BP_TO_ROI_CENTER = "FRAME-BY-FRAME BODY-PART DISTANCES TO ROI CENTERS (MM)"
 FRAME_BP_INSIDE_ROI = "FRAME-BY-FRAME BODY-PARTS INSIDE ROIS (BOOLEAN)"
 ARENA_EDGE = "BODY-PART DISTANCES TO VIDEO FRAME EDGE (MM)"
+
+
+class FeatureFamily(Enum):
+    """Enum form of the feature family identifiers.
+
+    The Enum's *value* is the public display string (matching the
+    legacy module-level constants like TWO_POINT_BP_DISTANCES).
+    This means:
+
+    - New code can use ``FeatureFamily.TWO_POINT_BP_DISTANCES`` for
+      type-safe references.
+    - Old code passing the string ``'TWO-POINT BODY-PART DISTANCES (MM)'``
+      still works — the string IS the enum's value, so
+      ``FeatureFamily('TWO-POINT BODY-PART DISTANCES (MM)')``
+      resolves cleanly. The UI code that builds feature_families
+      from string lists does not need to change.
+
+    - Internal dispatch in process_one_video can compare against
+      either form.
+
+    Intentionally NOT changing the public string constants — they're
+    imported by the UI forms and removing them would be a breaking
+    change with no compensating benefit.
+    """
+
+    TWO_POINT_BP_DISTANCES = TWO_POINT_BP_DISTANCES
+    WITHIN_ANIMAL_THREE_POINT_ANGLES = WITHIN_ANIMAL_THREE_POINT_ANGLES
+    WITHIN_ANIMAL_THREE_POINT_HULL = WITHIN_ANIMAL_THREE_POINT_HULL
+    WITHIN_ANIMAL_FOUR_POINT_HULL = WITHIN_ANIMAL_FOUR_POINT_HULL
+    ANIMAL_CONVEX_HULL_PERIMETER = ANIMAL_CONVEX_HULL_PERIMETER
+    ANIMAL_CONVEX_HULL_AREA = ANIMAL_CONVEX_HULL_AREA
+    FRAME_BP_MOVEMENT = FRAME_BP_MOVEMENT
+    FRAME_BP_TO_ROI_CENTER = FRAME_BP_TO_ROI_CENTER
+    FRAME_BP_INSIDE_ROI = FRAME_BP_INSIDE_ROI
+    ARENA_EDGE = ARENA_EDGE
 
 
 
