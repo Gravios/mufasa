@@ -468,41 +468,42 @@ class VideoInfoForm(OperationForm):
             )
             return
 
-        # The actual class is CalculatePixelDistanceTool from
-        # mufasa.video_processors.calculate_px_dist. Note the API:
-        # the OpenCV widget runs in __init__ (it calls
-        # choose_first_coordinate, choose_second_coordinate, and
-        # manipulate_choices internally), so by the time the
-        # constructor returns, the user has already drawn the line
-        # and `tool.ppm` is populated. There is NO separate .run()
-        # method — calling .run() on the instance raises
-        # AttributeError. (The existing Tools-menu helper in
-        # video_processing_page.py also gets this wrong, which is
-        # why the Tools menu's "Calibrate pixels/mm…" action has
-        # also been broken.)
+        # Use the native Qt PixelCalibrationDialog. Preferred over
+        # the OpenCV-based CalculatePixelDistanceTool because:
+        # - inline confirm/cancel via QDialogButtonBox (the OpenCV
+        #   widget had truncated instruction text on some displays
+        #   that hid the ESC-to-confirm hint)
+        # - live readouts of pixel distance and computed px/mm
+        # - explicit Reset button instead of double-click-to-move
+        # - no separate window competing for focus with the Qt host
         try:
-            from mufasa.video_processors.calculate_px_dist import (
-                CalculatePixelDistanceTool,
+            from mufasa.ui_qt.dialogs.pixel_calibration import (
+                PixelCalibrationDialog,
             )
         except ImportError as exc:
             QMessageBox.critical(
                 self, self.title,
-                f"Calibration backend unavailable: {exc}",
+                f"Calibration dialog unavailable: {exc}",
             )
             return
 
         try:
-            tool = CalculatePixelDistanceTool(
+            dlg = PixelCalibrationDialog(
                 video_path=video_path,
                 known_mm_distance=known_distance,
+                parent=self,
             )
-            ppm = float(getattr(tool, "ppm", 0))
-        except Exception as exc:
+        except RuntimeError as exc:
+            # First-frame read failure (corrupt / missing / codec)
             QMessageBox.critical(
                 self, self.title,
-                f"Calibration failed: {type(exc).__name__}: {exc}",
+                f"Could not load video frame: {exc}",
             )
             return
+
+        if dlg.exec() != dlg.Accepted:
+            return  # User cancelled
+        ppm = dlg.ppm or 0.0
 
         if ppm <= 0:
             QMessageBox.warning(
@@ -511,10 +512,25 @@ class VideoInfoForm(OperationForm):
                 "without two clicks?). Try again.",
             )
             return
-        # Write rounded value back to the cell
+        # Write rounded values back to BOTH cells. Previous bug:
+        # only px/mm was updated, so if the user edited the
+        # known-distance spinbox inside the dialog (e.g. realized
+        # the reference object was 150mm not 100mm), the table's
+        # Distance cell stayed at the old value while the px/mm
+        # cell reflected the new computation. Saving in that state
+        # would write inconsistent values to logs/video_info.csv.
         self.table.setItem(
             row, _COL_PX_PER_MM, QTableWidgetItem(f"{ppm:.4f}"),
         )
+        # Also update the Distance cell with whatever the dialog
+        # ended at — could be unchanged (the user didn't touch the
+        # spinbox) or different (the user adjusted mid-flow).
+        new_distance = getattr(dlg, "known_mm_distance", None)
+        if new_distance is not None:
+            self.table.setItem(
+                row, _COL_DISTANCE,
+                QTableWidgetItem(f"{float(new_distance):g}"),
+            )
 
     # --------------------------------------------------------------- #
     # Save
