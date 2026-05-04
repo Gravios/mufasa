@@ -109,7 +109,6 @@ dependencies = [
     "python-dotenv>=1.0",
     "trafaret>=2.1",
     "osfclient>=0.0.5",
-    "pyglet>=2.0",                    # used by lookups.load_simba_fonts
 ]
 
 [project.optional-dependencies]

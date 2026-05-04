@@ -23,7 +23,6 @@ except:
 import matplotlib.font_manager
 import pandas as pd
 import psutil
-import pyglet
 from matplotlib import cm
 from matplotlib.colors import hsv_to_rgb, rgb2hex
 from tabulate import tabulate
@@ -44,9 +43,18 @@ from mufasa.utils.read_write import (fetch_pip_data,
                                     get_fn_ext, get_video_meta_data, read_json)
 from mufasa.utils.warnings import NoDataFoundWarning
 
-if platform.system() == OS.WINDOWS.value:
-    from pyglet.libs.win32 import constants
-    constants.COINIT_MULTITHREADED = 0x2  # 0x2 = COINIT_APARTMENTTHREADED
+# Pre-fix this module imported pyglet at module level and set
+# pyglet.libs.win32.constants.COINIT_MULTITHREADED on Windows.
+# Both removed in the pyglet-removal patch:
+#   - The COINIT constant assignment was dead code: pyglet reads
+#     that constant only from its own COM-using paths (DirectShow
+#     video, etc.), none of which mufasa invokes
+#   - pyglet itself was used in a single place — load_simba_fonts
+#     (below) — that registered bundled TTF files into pyglet's
+#     internal font cache. But neither Tk nor Qt nor matplotlib
+#     nor cv2 reads from pyglet's cache, so the registration was
+#     a no-op for everything that actually renders text. See the
+#     stub docstring on load_simba_fonts for the post-fix behavior.
 
 
 RGBFloat = Tuple[float, float, float]
@@ -176,12 +184,39 @@ def get_icons_paths() -> Dict[str, Union[str, os.PathLike]]:
         icons[icon_name]["icon_path"] = icon_path
     return icons
 
-def load_simba_fonts():
-    """ Load fonts defined in mufasa.utils.enums.FontPaths into memory"""
-    simba_dir = os.path.dirname(mufasa.__file__)
-    font_enum = {i.name: i.value for i in FontPaths}
-    for k, v in font_enum.items():
-        pyglet.font.add_file(os.path.join(simba_dir, v))
+def load_simba_fonts() -> None:
+    """No-op kept for API compatibility with the legacy Tk launcher.
+
+    Originally registered the three TTF files in
+    :class:`mufasa.utils.enums.FontPaths` (Poppins Regular,
+    Poppins Bold, Playwrite ES Deco) into pyglet's internal font
+    cache via ``pyglet.font.add_file``.
+
+    Why it's a no-op now:
+
+    - **Tk** uses the platform's native font system (Xft on
+      Linux, GDI on Windows, Cocoa on macOS) for resolving font
+      tuples like ``('Poppins Regular', 13)``. It does NOT read
+      from pyglet's font cache. So even when this function ran
+      on Windows/macOS (it was never called on Linux), Tk fell
+      back to system defaults whenever a Poppins or Playwrite
+      face was requested. The bundled TTFs were dead weight.
+    - **Qt** has its own ``QFontDatabase`` for custom font
+      registration; pyglet's cache is irrelevant.
+    - **matplotlib** uses its own ``font_manager`` cache.
+    - **cv2** uses Hershey vector fonts internally for text
+      overlays.
+
+    Removing the pyglet-based registration eliminates the
+    ``pyglet>=2.0`` runtime dependency without changing any
+    visible behavior — Tk widgets that used to render as
+    Poppins are now rendering as Tk's default sans-serif, just
+    like they always actually were.
+
+    Callers (``mufasa.SimBA``) keep this name to avoid touching
+    legacy launcher code; the function is preserved as a stub.
+    """
+    return None
 
 def get_third_party_appender_file_formats() -> Dict[str, str]:
     """
