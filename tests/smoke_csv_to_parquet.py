@@ -139,17 +139,55 @@ def main() -> int:
         cfg.read(str(config_path))
         assert cfg["General settings"]["file_type"] == "csv"
 
+    # ------------------------------------------------------------------ #
+    # Case 1.5: _convert_one worker is at module top level (required
+    # for ProcessPoolExecutor pickling) and accepts a tuple
+    # ------------------------------------------------------------------ #
+    assert hasattr(csv_to_parquet, "_convert_one"), (
+        "_convert_one must exist at module level for ProcessPoolExecutor"
+    )
+    import inspect
+    sig = inspect.signature(csv_to_parquet._convert_one)
+    params = list(sig.parameters)
+    assert len(params) == 1, (
+        f"_convert_one should take a single tuple arg (got {params})"
+    )
+
+    # ------------------------------------------------------------------ #
+    # Case 1.6: convert_csv_to_parquet uses pyarrow.csv directly
+    # when available (fast path), with pandas fallback. We check
+    # this structurally since pyarrow may not be installed in
+    # sandbox.
+    # ------------------------------------------------------------------ #
+    import ast
+    src_csv2pq = Path("mufasa/tools/csv_to_parquet.py").read_text()
+    tree_csv2pq = ast.parse(src_csv2pq)
+    convert_fn = next(
+        n for n in tree_csv2pq.body
+        if isinstance(n, ast.FunctionDef) and n.name == "convert_csv_to_parquet"
+    )
+    convert_src = ast.unparse(convert_fn)
+    assert "pyarrow" in convert_src and "csv" in convert_src, (
+        "convert_csv_to_parquet should import pyarrow.csv for the "
+        "fast path"
+    )
+    assert "low_memory=False" in convert_src, (
+        "Pandas fallback should use low_memory=False to avoid the "
+        "DtypeWarning spam from chunked dtype inference"
+    )
+
     # The remaining cases all run the actual conversion. If no
     # parquet engine is available, skip them with a note (pyarrow
     # is in Mufasa's actual dependency chain — `read_df` uses it —
     # so on the user's workstation these will run).
     if not _has_parquet_engine():
         print(
-            "smoke_csv_to_parquet: 2/2 structural cases passed "
+            "smoke_csv_to_parquet: 4/4 structural cases passed "
             "(remaining cases need pyarrow/fastparquet — install for "
             "full coverage)"
         )
         return 0
+
 
     # ------------------------------------------------------------------ #
     # Case 3: actual run converts files, verifies, updates config,
