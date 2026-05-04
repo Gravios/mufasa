@@ -94,20 +94,37 @@ def main() -> int:
     # ------------------------------------------------------------------ #
     assert "_calibrate_row" in methods
     cal_src = ast.unparse(methods["_calibrate_row"])
-    assert "CalculatePixelDistanceTool" in cal_src, (
-        "Calibrate button should use the CalculatePixelDistanceTool "
-        "class from mufasa.video_processors.calculate_px_dist"
+    assert "PixelCalibrationDialog" in cal_src, (
+        "Calibrate button should use the native Qt "
+        "PixelCalibrationDialog from "
+        "mufasa.ui_qt.dialogs.pixel_calibration (replaces the "
+        "OpenCV CalculatePixelDistanceTool — see screenshot bug "
+        "report where the OpenCV widget had truncated instructions "
+        "and no clear way to confirm)"
     )
-    # The class's constructor blocks on the OpenCV widget; there's
-    # no separate .run() method (calling .run() raises AttributeError).
-    assert ".run()" not in cal_src, (
-        "CalculatePixelDistanceTool runs the OpenCV widget in its "
-        "constructor; do not call .run() on the instance"
+    # Dialog uses .exec() / Accepted, not .run()
+    assert ".exec()" in cal_src or "exec()" in cal_src, (
+        "Dialog should be invoked via exec()"
     )
-    # known_mm_distance is the actual constructor parameter name
-    # (NOT known_metric_mm — that was the legacy SimBA name)
+    # known_mm_distance is the constructor parameter name on the
+    # new dialog (preserved from the old API for compatibility
+    # with how the form was already calling it)
     assert "known_mm_distance" in cal_src, (
-        "Constructor takes 'known_mm_distance', not 'known_metric_mm'"
+        "Dialog constructor takes 'known_mm_distance'"
+    )
+    # Form must write back to BOTH columns: px/mm AND Distance.
+    # Previous bug: only px/mm was updated when the user edited
+    # the dialog's known-distance spinbox during calibration, so
+    # the table's Distance cell stayed stale and the saved CSV
+    # had inconsistent values (Distance × ppm ≠ pixel distance).
+    assert "_COL_PX_PER_MM" in cal_src, (
+        "Calibrate must update the px/mm cell"
+    )
+    assert "_COL_DISTANCE" in cal_src, (
+        "Calibrate must ALSO update the Distance cell — the user "
+        "may have edited the dialog's known-distance spinbox "
+        "during calibration. Writing back only px/mm leaves the "
+        "Distance cell stale and the row internally inconsistent."
     )
     assert "_COL_PX_PER_MM" in cal_src, (
         "Result should be written to the px/mm column"

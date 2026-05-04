@@ -95,41 +95,52 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # Case 5: form is calling the right thing — the actual import
-    # in the form must reference CalculatePixelDistanceTool, not the
-    # old GetPixelsPerMillimeterInterface name.
+    # Case 5: form is calling the new Qt dialog now (replaces the
+    # OpenCV-based CalculatePixelDistanceTool — see commentary in
+    # mufasa/ui_qt/dialogs/pixel_calibration.py for why). The form
+    # must NOT reference the legacy GetPixelsPerMillimeterInterface
+    # name OR the OpenCV CalculatePixelDistanceTool.
     # ------------------------------------------------------------------ #
     form_src = Path("mufasa/ui_qt/forms/video_info.py").read_text()
-    assert "CalculatePixelDistanceTool" in form_src, (
-        "Form must import CalculatePixelDistanceTool from "
-        "mufasa.video_processors.calculate_px_dist"
+    assert "PixelCalibrationDialog" in form_src, (
+        "Form must import PixelCalibrationDialog from "
+        "mufasa.ui_qt.dialogs.pixel_calibration"
     )
     assert "GetPixelsPerMillimeterInterface" not in form_src, (
         "Form must not reference the legacy "
-        "GetPixelsPerMillimeterInterface name (renamed when SimBA "
-        "→ Mufasa). Previous bug: the wrong name caused ImportError "
-        "at click time."
+        "GetPixelsPerMillimeterInterface name"
     )
-    # known_mm_distance, not known_metric_mm
-    assert "known_mm_distance" in form_src, (
-        "Form must pass known_mm_distance keyword (matches the "
-        "constructor signature)"
+    # No actual import/call of CalculatePixelDistanceTool — but a
+    # comment mentioning it for context is fine. Check via AST.
+    form_tree = ast.parse(form_src)
+    bad_imports = []
+    for node in ast.walk(form_tree):
+        if isinstance(node, ast.ImportFrom):
+            for alias in (node.names or []):
+                if alias.name == "CalculatePixelDistanceTool":
+                    bad_imports.append(ast.unparse(node))
+        elif isinstance(node, ast.Name) and node.id == "CalculatePixelDistanceTool":
+            # Reference to the name in code (not in a string/comment)
+            bad_imports.append(node.id)
+    assert not bad_imports, (
+        f"Form should use the Qt PixelCalibrationDialog instead "
+        f"of the OpenCV CalculatePixelDistanceTool. Found "
+        f"references in code: {bad_imports}"
     )
-    assert "known_metric_mm" not in form_src, (
-        "Form must not use the legacy known_metric_mm parameter name"
-    )
+    # known_mm_distance keyword preserved (Qt dialog uses the
+    # same name for API consistency)
+    assert "known_mm_distance" in form_src
 
     # ------------------------------------------------------------------ #
-    # Case 6: the Tools-menu helper in video_processing_page.py uses
-    # the same correct API (was also broken pre-fix, calling
-    # _pxd.run() which doesn't exist)
+    # Case 6: the Tools-menu helper in video_processing_page.py also
+    # uses the Qt dialog (was previously using CalculatePixelDistanceTool)
     # ------------------------------------------------------------------ #
     page_src = Path(
         "mufasa/ui_qt/pages/video_processing_page.py"
     ).read_text()
-    assert "CalculatePixelDistanceTool" in page_src, (
+    assert "PixelCalibrationDialog" in page_src, (
         "Tools-menu calibration helper must also use "
-        "CalculatePixelDistanceTool"
+        "PixelCalibrationDialog"
     )
     # No bare _pxd.run() *call* anywhere (was the original bug).
     # A comment mentioning the historical bug is fine; we check
@@ -148,8 +159,7 @@ def main() -> int:
                 bad_calls.append(ast.unparse(node))
     assert not bad_calls, (
         f"_pxd.run() doesn't exist as a module-level function in "
-        f"calculate_px_dist.py; use CalculatePixelDistanceTool(...) "
-        f"instead. Found: {bad_calls}"
+        f"calculate_px_dist.py. Found: {bad_calls}"
     )
 
     print("smoke_calibration_api: 6/6 cases passed")

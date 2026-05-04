@@ -177,54 +177,42 @@ def register_video_processing_menu_actions(workbench) -> None:
     def _pixels_per_mm() -> None:
         path = _pick_video("Pixels/mm — select a video")
         if not path: return
-        # The Tools-menu helper had been calling _pxd.run(video_path=...)
-        # but calculate_px_dist has no module-level run() function.
-        # The actual class is CalculatePixelDistanceTool whose
-        # constructor blocks on the OpenCV widget and exposes
-        # `tool.ppm` after the user clicks two points. Tools-menu
-        # invocation just shows the result; the per-video form on
-        # the Data Import page is where the value gets persisted
-        # to logs/video_info.csv.
+        # Tools-menu calibration helper. Uses the native Qt
+        # PixelCalibrationDialog (replaces the OpenCV-based
+        # CalculatePixelDistanceTool — see commentary in
+        # mufasa/ui_qt/dialogs/pixel_calibration.py for why).
+        # The dialog has its own known-mm spinbox; we pass a
+        # default of 100.0 since this Tools-menu action isn't
+        # bound to project state.
         try:
-            from mufasa.video_processors.calculate_px_dist import (
-                CalculatePixelDistanceTool,
+            from mufasa.ui_qt.dialogs.pixel_calibration import (
+                PixelCalibrationDialog,
             )
         except ImportError as exc:
             QMessageBox.critical(
                 workbench, "Pixels/mm",
-                f"Calibration backend not available: {exc}",
+                f"Calibration dialog unavailable: {exc}",
             )
-            return
-        # Need a known distance to compute px/mm. The Tools-menu
-        # action is just a one-off helper (not bound to any
-        # project state), so prompt for it. The Data Import form
-        # has a proper Distance (mm) cell; use that for repeatable
-        # work.
-        from PySide6.QtWidgets import QInputDialog
-        known_mm, ok = QInputDialog.getDouble(
-            workbench, "Pixels/mm — known distance",
-            "Enter the real-world reference distance in mm "
-            "(the length you'll click in the video frame):",
-            value=100.0, minValue=0.001, maxValue=100000.0, decimals=3,
-        )
-        if not ok:
             return
         try:
-            tool = CalculatePixelDistanceTool(
-                video_path=path, known_mm_distance=float(known_mm),
+            dlg = PixelCalibrationDialog(
+                video_path=path,
+                known_mm_distance=100.0,
+                parent=workbench,
             )
-            ppm = float(getattr(tool, "ppm", 0))
-        except Exception as exc:
+        except RuntimeError as exc:
             QMessageBox.critical(
                 workbench, "Pixels/mm",
-                f"Calibration failed: {type(exc).__name__}: {exc}",
+                f"Could not load video frame: {exc}",
             )
             return
+        if dlg.exec() != dlg.Accepted:
+            return
+        ppm = dlg.ppm or 0.0
         if ppm <= 0:
             QMessageBox.warning(
                 workbench, "Pixels/mm",
-                "No value derived (window closed without two "
-                "double-clicks?). Try again.",
+                "No value derived. Try again.",
             )
             return
         QMessageBox.information(
