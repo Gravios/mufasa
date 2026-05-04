@@ -123,62 +123,132 @@ def discover_files(project_folder: str) -> List[str]:
     return found
 
 
+def _detect_header_rows(csv_path: str, max_probe_lines: int = 10) -> int:
+    """Detect the number of non-numeric header rows in a CSV.
+
+    Mufasa's input_csv/ files preserve the DLC-style multi-row
+    header (typically 3 rows: scorer, bodypart, coord). Other
+    pipeline stages (outlier_corrected_*, features_extracted/,
+    targets_inserted/, machine_results/) write flat single-row
+    headers via pyarrow's csv.write_csv path.
+
+    Returns the row index where actual data starts. 1 means the
+    standard "first row is header" case (so 0-indexed line 0 is
+    the header). 3 means a 3-row multi-index header (rows 0-2
+    are headers, line 3 is first data).
+
+    Algorithm: read up to ``max_probe_lines`` lines, try to
+    parse each row's columns (after the first index column) as
+    float. The first row that's all-float marks the start of
+    data; the count of non-data rows above it is the header count.
+    """
+    import csv as _csv
+    header_count = 0
+    with open(csv_path, "r", newline="") as f:
+        reader = _csv.reader(f)
+        for i, row in enumerate(reader):
+            if i >= max_probe_lines:
+                break
+            if not row:
+                continue
+            # Skip the first column (Mufasa's index pad) when
+            # checking — it's expected to be either empty or a
+            # numeric row index.
+            data_cells = row[1:] if len(row) > 1 else row
+            try:
+                # If every cell parses as float, this is a data row.
+                for cell in data_cells:
+                    if cell == "" or cell.lower() == "nan":
+                        continue
+                    float(cell)
+                # All cells are numeric — this row is data.
+                return header_count
+            except ValueError:
+                # Non-numeric cell present — this is a header row.
+                header_count += 1
+    # If we didn't find a data row in the probe window, assume the
+    # standard flat header (1 row). The caller will likely catch
+    # any inconsistency at write/verify time.
+    return 1 if header_count == 0 else header_count
+
+
 def convert_csv_to_parquet(
     csv_path: str, parquet_path: Optional[str] = None,
     has_index: bool = True,
 ) -> Tuple[int, int]:
     """Convert a single CSV to parquet.
 
-    Uses pyarrow's CSV reader directly when available (5-10× faster
-    than pandas, no chunked dtype-inference issues that trigger the
-    DtypeWarning spam on Mufasa's CSVs). Falls back to pandas with
-    low_memory=False if pyarrow CSV is unavailable for some reason.
+    Auto-detects whether the CSV has a single-row header (the
+    standard Mufasa output for processed pipeline stages) or a
+    multi-row header (Mufasa's input_csv/ files preserve a 3-row
+    DLC-style header: scorer, bodypart, coord). The two paths
+    differ:
+
+    - Flat single-row header: use pyarrow.csv.read_csv → table →
+      parquet directly. Fastest path. Doesn't suffer from
+      pandas's chunked-inference DtypeWarning because pyarrow
+      uses per-column inference.
+
+    - Multi-row header: pandas read_csv with header=list(range(N))
+      to parse the multi-index, flatten by taking the LAST level
+      of the multi-index (which carries the bodypart_x / _y / _p
+      column names — the actual identifiers downstream code uses),
+      then write parquet via pandas. Slower per file but only
+      applies to the input_csv/ stage.
 
     :param has_index: True if the CSV has a leading unnamed
-        index column (pandas to_csv default). Mufasa writes with
-        this, so default True. With pyarrow, the index column is
-        loaded as a regular column and then dropped after read —
-        same end-state as pandas's index_col=0 path.
-    :return: (n_rows, n_cols) of the converted file. Caller can
-        compare against the original to verify.
+        index column. Mufasa writes with this, so default True.
+    :return: (n_rows, n_cols) of the converted file.
     """
     if parquet_path is None:
         parquet_path = str(Path(csv_path).with_suffix(".parquet"))
 
-    # Try pyarrow's native CSV reader first — much faster, and
-    # doesn't suffer from pandas's chunked-inference DtypeWarning.
-    try:
-        from pyarrow import csv as pa_csv
-        from pyarrow import parquet as pa_parquet
-        # ParseOptions/ConvertOptions defaults handle Mufasa's CSVs
-        # cleanly: comma delimiter, automatic type inference per
-        # COLUMN (not per chunk like pandas), null sentinels for
-        # empty cells.
-        table = pa_csv.read_csv(csv_path)
-        if has_index:
-            # Drop the leading index column ("Unnamed: 0" in pandas
-            # parlance, but pyarrow names it from whatever the empty
-            # header cell parses as — typically "" or the first
-            # column gets a synthetic name. The first column is
-            # always the index in Mufasa's output, so drop by
-            # position).
-            col_names = table.column_names
-            if col_names:
-                table = table.drop([col_names[0]])
-        pa_parquet.write_table(table, parquet_path)
-        return table.num_rows, table.num_columns
-    except ImportError:
-        pass
+    n_header_rows = _detect_header_rows(csv_path)
 
-    # Pandas fallback. low_memory=False loads the whole file into
-    # memory before inferring types — slower than chunked but
-    # produces consistent dtypes per column and silences the
-    # DtypeWarning. For 50K-row Mufasa files memory cost is fine.
+    if n_header_rows <= 1:
+        # Flat header — fast path via pyarrow.
+        try:
+            from pyarrow import csv as pa_csv
+            from pyarrow import parquet as pa_parquet
+            table = pa_csv.read_csv(csv_path)
+            if has_index:
+                col_names = table.column_names
+                if col_names:
+                    table = table.drop([col_names[0]])
+            pa_parquet.write_table(table, parquet_path)
+            return table.num_rows, table.num_columns
+        except ImportError:
+            pass
+        # Pandas fallback for single-row case
+        df = pd.read_csv(
+            csv_path,
+            index_col=0 if has_index else None,
+            low_memory=False,
+        )
+        df.to_parquet(parquet_path)
+        return len(df), len(df.columns)
+
+    # Multi-row header path. read_csv with header=[0,1,2] for
+    # 3-row case. Pandas builds a MultiIndex from those rows;
+    # we flatten by taking just the last level (the actual
+    # bodypart_x / _y / _p column names).
     df = pd.read_csv(
         csv_path,
         index_col=0 if has_index else None,
+        header=list(range(n_header_rows)),
         low_memory=False,
     )
+    # Flatten MultiIndex columns to just the last level. This
+    # matches what Mufasa's downstream code expects after read_df
+    # processes a multi-idx file (see read_df with check_multiindex
+    # in utils/read_write.py — it drops the header rows and
+    # essentially uses the column names from the bottom level).
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(-1)
+    # Coerce all numeric — multi-index files may have data
+    # parsed as object dtype if pandas saw the header rows
+    # ambiguously. Force-cast.
+    df = df.apply(pd.to_numeric, errors="coerce")
     df.to_parquet(parquet_path)
     return len(df), len(df.columns)
 
@@ -188,54 +258,58 @@ def verify_parquet(
 ) -> bool:
     """Read both files and check shape + column names match.
 
-    Uses pyarrow for the CSV header read (fast, no dtype issues),
-    parquet metadata for the row count (no full read), and a streamed
-    line count for the CSV row count. Total cost: well under a
-    second per file.
-    """
-    # Get CSV columns + row count without parsing values.
-    try:
-        from pyarrow import csv as pa_csv
-        # read_options=skip_rows would let us read just the header,
-        # but pyarrow doesn't expose a "header only" API. Fastest
-        # alternative: read with column_types={} and a tiny block_size
-        # — still parses the whole file but quickly. For verification
-        # we just want columns + row count, so use a streamed
-        # reader and stop after one block.
-        # Simpler: read the header line manually, then count rows.
-        with open(csv_path, "rb") as f:
-            header_bytes = f.readline()
-        header = header_bytes.decode("utf-8", errors="replace").rstrip("\r\n")
-        # Crude split on comma — Mufasa's CSVs don't use quoted
-        # field names with embedded commas, so this is safe. The
-        # important comparison is column NAMES match, not exact bytes.
-        csv_cols = header.split(",")
-        if has_index:
-            # First column in pandas-written CSV is the index slot
-            # (often empty header). Drop to align with parquet.
-            csv_cols = csv_cols[1:]
-    except Exception:
-        # Fall back to pandas
-        csv_df = pd.read_csv(
-            csv_path, index_col=0 if has_index else None, nrows=0,
-        )
-        csv_cols = list(csv_df.columns)
+    For multi-row-header CSVs (input_csv/ files), the column
+    names in the parquet are derived from the LAST row of the
+    multi-index header (matching convert_csv_to_parquet's
+    flattening). So we compare against the last header line of
+    the CSV.
 
-    # Parquet columns from metadata (no row data read).
+    Row count for parquet comes from metadata. For CSV it's
+    streamed line count minus the number of header rows.
+    """
+    n_header_rows = _detect_header_rows(csv_path)
+
+    # Get CSV columns (last header row, the data-level names)
+    try:
+        with open(csv_path, "r", newline="") as f:
+            import csv as _csv
+            reader = _csv.reader(f)
+            header_lines = []
+            for i, row in enumerate(reader):
+                if i >= n_header_rows:
+                    break
+                header_lines.append(row)
+        if not header_lines:
+            return False
+        csv_cols = header_lines[-1]  # last header row = column names
+        if has_index:
+            csv_cols = csv_cols[1:]  # drop index slot
+    except Exception:
+        # Fall back to pandas if our streaming reader chokes
+        df = pd.read_csv(
+            csv_path,
+            index_col=0 if has_index else None,
+            header=list(range(n_header_rows)) if n_header_rows > 1 else 0,
+            nrows=0,
+        )
+        if isinstance(df.columns, pd.MultiIndex):
+            csv_cols = list(df.columns.get_level_values(-1))
+        else:
+            csv_cols = list(df.columns)
+
+    # Parquet columns from metadata (no row data read)
     import pyarrow.parquet as pq_module
     pq_schema = pq_module.read_schema(parquet_path)
     pq_cols = list(pq_schema.names)
 
     if csv_cols != pq_cols:
-        # Difference detected — useful diagnostic for the caller.
-        # Don't print here; let the caller decide on verbosity.
         return False
 
     pq_rows = pq_module.read_metadata(parquet_path).num_rows
-    # Stream-count CSV rows (subtract 1 for header)
-    csv_rows = 0
+    # Stream-count CSV rows minus header rows
     with open(csv_path, "rb") as f:
-        csv_rows = sum(1 for _ in f) - 1
+        total_lines = sum(1 for _ in f)
+    csv_rows = total_lines - n_header_rows
     return pq_rows == csv_rows
 
 
