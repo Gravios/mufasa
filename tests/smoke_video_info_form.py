@@ -94,11 +94,20 @@ def main() -> int:
     # ------------------------------------------------------------------ #
     assert "_calibrate_row" in methods
     cal_src = ast.unparse(methods["_calibrate_row"])
-    assert "GetPixelsPerMillimeterInterface" in cal_src, (
-        "Calibrate button should use the existing OpenCV helper"
+    assert "CalculatePixelDistanceTool" in cal_src, (
+        "Calibrate button should use the CalculatePixelDistanceTool "
+        "class from mufasa.video_processors.calculate_px_dist"
     )
-    assert "interface.run()" in cal_src, (
-        "Calibrate should actually run the OpenCV widget"
+    # The class's constructor blocks on the OpenCV widget; there's
+    # no separate .run() method (calling .run() raises AttributeError).
+    assert ".run()" not in cal_src, (
+        "CalculatePixelDistanceTool runs the OpenCV widget in its "
+        "constructor; do not call .run() on the instance"
+    )
+    # known_mm_distance is the actual constructor parameter name
+    # (NOT known_metric_mm — that was the legacy SimBA name)
+    assert "known_mm_distance" in cal_src, (
+        "Constructor takes 'known_mm_distance', not 'known_metric_mm'"
     )
     assert "_COL_PX_PER_MM" in cal_src, (
         "Result should be written to the px/mm column"

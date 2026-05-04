@@ -468,30 +468,35 @@ class VideoInfoForm(OperationForm):
             )
             return
 
+        # The actual class is CalculatePixelDistanceTool from
+        # mufasa.video_processors.calculate_px_dist. Note the API:
+        # the OpenCV widget runs in __init__ (it calls
+        # choose_first_coordinate, choose_second_coordinate, and
+        # manipulate_choices internally), so by the time the
+        # constructor returns, the user has already drawn the line
+        # and `tool.ppm` is populated. There is NO separate .run()
+        # method — calling .run() on the instance raises
+        # AttributeError. (The existing Tools-menu helper in
+        # video_processing_page.py also gets this wrong, which is
+        # why the Tools menu's "Calibrate pixels/mm…" action has
+        # also been broken.)
         try:
             from mufasa.video_processors.calculate_px_dist import (
-                GetPixelsPerMillimeterInterface,
+                CalculatePixelDistanceTool,
             )
-        except ImportError:
-            try:
-                # Fallback location used by some Mufasa branches
-                from mufasa.video_processors.px_dist_widget import (
-                    GetPixelsPerMillimeterInterface,
-                )
-            except ImportError as exc:
-                QMessageBox.critical(
-                    self, self.title,
-                    f"Calibration backend unavailable: {exc}",
-                )
-                return
+        except ImportError as exc:
+            QMessageBox.critical(
+                self, self.title,
+                f"Calibration backend unavailable: {exc}",
+            )
+            return
 
         try:
-            interface = GetPixelsPerMillimeterInterface(
+            tool = CalculatePixelDistanceTool(
                 video_path=video_path,
-                known_metric_mm=known_distance,
+                known_mm_distance=known_distance,
             )
-            interface.run()
-            ppm = float(getattr(interface, "ppm", 0))
+            ppm = float(getattr(tool, "ppm", 0))
         except Exception as exc:
             QMessageBox.critical(
                 self, self.title,
