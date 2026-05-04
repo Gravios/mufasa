@@ -176,13 +176,42 @@ def main() -> int:
         "DtypeWarning spam from chunked dtype inference"
     )
 
+    # ------------------------------------------------------------------ #
+    # Case 1.7: convert_csv_to_parquet detects multi-row headers
+    # (input_csv/ files have 3-row IMPORTED_POSE / bodypart_coord
+    # headers from Mufasa's preserved-DLC-style storage)
+    # ------------------------------------------------------------------ #
+    assert hasattr(csv_to_parquet, "_detect_header_rows"), (
+        "_detect_header_rows helper must exist for multi-index "
+        "input_csv/ files"
+    )
+    # Test it directly on synthetic CSVs
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as f:
+        flat_path = f.name
+        f.write(",Nose_x,Nose_y,Nose_p\n0,1.5,2.5,0.99\n")
+    n = csv_to_parquet._detect_header_rows(flat_path)
+    assert n == 1, f"Flat CSV should detect 1 header row, got {n}"
+    os.unlink(flat_path)
+
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w") as f:
+        multi_path = f.name
+        f.write(",IMPORTED_POSE,IMPORTED_POSE,IMPORTED_POSE\n")
+        f.write(",IMPORTED_POSE,IMPORTED_POSE,IMPORTED_POSE\n")
+        f.write(",nose_x,nose_y,nose_p\n")
+        f.write("0,1.5,2.5,0.99\n")
+    n = csv_to_parquet._detect_header_rows(multi_path)
+    assert n == 3, (
+        f"Multi-row header CSV should detect 3 header rows, got {n}"
+    )
+    os.unlink(multi_path)
+
     # The remaining cases all run the actual conversion. If no
     # parquet engine is available, skip them with a note (pyarrow
     # is in Mufasa's actual dependency chain — `read_df` uses it —
     # so on the user's workstation these will run).
     if not _has_parquet_engine():
         print(
-            "smoke_csv_to_parquet: 4/4 structural cases passed "
+            "smoke_csv_to_parquet: 5/5 structural cases passed "
             "(remaining cases need pyarrow/fastparquet — install for "
             "full coverage)"
         )
