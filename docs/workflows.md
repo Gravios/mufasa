@@ -191,23 +191,225 @@ never finished or it was deliberately disabled and the button
 forgotten. (Source: `mufasa/SimBA.py` line near
 `reverse_btn = SimbaButton(... cmd=None)`.)
 
-## Interpolate pose 🟡
+## Interpolate pose 🟢
 **Tk entry**: Further imports → INTERPOLATE POSE IN SIMBA PROJECT
-(`InterpolatePopUp`)
+(`InterpolatePopUp` from `mufasa/ui/pop_ups/interpolate_pop_up.py`)
 **Qt entry**: not ported
-**Backend**: `data_processors/interpolate.py` (likely)
-Fills NaN gaps in pose data using user-selected method (linear /
-quadratic / nearest / by body-part / by animal). Applied in-place
-to `csv/input_csv/`.
+**Backend**: `mufasa/data_processors/interpolate.py` →
+  `Interpolate.run()` → `animal_interpolator` /
+  `body_part_interpolator` from `mufasa/utils/data.py`
+**Reads**: `csv/<subdir>/<video>.csv` (any subdirectory under
+  `csv/`; user picks via the popup),
+  `project_bp_names.csv` (via ConfigReader's `bp_headers`)
+**Writes**: same path as input — **interpolation is in-place**.
+  If `copy_originals=True`, the original is first copied to a
+  timestamped sibling directory:
+  `<input_dir>/Pre_<method>_<type>_interpolation_<datetime>/<video>.csv`
+**Branches**:
+- **Type dropdown** — two algorithms with completely different
+  detection logic (these are not interchangeable):
+    - `MISSING BODY-PARTS` → `body_part_interpolator`. Per
+      bodypart per animal: a frame is "missing" when both x AND
+      y of that bodypart are ≤ 0.0. Each bodypart interpolated
+      independently in time.
+    - `MISSING ANIMALS` → `animal_interpolator`. Per animal:
+      a frame is "missing" when **all bodypart x-values are
+      identical** (i.e., the entire animal collapsed to a point).
+      Interpolates the whole animal block at once. **Only useful
+      for multi-animal projects** where one animal can disappear
+      while another stays present.
+- **Method dropdown** — passed through to pandas's `.interpolate()`:
+    - `NEAREST` (default), `LINEAR`, `QUADRATIC`. Applied via
+      `df[col].interpolate(method=method).ffill().bfill()` so
+      gaps at the start or end of the timeline get filled with
+      the nearest valid value.
+- **Save originals** — boolean. Off by default in the Tk popup
+  but Mufasa users typically leave it on; without it, a bad
+  interpolation run silently overwrites the source data.
+- **Single file vs directory** — the popup has both a
+  FileSelect and a FolderSelect. FolderSelect processes every
+  `.csv` (or `.parquet` per `file_type`) in the folder.
+- **Multi-index header detection** (popup, line 82-84): uses
+  `Path.resolve().absolute()` comparison against
+  `self.input_csv_dir`. **Correct** — this path is what passes
+  the auto-detection challenge that the Smoothing popup gets
+  wrong (see below).
 
-## Smooth pose 🟡
+**Important behavior — what gets interpolated**:
+- Only `X_bps + Y_bps` columns are touched. The `_p` (likelihood)
+  columns are **NOT** interpolated, which is correct: a likelihood
+  is a measurement confidence and shouldn't be synthesized.
+- For body-part mode, missing detection is `(x <= 0) AND (y <= 0)`.
+  This means a bodypart at the literal corner (0, 0) is treated
+  as missing. In practice, DLC and SLEAP rarely produce exactly
+  (0, 0) values for valid detections (they output floats with
+  noise), but it's a corner case worth knowing about.
+- For animal mode, missing detection is "all x columns equal" —
+  detects when an entire animal collapsed to one point (e.g., a
+  legacy DLC behavior when no detection passes confidence).
+
+**Status**: Functional. Backend has been touched defensively
+(see "Audit A1 fix" comment in `interpolate.py:83-89` adding
+auto-detection of multi-index headers when `multi_index_df_headers`
+is `None`).
+
+**Watch-outs**:
+- `df.fillna(0)` then `df < 0 → 0` then `astype(int)` (line 1302
+  for animals, line 1345 for body-parts) — input data gets
+  **forcibly cast to int32** before interpolation. **This loses
+  sub-pixel precision** if the user's pose-estimation produces
+  floating-point coordinates (DLC does; SLEAP does). After
+  interpolation, the values are written as float32 again, but
+  the precision damage is done. Not catastrophic for behavior
+  research at typical pixel-scale resolutions but worth knowing
+  about for high-resolution work.
+- "Animal missing" detection compares against the FIRST column
+  (`animal_df.iloc[:, 0]`). If your first body-part is genuinely
+  motionless across many frames (e.g., a tail-tracker on a
+  mostly-stationary animal), you'd get false positives. Reorder
+  body parts so the most-mobile one is first, or use body-part
+  mode instead.
+- Output is converted to `np.float32` on write (`interpolate.py:120`).
+  If your downstream code assumes float64, you'd see precision
+  divergence. Mufasa's own pipeline tolerates float32 fine.
+
+## Smooth pose 🟢
 **Tk entry**: Further imports → SMOOTH POSE IN SIMBA PROJECT
-(`SmoothingPopUp`)
+(`SmoothingPopUp` from `mufasa/ui/pop_ups/smoothing_popup.py`)
 **Qt entry**: not ported
-**Backend**: `data_processors/smoothing.py`
-Smooths pose data with Gaussian / Savitzky-Golay / moving-average
-filter. Applied in-place to `csv/input_csv/`. Useful pre-feature-
-extraction step to reduce frame-to-frame jitter.
+**Backend**: `mufasa/data_processors/smoothing.py` →
+  `Smoothing.run()` → `savgol_smoother` / `df_smoother` from
+  `mufasa/utils/data.py`
+**Reads**: same as interpolate (any csv subdir),
+  `logs/video_info.csv` OR raw video file (for FPS lookup)
+**Writes**: in-place at the input path. Same backup convention
+  as interpolate when `copy_originals=True`:
+  `<input_dir>/Pre_<method>_<time_window>_smoothing_<datetime>/`.
+**Branches**:
+- **Method dropdown** — two routes:
+    - `Savitzky Golay` → `savgol_smoother`. Polynomial fit
+      (order 3) within a sliding window. Handles edges via
+      `mode='nearest'`.
+    - `Gaussian` → `df_smoother(method='gaussian')`. Pandas
+      rolling window with Gaussian weighting (`std=5`,
+      hardcoded). Centered window, NaN edges filled with
+      original values via `.fillna(data[c])`.
+- **Time window** — milliseconds, converted to frames via
+  `frms_in_smoothing_window = int(time_window / (1000 / fps))`.
+  Default 100ms in the popup. **Critical**: if `time_window`
+  is short relative to `fps`, the result will be a no-op:
+  `if frms_in_smoothing_window <= 1: return data` (line 1396 for
+  savgol, 1452 for gaussian).
+- **Polynomial order** for savgol is **hardcoded to 3** in the
+  kernel — the popup doesn't expose it. To override, you'd have
+  to call `savgol_smoother` programmatically.
+- **Save originals** — same as interpolate.
+
+**FPS source** — required because time window converts to frames
+via FPS:
+1. First tries `find_video_of_file(self.video_dir, video_name)`
+   to locate the source video; reads FPS via
+   `get_video_meta_data` (`cv2.VideoCapture` under the hood)
+2. Falls back to reading `logs/video_info.csv` if no video file
+   is found
+3. Raises `NoFilesFoundError` if neither source is available
+
+**This means smoothing requires either the actual video file
+in `videos/` or a populated `logs/video_info.csv` — the same
+calibration table we just built the Qt form for.** Without it,
+smoothing flat-out fails.
+
+**Critical bug — `_p` likelihood columns get smoothed too**:
+Both kernels iterate over all DataFrame columns (`for c in
+data.columns`). They don't distinguish between coordinate
+columns (`_x`, `_y`) and likelihood columns (`_p`). This means:
+- `_p` values get rolling-averaged across the time window.
+- After smoothing, a likelihood of 0.99 followed by a 0.01
+  followed by 0.99 (a single-frame dropout) becomes ~0.66 across
+  three frames.
+- Downstream code (e.g., likelihood masking in feature
+  extraction) reads the smoothed likelihood and may treat the
+  three frames as borderline-valid when only the middle one was
+  actually low-confidence.
+
+This is a **real correctness issue** for the standard pipeline,
+not just a code-smell. Compare to `body_part_interpolator` and
+`animal_interpolator` which deliberately only operate on
+`X_bps + Y_bps`. The smoothers should match that behavior.
+
+**Critical bug — popup's multi-index detection is broken**:
+`smoothing_popup.py:83`:
+```python
+multi_index_df_headers = False
+if data_dir == self.input_csv_dir: multi_index_df_headers = True
+```
+This is raw string equality. It fails when:
+- The user picks the directory via FolderSelect with a trailing
+  slash (`/path/csv/input_csv/` vs `/path/csv/input_csv`)
+- Different case on Windows
+- Symlinks in the path
+- Any `os.path.normpath` quirk
+
+The interpolate popup uses `Path.resolve().absolute()` (correct)
+for the equivalent check. The smoothing backend has an
+"Audit A1 fix" comment at `smoothing.py:92-102` that adds the
+correct detection — but **only when the popup passes
+`multi_index_df_headers=None`**. The popup hardcodes the value
+it computed (line 89), so the backend fallback is unreachable
+from the Tk UI.
+
+**Result**: smoothing a project's `csv/input_csv/` files via
+the GUI may write back without re-inserting the multi-index
+header rows on environments where the path comparison fails.
+The next pipeline stage (outlier correction, feature extraction)
+would then fail to read the file with `read_df(check_multiindex=True)`
+because the expected 3-row IMPORTED_POSE header is gone.
+
+**Workaround**: smooth files in `csv/outlier_corrected_movement_location/`
+or later instead of `csv/input_csv/` — those don't have multi-
+index headers and the comparison doesn't matter.
+
+**Watch-outs**:
+- Smoothing in-place is permanent. Always run with
+  Save Originals = True the first time on a new project.
+- Smoothing the `_p` columns (above) — until that's fixed,
+  re-run likelihood-mask after any smoothing pass to overwrite
+  the corrupted likelihoods with zeros.
+- Both savgol and gaussian smoothers `.clip(lower=0)` the data.
+  Pose data shouldn't be negative anyway, but if you have
+  centered/transformed pose data (e.g., post-egocentric-alignment
+  where coordinates are relative to the animal's center and CAN
+  be negative), running smoothing afterward will silently zero
+  out half your data. Smooth BEFORE alignment.
+
+**Recommended fix priority**: medium. The `_p` smoothing is the
+most concerning because it silently corrupts confidence values
+that downstream code trusts. The multi-index detection bug only
+fires in `csv/input_csv/` and only on certain paths; most users
+smooth elsewhere in the pipeline.
+
+---
+
+## Dead code — advanced interpolator/smoother variants 🔴
+There are TWO `AdvancedInterpolator` class definitions in the
+codebase:
+- `mufasa/data_processors/advanced_interpolator.py` (266 lines)
+- `mufasa/data_processors/interpolation_smoothing.py:428` (in a
+  819-line module that also contains an `AdvancedSmoothing` class)
+
+Plus:
+- `mufasa/data_processors/advanced_smoothing.py` (213 lines)
+
+**Nothing in the codebase imports any of these.** Confirmed via
+`grep -rn "from mufasa.data_processors.advanced"`. They're
+orphaned drafts. Likely the result of a refactor where one
+version was promoted and the others were never deleted.
+
+**Recommendation**: delete them in a future cleanup pass. Not
+worth doing now — they don't break anything by sitting there,
+and confirming "really nothing imports these" needs more
+verification than I've done. Flagging for the workflow audit
+so future maintainers don't trip on them.
 
 ## Egocentric alignment 🟢
 **Tk entry**: Further imports → EGOCENTRICALLY ALIGN POSE AND VIDEO
