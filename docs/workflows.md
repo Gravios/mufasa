@@ -390,26 +390,137 @@ smooth elsewhere in the pipeline.
 
 ---
 
-## Dead code — advanced interpolator/smoother variants 🔴
-There are TWO `AdvancedInterpolator` class definitions in the
-codebase:
+## Orphaned advanced interpolator/smoother variants — salvageable 🟢
+Three files exist with classes that nothing in the codebase
+imports:
+
 - `mufasa/data_processors/advanced_interpolator.py` (266 lines)
-- `mufasa/data_processors/interpolation_smoothing.py:428` (in a
-  819-line module that also contains an `AdvancedSmoothing` class)
-
-Plus:
 - `mufasa/data_processors/advanced_smoothing.py` (213 lines)
+- `mufasa/data_processors/interpolation_smoothing.py` (819 lines —
+  monolithic version containing FOUR classes: `Interpolate`,
+  `Smooth`, `AdvancedInterpolator`, `AdvancedSmoother`)
 
-**Nothing in the codebase imports any of these.** Confirmed via
-`grep -rn "from mufasa.data_processors.advanced"`. They're
-orphaned drafts. Likely the result of a refactor where one
-version was promoted and the others were never deleted.
+Confirmed via `grep -rn "from mufasa.data_processors.advanced..."`
+returning no results.
 
-**Recommendation**: delete them in a future cleanup pass. Not
-worth doing now — they don't break anything by sitting there,
-and confirming "really nothing imports these" needs more
-verification than I've done. Flagging for the workflow audit
-so future maintainers don't trip on them.
+**Diagnosis**: a refactor split the monolithic
+`interpolation_smoothing.py` into per-class files. The split
+versions are newer/cleaner. The Tk popups (`InterpolatePopUp`,
+`SmoothingPopUp`) were wired to the simpler `Interpolate` and
+`Smoothing` classes in `interpolate.py` and `smoothing.py`,
+NOT to the Advanced variants. The Advanced variants got
+orphaned in the split — they have no UI to drive them.
+
+### Algorithms — what's there
+
+**No new algorithms.** Both Advanced classes use the same
+underlying methods as the simple ones:
+- Interpolation: pandas `.interpolate()` with `nearest`,
+  `linear`, `quadratic`
+- Smoothing: `savgol_smoother` (scipy savgol_filter,
+  hardcoded polyorder 3) and `df_smoother` (pandas
+  `.rolling(win_type='gaussian').mean(std=5)`)
+
+The "advanced" label refers entirely to **per-bodypart and
+per-animal configuration**, not new mathematical methods.
+
+### What the Advanced variants add beyond the simple ones
+
+#### `AdvancedInterpolator` (the standalone newer version)
+
+1. **Per-bodypart method selection.** Different bodyparts on
+   the same animal can use different interpolation methods.
+   Useful when fast-moving parts (nose, paws) benefit from
+   `quadratic` interpolation that follows trajectory curvature,
+   while slow/stable parts (tail base, center) get `nearest`
+   to avoid invented motion in periods of true stillness.
+2. **`max_interpolation_length` cap.** Only interpolate gaps
+   up to N frames; longer gaps are left as 0 / NaN. **This is
+   the genuinely valuable feature.** Without it, a 200-frame
+   dropout (animal exits the frame) gets a smooth quadratic
+   trajectory invented across it. With the cap, gaps shorter
+   than e.g. 30 frames (1 second at 30fps) are filled, longer
+   gaps are honored as missing data downstream. Critical for
+   avoiding hallucinated trajectories in feature extraction.
+3. **Detection-bout-based gap counting.** Uses
+   `detect_bouts(target_lst=[...]_temp)` from
+   `mufasa.utils.data` to find runs of missing frames (rather
+   than per-frame interpolation). Internally consistent way
+   to apply the gap-length cap.
+
+The two AdvancedInterpolator versions (standalone vs
+monolithic) differ slightly: the standalone is newer and has
+`max_interpolation_length`; the monolithic version lacks it.
+The standalone is the salvage target.
+
+#### `AdvancedSmoother` (standalone newer version)
+
+1. **Per-bodypart method AND time-window.** Even more granular
+   than the interpolator — each bodypart can have its OWN
+   smoothing time-window. Practical example: aggressive
+   smoothing (3500ms) on a slow-moving tail base, gentle
+   smoothing (200ms) on a fast-moving nose. Captures the fact
+   that rolling-average windows that are appropriate for one
+   bodypart are wrong for another.
+2. **Per-animal method assignment** as a coarser alternative
+   to per-bodypart. Useful when animals differ in their
+   typical movement patterns (e.g., test animal vs. resident).
+3. **Architecturally cleaner — column slicing avoids the
+   `_p`-smoothing bug** documented in the simple Smoothing
+   section above. AdvancedSmoother does
+   `bp_df = df[[f"{bp}_x", f"{bp}_y"]]` BEFORE passing to the
+   smoother kernel, so likelihood columns are never touched.
+   This is by accident (consequence of per-bodypart
+   slicing) rather than by design, but it works out correct.
+   **Salvaging this and exposing it via UI would give users a
+   smoother that doesn't corrupt likelihoods.**
+
+### Salvage assessment
+
+**Yes, salvageable. Genuinely worth doing.**
+
+The Advanced variants implement real, useful capabilities that
+the simple variants lack:
+- `max_interpolation_length` (gap cap) for AdvancedInterpolator
+- Per-bodypart time-window for AdvancedSmoother
+- Correct handling of likelihood columns in AdvancedSmoother
+  (vs. the bug in the simple Smoother)
+
+**Recommended salvage plan**:
+1. Keep `advanced_interpolator.py` and `advanced_smoothing.py`
+   (the standalone newer files). These are ~480 lines total
+   of working code.
+2. Delete `interpolation_smoothing.py` (819 lines of duplicate
+   monolithic code). Confirmed nothing imports it.
+3. Build Qt forms for both Advanced variants — they're a
+   natural fit for a Qt table widget where each row is a
+   bodypart and the columns are method + time-window. The
+   simple variants' single-method dropdown maps poorly to per-
+   bodypart configuration, but a per-bodypart table maps
+   beautifully to a Qt form.
+4. Once the Qt UI lands, the simple Tk popups can be left as-is
+   (they keep working) or deprecated in favor of the Advanced
+   ones (which strict-superset the simple cases by allowing the
+   user to set the same method for every bodypart).
+
+**Trivial bug to fix during salvage**: standalone AdvancedSmoother
+names its backup directory `Pre_Advanced_Interpolation_*`
+(line 104, 107) even though it's the smoother. Should be
+`Pre_Advanced_Smoothing_*`. Cosmetic but worth fixing.
+
+**One thing to verify before relying on the salvage**: neither
+of the Advanced classes has had any user testing in a long time
+(if ever — they may have been deprecated *before* shipping to
+users). The code reads correctly to me, but I haven't run them
+in anger. A salvage patch should include at minimum a smoke test
+that constructs each class with a synthetic DataFrame and
+verifies the run path completes without exception.
+
+**What NOT to salvage**: `interpolation_smoothing.py` outright.
+It has duplicate-class definitions that cause confusion (two
+`AdvancedInterpolator` classes with the same name in the same
+project) and its versions are older. Delete it as part of the
+salvage cleanup.
 
 ## Egocentric alignment 🟢
 **Tk entry**: Further imports → EGOCENTRICALLY ALIGN POSE AND VIDEO
