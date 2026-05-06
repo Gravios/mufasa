@@ -1720,9 +1720,11 @@ def main() -> int:
             fps=30.0, likelihood_threshold=0.7,
         )
 
-        layout_l, fitted_l, params_l, fps_l, thr_l = (
+        layout_l, fitted_l, params_l, fps_l, thr_l, persp_l = (
             load_model_v2(model_path)
         )
+        # No perspective in pre-109 save (or non-perspective save)
+        assert persp_l is None
         # Layout same structure
         assert (
             [s.name for s in layout_l.segments]
@@ -2246,7 +2248,240 @@ def main() -> int:
             f"{sigma_warm_broken[m]:.3f}"
         )
 
-    print("smoke_kalman_pose_smoother_v2: 63/63 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 109: perspective model.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        PerspectiveModelV2, fit_perspective_model_v2,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 64: PerspectiveModelV2.identity gives scale=1
+    # everywhere; partials are zero.
+    # ---------------------------------------------------------- #
+    persp_id = PerspectiveModelV2.identity(layout)
+    for x in [-100, 0, 100, 500]:
+        for y in [-100, 0, 100, 500]:
+            scales = persp_id.scale_for_position(x, y)
+            assert np.allclose(scales, 1.0), (
+                f"identity should give scale=1 at ({x},{y}); "
+                f"got {scales}"
+            )
+            d_x, d_y = persp_id.scale_partials(x, y)
+            assert np.allclose(d_x, 0.0)
+            assert np.allclose(d_y, 0.0)
+
+    # ---------------------------------------------------------- #
+    # Case 65: state_to_marker_positions with identity
+    # perspective gives the same result as without perspective.
+    # ---------------------------------------------------------- #
+    indices = _pack_state_layout_indices(layout)
+    state_test = np.zeros(layout.state_dim)
+    state_test[indices["__root__"]["x"]] = 100.0
+    state_test[indices["__root__"]["y"]] = 200.0
+    state_test[indices["__root__"]["cos"]] = 1.0
+    for seg_name in layout.non_root_topo_order:
+        state_test[indices[seg_name]["cos"]] = 1.0
+        state_test[indices[seg_name]["length"]] = 5.0
+
+    pos_no_persp = state_to_marker_positions(state_test, layout)
+    pos_id_persp = state_to_marker_positions(
+        state_test, layout, perspective=persp_id,
+    )
+    assert np.allclose(pos_no_persp, pos_id_persp), (
+        "Identity perspective should not change predictions"
+    )
+
+    # Same for Jacobian
+    H_no_persp = state_to_marker_jacobian(state_test, layout)
+    H_id_persp = state_to_marker_jacobian(
+        state_test, layout, perspective=persp_id,
+    )
+    assert np.allclose(H_no_persp, H_id_persp), (
+        "Identity perspective should not change Jacobian"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 66: perspective with non-trivial coeffs scales
+    # marker offsets correctly. Markers at the segment distal
+    # end (zero offset) are NOT affected.
+    # ---------------------------------------------------------- #
+    coeffs_test = {
+        m: np.array([0.2, 0.1, 0.0]) for m in layout.marker_names
+    }
+    persp_test = PerspectiveModelV2(
+        coeffs=coeffs_test,
+        arena_x_mean=0.0, arena_x_range=200.0,
+        arena_y_mean=0.0, arena_y_range=200.0,
+    )
+    # At root_x=100, y=100: x_n = 100/100 = 1, y_n = 1
+    # scale = 1 + 0.2*1 + 0.1*1 = 1.3
+    state_pos = state_test.copy()
+    state_pos[indices["__root__"]["x"]] = 100.0
+    state_pos[indices["__root__"]["y"]] = 100.0
+    pos_scaled = state_to_marker_positions(
+        state_pos, layout, perspective=persp_test,
+    )
+    pos_unscaled = state_to_marker_positions(state_pos, layout)
+    # Distal marker (back2 — root distal, no offset) should be
+    # unchanged
+    back2_idx = layout.marker_names.index("back2")
+    assert np.allclose(pos_scaled[back2_idx], pos_unscaled[back2_idx]), (
+        "Distal marker (no offset) shouldn't be affected by "
+        "perspective scale"
+    )
+    # back1 has a nonzero offset and should differ
+    back1_idx = layout.marker_names.index("back1")
+    diff_back1 = np.linalg.norm(
+        pos_scaled[back1_idx] - pos_unscaled[back1_idx]
+    )
+    assert diff_back1 > 0.05, (
+        f"back1 with offset should be perspective-scaled; "
+        f"got diff={diff_back1:.4f}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 67: Jacobian with perspective passes finite-
+    # difference check (analytic vs FD).
+    # ---------------------------------------------------------- #
+    state_fd = state_test.copy()
+    state_fd[indices["__root__"]["x"]] = 50.0
+    state_fd[indices["__root__"]["y"]] = -30.0
+    H_persp = state_to_marker_jacobian(
+        state_fd, layout, perspective=persp_test,
+    )
+    eps = 1e-5
+    K_test = layout.n_markers
+    H_fd = np.zeros((2 * K_test, layout.state_dim))
+    for j in range(layout.state_dim):
+        sp = state_fd.copy()
+        sm = state_fd.copy()
+        sp[j] += eps
+        sm[j] -= eps
+        p_p = state_to_marker_positions(
+            sp, layout, perspective=persp_test,
+        )
+        p_m = state_to_marker_positions(
+            sm, layout, perspective=persp_test,
+        )
+        H_fd[:, j] = ((p_p - p_m) / (2 * eps)).flatten()
+    max_err = float(np.max(np.abs(H_persp - H_fd)))
+    assert max_err < 1e-3, (
+        f"Perspective-aware Jacobian disagrees with FD: "
+        f"max_err = {max_err:.6e}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 68: fit_perspective_model_v2 recovers known scale
+    # coefficients on synthetic data.
+    # ---------------------------------------------------------- #
+    rng = np.random.default_rng(2080)
+    fps = 30.0
+    dt = 1.0 / fps
+    n_m = layout.n_markers
+
+    # True perspective: lateral markers shrink as rat moves to
+    # negative x (camera-edge effect)
+    lateral_left_idx = layout.marker_names.index("lateral_left")
+    lateral_right_idx = layout.marker_names.index("lateral_right")
+    true_coeffs = {m: np.zeros(3) for m in layout.marker_names}
+    true_coeffs["lateral_left"] = np.array([0.2, 0.0, 0.0])
+    true_coeffs["lateral_right"] = np.array([0.2, 0.0, 0.0])
+    true_persp = PerspectiveModelV2(
+        coeffs=true_coeffs,
+        arena_x_mean=100.0, arena_x_range=200.0,
+        arena_y_mean=200.0, arena_y_range=200.0,
+    )
+
+    # Generate trajectory with rat moving across the arena
+    T_p = 600
+    F_p = build_F_v2(layout, dt)
+    states_p = np.zeros((T_p, layout.state_dim))
+    states_p[0] = state_test.copy()
+    states_p[0, indices["__root__"]["x"]] = 0.0  # arena left
+    states_p[0, indices["__root__"]["vx"]] = 200.0 / (T_p * dt)  # cross full arena
+    for t in range(1, T_p):
+        states_p[t] = F_p @ states_p[t - 1]
+
+    pos_p = np.zeros((T_p, n_m, 2))
+    likes_p = np.full((T_p, n_m), 0.95)
+    for t in range(T_p):
+        clean = state_to_marker_positions(
+            states_p[t], layout, perspective=true_persp,
+        )
+        pos_p[t] = clean + rng.normal(0, 0.5, (n_m, 2))
+
+    fitted_p = fit_body_lengths(
+        pos_p, likes_p, layout, layout.marker_names,
+    )
+    params_p = NoiseParamsV2.default(layout, sigma_marker=1.5)
+
+    fitted_persp = fit_perspective_model_v2(
+        [(pos_p, likes_p)], layout, layout.marker_names,
+        fitted_p, params_p, fps,
+    )
+
+    # The fitted lateral_left coefficient on x should be
+    # positive (lateral expands when rat moves to positive x).
+    fitted_lat_l_a = fitted_persp.coeffs["lateral_left"][0]
+    assert fitted_lat_l_a > 0.05, (
+        f"lateral_left x-coeff should be positive; "
+        f"got {fitted_lat_l_a:.3f}"
+    )
+
+    # Markers without perspective in the truth should have
+    # small fitted coefficients (close to zero, but allow some
+    # noise from finite data and from how the smoother
+    # interacts with coupled markers)
+    back2_a = fitted_persp.coeffs["back2"][0]
+    assert abs(back2_a) < 0.3, (
+        f"back2 x-coeff should be near zero (no perspective); "
+        f"got {back2_a:.3f}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 69: save_model_v2 + load_model_v2 round-trips
+    # PerspectiveModelV2 correctly.
+    # ---------------------------------------------------------- #
+    import tempfile
+    import os as _os
+    with tempfile.TemporaryDirectory() as td:
+        model_path = _os.path.join(td, "model_persp.npz")
+        save_model_v2(
+            model_path, layout, fitted_p, params_p,
+            fps=30.0, likelihood_threshold=0.5,
+            perspective=fitted_persp,
+        )
+        (
+            layout_l, fitted_l, params_l, fps_l, thr_l, persp_l
+        ) = load_model_v2(model_path)
+        assert persp_l is not None
+        # Coefficients match
+        for m in layout.marker_names:
+            assert np.allclose(
+                persp_l.coeffs[m], fitted_persp.coeffs[m]
+            ), f"perspective coeffs mismatch for {m}"
+        assert abs(persp_l.arena_x_mean - fitted_persp.arena_x_mean) < 1e-9
+        assert abs(persp_l.arena_x_range - fitted_persp.arena_x_range) < 1e-9
+        assert abs(persp_l.arena_y_mean - fitted_persp.arena_y_mean) < 1e-9
+        assert abs(persp_l.arena_y_range - fitted_persp.arena_y_range) < 1e-9
+
+    # Save without perspective, verify load returns None
+    with tempfile.TemporaryDirectory() as td:
+        model_path = _os.path.join(td, "model_no_persp.npz")
+        save_model_v2(
+            model_path, layout, fitted_p, params_p,
+            fps=30.0, likelihood_threshold=0.5,
+        )
+        (
+            _, _, _, _, _, persp_none
+        ) = load_model_v2(model_path)
+        assert persp_none is None, (
+            "load_model_v2 should return None for perspective "
+            "when save was without it"
+        )
+
+    print("smoke_kalman_pose_smoother_v2: 69/69 cases passed")
     return 0
 
 
