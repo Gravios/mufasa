@@ -269,8 +269,9 @@ e_t^τ = [
     α_1, α_2,                    # 2 internal angles (3rd is determined)
     d_12, d_13, d_23,            # 3 pairwise distances
     x_1, y_1, x_2, y_2, x_3, y_3, # 6 egocentric coordinates
-    vx_h, vy_h                   # 2 head-frame egocentric velocities
-] ∈ ℝ¹³
+    vx_h, vy_h,                  # 2 head-frame egocentric velocities
+    vx_b, vy_b                   # 2 body-frame egocentric velocities
+] ∈ ℝ¹⁵
 ```
 
 The egocentric (x,y) of each marker plus the angles plus the
@@ -313,32 +314,76 @@ the head is pointing" (forward locomotion) regardless of the
 world-frame orientation. `vy_h` is lateral motion in the
 animal's own frame.
 
-For triplets that don't include head markers, the head-frame
-velocity is still computed from the head triplet (which is
-distinguished as a special role at config time) and used as
-the conditioning variable for ALL triplets. Every triplet's
-configuration is conditioned on the head's velocity, not its
-own velocity. This preserves the "behavioral state" intuition:
-when the animal's head is moving fast forward, ALL body
-parts have correlated configurations (the body is committed
-to forward locomotion).
+**Body-frame egocentric velocity**: `(vx_b, vy_b)` is the
+animal's body-centroid velocity expressed in the body's frame
+of reference. Body frame definition (committed: option (b),
+PCA major axis):
+
+1. Body markers: all markers minus head markers (configurable
+   per project; default = automatic).
+2. Body centroid `c_b^t`: mean of body marker positions at
+   frame t.
+3. Body major axis `â_b^t`: leading eigenvector of the 2×2
+   covariance matrix of centered body marker positions at
+   frame t (PCA per frame).
+4. Sign disambiguation: PCA returns an unsigned axis (v and
+   -v are both eigenvectors). The sign is chosen so that
+   `dot(â_b^t, head_direction_t) > 0` when head direction is
+   reliable, falling back to continuity with the previous
+   frame's body axis when head direction is unreliable.
+5. Body heading angle: `θ_b^t = atan2(â_b^t,y, â_b^t,x)`
+6. World-frame body velocity: `v_b_world = (c_b^t - c_b^{t-1}) / Δt`
+7. Rotate into body frame: `(vx_b, vy_b) = R(-θ_b^t) · v_b_world`
+
+This means `vx_b > 0` corresponds to "moving in the direction
+the body is oriented" (forward body locomotion). For typical
+rodent postures, the body major axis is approximately the
+spine direction, so vx_b roughly tracks "rate of forward
+spine progress."
+
+The reason for using BOTH velocities (rather than head only):
+head and body don't always move together. The clearest case
+is **scanning**: animal stationary, head sweeping side to
+side. Head velocity is high; body velocity is zero. With
+head-only conditioning, ALL triplets would condition on a
+"high-velocity" regime, but the body triplet's anatomical
+configuration is in the "stationary" regime. Including body
+velocity in the conditioning vector lets the empirical
+fitting separate these regimes.
+
+For triplets that don't include head markers (most body
+triplets), the head-frame velocity is still computed from
+the head triplet (special role at config time) and the
+body-frame velocity is computed from the body markers
+(special role too). Both velocities are global per-frame
+quantities used as the conditioning vector for ALL triplets.
+Every triplet's configuration is conditioned on the *animal's*
+overall motion state — head and body — not on the triplet's
+own local velocity. This preserves the "behavioral state"
+intuition: when the animal is locomoting forward, ALL body
+parts have correlated configurations; when the animal is
+scanning, head triplets and body triplets have very different
+anatomical regimes.
 
 **The empirical sample set**:
 ```
 S_high^τ = { t : p_t^i > τ_high
               AND p_t^j > τ_high
               AND p_t^k > τ_high
-              AND head triplet is also high-p at t and t-1 }
+              AND head triplet is high-p at t and t-1
+              AND body markers are high-p at t and t-1 }
 ```
-The extra "head triplet high-p at t and t-1" requirement is
-necessary because the head-frame velocity needs reliable head
-markers in two consecutive frames. Frames where the head was
-poorly tracked are excluded from fitting.
+The extra "head triplet AND body markers high-p at t and t-1"
+requirement is necessary because both velocity components
+need reliable markers in two consecutive frames. Frames
+where either head or body was poorly tracked are excluded
+from fitting.
 
 `τ_high` is a threshold (default 0.95). |S_high^τ| should be
 several thousand frames minimum for stable estimation in the
-13-dim feature space; fewer than ~500 → fall back to lower-dim
-feature vector (drop velocity, then drop coords) and warn.
+15-dim feature space; fewer than ~500 → fall back to lower-dim
+feature vector (drop body velocity → 13-dim → drop head
+velocity → 11-dim → drop coords → 5-dim) and warn.
 
 ### 3.4.5 Velocity-conditional covariance — manifold approach
 
@@ -347,33 +392,42 @@ covariance Σ^τ from S_high^τ, fit a **velocity-conditional**
 covariance Σ^τ(v) where v = (vx_h, vy_h) is the head-frame
 velocity at the query frame. Different velocity regimes have
 different anatomical configurations:
-- Stationary (|v| ≈ 0): head can turn freely, wide spatial
-  covariance over nose-ear angles
-- Forward locomotion (vx_h > threshold): head locked toward
-  motion direction, narrow covariance
-- Lateral motion: different distribution again
+- Stationary (|v_h| ≈ 0, |v_b| ≈ 0): head can turn freely,
+  wide spatial covariance over nose-ear angles
+- Forward locomotion (vx_h > 0, vx_b > 0, both aligned): head
+  locked toward motion direction, narrow covariance
+- Scanning (|v_h| > 0, |v_b| ≈ 0): head sweeping, body still.
+  Head triplets in "scanning" regime; body triplets in
+  "stationary" regime. ONLY 4D conditioning captures this.
+- Lateral motion (vy_h ≠ 0): different distribution again
 - Reverse motion (vx_h < 0): rare in rats, distinct
   configuration if it occurs
 
-A static Σ^τ averages over all regimes and fits none well. A
-velocity-conditional Σ^τ(v) lets the smoother specialize.
+A static Σ^τ averages over all regimes and fits none well.
+2D conditioning (head only) misses the scanning regime and
+treats body triplets as if they shared the head's motion
+state, which they don't. 4D conditioning (head + body)
+captures all four regimes natively. Velocity-conditional
+Σ^τ(v) with v = (vx_h, vy_h, vx_b, vy_b) lets the smoother
+specialize per regime.
 
-**Method (committed: KD-tree + local kernel covariance)**:
+**Method (committed: KD-tree + local kernel covariance, 4D)**:
 
 Pre-fit phase, once per project:
-1. Compute the full feature vector e_t^τ ∈ ℝ¹³ for every
+1. Compute the full feature vector e_t^τ ∈ ℝ¹⁵ for every
    triplet τ and every frame t ∈ S_high^τ.
-2. Extract the velocity component v_t = (vx_h, vy_h) from each.
-3. Build a KD-tree indexed on velocity over S_high^τ.
+2. Extract the 4D velocity component
+   v_t = (vx_h, vy_h, vx_b, vy_b) from each.
+3. Build a KD-tree indexed on the 4D velocity space over
+   S_high^τ.
 4. Persist the (KD-tree, features, velocities) tuple to disk
    as the saved model artifact (see §3.4.6 for storage spec).
 
 Inference phase, per query frame t:
-1. Estimate or read the head-frame velocity v_t at the query
-   frame. (Note: this is itself state-dependent; see §3.4.7
-   for the bootstrapping treatment.)
+1. Estimate or read the 4D velocity v_t at the query frame.
+   (State-dependent; see §3.4.7 for bootstrapping treatment.)
 2. KD-tree query: find the K nearest neighbors of v_t in the
-   stored velocity set. Default K = 200 (tunable).
+   stored velocity set.
 3. Compute the local empirical covariance with Gaussian kernel
    weighting:
    ```
@@ -381,14 +435,28 @@ Inference phase, per query frame t:
    μ^τ(v_t) = Σ_s w_s · e_s^τ / Σ_s w_s
    Σ^τ(v_t) = Σ_s w_s · (e_s^τ - μ^τ(v_t))(e_s^τ - μ^τ(v_t))ᵀ / Σ_s w_s
    ```
-   Bandwidth h: default = median nearest-neighbor distance in
-   the velocity training set (Silverman's rule of thumb,
-   adapted for 2D).
 4. Use μ^τ(v_t) and Σ^τ(v_t) as the spatial prior in the
    Mahalanobis loss for the Kalman update:
    ```
    L_spatial^τ(e_t, v_t) = (e_t - μ^τ(v_t))ᵀ Σ^τ(v_t)⁻¹ (e_t - μ^τ(v_t))
    ```
+
+**K-tuning for 4D vs 2D**: in 4D space, the typical neighbor
+distance grows as N^{-1/4} versus N^{-1/2} in 2D. For typical
+N = 30K high-confidence frames, the 4D ball containing K=200
+neighbors is ~3.5× larger than the equivalent 2D ball with
+the same K. To keep the local-covariance neighborhood at
+comparable specificity:
+
+| Conditioning | Default K | Bandwidth h |
+|--------------|-----------|-------------|
+| 2D (head only)   | 200       | Silverman 2D     |
+| 4D (head + body) | 50        | Silverman 4D     |
+
+The 4D defaults (K=50, Silverman 4D bandwidth) keep ball
+volume comparable. Both are tunable per project. Cross-
+validation for K and h is a v3 enhancement; for v2 we use
+defaults and let users adjust if results are unsatisfactory.
 
 **Pros of this approach**:
 - No parametric form to commit to (no "covariance is
@@ -401,17 +469,21 @@ Inference phase, per query frame t:
   manifold's tangent structure
 - Adds new high-confidence data incrementally (just append
   to the saved features array)
+- 4D conditioning captures head/body decoupled regimes
+  (scanning, twisting) that 2D conditioning misses
 
 **Cons / costs**:
 - Storage: O(|S_high^τ| × dim) per triplet — for a 50K-frame
-  video with ~30K high-p frames per triplet and 13-dim
-  features, ~3MB per triplet. With ~5 triplets per
-  body-part scheme, ~15MB per project. Trivial.
-- KD-tree query is O(log N) per query frame. Sub-millisecond.
+  video with ~30K high-p frames per triplet and 15-dim
+  features, ~3.6MB per triplet. With ~5 triplets per
+  body-part scheme, ~18MB per project. Trivial.
+- KD-tree query is O(log N) per query frame regardless of
+  ambient dimension. Sub-millisecond.
 - O(K × dim²) per query for the covariance computation.
-  K=200, dim=13: ~34K ops per query frame. Hundreds of
-  microseconds. Per-video cost: ~10s for a 50K-frame video
-  on one core. Acceptable, parallelizable across triplets.
+  K=50, dim=15: ~11K ops per query frame. Faster than the
+  2D K=200 case despite larger feature dim. Per-video cost:
+  ~5s for a 50K-frame video on one core. Acceptable,
+  parallelizable across triplets.
 - Bandwidth h is a hyperparameter. The Silverman default is
   reasonable but not optimal; could tune via cross-validation
   if it matters.
@@ -447,12 +519,16 @@ project_folder/logs/kalman_smoother_model.npz
                        [(name, marker_i, marker_j, marker_k), ...]
 ├── head_triplet     : reference to which triplet defines the
                        head frame
+├── body_markers     : list of marker names defining the body
+                       frame (centroid + PCA major axis); empty
+                       if body conditioning unavailable
 ├── per_triplet:
-│   ├── <triplet_name>_features    : (N_high, 13) float32 array
-│   ├── <triplet_name>_velocities  : (N_high, 2)  float32 array
+│   ├── <triplet_name>_features    : (N_high, 15) float32 array
+│   ├── <triplet_name>_velocities  : (N_high, 4)  float32 array
+                                      (vx_h, vy_h, vx_b, vy_b)
 │   ├── <triplet_name>_kdtree_data : pickled scipy.spatial.cKDTree
-│   ├── <triplet_name>_static_mu   : (13,) float32 — fallback mean
-│   ├── <triplet_name>_static_cov  : (13, 13) float32 — fallback covariance
+│   ├── <triplet_name>_static_mu   : (15,) float32 — fallback mean
+│   ├── <triplet_name>_static_cov  : (15, 15) float32 — fallback covariance
 │   └── <triplet_name>_n_samples   : int
 ├── per_marker:
 │   ├── <marker>_sigma_base : float32 — measurement noise baseline
@@ -462,16 +538,27 @@ project_folder/logs/kalman_smoother_model.npz
 └── config:
     ├── tau_high            : float — likelihood threshold for fitting
     ├── p_floor             : float — likelihood floor for variance map
-    ├── kdtree_k            : int   — K for KNN
+    ├── kdtree_k            : int   — K for KNN (default 50 in 4D)
     ├── kdtree_bandwidth    : float — kernel bandwidth h
     ├── spatial_weight      : float — λ_spatial multiplier
-    └── reg_epsilon         : float — covariance regularizer
+    ├── reg_epsilon         : float — covariance regularizer
+    ├── conditioning_dim    : int   — 2 (head only) or 4 (head + body)
+    └── body_axis_method    : str   — "pca_major" | "spine_direction"
+                                       | "designated_triplet"
 ```
 
+For body_axis_method = "pca_major" (the committed default),
+the body axis is recomputed at fit and inference time by
+running PCA on the body markers per frame. The body markers
+list is recorded in the artifact so inference uses the same
+markers. PCA itself is reproducible (deterministic given
+inputs) so the body axis is reconstructible without storing
+per-frame axis arrays.
+
 **Versioning**: any change to the feature vector definition,
-the number of dimensions, or the fitting protocol increments
-the version string. Loaders check version compatibility and
-refuse to load mismatches.
+the number of dimensions, the conditioning scheme, or the
+fitting protocol increments the version string. Loaders
+check version compatibility and refuse to load mismatches.
 
 **Reuse across projects**: if `source_data_hash` matches the
 input data hash at load time, the fitted model is used as-is.
@@ -597,17 +684,21 @@ are recorded here, with the original options preserved as
 context for future reference.
 
 ### 4.1 What goes in the egocentric covariance ✅ COMMITTED
-**Committed: full feature vector (option d).** Internal angles
-+ inter-marker distances + egocentric (x,y) of each marker +
-head-frame egocentric velocities. 13-dim per triplet. See §3.4
-for the full vector definition. Rank-deficient covariance
-handled via small-eigenvalue regularization or pseudo-inverse.
+**Committed: full feature vector (option d), extended to 15-dim
+in 2026-05-01 update.** Internal angles + inter-marker distances
++ egocentric (x,y) of each marker + head-frame egocentric
+velocities + body-frame egocentric velocities. 15-dim per
+triplet. See §3.4 for the full vector definition. Rank-deficient
+covariance handled via small-eigenvalue regularization or
+pseudo-inverse.
 
 Original options kept for reference:
 - (a) Internal angles only — 2-dim
 - (b) Pairwise distances + angles — 5-dim
 - (c) Egocentric (x,y) of each marker — 6-dim
-- (d) **All combined + velocity — 13-dim** ← committed
+- (d) **All combined + head velocity — 13-dim** (initial commit)
+- (e) **All combined + head velocity + body velocity — 15-dim**
+      ← extended commit (2026-05-01)
 
 ### 4.2 How are triplets identified ✅ COMMITTED
 **Committed: use ALL angles and ALL marker distances**
@@ -706,72 +797,167 @@ behavioral paradigms have natural anchor events. Specifics:
 
 ---
 
-## 5. Implementation plan (revised after committed answers)
+## 5. Implementation plan (revised after committed answers + Gravio data review)
 
-After the committed answers in §4, the plan is more
-substantial than the original sketch. Three stages with
-revised time estimates.
+After the committed answers in §4 AND the Stage 0 diagnostic
+results on Gravio's 67-session dataset (see §5.0), the plan
+has been refined further. The big change vs the original
+sketch: the head-marker triplet is deferred from v1 to v2 as
+a full latent-posture model, because in 2D camera projection
+inter-head-marker distances vary meaningfully with posture
+(rearing, head pitch) and a static-Σ triplet prior would
+flatten that signal.
+
+### 5.0 Stage 0 results summary (April-May 2026)
+
+Run on `/data/testing/mufasa/test-20260427/project_folder/csv/input_csv/`:
+- 67 sessions × ~54k frames = 3.6M frames
+- Per-marker median p around 0.5-0.87; threshold 0.95 produced
+  almost no high-confidence frames → ran at threshold 0.70.
+- Aggregate worst frac_high = 0.302; avg = 0.561
+- Per-session quality: 0/67 "good" (>0.5), 34 marginal, 33 bad
+- 5-7 sessions have full-session-length dropouts on back3 or
+  back4 (catastrophic — flagged for separate handling)
+- Auto-detected rigid pairs (CV < 0.20) are dominated by
+  back↔headmid and back↔lateral_* with avg CV = 0.131
+- Velocity unimodal (head and body); head-body Pearson r = 0.82
+- ear_left↔ear_right CV = 0.154 (just outside the rigid-pair
+  threshold) — but this is genuine 3D-rigid pair, with apparent
+  variance driven by 2D projection (rearing changes projected
+  inter-ear distance). Treated as BEHAVIORAL SIGNAL, not
+  rigidity constraint.
+
+Recommendation produced: **build v1 + static-Σ triplet prior**
+(skip velocity-conditional Σ for v1; defer to v2 as full
+latent-posture extension).
 
 ### 5.1 Stages
 
-**Stage 0: Diagnostic (THIS HAS HAPPENED, see patch
-`kalman_smoother_diagnostic`)**
-A pure-analysis tool that loads pose data and produces
-plots/statistics confirming whether the data has the
-characteristics that justify building this smoother:
-- Likelihood histograms (per marker, all markers)
-- Run-length distribution of consecutive low-p frames
-- Inter-marker distance distributions for "rigid" pairs
-  (testing the rigidity assumption)
-- Head-frame egocentric velocity distribution
-- Velocity-vs-configuration scatter for canonical triplets
-  (testing whether velocity-conditional Σ buys anything)
+**Stage 0: Diagnostic** — DONE. See `kalman_diagnostic.py` and
+patches 75-84. The diagnostic now produces:
+- Per-marker likelihood + dropout stats (per-session and
+  aggregate)
+- Auto-detected rigid pairs (excluding head markers)
+- Auto-detected candidate triplets (body-only)
+- Behavioral-signal pairs (head-internal, e.g. ear-distance)
+- Per-session quality bar chart
+- Build/scope recommendation
 
-If the diagnostic shows mostly p>0.95 likelihoods and uniform
-velocity distribution, **we don't build this**.
+**Stage 1: v1 — joint-state Kalman + RTS with body-only static-Σ
+triplet prior** ~4 weeks
 
-**Stage 1: v1 — per-marker Kalman + RTS, no spatial prior**
-~1-2 weeks
-- Per-marker forward Kalman filter with R_t from likelihood
-- RTS backward smoother
-- Empirical fitting of σ_base, q_pos, q_vel from
-  high-confidence segments per marker
-- No triplet structure — markers are independent
-- Saved per-marker noise parameters (subset of the full v2
-  saved-model artifact)
-- Synthetic-data smoke test, basic correctness check
+After review of the per-marker-only v1 sketch, we committed
+to a stronger v1: a joint-state Kalman filter where the body
+triplet prior enters as a *pseudo-measurement* applied
+jointly with real per-marker observations, rather than as a
+sequential post-hoc correction (which would have been the
+original v1's "Option A" approximation). This is "Option B"
+in the build review notes — a principled implementation
+rather than a faster approximation that v2 would have to
+replace.
 
-**Stage 2: v2 — add velocity-conditional triplet covariance**
-~3-4 weeks
-- Triplet definition system: defaults per body-part scheme +
-  user override
-- Egocentric frame computation (centroid + PCA orientation)
-- Full 13-dim feature vector extraction
-- Head-frame velocity extraction
-- KD-tree indexing on velocity space, per triplet
-- Local kernel covariance computation at query time
-- Two-pass treatment of velocity-state circular dependency
-  (§3.4.7)
-- Spatial prior augmented measurement update
-- Saved-model artifact (.npz) with version tag, source data
-  hash, full features + KD-tree
-- Validation: synthetic + hand-curated frames + held-out
-  velocity manifold + downstream classification
+**State vector**: 4n-dim where n is the number of markers.
+For each marker: [x, y, vx, vy]. For Gravio's 15-marker
+project: 60-dim state.
 
-**Stage 3: v3 — Qt UI**
-~1 week
+**Dynamics**: F is block-diagonal with 15 copies of the
+standard CV block, dt=1/fps. Q has per-marker dynamics
+noise on the diagonal blocks.
+
+**Per-frame observations**: variable-dimensional per frame.
+For each marker i with p_{i,t} ≥ τ: a 2-dim measurement
+(x_i, y_i) with R_{i,t} = σ_base,i² / p_{i,t}². For each
+candidate triplet (a, b, c) where global Σ exists: a 6-dim
+pseudo-measurement [x_a, y_a, x_b, y_b, x_c, y_c] = mean
+configuration with covariance Σ_abc.
+
+**Triplet Σ scope**: GLOBAL fit. One Σ_abc per triplet,
+estimated from high-confidence frames across all sessions
+in the input collection. Sessions where a triplet's markers
+have insufficient coverage still get the global prior
+applied (at the cost of confident-looking interpolation
+that's not directly supported by that session's
+observations — flagged in output for the user to decide).
+
+**HEAD MARKERS get NO triplet prior in v1.** Each head
+marker (nose, ear_left, ear_right, headmid) is smoothed
+through the same joint-state filter as part of the 60-dim
+state but with NO pseudo-measurements — only their per-marker
+observations and their dynamics couple them. This preserves
+posture-driven signal (rearing, head pitch) for downstream
+behavioral feature extraction. Coupled handling deferred to
+v2 with full latent posture.
+
+**EM noise fitting**: σ_base, q_pos, q_vel per marker fit
+via EM iterations (typically 3-5):
+  1. Initialize from p>0.5 finite-difference velocity stats
+  2. Run forward+backward smoother
+  3. Re-estimate noise from smoothed residuals
+  4. Iterate until parameters stabilize
+Σ_abc is fit ONCE (not EM-updated) — the rigid configuration
+prior shouldn't depend on noise estimates.
+
+**Numerical implementation**: dense NumPy for the v1 build.
+60×60 matrices are tractable (~10ms/frame, ~10 hours for
+3.6M frames; acceptable for one-time runs). Sparse / info
+form deferred unless real-data runs prove unacceptably slow.
+
+**Saved-model artifact** (.npz): per-marker noise
+parameters, triplet definitions, triplet Σ matrices, source
+data hash, version tag.
+
+**Patch breakdown** (patches 85-90, sequential ship):
+  85. Joint-state forward filter only, fixed noise params,
+      no triplet. Synthetic smoke tests with known ground
+      truth.
+  86. RTS backward smoother. Synthetic: smoother variance
+      < filter variance.
+  87. Triplet pseudo-measurement infrastructure + global
+      Σ fitting.
+  88. EM noise parameter fitting wrapped around forward+
+      backward.
+  89. Multi-file orchestrator, parquet support, CLI,
+      save/load. Matches diagnostic's interface.
+  90. Validation on real data + iteration.
+
+Each patch lands cleanly without breaking the others.
+Synthetic smoke tests run after every patch.
+
+**Stage 1.5: Rearing feature module** ~1 day (after Stage 1
+ships)
+- New module `mufasa/features/rearing.py`
+- Takes smoothed pose DataFrame, returns continuous `d_ears(t)`
+  and discrete rearing state via 2-state lognormal HMM (EM-fit)
+- Global HMM fit across all sessions concatenated; applied per
+  session for inference
+- Lognormal emission distribution (right choice for
+  non-negative distances; +5 lines vs Gaussian)
+- Missing-observation handling for ear-dropout frames
+- Exposes both posterior `p_rearing(t)` and Viterbi
+  `is_rearing(t)`
+
+**Stage 2: v2 — full latent posture model for the head** ~3-4
+weeks
+- Augment v1's joint-state with a 1D head-pitch latent variable
+- Posture-conditional triplet Σ for the head triplet
+  (nose, ear_left, ear_right) — distinct Σ per posture bin,
+  or a continuous Σ(pitch)
+- Body remains v1 (static Σ). Head gets posture-aware Σ.
+- Validation: synthetic + hand-curated rearing frames + held-out
+  posture-distinguishability test
+
+**Stage 3: v3 — Qt UI** ~1 week
 - Per-bodypart and per-triplet config table form
-- Triplet selection UI (defaults + manual override)
-- Likelihood threshold + spatial weight + KD-tree-K controls
-- Diagnostic plots in-app (velocity-binned covariance
-  visualization, before/after trajectory comparison)
-- Integration with existing data import workflow (the form
-  becomes a peer of the existing simple Smoothing form)
+- Triplet selection UI (defaults from auto-detect + manual
+  override)
+- Likelihood threshold + spatial weight controls
+- Diagnostic plots in-app (per-session quality, candidate
+  triplet visualization, before/after trajectory comparison)
+- Integration with existing data import workflow
 
-**Total estimate: 4-7 weeks of focused work** for the full
-system. Dependent on diagnostic results justifying Stage 2.
-If diagnostics show a static-Σ approach is sufficient, Stage 2
-shrinks substantially (~1-2 weeks).
+**Total estimate: 6-8 weeks** for v1 + v1.5 + v2 + Qt UI.
+v1 + v1.5 alone is ~4-4.5 weeks and produces principled
+joint smoothed pose + rearing feature.
 
 ### 5.2 Module structure (revised)
 ```
@@ -779,8 +965,8 @@ mufasa/data_processors/kalman_smoother/
 ├── __init__.py
 ├── empirical_fit.py          # σ_base, q_pos, q_vel fitting from S_high
 ├── kalman_filter.py          # per-marker forward filter + RTS smoother
-├── triplet_features.py       # egocentric frame + 13-dim feature extraction
-├── velocity_frame.py         # head-frame velocity computation
+├── triplet_features.py       # egocentric frame + 15-dim feature extraction
+├── velocity_frame.py         # head- and body-frame velocity computation
 ├── conditional_covariance.py # KD-tree + local kernel covariance
 ├── spatial_prior.py          # Mahalanobis loss in measurement update
 ├── two_pass.py               # bootstrap velocity → re-smooth orchestration
@@ -801,16 +987,26 @@ class KalmanPoseSmoother(ConfigReader):
         manual_triplets: list[tuple[str, str, str]] | None = None,
         head_triplet: tuple[str, str, str] | None = None,
             # If None, picked from defaults; required for vel-conditional
+        body_markers: list[str] | None = None,
+            # Markers used for body centroid + PCA major axis.
+            # If None, defaults to all markers minus head triplet markers.
+            # Pass empty list to disable body conditioning (2D fallback).
         # Hyperparameters
         likelihood_threshold: float = 0.95,  # τ_high
         likelihood_floor: float = 0.01,      # p_floor
         spatial_weight: float = 1.0,         # λ_spatial
-        kdtree_k: int = 200,                 # KNN for vel-conditional Σ
+        kdtree_k: int | None = None,
+            # KNN for vel-conditional Σ. Default: 200 if 2D, 50 if 4D.
         kdtree_bandwidth: float | None = None,  # None = Silverman
         spatial_reg_epsilon: float = 1e-6,   # covariance regularizer
         # Mode flags
         use_velocity_conditional: bool = True,
             # Set False to use static Σ (Stage 1 behavior)
+        use_body_velocity: bool = True,
+            # Set False to drop body velocity from conditioning vector
+            # (2D conditioning even when body markers are available).
+            # Useful for ablation testing or when body markers are
+            # too unreliable to anchor the body frame.
         # Model persistence
         model_path: str | None = None,
             # If set + file exists, load that model (skip refit)
@@ -989,7 +1185,28 @@ valuable.
   If the animal rarely visits certain velocity regimes, the
   KNN-based local covariance has high variance / few samples.
   The fallback-to-static-Σ mechanism should catch this but
-  could be brittle if the threshold is mis-tuned.
+  could be brittle if the threshold is mis-tuned. The 4D
+  conditioning makes this risk worse than 2D, since 4D space
+  has many more "sparse corners."
+- **Body-axis sign flip from PCA.** PCA returns an unsigned
+  eigenvector (v and -v are both valid). Sign disambiguation
+  uses head direction when available, with continuity fallback.
+  Risks: if head markers fail at the start of a long valid
+  body run, the sign is arbitrary for that whole run; if
+  head markers are unreliable for an extended segment, the
+  body axis could drift via continuity errors (each frame's
+  sign is correct relative to the previous, but the chain can
+  walk away from the head-anchored definition). The diagnostic
+  reports n_signed_arbitrary / n_signed_by_continuity counts
+  so users can detect this.
+- **Body shape near-isotropic (PCA degenerate).** When body
+  markers form a roughly circular pattern around the body
+  centroid (eigenvalue ratio close to 1), the PCA major axis
+  is poorly determined and small noise can flip its
+  orientation. Common in body-marker schemes that lack a
+  strong anterior-posterior arrangement. Diagnostic detects
+  these frames; the fitting code should warn if their
+  fraction is non-trivial.
 - **Two-pass divergence.** If Pass-1 velocities are very wrong
   (because the animal moves erratically and the static-Σ
   initial smoother gets it wrong), Pass-2 conditional Σ might
@@ -1089,12 +1306,13 @@ confirms the data warrants it.
 
 ## 8. Decisions committed (2026-05-01)
 
-The five questions originally posed in this section have all
-been answered:
+The five original questions have been answered, plus a sixth
+about body-frame velocity:
 
-1. **Triplet content (§4.1)**: ✅ Full 13-dim feature vector
+1. **Triplet content (§4.1)**: ✅ Full 15-dim feature vector
    (angles + distances + egocentric coords + head-frame
-   velocity). Was option (d) — "all of the above" — committed.
+   velocity + body-frame velocity). Was option (d) — "all of
+   the above" — committed; subsequently extended in #6 below.
 
 2. **Triplet selection (§4.2)**: ✅ Defaults per body-part
    scheme + manual override. All angles + all marker
@@ -1107,7 +1325,8 @@ been answered:
    **EXTENDED with velocity-conditional Σ via KD-tree + local
    kernel covariance** (committed approach: Option C in the
    velocity-conditional section). The covariance is no longer
-   static — it's a function Σ^τ(v) of head-frame velocity.
+   static — it's a function Σ^τ(v) of velocity. Initially v
+   was 2D (head only); subsequently extended to 4D in #6.
 
 4. **Run diagnostic before committing? (§7)**: ✅ Yes.
    Diagnostic is Stage 0 in §5.1 and ships as a separate
@@ -1120,6 +1339,20 @@ been answered:
    diagnostic shows velocity conditioning isn't needed,
    wrapping LP-EKS becomes much more attractive.
 
+6. **Body-frame velocity? (added 2026-05-01)**: ✅ Yes — use
+   both head-frame and body-frame velocities as 4D
+   conditioning. Body frame defined by **option (b): body
+   centroid + PCA major axis** on body marker positions per
+   frame. Sign disambiguated using head direction (preferred)
+   or temporal continuity (fallback). The 4D conditioning
+   captures decoupled head/body motion regimes (scanning,
+   twisting) that 2D conditioning misses. Approach 1 (4D
+   shared conditioning across all triplets) committed over
+   Approach 2 (per-triplet head-or-body conditioning) for
+   simplicity — the empirical fitting will learn which
+   dimensions matter for each triplet without us having to
+   label them.
+
 ### Remaining open decisions
 
 These haven't been decided yet, but are second-order — we can
@@ -1129,9 +1362,8 @@ prerequisite:
 - **Bandwidth h selection method**: Silverman default vs
   cross-validated. Decide empirically after seeing the
   diagnostic data.
-- **K (KNN size for local covariance)**: default 200, but
-  this depends on |S_high| in real data. Tune during
-  implementation.
+- **K (KNN size for local covariance)**: default K=50 in 4D
+  conditioning (was K=200 in 2D). Tunable per project.
 - **Two-pass vs iterated EKF for the circular dependency**:
   start with two-pass; upgrade to iterated only if convergence
   problems show in v1.
@@ -1139,6 +1371,11 @@ prerequisite:
   use static Σ instead of conditional). Default: average
   KNN distance > 2× median in training set.
 - **Multi-animal extension**: deferred to post-v2.
+- **Body-frame fallback** when body shape is near-isotropic
+  or body markers are scarce. Current plan: detect at fit
+  time, warn, fall back to 2D head-only conditioning if
+  fraction of degenerate frames exceeds threshold (default
+  20%). Threshold is tunable.
 
 ### Decisions committed but worth revisiting if v1 results disappoint
 

@@ -342,7 +342,109 @@ def main() -> int:
             f"got {parquets}"
         )
 
-    print("smoke_csv_to_parquet: 8/8 cases passed")
+    # ------------------------------------------------------------------ #
+    # Case 9: REGRESSION — multi-row IMPORTED_POSE header CSV round-trips
+    # through convert + verify cleanly. Prior bug: the multi-row path
+    # called df.to_parquet without index=False, which caused pandas to
+    # preserve the dataframe index as an "__index_level_0__" column in
+    # the parquet schema. verify_parquet then compared 45 csv columns
+    # against 46 parquet columns (incl. the preserved index) and
+    # always returned False for input_csv/ files.
+    # ------------------------------------------------------------------ #
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        csv_path = str(td / "imported_pose.csv")
+        pq_path = str(td / "imported_pose.parquet")
+        # Build a multi-row IMPORTED_POSE-format CSV with realistic
+        # 3-row header and a small number of frames
+        markers = ["nose", "ear_left", "ear_right", "center", "tail"]
+        suffixes = ["x", "y", "p"]
+        with open(csv_path, "w") as f:
+            n_data_cols = len(markers) * len(suffixes)
+            # Row 0: scorer (IMPORTED_POSE × n_data_cols)
+            f.write("," + ",".join(["IMPORTED_POSE"] * n_data_cols) + "\n")
+            # Row 1: bodypart-row (also IMPORTED_POSE in Mufasa's format)
+            f.write("," + ",".join(["IMPORTED_POSE"] * n_data_cols) + "\n")
+            # Row 2: real column names
+            real_names = [f"{m}_{s}" for m in markers for s in suffixes]
+            f.write("," + ",".join(real_names) + "\n")
+            # Data rows
+            for i in range(20):
+                values = [str(i)] + [f"{(i + k) * 1.5:.4f}"
+                                     for k in range(n_data_cols)]
+                f.write(",".join(values) + "\n")
+
+        # Convert
+        n_rows, n_cols = csv_to_parquet.convert_csv_to_parquet(
+            csv_path, pq_path, has_index=True,
+        )
+        assert n_rows == 20, f"Expected 20 data rows, got {n_rows}"
+        assert n_cols == 15, f"Expected 15 data columns, got {n_cols}"
+
+        # Inspect the parquet schema directly — it must NOT contain
+        # the pandas-internal __index_level_0__ column.
+        import pyarrow.parquet as pq_module
+        pq_cols = list(pq_module.read_schema(pq_path).names)
+        assert "__index_level_0__" not in pq_cols, (
+            f"Parquet schema should not preserve the dataframe index "
+            f"as a column; got {pq_cols}"
+        )
+        assert pq_cols == real_names, (
+            f"Parquet columns should match the CSV's last-header-row "
+            f"names exactly; got {pq_cols} vs {real_names}"
+        )
+
+        # Now the full verification cycle should succeed.
+        assert csv_to_parquet.verify_parquet(csv_path, pq_path, has_index=True), (
+            "verify_parquet should succeed on a clean multi-row "
+            "round-trip — this was the original bug"
+        )
+
+    # ------------------------------------------------------------------ #
+    # Case 10: REGRESSION (compat) — verify_parquet tolerates parquets
+    # that were written by the OLD (buggy) code path with the index
+    # preserved. Users may have such files on disk from a partial
+    # prior run; we shouldn't fail those when they re-run.
+    # ------------------------------------------------------------------ #
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        csv_path = str(td / "legacy.csv")
+        pq_path = str(td / "legacy.parquet")
+        # Same multi-row CSV
+        markers = ["nose", "ear_left", "ear_right"]
+        suffixes = ["x", "y", "p"]
+        n_data_cols = len(markers) * len(suffixes)
+        with open(csv_path, "w") as f:
+            f.write("," + ",".join(["IMPORTED_POSE"] * n_data_cols) + "\n")
+            f.write("," + ",".join(["IMPORTED_POSE"] * n_data_cols) + "\n")
+            real_names = [f"{m}_{s}" for m in markers for s in suffixes]
+            f.write("," + ",".join(real_names) + "\n")
+            for i in range(10):
+                values = [str(i)] + [f"{(i + k) * 0.5:.4f}"
+                                     for k in range(n_data_cols)]
+                f.write(",".join(values) + "\n")
+
+        # Simulate the OLD (buggy) write path: pandas read with
+        # multi-index, flatten, then write WITH index preservation
+        df = pd.read_csv(csv_path, index_col=0, header=[0, 1, 2])
+        df.columns = df.columns.get_level_values(-1)
+        df = df.apply(pd.to_numeric, errors="coerce")
+        df.to_parquet(pq_path)  # NO index=False — old buggy behavior
+
+        import pyarrow.parquet as pq_module
+        pq_cols = list(pq_module.read_schema(pq_path).names)
+        assert "__index_level_0__" in pq_cols, (
+            "Sanity check: simulated legacy write should produce the "
+            "preserved-index column"
+        )
+
+        # The hardened verify_parquet should accept this anyway
+        assert csv_to_parquet.verify_parquet(csv_path, pq_path, has_index=True), (
+            "verify_parquet should tolerate legacy parquets with "
+            "preserved __index_level_0__ column"
+        )
+
+    print("smoke_csv_to_parquet: 10/10 cases passed")
     return 0
 
 

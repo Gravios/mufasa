@@ -249,7 +249,15 @@ def convert_csv_to_parquet(
     # parsed as object dtype if pandas saw the header rows
     # ambiguously. Force-cast.
     df = df.apply(pd.to_numeric, errors="coerce")
-    df.to_parquet(parquet_path)
+    # IMPORTANT: index=False mirrors the flat-header path (which
+    # explicitly drops the leading index column before writing).
+    # Without index=False, pandas preserves the index by writing
+    # an `__index_level_0__` column into the parquet schema,
+    # which causes the column-name comparison in verify_parquet
+    # to fail with N+1 != N. The index is just a row counter
+    # (0, 1, 2, ...), not meaningful data — dropping it matches
+    # both paths and matches what downstream Mufasa code expects.
+    df.to_parquet(parquet_path, index=False)
     return len(df), len(df.columns)
 
 
@@ -301,6 +309,14 @@ def verify_parquet(
     import pyarrow.parquet as pq_module
     pq_schema = pq_module.read_schema(parquet_path)
     pq_cols = list(pq_schema.names)
+
+    # Tolerate parquets that were written with index preservation
+    # (older versions of this tool didn't pass index=False on the
+    # multi-row path, so on-disk parquets from prior runs may have
+    # an extra "__index_level_0__" column). Strip any of pandas'
+    # well-known internal index column names before comparing.
+    _INDEX_COL_NAMES = ("__index_level_0__",)
+    pq_cols = [c for c in pq_cols if c not in _INDEX_COL_NAMES]
 
     if csv_cols != pq_cols:
         return False
