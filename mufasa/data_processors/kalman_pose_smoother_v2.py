@@ -1916,3 +1916,349 @@ def rts_smooth_v2(
         P_smooth=P_smooth,
         P_lag_one=P_lag_one,
     )
+
+
+# ============================================================
+# Shumway-Stoffer M-step on body state — patch 103
+# ============================================================
+#
+# After the E-step (forward filter + RTS smoother), the M-step
+# fits noise parameters that maximize the expected complete-
+# data log-likelihood given the smoothed posterior estimates.
+#
+# For our linear-dynamics model x_{t+1} = F x_t + w_t with
+# w_t ~ N(0, Q):
+#
+#   Q-hat = (1/(T-1)) (S11 - S10 F^T - F S10^T + F S00 F^T)
+#
+# where:
+#   S00 = Σ_{t=0..T-2} (x̂_t x̂_t^T + P_t)
+#   S11 = Σ_{t=0..T-2} (x̂_{t+1} x̂_{t+1}^T + P_{t+1})
+#   S10 = Σ_{t=0..T-2} (x̂_{t+1} x̂_t^T + P_{t,t+1|T})
+#                                         ↑ lag-one cross-cov
+#
+# These are the sufficient statistics (E-step output, used in
+# M-step). Each is a (D, D) matrix.
+#
+# σ_marker is fit per-marker from observation residuals:
+#
+#   σ_m²_hat = (1/(2 N_m)) Σ_t p_t² (||z_t - h(x̂_t)||²
+#                                    + trace(H_t P_{t|T} H_t^T))
+#
+# where 2 N_m is the total observation count (2 axes × N_m
+# observation frames) and the trace correction accounts for
+# posterior uncertainty in h(x).
+#
+# Per-block q values are recovered from the diagonal-block
+# of Q-hat using the q-scaling template:
+#
+#   For 4×4 (pos_x, pos_y, vel_x, vel_y) block:
+#     Q-hat block diagonals: dt^4/4 (pos), dt² (vel)
+#     q-recovered = average(vel-vel diagonals) / dt²
+#
+#   For 2×2 (pos, vel) block:
+#     Q-hat block diagonals: dt^4/4, dt²
+#     q-recovered = vel-vel diagonal / dt²
+#
+# Floors and ceilings (from v1 patches 91-94 lessons):
+#   - σ floor: 0.5 px global; ceiling: 3× initial estimate
+#   - q floor: max(global_floor, q_initial / 10)
+#
+# These prevent the degenerate fixed points that plagued v1's
+# EM — σ→0 / q→∞ runaway and σ→large / q→0 collapse.
+
+
+# Per-axis floor for σ. Below this, observations are essentially
+# noise-free; setting σ here prevents σ from going to zero.
+_M_STEP_FLOOR_SIGMA = _FLOOR_SIGMA_MARKER_V2  # 0.5 from patch 101
+
+# Per-axis ceiling factor: σ ≤ ceiling_factor × σ_initial.
+# Prevents σ from running away upward.
+_M_STEP_SIGMA_CEILING_FACTOR = 3.0
+
+# Per-axis q floor factor: q ≥ floor_factor × q_initial. Below
+# the global floor, we use the global floor.
+_M_STEP_Q_FLOOR_FACTOR = 0.1
+
+
+@dataclass
+class _MStepStatsV2:
+    """Sufficient statistics accumulated from one or more
+    sessions during the E-step. Used by ``finalize_m_step_v2``
+    to fit Q and σ.
+
+    Q stats (D, D):
+      S00, S11, S10 — sums over transition pairs.
+    σ stats (per marker):
+      sigma_sum_sq[m] — Σ p_t² (||residual||² + trace_correction)
+      sigma_n_obs[m]  — total number of observation axes for m
+                        (2 × frames where m was observed)
+    n_pairs: total number of transition pairs (T-1 per session,
+             summed across sessions).
+    """
+    S00: np.ndarray
+    S11: np.ndarray
+    S10: np.ndarray
+    n_pairs: int
+    sigma_sum_sq: Dict[str, float]
+    sigma_n_obs: Dict[str, int]
+
+    @classmethod
+    def empty(cls, layout: BodyLayout) -> "_MStepStatsV2":
+        D = layout.state_dim
+        return cls(
+            S00=np.zeros((D, D)),
+            S11=np.zeros((D, D)),
+            S10=np.zeros((D, D)),
+            n_pairs=0,
+            sigma_sum_sq={m: 0.0 for m in layout.marker_names},
+            sigma_n_obs={m: 0 for m in layout.marker_names},
+        )
+
+    def __iadd__(self, other: "_MStepStatsV2") -> "_MStepStatsV2":
+        """Combine stats from two sessions (used for multi-
+        session EM).
+        """
+        self.S00 += other.S00
+        self.S11 += other.S11
+        self.S10 += other.S10
+        self.n_pairs += other.n_pairs
+        for m in self.sigma_sum_sq:
+            self.sigma_sum_sq[m] += other.sigma_sum_sq.get(m, 0.0)
+            self.sigma_n_obs[m] += other.sigma_n_obs.get(m, 0)
+        return self
+
+
+def accumulate_m_step_stats_v2(
+    smooth_result: SmoothResultV2,
+    positions: np.ndarray,
+    likelihoods: np.ndarray,
+    layout: BodyLayout,
+    likelihood_threshold: float = 0.5,
+) -> _MStepStatsV2:
+    """Accumulate sufficient statistics for the M-step from
+    one session's smoother output.
+
+    Computes:
+      - Q stats (S00, S11, S10) over all transition pairs
+        t=0..T-2.
+      - σ stats per marker, including trace correction for
+        posterior uncertainty in predicted observations.
+
+    Parameters
+    ----------
+    smooth_result : SmoothResultV2
+        Output of rts_smooth_v2.
+    positions : (T, K, 2)
+    likelihoods : (T, K)
+    layout : BodyLayout
+    likelihood_threshold : float
+        Frames with marker likelihood below this are excluded
+        from σ stats for that marker.
+
+    Returns
+    -------
+    _MStepStatsV2
+    """
+    T = smooth_result.x_smooth.shape[0]
+    D = layout.state_dim
+    K = positions.shape[1]
+    marker_names = layout.marker_names
+
+    stats = _MStepStatsV2.empty(layout)
+
+    # Q stats: sum over t=0..T-2 of (x_t x_t^T + P_t),
+    # (x_{t+1} x_{t+1}^T + P_{t+1}), (x_{t+1} x_t^T + P_{t,t+1}).
+    # Vectorize for speed.
+    x = smooth_result.x_smooth  # (T, D)
+    P = smooth_result.P_smooth  # (T, D, D)
+    P_lag = smooth_result.P_lag_one  # (T-1, D, D)
+
+    # S00: sum over t=0..T-2 of x_t x_t^T + P_t
+    # → outer products of x[0:T-1] + sum of P[0:T-1]
+    x_lo = x[:-1]  # (T-1, D)
+    x_hi = x[1:]   # (T-1, D)
+    # einsum for outer product sum
+    S00 = np.einsum("ti,tj->ij", x_lo, x_lo) + P[:-1].sum(axis=0)
+    S11 = np.einsum("ti,tj->ij", x_hi, x_hi) + P[1:].sum(axis=0)
+    S10 = np.einsum("ti,tj->ij", x_hi, x_lo) + P_lag.sum(axis=0)
+    stats.S00 = S00
+    stats.S11 = S11
+    stats.S10 = S10
+    stats.n_pairs = T - 1
+
+    # σ stats: per-marker.
+    # For each frame and each observed marker, compute:
+    #   residual_sq = ||z_t - h(x̂_t)||²
+    #   trace_corr = trace(H_t,m P_{t|T} H_t,m^T)
+    #   weighted contribution = p_t² * (residual_sq + trace_corr)
+    for t in range(T):
+        # Build h(x̂_t) and H at x̂_t
+        fk = forward_kinematics(x[t], layout)
+        pred = state_to_marker_positions(x[t], layout, fk=fk)
+        H_full = state_to_marker_jacobian(x[t], layout, fk=fk)
+        # H_full is (2K, D)
+
+        for k, m in enumerate(marker_names):
+            x_obs = positions[t, k, 0]
+            y_obs = positions[t, k, 1]
+            p = likelihoods[t, k]
+            if (
+                not (np.isfinite(x_obs) and np.isfinite(y_obs))
+                or p < likelihood_threshold
+            ):
+                continue
+
+            residual = np.array([
+                x_obs - pred[k, 0],
+                y_obs - pred[k, 1],
+            ])
+            residual_sq = float(residual @ residual)
+            # trace(H_m P H_m^T) = sum over rows of H_m of
+            # H_row @ P @ H_row^T.  H_m is (2, D).
+            H_m = H_full[2 * k:2 * k + 2, :]
+            trace_corr = float(np.trace(H_m @ P[t] @ H_m.T))
+
+            w = p * p
+            stats.sigma_sum_sq[m] += w * (residual_sq + trace_corr)
+            stats.sigma_n_obs[m] += 2  # x and y axes
+
+    return stats
+
+
+def finalize_m_step_v2(
+    stats: _MStepStatsV2,
+    layout: BodyLayout,
+    dt: float,
+    prev_params: NoiseParamsV2,
+    initial_params: Optional[NoiseParamsV2] = None,
+) -> NoiseParamsV2:
+    """Convert accumulated sufficient statistics into refined
+    NoiseParamsV2.
+
+    Computes Q-hat from S00/S11/S10/F, then extracts per-block
+    q values. Computes σ-hat from per-marker stats. Applies
+    floors and ceilings to prevent EM from settling on the
+    degenerate fixed points that plagued v1.
+
+    Parameters
+    ----------
+    stats : _MStepStatsV2
+        Accumulated sufficient statistics.
+    layout : BodyLayout
+    dt : float
+    prev_params : NoiseParamsV2
+        Previous iteration's params, used as fallback for
+        markers / segments with insufficient data.
+    initial_params : NoiseParamsV2, optional
+        Initial (iteration-0) params, used for floor/ceiling
+        computation. If None, uses prev_params.
+
+    Returns
+    -------
+    NoiseParamsV2
+    """
+    if initial_params is None:
+        initial_params = prev_params
+
+    F = build_F_v2(layout, dt)
+    n_pairs = max(stats.n_pairs, 1)
+
+    # Q-hat = (1/n_pairs) * (S11 - S10 F^T - F S10^T + F S00 F^T)
+    Q_hat = (
+        stats.S11
+        - stats.S10 @ F.T
+        - F @ stats.S10.T
+        + F @ stats.S00 @ F.T
+    ) / n_pairs
+    # Symmetrize against fp drift
+    Q_hat = 0.5 * (Q_hat + Q_hat.T)
+
+    indices = _pack_state_layout_indices(layout)
+    dt2 = dt * dt
+
+    # Helper: extract q from a 4×4 (pos_x, pos_y, vel_x, vel_y)
+    # block. Use velocity-velocity diagonals (Q[2,2] = Q[3,3]
+    # = q * dt²).
+    def _q_from_4block(block: np.ndarray) -> float:
+        return float((block[2, 2] + block[3, 3]) / 2.0 / dt2)
+
+    # Helper: extract q from a 2×2 (pos, vel) block.
+    def _q_from_2block(block: np.ndarray) -> float:
+        return float(block[1, 1] / dt2)
+
+    # ---------- Q components ----------
+
+    # Root translation: indices 0:4 (x, y, vx, vy)
+    q_root_pos_raw = _q_from_4block(Q_hat[0:4, 0:4])
+    q_root_pos_floor = max(
+        _FLOOR_Q_ROOT_POS,
+        initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
+    )
+    q_root_pos = max(q_root_pos_raw, q_root_pos_floor)
+
+    # Root orientation: indices 4:8
+    q_root_ori_raw = _q_from_4block(Q_hat[4:8, 4:8])
+    q_root_ori_floor = max(
+        _FLOOR_Q_ROOT_ORI,
+        initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
+    )
+    q_root_ori = max(q_root_ori_raw, q_root_ori_floor)
+
+    # Per-segment orientation
+    q_seg_ori: Dict[str, float] = {}
+    for seg_name in layout.non_root_topo_order:
+        sl = layout.slice_segment_orientation(seg_name)
+        block = Q_hat[sl, sl]
+        q_raw = _q_from_4block(block)
+        q_initial = initial_params.q_seg_ori.get(
+            seg_name, _FLOOR_Q_SEG_ORI,
+        )
+        q_floor = max(
+            _FLOOR_Q_SEG_ORI, q_initial * _M_STEP_Q_FLOOR_FACTOR,
+        )
+        q_seg_ori[seg_name] = max(q_raw, q_floor)
+
+    # Per-segment length
+    q_length: Dict[str, float] = {}
+    for seg_name in layout.non_root_topo_order:
+        sl = layout.slice_segment_length(seg_name)
+        block = Q_hat[sl, sl]
+        q_raw = _q_from_2block(block)
+        q_initial = initial_params.q_length.get(
+            seg_name, _FLOOR_Q_LENGTH,
+        )
+        q_floor = max(
+            _FLOOR_Q_LENGTH, q_initial * _M_STEP_Q_FLOOR_FACTOR,
+        )
+        q_length[seg_name] = max(q_raw, q_floor)
+
+    # ---------- σ components ----------
+
+    sigma_marker: Dict[str, float] = {}
+    for m in layout.marker_names:
+        n_obs = stats.sigma_n_obs.get(m, 0)
+        if n_obs < 4:
+            # Not enough observations — keep previous value
+            sigma_marker[m] = prev_params.sigma_marker.get(m, 3.0)
+            continue
+        # σ²_hat = (1/n_obs) * sum_sq
+        # n_obs already counts 2 axes per frame
+        sigma_sq = stats.sigma_sum_sq[m] / n_obs
+        sigma_raw = float(np.sqrt(max(sigma_sq, 0.0)))
+        # Floor and ceiling
+        sigma_floor = _M_STEP_FLOOR_SIGMA
+        sigma_initial = initial_params.sigma_marker.get(m, 3.0)
+        sigma_ceiling = _M_STEP_SIGMA_CEILING_FACTOR * sigma_initial
+        sigma_marker[m] = float(
+            max(sigma_floor, min(sigma_ceiling, sigma_raw))
+        )
+
+    return NoiseParamsV2(
+        sigma_marker=sigma_marker,
+        q_root_pos=q_root_pos,
+        q_root_ori=q_root_ori,
+        q_seg_ori=q_seg_ori,
+        q_length=q_length,
+        constraint_sigma=prev_params.constraint_sigma,
+    )
