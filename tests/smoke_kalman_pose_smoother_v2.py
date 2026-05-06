@@ -558,7 +558,291 @@ def main() -> int:
         f"that are far from observations: max_diff={max_diff:.3f}"
     )
 
-    print("smoke_kalman_pose_smoother_v2: 19/19 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 101: EKF forward filter.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        NoiseParamsV2, build_F_v2, build_Q_v2,
+        forward_filter_v2, _build_constraint_observations,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 20: build_F_v2 has correct constant-velocity
+    # structure — applying F to a state propagates positions
+    # by velocity*dt, leaves velocities unchanged.
+    # ---------------------------------------------------------- #
+    layout = standard_rat_layout()
+    indices = _pack_state_layout_indices(layout)
+    dt = 1.0 / 30.0
+    F = build_F_v2(layout, dt)
+    assert F.shape == (layout.state_dim, layout.state_dim)
+
+    # Build a state with known velocities, zero positions
+    x = np.zeros(layout.state_dim)
+    x[indices["__root__"]["vx"]] = 10.0
+    x[indices["__root__"]["vy"]] = -5.0
+    x[indices["__root__"]["cos_dot"]] = 0.1
+    x[indices["__root__"]["sin_dot"]] = 0.2
+    # Set initial cos=1, sin=0 (otherwise ambient cos/sin
+    # don't propagate sensibly under linear dynamics)
+    x[indices["__root__"]["cos"]] = 1.0
+    x[indices["__root__"]["sin"]] = 0.0
+    for seg_name in layout.non_root_topo_order:
+        x[indices[seg_name]["cos"]] = 1.0
+        x[indices[seg_name]["length"]] = 5.0
+        x[indices[seg_name]["length_dot"]] = 0.5
+
+    x_next = F @ x
+    # Root x: was 0, vx=10, dt=1/30 → 10/30
+    assert abs(x_next[indices["__root__"]["x"]] - 10.0/30.0) < 1e-12
+    assert abs(x_next[indices["__root__"]["y"]] - (-5.0/30.0)) < 1e-12
+    # Velocities unchanged
+    assert abs(x_next[indices["__root__"]["vx"]] - 10.0) < 1e-12
+    assert abs(x_next[indices["__root__"]["vy"]] - (-5.0)) < 1e-12
+    # Orientation cos: was 1, ċ=0.1 → 1 + 0.1/30
+    assert abs(x_next[indices["__root__"]["cos"]] - (1.0 + 0.1/30.0)) < 1e-12
+    assert abs(x_next[indices["__root__"]["sin"]] - (0.0 + 0.2/30.0)) < 1e-12
+    # Length: 5 + 0.5*dt
+    seg = layout.non_root_topo_order[0]
+    assert abs(x_next[indices[seg]["length"]] - (5.0 + 0.5/30.0)) < 1e-12
+
+    # ---------------------------------------------------------- #
+    # Case 21: build_Q_v2 is symmetric + positive semi-definite.
+    # ---------------------------------------------------------- #
+    params = NoiseParamsV2.default(layout)
+    Q = build_Q_v2(layout, params, dt)
+    assert Q.shape == (layout.state_dim, layout.state_dim)
+    # Symmetric
+    assert np.allclose(Q, Q.T), "Q should be symmetric"
+    # PSD: eigenvalues all ≥ 0 (allow tiny fp negative)
+    eigvals = np.linalg.eigvalsh(Q)
+    min_eig = float(eigvals.min())
+    assert min_eig > -1e-10, (
+        f"Q has negative eigenvalue {min_eig:.6e}; should be PSD"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 22: constraint observations have target zero,
+    # current value cos²+sin²-1, Jacobian (2cos, 2sin).
+    # ---------------------------------------------------------- #
+    layout = standard_rat_layout()
+    state = np.zeros(layout.state_dim)
+    indices = _pack_state_layout_indices(layout)
+    # Set root cos=0.6, sin=0.8 (unit norm)
+    state[indices["__root__"]["cos"]] = 0.6
+    state[indices["__root__"]["sin"]] = 0.8
+    # All other segments cos=1, sin=0 (unit norm)
+    for seg_name in layout.non_root_topo_order:
+        state[indices[seg_name]["cos"]] = 1.0
+        state[indices[seg_name]["sin"]] = 0.0
+
+    z, h, H = _build_constraint_observations(state, layout, 0.05)
+    # For all-unit-norm states, constraint residual h = 0
+    assert np.allclose(h, 0.0), (
+        f"Constraint residual should be 0 for unit-norm state; "
+        f"got {h}"
+    )
+    # Targets are all zero
+    assert np.allclose(z, 0.0)
+    # Number of constraints = 1 root + 6 non-root = 7
+    assert h.shape == (7,)
+    # Jacobian rows: H[0] should have nonzero entries only at
+    # root cos/sin columns
+    nonzero_root = np.where(np.abs(H[0]) > 1e-12)[0]
+    expected = {indices["__root__"]["cos"], indices["__root__"]["sin"]}
+    assert set(nonzero_root.tolist()) == expected, (
+        f"Root constraint Jacobian has wrong sparsity: {nonzero_root}"
+    )
+    # Values: 2 * cos = 1.2, 2 * sin = 1.6
+    assert abs(H[0, indices["__root__"]["cos"]] - 1.2) < 1e-12
+    assert abs(H[0, indices["__root__"]["sin"]] - 1.6) < 1e-12
+
+    # Now perturb root cos so unit norm violated → residual > 0
+    state2 = state.copy()
+    state2[indices["__root__"]["cos"]] = 1.5  # not unit
+    z, h, H = _build_constraint_observations(state2, layout, 0.05)
+    expected_residual = 1.5**2 + 0.8**2 - 1.0  # 1.44 + 0.64 - 1 = 1.08
+    assert abs(h[0] - expected_residual) < 1e-10
+
+    # ---------------------------------------------------------- #
+    # Case 23: forward_filter_v2 on synthetic clean data
+    # converges to truth. The smoothed marker positions should
+    # be very close to the noise-free truth.
+    # ---------------------------------------------------------- #
+    layout = standard_rat_layout()
+    rng = np.random.default_rng(2026)
+    fps = 30.0
+    dt = 1.0 / fps
+    T = 200
+    marker_names_layout = layout.marker_names
+    n_m = len(marker_names_layout)
+    name_to_idx = {n: i for i, n in enumerate(marker_names_layout)}
+
+    # Build a true state that's mostly stationary — just
+    # constant-velocity drift of root, all segments aligned.
+    indices = _pack_state_layout_indices(layout)
+    true_state_template = np.zeros(layout.state_dim)
+    true_state_template[indices["__root__"]["x"]] = 100.0
+    true_state_template[indices["__root__"]["y"]] = 200.0
+    true_state_template[indices["__root__"]["vx"]] = 1.0  # drift
+    true_state_template[indices["__root__"]["vy"]] = 0.0
+    true_state_template[indices["__root__"]["cos"]] = 1.0
+    true_state_template[indices["__root__"]["sin"]] = 0.0
+    for seg_name in layout.non_root_topo_order:
+        true_state_template[indices[seg_name]["cos"]] = 1.0
+        true_state_template[indices[seg_name]["sin"]] = 0.0
+        true_state_template[indices[seg_name]["length"]] = 5.0
+
+    # Generate frames by propagating with F, generating marker
+    # observations from forward kinematics + small noise
+    F = build_F_v2(layout, dt)
+    sigma_obs = 1.0  # px noise
+    true_states = np.zeros((T, layout.state_dim))
+    true_states[0] = true_state_template
+    for t in range(1, T):
+        true_states[t] = F @ true_states[t-1]
+
+    # Generate noisy observations
+    positions_obs = np.zeros((T, n_m, 2))
+    likelihoods_obs = np.full((T, n_m), 0.95)
+    fitted_lengths = FittedLengths(
+        segment_lengths={s: 5.0 for s in layout.non_root_topo_order},
+        segment_length_iqr={s: 0.1 for s in layout.non_root_topo_order},
+        marker_offsets={
+            "back2": (0.0, 0.0), "back1": (1.0, 0.0),
+            "back3": (1.0, np.pi),
+            "lateral_left": (1.0, np.pi/2),
+            "lateral_right": (1.0, -np.pi/2),
+            "center": (0.5, 0.0), "back4": (0.0, 0.0),
+            "neck": (0.0, 0.0), "headmid": (0.0, 0.0),
+            "nose": (1.0, 0.0),
+            "ear_left": (0.5, np.pi/3),
+            "ear_right": (0.5, -np.pi/3),
+            "tailbase": (0.0, 0.0), "tailmid": (0.0, 0.0),
+            "tailend": (0.0, 0.0),
+        },
+    )
+    for t in range(T):
+        clean = state_to_marker_positions(true_states[t], layout)
+        # Reorder from layout marker order to our test
+        # marker_names ordering (which IS layout.marker_names here)
+        positions_obs[t] = clean + rng.normal(0, sigma_obs, (n_m, 2))
+
+    # Run filter
+    params = NoiseParamsV2.default(
+        layout, sigma_marker=sigma_obs, q_root_pos=10.0,
+    )
+    initial_state = true_states[0].copy()
+    initial_state[indices["__root__"]["x"]] += rng.normal(0, 2.0)
+    initial_state[indices["__root__"]["y"]] += rng.normal(0, 2.0)
+    result = forward_filter_v2(
+        positions_obs, likelihoods_obs, layout, params, dt,
+        initial_state=initial_state,
+        likelihood_threshold=0.5,
+    )
+
+    # Result shapes
+    assert result.x_filt.shape == (T, layout.state_dim)
+    assert result.P_filt.shape == (T, layout.state_dim, layout.state_dim)
+    assert result.x_pred.shape == (T, layout.state_dim)
+    assert result.n_observed.shape == (T,)
+    # All frames have all 15 markers observed
+    assert (result.n_observed == n_m).all()
+
+    # The filter's smoothed marker positions should be close
+    # to truth on later frames (after filter has settled).
+    # Compute on frame T//2 onwards.
+    avg_err = 0.0
+    n_check = 0
+    for t in range(T // 2, T):
+        pred_pos = state_to_marker_positions(result.x_filt[t], layout)
+        true_pos = state_to_marker_positions(true_states[t], layout)
+        avg_err += np.mean(np.linalg.norm(pred_pos - true_pos, axis=1))
+        n_check += 1
+    avg_err /= n_check
+    assert avg_err < 1.0, (
+        f"Filter fails to track truth: avg marker error {avg_err:.3f} px"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 24: filter handles missing observations (NaN, low-p)
+    # gracefully. n_observed reflects actual count.
+    # ---------------------------------------------------------- #
+    positions_drop = positions_obs.copy()
+    likelihoods_drop = likelihoods_obs.copy()
+    # Drop nose (set to NaN) for frames 50-99
+    nose_idx = marker_names_layout.index("nose")
+    positions_drop[50:100, nose_idx, :] = np.nan
+    # Drop ear_left via low likelihood for frames 70-89
+    ear_idx = marker_names_layout.index("ear_left")
+    likelihoods_drop[70:90, ear_idx] = 0.1
+
+    result_drop = forward_filter_v2(
+        positions_drop, likelihoods_drop, layout, params, dt,
+        initial_state=initial_state,
+        likelihood_threshold=0.5,
+    )
+    # n_observed should reflect drops
+    assert (result_drop.n_observed[0:50] == n_m).all()
+    assert (result_drop.n_observed[50:70] == n_m - 1).all()  # nose dropped
+    assert (result_drop.n_observed[70:90] == n_m - 2).all()  # nose+ear dropped
+    assert (result_drop.n_observed[90:100] == n_m - 1).all()  # ear back, nose still dropped
+    assert (result_drop.n_observed[100:] == n_m).all()
+
+    # Filter should still track (kinematic coupling helps
+    # recover dropped markers from neighbors)
+    avg_err_drop = 0.0
+    n_check = 0
+    for t in range(T // 2, T):
+        pred_pos = state_to_marker_positions(result_drop.x_filt[t], layout)
+        true_pos = state_to_marker_positions(true_states[t], layout)
+        avg_err_drop += np.mean(np.linalg.norm(pred_pos - true_pos, axis=1))
+        n_check += 1
+    avg_err_drop /= n_check
+    assert avg_err_drop < 2.0, (
+        f"Filter with dropouts: avg marker error {avg_err_drop:.3f} px"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 25: P_filt remains symmetric + positive semi-definite
+    # at every frame (Joseph form preserves PSD better than
+    # naive (I-KH)P).
+    # ---------------------------------------------------------- #
+    for t in range(T):
+        P = result.P_filt[t]
+        sym_err = np.max(np.abs(P - P.T))
+        assert sym_err < 1e-8, (
+            f"P_filt[{t}] not symmetric: max asymmetry {sym_err:.6e}"
+        )
+        eigs = np.linalg.eigvalsh(P)
+        min_eig = float(eigs.min())
+        assert min_eig > -1e-6, (
+            f"P_filt[{t}] not PSD: min eigenvalue {min_eig:.6e}"
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 26: with apply_constraints=True, the unit-norm
+    # constraint is approximately preserved (cos²+sin² stays
+    # close to 1 across the trajectory).
+    # ---------------------------------------------------------- #
+    max_norm_err = 0.0
+    for t in range(T):
+        c = result.x_filt[t, indices["__root__"]["cos"]]
+        s = result.x_filt[t, indices["__root__"]["sin"]]
+        norm_sq = c*c + s*s
+        max_norm_err = max(max_norm_err, abs(norm_sq - 1.0))
+        for seg_name in layout.non_root_topo_order:
+            c = result.x_filt[t, indices[seg_name]["cos"]]
+            s = result.x_filt[t, indices[seg_name]["sin"]]
+            norm_sq = c*c + s*s
+            max_norm_err = max(max_norm_err, abs(norm_sq - 1.0))
+
+    assert max_norm_err < 0.05, (
+        f"Unit-norm constraint violated: max |cos²+sin²-1| "
+        f"= {max_norm_err:.4f}"
+    )
+
+    print("smoke_kalman_pose_smoother_v2: 26/26 cases passed")
     return 0
 
 

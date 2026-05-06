@@ -1216,3 +1216,568 @@ def initial_state_from_data(
         R_world[seg_name] = R_world[seg.parent] @ _R(s_cos, s_sin)
 
     return state
+
+
+# ============================================================
+# EKF forward filter — patch 101
+# ============================================================
+
+# Floor on per-frame likelihood used in observation-noise
+# scaling. p == 0 means "definitely missed" (excluded from
+# observations entirely); but for borderline-low p we use the
+# inverse-likelihood-squared scaling and need to clip away
+# from zero to avoid numerical issues.
+_P_FLOOR_V2 = 0.05
+
+# Default noise on the unit-norm constraint observations.
+# Small enough to pull (cos, sin) toward the unit circle each
+# frame; large enough not to dominate over real marker
+# observations during normal operation.
+_DEFAULT_CONSTRAINT_SIGMA = 0.05
+
+# Floors and conservative defaults for noise params. Set with
+# v2's smaller-state-space EM degeneracy bounds in mind.
+_FLOOR_SIGMA_MARKER_V2 = 0.5      # px
+_FLOOR_Q_ROOT_POS = 1.0           # px²/s³ (continuous-time q for accel noise)
+_FLOOR_Q_ROOT_ORI = 0.01
+_FLOOR_Q_SEG_ORI = 0.001
+_FLOOR_Q_LENGTH = 1e-6
+
+
+@dataclass
+class NoiseParamsV2:
+    """EM-fittable noise parameters for the v2 smoother.
+
+    Compared to v1, the parameter set is much smaller —
+    ~5+M scalars instead of 3M (where M = number of markers).
+    The smaller parameter space leaves less room for the
+    degenerate EM fixed points that plagued v1.
+
+    Fields
+    ------
+    sigma_marker : dict[str, float]
+        Per-marker observation noise (px) at p=1. Effective
+        noise at frame t with likelihood p_t is
+        ``sigma_marker / max(p_t, p_floor)``.
+    q_root_pos : float
+        Continuous-time process noise on root position
+        acceleration, px²/s³. Drives root translation
+        randomness.
+    q_root_ori : float
+        Process noise on root orientation (in ambient
+        cos/sin coordinates) angular acceleration.
+    q_seg_ori : dict[str, float]
+        Per non-root segment process noise on relative
+        orientation angular acceleration. Smaller than root
+        because segment angles are bounded (head can't
+        rotate as fast as the body).
+    q_length : dict[str, float]
+        Per-segment length process noise. Very small (lengths
+        nearly constant within session).
+    constraint_sigma : float
+        Observation noise on the unit-norm constraint
+        observations. Held fixed (not EM-fit); acts as
+        regularization toward (cos² + sin²) = 1.
+    """
+    sigma_marker: Dict[str, float]
+    q_root_pos: float
+    q_root_ori: float
+    q_seg_ori: Dict[str, float]
+    q_length: Dict[str, float]
+    constraint_sigma: float = _DEFAULT_CONSTRAINT_SIGMA
+
+    @classmethod
+    def default(
+        cls,
+        layout: BodyLayout,
+        sigma_marker: float = 3.0,
+        q_root_pos: float = 200.0,
+        q_root_ori: float = 1.0,
+        q_seg_ori: float = 0.5,
+        q_length: float = 0.01,
+        constraint_sigma: float = _DEFAULT_CONSTRAINT_SIGMA,
+    ) -> "NoiseParamsV2":
+        """Build default noise params with uniform per-marker
+        and per-segment values. Useful as initial values for
+        EM.
+        """
+        return cls(
+            sigma_marker={m: sigma_marker for m in layout.marker_names},
+            q_root_pos=q_root_pos,
+            q_root_ori=q_root_ori,
+            q_seg_ori={s: q_seg_ori for s in layout.non_root_topo_order},
+            q_length={s: q_length for s in layout.non_root_topo_order},
+            constraint_sigma=constraint_sigma,
+        )
+
+
+def build_F_v2(layout: BodyLayout, dt: float) -> np.ndarray:
+    """Build the state transition matrix F.
+
+    F is block-diagonal:
+      - Root pose block (8×8): standard 2D constant-velocity
+        for (x, y, vx, vy) plus same form for ambient
+        orientation (cos, sin, ċ, ṡ).
+      - Per non-root segment orientation block (4×4):
+        constant-velocity for (cos, sin) treated as ambient
+        coordinates.
+      - Per non-root segment length block (2×2):
+        constant-velocity for (length, length_dot).
+
+    All velocities propagate by their corresponding rate ×
+    dt; rates themselves are constant under this dynamics
+    model (with process noise injected via Q).
+
+    Parameters
+    ----------
+    layout : BodyLayout
+    dt : float
+
+    Returns
+    -------
+    (state_dim, state_dim) array
+    """
+    D = layout.state_dim
+    F = np.eye(D)
+
+    # Helper: 2x2 constant-velocity block [[1, dt], [0, 1]]
+    cv = np.array([[1.0, dt], [0.0, 1.0]])
+
+    # Root: pose (x, y, vx, vy) at indices 0..3
+    # The convention is [x, y, vx, vy], NOT [x, vx, y, vy].
+    # F maps x → x + vx*dt, y → y + vy*dt.
+    F[0, 2] = dt
+    F[1, 3] = dt
+    # Root orientation (cos, sin, ċ, ṡ) at indices 4..7
+    F[4, 6] = dt
+    F[5, 7] = dt
+
+    # Per-segment orientation blocks
+    for seg_name in layout.non_root_topo_order:
+        sl = layout.slice_segment_orientation(seg_name)
+        # [cos, sin, cos_dot, sin_dot]
+        F[sl.start, sl.start + 2] = dt
+        F[sl.start + 1, sl.start + 3] = dt
+
+    # Per-segment length blocks
+    for seg_name in layout.non_root_topo_order:
+        sl = layout.slice_segment_length(seg_name)
+        F[sl.start, sl.start + 1] = dt
+
+    return F
+
+
+def build_Q_v2(
+    layout: BodyLayout, params: NoiseParamsV2, dt: float,
+) -> np.ndarray:
+    """Build the process noise covariance Q.
+
+    Q is block-diagonal with each block parameterized by a
+    scalar continuous-time process-noise intensity q. For a
+    2D constant-velocity (pos, vel) block with process noise q
+    on acceleration:
+
+      Q_block = q * [dt^4/4   dt^3/2]
+                    [dt^3/2   dt^2  ]
+
+    For 4D blocks (pos, vel) × 2 axes (e.g., x and y of root,
+    or cos and sin of orientation), Q is the kron product of
+    the above 2×2 with I_2. Equivalently, the 4×4 block's
+    diagonal has [dt^4/4, dt^4/4, dt^2, dt^2] and the
+    cross-correlation between position and velocity is
+    [dt^3/2, dt^3/2, 0, 0] in appropriate places.
+
+    Note we store state as [x, y, vx, vy], not [x, vx, y, vy],
+    so positions are at the front of the block and velocities
+    at the back. The Q block accordingly is:
+
+      Q_4d = q * [dt^4/4    0     dt^3/2  0     ]
+                 [0      dt^4/4   0       dt^3/2]
+                 [dt^3/2   0      dt^2    0     ]
+                 [0      dt^3/2   0       dt^2  ]
+
+    Parameters
+    ----------
+    layout : BodyLayout
+    params : NoiseParamsV2
+    dt : float
+
+    Returns
+    -------
+    (state_dim, state_dim) array
+    """
+    D = layout.state_dim
+    Q = np.zeros((D, D))
+
+    dt2 = dt * dt
+    dt3 = dt2 * dt
+    dt4 = dt2 * dt2
+
+    def _q4_block(q: float) -> np.ndarray:
+        """4x4 block for [pos_x, pos_y, vel_x, vel_y]."""
+        b = np.zeros((4, 4))
+        b[0, 0] = q * dt4 / 4
+        b[1, 1] = q * dt4 / 4
+        b[2, 2] = q * dt2
+        b[3, 3] = q * dt2
+        b[0, 2] = q * dt3 / 2
+        b[2, 0] = q * dt3 / 2
+        b[1, 3] = q * dt3 / 2
+        b[3, 1] = q * dt3 / 2
+        return b
+
+    def _q2_block(q: float) -> np.ndarray:
+        """2x2 block for [pos, vel]."""
+        b = np.zeros((2, 2))
+        b[0, 0] = q * dt4 / 4
+        b[1, 1] = q * dt2
+        b[0, 1] = q * dt3 / 2
+        b[1, 0] = q * dt3 / 2
+        return b
+
+    # Root pose: (x, y, vx, vy) at 0..3
+    Q[0:4, 0:4] = _q4_block(params.q_root_pos)
+    # Root orientation: (cos, sin, ċ, ṡ) at 4..7
+    Q[4:8, 4:8] = _q4_block(params.q_root_ori)
+
+    # Per-segment orientation blocks
+    for seg_name in layout.non_root_topo_order:
+        sl = layout.slice_segment_orientation(seg_name)
+        q_s = params.q_seg_ori.get(seg_name, _FLOOR_Q_SEG_ORI)
+        Q[sl, sl] = _q4_block(q_s)
+
+    # Per-segment length blocks
+    for seg_name in layout.non_root_topo_order:
+        sl = layout.slice_segment_length(seg_name)
+        q_l = params.q_length.get(seg_name, _FLOOR_Q_LENGTH)
+        Q[sl, sl] = _q2_block(q_l)
+
+    return Q
+
+
+@dataclass
+class FilterResultV2:
+    """Per-frame filtered state estimate.
+
+    Stores predicted and filtered (after observation update)
+    means and covariances at every frame, plus per-frame
+    metadata used by the smoother and EM.
+
+    Fields
+    ------
+    x_pred : (T, D)
+        Predicted state mean (before observation update),
+        x̂_{t|t-1}.
+    P_pred : (T, D, D)
+        Predicted state covariance.
+    x_filt : (T, D)
+        Filtered state mean (after observation update),
+        x̂_{t|t}.
+    P_filt : (T, D, D)
+        Filtered state covariance.
+    n_observed : (T,) int
+        Number of markers contributing observations per frame
+        (excluding constraint observations).
+    """
+    x_pred: np.ndarray
+    P_pred: np.ndarray
+    x_filt: np.ndarray
+    P_filt: np.ndarray
+    n_observed: np.ndarray
+
+
+def _build_constraint_observations(
+    state: np.ndarray,
+    layout: BodyLayout,
+    constraint_sigma: float,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Build the unit-norm constraint pseudo-observations.
+
+    For each (cos, sin) pair in the state, the constraint is
+    cos² + sin² = 1. As a soft observation:
+      h_constraint(x) = cos² + sin² - 1
+      target z_constraint = 0
+      noise variance = constraint_sigma²
+
+    Linearization at the current state gives Jacobian row
+    H_row = [..., 2*cos, 2*sin, ...] (zeros elsewhere).
+
+    Returns
+    -------
+    z : (n_constraints,) — target values, all zero
+    h : (n_constraints,) — current values of cos²+sin²-1
+    H : (n_constraints, state_dim) — Jacobian
+    """
+    indices = _pack_state_layout_indices(layout)
+    rows: List[np.ndarray] = []
+    h_vals: List[float] = []
+
+    # Root constraint
+    c = state[indices["__root__"]["cos"]]
+    s = state[indices["__root__"]["sin"]]
+    h_vals.append(c * c + s * s - 1.0)
+    row = np.zeros(layout.state_dim)
+    row[indices["__root__"]["cos"]] = 2.0 * c
+    row[indices["__root__"]["sin"]] = 2.0 * s
+    rows.append(row)
+
+    # Per-segment constraints
+    for seg_name in layout.non_root_topo_order:
+        c = state[indices[seg_name]["cos"]]
+        s = state[indices[seg_name]["sin"]]
+        h_vals.append(c * c + s * s - 1.0)
+        row = np.zeros(layout.state_dim)
+        row[indices[seg_name]["cos"]] = 2.0 * c
+        row[indices[seg_name]["sin"]] = 2.0 * s
+        rows.append(row)
+
+    n_constraints = len(rows)
+    z = np.zeros(n_constraints)
+    h = np.array(h_vals)
+    H = np.array(rows)
+    return z, h, H
+
+
+def _build_marker_observations(
+    state: np.ndarray,
+    obs: np.ndarray,            # (K, 2) per-frame marker positions
+    likes: np.ndarray,          # (K,) per-frame marker likelihoods
+    layout: BodyLayout,
+    params: NoiseParamsV2,
+    likelihood_threshold: float,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    """Build the observation vector, predicted observation,
+    Jacobian, and observation noise R for one frame's marker
+    observations.
+
+    Excludes markers below the likelihood threshold or with
+    NaN positions. The remaining markers are stacked into z,
+    with corresponding rows of H and diagonal entries of R.
+
+    Returns
+    -------
+    z : (n_obs,) observation vector
+    h : (n_obs,) predicted observation at current state
+    H : (n_obs, state_dim) Jacobian
+    R_diag : (n_obs,) diagonal of observation noise covariance
+    n_observed_markers : int
+    """
+    fk = forward_kinematics(state, layout)
+    pred = state_to_marker_positions(state, layout, fk=fk)
+    H_full = state_to_marker_jacobian(state, layout, fk=fk)
+    marker_names = layout.marker_names
+
+    z_list: List[np.ndarray] = []
+    h_list: List[np.ndarray] = []
+    H_list: List[np.ndarray] = []
+    R_list: List[float] = []
+    n_obs = 0
+
+    for k, m in enumerate(marker_names):
+        x_obs = obs[k, 0]
+        y_obs = obs[k, 1]
+        p = likes[k]
+        if (
+            not (np.isfinite(x_obs) and np.isfinite(y_obs))
+            or p < likelihood_threshold
+        ):
+            continue
+        n_obs += 1
+        z_list.append(np.array([x_obs, y_obs]))
+        h_list.append(pred[k])
+        # Two rows of H per marker (x and y)
+        H_list.append(H_full[2 * k:2 * k + 2, :])
+        # Likelihood-modulated noise
+        sigma = params.sigma_marker.get(m, 3.0)
+        p_eff = max(p, _P_FLOOR_V2)
+        sigma_eff = sigma / p_eff
+        R_list.append(sigma_eff ** 2)
+        R_list.append(sigma_eff ** 2)
+
+    if n_obs == 0:
+        return (
+            np.zeros(0), np.zeros(0),
+            np.zeros((0, layout.state_dim)),
+            np.zeros(0), 0,
+        )
+
+    z = np.concatenate(z_list)
+    h = np.concatenate(h_list)
+    H = np.vstack(H_list)
+    R_diag = np.array(R_list)
+    return z, h, H, R_diag, n_obs
+
+
+def forward_filter_v2(
+    positions: np.ndarray,        # (T, K, 2)
+    likelihoods: np.ndarray,      # (T, K)
+    layout: BodyLayout,
+    params: NoiseParamsV2,
+    dt: float,
+    initial_state: np.ndarray,
+    initial_cov: Optional[np.ndarray] = None,
+    likelihood_threshold: float = 0.5,
+    apply_constraints: bool = True,
+) -> FilterResultV2:
+    """EKF forward pass on the v2 body-state representation.
+
+    For each frame:
+      1. Predict: x_{t|t-1} = F x_{t-1|t-1};
+                  P_{t|t-1} = F P_{t-1|t-1} F^T + Q
+      2. Build per-frame observations from observed markers
+         (excluding low-likelihood / NaN) plus optional unit-
+         norm constraint pseudo-observations.
+      3. Update: standard EKF update with linearized H from
+         the v2 forward kinematics Jacobian.
+
+    Parameters
+    ----------
+    positions : (T, K, 2)
+        Marker observations per frame.
+    likelihoods : (T, K)
+        Per-marker likelihoods.
+    layout : BodyLayout
+    params : NoiseParamsV2
+    dt : float
+        Time step (1 / fps).
+    initial_state : (state_dim,)
+        Starting state estimate.
+    initial_cov : (state_dim, state_dim), optional
+        Starting state covariance. Defaults to a moderately
+        large diagonal (100 px² for positions, 1.0 for
+        unit-vector orientations, length scale² for lengths).
+    likelihood_threshold : float
+        Markers with p below this are excluded from
+        observations.
+    apply_constraints : bool
+        If True (default), include unit-norm constraint
+        observations. Disable for debugging or testing the
+        filter without regularization.
+
+    Returns
+    -------
+    FilterResultV2
+    """
+    T, K, _ = positions.shape
+    D = layout.state_dim
+    if initial_state.shape != (D,):
+        raise ValueError(
+            f"initial_state shape {initial_state.shape} != ({D},)"
+        )
+
+    F = build_F_v2(layout, dt)
+    Q = build_Q_v2(layout, params, dt)
+
+    if initial_cov is None:
+        # Sensible defaults — moderate uncertainty
+        P0 = np.eye(D)
+        indices = _pack_state_layout_indices(layout)
+        # Position uncertainty: 100 px²
+        for k in ("x", "y"):
+            P0[indices["__root__"][k], indices["__root__"][k]] = 100.0
+        # Velocity uncertainty: 1000 px²/s² (the rat could be
+        # moving fast or slow at start)
+        for k in ("vx", "vy"):
+            P0[indices["__root__"][k], indices["__root__"][k]] = 1000.0
+        # Orientation uncertainty: small (we initialized from data)
+        for k in ("cos", "sin"):
+            P0[indices["__root__"][k], indices["__root__"][k]] = 0.1
+        for k in ("cos_dot", "sin_dot"):
+            P0[indices["__root__"][k], indices["__root__"][k]] = 1.0
+        for seg_name in layout.non_root_topo_order:
+            for k in ("cos", "sin"):
+                P0[indices[seg_name][k], indices[seg_name][k]] = 0.1
+            for k in ("cos_dot", "sin_dot"):
+                P0[indices[seg_name][k], indices[seg_name][k]] = 1.0
+            # Length uncertainty: 1.0 px²
+            P0[indices[seg_name]["length"], indices[seg_name]["length"]] = 1.0
+            P0[indices[seg_name]["length_dot"], indices[seg_name]["length_dot"]] = 0.01
+    else:
+        P0 = initial_cov
+
+    x_pred = np.empty((T, D))
+    P_pred = np.empty((T, D, D))
+    x_filt = np.empty((T, D))
+    P_filt = np.empty((T, D, D))
+    n_observed = np.zeros(T, dtype=np.int64)
+
+    # Initialize: no predict step at t=0; treat initial as the
+    # filter's starting belief.
+    x_pred[0] = initial_state
+    P_pred[0] = P0
+    x_prev = initial_state
+    P_prev = P0
+
+    for t in range(T):
+        # Predict (skip at t=0; pred[0] is the initial)
+        if t > 0:
+            x_p = F @ x_prev
+            P_p = F @ P_prev @ F.T + Q
+            x_pred[t] = x_p
+            P_pred[t] = P_p
+        else:
+            x_p = x_pred[0]
+            P_p = P_pred[0]
+
+        # Build observation
+        z_m, h_m, H_m, R_diag_m, n_m = _build_marker_observations(
+            x_p, positions[t], likelihoods[t], layout, params,
+            likelihood_threshold,
+        )
+        n_observed[t] = n_m
+
+        if apply_constraints:
+            z_c, h_c, H_c = _build_constraint_observations(
+                x_p, layout, params.constraint_sigma,
+            )
+            z_full = np.concatenate([z_m, z_c])
+            h_full = np.concatenate([h_m, h_c])
+            H_full = np.vstack([H_m, H_c]) if n_m > 0 else H_c
+            R_diag_full = np.concatenate([
+                R_diag_m,
+                np.full(z_c.shape[0], params.constraint_sigma ** 2),
+            ])
+        else:
+            z_full = z_m
+            h_full = h_m
+            H_full = H_m
+            R_diag_full = R_diag_m
+
+        # EKF update — only if we have any observations
+        if z_full.shape[0] > 0:
+            innovation = z_full - h_full
+            R_full = np.diag(R_diag_full)
+            S = H_full @ P_p @ H_full.T + R_full
+            # Solve K = P_p @ H^T @ inv(S) via solve for stability
+            try:
+                K = np.linalg.solve(S.T, H_full @ P_p.T).T
+            except np.linalg.LinAlgError:
+                # Singular S — skip update for this frame.
+                # Shouldn't happen with constraint regularization.
+                x_filt[t] = x_p
+                P_filt[t] = P_p
+                x_prev = x_p
+                P_prev = P_p
+                continue
+
+            x_f = x_p + K @ innovation
+            # Joseph form for numerical stability:
+            # P_filt = (I - K H) P_p (I - K H)^T + K R K^T
+            I_KH = np.eye(D) - K @ H_full
+            P_f = I_KH @ P_p @ I_KH.T + K @ R_full @ K.T
+            # Symmetrize against fp drift
+            P_f = 0.5 * (P_f + P_f.T)
+        else:
+            x_f = x_p
+            P_f = P_p
+
+        x_filt[t] = x_f
+        P_filt[t] = P_f
+        x_prev = x_f
+        P_prev = P_f
+
+    return FilterResultV2(
+        x_pred=x_pred, P_pred=P_pred,
+        x_filt=x_filt, P_filt=P_filt,
+        n_observed=n_observed,
+    )
