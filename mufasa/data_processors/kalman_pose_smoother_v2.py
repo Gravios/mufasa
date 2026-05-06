@@ -1781,3 +1781,138 @@ def forward_filter_v2(
         x_filt=x_filt, P_filt=P_filt,
         n_observed=n_observed,
     )
+
+
+# ============================================================
+# RTS backward smoother — patch 102
+# ============================================================
+#
+# Given the forward filter's pred and filt arrays (x̂_{t|t-1},
+# P_{t|t-1}, x̂_{t|t}, P_{t|t}), produce smoothed estimates
+# x̂_{t|T}, P_{t|T} that use ALL observations, not just past.
+#
+# Standard RTS recursion (linear dynamics, F constant):
+#
+#   x̂_{T-1|T} = x̂_{T-1|T-1}
+#   P_{T-1|T} = P_{T-1|T-1}
+#
+#   For t = T-2 down to 0:
+#     G_t = P_{t|t} F^T inv(P_{t+1|t})
+#     x̂_{t|T} = x̂_{t|t} + G_t (x̂_{t+1|T} - x̂_{t+1|t})
+#     P_{t|T} = P_{t|t} + G_t (P_{t+1|T} - P_{t+1|t}) G_t^T
+#
+# Lag-one cross-covariance for the M-step (Shumway-Stoffer):
+#
+#   P_{t, t+1 | T} = G_t P_{t+1|T}
+#
+# These are computed during the same backward pass.
+#
+# Numerical stability: use solve() instead of explicit inverse;
+# symmetrize covariances each step.
+
+
+@dataclass
+class SmoothResultV2:
+    """RTS smoother output.
+
+    Fields
+    ------
+    x_smooth : (T, D)
+        Smoothed state means x̂_{t|T} using all observations.
+    P_smooth : (T, D, D)
+        Smoothed state covariances.
+    P_lag_one : (T-1, D, D)
+        Lag-one cross-covariance: P_lag_one[t] = Cov(x_t,
+        x_{t+1} | y_{1:T}). Used by the Shumway-Stoffer
+        M-step (patch 103).
+    """
+    x_smooth: np.ndarray
+    P_smooth: np.ndarray
+    P_lag_one: np.ndarray
+
+
+def rts_smooth_v2(
+    filter_result: FilterResultV2,
+    layout: BodyLayout,
+    dt: float,
+) -> SmoothResultV2:
+    """RTS backward smoother for v2.
+
+    Refines the forward filter's per-frame estimates using
+    future observations. For frames where the forward filter
+    was uncertain (typically dropout intervals), the smoother
+    can reduce uncertainty significantly using the smoothed
+    estimate at t+1 to constrain t.
+
+    Also computes the lag-one cross-covariance needed by
+    Shumway-Stoffer EM in patch 103.
+
+    Parameters
+    ----------
+    filter_result : FilterResultV2
+        Output of forward_filter_v2.
+    layout : BodyLayout
+        Used to rebuild F (must match what was used in the
+        forward pass).
+    dt : float
+        Same dt used in the forward pass.
+
+    Returns
+    -------
+    SmoothResultV2
+    """
+    T = filter_result.x_filt.shape[0]
+    D = layout.state_dim
+    F = build_F_v2(layout, dt)
+
+    x_smooth = np.empty_like(filter_result.x_filt)
+    P_smooth = np.empty_like(filter_result.P_filt)
+    P_lag_one = np.empty((T - 1, D, D))
+
+    # Initialize at the last frame: smoothed = filtered
+    x_smooth[T - 1] = filter_result.x_filt[T - 1]
+    P_smooth[T - 1] = filter_result.P_filt[T - 1]
+
+    # Backward pass
+    for t in range(T - 2, -1, -1):
+        P_filt_t = filter_result.P_filt[t]
+        x_filt_t = filter_result.x_filt[t]
+        P_pred_tp1 = filter_result.P_pred[t + 1]
+        x_pred_tp1 = filter_result.x_pred[t + 1]
+
+        # Symmetrize P_pred to guard against fp drift
+        P_pred_tp1_sym = 0.5 * (P_pred_tp1 + P_pred_tp1.T)
+
+        # Smoother gain: G_t = P_filt_t @ F^T @ inv(P_pred_tp1)
+        # Solve via:
+        #   G_t @ P_pred_tp1 = P_filt_t @ F^T
+        # i.e., G_t.T = solve(P_pred_tp1.T, F @ P_filt_t.T)
+        # (using solve A^T G^T = (P_filt @ F^T)^T = F @ P_filt^T)
+        try:
+            G_t = np.linalg.solve(
+                P_pred_tp1_sym.T, F @ P_filt_t.T,
+            ).T
+        except np.linalg.LinAlgError:
+            # Singular P_pred — add small regularizer and retry
+            P_pred_reg = P_pred_tp1_sym + 1e-9 * np.eye(D)
+            G_t = np.linalg.solve(
+                P_pred_reg.T, F @ P_filt_t.T,
+            ).T
+
+        # Smoothed mean and covariance
+        x_smooth[t] = x_filt_t + G_t @ (x_smooth[t + 1] - x_pred_tp1)
+        P_smooth_t = (
+            P_filt_t + G_t @ (P_smooth[t + 1] - P_pred_tp1_sym) @ G_t.T
+        )
+        # Symmetrize against fp drift
+        P_smooth[t] = 0.5 * (P_smooth_t + P_smooth_t.T)
+
+        # Lag-one cross-covariance: P_{t, t+1 | T} = G_t @ P_smooth[t+1]
+        # (Shumway-Stoffer Property 6.3)
+        P_lag_one[t] = G_t @ P_smooth[t + 1]
+
+    return SmoothResultV2(
+        x_smooth=x_smooth,
+        P_smooth=P_smooth,
+        P_lag_one=P_lag_one,
+    )
