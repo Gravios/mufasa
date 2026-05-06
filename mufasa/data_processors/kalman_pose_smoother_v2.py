@@ -3199,6 +3199,8 @@ def fit_warm_start_sigma_v2(
     sigma_inflation_cap: float = 20.0,
     apply_constraints: bool = True,
     perspective: Optional["PerspectiveModelV2"] = None,
+    verbose: bool = False,
+    session_names: Optional[List[str]] = None,
 ) -> Dict[str, float]:
     """Warm-start σ_marker estimation: run filter+smoother
     once with current params, measure mean |smoothed - raw|
@@ -3260,7 +3262,24 @@ def fit_warm_start_sigma_v2(
     sum_abs_diff: Dict[str, float] = {m: 0.0 for m in layout.marker_names}
     n_obs: Dict[str, int] = {m: 0 for m in layout.marker_names}
 
-    for pos, likes in sessions:
+    n_sess = len(sessions)
+    import time as _time
+    t_start_total = _time.time()
+    times_per_session: List[float] = []
+    for sess_idx, (pos, likes) in enumerate(sessions):
+        t_sess_start = _time.time()
+        sess_label = (
+            session_names[sess_idx]
+            if session_names is not None and sess_idx < len(session_names)
+            else f"session_{sess_idx}"
+        )
+        T_sess = pos.shape[0]
+        if verbose:
+            print(
+                f"[v2-em-warm]   {sess_idx+1:3d}/{n_sess} "
+                f"{sess_label} (T={T_sess}) ...",
+                end=" ", flush=True,
+            )
         # Run a forward filter + smoother with current params.
         x0 = initial_state_from_data(
             pos, likes, layout, marker_names,
@@ -3298,6 +3317,25 @@ def fit_warm_start_sigma_v2(
         for k, m in enumerate(layout.marker_names):
             sum_abs_diff[m] += float(sums_per_marker[k])
             n_obs[m] += int(counts_per_marker[k])
+
+        sess_dt = _time.time() - t_sess_start
+        times_per_session.append(sess_dt)
+        if verbose:
+            mean_t = sum(times_per_session) / len(times_per_session)
+            remaining = (n_sess - sess_idx - 1) * mean_t
+            print(
+                f"{sess_dt:.1f}s "
+                f"(ETA {remaining/60:.1f}min)",
+                flush=True,
+            )
+
+    if verbose:
+        total_dt = _time.time() - t_start_total
+        print(
+            f"[v2-em-warm] done in {total_dt/60:.2f}min total "
+            f"({total_dt/n_sess:.1f}s/session avg)",
+            flush=True,
+        )
 
     sigma_warm: Dict[str, float] = {}
     for m in layout.marker_names:
@@ -3585,6 +3623,7 @@ def fit_noise_params_em_v2(
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
     verbose: bool = False,
+    session_names: Optional[List[str]] = None,
 ) -> EMResultV2:
     """Multi-session EM for v2 noise parameters.
 
@@ -3662,6 +3701,8 @@ def fit_noise_params_em_v2(
             initial_params, fps,
             likelihood_threshold=likelihood_threshold,
             apply_constraints=apply_constraints,
+            verbose=verbose,
+            session_names=session_names,
         )
         # Update initial_params with warm-started σ
         initial_params = NoiseParamsV2(
@@ -3702,6 +3743,8 @@ def fit_noise_params_em_v2(
             initial_params, fps,
             likelihood_threshold=likelihood_threshold,
             apply_constraints=apply_constraints,
+            verbose=verbose,
+            session_names=session_names,
         )
         if verbose:
             # Report per-marker max |scale - 1| at arena edges
@@ -3723,12 +3766,30 @@ def fit_noise_params_em_v2(
     params = initial_params
     history: List[Dict[str, float]] = []
     converged = False
+    n_sess_em = len(sessions)
+    import time as _time_em
 
     for iteration in range(max_iter):
         # E-step + stat accumulation across sessions
         combined_stats = _MStepStatsV2.empty(layout)
+        t_iter_start = _time_em.time()
+        sess_times: List[float] = []
 
         for sess_idx, (pos, likes) in enumerate(sessions):
+            t_sess_start = _time_em.time()
+            sess_label = (
+                session_names[sess_idx]
+                if session_names is not None
+                and sess_idx < len(session_names)
+                else f"session_{sess_idx}"
+            )
+            if verbose:
+                print(
+                    f"[v2-em iter{iteration}]   "
+                    f"{sess_idx+1:3d}/{n_sess_em} "
+                    f"{sess_label} (T={pos.shape[0]}) ...",
+                    end=" ", flush=True,
+                )
             # Build initial state for this session
             x0 = initial_state_from_data(
                 pos, likes, layout, marker_names,
@@ -3759,6 +3820,26 @@ def fit_noise_params_em_v2(
                 perspective=perspective,
             )
             combined_stats += sess_stats
+
+            sess_dt = _time_em.time() - t_sess_start
+            sess_times.append(sess_dt)
+            if verbose:
+                mean_t = sum(sess_times) / len(sess_times)
+                remaining = (n_sess_em - sess_idx - 1) * mean_t
+                print(
+                    f"{sess_dt:.1f}s "
+                    f"(ETA {remaining/60:.1f}min)",
+                    flush=True,
+                )
+
+        if verbose:
+            iter_dt = _time_em.time() - t_iter_start
+            print(
+                f"[v2-em iter{iteration}] E-step done in "
+                f"{iter_dt/60:.2f}min "
+                f"({iter_dt/n_sess_em:.1f}s/session avg)",
+                flush=True,
+            )
 
         # M-step finalization
         new_params = finalize_m_step_v2(
@@ -4261,9 +4342,14 @@ def smooth_pose_v2(
     # logic as mufasa.tools.pose_viewer._load_pose_file but
     # without the PySide6 dependency.
     raw_sessions: List[Dict] = []
-    for path in paths:
+    n_paths = len(paths)
+    for path_idx, path in enumerate(paths):
         if verbose:
-            print(f"[smoother-v2]   loading {path}")
+            print(
+                f"[smoother-v2]   loading "
+                f"{path_idx+1:3d}/{n_paths} {Path(path).name}",
+                flush=True,
+            )
         path = Path(path)
         suffix = path.suffix.lower()
         df = None
@@ -4449,6 +4535,7 @@ def smooth_pose_v2(
             enable_warm_start_sigma=enable_warm_start_sigma,
             enable_perspective=enable_perspective,
             verbose=verbose,
+            session_names=[s["path"].stem for s in raw_sessions],
         )
         params = em_result.params
         em_history = em_result.history
@@ -4484,7 +4571,20 @@ def smooth_pose_v2(
         output_dir_path = Path(output_dir)
         output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    for s, (pos, likes) in zip(raw_sessions, sessions_arr):
+    import time as _time_smooth
+    n_sess_final = len(sessions_arr)
+    t_smooth_start_total = _time_smooth.time()
+    smooth_times: List[float] = []
+    for sess_idx, (s, (pos, likes)) in enumerate(
+        zip(raw_sessions, sessions_arr)
+    ):
+        t_sess_start = _time_smooth.time()
+        if verbose:
+            print(
+                f"[smoother-v2]    {sess_idx+1:3d}/{n_sess_final} "
+                f"{s['path'].stem} (T={pos.shape[0]}) ...",
+                end=" ", flush=True,
+            )
         smooth_pos, smooth_var = smooth_session_v2(
             pos, likes, layout, layout_marker_names,
             fitted_lengths, params, fps,
@@ -4512,6 +4612,8 @@ def smooth_pose_v2(
         )
 
         out_path = None
+        _wrote_csv_fallback = False
+        _csv_fallback_reason = ""
         if output_dir is not None:
             stem = s["path"].stem
             # Strip common DLC suffix patterns
@@ -4521,19 +4623,13 @@ def smooth_pose_v2(
             out_path = output_dir_path / out_name
             try:
                 df_out.to_parquet(out_path, index=False)
+                _wrote_csv_fallback = False
             except (ImportError, Exception) as e:
                 # Fallback to CSV
                 out_path = output_dir_path / f"{stem}_smoothed_v2.csv"
                 df_out.to_csv(out_path, index=False)
-                if verbose:
-                    print(
-                        f"[smoother-v2]   {out_path.name} "
-                        f"(parquet failed: {type(e).__name__}, "
-                        f"used CSV)"
-                    )
-            else:
-                if verbose:
-                    print(f"[smoother-v2]   wrote {out_path.name}")
+                _wrote_csv_fallback = True
+                _csv_fallback_reason = type(e).__name__
 
         output_sessions.append({
             "input_path": s["path"],
@@ -4542,6 +4638,34 @@ def smooth_pose_v2(
             "variances": smooth_var,
             "n_frames": T,
         })
+
+        sess_dt = _time_smooth.time() - t_sess_start
+        smooth_times.append(sess_dt)
+        if verbose:
+            mean_t = sum(smooth_times) / len(smooth_times)
+            remaining = (n_sess_final - sess_idx - 1) * mean_t
+            extra = ""
+            if output_dir is not None:
+                if _wrote_csv_fallback:
+                    extra = (
+                        f" → {out_path.name} "
+                        f"(parquet failed: {_csv_fallback_reason}, CSV)"
+                    )
+                else:
+                    extra = f" → {out_path.name}"
+            print(
+                f"{sess_dt:.1f}s "
+                f"(ETA {remaining/60:.1f}min){extra}",
+                flush=True,
+            )
+
+    if verbose:
+        total_smooth_dt = _time_smooth.time() - t_smooth_start_total
+        print(
+            f"[smoother-v2] final smoothing done in "
+            f"{total_smooth_dt/60:.2f}min total",
+            flush=True,
+        )
 
     return {
         "params": params,
@@ -4832,6 +4956,8 @@ def fit_perspective_model_v2(
     apply_constraints: bool = True,
     min_offset_magnitude: float = 1.0,
     max_abs_coeff: float = 0.4,
+    verbose: bool = False,
+    session_names: Optional[List[str]] = None,
 ) -> PerspectiveModelV2:
     """Fit a per-marker bilinear perspective correction.
 
@@ -4931,7 +5057,23 @@ def fit_perspective_model_v2(
         if m in name_to_idx:
             layout_to_data[m] = name_to_idx[m]
 
-    for pos, likes in sessions:
+    n_sess_p = len(sessions)
+    import time as _time_p
+    t_start_p = _time_p.time()
+    times_p: List[float] = []
+    for sess_idx, (pos, likes) in enumerate(sessions):
+        t_sess_start = _time_p.time()
+        sess_label = (
+            session_names[sess_idx]
+            if session_names is not None and sess_idx < len(session_names)
+            else f"session_{sess_idx}"
+        )
+        if verbose:
+            print(
+                f"[v2-em-persp]  {sess_idx+1:3d}/{n_sess_p} "
+                f"{sess_label} (T={pos.shape[0]}) ...",
+                end=" ", flush=True,
+            )
         # Run smoother
         x0 = initial_state_from_data(
             pos, likes, layout, marker_names,
@@ -5022,6 +5164,25 @@ def fit_perspective_model_v2(
             XtX_per_marker[m] += x_design.T @ x_design
             Xty_per_marker[m] += x_design.T @ y_target
             n_obs_per_marker[m] += n_valid
+
+        sess_dt = _time_p.time() - t_sess_start
+        times_p.append(sess_dt)
+        if verbose:
+            mean_t = sum(times_p) / len(times_p)
+            remaining = (n_sess_p - sess_idx - 1) * mean_t
+            print(
+                f"{sess_dt:.1f}s "
+                f"(ETA {remaining/60:.1f}min)",
+                flush=True,
+            )
+
+    if verbose:
+        total_dt = _time_p.time() - t_start_p
+        print(
+            f"[v2-em-persp] done in {total_dt/60:.2f}min total "
+            f"({total_dt/n_sess_p:.1f}s/session avg)",
+            flush=True,
+        )
 
     # Solve OLS per marker
     coeffs: Dict[str, np.ndarray] = {}
