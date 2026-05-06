@@ -2481,7 +2481,138 @@ def main() -> int:
             "when save was without it"
         )
 
-    print("smoke_kalman_pose_smoother_v2: 69/69 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 110: vectorized batch functions + GPU support.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        state_to_marker_positions_batch,
+        state_to_marker_jacobian_batch,
+        _resolve_device, _try_import_torch,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 70: batch state_to_marker_positions matches per-frame
+    # version exactly (no perspective).
+    # ---------------------------------------------------------- #
+    rng_b = np.random.default_rng(2090)
+    T_b = 50
+    states_b = np.zeros((T_b, layout.state_dim))
+    for t in range(T_b):
+        states_b[t, indices["__root__"]["x"]] = 100.0 + t * 0.5
+        states_b[t, indices["__root__"]["y"]] = 200.0 - t * 0.3
+        # Random orientation
+        theta = rng_b.uniform(-0.5, 0.5)
+        states_b[t, indices["__root__"]["cos"]] = np.cos(theta)
+        states_b[t, indices["__root__"]["sin"]] = np.sin(theta)
+        for seg_name in layout.non_root_topo_order:
+            theta_s = rng_b.uniform(-0.3, 0.3)
+            states_b[t, indices[seg_name]["cos"]] = np.cos(theta_s)
+            states_b[t, indices[seg_name]["sin"]] = np.sin(theta_s)
+            states_b[t, indices[seg_name]["length"]] = 5.0
+
+    pos_batch = state_to_marker_positions_batch(states_b, layout)
+    pos_per_frame = np.zeros((T_b, layout.n_markers, 2))
+    for t in range(T_b):
+        pos_per_frame[t] = state_to_marker_positions(
+            states_b[t], layout,
+        )
+    assert pos_batch.shape == pos_per_frame.shape
+    assert np.allclose(pos_batch, pos_per_frame), (
+        f"batch and per-frame positions disagree: "
+        f"max diff = {np.max(np.abs(pos_batch - pos_per_frame)):.6e}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 71: batch Jacobian matches per-frame Jacobian
+    # exactly (no perspective).
+    # ---------------------------------------------------------- #
+    H_batch_test = state_to_marker_jacobian_batch(states_b, layout)
+    H_per_frame = np.zeros(
+        (T_b, 2 * layout.n_markers, layout.state_dim)
+    )
+    for t in range(T_b):
+        H_per_frame[t] = state_to_marker_jacobian(
+            states_b[t], layout,
+        )
+    assert H_batch_test.shape == H_per_frame.shape
+    max_diff = float(np.max(np.abs(H_batch_test - H_per_frame)))
+    assert max_diff < 1e-9, (
+        f"batch and per-frame Jacobians disagree: "
+        f"max diff = {max_diff:.6e}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 72: batch with perspective matches per-frame with
+    # perspective.
+    # ---------------------------------------------------------- #
+    persp_test_b = PerspectiveModelV2(
+        coeffs={
+            m: np.array([0.1, -0.05, 0.02])
+            for m in layout.marker_names
+        },
+        arena_x_mean=100.0, arena_x_range=200.0,
+        arena_y_mean=200.0, arena_y_range=200.0,
+    )
+    pos_batch_p = state_to_marker_positions_batch(
+        states_b, layout, perspective=persp_test_b,
+    )
+    pos_pf_p = np.zeros((T_b, layout.n_markers, 2))
+    for t in range(T_b):
+        pos_pf_p[t] = state_to_marker_positions(
+            states_b[t], layout, perspective=persp_test_b,
+        )
+    assert np.allclose(pos_batch_p, pos_pf_p), (
+        f"batch+persp vs per-frame+persp positions disagree"
+    )
+
+    H_batch_p = state_to_marker_jacobian_batch(
+        states_b, layout, perspective=persp_test_b,
+    )
+    H_pf_p = np.zeros((T_b, 2 * layout.n_markers, layout.state_dim))
+    for t in range(T_b):
+        H_pf_p[t] = state_to_marker_jacobian(
+            states_b[t], layout, perspective=persp_test_b,
+        )
+    max_diff_p = float(np.max(np.abs(H_batch_p - H_pf_p)))
+    assert max_diff_p < 1e-9, (
+        f"batch+persp vs per-frame+persp Jacobians disagree: "
+        f"max diff = {max_diff_p:.6e}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 73: device resolution. "cpu" stays cpu. "cuda" with
+    # no torch falls back to cpu. "auto" with no torch is cpu.
+    # ---------------------------------------------------------- #
+    assert _resolve_device("cpu", 1000) == "cpu"
+    # If torch isn't installed in sandbox, both 'cuda' and
+    # 'auto' should fall back to cpu cleanly.
+    torch = _try_import_torch()
+    if torch is None:
+        assert _resolve_device("cuda", 10000) == "cpu"
+        assert _resolve_device("auto", 10000) == "cpu"
+
+    # ---------------------------------------------------------- #
+    # Case 74: GPU path produces same results as CPU path
+    # (skipped if torch+cuda unavailable in sandbox).
+    # ---------------------------------------------------------- #
+    if torch is not None and torch.cuda.is_available():
+        pos_cpu = state_to_marker_positions_batch(
+            states_b, layout, device="cpu",
+        )
+        pos_gpu = state_to_marker_positions_batch(
+            states_b, layout, device="cuda",
+        )
+        assert np.allclose(pos_cpu, pos_gpu, atol=1e-9)
+        # And with perspective
+        pos_cpu_p = state_to_marker_positions_batch(
+            states_b, layout, perspective=persp_test_b, device="cpu",
+        )
+        pos_gpu_p = state_to_marker_positions_batch(
+            states_b, layout, perspective=persp_test_b, device="cuda",
+        )
+        assert np.allclose(pos_cpu_p, pos_gpu_p, atol=1e-9)
+
+    print("smoke_kalman_pose_smoother_v2: 74/74 cases passed")
     return 0
 
 
