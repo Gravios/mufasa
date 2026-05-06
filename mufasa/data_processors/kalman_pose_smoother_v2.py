@@ -702,3 +702,517 @@ def fit_body_lengths(
         segment_length_iqr=segment_length_iqr,
         marker_offsets=marker_offsets,
     )
+
+
+# ============================================================
+# Forward kinematics + observation function + Jacobian
+# (patch 100)
+# ============================================================
+#
+# Given a body state vector and a layout, compute the predicted
+# 2D position of every marker (forward kinematics) and the
+# Jacobian of those positions with respect to state. The Jacobian
+# is the linearization needed by the EKF.
+#
+# Math (see commit message for full derivation)
+# ----------------------------------------------
+#
+# State packing (per BodyLayout):
+#
+#   [root_x, root_y, root_vx, root_vy,
+#    root_cos, root_sin, root_cos_dot, root_sin_dot,
+#    for each non-root segment in topo order:
+#      s_cos, s_sin, s_cos_dot, s_sin_dot,
+#    for each non-root segment in topo order:
+#      s_length, s_length_dot]
+#
+# Forward kinematics (depth-first by topo order):
+#
+#   P_root = (root_x, root_y)
+#   R_root = R(root_cos, root_sin)
+#
+#   for each non-root segment s in topo order:
+#     v_s_local = (s_length * s_cos, s_length * s_sin)
+#       in parent(s)'s frame
+#     P_s_distal = P_parent_distal + R_world[parent(s)] @ v_s_local
+#     R_world[s] = R_world[parent(s)] @ R_local(s_cos, s_sin)
+#
+# Marker position (for marker on segment s with offset (l, α)
+# in s's frame):
+#
+#   v_marker_local = (l * cos α, l * sin α)
+#   p_marker = P_s_distal + R_world[s] @ v_marker_local
+#
+# Jacobian (∂p_marker / ∂state):
+#
+# For state components NOT in {positions, orientations, lengths}
+# (i.e., velocities), ∂ = 0 (velocities don't affect positions).
+#
+# Position components (root_x, root_y):
+#   ∂p_marker / ∂root_x = (1, 0)
+#   ∂p_marker / ∂root_y = (0, 1)
+#
+# Orientation components — use 2-column ambient-space Jacobian
+# (treats cos and sin as independent R^2 coords, NOT
+# constrained-tangent).  For each ancestor a in the chain from
+# root to marker's segment, with cumulative_offset_at_a being
+# the marker position in a's parent's frame minus P_a_proximal:
+#
+#   ∂p_marker / ∂a_cos =
+#     R_world[parent(a)] @ ((L_a, 0) + cumulative_offset_past_a)
+#   ∂p_marker / ∂a_sin =
+#     R_world[parent(a)] @ ((0, L_a) + J @ cumulative_offset_past_a)
+#
+# where for root a: R_world[parent(root)] := I, and L_root := 0
+# (root has no length state — its position state covers
+# translation directly).  cumulative_offset_past_root = (p_m -
+# P_root) expressed in root's frame.
+#
+# Length components:
+#   ∂p_marker / ∂s_length = R_world[parent(s)] @ (s_cos, s_sin)
+#
+# Note: for ancestors of the marker's segment that are NOT in
+# the chain from root to that segment, partials are zero
+# (different branches of the tree don't affect each other).
+
+
+def _R(cos_a: float, sin_a: float) -> np.ndarray:
+    """2x2 rotation matrix from (cos, sin)."""
+    return np.array([[cos_a, -sin_a], [sin_a, cos_a]])
+
+
+# 2x2 90-degree rotation matrix used in Jacobian computation
+_J90 = np.array([[0.0, -1.0], [1.0, 0.0]])
+
+
+def _pack_state_layout_indices(layout: BodyLayout) -> Dict[str, Dict[str, int]]:
+    """Convenience: pre-compute named indices into the state
+    vector for fast access during forward kinematics.
+
+    Returns a dict ``{block_name: {field_name: index}}`` where:
+      block_name = 'root' or non-root segment name
+      field_name in {'x', 'y', 'vx', 'vy', 'cos', 'sin',
+                     'cos_dot', 'sin_dot', 'length',
+                     'length_dot'} (root has no length;
+                     non-root has all)
+    """
+    indices: Dict[str, Dict[str, int]] = {}
+    rs = layout.slice_root_pose()
+    indices["__root__"] = {
+        "x": rs.start + 0,
+        "y": rs.start + 1,
+        "vx": rs.start + 2,
+        "vy": rs.start + 3,
+        "cos": rs.start + 4,
+        "sin": rs.start + 5,
+        "cos_dot": rs.start + 6,
+        "sin_dot": rs.start + 7,
+    }
+    for seg_name in layout.non_root_topo_order:
+        os_ = layout.slice_segment_orientation(seg_name)
+        ls = layout.slice_segment_length(seg_name)
+        indices[seg_name] = {
+            "cos": os_.start + 0,
+            "sin": os_.start + 1,
+            "cos_dot": os_.start + 2,
+            "sin_dot": os_.start + 3,
+            "length": ls.start + 0,
+            "length_dot": ls.start + 1,
+        }
+    return indices
+
+
+@dataclass
+class ForwardKinematicsResult:
+    """Per-segment world poses computed by forward kinematics.
+
+    For segment s:
+      P_distal[s]: world position of s's distal end (where
+                   markers attached at offset (0, 0) live)
+      R_world[s]:  world-frame rotation matrix of s
+
+    For the root, P_distal is the root position (root_x, root_y)
+    and R_world is R(root_cos, root_sin).
+
+    These are the inputs to marker-position and Jacobian
+    computation.
+    """
+    P_distal: Dict[str, np.ndarray]   # segment name -> (2,) array
+    R_world: Dict[str, np.ndarray]    # segment name -> (2, 2) array
+
+
+def forward_kinematics(
+    state: np.ndarray,
+    layout: BodyLayout,
+) -> ForwardKinematicsResult:
+    """Compute per-segment world poses from a body state.
+
+    Walks the kinematic tree in topological order (root first,
+    children after parents), accumulating world rotations and
+    positions through the chain. O(M) where M is number of
+    segments.
+
+    Parameters
+    ----------
+    state : (state_dim,) array
+        Body state vector packed per ``BodyLayout`` convention.
+    layout : BodyLayout
+
+    Returns
+    -------
+    ForwardKinematicsResult
+    """
+    if state.shape != (layout.state_dim,):
+        raise ValueError(
+            f"state shape {state.shape} != ({layout.state_dim},)"
+        )
+
+    idx = _pack_state_layout_indices(layout)
+    P_distal: Dict[str, np.ndarray] = {}
+    R_world: Dict[str, np.ndarray] = {}
+
+    # Root
+    root = layout.root_segment
+    P_distal[root.name] = np.array([
+        state[idx["__root__"]["x"]],
+        state[idx["__root__"]["y"]],
+    ])
+    R_world[root.name] = _R(
+        state[idx["__root__"]["cos"]],
+        state[idx["__root__"]["sin"]],
+    )
+
+    # Non-root in topo order
+    for seg_name in layout.non_root_topo_order:
+        seg = layout.segment_by_name(seg_name)
+        parent_name = seg.parent
+        # State for s
+        s_cos = state[idx[seg_name]["cos"]]
+        s_sin = state[idx[seg_name]["sin"]]
+        s_length = state[idx[seg_name]["length"]]
+        # Segment vector in parent frame
+        v_s_local = np.array([s_length * s_cos, s_length * s_sin])
+        # World position
+        P_distal[seg_name] = (
+            P_distal[parent_name] + R_world[parent_name] @ v_s_local
+        )
+        # World rotation
+        R_local_s = _R(s_cos, s_sin)
+        R_world[seg_name] = R_world[parent_name] @ R_local_s
+
+    return ForwardKinematicsResult(P_distal=P_distal, R_world=R_world)
+
+
+def state_to_marker_positions(
+    state: np.ndarray,
+    layout: BodyLayout,
+    fk: Optional[ForwardKinematicsResult] = None,
+) -> np.ndarray:
+    """Compute predicted 2D positions for all markers.
+
+    Order matches ``layout.marker_names`` (topological by
+    segment, then alphabetical within segment as Python dict
+    iteration preserves insertion order).
+
+    Parameters
+    ----------
+    state : (state_dim,) array
+    layout : BodyLayout
+    fk : ForwardKinematicsResult, optional
+        If provided, skip recomputing forward kinematics
+        (useful when computing both positions and Jacobian).
+
+    Returns
+    -------
+    (n_markers, 2) array
+        Predicted x, y per marker.
+    """
+    if fk is None:
+        fk = forward_kinematics(state, layout)
+
+    marker_names = layout.marker_names
+    positions = np.zeros((len(marker_names), 2))
+
+    for i, marker in enumerate(marker_names):
+        seg_name, (l_off, a_off) = layout.marker_attachment(marker)
+        v_marker_local = np.array([
+            l_off * np.cos(a_off),
+            l_off * np.sin(a_off),
+        ])
+        positions[i] = (
+            fk.P_distal[seg_name] + fk.R_world[seg_name] @ v_marker_local
+        )
+    return positions
+
+
+def state_to_marker_jacobian(
+    state: np.ndarray,
+    layout: BodyLayout,
+    fk: Optional[ForwardKinematicsResult] = None,
+) -> np.ndarray:
+    """Compute the Jacobian of marker positions w.r.t. state.
+
+    For K markers and state dimension D, returns a (2K, D)
+    matrix where row 2i, 2i+1 are ∂x_marker_i/∂state and
+    ∂y_marker_i/∂state respectively.
+
+    Velocity components have zero columns (don't affect
+    positions). Orientation columns use the 2-coordinate
+    ambient-space Jacobian (cos and sin treated as independent
+    coordinates, not constrained tangent space) — this is the
+    correct form for an EKF that tracks (cos, sin) as state
+    components.
+
+    Parameters
+    ----------
+    state : (state_dim,) array
+    layout : BodyLayout
+    fk : ForwardKinematicsResult, optional
+        If provided, skip recomputing forward kinematics.
+
+    Returns
+    -------
+    (2 * n_markers, state_dim) array
+    """
+    if fk is None:
+        fk = forward_kinematics(state, layout)
+
+    idx = _pack_state_layout_indices(layout)
+    marker_names = layout.marker_names
+    K = len(marker_names)
+    D = layout.state_dim
+    H = np.zeros((2 * K, D))
+
+    # Pre-compute segment ancestor chains (root → marker's
+    # segment, in topo order). Used to know which a's affect
+    # which marker.
+    parent_of: Dict[str, Optional[str]] = {
+        s.name: s.parent for s in layout.segments
+    }
+
+    def chain_to_root(seg_name: str) -> List[str]:
+        """List of segments from root to seg_name (inclusive),
+        in proximal-to-distal order.
+        """
+        chain: List[str] = []
+        cur: Optional[str] = seg_name
+        while cur is not None:
+            chain.append(cur)
+            cur = parent_of[cur]
+        return list(reversed(chain))
+
+    root_name = layout.root_segment.name
+
+    for i, marker in enumerate(marker_names):
+        seg_name, (l_off, a_off) = layout.marker_attachment(marker)
+        v_marker_local = np.array([
+            l_off * np.cos(a_off),
+            l_off * np.sin(a_off),
+        ])
+        # World marker position
+        p_m = fk.P_distal[seg_name] + fk.R_world[seg_name] @ v_marker_local
+
+        row_x = 2 * i
+        row_y = 2 * i + 1
+
+        # Position-of-root partials are constant
+        H[row_x, idx["__root__"]["x"]] = 1.0
+        H[row_y, idx["__root__"]["y"]] = 1.0
+
+        # Walk the chain from root to seg_name, computing
+        # partials at each ancestor.
+        chain = chain_to_root(seg_name)
+        for a_name in chain:
+            a_seg = layout.segment_by_name(a_name)
+
+            # Determine R_world[parent(a)]: identity for root,
+            # R_world[parent] otherwise.
+            if a_seg.parent is None:
+                R_pa = np.eye(2)
+            else:
+                R_pa = fk.R_world[a_seg.parent]
+
+            # Cumulative offset past a, in a's frame:
+            # (p_m - P_a_distal) expressed in a's local frame.
+            # For root, P_a_distal = P_root and R_world[a]^T
+            # transforms p_m - P_root into root's frame.
+            P_a_distal = fk.P_distal[a_name]
+            R_a_world = fk.R_world[a_name]
+            offset_past_a_in_a_frame = R_a_world.T @ (p_m - P_a_distal)
+
+            # Length state — only for non-root segments.
+            if a_seg.parent is not None:
+                a_cos = state[idx[a_name]["cos"]]
+                a_sin = state[idx[a_name]["sin"]]
+                a_length = state[idx[a_name]["length"]]
+                # ∂p_m / ∂a_length = R_world[parent(a)] @ (a_cos, a_sin)
+                # (changing length scales the segment vector,
+                # which shifts everything past a by that
+                # direction in parent(a)'s frame.)
+                d_p_d_length = R_pa @ np.array([a_cos, a_sin])
+                col = idx[a_name]["length"]
+                H[row_x, col] = d_p_d_length[0]
+                H[row_y, col] = d_p_d_length[1]
+            else:
+                a_length = 0.0
+
+            # Orientation state:
+            #   ∂p_m / ∂a_cos = R_world[parent(a)] @ (
+            #     (L_a, 0) + offset_past_a_in_a_frame)
+            #   ∂p_m / ∂a_sin = R_world[parent(a)] @ (
+            #     (0, L_a) + J @ offset_past_a_in_a_frame)
+            #
+            # The (L_a, 0)/(0, L_a) terms come from
+            # differentiating the segment vector (a_length *
+            # a_cos, a_length * a_sin).  For root, L_a = 0 so
+            # those terms vanish.
+
+            d_offset_d_cos = (
+                np.array([a_length, 0.0]) + offset_past_a_in_a_frame
+            )
+            d_offset_d_sin = (
+                np.array([0.0, a_length]) + _J90 @ offset_past_a_in_a_frame
+            )
+
+            d_p_d_cos = R_pa @ d_offset_d_cos
+            d_p_d_sin = R_pa @ d_offset_d_sin
+
+            if a_seg.parent is None:
+                col_cos = idx["__root__"]["cos"]
+                col_sin = idx["__root__"]["sin"]
+            else:
+                col_cos = idx[a_name]["cos"]
+                col_sin = idx[a_name]["sin"]
+            H[row_x, col_cos] = d_p_d_cos[0]
+            H[row_y, col_cos] = d_p_d_cos[1]
+            H[row_x, col_sin] = d_p_d_sin[0]
+            H[row_y, col_sin] = d_p_d_sin[1]
+
+    return H
+
+
+def initial_state_from_data(
+    positions: np.ndarray,
+    likelihoods: np.ndarray,
+    layout: BodyLayout,
+    marker_names: List[str],
+    fitted: FittedLengths,
+    likelihood_threshold: float = 0.5,
+) -> np.ndarray:
+    """Build an initial state vector by inverting the kinematic
+    chain on the first well-observed frame.
+
+    For each segment, compute its orientation and length from
+    the observed marker positions. Velocities are initialized
+    to zero. This gives EM a sensible starting point that's
+    consistent with the data.
+
+    Returns
+    -------
+    state : (state_dim,) array
+    """
+    name_to_idx = {n: i for i, n in enumerate(marker_names)}
+    state = np.zeros(layout.state_dim)
+    indices = _pack_state_layout_indices(layout)
+
+    # Find a frame where many key markers are observed
+    distal_markers = [
+        m for s in layout.segments
+        for m in [_segment_distal_marker(layout, s.name)]
+        if m is not None and m in name_to_idx
+    ]
+    if not distal_markers:
+        # Can't initialize meaningfully — use zeros
+        # (root cos = 1.0 to avoid degenerate identity)
+        state[indices["__root__"]["cos"]] = 1.0
+        for seg_name in layout.non_root_topo_order:
+            state[indices[seg_name]["cos"]] = 1.0
+            state[indices[seg_name]["length"]] = (
+                fitted.segment_lengths.get(seg_name, 1.0)
+            )
+        return state
+
+    distal_idx = [name_to_idx[m] for m in distal_markers]
+    finite_per_frame = np.all(
+        np.isfinite(positions[:, distal_idx, :]), axis=(1, 2),
+    )
+    high_p_per_frame = np.all(
+        likelihoods[:, distal_idx] >= likelihood_threshold, axis=1,
+    )
+    valid = finite_per_frame & high_p_per_frame
+    if not valid.any():
+        # Fallback to first frame's data
+        t0 = 0
+    else:
+        t0 = int(np.argmax(valid))
+
+    # Root position from root's distal marker
+    root = layout.root_segment
+    root_distal = _segment_distal_marker(layout, root.name)
+    if root_distal in name_to_idx:
+        root_pos = positions[t0, name_to_idx[root_distal], :]
+        state[indices["__root__"]["x"]] = root_pos[0]
+        state[indices["__root__"]["y"]] = root_pos[1]
+
+    # Root orientation: align with body direction (back3 → back1
+    # if available, otherwise default to identity).
+    root_cos = 1.0
+    root_sin = 0.0
+    if "back1" in name_to_idx and "back3" in name_to_idx:
+        front = positions[t0, name_to_idx["back1"], :]
+        rear = positions[t0, name_to_idx["back3"], :]
+        if np.all(np.isfinite(front)) and np.all(np.isfinite(rear)):
+            d = front - rear
+            n = np.linalg.norm(d)
+            if n > 1e-6:
+                root_cos = float(d[0] / n)
+                root_sin = float(d[1] / n)
+    state[indices["__root__"]["cos"]] = root_cos
+    state[indices["__root__"]["sin"]] = root_sin
+
+    # Per non-root segment: fit cos/sin and length from data
+    # Build forward kinematics incrementally.  At each segment
+    # in topo order, we know parent's world pose; compute s's
+    # local angle from observed (P_s_distal - P_parent_distal)
+    # in parent's frame.
+    P_world: Dict[str, np.ndarray] = {root.name: np.array([
+        state[indices["__root__"]["x"]],
+        state[indices["__root__"]["y"]],
+    ])}
+    R_world: Dict[str, np.ndarray] = {root.name: _R(root_cos, root_sin)}
+
+    for seg_name in layout.non_root_topo_order:
+        seg = layout.segment_by_name(seg_name)
+        parent_distal = _segment_distal_marker(layout, seg.parent)
+        seg_distal = _segment_distal_marker(layout, seg_name)
+
+        s_cos = 1.0
+        s_sin = 0.0
+        s_length = fitted.segment_lengths.get(seg_name, 1.0)
+
+        if (
+            parent_distal in name_to_idx and seg_distal in name_to_idx
+        ):
+            p_par = positions[t0, name_to_idx[parent_distal], :]
+            p_seg = positions[t0, name_to_idx[seg_distal], :]
+            if np.all(np.isfinite(p_par)) and np.all(np.isfinite(p_seg)):
+                world_offset = p_seg - p_par
+                # In parent's frame
+                R_par = R_world[seg.parent]
+                local_offset = R_par.T @ world_offset
+                length = float(np.linalg.norm(local_offset))
+                if length > 1e-6:
+                    s_cos = float(local_offset[0] / length)
+                    s_sin = float(local_offset[1] / length)
+                    s_length = length
+
+        state[indices[seg_name]["cos"]] = s_cos
+        state[indices[seg_name]["sin"]] = s_sin
+        state[indices[seg_name]["length"]] = s_length
+
+        # Update P_world / R_world for children to use
+        v_local = np.array([s_length * s_cos, s_length * s_sin])
+        P_world[seg_name] = P_world[seg.parent] + R_world[seg.parent] @ v_local
+        R_world[seg_name] = R_world[seg.parent] @ _R(s_cos, s_sin)
+
+    return state
