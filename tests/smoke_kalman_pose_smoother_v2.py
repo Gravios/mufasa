@@ -2131,7 +2131,122 @@ def main() -> int:
     )
     # Should not raise — sparse markers skip range_ratio.
 
-    print("smoke_kalman_pose_smoother_v2: 60/60 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 108: warm-start σ to absorb structural variation.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        fit_warm_start_sigma_v2,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 61: warm-start σ inflates σ_marker for markers with
+    # large structural offsets, leaves others unchanged.
+    # ---------------------------------------------------------- #
+    rng = np.random.default_rng(2070)
+    fps = 30.0
+    dt = 1.0 / fps
+    T_w = 200
+    n_m = layout.n_markers
+    indices = _pack_state_layout_indices(layout)
+
+    true_state_w = np.zeros(layout.state_dim)
+    true_state_w[indices["__root__"]["x"]] = 100.0
+    true_state_w[indices["__root__"]["y"]] = 200.0
+    true_state_w[indices["__root__"]["cos"]] = 1.0
+    for seg_name in layout.non_root_topo_order:
+        true_state_w[indices[seg_name]["cos"]] = 1.0
+        true_state_w[indices[seg_name]["length"]] = 5.0
+
+    # Generate clean trajectory
+    pred_w = state_to_marker_positions(true_state_w, layout)
+    sigma_obs = 1.5
+
+    # Inject structural offset only for lateral markers
+    structural_offset = np.zeros((n_m, 2))
+    lateral_left_idx = layout.marker_names.index("lateral_left")
+    lateral_right_idx = layout.marker_names.index("lateral_right")
+    structural_offset[lateral_left_idx, 0] = 15.0  # 10σ shift
+    structural_offset[lateral_right_idx, 0] = -15.0
+
+    pos_w = np.zeros((T_w, n_m, 2))
+    likes_w = np.full((T_w, n_m), 0.95)
+    for t in range(T_w):
+        pos_w[t] = pred_w + structural_offset + rng.normal(0, sigma_obs, (n_m, 2))
+
+    fitted_w = fit_body_lengths(
+        pos_w, likes_w, layout, layout.marker_names,
+    )
+    params_init = NoiseParamsV2.default(
+        layout, sigma_marker=sigma_obs,
+    )
+
+    sigma_warm = fit_warm_start_sigma_v2(
+        [(pos_w, likes_w)], layout, layout.marker_names,
+        fitted_w, params_init, fps,
+    )
+
+    # Lateral markers should have INFLATED σ
+    sig_lat_l = sigma_warm["lateral_left"]
+    sig_lat_r = sigma_warm["lateral_right"]
+    sig_back2 = sigma_warm["back2"]
+    assert sig_lat_l > 5.0, (
+        f"lateral_left σ should be inflated: got {sig_lat_l:.3f}"
+    )
+    assert sig_lat_r > 5.0, (
+        f"lateral_right σ should be inflated: got {sig_lat_r:.3f}"
+    )
+    # back2 (no structural offset) should stay near initial
+    assert sig_back2 < 4.0, (
+        f"back2 σ should stay low: got {sig_back2:.3f}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 62: warm-start σ never goes BELOW initial σ.
+    # ---------------------------------------------------------- #
+    # Use clean data: warm-start should yield σ ≥ initial σ
+    pos_clean = np.zeros((T_w, n_m, 2))
+    for t in range(T_w):
+        pos_clean[t] = pred_w + rng.normal(0, sigma_obs, (n_m, 2))
+
+    sigma_warm_clean = fit_warm_start_sigma_v2(
+        [(pos_clean, likes_w)], layout, layout.marker_names,
+        fitted_w, params_init, fps,
+    )
+    for m in layout.marker_names:
+        assert sigma_warm_clean[m] >= params_init.sigma_marker[m] - 1e-6, (
+            f"warm-start σ should be ≥ initial: {m} got "
+            f"{sigma_warm_clean[m]:.3f} < "
+            f"{params_init.sigma_marker[m]:.3f}"
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 63: warm-start σ caps inflation when smoother is
+    # broken (mean_diff huge for everything).
+    # ---------------------------------------------------------- #
+    # Manufacture a degenerate case: extremely tight initial
+    # σ that will force the smoother to track wildly. Then
+    # observation noise is enormous (50σ).
+    pos_broken = np.zeros((T_w, n_m, 2))
+    for t in range(T_w):
+        pos_broken[t] = pred_w + rng.normal(0, 50.0, (n_m, 2))
+
+    params_tight = NoiseParamsV2.default(
+        layout, sigma_marker=0.5,  # Very tight
+    )
+    sigma_warm_broken = fit_warm_start_sigma_v2(
+        [(pos_broken, likes_w)], layout, layout.marker_names,
+        fitted_w, params_tight, fps,
+        sigma_inflation_cap=20.0,
+    )
+    # Cap is 20× initial = 0.5 × 20 = 10. If warm-start would
+    # exceed 10, fall back to initial 0.5.
+    for m in layout.marker_names:
+        assert sigma_warm_broken[m] <= 10.0 + 1e-6, (
+            f"warm-start σ exceeded cap for {m}: "
+            f"{sigma_warm_broken[m]:.3f}"
+        )
+
+    print("smoke_kalman_pose_smoother_v2: 63/63 cases passed")
     return 0
 
 

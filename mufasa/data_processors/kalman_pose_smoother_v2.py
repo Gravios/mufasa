@@ -2599,6 +2599,142 @@ def fit_initial_params_v2(
     )
 
 
+def fit_warm_start_sigma_v2(
+    sessions: List[Tuple[np.ndarray, np.ndarray]],
+    layout: BodyLayout,
+    marker_names: List[str],
+    fitted_lengths: FittedLengths,
+    params: NoiseParamsV2,
+    fps: float,
+    likelihood_threshold: float = 0.5,
+    sigma_inflation_cap: float = 20.0,
+    apply_constraints: bool = True,
+) -> Dict[str, float]:
+    """Warm-start σ_marker estimation: run filter+smoother
+    once with current params, measure mean |smoothed - raw|
+    per marker, use that as a *lower bound* for σ_marker.
+
+    Why this matters
+    ----------------
+
+    The MA-residual estimator in fit_initial_params_v2 captures
+    only frame-to-frame jitter (typically 1-3 px). For body
+    markers at the widest part of the rat (lateral_left/
+    lateral_right) and other markers where rigid-offset
+    prediction has structural mismatch (ear positions varying
+    with head orientation), the actual σ should also account
+    for postural variation — typically 5-30 px depending on
+    the marker.
+
+    The MA-residual approach systematically underestimates σ
+    for these markers, causing the validation hook to fire
+    even though the smoother is doing its job correctly.
+
+    Solution: a single warm-up pass to MEASURE structural
+    residuals from the smoother's predictions, use that as a
+    lower bound for σ_marker before EM.
+
+    For Gaussian residuals: mean(|residual|) ≈ σ × √(2/π) ≈ 0.8σ
+    So σ ≈ mean_diff × 1.25.
+
+    sigma_inflation_cap protects against the degenerate case
+    where the smoother itself is broken (mean_diff huge for
+    every marker). If warm-start σ is more than
+    sigma_inflation_cap × initial σ, that's a sign the warm-
+    start is unreliable and we keep the initial σ.
+
+    Parameters
+    ----------
+    sessions : list of (positions, likelihoods)
+    layout : BodyLayout
+    marker_names : list[str]
+    fitted_lengths : FittedLengths
+    params : NoiseParamsV2
+        Current params; used to run the warm-up smoother and
+        as the floor for the new σ.
+    fps : float
+    likelihood_threshold : float
+    sigma_inflation_cap : float, default 20
+        Maximum factor by which warm-start σ can exceed
+        initial σ. Above this, fall back to initial σ
+        (warm-start unreliable).
+    apply_constraints : bool
+
+    Returns
+    -------
+    sigma_warm : Dict[str, float]
+        Per-marker warm-started σ, ≥ initial σ.
+    """
+    dt = 1.0 / fps
+    # Per-marker accumulators across all sessions
+    sum_abs_diff: Dict[str, float] = {m: 0.0 for m in layout.marker_names}
+    n_obs: Dict[str, int] = {m: 0 for m in layout.marker_names}
+
+    for pos, likes in sessions:
+        # Run a forward filter + smoother with current params.
+        x0 = initial_state_from_data(
+            pos, likes, layout, marker_names,
+            fitted_lengths, likelihood_threshold,
+        )
+        filt = forward_filter_v2(
+            pos, likes, layout, params, dt,
+            initial_state=x0,
+            likelihood_threshold=likelihood_threshold,
+            apply_constraints=apply_constraints,
+        )
+        smooth = rts_smooth_v2(filt, layout, dt)
+
+        T = smooth.x_smooth.shape[0]
+        # Predicted marker positions per frame
+        for t in range(T):
+            pred = state_to_marker_positions(
+                smooth.x_smooth[t], layout,
+            )
+            for k, m in enumerate(layout.marker_names):
+                x_obs = pos[t, k, 0]
+                y_obs = pos[t, k, 1]
+                p = likes[t, k]
+                if (
+                    not (np.isfinite(x_obs) and np.isfinite(y_obs))
+                    or p < likelihood_threshold
+                    or not np.all(np.isfinite(pred[k]))
+                ):
+                    continue
+                diff = np.sqrt(
+                    (pred[k, 0] - x_obs) ** 2
+                    + (pred[k, 1] - y_obs) ** 2
+                )
+                sum_abs_diff[m] += float(diff)
+                n_obs[m] += 1
+
+    sigma_warm: Dict[str, float] = {}
+    for m in layout.marker_names:
+        sigma_init = params.sigma_marker.get(m, 3.0)
+        if n_obs[m] < 50:
+            # Insufficient data for warm-start; keep initial
+            sigma_warm[m] = sigma_init
+            continue
+        mean_diff = sum_abs_diff[m] / n_obs[m]
+        # Convert mean abs diff to σ estimate (Gaussian: σ ≈
+        # mean_diff / 0.8). Also accounts for the smoother
+        # already absorbing some noise — the residuals here
+        # are after the smoother, so they reflect what the
+        # smoother CAN'T explain (mostly structural).
+        sigma_residual = mean_diff / 0.8
+        # Lower bound at initial σ
+        sigma_candidate = max(sigma_init, sigma_residual)
+        # Cap inflation factor
+        sigma_max = sigma_init * sigma_inflation_cap
+        if sigma_candidate > sigma_max:
+            # Warm-start unreliable (smoother probably broken).
+            # Stay at initial σ.
+            sigma_warm[m] = sigma_init
+        else:
+            sigma_warm[m] = sigma_candidate
+
+    return sigma_warm
+
+
 def _validate_trajectory_v2(
     smooth: SmoothResultV2,
     positions: np.ndarray,
@@ -2850,6 +2986,7 @@ def fit_noise_params_em_v2(
     initial_params: Optional[NoiseParamsV2] = None,
     apply_constraints: bool = True,
     enable_validation: bool = True,
+    enable_warm_start_sigma: bool = True,
     verbose: bool = False,
 ) -> EMResultV2:
     """Multi-session EM for v2 noise parameters.
@@ -2909,6 +3046,46 @@ def fit_noise_params_em_v2(
             f"q_root_pos = {initial_params.q_root_pos:.1f}, "
             f"q_root_ori = {initial_params.q_root_ori:.3f}"
         )
+
+    # Warm-start σ_marker: run a single filter+smoother pass
+    # with current params, measure mean |smoothed - raw| per
+    # marker, use that as a lower bound for σ_marker. This
+    # absorbs structural variation (postural sway in body
+    # markers like lateral_left/right) that the raw MA-residual
+    # estimator misses. Without this, EM struggles to grow σ
+    # for these markers and validation may false-positive.
+    if enable_warm_start_sigma:
+        if verbose:
+            print(
+                "[v2-em] Running warm-start σ pass to absorb "
+                "structural variation..."
+            )
+        sigma_warm = fit_warm_start_sigma_v2(
+            sessions, layout, marker_names, fitted_lengths,
+            initial_params, fps,
+            likelihood_threshold=likelihood_threshold,
+            apply_constraints=apply_constraints,
+        )
+        # Update initial_params with warm-started σ
+        initial_params = NoiseParamsV2(
+            sigma_marker=sigma_warm,
+            q_root_pos=initial_params.q_root_pos,
+            q_root_ori=initial_params.q_root_ori,
+            q_seg_ori=dict(initial_params.q_seg_ori),
+            q_length=dict(initial_params.q_length),
+            constraint_sigma=initial_params.constraint_sigma,
+        )
+        if verbose:
+            sigma_changes = []
+            for m in layout.marker_names:
+                sigma_changes.append(
+                    f"{m}={sigma_warm[m]:.2f}"
+                )
+            print(
+                f"[v2-em] warm-start σ: "
+                f"σ̄ = {np.mean(list(sigma_warm.values())):.3f}px, "
+                f"per-marker: {', '.join(sigma_changes)}"
+            )
 
     params = initial_params
     history: List[Dict[str, float]] = []
@@ -3327,6 +3504,7 @@ def smooth_pose_v2(
     load_model: Optional[str] = None,
     apply_constraints: bool = True,
     enable_validation: bool = True,
+    enable_warm_start_sigma: bool = True,
     verbose: bool = False,
 ) -> Dict:
     """Top-level user-facing function for v2 pose smoothing.
@@ -3600,6 +3778,7 @@ def smooth_pose_v2(
             max_iter=em_max_iter, tol=em_tol,
             apply_constraints=apply_constraints,
             enable_validation=enable_validation,
+            enable_warm_start_sigma=enable_warm_start_sigma,
             verbose=verbose,
         )
         params = em_result.params
@@ -3789,6 +3968,16 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--no-warm-start-sigma", action="store_true",
+        help=(
+            "Disable warm-start σ pass. By default, an extra "
+            "filter+smoother pass runs before EM to inflate "
+            "σ_marker for body markers with structural "
+            "variation (lateral_left/right, etc.). Disable to "
+            "use raw MA-residual σ only."
+        ),
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Verbose logging",
     )
@@ -3814,6 +4003,7 @@ def main(argv=None) -> int:
             load_model=args.load_model,
             apply_constraints=not args.no_constraints,
             enable_validation=not args.no_validate,
+            enable_warm_start_sigma=not args.no_warm_start_sigma,
             verbose=args.verbose,
         )
     except Exception as e:
