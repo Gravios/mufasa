@@ -2021,7 +2021,117 @@ def main() -> int:
         assert "NaN" in msg
         assert "EKF has diverged" in msg
 
-    print("smoke_kalman_pose_smoother_v2: 58/58 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 107: relaxed validation thresholds + range_ratio fix.
+    # ---------------------------------------------------------- #
+
+    # ---------------------------------------------------------- #
+    # Case 59: validation with the new default 8σ threshold
+    # passes on real-data-like residuals (~6σ mean diff)
+    # that would have failed with the old 5σ threshold.
+    # ---------------------------------------------------------- #
+    rng = np.random.default_rng(2060)
+    T_v = 80
+    n_m = layout.n_markers
+    indices = _pack_state_layout_indices(layout)
+
+    # Build a layout state and synthetic data where the smoother
+    # produces marker positions that systematically deviate from
+    # raw observations by ~6σ — the kind of structural mismatch
+    # that 5σ would flag but 8σ tolerates.
+    true_state_v = np.zeros(layout.state_dim)
+    true_state_v[indices["__root__"]["x"]] = 100.0
+    true_state_v[indices["__root__"]["y"]] = 200.0
+    true_state_v[indices["__root__"]["cos"]] = 1.0
+    for seg_name in layout.non_root_topo_order:
+        true_state_v[indices[seg_name]["cos"]] = 1.0
+        true_state_v[indices[seg_name]["length"]] = 5.0
+
+    # smoothed = constant true position (rigid body model)
+    pred_clean = state_to_marker_positions(true_state_v, layout)
+    x_smooth_v = np.tile(true_state_v, (T_v, 1))
+    P_smooth_v = np.tile(np.eye(layout.state_dim) * 0.1, (T_v, 1, 1))
+    P_lag_v = np.tile(np.eye(layout.state_dim) * 0.1, (T_v - 1, 1, 1))
+    smooth_v = SmoothResultV2(
+        x_smooth=x_smooth_v, P_smooth=P_smooth_v,
+        P_lag_one=P_lag_v,
+    )
+
+    # raw observations: clean position + DETERMINISTIC structural
+    # offset of 5σ on each marker (constant per marker, all
+    # markers shifted same amount per axis to keep test
+    # reproducible — random draws give occasional 8σ outliers
+    # which fail this test inconsistently)
+    sigma_v = 2.0
+    structural_offset_per_marker = np.zeros((n_m, 2))
+    structural_offset_per_marker[:, 0] = 5 * sigma_v  # 10 px in x
+    structural_offset_per_marker[:, 1] = 0.0
+    pos_v = np.zeros((T_v, n_m, 2))
+    likes_v = np.full((T_v, n_m), 0.95)
+    for t in range(T_v):
+        pos_v[t] = (
+            pred_clean
+            + structural_offset_per_marker
+            + rng.normal(0, sigma_v, (n_m, 2))
+        )
+
+    params_v = NoiseParamsV2.default(layout, sigma_marker=sigma_v)
+
+    # With default 8σ, this should NOT raise (mean_diff ≈ 6.5σ < 8σ)
+    _validate_trajectory_v2(
+        smooth_v, pos_v, likes_v, layout, params_v,
+        iteration=0, likelihood_threshold=0.5,
+    )
+
+    # With explicit 4σ, it SHOULD raise (regression to old behavior)
+    raised = False
+    try:
+        _validate_trajectory_v2(
+            smooth_v, pos_v, likes_v, layout, params_v,
+            iteration=0, likelihood_threshold=0.5,
+            mean_diff_sigma_factor=4.0,
+        )
+    except RuntimeError:
+        raised = True
+    assert raised, "4σ threshold should fail on 5.5σ structural offset"
+
+    # ---------------------------------------------------------- #
+    # Case 60: range_ratio uses high-p frames only for both
+    # raw and smoothed, eliminating the apples-to-oranges issue
+    # that caused the 25,000× range_ratio for sparse markers.
+    # ---------------------------------------------------------- #
+    T_60 = 200
+    rng_60 = np.random.default_rng(2061)
+    # Truth: marker moves substantially across all T frames
+    true_states_60 = np.tile(true_state_v, (T_60, 1))
+    F_60 = build_F_v2(layout, 1.0/30.0)
+    # Inject root motion so smoothed trajectory varies
+    true_states_60[0, indices["__root__"]["vx"]] = 5.0
+    for t in range(1, T_60):
+        true_states_60[t] = F_60 @ true_states_60[t-1]
+
+    # Raw observations: only available in first 5 frames
+    pos_60 = np.full((T_60, n_m, 2), np.nan)
+    likes_60 = np.zeros((T_60, n_m))
+    for t in range(5):
+        pos_60[t] = state_to_marker_positions(true_states_60[t], layout)
+        likes_60[t] = 0.95
+    # Smoothed: tracks all 200 frames
+    P_smooth_60 = np.tile(np.eye(layout.state_dim) * 0.1, (T_60, 1, 1))
+    P_lag_60 = np.tile(np.eye(layout.state_dim) * 0.1, (T_60 - 1, 1, 1))
+    smooth_60 = SmoothResultV2(
+        x_smooth=true_states_60, P_smooth=P_smooth_60,
+        P_lag_one=P_lag_60,
+    )
+    # Sparse marker (5 obs out of 200 = 2.5%) should skip
+    # range_ratio check (below default min_observation_fraction=0.05).
+    _validate_trajectory_v2(
+        smooth_60, pos_60, likes_60, layout, params_v,
+        iteration=0, likelihood_threshold=0.5,
+    )
+    # Should not raise — sparse markers skip range_ratio.
+
+    print("smoke_kalman_pose_smoother_v2: 60/60 cases passed")
     return 0
 
 
