@@ -2262,3 +2262,1445 @@ def finalize_m_step_v2(
         q_length=q_length,
         constraint_sigma=prev_params.constraint_sigma,
     )
+
+
+# ============================================================
+# Data-driven parameter initialization + EM loop +
+# validation hook — patch 104
+# ============================================================
+#
+# This patch ties together patches 99-103 into a working
+# multi-iteration EM that fits NoiseParamsV2 to one or more
+# sessions. Three components:
+#
+# 1. fit_initial_params_v2: estimates σ_marker from MA-residuals
+#    and q_root_pos from window-variance of the root marker
+#    (the v1 patch-94 approach ported to v2). This is the
+#    fix for the slow-EM-convergence issue documented in
+#    patch 103.
+#
+# 2. fit_noise_params_em_v2: the EM loop. Multi-session aware
+#    via per-session E-step + combined M-step.
+#
+# 3. _validate_trajectory_v2: post-E-step hook that catches
+#    degenerate trajectories (frozen smoothed, prior overruling
+#    data) and raises RuntimeError with per-marker breakdown.
+
+
+_INIT_FLOOR_Q_ROOT_POS_V2 = 100.0
+_INIT_DEFAULT_Q_ROOT_ORI = 1.0
+_INIT_DEFAULT_Q_SEG_ORI = 0.5
+_INIT_DEFAULT_Q_LENGTH = 0.01
+
+
+def fit_initial_params_v2(
+    positions: np.ndarray,
+    likelihoods: np.ndarray,
+    layout: BodyLayout,
+    marker_names: List[str],
+    fitted_lengths: FittedLengths,
+    fps: float,
+    likelihood_threshold: float = 0.5,
+) -> NoiseParamsV2:
+    """Estimate initial NoiseParamsV2 from data.
+
+    Calibrates EM's starting point so it doesn't have to
+    grow q from arbitrary defaults across many iterations.
+
+    σ_marker estimation
+    -------------------
+
+    Per marker, residuals from a 5-frame moving average over
+    high-confidence frames give a rough observation noise
+    estimate. Falls back to 2.0 px if insufficient data.
+
+    q_root_pos estimation
+    ---------------------
+
+    Window-variance estimator (patch 94 from v1, ported here):
+
+      For sliding 1-second windows, compute Var(positions in
+      window). Under a CV model:
+        Var(x in window) ≈ σ² + (1/12) q T_w³
+      → q ≈ 12 * (mean_window_var - σ²) / T_w³
+
+    Uses all observations in each window (not just consecutive
+    high-p pairs), so it's robust to sparse coverage.  Mean
+    across windows captures motion across all behavioral
+    regimes.
+
+    q_root_ori estimation
+    ---------------------
+
+    Compute the body-orientation proxy per frame from
+    (back1 - back3) — direction the rat is facing. The
+    angle θ_t = atan2(dy, dx). Window-variance of θ →
+    q_root_ori. Uses unwrapped angle to avoid wraparound.
+
+    Other q values
+    --------------
+
+    q_seg_ori per segment: default value (refined by EM).
+    q_length per segment: default value calibrated by IQR
+                          if available.
+
+    Parameters
+    ----------
+    positions : (T, K, 2)
+    likelihoods : (T, K)
+    layout : BodyLayout
+    marker_names : list[str]
+        Marker names matching the columns of positions /
+        likelihoods.
+    fitted_lengths : FittedLengths
+        From fit_body_lengths; provides marker offsets and
+        length IQR.
+    fps : float
+    likelihood_threshold : float
+
+    Returns
+    -------
+    NoiseParamsV2
+    """
+    name_to_idx = {n: i for i, n in enumerate(marker_names)}
+    dt = 1.0 / fps
+    T = positions.shape[0]
+    window_frames = min(int(round(fps)), max(T // 4, 5))
+    T_w = window_frames * dt
+
+    # ---------- σ_marker ----------
+    sigma_marker: Dict[str, float] = {}
+    for m in layout.marker_names:
+        if m not in name_to_idx:
+            sigma_marker[m] = 2.0
+            continue
+        i = name_to_idx[m]
+        x = positions[:, i, 0]
+        y = positions[:, i, 1]
+        p = likelihoods[:, i]
+        mask = (
+            (p >= likelihood_threshold)
+            & np.isfinite(x) & np.isfinite(y)
+        )
+        if mask.sum() < 20:
+            sigma_marker[m] = 2.0
+            continue
+        x_clean = x[mask]
+        y_clean = y[mask]
+        ma_w = 5
+        kernel = np.ones(ma_w) / ma_w
+        x_ma = np.convolve(x_clean, kernel, mode="valid")
+        y_ma = np.convolve(y_clean, kernel, mode="valid")
+        x_resid = x_clean[ma_w // 2: ma_w // 2 + len(x_ma)] - x_ma
+        y_resid = y_clean[ma_w // 2: ma_w // 2 + len(y_ma)] - y_ma
+        sigma_est = float(
+            np.sqrt(0.5 * (np.var(x_resid) + np.var(y_resid)))
+        )
+        sigma_marker[m] = max(sigma_est, _FLOOR_SIGMA_MARKER_V2)
+
+    # ---------- q_root_pos ----------
+    # Use root distal marker (back2 in standard rat). Estimate
+    # from window-variance of position.
+    root_distal = _segment_distal_marker(layout, layout.root_segment.name)
+    q_root_pos = _INIT_FLOOR_Q_ROOT_POS_V2
+    if root_distal is not None and root_distal in name_to_idx:
+        i = name_to_idx[root_distal]
+        x = positions[:, i, 0]
+        y = positions[:, i, 1]
+        p = likelihoods[:, i]
+        mask = (
+            (p >= likelihood_threshold)
+            & np.isfinite(x) & np.isfinite(y)
+        )
+        if mask.sum() >= 20:
+            n_windows = T // window_frames
+            window_vars: List[float] = []
+            for w in range(n_windows):
+                start = w * window_frames
+                end = start + window_frames
+                wm = mask[start:end]
+                if wm.sum() < 5:
+                    continue
+                wx = x[start:end][wm]
+                wy = y[start:end][wm]
+                window_vars.append(0.5 * (np.var(wx) + np.var(wy)))
+            if len(window_vars) >= 3:
+                mean_var = float(np.mean(window_vars))
+                sigma_root = sigma_marker.get(root_distal, 2.0)
+                motion_var = max(mean_var - sigma_root ** 2, 0.0)
+                q_est = 12.0 * motion_var / (T_w ** 3)
+                q_root_pos = max(q_est, _INIT_FLOOR_Q_ROOT_POS_V2)
+
+    # ---------- q_root_ori ----------
+    # Body orientation proxy: angle of (back1 - back3) per
+    # frame. Use unwrapped angle for variance computation.
+    q_root_ori = _INIT_DEFAULT_Q_ROOT_ORI
+    if (
+        "back1" in name_to_idx and "back3" in name_to_idx
+    ):
+        i1 = name_to_idx["back1"]
+        i3 = name_to_idx["back3"]
+        p1 = likelihoods[:, i1]
+        p3 = likelihoods[:, i3]
+        x1 = positions[:, i1, 0]
+        y1 = positions[:, i1, 1]
+        x3 = positions[:, i3, 0]
+        y3 = positions[:, i3, 1]
+        mask = (
+            (p1 >= likelihood_threshold) & (p3 >= likelihood_threshold)
+            & np.isfinite(x1) & np.isfinite(y1)
+            & np.isfinite(x3) & np.isfinite(y3)
+        )
+        if mask.sum() >= 50:
+            dx = x1[mask] - x3[mask]
+            dy = y1[mask] - y3[mask]
+            theta = np.arctan2(dy, dx)
+            theta_unwrapped = np.unwrap(theta)
+            # Window-variance of orientation. Convert angular
+            # variance per second² to ambient (cos, sin)
+            # acceleration variance using small-angle
+            # approximation: d/dt(cos) ≈ -sin * ω, so for
+            # tracking purposes the ambient q ≈ angular q.
+            n_w = len(theta_unwrapped) // window_frames
+            wv: List[float] = []
+            for w in range(n_w):
+                start = w * window_frames
+                end = start + window_frames
+                if end > len(theta_unwrapped):
+                    break
+                wv.append(np.var(theta_unwrapped[start:end]))
+            if len(wv) >= 3:
+                mean_var = float(np.mean(wv))
+                # Constraint variance ≈ obs noise on θ from
+                # σ_root / d_root3-to-1. Small if back markers
+                # are several pixels apart.
+                q_est = 12.0 * mean_var / (T_w ** 3)
+                q_root_ori = max(q_est, _FLOOR_Q_ROOT_ORI)
+
+    # ---------- q_seg_ori, q_length ----------
+    q_seg_ori: Dict[str, float] = {}
+    q_length: Dict[str, float] = {}
+    for seg_name in layout.non_root_topo_order:
+        # Default per category — head/tail are more mobile
+        if seg_name in ("head", "neck"):
+            q_seg_ori[seg_name] = 2.0
+        elif seg_name.startswith("tail"):
+            q_seg_ori[seg_name] = 5.0
+        else:
+            q_seg_ori[seg_name] = _INIT_DEFAULT_Q_SEG_ORI
+
+        # q_length from IQR if available, else default
+        iqr = fitted_lengths.segment_length_iqr.get(seg_name, 0.0)
+        if iqr > 0:
+            # Treat IQR as a 1-second standard deviation proxy
+            q_length[seg_name] = max(
+                (iqr ** 2) / (T_w ** 2), _FLOOR_Q_LENGTH,
+            )
+        else:
+            q_length[seg_name] = _INIT_DEFAULT_Q_LENGTH
+
+    return NoiseParamsV2(
+        sigma_marker=sigma_marker,
+        q_root_pos=q_root_pos,
+        q_root_ori=q_root_ori,
+        q_seg_ori=q_seg_ori,
+        q_length=q_length,
+    )
+
+
+def _validate_trajectory_v2(
+    smooth: SmoothResultV2,
+    positions: np.ndarray,
+    likelihoods: np.ndarray,
+    layout: BodyLayout,
+    params: NoiseParamsV2,
+    iteration: int,
+    likelihood_threshold: float,
+    range_ratio_floor: float = 0.1,
+    mean_diff_sigma_factor: float = 5.0,
+    verbose: bool = False,
+) -> None:
+    """Validation hook: catches degenerate trajectories.
+
+    Two checks per marker (port from v1 patch 91-93):
+
+    1. range_ratio: range of smoothed marker positions
+       should be at least range_ratio_floor (default 0.1) of
+       the range of raw observations on high-confidence
+       frames. A smoothed range much smaller than raw means
+       the smoother is freezing the trajectory — typically
+       a sign that q has collapsed too far.
+
+    2. mean_diff: mean |predicted - observed| on high-p frames
+       should be ≤ mean_diff_sigma_factor (default 5) × σ_marker.
+       If predicted deviates strongly from data on confident
+       frames, the prior is overruling observations — typically
+       a sign that σ has collapsed too far down.
+
+    Raises RuntimeError on the first marker that fails either
+    check, with diagnostic info (per-marker breakdown when
+    verbose).
+
+    Parameters
+    ----------
+    smooth : SmoothResultV2
+    positions : (T, K, 2)
+    likelihoods : (T, K)
+    layout : BodyLayout
+    params : NoiseParamsV2
+    iteration : int
+        EM iteration number (for error message).
+    likelihood_threshold : float
+    range_ratio_floor : float
+    mean_diff_sigma_factor : float
+    verbose : bool
+        If True, print per-marker check results before any
+        failure.
+    """
+    T = smooth.x_smooth.shape[0]
+    K = positions.shape[1]
+    marker_names = layout.marker_names
+
+    # Compute predicted marker positions from smoothed states
+    # for every frame.
+    pred = np.zeros((T, K, 2))
+    for t in range(T):
+        pred[t] = state_to_marker_positions(smooth.x_smooth[t], layout)
+
+    # For each marker, compute range_ratio and mean_diff
+    if verbose:
+        print(
+            f"[v2-em-val] iter {iteration}: per-marker stats "
+            f"(range_ratio>{range_ratio_floor:.2f} ok; "
+            f"mean_diff<{mean_diff_sigma_factor:.0f}σ ok):"
+        )
+
+    failures: List[str] = []
+    for k, m in enumerate(marker_names):
+        sigma_m = params.sigma_marker.get(m, 3.0)
+
+        x_obs = positions[:, k, 0]
+        y_obs = positions[:, k, 1]
+        p = likelihoods[:, k]
+        high_p_mask = (
+            (p >= likelihood_threshold)
+            & np.isfinite(x_obs) & np.isfinite(y_obs)
+        )
+        n_hp = int(high_p_mask.sum())
+
+        # range_ratio: compute range of smoothed and raw on
+        # high-p frames. If too few high-p frames, skip.
+        if n_hp < 5:
+            if verbose:
+                print(
+                    f"[v2-em-val]   {m:<14s}  skipped "
+                    f"(only n_high_p={n_hp})"
+                )
+            continue
+
+        raw_x_range = float(x_obs[high_p_mask].max() - x_obs[high_p_mask].min())
+        raw_y_range = float(y_obs[high_p_mask].max() - y_obs[high_p_mask].min())
+        raw_range = max(raw_x_range, raw_y_range)
+        sm_x = pred[:, k, 0]
+        sm_y = pred[:, k, 1]
+        sm_x_range = float(sm_x.max() - sm_x.min())
+        sm_y_range = float(sm_y.max() - sm_y.min())
+        sm_range = max(sm_x_range, sm_y_range)
+        # range_ratio is only meaningful when raw_range
+        # substantially exceeds observation noise. For
+        # nearly-stationary markers, raw_range is dominated by
+        # observation noise (~6σ peak-to-peak), and the
+        # smoother's job is to suppress that noise — so
+        # smoothed range << raw range is CORRECT, not frozen.
+        # Skip the check when raw range is below ~10× σ
+        # (equivalent to the marker being effectively
+        # stationary).
+        raw_motion_threshold = 10.0 * sigma_m
+        if raw_range > raw_motion_threshold:
+            range_ratio = sm_range / raw_range
+        else:
+            range_ratio = 1.0  # Marker effectively stationary; pass
+
+        # mean_diff: mean Euclidean distance smoothed vs raw
+        # on high-p frames
+        diff = np.sqrt(
+            (sm_x[high_p_mask] - x_obs[high_p_mask]) ** 2
+            + (sm_y[high_p_mask] - y_obs[high_p_mask]) ** 2
+        )
+        mean_diff = float(np.mean(diff))
+        sigma_5 = mean_diff_sigma_factor * sigma_m
+
+        range_ok = range_ratio >= range_ratio_floor
+        mean_ok = mean_diff <= sigma_5
+
+        if verbose:
+            print(
+                f"[v2-em-val]   {m:<14s}  "
+                f"range_ratio={range_ratio:5.2f}  "
+                f"({'ok' if range_ok else 'FROZEN'})  "
+                f"mean_diff={mean_diff:6.2f}px  "
+                f"5σ={sigma_5:6.2f}px  "
+                f"({'ok' if mean_ok else 'OVERRULE'})  "
+                f"n_high_p={n_hp}"
+            )
+
+        if not range_ok:
+            failures.append(
+                f"frozen-output check failed for marker {m!r}: "
+                f"smoothed range {sm_range:.2f}px is "
+                f"{range_ratio:.4f}x raw range {raw_range:.2f}px "
+                f"(threshold: {range_ratio_floor:.2f})"
+            )
+        if not mean_ok:
+            failures.append(
+                f"prior-overruling-data check failed for marker "
+                f"{m!r}: mean |smoothed - raw| at high-p frames "
+                f"= {mean_diff:.2f}px, exceeds "
+                f"{mean_diff_sigma_factor:.0f}x current sigma_marker "
+                f"({sigma_5:.2f}px). This indicates the prior is "
+                f"systematically pulling away from trusted "
+                f"observations."
+            )
+
+    if failures:
+        raise RuntimeError(
+            f"v2 EM validation hook triggered at iteration "
+            f"{iteration}: " + "; ".join(failures)
+        )
+
+
+@dataclass
+class EMResultV2:
+    """Output of fit_noise_params_em_v2.
+
+    Fields
+    ------
+    params : NoiseParamsV2
+        Final fitted noise parameters.
+    history : list of dicts
+        Per-iteration diagnostics: iter number, max change,
+        mean σ across markers, mean q values.
+    initial_params : NoiseParamsV2
+        Initial parameters (data-driven estimate).
+    converged : bool
+    """
+    params: NoiseParamsV2
+    history: List[Dict[str, float]]
+    initial_params: NoiseParamsV2
+    converged: bool
+
+
+def _max_param_change(
+    new: NoiseParamsV2, old: NoiseParamsV2,
+) -> float:
+    """Compute max relative change in any parameter."""
+    rels: List[float] = []
+    for m, sigma_new in new.sigma_marker.items():
+        sigma_old = old.sigma_marker.get(m, sigma_new)
+        if sigma_old > 1e-9:
+            rels.append(abs(sigma_new - sigma_old) / sigma_old)
+    if old.q_root_pos > 1e-9:
+        rels.append(abs(new.q_root_pos - old.q_root_pos) / old.q_root_pos)
+    if old.q_root_ori > 1e-9:
+        rels.append(abs(new.q_root_ori - old.q_root_ori) / old.q_root_ori)
+    for s, q_new in new.q_seg_ori.items():
+        q_old = old.q_seg_ori.get(s, q_new)
+        if q_old > 1e-9:
+            rels.append(abs(q_new - q_old) / q_old)
+    for s, q_new in new.q_length.items():
+        q_old = old.q_length.get(s, q_new)
+        if q_old > 1e-9:
+            rels.append(abs(q_new - q_old) / q_old)
+    return max(rels) if rels else 0.0
+
+
+def fit_noise_params_em_v2(
+    sessions: List[Tuple[np.ndarray, np.ndarray]],
+    layout: BodyLayout,
+    marker_names: List[str],
+    fitted_lengths: FittedLengths,
+    fps: float,
+    likelihood_threshold: float = 0.5,
+    max_iter: int = 10,
+    tol: float = 1e-3,
+    initial_params: Optional[NoiseParamsV2] = None,
+    apply_constraints: bool = True,
+    enable_validation: bool = True,
+    verbose: bool = False,
+) -> EMResultV2:
+    """Multi-session EM for v2 noise parameters.
+
+    Each iteration:
+      For each session:
+        - Build initial state from data
+        - Forward filter
+        - RTS smooth
+        - Accumulate M-step stats (per session, then combined)
+        - Validation hook (warns/raises if degenerate)
+      Combined M-step finalizes new params.
+
+    Parameters
+    ----------
+    sessions : list of (positions, likelihoods)
+        Each session's (T, K, 2) positions and (T, K)
+        likelihoods. Sessions can have different T values.
+    layout : BodyLayout
+    marker_names : list[str]
+        Column names for the positions / likelihoods arrays.
+    fitted_lengths : FittedLengths
+        Fit body lengths from data once before EM.
+    fps : float
+    likelihood_threshold : float
+    max_iter : int
+    tol : float
+        Convergence threshold on max relative parameter change.
+    initial_params : NoiseParamsV2, optional
+        If None, computed from data via fit_initial_params_v2.
+    apply_constraints : bool
+        Pass through to forward filter.
+    enable_validation : bool
+        If True, run validation hook each iteration.
+    verbose : bool
+
+    Returns
+    -------
+    EMResultV2
+    """
+    dt = 1.0 / fps
+
+    # Data-driven initial params (uses first session — assumed
+    # representative; for multi-session, all sessions have
+    # similar tracking quality)
+    if initial_params is None:
+        first_pos, first_likes = sessions[0]
+        initial_params = fit_initial_params_v2(
+            first_pos, first_likes, layout, marker_names,
+            fitted_lengths, fps, likelihood_threshold,
+        )
+
+    if verbose:
+        print(
+            f"[v2-em] initial: σ̄ = "
+            f"{np.mean(list(initial_params.sigma_marker.values())):.3f}px, "
+            f"q_root_pos = {initial_params.q_root_pos:.1f}, "
+            f"q_root_ori = {initial_params.q_root_ori:.3f}"
+        )
+
+    params = initial_params
+    history: List[Dict[str, float]] = []
+    converged = False
+
+    for iteration in range(max_iter):
+        # E-step + stat accumulation across sessions
+        combined_stats = _MStepStatsV2.empty(layout)
+
+        for sess_idx, (pos, likes) in enumerate(sessions):
+            # Build initial state for this session
+            x0 = initial_state_from_data(
+                pos, likes, layout, marker_names,
+                fitted_lengths, likelihood_threshold,
+            )
+            # Forward filter + smoother
+            filt = forward_filter_v2(
+                pos, likes, layout, params, dt,
+                initial_state=x0,
+                likelihood_threshold=likelihood_threshold,
+                apply_constraints=apply_constraints,
+            )
+            smooth = rts_smooth_v2(filt, layout, dt)
+
+            # Validation hook
+            if enable_validation:
+                _validate_trajectory_v2(
+                    smooth, pos, likes, layout, params,
+                    iteration=iteration,
+                    likelihood_threshold=likelihood_threshold,
+                    verbose=verbose and sess_idx == 0,
+                )
+
+            # Accumulate M-step stats
+            sess_stats = accumulate_m_step_stats_v2(
+                smooth, pos, likes, layout, likelihood_threshold,
+            )
+            combined_stats += sess_stats
+
+        # M-step finalization
+        new_params = finalize_m_step_v2(
+            combined_stats, layout, dt,
+            prev_params=params, initial_params=initial_params,
+        )
+
+        max_rel = _max_param_change(new_params, params)
+        sigmas = list(new_params.sigma_marker.values())
+        q_segs = list(new_params.q_seg_ori.values())
+        history.append({
+            "iter": iteration,
+            "max_rel_change": max_rel,
+            "mean_sigma": float(np.mean(sigmas)),
+            "q_root_pos": float(new_params.q_root_pos),
+            "q_root_ori": float(new_params.q_root_ori),
+            "mean_q_seg_ori": float(np.mean(q_segs)),
+        })
+
+        if verbose:
+            print(
+                f"[v2-em] iter {iteration}: max Δ/x = "
+                f"{max_rel:.4e}, σ̄ = "
+                f"{np.mean(sigmas):.3f}px, "
+                f"q_root_pos = {new_params.q_root_pos:.1f}"
+            )
+
+        params = new_params
+        if max_rel < tol:
+            converged = True
+            break
+
+    return EMResultV2(
+        params=params, history=history,
+        initial_params=initial_params, converged=converged,
+    )
+
+
+# ============================================================
+# Orchestrator + CLI + save/load — patch 105
+# ============================================================
+#
+# This is the user-facing entry point. ``smooth_pose_v2`` and
+# its CLI wrapper ``main`` glue patches 99-104 into a complete
+# pipeline:
+#
+#   1. Discover input files
+#   2. Load each session (DLC CSV / parquet, via the
+#      diagnostic loader for full format compatibility)
+#   3. Fit body lengths once across sessions
+#   4. Compute initial NoiseParamsV2 from data
+#   5. Run multi-session EM
+#   6. Apply final smoother to each session, write smoothed
+#      output (parquet by default; CSV fallback)
+#   7. Save model artifact for re-use
+#
+# Output schema matches v1: per-marker [_x, _y, _p, _var_x,
+# _var_y]. The Qt viewer (patches 95-98) auto-detects smoothed
+# output via _var_x columns and works on either v1 or v2
+# output without changes.
+
+
+# Lazy imports — pulled in only when running the CLI / loader,
+# avoids importing pandas/argparse just to use the math layer.
+def _import_io_helpers():
+    """Lazy import of pandas-dependent utilities. Returns a
+    namespace dict.
+    """
+    import argparse
+    import hashlib
+    import os
+    import sys as _sys
+    from pathlib import Path
+    import pandas as pd
+    return {
+        "argparse": argparse,
+        "hashlib": hashlib,
+        "os": os,
+        "sys": _sys,
+        "Path": Path,
+        "pd": pd,
+    }
+
+
+def _arrays_to_df_v2(
+    positions: np.ndarray,    # (T, K, 2)
+    variances: np.ndarray,    # (T, K, 2) — diagonal of marker covariance
+    likelihoods: np.ndarray,  # (T, K) — original raw likelihoods
+    marker_names: List[str],
+):
+    """Convert smoothed (T, K, 2) marker positions + variances
+    + raw likelihoods into a flat-column DataFrame.
+
+    Schema matches v1's ``_arrays_to_df`` for downstream-tool
+    and viewer compatibility:
+
+      <marker>_x, <marker>_y, <marker>_p,
+      <marker>_var_x, <marker>_var_y
+
+    The Qt viewer (mufasa.tools.pose_viewer) auto-detects this
+    schema as smoothed output.
+    """
+    io = _import_io_helpers()
+    pd = io["pd"]
+    T = positions.shape[0]
+    cols: Dict[str, np.ndarray] = {}
+    for i, m in enumerate(marker_names):
+        cols[f"{m}_x"] = positions[:, i, 0]
+        cols[f"{m}_y"] = positions[:, i, 1]
+        cols[f"{m}_p"] = likelihoods[:, i]
+        cols[f"{m}_var_x"] = variances[:, i, 0]
+        cols[f"{m}_var_y"] = variances[:, i, 1]
+    return pd.DataFrame(cols, index=np.arange(T))
+
+
+def state_to_marker_variances(
+    x_smooth: np.ndarray,   # (T, D)
+    P_smooth: np.ndarray,   # (T, D, D)
+    layout: BodyLayout,
+) -> np.ndarray:
+    """Compute per-marker per-frame variance from the smoothed
+    state covariance.
+
+    For marker m at frame t with Jacobian H_t,m (2 × D):
+      Cov(marker_m, t) = H_t,m @ P_smooth[t] @ H_t,m^T
+
+    Returns the diagonal (var_x, var_y) per marker per frame.
+
+    Cross-covariance (off-diagonal of the 2x2 marker
+    covariance) is discarded — v1's output schema doesn't
+    store it, and the viewer draws axis-aligned ellipses.
+
+    Returns
+    -------
+    (T, K, 2) array
+        variances[t, k, 0] = var_x for marker k at frame t
+        variances[t, k, 1] = var_y for marker k at frame t
+    """
+    T = x_smooth.shape[0]
+    K = layout.n_markers
+    variances = np.zeros((T, K, 2))
+    for t in range(T):
+        fk = forward_kinematics(x_smooth[t], layout)
+        H = state_to_marker_jacobian(x_smooth[t], layout, fk=fk)
+        # H shape: (2K, D)
+        # For each marker k, rows 2k and 2k+1 are H_t,m
+        for k in range(K):
+            H_m = H[2 * k:2 * k + 2, :]
+            cov_m = H_m @ P_smooth[t] @ H_m.T
+            variances[t, k, 0] = cov_m[0, 0]
+            variances[t, k, 1] = cov_m[1, 1]
+    return variances
+
+
+def smooth_session_v2(
+    positions: np.ndarray,
+    likelihoods: np.ndarray,
+    layout: BodyLayout,
+    marker_names: List[str],
+    fitted_lengths: FittedLengths,
+    params: NoiseParamsV2,
+    fps: float,
+    likelihood_threshold: float = 0.7,
+    apply_constraints: bool = True,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Run forward filter + RTS smoother on one session, return
+    smoothed marker positions and variances.
+
+    Parameters
+    ----------
+    positions : (T, K, 2)
+    likelihoods : (T, K)
+    layout : BodyLayout
+    marker_names : list[str]
+    fitted_lengths : FittedLengths
+    params : NoiseParamsV2
+        Fitted noise params from EM.
+    fps : float
+    likelihood_threshold : float
+    apply_constraints : bool
+
+    Returns
+    -------
+    smoothed_positions : (T, K, 2)
+    smoothed_variances : (T, K, 2)
+    """
+    dt = 1.0 / fps
+    initial_state = initial_state_from_data(
+        positions, likelihoods, layout, marker_names,
+        fitted_lengths, likelihood_threshold,
+    )
+    filt = forward_filter_v2(
+        positions, likelihoods, layout, params, dt,
+        initial_state=initial_state,
+        likelihood_threshold=likelihood_threshold,
+        apply_constraints=apply_constraints,
+    )
+    smooth = rts_smooth_v2(filt, layout, dt)
+
+    # Compute marker positions from smoothed body state
+    T = smooth.x_smooth.shape[0]
+    K = layout.n_markers
+    smoothed_positions = np.zeros((T, K, 2))
+    for t in range(T):
+        smoothed_positions[t] = state_to_marker_positions(
+            smooth.x_smooth[t], layout,
+        )
+    smoothed_variances = state_to_marker_variances(
+        smooth.x_smooth, smooth.P_smooth, layout,
+    )
+    return smoothed_positions, smoothed_variances
+
+
+def save_model_v2(
+    path,
+    layout: BodyLayout,
+    fitted_lengths: FittedLengths,
+    params: NoiseParamsV2,
+    fps: float,
+    likelihood_threshold: float,
+) -> None:
+    """Serialize a fitted v2 model to .npz.
+
+    Stored fields:
+      version: "v2"
+      layout_segments: list of (name, parent, rest_angle,
+                                marker offsets)
+      fitted_lengths: dict of segment lengths + IQRs
+      marker_offsets: dict of per-marker (length, angle)
+      params_sigma_marker: dict
+      params_q_root_pos: scalar
+      params_q_root_ori: scalar
+      params_q_seg_ori: dict
+      params_q_length: dict
+      params_constraint_sigma: scalar
+      fps: float
+      likelihood_threshold: float
+
+    Reload via ``load_model_v2``.
+
+    Note: BodyLayout has nested data structures (BodySegment
+    instances with marker dicts). We serialize as a list of
+    plain tuples for npz compatibility, then reconstruct on
+    load.
+    """
+    io = _import_io_helpers()
+    Path = io["Path"]
+    path = Path(path)
+
+    # Serialize layout — npz can't store dataclasses directly,
+    # so flatten to plain types.
+    seg_data = []
+    for seg in layout.segments:
+        seg_data.append({
+            "name": seg.name,
+            "parent": seg.parent if seg.parent is not None else "__root__",
+            "rest_angle": seg.rest_angle,
+            "markers": dict(seg.markers),
+        })
+
+    np.savez(
+        path,
+        version="v2",
+        layout_segments=np.array(seg_data, dtype=object),
+        fitted_segment_lengths=np.array(
+            list(fitted_lengths.segment_lengths.items()),
+            dtype=object,
+        ),
+        fitted_segment_length_iqr=np.array(
+            list(fitted_lengths.segment_length_iqr.items()),
+            dtype=object,
+        ),
+        fitted_marker_offsets=np.array(
+            list(fitted_lengths.marker_offsets.items()),
+            dtype=object,
+        ),
+        params_sigma_marker=np.array(
+            list(params.sigma_marker.items()), dtype=object,
+        ),
+        params_q_root_pos=params.q_root_pos,
+        params_q_root_ori=params.q_root_ori,
+        params_q_seg_ori=np.array(
+            list(params.q_seg_ori.items()), dtype=object,
+        ),
+        params_q_length=np.array(
+            list(params.q_length.items()), dtype=object,
+        ),
+        params_constraint_sigma=params.constraint_sigma,
+        fps=fps,
+        likelihood_threshold=likelihood_threshold,
+    )
+
+
+def load_model_v2(
+    path,
+) -> Tuple[BodyLayout, FittedLengths, NoiseParamsV2, float, float]:
+    """Load a v2 model from .npz.
+
+    Returns
+    -------
+    layout : BodyLayout
+    fitted_lengths : FittedLengths
+    params : NoiseParamsV2
+    fps : float
+    likelihood_threshold : float
+    """
+    io = _import_io_helpers()
+    Path = io["Path"]
+    path = Path(path)
+
+    data = np.load(path, allow_pickle=True)
+    version = str(data["version"])
+    if version != "v2":
+        raise ValueError(
+            f"Model version mismatch: expected 'v2', got "
+            f"{version!r}. Did you mean to use the v1 loader?"
+        )
+
+    # Reconstruct BodyLayout
+    seg_data = data["layout_segments"]
+    segments = []
+    for sd in seg_data:
+        parent = sd["parent"]
+        if parent == "__root__":
+            parent = None
+        segments.append(BodySegment(
+            name=sd["name"],
+            parent=parent,
+            rest_angle=float(sd["rest_angle"]),
+            markers=dict(sd["markers"]),
+        ))
+    layout = BodyLayout(segments=segments)
+
+    # FittedLengths
+    fitted_lengths = FittedLengths(
+        segment_lengths={
+            k: float(v) for k, v in data["fitted_segment_lengths"]
+        },
+        segment_length_iqr={
+            k: float(v) for k, v in data["fitted_segment_length_iqr"]
+        },
+        marker_offsets={
+            k: tuple(v) for k, v in data["fitted_marker_offsets"]
+        },
+    )
+
+    # NoiseParamsV2
+    params = NoiseParamsV2(
+        sigma_marker={
+            k: float(v) for k, v in data["params_sigma_marker"]
+        },
+        q_root_pos=float(data["params_q_root_pos"]),
+        q_root_ori=float(data["params_q_root_ori"]),
+        q_seg_ori={
+            k: float(v) for k, v in data["params_q_seg_ori"]
+        },
+        q_length={
+            k: float(v) for k, v in data["params_q_length"]
+        },
+        constraint_sigma=float(data["params_constraint_sigma"]),
+    )
+
+    fps = float(data["fps"])
+    likelihood_threshold = float(data["likelihood_threshold"])
+
+    return layout, fitted_lengths, params, fps, likelihood_threshold
+
+
+def smooth_pose_v2(
+    pose_input,
+    output_dir=None,
+    layout: Optional[BodyLayout] = None,
+    fps: float = 30.0,
+    likelihood_threshold: float = 0.7,
+    em_max_iter: int = 10,
+    em_tol: float = 1e-3,
+    save_model: Optional[str] = None,
+    load_model: Optional[str] = None,
+    apply_constraints: bool = True,
+    enable_validation: bool = True,
+    verbose: bool = False,
+) -> Dict:
+    """Top-level user-facing function for v2 pose smoothing.
+
+    Discovers input files, loads each as a session, fits body
+    lengths + noise params via EM (or loads from a saved
+    model), runs the final smoother on each session, writes
+    smoothed output to disk.
+
+    Output schema is identical to v1's: per-marker [_x, _y,
+    _p, _var_x, _var_y] columns. The Qt viewer (mufasa.tools.
+    pose_viewer) handles either smoothly.
+
+    Parameters
+    ----------
+    pose_input : str or list[str] or Path
+        File or directory of pose data. If directory, scanned
+        for parquet (preferred) or CSV files.
+    output_dir : str or Path, optional
+        Output directory. Created if missing. If None, no
+        output written (useful for in-process use).
+    layout : BodyLayout, optional
+        Custom body layout. Defaults to standard_rat_layout().
+    fps : float
+    likelihood_threshold : float
+    em_max_iter : int
+    em_tol : float
+    save_model : str, optional
+        If given, save fitted model to this path after EM.
+    load_model : str, optional
+        If given, load model and skip EM. Mutually exclusive
+        with save_model? No — save_model just re-saves what
+        was loaded; that's fine.
+    apply_constraints : bool
+        Pass through to forward filter.
+    enable_validation : bool
+        Run validation hook each EM iteration.
+    verbose : bool
+
+    Returns
+    -------
+    dict with:
+      params: NoiseParamsV2
+      fitted_lengths: FittedLengths
+      layout: BodyLayout
+      em_history: list of dicts
+      sessions: list of {input_path, output_path, smoothed,
+                          variances, n_frames}
+      converged: bool
+    """
+    io = _import_io_helpers()
+    Path = io["Path"]
+    pd = io["pd"]
+    os_ = io["os"]
+
+    # ---------- Discover input files ----------
+    if isinstance(pose_input, (str, type(Path()))):
+        pose_input = [pose_input]
+    paths: List = []
+    for p in pose_input:
+        path_obj = Path(p)
+        if path_obj.is_dir():
+            try:
+                from mufasa.data_processors.kalman_diagnostic import (
+                    discover_pose_files,
+                )
+                discovered = discover_pose_files(str(path_obj))
+                paths.extend(Path(d) for d in discovered)
+            except ImportError:
+                # Fallback: glob for csv / parquet
+                paths.extend(path_obj.glob("**/*.parquet"))
+                if not paths:
+                    paths.extend(path_obj.glob("**/*.csv"))
+        else:
+            paths.append(path_obj)
+
+    if not paths:
+        raise FileNotFoundError(
+            f"No pose files found in input: {pose_input}"
+        )
+
+    if verbose:
+        print(f"[smoother-v2] Discovered {len(paths)} file(s)")
+
+    # ---------- Load each session ----------
+    # Inline loader — direct read first, fall back to
+    # diagnostic loader for DLC multi-row headers. Same
+    # logic as mufasa.tools.pose_viewer._load_pose_file but
+    # without the PySide6 dependency.
+    raw_sessions: List[Dict] = []
+    for path in paths:
+        if verbose:
+            print(f"[smoother-v2]   loading {path}")
+        path = Path(path)
+        suffix = path.suffix.lower()
+        df = None
+        # Try direct read first (works for smoothed-flat
+        # parquets and pre-flattened CSVs)
+        try:
+            if suffix == ".parquet":
+                df_direct = pd.read_parquet(path)
+            elif suffix in ("", ".csv", ".tsv"):
+                df_direct = pd.read_csv(path, low_memory=False)
+            else:
+                try:
+                    df_direct = pd.read_parquet(path)
+                except Exception:
+                    df_direct = pd.read_csv(path, low_memory=False)
+            df_direct.columns = [
+                str(c).lower() for c in df_direct.columns
+            ]
+            # Check for marker columns
+            markers_found = set()
+            for col in df_direct.columns:
+                if col.endswith("_x"):
+                    base = col[:-2]
+                    if (
+                        f"{base}_y" in df_direct.columns
+                        and not base.endswith("_var")
+                    ):
+                        markers_found.add(base)
+            if markers_found:
+                df = df_direct
+        except Exception:
+            df = None
+
+        # Fall back to diagnostic loader (DLC multi-row header)
+        if df is None:
+            try:
+                from mufasa.data_processors.kalman_diagnostic import (
+                    load_pose_file as _diag_load_pose_file,
+                )
+                df, _ = _diag_load_pose_file(str(path))
+            except (ImportError, ValueError):
+                pass
+
+        if df is None:
+            raise RuntimeError(
+                f"Could not load {path}. Tried direct read and "
+                f"DLC multi-row header parsing."
+            )
+
+        # Detect markers
+        markers = sorted({
+            col[:-2] for col in df.columns
+            if col.endswith("_x")
+            and f"{col[:-2]}_y" in df.columns
+            and not col[:-2].endswith("_var")
+        })
+        if not markers:
+            raise RuntimeError(
+                f"No marker columns detected in {path}"
+            )
+        T = len(df)
+        K = len(markers)
+        positions = np.full((T, K, 2), np.nan)
+        likelihoods = np.zeros((T, K))
+        for k, m in enumerate(markers):
+            positions[:, k, 0] = pd.to_numeric(
+                df[f"{m}_x"], errors="coerce",
+            ).to_numpy()
+            positions[:, k, 1] = pd.to_numeric(
+                df[f"{m}_y"], errors="coerce",
+            ).to_numpy()
+            if f"{m}_p" in df.columns:
+                likelihoods[:, k] = pd.to_numeric(
+                    df[f"{m}_p"], errors="coerce",
+                ).fillna(0.0).to_numpy()
+            else:
+                likelihoods[:, k] = 1.0
+        raw_sessions.append({
+            "path": Path(path),
+            "markers": markers,
+            "positions": positions,
+            "likelihoods": likelihoods,
+            "n_frames": T,
+        })
+
+    if verbose:
+        total_frames = sum(s["n_frames"] for s in raw_sessions)
+        n_markers_first = len(raw_sessions[0]["markers"])
+        print(
+            f"[smoother-v2] Total: {total_frames} frames × "
+            f"{n_markers_first} markers from "
+            f"{len(raw_sessions)} session(s)"
+        )
+
+    # Use the marker list from the first session as canonical.
+    # Sessions with different markers will have NaN-padded
+    # rows for missing markers — but for now, require all
+    # sessions to have the same markers.
+    first_markers = sorted(raw_sessions[0]["markers"])
+    for s in raw_sessions[1:]:
+        if sorted(s["markers"]) != first_markers:
+            raise ValueError(
+                f"Inconsistent marker sets across sessions. "
+                f"First session ({raw_sessions[0]['path']}): "
+                f"{first_markers}. "
+                f"This session ({s['path']}): "
+                f"{sorted(s['markers'])}"
+            )
+    marker_names_data = first_markers
+
+    # ---------- Layout ----------
+    if layout is None:
+        layout = standard_rat_layout()
+
+    # Verify layout marker names are subset of data marker names
+    missing = set(layout.marker_names) - set(marker_names_data)
+    if missing:
+        if verbose:
+            print(
+                f"[smoother-v2] WARNING: layout markers not in "
+                f"data: {sorted(missing)}. These markers will "
+                f"have default offsets."
+            )
+
+    # Build session arrays in layout marker order — that's what
+    # the EM/filter expect. We keep a mapping data_idx → layout_idx.
+    layout_marker_names = layout.marker_names
+    data_to_layout: Dict[str, int] = {
+        m: layout_marker_names.index(m)
+        for m in marker_names_data
+        if m in layout_marker_names
+    }
+
+    sessions_arr: List[Tuple[np.ndarray, np.ndarray]] = []
+    for s in raw_sessions:
+        K_layout = layout.n_markers
+        T = s["n_frames"]
+        pos = np.full((T, K_layout, 2), np.nan)
+        likes = np.zeros((T, K_layout))
+        for k_data, m in enumerate(s["markers"]):
+            if m in data_to_layout:
+                k_layout = data_to_layout[m]
+                pos[:, k_layout, :] = s["positions"][:, k_data, :]
+                likes[:, k_layout] = s["likelihoods"][:, k_data]
+        sessions_arr.append((pos, likes))
+
+    # ---------- Fit lengths + EM (or load) ----------
+    if load_model is not None:
+        if verbose:
+            print(f"[smoother-v2] Loading model from {load_model}")
+        layout, fitted_lengths, params, _, _ = load_model_v2(load_model)
+        em_history: List[Dict] = []
+        converged = True
+    else:
+        # Fit lengths from first session (could be improved to
+        # aggregate across all)
+        first_pos, first_likes = sessions_arr[0]
+        fitted_lengths = fit_body_lengths(
+            first_pos, first_likes, layout, layout_marker_names,
+            likelihood_threshold,
+        )
+        if verbose:
+            print(
+                f"[smoother-v2] Fitted body lengths: "
+                f"{ {k: f'{v:.2f}' for k, v in fitted_lengths.segment_lengths.items()} }"
+            )
+
+        if verbose:
+            print(
+                f"[smoother-v2] Fitting noise params via EM "
+                f"(max_iter={em_max_iter}, tol={em_tol:.4f})..."
+            )
+
+        em_result = fit_noise_params_em_v2(
+            sessions_arr, layout, layout_marker_names,
+            fitted_lengths, fps,
+            likelihood_threshold=likelihood_threshold,
+            max_iter=em_max_iter, tol=em_tol,
+            apply_constraints=apply_constraints,
+            enable_validation=enable_validation,
+            verbose=verbose,
+        )
+        params = em_result.params
+        em_history = em_result.history
+        converged = em_result.converged
+
+        if verbose:
+            print(
+                f"[smoother-v2] EM finished after "
+                f"{len(em_history)} iterations "
+                f"(converged={converged})"
+            )
+
+    # Save model if requested
+    if save_model is not None:
+        if verbose:
+            print(f"[smoother-v2] Saving model to {save_model}")
+        save_model_v2(
+            save_model, layout, fitted_lengths, params,
+            fps, likelihood_threshold,
+        )
+
+    # ---------- Final smoother pass per session ----------
+    output_sessions: List[Dict] = []
+    if verbose:
+        print(
+            f"[smoother-v2] Smoothing {len(sessions_arr)} "
+            f"session(s)..."
+        )
+
+    if output_dir is not None:
+        output_dir_path = Path(output_dir)
+        output_dir_path.mkdir(parents=True, exist_ok=True)
+
+    for s, (pos, likes) in zip(raw_sessions, sessions_arr):
+        smooth_pos, smooth_var = smooth_session_v2(
+            pos, likes, layout, layout_marker_names,
+            fitted_lengths, params, fps,
+            likelihood_threshold=likelihood_threshold,
+            apply_constraints=apply_constraints,
+        )
+
+        # Build output DataFrame in DATA marker order (so it
+        # matches the original input file's marker set, even
+        # if layout has more)
+        T = smooth_pos.shape[0]
+        K_data = len(s["markers"])
+        out_pos = np.full((T, K_data, 2), np.nan)
+        out_var = np.full((T, K_data, 2), np.nan)
+        out_likes = s["likelihoods"].copy()
+        for k_data, m in enumerate(s["markers"]):
+            if m in data_to_layout:
+                k_layout = data_to_layout[m]
+                out_pos[:, k_data, :] = smooth_pos[:, k_layout, :]
+                out_var[:, k_data, :] = smooth_var[:, k_layout, :]
+
+        df_out = _arrays_to_df_v2(
+            out_pos, out_var, out_likes, list(s["markers"]),
+        )
+
+        out_path = None
+        if output_dir is not None:
+            stem = s["path"].stem
+            # Strip common DLC suffix patterns
+            if stem.endswith("DeepCut"):
+                stem = stem[: -len("DeepCut")]
+            out_name = f"{stem}_smoothed_v2.parquet"
+            out_path = output_dir_path / out_name
+            try:
+                df_out.to_parquet(out_path, index=False)
+            except (ImportError, Exception) as e:
+                # Fallback to CSV
+                out_path = output_dir_path / f"{stem}_smoothed_v2.csv"
+                df_out.to_csv(out_path, index=False)
+                if verbose:
+                    print(
+                        f"[smoother-v2]   {out_path.name} "
+                        f"(parquet failed: {type(e).__name__}, "
+                        f"used CSV)"
+                    )
+            else:
+                if verbose:
+                    print(f"[smoother-v2]   wrote {out_path.name}")
+
+        output_sessions.append({
+            "input_path": s["path"],
+            "output_path": out_path,
+            "smoothed": smooth_pos,
+            "variances": smooth_var,
+            "n_frames": T,
+        })
+
+    return {
+        "params": params,
+        "fitted_lengths": fitted_lengths,
+        "layout": layout,
+        "em_history": em_history,
+        "sessions": output_sessions,
+        "converged": converged,
+    }
+
+
+def main(argv=None) -> int:
+    """CLI entry point. ``python -m mufasa.data_processors.
+    kalman_pose_smoother_v2 ...``.
+    """
+    io = _import_io_helpers()
+    argparse = io["argparse"]
+    sys = io["sys"]
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Joint-state Kalman pose smoother v2 with kinematic-"
+            "tree spatial coupling. Stage 2 of the Mufasa Kalman "
+            "smoother. v1 is in mufasa.data_processors."
+            "kalman_pose_smoother."
+        ),
+    )
+    parser.add_argument(
+        "pose_input", nargs="+",
+        help=(
+            "Pose data input. Single file (CSV or parquet), "
+            "directory (recursively scanned), or multiple "
+            "file paths. Multiple files are smoothed as "
+            "separate sessions with proper boundary handling."
+        ),
+    )
+    parser.add_argument(
+        "--output-dir", default="./kalman_smoother_v2_output",
+        help=(
+            "Output directory for smoothed parquets. Files "
+            "are named <stem>_smoothed_v2.parquet."
+        ),
+    )
+    parser.add_argument(
+        "--likelihood-threshold", type=float, default=0.7,
+        help="Likelihood threshold for high-confidence frames",
+    )
+    parser.add_argument(
+        "--fps", type=float, default=30.0,
+        help="Frame rate of the input data (default 30)",
+    )
+    parser.add_argument(
+        "--em-max-iter", type=int, default=10,
+        help="Max EM iterations (default 10)",
+    )
+    parser.add_argument(
+        "--em-tol", type=float, default=1e-3,
+        help=(
+            "EM convergence threshold on max relative param "
+            "change (default 1e-3)"
+        ),
+    )
+    parser.add_argument(
+        "--save-model", default=None,
+        help="Save fitted model artifact to this path",
+    )
+    parser.add_argument(
+        "--load-model", default=None,
+        help="Load model from this path; skip EM",
+    )
+    parser.add_argument(
+        "--no-back4", action="store_true",
+        help="Layout: omit back4 / back_rear segment",
+    )
+    parser.add_argument(
+        "--no-tail", action="store_true",
+        help="Layout: omit all tail segments",
+    )
+    parser.add_argument(
+        "--no-lateral", action="store_true",
+        help="Layout: omit lateral_left / lateral_right markers",
+    )
+    parser.add_argument(
+        "--no-center", action="store_true",
+        help="Layout: omit center marker",
+    )
+    parser.add_argument(
+        "--no-validate", action="store_true",
+        help="Disable EM validation hook (not recommended)",
+    )
+    parser.add_argument(
+        "--no-constraints", action="store_true",
+        help=(
+            "Disable unit-norm constraint observations "
+            "(not recommended; can cause orientation drift)"
+        ),
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true",
+        help="Verbose logging",
+    )
+    args = parser.parse_args(argv)
+
+    layout = standard_rat_layout(
+        include_back4=not args.no_back4,
+        include_tail=not args.no_tail,
+        include_lateral=not args.no_lateral,
+        include_center=not args.no_center,
+    )
+
+    try:
+        smooth_pose_v2(
+            pose_input=args.pose_input,
+            output_dir=args.output_dir,
+            layout=layout,
+            fps=args.fps,
+            likelihood_threshold=args.likelihood_threshold,
+            em_max_iter=args.em_max_iter,
+            em_tol=args.em_tol,
+            save_model=args.save_model,
+            load_model=args.load_model,
+            apply_constraints=not args.no_constraints,
+            enable_validation=not args.no_validate,
+            verbose=args.verbose,
+        )
+    except Exception as e:
+        print(
+            f"[smoother-v2] ERROR: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    import sys as _sys
+    _sys.exit(main())
