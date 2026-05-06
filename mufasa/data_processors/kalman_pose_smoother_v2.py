@@ -1148,6 +1148,514 @@ def state_to_marker_jacobian(
     return H
 
 
+# ============================================================
+# Batch (vectorized over time) versions — patch 110
+# ============================================================
+#
+# The per-frame state_to_marker_{positions,jacobian} above
+# spend most of their time in Python overhead (per-marker
+# attribute lookups, small matrix builds). When called T
+# times in the M-step, warm-start σ pass, perspective fit,
+# and final smoothing pass, this dominates total runtime —
+# each session takes minutes per pass on real data.
+#
+# The batch versions vectorize across time: given (T, D)
+# state arrays, produce (T, K, 2) predictions and
+# (T, 2K, D) Jacobians in a small number of numpy ops.
+# Forward kinematics is inherently sequential across the
+# segment chain (parent before child), but the chain depth
+# is M=8 for the standard rat — so we walk M sequential
+# steps with each step vectorized across T frames.
+#
+# Backend: NumPy by default. Optional GPU support via
+# PyTorch when:
+#   - PyTorch is installed
+#   - device="cuda" is passed
+#   - T is large enough for transfer overhead to amortize
+#     (default threshold: T >= 5000)
+# Below this threshold, GPU is slower than CPU due to
+# H2D/D2H transfer cost. The `device="auto"` mode picks
+# automatically based on T.
+
+
+# Lazy-imported torch reference; None if torch unavailable
+_torch = None
+_torch_import_attempted = False
+
+
+def _try_import_torch():
+    """Lazy import torch. Returns torch module or None."""
+    global _torch, _torch_import_attempted
+    if _torch_import_attempted:
+        return _torch
+    _torch_import_attempted = True
+    try:
+        import torch  # type: ignore
+        _torch = torch
+    except ImportError:
+        _torch = None
+    return _torch
+
+
+def _resolve_device(device: str, T: int) -> str:
+    """Resolve 'auto' to 'cuda' or 'cpu' based on workload size
+    and torch availability. Returns 'cpu' or 'cuda'.
+    """
+    if device == "cpu":
+        return "cpu"
+    torch = _try_import_torch()
+    if torch is None:
+        return "cpu"
+    if device == "cuda":
+        if torch.cuda.is_available():
+            return "cuda"
+        return "cpu"
+    if device == "auto":
+        if torch.cuda.is_available() and T >= 5000:
+            return "cuda"
+        return "cpu"
+    raise ValueError(
+        f"Unknown device {device!r}; expected cpu, cuda, or auto"
+    )
+
+
+def _state_to_world_transforms_batch_np(
+    states: np.ndarray,  # (T, D)
+    layout: BodyLayout,
+) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+    """Vectorized forward kinematics across T frames using
+    NumPy. Returns:
+      P_distal: dict seg_name -> (T, 2)
+      R_world: dict seg_name -> (T, 2, 2)
+    """
+    idx = _pack_state_layout_indices(layout)
+    T = states.shape[0]
+    P_distal: Dict[str, np.ndarray] = {}
+    R_world: Dict[str, np.ndarray] = {}
+
+    # Root
+    root = layout.root_segment
+    P_distal[root.name] = np.stack([
+        states[:, idx["__root__"]["x"]],
+        states[:, idx["__root__"]["y"]],
+    ], axis=1)  # (T, 2)
+    c_r = states[:, idx["__root__"]["cos"]]
+    s_r = states[:, idx["__root__"]["sin"]]
+    # R = [[c, -s], [s, c]] across T
+    R_root = np.empty((T, 2, 2))
+    R_root[:, 0, 0] = c_r
+    R_root[:, 0, 1] = -s_r
+    R_root[:, 1, 0] = s_r
+    R_root[:, 1, 1] = c_r
+    R_world[root.name] = R_root
+
+    # Non-root segments in topo order
+    for seg_name in layout.non_root_topo_order:
+        seg = layout.segment_by_name(seg_name)
+        parent_name = seg.parent
+        c = states[:, idx[seg_name]["cos"]]
+        s = states[:, idx[seg_name]["sin"]]
+        L = states[:, idx[seg_name]["length"]]
+        # v_local = (L*c, L*s) per frame
+        v_local = np.stack([L * c, L * s], axis=1)  # (T, 2)
+        # P_distal[seg] = P_distal[parent] + R_world[parent] @ v_local
+        # einsum: (T,2,2) @ (T,2) -> (T,2)
+        rotated = np.einsum(
+            "tij,tj->ti", R_world[parent_name], v_local,
+        )
+        P_distal[seg_name] = P_distal[parent_name] + rotated
+        # R_local = [[c, -s], [s, c]] across T
+        R_local = np.empty((T, 2, 2))
+        R_local[:, 0, 0] = c
+        R_local[:, 0, 1] = -s
+        R_local[:, 1, 0] = s
+        R_local[:, 1, 1] = c
+        # R_world[seg] = R_world[parent] @ R_local
+        R_world[seg_name] = np.einsum(
+            "tij,tjk->tik", R_world[parent_name], R_local,
+        )
+
+    return P_distal, R_world
+
+
+def _state_to_world_transforms_batch_torch(
+    states,  # torch tensor (T, D) on cuda
+    layout: BodyLayout,
+):
+    """Same as _state_to_world_transforms_batch_np but using
+    torch on the device of `states` (typically cuda).
+    """
+    torch = _try_import_torch()
+    idx = _pack_state_layout_indices(layout)
+    T = states.shape[0]
+    device = states.device
+    dtype = states.dtype
+    P_distal: Dict[str, "torch.Tensor"] = {}
+    R_world: Dict[str, "torch.Tensor"] = {}
+
+    root = layout.root_segment
+    P_distal[root.name] = torch.stack([
+        states[:, idx["__root__"]["x"]],
+        states[:, idx["__root__"]["y"]],
+    ], dim=1)
+    c_r = states[:, idx["__root__"]["cos"]]
+    s_r = states[:, idx["__root__"]["sin"]]
+    R_root = torch.empty((T, 2, 2), dtype=dtype, device=device)
+    R_root[:, 0, 0] = c_r
+    R_root[:, 0, 1] = -s_r
+    R_root[:, 1, 0] = s_r
+    R_root[:, 1, 1] = c_r
+    R_world[root.name] = R_root
+
+    for seg_name in layout.non_root_topo_order:
+        seg = layout.segment_by_name(seg_name)
+        parent_name = seg.parent
+        c = states[:, idx[seg_name]["cos"]]
+        s = states[:, idx[seg_name]["sin"]]
+        L = states[:, idx[seg_name]["length"]]
+        v_local = torch.stack([L * c, L * s], dim=1)
+        rotated = torch.einsum(
+            "tij,tj->ti", R_world[parent_name], v_local,
+        )
+        P_distal[seg_name] = P_distal[parent_name] + rotated
+        R_local = torch.empty((T, 2, 2), dtype=dtype, device=device)
+        R_local[:, 0, 0] = c
+        R_local[:, 0, 1] = -s
+        R_local[:, 1, 0] = s
+        R_local[:, 1, 1] = c
+        R_world[seg_name] = torch.einsum(
+            "tij,tjk->tik", R_world[parent_name], R_local,
+        )
+    return P_distal, R_world
+
+
+def state_to_marker_positions_batch(
+    states: np.ndarray,  # (T, D)
+    layout: BodyLayout,
+    perspective: Optional["PerspectiveModelV2"] = None,
+    device: str = "cpu",
+) -> np.ndarray:
+    """Vectorized state_to_marker_positions across T frames.
+
+    Returns
+    -------
+    (T, K, 2) array of predicted marker positions.
+
+    Backend selection
+    -----------------
+    device="cpu": NumPy
+    device="cuda": PyTorch on cuda (requires torch installed
+                   and cuda available)
+    device="auto": cuda if torch+cuda available and T >= 5000,
+                   else cpu
+    """
+    T = states.shape[0]
+    resolved = _resolve_device(device, T)
+    K = layout.n_markers
+    marker_names = layout.marker_names
+
+    if resolved == "cpu":
+        P_distal, R_world = _state_to_world_transforms_batch_np(
+            states, layout,
+        )
+        # Build per-marker offsets
+        positions = np.zeros((T, K, 2))
+        # Apply perspective scales if given
+        if perspective is not None:
+            idx = _pack_state_layout_indices(layout)
+            root_x = states[:, idx["__root__"]["x"]]
+            root_y = states[:, idx["__root__"]["y"]]
+            scales_per_marker = (
+                _perspective_scales_batch_np(
+                    perspective, root_x, root_y, marker_names,
+                )
+            )  # (T, K)
+        for i, marker in enumerate(marker_names):
+            seg_name, (l_off, a_off) = layout.marker_attachment(marker)
+            v_local = np.array([
+                l_off * np.cos(a_off),
+                l_off * np.sin(a_off),
+            ])  # (2,)
+            if perspective is not None:
+                # (T, 2): broadcast scale across the offset
+                v_local_t = (
+                    scales_per_marker[:, i:i+1] * v_local[None, :]
+                )
+            else:
+                v_local_t = np.broadcast_to(v_local, (T, 2))
+            # rotated = R_world[seg] @ v_local_t per frame
+            rotated = np.einsum(
+                "tij,tj->ti", R_world[seg_name], v_local_t,
+            )
+            positions[:, i, :] = P_distal[seg_name] + rotated
+        return positions
+
+    # CUDA path
+    torch = _try_import_torch()
+    states_t = torch.as_tensor(states, dtype=torch.float64).cuda()
+    P_distal, R_world = _state_to_world_transforms_batch_torch(
+        states_t, layout,
+    )
+    positions = torch.zeros(
+        (T, K, 2), dtype=torch.float64, device="cuda",
+    )
+    if perspective is not None:
+        idx = _pack_state_layout_indices(layout)
+        root_x = states_t[:, idx["__root__"]["x"]]
+        root_y = states_t[:, idx["__root__"]["y"]]
+        scales_per_marker = _perspective_scales_batch_torch(
+            perspective, root_x, root_y, marker_names,
+        )
+    for i, marker in enumerate(marker_names):
+        seg_name, (l_off, a_off) = layout.marker_attachment(marker)
+        v_local = torch.tensor(
+            [l_off * np.cos(a_off), l_off * np.sin(a_off)],
+            dtype=torch.float64, device="cuda",
+        )
+        if perspective is not None:
+            v_local_t = (
+                scales_per_marker[:, i:i+1] * v_local[None, :]
+            )
+        else:
+            v_local_t = v_local[None, :].expand(T, 2)
+        rotated = torch.einsum(
+            "tij,tj->ti", R_world[seg_name], v_local_t,
+        )
+        positions[:, i, :] = P_distal[seg_name] + rotated
+    return positions.cpu().numpy()
+
+
+def _perspective_scales_batch_np(
+    perspective: "PerspectiveModelV2",
+    root_x: np.ndarray,  # (T,)
+    root_y: np.ndarray,  # (T,)
+    marker_names: List[str],
+) -> np.ndarray:
+    """Compute scale factor per (frame, marker). Returns
+    (T, K) array.
+    """
+    x_n = (root_x - perspective.arena_x_mean) / max(
+        perspective.arena_x_range / 2.0, 1.0,
+    )
+    y_n = (root_y - perspective.arena_y_mean) / max(
+        perspective.arena_y_range / 2.0, 1.0,
+    )
+    K = len(marker_names)
+    T = root_x.shape[0]
+    scales = np.empty((T, K))
+    for i, m in enumerate(marker_names):
+        a, b, c = perspective.coeffs[m]
+        scales[:, i] = 1.0 + a * x_n + b * y_n + c * x_n * y_n
+    return scales
+
+
+def _perspective_scales_batch_torch(
+    perspective: "PerspectiveModelV2",
+    root_x,  # torch tensor (T,)
+    root_y,
+    marker_names: List[str],
+):
+    torch = _try_import_torch()
+    x_n = (root_x - perspective.arena_x_mean) / max(
+        perspective.arena_x_range / 2.0, 1.0,
+    )
+    y_n = (root_y - perspective.arena_y_mean) / max(
+        perspective.arena_y_range / 2.0, 1.0,
+    )
+    K = len(marker_names)
+    T = root_x.shape[0]
+    scales = torch.empty(
+        (T, K), dtype=root_x.dtype, device=root_x.device,
+    )
+    for i, m in enumerate(marker_names):
+        a, b, c = perspective.coeffs[m]
+        scales[:, i] = 1.0 + a * x_n + b * y_n + c * x_n * y_n
+    return scales
+
+
+def state_to_marker_jacobian_batch(
+    states: np.ndarray,  # (T, D)
+    layout: BodyLayout,
+    perspective: Optional["PerspectiveModelV2"] = None,
+    device: str = "cpu",
+) -> np.ndarray:
+    """Vectorized state_to_marker_jacobian across T frames.
+
+    Returns
+    -------
+    (T, 2K, D) array
+    """
+    T = states.shape[0]
+    resolved = _resolve_device(device, T)
+    K = layout.n_markers
+    D = layout.state_dim
+    marker_names = layout.marker_names
+    idx = _pack_state_layout_indices(layout)
+
+    if resolved == "cpu":
+        P_distal, R_world = _state_to_world_transforms_batch_np(
+            states, layout,
+        )
+    else:
+        torch = _try_import_torch()
+        states_t = torch.as_tensor(states, dtype=torch.float64).cuda()
+        P_distal_t, R_world_t = (
+            _state_to_world_transforms_batch_torch(states_t, layout)
+        )
+        # Convert back to numpy for the Jacobian assembly
+        # (which is per-marker logic; not the bottleneck since
+        # K is small and per-marker work is dominated by the
+        # (T,2,2) rotations we already vectorized)
+        P_distal = {
+            k: v.cpu().numpy() for k, v in P_distal_t.items()
+        }
+        R_world = {
+            k: v.cpu().numpy() for k, v in R_world_t.items()
+        }
+
+    H = np.zeros((T, 2 * K, D))
+
+    parent_of: Dict[str, Optional[str]] = {
+        s.name: s.parent for s in layout.segments
+    }
+
+    def chain_to_root(seg_name: str) -> List[str]:
+        chain: List[str] = []
+        cur: Optional[str] = seg_name
+        while cur is not None:
+            chain.append(cur)
+            cur = parent_of[cur]
+        return list(reversed(chain))
+
+    # Cache chain per segment to avoid recomputing per frame
+    chain_per_seg: Dict[str, List[str]] = {
+        s.name: chain_to_root(s.name) for s in layout.segments
+    }
+
+    # Perspective per-marker per-frame scales + partials
+    if perspective is not None:
+        root_x = states[:, idx["__root__"]["x"]]
+        root_y = states[:, idx["__root__"]["y"]]
+        scales_per_marker = _perspective_scales_batch_np(
+            perspective, root_x, root_y, marker_names,
+        )  # (T, K)
+        x_factor = 1.0 / max(perspective.arena_x_range / 2.0, 1.0)
+        y_factor = 1.0 / max(perspective.arena_y_range / 2.0, 1.0)
+        x_n = (root_x - perspective.arena_x_mean) * x_factor
+        y_n = (root_y - perspective.arena_y_mean) * y_factor
+        d_scales_dx = np.empty((T, K))
+        d_scales_dy = np.empty((T, K))
+        for i, m in enumerate(marker_names):
+            a, b, c = perspective.coeffs[m]
+            d_scales_dx[:, i] = (a + c * y_n) * x_factor
+            d_scales_dy[:, i] = (b + c * x_n) * y_factor
+
+    for i, marker in enumerate(marker_names):
+        seg_name, (l_off, a_off) = layout.marker_attachment(marker)
+        offset_unit = np.array([
+            l_off * np.cos(a_off), l_off * np.sin(a_off),
+        ])  # (2,)
+        if perspective is not None:
+            scale_m = scales_per_marker[:, i:i+1]  # (T, 1)
+            v_marker_local = scale_m * offset_unit[None, :]  # (T, 2)
+        else:
+            v_marker_local = np.broadcast_to(
+                offset_unit, (T, 2),
+            )  # (T, 2)
+
+        # World marker position
+        p_m = P_distal[seg_name] + np.einsum(
+            "tij,tj->ti", R_world[seg_name], v_marker_local,
+        )  # (T, 2)
+
+        row_x = 2 * i
+        row_y = 2 * i + 1
+
+        # Position-of-root partials: constant 1
+        H[:, row_x, idx["__root__"]["x"]] = 1.0
+        H[:, row_y, idx["__root__"]["y"]] = 1.0
+
+        # Perspective contribution to root partials
+        if perspective is not None:
+            R_seg = R_world[seg_name]  # (T, 2, 2)
+            # ∂(R @ scale * offset) / ∂root_x =
+            #   R @ (offset * ∂scale/∂root_x)
+            d_x_off = (
+                d_scales_dx[:, i:i+1] * offset_unit[None, :]
+            )  # (T, 2)
+            d_y_off = (
+                d_scales_dy[:, i:i+1] * offset_unit[None, :]
+            )
+            d_p_dx = np.einsum("tij,tj->ti", R_seg, d_x_off)
+            d_p_dy = np.einsum("tij,tj->ti", R_seg, d_y_off)
+            H[:, row_x, idx["__root__"]["x"]] += d_p_dx[:, 0]
+            H[:, row_y, idx["__root__"]["x"]] += d_p_dx[:, 1]
+            H[:, row_x, idx["__root__"]["y"]] += d_p_dy[:, 0]
+            H[:, row_y, idx["__root__"]["y"]] += d_p_dy[:, 1]
+
+        # Walk chain from root to seg_name
+        chain = chain_per_seg[seg_name]
+        for a_name in chain:
+            a_seg = layout.segment_by_name(a_name)
+
+            if a_seg.parent is None:
+                R_pa = np.broadcast_to(
+                    np.eye(2), (T, 2, 2),
+                )
+            else:
+                R_pa = R_world[a_seg.parent]  # (T, 2, 2)
+
+            P_a_distal = P_distal[a_name]  # (T, 2)
+            R_a_world = R_world[a_name]  # (T, 2, 2)
+            # offset_past_a_in_a_frame: (T, 2)
+            #   = R_a_world.T @ (p_m - P_a_distal)
+            diff = p_m - P_a_distal  # (T, 2)
+            # R^T @ x: einsum("tji,tj->ti", R, x)
+            offset_past_a = np.einsum(
+                "tji,tj->ti", R_a_world, diff,
+            )
+
+            if a_seg.parent is not None:
+                a_cos = states[:, idx[a_name]["cos"]]
+                a_sin = states[:, idx[a_name]["sin"]]
+                a_length = states[:, idx[a_name]["length"]]
+                # ∂p/∂a_length = R_pa @ (a_cos, a_sin)
+                cs_stack = np.stack([a_cos, a_sin], axis=1)  # (T, 2)
+                d_p_d_length = np.einsum(
+                    "tij,tj->ti", R_pa, cs_stack,
+                )
+                col = idx[a_name]["length"]
+                H[:, row_x, col] = d_p_d_length[:, 0]
+                H[:, row_y, col] = d_p_d_length[:, 1]
+            else:
+                a_length = np.zeros(T)
+
+            # d_offset_d_cos = (a_length, 0) + offset_past_a
+            # d_offset_d_sin = (0, a_length) + J90 @ offset_past_a
+            d_offset_d_cos = offset_past_a.copy()
+            d_offset_d_cos[:, 0] += a_length
+            # J90 @ (x, y) = (-y, x)
+            d_offset_d_sin = np.empty((T, 2))
+            d_offset_d_sin[:, 0] = -offset_past_a[:, 1]
+            d_offset_d_sin[:, 1] = offset_past_a[:, 0] + a_length
+
+            d_p_d_cos = np.einsum("tij,tj->ti", R_pa, d_offset_d_cos)
+            d_p_d_sin = np.einsum("tij,tj->ti", R_pa, d_offset_d_sin)
+
+            if a_seg.parent is None:
+                col_cos = idx["__root__"]["cos"]
+                col_sin = idx["__root__"]["sin"]
+            else:
+                col_cos = idx[a_name]["cos"]
+                col_sin = idx[a_name]["sin"]
+            H[:, row_x, col_cos] = d_p_d_cos[:, 0]
+            H[:, row_y, col_cos] = d_p_d_cos[:, 1]
+            H[:, row_x, col_sin] = d_p_d_sin[:, 0]
+            H[:, row_y, col_sin] = d_p_d_sin[:, 1]
+
+    return H
+
+
 def initial_state_from_data(
     positions: np.ndarray,
     likelihoods: np.ndarray,
@@ -2247,40 +2755,53 @@ def accumulate_m_step_stats_v2(
     #   residual_sq = ||z_t - h(x̂_t)||²
     #   trace_corr = trace(H_t,m P_{t|T} H_t,m^T)
     #   weighted contribution = p_t² * (residual_sq + trace_corr)
-    for t in range(T):
-        # Build h(x̂_t) and H at x̂_t
-        fk = forward_kinematics(x[t], layout)
-        pred = state_to_marker_positions(
-            x[t], layout, fk=fk, perspective=perspective,
-        )
-        H_full = state_to_marker_jacobian(
-            x[t], layout, fk=fk, perspective=perspective,
-        )
-        # H_full is (2K, D)
+    #
+    # Vectorized: compute predictions and Jacobians for all T
+    # frames in batch, then accumulate per-marker stats with
+    # masked array operations.
+    pred_batch = state_to_marker_positions_batch(
+        x, layout, perspective=perspective,
+    )  # (T, K, 2)
+    H_batch = state_to_marker_jacobian_batch(
+        x, layout, perspective=perspective,
+    )  # (T, 2K, D)
 
-        for k, m in enumerate(marker_names):
-            x_obs = positions[t, k, 0]
-            y_obs = positions[t, k, 1]
-            p = likelihoods[t, k]
-            if (
-                not (np.isfinite(x_obs) and np.isfinite(y_obs))
-                or p < likelihood_threshold
-            ):
-                continue
+    # Residuals: (T, K, 2)
+    resid = positions - pred_batch
+    # Mask of valid observations: finite + above threshold
+    valid_mask = (
+        np.isfinite(positions[:, :, 0])
+        & np.isfinite(positions[:, :, 1])
+        & (likelihoods >= likelihood_threshold)
+    )  # (T, K)
+    # Squared residuals per (t, k): ||resid||² per marker
+    resid_sq = (resid ** 2).sum(axis=2)  # (T, K)
+    # Replace invalid entries with 0 so they don't contribute
+    resid_sq_masked = np.where(valid_mask, resid_sq, 0.0)
 
-            residual = np.array([
-                x_obs - pred[k, 0],
-                y_obs - pred[k, 1],
-            ])
-            residual_sq = float(residual @ residual)
-            # trace(H_m P H_m^T) = sum over rows of H_m of
-            # H_row @ P @ H_row^T.  H_m is (2, D).
-            H_m = H_full[2 * k:2 * k + 2, :]
-            trace_corr = float(np.trace(H_m @ P[t] @ H_m.T))
+    # Trace correction: trace(H_m P H_m^T) per (t, k).
+    # H_m for marker k is rows 2k:2k+2 of H_batch[t].
+    # Vectorize: reshape H_batch to (T, K, 2, D), then for
+    # each (t, k) compute H_m @ P[t] @ H_m^T.
+    H_per_marker = H_batch.reshape(T, K, 2, D)  # (T, K, 2, D)
+    # H_m @ P[t]: (T, K, 2, D) @ (T, D, D) -> (T, K, 2, D)
+    HP = np.einsum("tkij,tjl->tkil", H_per_marker, P)
+    # (HP) @ H_m^T: (T, K, 2, D) @ (T, K, D, 2) -> (T, K, 2, 2)
+    HPH = np.einsum("tkij,tklj->tkil", HP, H_per_marker)
+    # Trace per (t, k): sum of diagonal entries
+    trace_corr = HPH[:, :, 0, 0] + HPH[:, :, 1, 1]  # (T, K)
+    trace_corr_masked = np.where(valid_mask, trace_corr, 0.0)
 
-            w = p * p
-            stats.sigma_sum_sq[m] += w * (residual_sq + trace_corr)
-            stats.sigma_n_obs[m] += 2  # x and y axes
+    # Weights p^2 per (t, k)
+    weights = (likelihoods ** 2) * valid_mask  # (T, K)
+    # Per-marker accumulation
+    contributions = weights * (resid_sq_masked + trace_corr_masked)
+    sum_per_marker = contributions.sum(axis=0)  # (K,)
+    n_obs_per_marker = (2 * valid_mask.astype(np.int64)).sum(axis=0)  # (K,)
+
+    for k, m in enumerate(marker_names):
+        stats.sigma_sum_sq[m] += float(sum_per_marker[k])
+        stats.sigma_n_obs[m] += int(n_obs_per_marker[k])
 
     return stats
 
@@ -2755,28 +3276,28 @@ def fit_warm_start_sigma_v2(
         smooth = rts_smooth_v2(filt, layout, dt)
 
         T = smooth.x_smooth.shape[0]
-        # Predicted marker positions per frame
-        for t in range(T):
-            pred = state_to_marker_positions(
-                smooth.x_smooth[t], layout,
-                perspective=perspective,
-            )
-            for k, m in enumerate(layout.marker_names):
-                x_obs = pos[t, k, 0]
-                y_obs = pos[t, k, 1]
-                p = likes[t, k]
-                if (
-                    not (np.isfinite(x_obs) and np.isfinite(y_obs))
-                    or p < likelihood_threshold
-                    or not np.all(np.isfinite(pred[k]))
-                ):
-                    continue
-                diff = np.sqrt(
-                    (pred[k, 0] - x_obs) ** 2
-                    + (pred[k, 1] - y_obs) ** 2
-                )
-                sum_abs_diff[m] += float(diff)
-                n_obs[m] += 1
+        # Predicted marker positions per frame, vectorized
+        pred_batch = state_to_marker_positions_batch(
+            smooth.x_smooth, layout, perspective=perspective,
+        )  # (T, K, 2)
+        # Per-frame validity mask
+        valid_mask = (
+            np.isfinite(pos[:, :, 0])
+            & np.isfinite(pos[:, :, 1])
+            & (likes >= likelihood_threshold)
+            & np.isfinite(pred_batch[:, :, 0])
+            & np.isfinite(pred_batch[:, :, 1])
+        )  # (T, K)
+        diff_per_frame = np.sqrt(
+            (pred_batch[:, :, 0] - pos[:, :, 0]) ** 2
+            + (pred_batch[:, :, 1] - pos[:, :, 1]) ** 2
+        )  # (T, K)
+        diff_masked = np.where(valid_mask, diff_per_frame, 0.0)
+        sums_per_marker = diff_masked.sum(axis=0)  # (K,)
+        counts_per_marker = valid_mask.sum(axis=0)  # (K,)
+        for k, m in enumerate(layout.marker_names):
+            sum_abs_diff[m] += float(sums_per_marker[k])
+            n_obs[m] += int(counts_per_marker[k])
 
     sigma_warm: Dict[str, float] = {}
     for m in layout.marker_names:
@@ -3359,6 +3880,7 @@ def state_to_marker_variances(
     P_smooth: np.ndarray,   # (T, D, D)
     layout: BodyLayout,
     perspective: Optional["PerspectiveModelV2"] = None,
+    device: str = "cpu",
 ) -> np.ndarray:
     """Compute per-marker per-frame variance from the smoothed
     state covariance.
@@ -3372,6 +3894,8 @@ def state_to_marker_variances(
     covariance) is discarded — v1's output schema doesn't
     store it, and the viewer draws axis-aligned ellipses.
 
+    Vectorized across T frames.
+
     Returns
     -------
     (T, K, 2) array
@@ -3380,19 +3904,16 @@ def state_to_marker_variances(
     """
     T = x_smooth.shape[0]
     K = layout.n_markers
-    variances = np.zeros((T, K, 2))
-    for t in range(T):
-        fk = forward_kinematics(x_smooth[t], layout)
-        H = state_to_marker_jacobian(
-            x_smooth[t], layout, fk=fk, perspective=perspective,
-        )
-        # H shape: (2K, D)
-        # For each marker k, rows 2k and 2k+1 are H_t,m
-        for k in range(K):
-            H_m = H[2 * k:2 * k + 2, :]
-            cov_m = H_m @ P_smooth[t] @ H_m.T
-            variances[t, k, 0] = cov_m[0, 0]
-            variances[t, k, 1] = cov_m[1, 1]
+    D = layout.state_dim
+    H_batch = state_to_marker_jacobian_batch(
+        x_smooth, layout, perspective=perspective, device=device,
+    )  # (T, 2K, D)
+    H_per_marker = H_batch.reshape(T, K, 2, D)  # (T, K, 2, D)
+    HP = np.einsum("tkij,tjl->tkil", H_per_marker, P_smooth)
+    HPH = np.einsum("tkij,tklj->tkil", HP, H_per_marker)
+    variances = np.empty((T, K, 2))
+    variances[:, :, 0] = HPH[:, :, 0, 0]
+    variances[:, :, 1] = HPH[:, :, 1, 1]
     return variances
 
 
@@ -3445,15 +3966,10 @@ def smooth_session_v2(
     )
     smooth = rts_smooth_v2(filt, layout, dt)
 
-    # Compute marker positions from smoothed body state
-    T = smooth.x_smooth.shape[0]
-    K = layout.n_markers
-    smoothed_positions = np.zeros((T, K, 2))
-    for t in range(T):
-        smoothed_positions[t] = state_to_marker_positions(
-            smooth.x_smooth[t], layout,
-            perspective=perspective,
-        )
+    # Compute marker positions from smoothed body state — vectorized
+    smoothed_positions = state_to_marker_positions_batch(
+        smooth.x_smooth, layout, perspective=perspective,
+    )
     smoothed_variances = state_to_marker_variances(
         smooth.x_smooth, smooth.P_smooth, layout,
         perspective=perspective,
@@ -4431,61 +4947,81 @@ def fit_perspective_model_v2(
         T = smooth.x_smooth.shape[0]
         idx_pack = _pack_state_layout_indices(layout)
 
-        for t in range(T):
-            state_t = smooth.x_smooth[t]
-            if not np.all(np.isfinite(state_t)):
+        # Vectorized: compute body pose for all T frames at once
+        # via batch FK
+        # Mask out frames with non-finite state
+        finite_mask = np.all(np.isfinite(smooth.x_smooth), axis=1)
+        # (T,) bool
+
+        P_distal_batch, R_world_batch = (
+            _state_to_world_transforms_batch_np(smooth.x_smooth, layout)
+        )
+        # P_distal_batch[seg]: (T, 2)
+        # R_world_batch[seg]: (T, 2, 2)
+
+        root_x_t = smooth.x_smooth[:, idx_pack["__root__"]["x"]]
+        root_y_t = smooth.x_smooth[:, idx_pack["__root__"]["y"]]
+        x_n_t = (root_x_t - arena_x_mean) / max(
+            arena_x_range / 2.0, 1.0,
+        )
+        y_n_t = (root_y_t - arena_y_mean) / max(
+            arena_y_range / 2.0, 1.0,
+        )
+
+        for m, k_data in layout_to_data.items():
+            seg_name, (l_off, a_off) = layout.marker_attachment(m)
+            if l_off < min_offset_magnitude:
                 continue
-            # Body pose at frame t
-            fk = forward_kinematics(state_t, layout)
-            root_x = state_t[idx_pack["__root__"]["x"]]
-            root_y = state_t[idx_pack["__root__"]["y"]]
-            x_n = (root_x - arena_x_mean) / max(arena_x_range / 2.0, 1.0)
-            y_n = (root_y - arena_y_mean) / max(arena_y_range / 2.0, 1.0)
 
-            for m, k_data in layout_to_data.items():
-                seg_name, (l_off, a_off) = layout.marker_attachment(m)
-                if l_off < min_offset_magnitude:
-                    # Distal marker — no offset to scale
-                    continue
+            offset_pred_local = np.array([
+                l_off * np.cos(a_off),
+                l_off * np.sin(a_off),
+            ])
+            pred_norm_sq = float(
+                offset_pred_local @ offset_pred_local
+            )
+            if pred_norm_sq < 1e-9:
+                continue
 
-                # Predicted offset in body frame (segment frame)
-                offset_pred_local = np.array([
-                    l_off * np.cos(a_off),
-                    l_off * np.sin(a_off),
-                ])
+            # Observed offsets in body frame across all T:
+            # obs_world (T, 2), P_distal (T, 2), R_world (T, 2, 2)
+            obs_world = pos[:, k_data, :]  # (T, 2)
+            P_d = P_distal_batch[seg_name]  # (T, 2)
+            R_w = R_world_batch[seg_name]  # (T, 2, 2)
+            diff_world = obs_world - P_d  # (T, 2)
+            # R_w.T @ diff_world per frame: einsum("tji,tj->ti")
+            obs_local = np.einsum(
+                "tji,tj->ti", R_w, diff_world,
+            )  # (T, 2)
 
-                # Observed offset in body frame: take raw obs,
-                # subtract distal point, rotate into segment
-                # frame.
-                x_obs = pos[t, k_data, 0]
-                y_obs = pos[t, k_data, 1]
-                p = likes[t, k_data]
-                if (
-                    not (np.isfinite(x_obs) and np.isfinite(y_obs))
-                    or p < likelihood_threshold
-                ):
-                    continue
-                P_distal = fk.P_distal[seg_name]
-                R_seg = fk.R_world[seg_name]
-                obs_world = np.array([x_obs, y_obs])
-                obs_local = R_seg.T @ (obs_world - P_distal)
+            # scale_t = offset_pred_local @ obs_local / pred_norm_sq
+            scale_t_arr = (
+                obs_local @ offset_pred_local
+            ) / pred_norm_sq  # (T,)
 
-                # Scale = projection of observed offset onto
-                # predicted offset direction divided by
-                # predicted offset magnitude
-                pred_norm_sq = float(offset_pred_local @ offset_pred_local)
-                if pred_norm_sq < 1e-9:
-                    continue
-                scale_t = float(
-                    offset_pred_local @ obs_local
-                ) / pred_norm_sq
+            # Mask of valid frames
+            obs_valid = (
+                finite_mask
+                & np.isfinite(pos[:, k_data, 0])
+                & np.isfinite(pos[:, k_data, 1])
+                & (likes[:, k_data] >= likelihood_threshold)
+            )
+            n_valid = int(obs_valid.sum())
+            if n_valid < 1:
+                continue
 
-                # OLS: y = scale_t - 1, x = [x_n, y_n, x_n*y_n]
-                y_obs_ols = scale_t - 1.0
-                x_design = np.array([x_n, y_n, x_n * y_n])
-                XtX_per_marker[m] += np.outer(x_design, x_design)
-                Xty_per_marker[m] += y_obs_ols * x_design
-                n_obs_per_marker[m] += 1
+            # Build OLS design matrix entries: [x_n, y_n, x_n*y_n]
+            x_design = np.column_stack([
+                x_n_t[obs_valid],
+                y_n_t[obs_valid],
+                (x_n_t * y_n_t)[obs_valid],
+            ])  # (n_valid, 3)
+            y_target = scale_t_arr[obs_valid] - 1.0  # (n_valid,)
+
+            # Accumulate XtX, Xty
+            XtX_per_marker[m] += x_design.T @ x_design
+            Xty_per_marker[m] += x_design.T @ y_target
+            n_obs_per_marker[m] += n_valid
 
     # Solve OLS per marker
     coeffs: Dict[str, np.ndarray] = {}
