@@ -1882,7 +1882,146 @@ def main() -> int:
         # Output written
         assert len(_os.listdir(out_dir)) == 1
 
-    print("smoke_kalman_pose_smoother_v2: 54/54 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 106: hard unit-norm projection + NaN safety.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        _project_state_to_unit_circle,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 55: _project_state_to_unit_circle normalizes each
+    # (cos, sin) pair to unit norm, leaves velocities and
+    # positions unchanged.
+    # ---------------------------------------------------------- #
+    layout = standard_rat_layout()
+    indices = _pack_state_layout_indices(layout)
+    state = np.zeros(layout.state_dim)
+    # Set up a state with non-unit-norm orientations
+    state[indices["__root__"]["x"]] = 100.0
+    state[indices["__root__"]["y"]] = 200.0
+    state[indices["__root__"]["vx"]] = 5.0
+    state[indices["__root__"]["cos"]] = 3.0  # not unit
+    state[indices["__root__"]["sin"]] = 4.0  # 3,4,5 triangle
+    state[indices["__root__"]["cos_dot"]] = 1.0  # velocity preserved
+    state[indices["__root__"]["sin_dot"]] = 2.0
+    for seg_name in layout.non_root_topo_order:
+        state[indices[seg_name]["cos"]] = 6.0
+        state[indices[seg_name]["sin"]] = 8.0  # 6,8,10 triangle
+        state[indices[seg_name]["length"]] = 5.0
+        state[indices[seg_name]["length_dot"]] = 0.5
+
+    state_before = state.copy()
+    _project_state_to_unit_circle(state, layout)
+
+    # Root cos/sin should be normalized
+    assert abs(state[indices["__root__"]["cos"]] - 0.6) < 1e-10
+    assert abs(state[indices["__root__"]["sin"]] - 0.8) < 1e-10
+    # Other components unchanged
+    assert state[indices["__root__"]["x"]] == 100.0
+    assert state[indices["__root__"]["y"]] == 200.0
+    assert state[indices["__root__"]["vx"]] == 5.0
+    assert state[indices["__root__"]["cos_dot"]] == 1.0  # velocity unchanged
+    assert state[indices["__root__"]["sin_dot"]] == 2.0
+    # Per-segment normalized to (0.6, 0.8)
+    for seg_name in layout.non_root_topo_order:
+        assert abs(state[indices[seg_name]["cos"]] - 0.6) < 1e-10
+        assert abs(state[indices[seg_name]["sin"]] - 0.8) < 1e-10
+        assert state[indices[seg_name]["length"]] == 5.0
+        assert state[indices[seg_name]["length_dot"]] == 0.5
+
+    # ---------------------------------------------------------- #
+    # Case 56: _project_state_to_unit_circle handles degenerate
+    # zero-norm pairs by resetting to identity (cos=1, sin=0).
+    # ---------------------------------------------------------- #
+    state_zero = np.zeros(layout.state_dim)
+    _project_state_to_unit_circle(state_zero, layout)
+    assert state_zero[indices["__root__"]["cos"]] == 1.0
+    assert state_zero[indices["__root__"]["sin"]] == 0.0
+    for seg_name in layout.non_root_topo_order:
+        assert state_zero[indices[seg_name]["cos"]] == 1.0
+        assert state_zero[indices[seg_name]["sin"]] == 0.0
+
+    # ---------------------------------------------------------- #
+    # Case 57: forward filter applies projection — after
+    # filtering, every (cos, sin) pair has unit norm to fp
+    # precision (much tighter than the soft constraint's 0.05
+    # tolerance from case 26).
+    # ---------------------------------------------------------- #
+    rng = np.random.default_rng(2050)
+    fps = 30.0
+    dt = 1.0 / fps
+    T_p = 100
+    n_m = layout.n_markers
+
+    true_state = np.zeros(layout.state_dim)
+    true_state[indices["__root__"]["x"]] = 100.0
+    true_state[indices["__root__"]["y"]] = 200.0
+    true_state[indices["__root__"]["cos"]] = 1.0
+    for seg_name in layout.non_root_topo_order:
+        true_state[indices[seg_name]["cos"]] = 1.0
+        true_state[indices[seg_name]["length"]] = 5.0
+
+    pos_p = np.zeros((T_p, n_m, 2))
+    likes_p = np.full((T_p, n_m), 0.95)
+    for t in range(T_p):
+        clean = state_to_marker_positions(true_state, layout)
+        pos_p[t] = clean + rng.normal(0, 1.5, (n_m, 2))
+
+    params = NoiseParamsV2.default(layout, sigma_marker=1.5)
+    initial_state = true_state.copy()
+    filt_p = forward_filter_v2(
+        pos_p, likes_p, layout, params, dt,
+        initial_state=initial_state, likelihood_threshold=0.5,
+    )
+
+    # Every frame's (cos, sin) pair should be unit-norm to
+    # fp precision (~1e-10) thanks to hard projection
+    max_norm_err = 0.0
+    for t in range(T_p):
+        c = filt_p.x_filt[t, indices["__root__"]["cos"]]
+        s = filt_p.x_filt[t, indices["__root__"]["sin"]]
+        max_norm_err = max(max_norm_err, abs(c*c + s*s - 1.0))
+        for seg_name in layout.non_root_topo_order:
+            c = filt_p.x_filt[t, indices[seg_name]["cos"]]
+            s = filt_p.x_filt[t, indices[seg_name]["sin"]]
+            max_norm_err = max(max_norm_err, abs(c*c + s*s - 1.0))
+    assert max_norm_err < 1e-9, (
+        f"Hard projection should give fp-precision unit norm; "
+        f"got max error {max_norm_err:.6e}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 58: validation hook raises with clear message when
+    # smoothed predictions contain NaN. Manufacture a smooth
+    # result with NaN values and verify the hook catches it
+    # before per-marker checks.
+    # ---------------------------------------------------------- #
+    T_n = 20
+    x_smooth_nan = np.full((T_n, layout.state_dim), np.nan)
+    P_smooth_nan = np.tile(np.eye(layout.state_dim), (T_n, 1, 1))
+    P_lag_nan = np.tile(np.eye(layout.state_dim), (T_n - 1, 1, 1))
+    smooth_nan = SmoothResultV2(
+        x_smooth=x_smooth_nan,
+        P_smooth=P_smooth_nan,
+        P_lag_one=P_lag_nan,
+    )
+    pos_n = np.zeros((T_n, n_m, 2))
+    likes_n = np.full((T_n, n_m), 0.95)
+    params_n = NoiseParamsV2.default(layout, sigma_marker=1.5)
+
+    try:
+        _validate_trajectory_v2(
+            smooth_nan, pos_n, likes_n, layout, params_n,
+            iteration=0, likelihood_threshold=0.5,
+        )
+        assert False, "Validation should have raised on NaN"
+    except RuntimeError as e:
+        msg = str(e)
+        assert "NaN" in msg
+        assert "EKF has diverged" in msg
+
+    print("smoke_kalman_pose_smoother_v2: 58/58 cases passed")
     return 0
 
 

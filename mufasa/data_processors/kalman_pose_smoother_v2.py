@@ -1771,6 +1771,44 @@ def forward_filter_v2(
             x_f = x_p
             P_f = P_p
 
+        # Hard unit-norm re-projection on each (cos, sin) pair.
+        # The soft constraint observations should hold the
+        # state near the unit circle, but on real data with
+        # long trajectories they aren't reliable enough — once
+        # the state drifts even moderately, the linearization
+        # at a non-unit-norm point amplifies the drift. Hard
+        # projection is the robust fix: after each EKF update,
+        # snap each (cos, sin) pair onto the unit circle.
+        # This is a standard manifold-EKF trick (see e.g.,
+        # Hertzberg et al. 2013, "Integrating Generic Sensor
+        # Fusion Algorithms with Sound State Representations
+        # through Encapsulation of Manifolds").
+        _project_state_to_unit_circle(x_f, layout)
+
+        # NaN/inf detection. If the filter has gone pathological
+        # (overflow, division by zero in S inverse), x_f or P_f
+        # contain NaN/inf. Recovery: fall back to predict-only
+        # (skip the update, propagate P_p with a slight
+        # inflation to model the missed observation). If the
+        # bad state was introduced in the predict step itself
+        # (e.g., from prior NaN), reset to last known-good state.
+        if not np.all(np.isfinite(x_f)) or not np.all(np.isfinite(P_f)):
+            # Fall back to predict-only at this frame
+            if np.all(np.isfinite(x_p)) and np.all(np.isfinite(P_p)):
+                x_f = x_p
+                P_f = P_p
+                _project_state_to_unit_circle(x_f, layout)
+            elif t > 0 and np.all(np.isfinite(x_filt[t - 1])):
+                # Reset to last known-good filtered state
+                x_f = x_filt[t - 1].copy()
+                P_f = P_filt[t - 1].copy()
+            else:
+                # No fallback available — re-initialize from
+                # initial state (rare; only first frame and
+                # initial state was bad)
+                x_f = initial_state.copy()
+                P_f = P0.copy()
+
         x_filt[t] = x_f
         P_filt[t] = P_f
         x_prev = x_f
@@ -1781,6 +1819,59 @@ def forward_filter_v2(
         x_filt=x_filt, P_filt=P_filt,
         n_observed=n_observed,
     )
+
+
+def _project_state_to_unit_circle(
+    state: np.ndarray, layout: BodyLayout,
+) -> None:
+    """Project each (cos, sin) pair in the state onto the unit
+    circle, IN PLACE. This is the hard counterpart to the soft
+    constraint observations — guarantees |R(cos, sin)| = 1
+    after each filter step regardless of how much the state
+    drifted.
+
+    The (cos_dot, sin_dot) velocity components are NOT
+    projected — they're tangent-space velocities and can have
+    any magnitude. This means after projection, the velocity
+    might point off-tangent, but Q-noise + the next predict
+    step will mix this back into a valid trajectory.
+
+    Why this matters: the EKF tracks (cos, sin) as 2 ambient
+    coordinates. Without hard projection, the linearization at
+    a state off the unit circle amplifies subsequent drift —
+    R = [[c, -s], [s, c]] with c² + s² = 4 has determinant 4,
+    and applying it to a vector scales it by 2. A few
+    iterations of this and overflow happens.
+
+    Run AFTER each filter update (and could also be run after
+    the predict step, but predict alone shouldn't cause
+    significant drift).
+    """
+    indices = _pack_state_layout_indices(layout)
+
+    # Root
+    c_idx = indices["__root__"]["cos"]
+    s_idx = indices["__root__"]["sin"]
+    norm = np.sqrt(state[c_idx] ** 2 + state[s_idx] ** 2)
+    if norm > 1e-9:
+        state[c_idx] /= norm
+        state[s_idx] /= norm
+    else:
+        # Degenerate — reset to identity
+        state[c_idx] = 1.0
+        state[s_idx] = 0.0
+
+    # Per-segment
+    for seg_name in layout.non_root_topo_order:
+        c_idx = indices[seg_name]["cos"]
+        s_idx = indices[seg_name]["sin"]
+        norm = np.sqrt(state[c_idx] ** 2 + state[s_idx] ** 2)
+        if norm > 1e-9:
+            state[c_idx] /= norm
+            state[s_idx] /= norm
+        else:
+            state[c_idx] = 1.0
+            state[s_idx] = 0.0
 
 
 # ============================================================
@@ -2573,6 +2664,23 @@ def _validate_trajectory_v2(
             f"[v2-em-val] iter {iteration}: per-marker stats "
             f"(range_ratio>{range_ratio_floor:.2f} ok; "
             f"mean_diff<{mean_diff_sigma_factor:.0f}σ ok):"
+        )
+
+    # Global NaN check — if any predicted positions are NaN,
+    # the EKF has gone pathological. Raise with a clear
+    # message rather than producing all-NaN per-marker stats.
+    n_nan = int(np.isnan(pred).sum())
+    if n_nan > 0:
+        raise RuntimeError(
+            f"v2 EM validation hook triggered at iteration "
+            f"{iteration}: smoothed marker predictions contain "
+            f"{n_nan} NaN values out of {pred.size}. The EKF has "
+            f"diverged — likely causes: orientation state drifted "
+            f"off the unit circle (should be prevented by hard "
+            f"projection in patch 106), initial state was "
+            f"inconsistent with observations, or process noise Q "
+            f"is too large. Inspect the early frames of x_smooth "
+            f"to diagnose."
         )
 
     failures: List[str] = []
