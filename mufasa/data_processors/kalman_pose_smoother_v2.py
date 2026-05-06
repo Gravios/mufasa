@@ -907,6 +907,7 @@ def state_to_marker_positions(
     state: np.ndarray,
     layout: BodyLayout,
     fk: Optional[ForwardKinematicsResult] = None,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> np.ndarray:
     """Compute predicted 2D positions for all markers.
 
@@ -921,6 +922,13 @@ def state_to_marker_positions(
     fk : ForwardKinematicsResult, optional
         If provided, skip recomputing forward kinematics
         (useful when computing both positions and Jacobian).
+    perspective : PerspectiveModelV2, optional
+        If provided, scale each marker's body-frame offset by
+        a position-dependent factor. Captures perspective /
+        radial-distortion effects where apparent body width
+        depends on the rat's location in the arena. When None,
+        behavior is identical to previous patches (rigid
+        offsets).
 
     Returns
     -------
@@ -933,12 +941,23 @@ def state_to_marker_positions(
     marker_names = layout.marker_names
     positions = np.zeros((len(marker_names), 2))
 
+    # Pre-compute scale factors per marker if perspective active
+    if perspective is not None:
+        idx = _pack_state_layout_indices(layout)
+        root_x = state[idx["__root__"]["x"]]
+        root_y = state[idx["__root__"]["y"]]
+        scales = perspective.scale_for_position(root_x, root_y)
+    else:
+        scales = None
+
     for i, marker in enumerate(marker_names):
         seg_name, (l_off, a_off) = layout.marker_attachment(marker)
         v_marker_local = np.array([
             l_off * np.cos(a_off),
             l_off * np.sin(a_off),
         ])
+        if scales is not None:
+            v_marker_local = v_marker_local * scales[i]
         positions[i] = (
             fk.P_distal[seg_name] + fk.R_world[seg_name] @ v_marker_local
         )
@@ -949,6 +968,7 @@ def state_to_marker_jacobian(
     state: np.ndarray,
     layout: BodyLayout,
     fk: Optional[ForwardKinematicsResult] = None,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> np.ndarray:
     """Compute the Jacobian of marker positions w.r.t. state.
 
@@ -969,6 +989,12 @@ def state_to_marker_jacobian(
     layout : BodyLayout
     fk : ForwardKinematicsResult, optional
         If provided, skip recomputing forward kinematics.
+    perspective : PerspectiveModelV2, optional
+        When provided, the Jacobian includes terms from the
+        position-dependent scale function:
+          ∂p_m/∂root_x picks up R_world @ (offset_m * ∂scale/∂x)
+          ∂p_m/∂root_y picks up R_world @ (offset_m * ∂scale/∂y)
+        and existing offset terms get multiplied by scale.
 
     Returns
     -------
@@ -982,6 +1008,19 @@ def state_to_marker_jacobian(
     K = len(marker_names)
     D = layout.state_dim
     H = np.zeros((2 * K, D))
+
+    # Perspective scales and partials
+    if perspective is not None:
+        root_x = state[idx["__root__"]["x"]]
+        root_y = state[idx["__root__"]["y"]]
+        scales = perspective.scale_for_position(root_x, root_y)
+        d_scales_d_x, d_scales_d_y = (
+            perspective.scale_partials(root_x, root_y)
+        )
+    else:
+        scales = None
+        d_scales_d_x = None
+        d_scales_d_y = None
 
     # Pre-compute segment ancestor chains (root → marker's
     # segment, in topo order). Used to know which a's affect
@@ -1005,19 +1044,38 @@ def state_to_marker_jacobian(
 
     for i, marker in enumerate(marker_names):
         seg_name, (l_off, a_off) = layout.marker_attachment(marker)
+        scale_m = 1.0 if scales is None else scales[i]
         v_marker_local = np.array([
             l_off * np.cos(a_off),
             l_off * np.sin(a_off),
-        ])
-        # World marker position
+        ]) * scale_m
+        # World marker position (using scaled offset)
         p_m = fk.P_distal[seg_name] + fk.R_world[seg_name] @ v_marker_local
 
         row_x = 2 * i
         row_y = 2 * i + 1
 
-        # Position-of-root partials are constant
+        # Position-of-root partials are constant 1
         H[row_x, idx["__root__"]["x"]] = 1.0
         H[row_y, idx["__root__"]["y"]] = 1.0
+
+        # Perspective contribution to root-position partials:
+        # ∂(R_world @ (offset_m * scale)) / ∂root_x
+        #   = R_world @ (offset_m * ∂scale/∂root_x)
+        # (R_world doesn't depend on root_x, only on
+        # orientation states.)
+        if perspective is not None:
+            R_seg = fk.R_world[seg_name]
+            offset_unit = np.array([
+                l_off * np.cos(a_off),
+                l_off * np.sin(a_off),
+            ])
+            d_p_d_rx_persp = R_seg @ (offset_unit * d_scales_d_x[i])
+            d_p_d_ry_persp = R_seg @ (offset_unit * d_scales_d_y[i])
+            H[row_x, idx["__root__"]["x"]] += d_p_d_rx_persp[0]
+            H[row_y, idx["__root__"]["x"]] += d_p_d_rx_persp[1]
+            H[row_x, idx["__root__"]["y"]] += d_p_d_ry_persp[0]
+            H[row_y, idx["__root__"]["y"]] += d_p_d_ry_persp[1]
 
         # Walk the chain from root to seg_name, computing
         # partials at each ancestor.
@@ -1034,8 +1092,7 @@ def state_to_marker_jacobian(
 
             # Cumulative offset past a, in a's frame:
             # (p_m - P_a_distal) expressed in a's local frame.
-            # For root, P_a_distal = P_root and R_world[a]^T
-            # transforms p_m - P_root into root's frame.
+            # Note p_m already includes the perspective scale.
             P_a_distal = fk.P_distal[a_name]
             R_a_world = fk.R_world[a_name]
             offset_past_a_in_a_frame = R_a_world.T @ (p_m - P_a_distal)
@@ -1545,6 +1602,7 @@ def _build_marker_observations(
     layout: BodyLayout,
     params: NoiseParamsV2,
     likelihood_threshold: float,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     """Build the observation vector, predicted observation,
     Jacobian, and observation noise R for one frame's marker
@@ -1563,8 +1621,12 @@ def _build_marker_observations(
     n_observed_markers : int
     """
     fk = forward_kinematics(state, layout)
-    pred = state_to_marker_positions(state, layout, fk=fk)
-    H_full = state_to_marker_jacobian(state, layout, fk=fk)
+    pred = state_to_marker_positions(
+        state, layout, fk=fk, perspective=perspective,
+    )
+    H_full = state_to_marker_jacobian(
+        state, layout, fk=fk, perspective=perspective,
+    )
     marker_names = layout.marker_names
 
     z_list: List[np.ndarray] = []
@@ -1618,6 +1680,7 @@ def forward_filter_v2(
     initial_cov: Optional[np.ndarray] = None,
     likelihood_threshold: float = 0.5,
     apply_constraints: bool = True,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> FilterResultV2:
     """EKF forward pass on the v2 body-state representation.
 
@@ -1722,7 +1785,7 @@ def forward_filter_v2(
         # Build observation
         z_m, h_m, H_m, R_diag_m, n_m = _build_marker_observations(
             x_p, positions[t], likelihoods[t], layout, params,
-            likelihood_threshold,
+            likelihood_threshold, perspective=perspective,
         )
         n_observed[t] = n_m
 
@@ -2126,6 +2189,7 @@ def accumulate_m_step_stats_v2(
     likelihoods: np.ndarray,
     layout: BodyLayout,
     likelihood_threshold: float = 0.5,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> _MStepStatsV2:
     """Accumulate sufficient statistics for the M-step from
     one session's smoother output.
@@ -2186,8 +2250,12 @@ def accumulate_m_step_stats_v2(
     for t in range(T):
         # Build h(x̂_t) and H at x̂_t
         fk = forward_kinematics(x[t], layout)
-        pred = state_to_marker_positions(x[t], layout, fk=fk)
-        H_full = state_to_marker_jacobian(x[t], layout, fk=fk)
+        pred = state_to_marker_positions(
+            x[t], layout, fk=fk, perspective=perspective,
+        )
+        H_full = state_to_marker_jacobian(
+            x[t], layout, fk=fk, perspective=perspective,
+        )
         # H_full is (2K, D)
 
         for k, m in enumerate(marker_names):
@@ -2609,6 +2677,7 @@ def fit_warm_start_sigma_v2(
     likelihood_threshold: float = 0.5,
     sigma_inflation_cap: float = 20.0,
     apply_constraints: bool = True,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> Dict[str, float]:
     """Warm-start σ_marker estimation: run filter+smoother
     once with current params, measure mean |smoothed - raw|
@@ -2681,6 +2750,7 @@ def fit_warm_start_sigma_v2(
             initial_state=x0,
             likelihood_threshold=likelihood_threshold,
             apply_constraints=apply_constraints,
+            perspective=perspective,
         )
         smooth = rts_smooth_v2(filt, layout, dt)
 
@@ -2689,6 +2759,7 @@ def fit_warm_start_sigma_v2(
         for t in range(T):
             pred = state_to_marker_positions(
                 smooth.x_smooth[t], layout,
+                perspective=perspective,
             )
             for k, m in enumerate(layout.marker_names):
                 x_obs = pos[t, k, 0]
@@ -2943,11 +3014,15 @@ class EMResultV2:
     initial_params : NoiseParamsV2
         Initial parameters (data-driven estimate).
     converged : bool
+    perspective : PerspectiveModelV2 or None
+        Fitted perspective correction model, or None if
+        perspective fitting was disabled.
     """
     params: NoiseParamsV2
     history: List[Dict[str, float]]
     initial_params: NoiseParamsV2
     converged: bool
+    perspective: Optional["PerspectiveModelV2"] = None
 
 
 def _max_param_change(
@@ -2987,6 +3062,7 @@ def fit_noise_params_em_v2(
     apply_constraints: bool = True,
     enable_validation: bool = True,
     enable_warm_start_sigma: bool = True,
+    enable_perspective: bool = True,
     verbose: bool = False,
 ) -> EMResultV2:
     """Multi-session EM for v2 noise parameters.
@@ -3087,6 +3163,42 @@ def fit_noise_params_em_v2(
                 f"per-marker: {', '.join(sigma_changes)}"
             )
 
+    # Fit perspective model: a per-marker bilinear scale
+    # function that captures lens distortion / camera-tilt
+    # effects where apparent body width depends on the rat's
+    # location in the arena. Fit ONCE before EM iterations
+    # begin; not refit during EM (would be expensive and
+    # interacts badly with σ EM step).
+    perspective: Optional[PerspectiveModelV2] = None
+    if enable_perspective:
+        if verbose:
+            print(
+                "[v2-em] Fitting perspective model "
+                "(per-marker bilinear scale)..."
+            )
+        perspective = fit_perspective_model_v2(
+            sessions, layout, marker_names, fitted_lengths,
+            initial_params, fps,
+            likelihood_threshold=likelihood_threshold,
+            apply_constraints=apply_constraints,
+        )
+        if verbose:
+            # Report per-marker max |scale - 1| at arena edges
+            max_corrections = []
+            for m, c in perspective.coeffs.items():
+                # Max correction at corner: 1 + a + b + c
+                # Bounds: |a|+|b|+|c| (worst case)
+                max_corr = float(abs(c[0]) + abs(c[1]) + abs(c[2]))
+                if max_corr > 0.01:
+                    max_corrections.append(
+                        f"{m}={max_corr:.2f}"
+                    )
+            print(
+                f"[v2-em] perspective: max |Δscale| at corners "
+                f"per marker (>1% only): "
+                f"{', '.join(max_corrections) if max_corrections else 'all <1%'}"
+            )
+
     params = initial_params
     history: List[Dict[str, float]] = []
     converged = False
@@ -3107,6 +3219,7 @@ def fit_noise_params_em_v2(
                 initial_state=x0,
                 likelihood_threshold=likelihood_threshold,
                 apply_constraints=apply_constraints,
+                perspective=perspective,
             )
             smooth = rts_smooth_v2(filt, layout, dt)
 
@@ -3122,6 +3235,7 @@ def fit_noise_params_em_v2(
             # Accumulate M-step stats
             sess_stats = accumulate_m_step_stats_v2(
                 smooth, pos, likes, layout, likelihood_threshold,
+                perspective=perspective,
             )
             combined_stats += sess_stats
 
@@ -3159,6 +3273,7 @@ def fit_noise_params_em_v2(
     return EMResultV2(
         params=params, history=history,
         initial_params=initial_params, converged=converged,
+        perspective=perspective,
     )
 
 
@@ -3243,6 +3358,7 @@ def state_to_marker_variances(
     x_smooth: np.ndarray,   # (T, D)
     P_smooth: np.ndarray,   # (T, D, D)
     layout: BodyLayout,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> np.ndarray:
     """Compute per-marker per-frame variance from the smoothed
     state covariance.
@@ -3267,7 +3383,9 @@ def state_to_marker_variances(
     variances = np.zeros((T, K, 2))
     for t in range(T):
         fk = forward_kinematics(x_smooth[t], layout)
-        H = state_to_marker_jacobian(x_smooth[t], layout, fk=fk)
+        H = state_to_marker_jacobian(
+            x_smooth[t], layout, fk=fk, perspective=perspective,
+        )
         # H shape: (2K, D)
         # For each marker k, rows 2k and 2k+1 are H_t,m
         for k in range(K):
@@ -3288,6 +3406,7 @@ def smooth_session_v2(
     fps: float,
     likelihood_threshold: float = 0.7,
     apply_constraints: bool = True,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Run forward filter + RTS smoother on one session, return
     smoothed marker positions and variances.
@@ -3304,6 +3423,8 @@ def smooth_session_v2(
     fps : float
     likelihood_threshold : float
     apply_constraints : bool
+    perspective : PerspectiveModelV2, optional
+        Fitted perspective model from EM.
 
     Returns
     -------
@@ -3320,6 +3441,7 @@ def smooth_session_v2(
         initial_state=initial_state,
         likelihood_threshold=likelihood_threshold,
         apply_constraints=apply_constraints,
+        perspective=perspective,
     )
     smooth = rts_smooth_v2(filt, layout, dt)
 
@@ -3330,9 +3452,11 @@ def smooth_session_v2(
     for t in range(T):
         smoothed_positions[t] = state_to_marker_positions(
             smooth.x_smooth[t], layout,
+            perspective=perspective,
         )
     smoothed_variances = state_to_marker_variances(
         smooth.x_smooth, smooth.P_smooth, layout,
+        perspective=perspective,
     )
     return smoothed_positions, smoothed_variances
 
@@ -3344,30 +3468,15 @@ def save_model_v2(
     params: NoiseParamsV2,
     fps: float,
     likelihood_threshold: float,
+    perspective: Optional["PerspectiveModelV2"] = None,
 ) -> None:
     """Serialize a fitted v2 model to .npz.
 
-    Stored fields:
-      version: "v2"
-      layout_segments: list of (name, parent, rest_angle,
-                                marker offsets)
-      fitted_lengths: dict of segment lengths + IQRs
-      marker_offsets: dict of per-marker (length, angle)
-      params_sigma_marker: dict
-      params_q_root_pos: scalar
-      params_q_root_ori: scalar
-      params_q_seg_ori: dict
-      params_q_length: dict
-      params_constraint_sigma: scalar
-      fps: float
-      likelihood_threshold: float
+    Stored fields include layout, fitted_lengths, params,
+    scalars, and (since patch 109) optional perspective
+    correction.
 
     Reload via ``load_model_v2``.
-
-    Note: BodyLayout has nested data structures (BodySegment
-    instances with marker dicts). We serialize as a list of
-    plain tuples for npz compatibility, then reconstruct on
-    load.
     """
     io = _import_io_helpers()
     Path = io["Path"]
@@ -3384,8 +3493,7 @@ def save_model_v2(
             "markers": dict(seg.markers),
         })
 
-    np.savez(
-        path,
+    save_kwargs = dict(
         version="v2",
         layout_segments=np.array(seg_data, dtype=object),
         fitted_segment_lengths=np.array(
@@ -3414,12 +3522,27 @@ def save_model_v2(
         params_constraint_sigma=params.constraint_sigma,
         fps=fps,
         likelihood_threshold=likelihood_threshold,
+        has_perspective=(perspective is not None),
     )
+
+    if perspective is not None:
+        save_kwargs["persp_coeffs"] = np.array(
+            list(perspective.coeffs.items()), dtype=object,
+        )
+        save_kwargs["persp_arena_x_mean"] = perspective.arena_x_mean
+        save_kwargs["persp_arena_x_range"] = perspective.arena_x_range
+        save_kwargs["persp_arena_y_mean"] = perspective.arena_y_mean
+        save_kwargs["persp_arena_y_range"] = perspective.arena_y_range
+
+    np.savez(path, **save_kwargs)
 
 
 def load_model_v2(
     path,
-) -> Tuple[BodyLayout, FittedLengths, NoiseParamsV2, float, float]:
+) -> Tuple[
+    BodyLayout, FittedLengths, NoiseParamsV2, float, float,
+    Optional["PerspectiveModelV2"],
+]:
     """Load a v2 model from .npz.
 
     Returns
@@ -3429,6 +3552,9 @@ def load_model_v2(
     params : NoiseParamsV2
     fps : float
     likelihood_threshold : float
+    perspective : PerspectiveModelV2 or None
+        Returned None if the saved model didn't include a
+        perspective correction (pre-patch-109 models).
     """
     io = _import_io_helpers()
     Path = io["Path"]
@@ -3489,7 +3615,30 @@ def load_model_v2(
     fps = float(data["fps"])
     likelihood_threshold = float(data["likelihood_threshold"])
 
-    return layout, fitted_lengths, params, fps, likelihood_threshold
+    # Perspective model (optional, only present in patch-109+
+    # saved models)
+    perspective: Optional["PerspectiveModelV2"] = None
+    has_perspective = (
+        "has_perspective" in data.files
+        and bool(data["has_perspective"])
+    )
+    if has_perspective:
+        coeffs_data = data["persp_coeffs"]
+        coeffs = {
+            k: np.asarray(v, dtype=float) for k, v in coeffs_data
+        }
+        perspective = PerspectiveModelV2(
+            coeffs=coeffs,
+            arena_x_mean=float(data["persp_arena_x_mean"]),
+            arena_x_range=float(data["persp_arena_x_range"]),
+            arena_y_mean=float(data["persp_arena_y_mean"]),
+            arena_y_range=float(data["persp_arena_y_range"]),
+        )
+
+    return (
+        layout, fitted_lengths, params, fps,
+        likelihood_threshold, perspective,
+    )
 
 
 def smooth_pose_v2(
@@ -3505,6 +3654,7 @@ def smooth_pose_v2(
     apply_constraints: bool = True,
     enable_validation: bool = True,
     enable_warm_start_sigma: bool = True,
+    enable_perspective: bool = True,
     verbose: bool = False,
 ) -> Dict:
     """Top-level user-facing function for v2 pose smoothing.
@@ -3748,7 +3898,9 @@ def smooth_pose_v2(
     if load_model is not None:
         if verbose:
             print(f"[smoother-v2] Loading model from {load_model}")
-        layout, fitted_lengths, params, _, _ = load_model_v2(load_model)
+        (
+            layout, fitted_lengths, params, _, _, perspective
+        ) = load_model_v2(load_model)
         em_history: List[Dict] = []
         converged = True
     else:
@@ -3779,11 +3931,13 @@ def smooth_pose_v2(
             apply_constraints=apply_constraints,
             enable_validation=enable_validation,
             enable_warm_start_sigma=enable_warm_start_sigma,
+            enable_perspective=enable_perspective,
             verbose=verbose,
         )
         params = em_result.params
         em_history = em_result.history
         converged = em_result.converged
+        perspective = em_result.perspective
 
         if verbose:
             print(
@@ -3799,6 +3953,7 @@ def smooth_pose_v2(
         save_model_v2(
             save_model, layout, fitted_lengths, params,
             fps, likelihood_threshold,
+            perspective=perspective,
         )
 
     # ---------- Final smoother pass per session ----------
@@ -3819,6 +3974,7 @@ def smooth_pose_v2(
             fitted_lengths, params, fps,
             likelihood_threshold=likelihood_threshold,
             apply_constraints=apply_constraints,
+            perspective=perspective,
         )
 
         # Build output DataFrame in DATA marker order (so it
@@ -3978,6 +4134,17 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--no-perspective", action="store_true",
+        help=(
+            "Disable per-marker bilinear perspective "
+            "correction. By default, an extra fit pass after "
+            "warm-start σ measures position-dependent scale "
+            "factors (camera lens distortion, slight tilt) "
+            "and applies them in the observation function. "
+            "Disable to use rigid-offset prediction only."
+        ),
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Verbose logging",
     )
@@ -4004,6 +4171,7 @@ def main(argv=None) -> int:
             apply_constraints=not args.no_constraints,
             enable_validation=not args.no_validate,
             enable_warm_start_sigma=not args.no_warm_start_sigma,
+            enable_perspective=not args.no_perspective,
             verbose=args.verbose,
         )
     except Exception as e:
@@ -4013,6 +4181,338 @@ def main(argv=None) -> int:
         )
         return 1
     return 0
+
+
+# ============================================================
+# Perspective model — patch 109
+# ============================================================
+#
+# Captures the position-dependent scaling of marker offsets
+# caused by camera lens distortion, slight camera tilt, or
+# non-perpendicular projection. Without this, the rigid-offset
+# observation model has systematic residuals of 5-30 px for
+# markers at the rat's widest body points (lateral_left,
+# lateral_right) when the rat moves toward the arena edges.
+#
+# Model: per-marker bilinear scale function
+#
+#   scale_m(x, y) = 1 + a_m * x_n + b_m * y_n + c_m * x_n * y_n
+#
+# where (x_n, y_n) are the rat's root position normalized to
+# the arena range (roughly [-1, 1]). At the arena center
+# scale = 1 (rigid model is correct); at the edges scale
+# can vary by ±0.3 or so. Scale is applied in the body frame:
+#
+#   v_marker_local_corrected = scale_m * (l_off * cos(a_off),
+#                                          l_off * sin(a_off))
+#
+# This is then transformed by R_world[seg] and added to
+# P_distal[seg] as before.
+#
+# Markers AT the segment distal end have l_off=0 so they're
+# unaffected (scale times zero is zero). Markers far from
+# the segment center get more correction.
+#
+# Parameters fit from warm-start smoother residuals via
+# closed-form OLS per marker. 3 params per marker.
+
+
+@dataclass
+class PerspectiveModelV2:
+    """Per-marker bilinear perspective correction.
+
+    Fields
+    ------
+    coeffs : Dict[str, np.ndarray]
+        Per-marker (a, b, c) coefficients for
+        scale_m(x, y) = 1 + a x_n + b y_n + c x_n y_n.
+    arena_x_mean, arena_x_range : float
+        Used to normalize: x_n = (root_x - arena_x_mean) /
+        (arena_x_range / 2). At arena center, x_n = 0.
+    arena_y_mean, arena_y_range : float
+    """
+    coeffs: Dict[str, np.ndarray]
+    arena_x_mean: float
+    arena_x_range: float
+    arena_y_mean: float
+    arena_y_range: float
+
+    @classmethod
+    def identity(cls, layout: BodyLayout) -> "PerspectiveModelV2":
+        """Identity perspective model (scale = 1 everywhere).
+        Useful for testing / when perspective fitting is
+        disabled.
+        """
+        return cls(
+            coeffs={
+                m: np.zeros(3) for m in layout.marker_names
+            },
+            arena_x_mean=0.0, arena_x_range=2.0,
+            arena_y_mean=0.0, arena_y_range=2.0,
+        )
+
+    def _normalize(self, x: float, y: float) -> Tuple[float, float]:
+        """Convert root_x, root_y to arena-normalized x_n, y_n
+        in roughly [-1, 1].
+        """
+        x_n = (x - self.arena_x_mean) / max(
+            self.arena_x_range / 2.0, 1.0,
+        )
+        y_n = (y - self.arena_y_mean) / max(
+            self.arena_y_range / 2.0, 1.0,
+        )
+        return x_n, y_n
+
+    def scale_for_position(
+        self, root_x: float, root_y: float,
+    ) -> np.ndarray:
+        """Compute scale factor per marker at the given root
+        position. Returns (n_markers,) array in the same
+        order as the layout's marker_names attribute (use
+        the layout that was used during fitting).
+
+        Note: relies on ordering of self.coeffs being the
+        same as layout.marker_names. coeffs is built via dict
+        comprehension preserving insertion order, and we use
+        layout.marker_names to insert.
+        """
+        x_n, y_n = self._normalize(root_x, root_y)
+        scales = np.empty(len(self.coeffs))
+        for i, m in enumerate(self.coeffs.keys()):
+            a, b, c = self.coeffs[m]
+            scales[i] = 1.0 + a * x_n + b * y_n + c * x_n * y_n
+        return scales
+
+    def scale_partials(
+        self, root_x: float, root_y: float,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """∂scale/∂root_x and ∂scale/∂root_y per marker.
+        Used in the observation Jacobian.
+
+        scale_m = 1 + a x_n + b y_n + c x_n y_n
+        ∂scale/∂x = (a + c y_n) / (arena_x_range / 2)
+        ∂scale/∂y = (b + c x_n) / (arena_y_range / 2)
+        """
+        x_n, y_n = self._normalize(root_x, root_y)
+        x_factor = 1.0 / max(self.arena_x_range / 2.0, 1.0)
+        y_factor = 1.0 / max(self.arena_y_range / 2.0, 1.0)
+        d_x = np.empty(len(self.coeffs))
+        d_y = np.empty(len(self.coeffs))
+        for i, m in enumerate(self.coeffs.keys()):
+            a, b, c = self.coeffs[m]
+            d_x[i] = (a + c * y_n) * x_factor
+            d_y[i] = (b + c * x_n) * y_factor
+        return d_x, d_y
+
+
+def fit_perspective_model_v2(
+    sessions: List[Tuple[np.ndarray, np.ndarray]],
+    layout: BodyLayout,
+    marker_names: List[str],
+    fitted_lengths: FittedLengths,
+    params: NoiseParamsV2,
+    fps: float,
+    likelihood_threshold: float = 0.5,
+    apply_constraints: bool = True,
+    min_offset_magnitude: float = 1.0,
+    max_abs_coeff: float = 0.4,
+) -> PerspectiveModelV2:
+    """Fit a per-marker bilinear perspective correction.
+
+    Workflow:
+      1. Run a filter+smoother pass with current params (no
+         perspective) on each session.
+      2. For each frame, transform raw marker observations
+         into the body frame using the smoothed body pose.
+         Compute the ratio of observed-offset-magnitude to
+         predicted-offset-magnitude per marker — this is the
+         "scale" the rat needs at that frame for the rigid
+         model to match.
+      3. Bin scales by (root_x, root_y), fit
+         scale_m(x_n, y_n) = 1 + a x_n + b y_n + c x_n y_n
+         via OLS per marker.
+      4. Clip coefficients to [-max_abs_coeff, max_abs_coeff]
+         to prevent extreme corrections.
+
+    Parameters
+    ----------
+    sessions : list of (positions, likelihoods)
+    layout : BodyLayout
+    marker_names : list[str]
+    fitted_lengths : FittedLengths
+    params : NoiseParamsV2
+    fps : float
+    likelihood_threshold : float
+    apply_constraints : bool
+    min_offset_magnitude : float
+        Markers with predicted offset magnitude below this
+        (in body frame, px) are skipped — their scale is
+        ill-defined. Distal markers like back2 (which IS
+        the segment endpoint) have zero offset and get
+        identity coefficients.
+    max_abs_coeff : float
+        Hard cap on |a|, |b|, |c|. Default 0.4 means scale
+        can range from 0.6 to 1.4 across the arena. Prevents
+        runaway when fits are unreliable.
+
+    Returns
+    -------
+    PerspectiveModelV2
+    """
+    dt = 1.0 / fps
+
+    # First pass: collect arena bounds from root positions
+    # (back2 marker, the root segment's distal point) over
+    # all sessions.
+    name_to_idx = {n: i for i, n in enumerate(marker_names)}
+    root_distal = _segment_distal_marker(layout, layout.root_segment.name)
+    if root_distal is None or root_distal not in name_to_idx:
+        # Can't fit perspective without root marker; return identity
+        return PerspectiveModelV2.identity(layout)
+
+    root_idx = name_to_idx[root_distal]
+    all_root_x: List[float] = []
+    all_root_y: List[float] = []
+    for pos, likes in sessions:
+        m_x = pos[:, root_idx, 0]
+        m_y = pos[:, root_idx, 1]
+        m_p = likes[:, root_idx]
+        mask = (
+            (m_p >= likelihood_threshold)
+            & np.isfinite(m_x) & np.isfinite(m_y)
+        )
+        all_root_x.extend(m_x[mask].tolist())
+        all_root_y.extend(m_y[mask].tolist())
+    if len(all_root_x) < 100:
+        # Not enough data to fit perspective
+        return PerspectiveModelV2.identity(layout)
+
+    arena_x_mean = float(np.mean(all_root_x))
+    arena_y_mean = float(np.mean(all_root_y))
+    # Use 95th percentile spread to avoid outlier sensitivity
+    x_lo, x_hi = float(np.percentile(all_root_x, 2.5)), float(np.percentile(all_root_x, 97.5))
+    y_lo, y_hi = float(np.percentile(all_root_y, 2.5)), float(np.percentile(all_root_y, 97.5))
+    arena_x_range = max(x_hi - x_lo, 10.0)
+    arena_y_range = max(y_hi - y_lo, 10.0)
+
+    # Per-marker accumulators for OLS fit
+    # scale_m(x, y) - 1 = a*x_n + b*y_n + c*x_n*y_n
+    # → for each marker, accumulate design matrix X^T X and X^T y
+    # and solve at the end.
+    XtX_per_marker: Dict[str, np.ndarray] = {
+        m: np.zeros((3, 3)) for m in layout.marker_names
+    }
+    Xty_per_marker: Dict[str, np.ndarray] = {
+        m: np.zeros(3) for m in layout.marker_names
+    }
+    n_obs_per_marker: Dict[str, int] = {
+        m: 0 for m in layout.marker_names
+    }
+
+    # Pre-compute layout marker → data marker mapping
+    layout_to_data: Dict[str, int] = {}
+    for m in layout.marker_names:
+        if m in name_to_idx:
+            layout_to_data[m] = name_to_idx[m]
+
+    for pos, likes in sessions:
+        # Run smoother
+        x0 = initial_state_from_data(
+            pos, likes, layout, marker_names,
+            fitted_lengths, likelihood_threshold,
+        )
+        filt = forward_filter_v2(
+            pos, likes, layout, params, dt,
+            initial_state=x0,
+            likelihood_threshold=likelihood_threshold,
+            apply_constraints=apply_constraints,
+        )
+        smooth = rts_smooth_v2(filt, layout, dt)
+        T = smooth.x_smooth.shape[0]
+        idx_pack = _pack_state_layout_indices(layout)
+
+        for t in range(T):
+            state_t = smooth.x_smooth[t]
+            if not np.all(np.isfinite(state_t)):
+                continue
+            # Body pose at frame t
+            fk = forward_kinematics(state_t, layout)
+            root_x = state_t[idx_pack["__root__"]["x"]]
+            root_y = state_t[idx_pack["__root__"]["y"]]
+            x_n = (root_x - arena_x_mean) / max(arena_x_range / 2.0, 1.0)
+            y_n = (root_y - arena_y_mean) / max(arena_y_range / 2.0, 1.0)
+
+            for m, k_data in layout_to_data.items():
+                seg_name, (l_off, a_off) = layout.marker_attachment(m)
+                if l_off < min_offset_magnitude:
+                    # Distal marker — no offset to scale
+                    continue
+
+                # Predicted offset in body frame (segment frame)
+                offset_pred_local = np.array([
+                    l_off * np.cos(a_off),
+                    l_off * np.sin(a_off),
+                ])
+
+                # Observed offset in body frame: take raw obs,
+                # subtract distal point, rotate into segment
+                # frame.
+                x_obs = pos[t, k_data, 0]
+                y_obs = pos[t, k_data, 1]
+                p = likes[t, k_data]
+                if (
+                    not (np.isfinite(x_obs) and np.isfinite(y_obs))
+                    or p < likelihood_threshold
+                ):
+                    continue
+                P_distal = fk.P_distal[seg_name]
+                R_seg = fk.R_world[seg_name]
+                obs_world = np.array([x_obs, y_obs])
+                obs_local = R_seg.T @ (obs_world - P_distal)
+
+                # Scale = projection of observed offset onto
+                # predicted offset direction divided by
+                # predicted offset magnitude
+                pred_norm_sq = float(offset_pred_local @ offset_pred_local)
+                if pred_norm_sq < 1e-9:
+                    continue
+                scale_t = float(
+                    offset_pred_local @ obs_local
+                ) / pred_norm_sq
+
+                # OLS: y = scale_t - 1, x = [x_n, y_n, x_n*y_n]
+                y_obs_ols = scale_t - 1.0
+                x_design = np.array([x_n, y_n, x_n * y_n])
+                XtX_per_marker[m] += np.outer(x_design, x_design)
+                Xty_per_marker[m] += y_obs_ols * x_design
+                n_obs_per_marker[m] += 1
+
+    # Solve OLS per marker
+    coeffs: Dict[str, np.ndarray] = {}
+    for m in layout.marker_names:
+        if n_obs_per_marker[m] < 50:
+            # Insufficient observations
+            coeffs[m] = np.zeros(3)
+            continue
+        XtX = XtX_per_marker[m]
+        Xty = Xty_per_marker[m]
+        # Add small regularization for numerical stability
+        XtX_reg = XtX + 1e-3 * np.eye(3)
+        try:
+            coeff = np.linalg.solve(XtX_reg, Xty)
+        except np.linalg.LinAlgError:
+            coeff = np.zeros(3)
+        # Clip
+        coeff = np.clip(coeff, -max_abs_coeff, max_abs_coeff)
+        coeffs[m] = coeff
+
+    return PerspectiveModelV2(
+        coeffs=coeffs,
+        arena_x_mean=arena_x_mean,
+        arena_x_range=arena_x_range,
+        arena_y_mean=arena_y_mean,
+        arena_y_range=arena_y_range,
+    )
 
 
 if __name__ == "__main__":
