@@ -842,7 +842,202 @@ def main() -> int:
         f"= {max_norm_err:.4f}"
     )
 
-    print("smoke_kalman_pose_smoother_v2: 26/26 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 102: RTS backward smoother.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        rts_smooth_v2, SmoothResultV2,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 27: smoother shapes correct, last frame matches
+    # filter, smoothed covariance never increases over filter.
+    # ---------------------------------------------------------- #
+    # Reuse filter result from case 23 setup
+    layout = standard_rat_layout()
+    indices = _pack_state_layout_indices(layout)
+    rng = np.random.default_rng(2027)
+    fps = 30.0
+    dt = 1.0 / fps
+    T = 200
+    n_m = layout.n_markers
+    marker_names_layout = layout.marker_names
+
+    # Same true-trajectory + observations setup as case 23
+    true_state_template = np.zeros(layout.state_dim)
+    true_state_template[indices["__root__"]["x"]] = 100.0
+    true_state_template[indices["__root__"]["y"]] = 200.0
+    true_state_template[indices["__root__"]["vx"]] = 1.0
+    true_state_template[indices["__root__"]["cos"]] = 1.0
+    for seg_name in layout.non_root_topo_order:
+        true_state_template[indices[seg_name]["cos"]] = 1.0
+        true_state_template[indices[seg_name]["length"]] = 5.0
+
+    F = build_F_v2(layout, dt)
+    sigma_obs = 1.0
+    true_states = np.zeros((T, layout.state_dim))
+    true_states[0] = true_state_template
+    for t in range(1, T):
+        true_states[t] = F @ true_states[t-1]
+
+    positions_obs = np.zeros((T, n_m, 2))
+    likelihoods_obs = np.full((T, n_m), 0.95)
+    for t in range(T):
+        clean = state_to_marker_positions(true_states[t], layout)
+        positions_obs[t] = clean + rng.normal(0, sigma_obs, (n_m, 2))
+
+    params = NoiseParamsV2.default(
+        layout, sigma_marker=sigma_obs, q_root_pos=10.0,
+    )
+    initial_state = true_states[0].copy() + rng.normal(0, 0.5, layout.state_dim) * 0.1
+
+    filt_result = forward_filter_v2(
+        positions_obs, likelihoods_obs, layout, params, dt,
+        initial_state=initial_state,
+        likelihood_threshold=0.5,
+    )
+    smooth_result = rts_smooth_v2(filt_result, layout, dt)
+
+    assert smooth_result.x_smooth.shape == (T, layout.state_dim)
+    assert smooth_result.P_smooth.shape == (T, layout.state_dim, layout.state_dim)
+    assert smooth_result.P_lag_one.shape == (T - 1, layout.state_dim, layout.state_dim)
+
+    # Last-frame check: smoothed[T-1] == filtered[T-1]
+    assert np.allclose(
+        smooth_result.x_smooth[T - 1], filt_result.x_filt[T - 1],
+    )
+    assert np.allclose(
+        smooth_result.P_smooth[T - 1], filt_result.P_filt[T - 1],
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 28: smoothed covariance has trace ≤ filtered covariance
+    # at every frame except the last (smoothing reduces
+    # uncertainty by incorporating future observations).
+    # ---------------------------------------------------------- #
+    n_reduced = 0
+    for t in range(T - 1):
+        tr_filt = np.trace(filt_result.P_filt[t])
+        tr_smooth = np.trace(smooth_result.P_smooth[t])
+        # Allow tiny fp slack
+        assert tr_smooth <= tr_filt + 1e-6, (
+            f"Frame {t}: smoothed trace {tr_smooth:.3f} > "
+            f"filtered trace {tr_filt:.3f}"
+        )
+        if tr_smooth < tr_filt - 1e-6:
+            n_reduced += 1
+    # Most frames should have strict reduction (the early
+    # frames especially, where future obs add lots of info)
+    assert n_reduced >= T // 2, (
+        f"Smoother only strictly reduced uncertainty at "
+        f"{n_reduced}/{T-1} frames; expected ≥ {T // 2}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 29: P_smooth is symmetric + PSD at every frame.
+    # ---------------------------------------------------------- #
+    for t in range(T):
+        P = smooth_result.P_smooth[t]
+        sym_err = np.max(np.abs(P - P.T))
+        assert sym_err < 1e-8, (
+            f"P_smooth[{t}] not symmetric: max asymmetry "
+            f"{sym_err:.6e}"
+        )
+        eigs = np.linalg.eigvalsh(P)
+        min_eig = float(eigs.min())
+        assert min_eig > -1e-6, (
+            f"P_smooth[{t}] not PSD: min eigenvalue {min_eig:.6e}"
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 30: smoothed marker error is at least as good as
+    # filtered marker error on average. Smoother should not
+    # make tracking WORSE.
+    # ---------------------------------------------------------- #
+    avg_filt_err = 0.0
+    avg_smooth_err = 0.0
+    for t in range(T):
+        true_pos = state_to_marker_positions(true_states[t], layout)
+        filt_pos = state_to_marker_positions(filt_result.x_filt[t], layout)
+        smooth_pos = state_to_marker_positions(smooth_result.x_smooth[t], layout)
+        avg_filt_err += np.mean(np.linalg.norm(filt_pos - true_pos, axis=1))
+        avg_smooth_err += np.mean(np.linalg.norm(smooth_pos - true_pos, axis=1))
+    avg_filt_err /= T
+    avg_smooth_err /= T
+    assert avg_smooth_err <= avg_filt_err + 0.1, (
+        f"Smoothed error {avg_smooth_err:.3f} > filtered error "
+        f"{avg_filt_err:.3f} — smoother made things worse"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 31: smoother dramatically helps during dropouts.
+    # Drop nose for frames 80-119 and verify the smoothed nose
+    # position during dropout is significantly closer to truth
+    # than the filtered nose position.
+    # ---------------------------------------------------------- #
+    positions_drop = positions_obs.copy()
+    nose_idx = marker_names_layout.index("nose")
+    positions_drop[80:120, nose_idx, :] = np.nan
+
+    filt_drop = forward_filter_v2(
+        positions_drop, likelihoods_obs, layout, params, dt,
+        initial_state=initial_state, likelihood_threshold=0.5,
+    )
+    smooth_drop = rts_smooth_v2(filt_drop, layout, dt)
+
+    # Compute nose position error during dropout (frames 80-119)
+    filt_nose_err = 0.0
+    smooth_nose_err = 0.0
+    for t in range(80, 120):
+        true_pos = state_to_marker_positions(true_states[t], layout)
+        filt_pos = state_to_marker_positions(filt_drop.x_filt[t], layout)
+        smooth_pos = state_to_marker_positions(smooth_drop.x_smooth[t], layout)
+        filt_nose_err += np.linalg.norm(filt_pos[nose_idx] - true_pos[nose_idx])
+        smooth_nose_err += np.linalg.norm(smooth_pos[nose_idx] - true_pos[nose_idx])
+    filt_nose_err /= 40
+    smooth_nose_err /= 40
+
+    # Both should be reasonable (kinematic chain provides
+    # recovery), but smoother ≤ filter.
+    assert smooth_nose_err <= filt_nose_err + 0.1, (
+        f"Smoothed nose error during dropout {smooth_nose_err:.3f} "
+        f"> filtered {filt_nose_err:.3f}"
+    )
+    # Both errors should be small thanks to spatial coupling
+    assert smooth_nose_err < 3.0, (
+        f"Smoothed nose error during dropout is too large: "
+        f"{smooth_nose_err:.3f}px"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 32: lag-one cross-covariance is consistent with
+    # state covariance scales (basic sanity, not a strict
+    # mathematical identity).
+    # ---------------------------------------------------------- #
+    # P_{t, t+1 | T} should be such that the joint covariance
+    # of (x_t, x_{t+1}) is PSD:
+    #   [P_t       P_{t,t+1}]
+    #   [P_{t,t+1}^T  P_{t+1}]
+    # Test on a few sampled frames.
+    for t in [10, 50, 100, T - 2]:
+        P_t = smooth_result.P_smooth[t]
+        P_tp1 = smooth_result.P_smooth[t + 1]
+        P_lag = smooth_result.P_lag_one[t]
+        joint = np.block([
+            [P_t, P_lag],
+            [P_lag.T, P_tp1],
+        ])
+        # Symmetrize
+        joint = 0.5 * (joint + joint.T)
+        eigs = np.linalg.eigvalsh(joint)
+        min_eig = float(eigs.min())
+        # Allow some slack — the joint may not be exactly PSD
+        # under fp, but should be very close.
+        assert min_eig > -1e-3, (
+            f"Joint cov at t={t} not PSD: min eigenvalue {min_eig:.6e}"
+        )
+
+    print("smoke_kalman_pose_smoother_v2: 32/32 cases passed")
     return 0
 
 
