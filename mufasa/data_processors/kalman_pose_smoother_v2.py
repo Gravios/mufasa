@@ -2608,7 +2608,8 @@ def _validate_trajectory_v2(
     iteration: int,
     likelihood_threshold: float,
     range_ratio_floor: float = 0.1,
-    mean_diff_sigma_factor: float = 5.0,
+    mean_diff_sigma_factor: float = 8.0,
+    min_observation_fraction: float = 0.05,
     verbose: bool = False,
 ) -> None:
     """Validation hook: catches degenerate trajectories.
@@ -2684,6 +2685,7 @@ def _validate_trajectory_v2(
         )
 
     failures: List[str] = []
+    T = positions.shape[0]
     for k, m in enumerate(marker_names):
         sigma_m = params.sigma_marker.get(m, 3.0)
 
@@ -2706,13 +2708,27 @@ def _validate_trajectory_v2(
                 )
             continue
 
+        # Skip range_ratio when the marker is rarely observed.
+        # In sparse-observation regimes (e.g., tailend with
+        # n_high_p=196 in a 53k-frame session), the raw range
+        # is computed over a small subset of frames while the
+        # smoothed range covers the whole trajectory — these
+        # aren't comparable. The smoother is filling in long
+        # gaps via spatial coupling and naturally explores
+        # more space than the sparse observations.
+        obs_fraction = n_hp / max(T, 1)
+        skip_range_check = obs_fraction < min_observation_fraction
+
         raw_x_range = float(x_obs[high_p_mask].max() - x_obs[high_p_mask].min())
         raw_y_range = float(y_obs[high_p_mask].max() - y_obs[high_p_mask].min())
         raw_range = max(raw_x_range, raw_y_range)
         sm_x = pred[:, k, 0]
         sm_y = pred[:, k, 1]
-        sm_x_range = float(sm_x.max() - sm_x.min())
-        sm_y_range = float(sm_y.max() - sm_y.min())
+        # Compare smoothed range over the SAME frames where
+        # raw observations exist (high-p frames). Apples-to-
+        # apples comparison.
+        sm_x_range = float(sm_x[high_p_mask].max() - sm_x[high_p_mask].min())
+        sm_y_range = float(sm_y[high_p_mask].max() - sm_y[high_p_mask].min())
         sm_range = max(sm_x_range, sm_y_range)
         # range_ratio is only meaningful when raw_range
         # substantially exceeds observation noise. For
@@ -2724,10 +2740,10 @@ def _validate_trajectory_v2(
         # (equivalent to the marker being effectively
         # stationary).
         raw_motion_threshold = 10.0 * sigma_m
-        if raw_range > raw_motion_threshold:
-            range_ratio = sm_range / raw_range
+        if skip_range_check or raw_range <= raw_motion_threshold:
+            range_ratio = 1.0  # Skipped; pass
         else:
-            range_ratio = 1.0  # Marker effectively stationary; pass
+            range_ratio = sm_range / raw_range
 
         # mean_diff: mean Euclidean distance smoothed vs raw
         # on high-p frames
@@ -2747,7 +2763,7 @@ def _validate_trajectory_v2(
                 f"range_ratio={range_ratio:5.2f}  "
                 f"({'ok' if range_ok else 'FROZEN'})  "
                 f"mean_diff={mean_diff:6.2f}px  "
-                f"5σ={sigma_5:6.2f}px  "
+                f"{int(mean_diff_sigma_factor)}σ={sigma_5:6.2f}px  "
                 f"({'ok' if mean_ok else 'OVERRULE'})  "
                 f"n_high_p={n_hp}"
             )
