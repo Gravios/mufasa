@@ -5338,6 +5338,12 @@ def save_model_v2(
     io = _import_io_helpers()
     Path = io["Path"]
     path = Path(path)
+    # Ensure the parent directory exists. Patch 118: previously,
+    # save_model_v2 would fail with FileNotFoundError if the
+    # user passed --save-model /path/that/doesnt/exist/foo.npz.
+    # The orchestrator only mkdir'd output_dir for the smoothed
+    # CSVs, not for save_model.
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     # Serialize layout — npz can't store dataclasses directly,
     # so flatten to plain types.

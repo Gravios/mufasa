@@ -3627,7 +3627,53 @@ def main() -> int:
         "With no valid sessions, returns prev_params unchanged"
     )
 
-    print("smoke_kalman_pose_smoother_v2: 93/93 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 118: save_model_v2 creates parent directory.
+    # ---------------------------------------------------------- #
+
+    # ---------------------------------------------------------- #
+    # Case 94: save_model_v2 to a path whose parent directory
+    # doesn't exist yet — should create it instead of raising.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        save_model_v2 as _save_94, load_model_v2 as _load_94,
+    )
+    test_layout_94 = standard_rat_layout()
+    fitted_lengths_94 = FittedLengths(
+        segment_lengths={
+            s: 5.0 for s in test_layout_94.non_root_topo_order
+        },
+        segment_length_iqr={
+            s: 0.5 for s in test_layout_94.non_root_topo_order
+        },
+        marker_offsets={
+            m: (1.0, 0.0) for m in test_layout_94.marker_names
+        },
+    )
+    params_94 = NoiseParamsV2.default(
+        test_layout_94, sigma_marker=2.0,
+    )
+
+    with _tempfile.TemporaryDirectory() as tmpdir:
+        # Path with two levels of nonexistent parents
+        save_path = Path(tmpdir) / "nonexistent" / "deeper" / "model.npz"
+        assert not save_path.parent.exists(), (
+            "Test setup invariant: parent should not exist"
+        )
+        # Should succeed, not raise FileNotFoundError
+        _save_94(
+            save_path, test_layout_94, fitted_lengths_94,
+            params_94, fps=30.0, likelihood_threshold=0.7,
+        )
+        assert save_path.exists(), (
+            f"save_model_v2 should have created the file at "
+            f"{save_path}"
+        )
+        # Round-trip works
+        loaded = _load_94(save_path)
+        assert loaded[0].n_markers == test_layout_94.n_markers
+
+    print("smoke_kalman_pose_smoother_v2: 94/94 cases passed")
     return 0
 
 
