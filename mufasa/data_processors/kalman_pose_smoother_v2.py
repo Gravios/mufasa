@@ -2666,6 +2666,24 @@ _M_STEP_SIGMA_CEILING_FACTOR = 3.0
 # the global floor, we use the global floor.
 _M_STEP_Q_FLOOR_FACTOR = 0.1
 
+# Per-axis q ceiling factor: q ≤ ceiling_factor × q_initial.
+# Prevents M-step runaway when smoothed transitions contain
+# outlier jumps (e.g. from EKF NaN-recovery). Without this,
+# a single iteration with bad smoothing can produce
+# astronomical q estimates that destabilize subsequent
+# iterations. Empirically chosen — patch 116 was triggered
+# by q_root_pos jumping 80× in one iteration. With this
+# ceiling, the worst case is a 30× single-step jump,
+# bounded.
+_M_STEP_Q_CEILING_FACTOR = 30.0
+
+# Damping factor for M-step parameter updates. New params =
+# alpha × prev + (1 - alpha) × M-step estimate. Set to 0.0
+# for full M-step (default, fastest convergence). Set higher
+# (e.g. 0.5) for trust-region style damping that prevents
+# big jumps.
+_M_STEP_DAMPING_FACTOR = 0.0
+
 
 @dataclass
 class _MStepStatsV2:
@@ -2837,6 +2855,7 @@ def finalize_m_step_v2(
     dt: float,
     prev_params: NoiseParamsV2,
     initial_params: Optional[NoiseParamsV2] = None,
+    damping: Optional[float] = None,
 ) -> NoiseParamsV2:
     """Convert accumulated sufficient statistics into refined
     NoiseParamsV2.
@@ -2893,6 +2912,27 @@ def finalize_m_step_v2(
         return float(block[1, 1] / dt2)
 
     # ---------- Q components ----------
+    # Patch 116: each q parameter is bounded above and below
+    # relative to its initial value. The M-step's raw estimate
+    # comes from Q_hat block diagonals; we then floor and
+    # ceiling against initial × factor.
+
+    # Helper for damping: blend prev_params with M-step estimate
+    # to reduce per-iteration step size when damping is non-zero.
+    # Uses the function-level damping arg if provided, else the
+    # module-level default _M_STEP_DAMPING_FACTOR.
+    damping_factor = (
+        damping if damping is not None else _M_STEP_DAMPING_FACTOR
+    )
+    damping_factor = max(0.0, min(0.95, float(damping_factor)))
+
+    def _damp(prev_value: float, m_step_value: float) -> float:
+        if damping_factor <= 0.0:
+            return m_step_value
+        return (
+            damping_factor * prev_value
+            + (1.0 - damping_factor) * m_step_value
+        )
 
     # Root translation: indices 0:4 (x, y, vx, vy)
     q_root_pos_raw = _q_from_4block(Q_hat[0:4, 0:4])
@@ -2900,7 +2940,13 @@ def finalize_m_step_v2(
         _FLOOR_Q_ROOT_POS,
         initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
     )
-    q_root_pos = max(q_root_pos_raw, q_root_pos_floor)
+    q_root_pos_ceiling = (
+        initial_params.q_root_pos * _M_STEP_Q_CEILING_FACTOR
+    )
+    q_root_pos_clipped = max(
+        q_root_pos_floor, min(q_root_pos_ceiling, q_root_pos_raw)
+    )
+    q_root_pos = _damp(prev_params.q_root_pos, q_root_pos_clipped)
 
     # Root orientation: indices 4:8
     q_root_ori_raw = _q_from_4block(Q_hat[4:8, 4:8])
@@ -2908,7 +2954,13 @@ def finalize_m_step_v2(
         _FLOOR_Q_ROOT_ORI,
         initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
     )
-    q_root_ori = max(q_root_ori_raw, q_root_ori_floor)
+    q_root_ori_ceiling = (
+        initial_params.q_root_ori * _M_STEP_Q_CEILING_FACTOR
+    )
+    q_root_ori_clipped = max(
+        q_root_ori_floor, min(q_root_ori_ceiling, q_root_ori_raw)
+    )
+    q_root_ori = _damp(prev_params.q_root_ori, q_root_ori_clipped)
 
     # Per-segment orientation
     q_seg_ori: Dict[str, float] = {}
@@ -2922,7 +2974,10 @@ def finalize_m_step_v2(
         q_floor = max(
             _FLOOR_Q_SEG_ORI, q_initial * _M_STEP_Q_FLOOR_FACTOR,
         )
-        q_seg_ori[seg_name] = max(q_raw, q_floor)
+        q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR
+        q_clipped = max(q_floor, min(q_ceiling, q_raw))
+        q_prev = prev_params.q_seg_ori.get(seg_name, q_initial)
+        q_seg_ori[seg_name] = _damp(q_prev, q_clipped)
 
     # Per-segment length
     q_length: Dict[str, float] = {}
@@ -2936,7 +2991,10 @@ def finalize_m_step_v2(
         q_floor = max(
             _FLOOR_Q_LENGTH, q_initial * _M_STEP_Q_FLOOR_FACTOR,
         )
-        q_length[seg_name] = max(q_raw, q_floor)
+        q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR
+        q_clipped = max(q_floor, min(q_ceiling, q_raw))
+        q_prev = prev_params.q_length.get(seg_name, q_initial)
+        q_length[seg_name] = _damp(q_prev, q_clipped)
 
     # ---------- σ components ----------
 
@@ -4152,6 +4210,7 @@ def fit_noise_params_em_v2(
     session_names: Optional[List[str]] = None,
     device: str = "cpu",
     pool: Optional[object] = None,
+    damping: float = 0.0,
 ) -> EMResultV2:
     """Multi-session EM for v2 noise parameters.
 
@@ -4469,6 +4528,7 @@ def fit_noise_params_em_v2(
         new_params = finalize_m_step_v2(
             combined_stats, layout, dt,
             prev_params=params, initial_params=initial_params,
+            damping=damping,
         )
 
         max_rel = _max_param_change(new_params, params)
@@ -4484,11 +4544,30 @@ def fit_noise_params_em_v2(
         })
 
         if verbose:
+            # Compute summary stats across all q values for
+            # quick inspection. After patch 116 added Q ceilings,
+            # this also reveals which params are near their
+            # ceiling (potential indicator of model-data mismatch).
+            q_seg_oris = list(new_params.q_seg_ori.values())
+            q_lengths = list(new_params.q_length.values())
+            mean_q_seg = (
+                np.mean(q_seg_oris) if q_seg_oris else 0.0
+            )
+            max_q_seg = (
+                np.max(q_seg_oris) if q_seg_oris else 0.0
+            )
+            mean_q_len = (
+                np.mean(q_lengths) if q_lengths else 0.0
+            )
             print(
                 f"[v2-em] iter {iteration}: max Δ/x = "
                 f"{max_rel:.4e}, σ̄ = "
                 f"{np.mean(sigmas):.3f}px, "
-                f"q_root_pos = {new_params.q_root_pos:.1f}"
+                f"q_root_pos = {new_params.q_root_pos:.1f}, "
+                f"q_root_ori = {new_params.q_root_ori:.4f}, "
+                f"q_seg_ori (mean/max) = "
+                f"{mean_q_seg:.4f}/{max_q_seg:.4f}, "
+                f"q_length (mean) = {mean_q_len:.4f}"
             )
 
         params = new_params
@@ -5040,6 +5119,7 @@ def smooth_pose_v2(
     enable_strict_validation: bool = False,
     device: str = "cpu",
     n_workers: int = 1,
+    em_damping: float = 0.0,
     verbose: bool = False,
 ) -> Dict:
     """Top-level user-facing function for v2 pose smoothing.
@@ -5359,6 +5439,7 @@ def smooth_pose_v2(
                 session_names=[s["path"].stem for s in raw_sessions],
                 device=device,
                 pool=_pool,
+                damping=em_damping,
             )
             params = em_result.params
             em_history = em_result.history
@@ -5659,6 +5740,21 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--em-damping", type=float, default=0.0,
+        help=(
+            "Damping factor for M-step parameter updates "
+            "(0.0 to 0.9). Default 0.0 is full M-step (fast "
+            "convergence). With damping > 0, new params = "
+            "alpha × prev + (1 - alpha) × M-step estimate. "
+            "Use 0.3-0.5 if EM trajectory shows oscillation "
+            "or divergence — slows convergence by ~2× but "
+            "prevents large per-iteration jumps that can "
+            "destabilize the EKF on the next iteration. "
+            "Patch 116 added q parameter ceilings as a hard "
+            "safety net; damping is the soft alternative."
+        ),
+    )
+    parser.add_argument(
         "--device", choices=["cpu", "cuda", "auto"],
         default="cpu",
         help=(
@@ -5722,6 +5818,7 @@ def main(argv=None) -> int:
             enable_strict_validation=args.strict_validation,
             device=args.device,
             n_workers=args.workers,
+            em_damping=args.em_damping,
             verbose=args.verbose,
         )
     except Exception as e:
