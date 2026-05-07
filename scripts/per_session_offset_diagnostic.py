@@ -37,6 +37,21 @@ Output is a text report:
 
 A high disagreement score (>2-3) for any marker is evidence
 that per-session offset fitting would help.
+
+Patch 119-pre: file loading
+---------------------------
+Previously this script assumed both raw and smoothed parquets
+used a DLC MultiIndex (scorer, bodyparts, coords). The v2
+smoother actually writes flat columns (``<marker>_x``,
+``<marker>_y``, ``<marker>_p``, ``<marker>_var_x``,
+``<marker>_var_y``), so ``load_session`` raised KeyError on
+every smoothed file, exceptions were caught silently, and
+the recommendation block fell through to a default "Phase 2"
+string with zero data behind it. Loading now goes through
+``mufasa.data_processors.kalman_diagnostic.load_pose_file``,
+which handles both formats. The recommendation block also
+no longer manufactures a recommendation when no data made
+it through.
 """
 from __future__ import annotations
 
@@ -53,59 +68,47 @@ def load_session(
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """Load raw + smoothed marker positions for one session.
 
+    Both inputs are routed through
+    ``mufasa.data_processors.kalman_diagnostic.load_pose_file``
+    which handles flat-column parquet/CSV (the v2 smoother's
+    output format) and DLC multi-row-header CSV (the typical
+    raw input format). Previously this routine assumed both
+    files were MultiIndex DLC parquets and raised KeyError on
+    every smoothed file.
+
     Returns
     -------
     raw : dict[marker -> (T, 2) array]
     smooth : dict[marker -> (T, 2) array of smoothed positions]
     """
     try:
-        import pandas as pd
-    except ImportError:
-        raise RuntimeError(
-            "pandas required for parquet loading; install via "
-            "conda or pip"
+        from mufasa.data_processors.kalman_diagnostic import (
+            load_pose_file,
         )
+    except ImportError as e:
+        raise RuntimeError(
+            "Could not import load_pose_file from "
+            "mufasa.data_processors.kalman_diagnostic. Make "
+            "sure mufasa is on PYTHONPATH."
+        ) from e
 
-    raw_df = pd.read_parquet(raw_path)
-    smooth_df = pd.read_parquet(smoothed_path)
+    raw_df, raw_markers_list = load_pose_file(str(raw_path))
+    smooth_df, smooth_markers_list = load_pose_file(str(smoothed_path))
 
-    # DLC parquet structure: MultiIndex (scorer, marker, coord)
-    # Smoothed format: same MultiIndex but coord is x or y
-    # (likelihood may be missing in smoothed output).
     raw_markers: Dict[str, np.ndarray] = {}
+    for m in raw_markers_list:
+        # load_pose_file lowercases columns; markers list is
+        # already lowercase. Marker names from the model file
+        # may be mixed-case, callers normalize as needed.
+        x = raw_df[f"{m}_x"].to_numpy(dtype=float)
+        y = raw_df[f"{m}_y"].to_numpy(dtype=float)
+        raw_markers[m] = np.stack([x, y], axis=1)
+
     smooth_markers: Dict[str, np.ndarray] = {}
-
-    for marker in raw_df.columns.get_level_values(
-        "bodyparts"
-    ).unique():
-        raw_x = raw_df.xs(
-            (marker, "x"), level=("bodyparts", "coords"),
-            axis=1,
-        ).iloc[:, 0].to_numpy()
-        raw_y = raw_df.xs(
-            (marker, "y"), level=("bodyparts", "coords"),
-            axis=1,
-        ).iloc[:, 0].to_numpy()
-        raw_markers[marker] = np.stack([raw_x, raw_y], axis=1)
-
-    for marker in smooth_df.columns.get_level_values(
-        "bodyparts"
-    ).unique():
-        try:
-            smooth_x = smooth_df.xs(
-                (marker, "x"), level=("bodyparts", "coords"),
-                axis=1,
-            ).iloc[:, 0].to_numpy()
-            smooth_y = smooth_df.xs(
-                (marker, "y"), level=("bodyparts", "coords"),
-                axis=1,
-            ).iloc[:, 0].to_numpy()
-            smooth_markers[marker] = np.stack(
-                [smooth_x, smooth_y], axis=1,
-            )
-        except (KeyError, IndexError):
-            # Marker not in smoothed output (likelihood-only?)
-            continue
+    for m in smooth_markers_list:
+        x = smooth_df[f"{m}_x"].to_numpy(dtype=float)
+        y = smooth_df[f"{m}_y"].to_numpy(dtype=float)
+        smooth_markers[m] = np.stack([x, y], axis=1)
 
     return raw_markers, smooth_markers
 
@@ -269,6 +272,12 @@ def main() -> int:
         str, Dict[str, Tuple[float, float, float, float]],
     ] = {m: {} for m in all_markers}
 
+    # Track load failures so we don't fall through to a
+    # bogus recommendation when most sessions failed to
+    # load. Previously these were printed once each and
+    # then forgotten.
+    load_errors: List[Tuple[str, str]] = []
+
     for i, (raw_p, smooth_p) in enumerate(pairs):
         sess_name = raw_p.stem
         if (i + 1) % 10 == 0 or i == 0:
@@ -278,6 +287,7 @@ def main() -> int:
                 raw_p, smooth_p,
             )
         except Exception as e:
+            load_errors.append((sess_name, f"{type(e).__name__}: {e}"))
             print(f"    ERROR: {e}")
             continue
 
@@ -310,6 +320,11 @@ def main() -> int:
     lines.append(
         f"Analyzed {len(pairs)} sessions × {len(all_markers)} markers"
     )
+    if load_errors:
+        lines.append(
+            f"WARNING: {len(load_errors)} session(s) failed "
+            f"to load and were skipped"
+        )
     lines.append("")
     lines.append("Per-marker summary:")
     lines.append("-" * 78)
@@ -395,11 +410,36 @@ def main() -> int:
         lines.append(f"  {i+1:2d}. {s:<40s} {d:.1f}")
     lines.append("")
     lines.append("Recommendation:")
+    n_with_data = sum(1 for m in all_markers if offsets_table[m])
     max_disagree = (
         max(d for _, d in overall_disagree)
         if overall_disagree else 0.0
     )
-    if max_disagree > 2.0:
+    if n_with_data == 0:
+        lines.append(
+            "  NO DATA — every (session, marker) pair was "
+            "either dropped at load time or had < 100 valid "
+            "frames. Cannot recommend a phase from this run."
+        )
+        if load_errors:
+            n_err = len(load_errors)
+            lines.append(
+                f"  {n_err} session(s) failed to load. First "
+                f"3 errors:"
+            )
+            for sess, msg in load_errors[:3]:
+                lines.append(f"    {sess}: {msg}")
+            if n_err > 3:
+                lines.append(f"    ...and {n_err - 3} more.")
+        else:
+            lines.append(
+                "  No load errors — failure is downstream "
+                "(e.g. parent_marker_map empty, or all "
+                "frames filtered by the body-frame mask). "
+                "Inspect compute_body_frame_offset by hand "
+                "on a single session."
+            )
+    elif max_disagree > 2.0:
         lines.append(
             "  Strong evidence for per-session offsets. "
             "Implement Phase 1 of the v2 next-steps plan."
