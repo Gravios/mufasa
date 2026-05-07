@@ -3302,14 +3302,16 @@ def fit_warm_start_sigma_v2(
             (sess_idx, params, perspective, device)
             for sess_idx in range(n_sess)
         ]
+        # Collect by sess_idx for deterministic accumulation
+        # (FP + isn't associative; completion-order accumulation
+        # produces different bits run-to-run).
+        results_by_idx: Dict[int, Tuple[np.ndarray, np.ndarray]] = {}
         completed = 0
         for sess_idx, sums, counts, sess_dt in (
             pool.imap_unordered(_pool_warm_start_pass, task_args)
         ):
             completed += 1
-            for k, m in enumerate(layout.marker_names):
-                sum_abs_diff[m] += float(sums[k])
-                n_obs[m] += int(counts[k])
+            results_by_idx[sess_idx] = (sums, counts)
             times_per_session.append(sess_dt)
             if verbose:
                 sess_label = (
@@ -3333,6 +3335,12 @@ def fit_warm_start_sigma_v2(
                     f"(ETA {remaining_wall/60:.1f}min wall)",
                     flush=True,
                 )
+        # Accumulate in session-index order
+        for sess_idx in range(n_sess):
+            sums, counts = results_by_idx[sess_idx]
+            for k, m in enumerate(layout.marker_names):
+                sum_abs_diff[m] += float(sums[k])
+                n_obs[m] += int(counts[k])
     else:
         # Serial path
         for sess_idx, (pos, likes) in enumerate(sessions):
@@ -4319,13 +4327,17 @@ def fit_noise_params_em_v2(
                 )
                 for sess_idx in range(n_sess_em)
             ]
+            # Collect results indexed by sess_idx so accumulation
+            # happens in deterministic order. Floating-point + is
+            # not associative; accumulating in completion order
+            # would yield different bits run-to-run.
+            results_by_idx: Dict[int, Tuple] = {}
             completed = 0
             for sess_idx, sess_stats, sess_violations, sess_dt in (
                 pool.imap_unordered(_pool_em_e_step, task_args)
             ):
                 completed += 1
-                combined_stats += sess_stats
-                iter_violations.extend(sess_violations)
+                results_by_idx[sess_idx] = (sess_stats, sess_violations)
                 sess_times.append(sess_dt)
                 if verbose:
                     sess_label = (
@@ -4349,6 +4361,11 @@ def fit_noise_params_em_v2(
                         f"(ETA {remaining_wall/60:.1f}min wall)",
                         flush=True,
                     )
+            # Accumulate in session-index order for determinism
+            for sess_idx in range(n_sess_em):
+                sess_stats, sess_violations = results_by_idx[sess_idx]
+                combined_stats += sess_stats
+                iter_violations.extend(sess_violations)
         else:
             # Serial path
             for sess_idx, (pos, likes) in enumerate(sessions):
@@ -4646,6 +4663,56 @@ def _arrays_to_df_v2(
         cols[f"{m}_var_x"] = variances[:, i, 0]
         cols[f"{m}_var_y"] = variances[:, i, 1]
     return pd.DataFrame(cols, index=np.arange(T))
+
+
+def _build_and_write_session_output(
+    s: Dict,
+    smooth_pos: np.ndarray,
+    smooth_var: np.ndarray,
+    data_to_layout: Dict[str, int],
+    output_dir_path: Optional[Path],
+) -> Tuple[Optional[Path], bool, str]:
+    """Build the per-session output DataFrame in data marker
+    order, write to parquet (with CSV fallback), and return
+    (out_path, was_csv_fallback, csv_fallback_reason).
+
+    Used by both serial and parallel branches of the final
+    smoothing loop in smooth_pose_v2.
+    """
+    T = smooth_pos.shape[0]
+    K_data = len(s["markers"])
+    out_pos = np.full((T, K_data, 2), np.nan)
+    out_var = np.full((T, K_data, 2), np.nan)
+    out_likes = s["likelihoods"].copy()
+    for k_data, m in enumerate(s["markers"]):
+        if m in data_to_layout:
+            k_layout = data_to_layout[m]
+            out_pos[:, k_data, :] = smooth_pos[:, k_layout, :]
+            out_var[:, k_data, :] = smooth_var[:, k_layout, :]
+
+    df_out = _arrays_to_df_v2(
+        out_pos, out_var, out_likes, list(s["markers"]),
+    )
+
+    out_path: Optional[Path] = None
+    was_csv_fallback = False
+    csv_fallback_reason = ""
+    if output_dir_path is not None:
+        stem = s["path"].stem
+        # Strip common DLC suffix patterns
+        if stem.endswith("DeepCut"):
+            stem = stem[: -len("DeepCut")]
+        out_name = f"{stem}_smoothed_v2.parquet"
+        out_path = output_dir_path / out_name
+        try:
+            df_out.to_parquet(out_path, index=False)
+        except (ImportError, Exception) as e:
+            # Fallback to CSV when parquet engine is missing
+            out_path = output_dir_path / f"{stem}_smoothed_v2.csv"
+            df_out.to_csv(out_path, index=False)
+            was_csv_fallback = True
+            csv_fallback_reason = type(e).__name__
+    return out_path, was_csv_fallback, csv_fallback_reason
 
 
 def state_to_marker_variances(
@@ -5345,41 +5412,16 @@ def smooth_pose_v2(
             ):
                 completed += 1
                 s = raw_sessions[sess_idx]
-
-                # Build output DataFrame in DATA marker order
                 T = smooth_pos.shape[0]
-                K_data = len(s["markers"])
-                out_pos = np.full((T, K_data, 2), np.nan)
-                out_var = np.full((T, K_data, 2), np.nan)
-                out_likes = s["likelihoods"].copy()
-                for k_data, m in enumerate(s["markers"]):
-                    if m in data_to_layout:
-                        k_layout = data_to_layout[m]
-                        out_pos[:, k_data, :] = smooth_pos[:, k_layout, :]
-                        out_var[:, k_data, :] = smooth_var[:, k_layout, :]
 
-                df_out = _arrays_to_df_v2(
-                    out_pos, out_var, out_likes, list(s["markers"]),
+                out_path, _wrote_csv_fallback, _csv_fallback_reason = (
+                    _build_and_write_session_output(
+                        s, smooth_pos, smooth_var,
+                        data_to_layout,
+                        output_dir_path
+                        if output_dir is not None else None,
+                    )
                 )
-
-                out_path = None
-                _wrote_csv_fallback = False
-                _csv_fallback_reason = ""
-                if output_dir is not None:
-                    stem = s["path"].stem
-                    if stem.endswith("DeepCut"):
-                        stem = stem[: -len("DeepCut")]
-                    out_name = f"{stem}_smoothed_v2.parquet"
-                    out_path = output_dir_path / out_name
-                    try:
-                        df_out.to_parquet(out_path, index=False)
-                    except (ImportError, Exception) as e:
-                        out_path = (
-                            output_dir_path / f"{stem}_smoothed_v2.csv"
-                        )
-                        df_out.to_csv(out_path, index=False)
-                        _wrote_csv_fallback = True
-                        _csv_fallback_reason = type(e).__name__
 
                 output_sessions.append({
                     "input_path": s["path"],
@@ -5437,43 +5479,15 @@ def smooth_pose_v2(
                     device=device,
                 )
 
-                # Build output DataFrame in DATA marker order (so it
-                # matches the original input file's marker set, even
-                # if layout has more)
                 T = smooth_pos.shape[0]
-                K_data = len(s["markers"])
-                out_pos = np.full((T, K_data, 2), np.nan)
-                out_var = np.full((T, K_data, 2), np.nan)
-                out_likes = s["likelihoods"].copy()
-                for k_data, m in enumerate(s["markers"]):
-                    if m in data_to_layout:
-                        k_layout = data_to_layout[m]
-                        out_pos[:, k_data, :] = smooth_pos[:, k_layout, :]
-                        out_var[:, k_data, :] = smooth_var[:, k_layout, :]
-
-                df_out = _arrays_to_df_v2(
-                    out_pos, out_var, out_likes, list(s["markers"]),
+                out_path, _wrote_csv_fallback, _csv_fallback_reason = (
+                    _build_and_write_session_output(
+                        s, smooth_pos, smooth_var,
+                        data_to_layout,
+                        output_dir_path
+                        if output_dir is not None else None,
+                    )
                 )
-
-                out_path = None
-                _wrote_csv_fallback = False
-                _csv_fallback_reason = ""
-                if output_dir is not None:
-                    stem = s["path"].stem
-                    # Strip common DLC suffix patterns
-                    if stem.endswith("DeepCut"):
-                        stem = stem[: -len("DeepCut")]
-                    out_name = f"{stem}_smoothed_v2.parquet"
-                    out_path = output_dir_path / out_name
-                    try:
-                        df_out.to_parquet(out_path, index=False)
-                        _wrote_csv_fallback = False
-                    except (ImportError, Exception) as e:
-                        # Fallback to CSV
-                        out_path = output_dir_path / f"{stem}_smoothed_v2.csv"
-                        df_out.to_csv(out_path, index=False)
-                        _wrote_csv_fallback = True
-                        _csv_fallback_reason = type(e).__name__
 
                 output_sessions.append({
                     "input_path": s["path"],
@@ -5983,15 +5997,17 @@ def fit_perspective_model_v2(
             )
             for sess_idx in range(n_sess_p)
         ]
+        # Collect by sess_idx for deterministic accumulation
+        results_by_idx: Dict[int, Tuple[
+            Dict[str, np.ndarray], Dict[str, np.ndarray],
+            Dict[str, int],
+        ]] = {}
         completed = 0
         for sess_idx, sess_XtX, sess_Xty, sess_n, sess_dt in (
             pool.imap_unordered(_pool_perspective_pass, task_args)
         ):
             completed += 1
-            for m in layout.marker_names:
-                XtX_per_marker[m] += sess_XtX[m]
-                Xty_per_marker[m] += sess_Xty[m]
-                n_obs_per_marker[m] += sess_n[m]
+            results_by_idx[sess_idx] = (sess_XtX, sess_Xty, sess_n)
             times_p.append(sess_dt)
             if verbose:
                 sess_label = (
@@ -6014,6 +6030,13 @@ def fit_perspective_model_v2(
                     f"(ETA {remaining_wall/60:.1f}min wall)",
                     flush=True,
                 )
+        # Accumulate in session-index order
+        for sess_idx in range(n_sess_p):
+            sess_XtX, sess_Xty, sess_n = results_by_idx[sess_idx]
+            for m in layout.marker_names:
+                XtX_per_marker[m] += sess_XtX[m]
+                Xty_per_marker[m] += sess_Xty[m]
+                n_obs_per_marker[m] += sess_n[m]
     else:
         # Serial path
         for sess_idx, (pos, likes) in enumerate(sessions):

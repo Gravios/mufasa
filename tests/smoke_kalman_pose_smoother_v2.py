@@ -3169,7 +3169,156 @@ def main() -> int:
         unpickled = pickle.loads(data)
         assert unpickled is fn or unpickled.__name__ == fn.__name__
 
-    print("smoke_kalman_pose_smoother_v2: 85/85 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 115 (audit pass 2): determinism in parallel mode.
+    # ---------------------------------------------------------- #
+
+    # ---------------------------------------------------------- #
+    # Case 86: parallel run twice produces bit-identical output.
+    # ---------------------------------------------------------- #
+    import tempfile as _tempfile
+    from pathlib import Path as _Path
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        smooth_pose_v2 as _spv2_86,
+    )
+    try:
+        import pandas as _pd_86
+    except ImportError:
+        _pd_86 = None
+
+    if _pd_86 is not None:
+        with _tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_p = _Path(tmpdir)
+            in_dir = tmpdir_p / "in"
+            in_dir.mkdir()
+            test_layout_86 = standard_rat_layout()
+            markers_86 = test_layout_86.marker_names
+
+            for i in range(4):
+                T = 200
+                rng_i = np.random.default_rng(8600 + i)
+                root_x = 100 + np.cumsum(rng_i.normal(0, 0.5, T))
+                root_y = 100 + np.cumsum(rng_i.normal(0, 0.5, T))
+                cols_data = {}
+                for m in markers_86:
+                    ox, oy = rng_i.uniform(-15, 15, 2)
+                    x = root_x + ox + rng_i.normal(0, 0.3, T)
+                    y = root_y + oy + rng_i.normal(0, 0.3, T)
+                    likes = np.full(T, 0.95)
+                    drop = rng_i.random(T) < 0.05
+                    likes[drop] = 0.1
+                    cols_data[(m, "x")] = x
+                    cols_data[(m, "y")] = y
+                    cols_data[(m, "likelihood")] = likes
+                df = _pd_86.DataFrame(cols_data)
+                df.columns = _pd_86.MultiIndex.from_tuples(
+                    [
+                        ("DeepCut", m, c)
+                        for m, c in df.columns
+                    ],
+                    names=["scorer", "bodyparts", "coords"],
+                )
+                df.to_csv(in_dir / f"sess_{i}DeepCut.csv")
+
+            # Run twice in parallel mode — should be bit-identical
+            # since accumulation now happens in sess_idx order
+            out_a = tmpdir_p / "run_a"
+            out_b = tmpdir_p / "run_b"
+            res_a = _spv2_86(
+                pose_input=str(in_dir),
+                output_dir=str(out_a),
+                layout=test_layout_86,
+                fps=30.0,
+                likelihood_threshold=0.7,
+                em_max_iter=3,
+                n_workers=2,
+                verbose=False,
+            )
+            res_b = _spv2_86(
+                pose_input=str(in_dir),
+                output_dir=str(out_b),
+                layout=test_layout_86,
+                fps=30.0,
+                likelihood_threshold=0.7,
+                em_max_iter=3,
+                n_workers=2,
+                verbose=False,
+            )
+
+            # σ values must be bit-identical (post-determinism-fix)
+            for m in test_layout_86.marker_names:
+                s_a = res_a["params"].sigma_marker[m]
+                s_b = res_b["params"].sigma_marker[m]
+                assert s_a == s_b, (
+                    f"Parallel runs differ at σ_{m}: "
+                    f"{s_a!r} vs {s_b!r} — accumulation order "
+                    f"is non-deterministic"
+                )
+
+            # Smoothed positions must be bit-identical
+            sa_by = {
+                d["input_path"].name: d for d in res_a["sessions"]
+            }
+            sb_by = {
+                d["input_path"].name: d for d in res_b["sessions"]
+            }
+            for name in sa_by:
+                pa = sa_by[name]["smoothed"]
+                pb = sb_by[name]["smoothed"]
+                assert np.array_equal(
+                    np.where(np.isnan(pa), 0, pa),
+                    np.where(np.isnan(pb), 0, pb),
+                ), (
+                    f"Smoothed positions differ between parallel "
+                    f"runs for {name}"
+                )
+
+    # ---------------------------------------------------------- #
+    # Case 87: _build_and_write_session_output helper produces
+    # the same DataFrame as the previous inline code.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        _build_and_write_session_output,
+    )
+    if _pd_86 is not None:
+        with _tempfile.TemporaryDirectory() as tmpdir:
+            out_dir = _Path(tmpdir) / "out"
+            out_dir.mkdir()
+            T_87 = 50
+            K_data_87 = 3
+            smooth_pos_87 = np.random.default_rng(8701).normal(
+                100, 10, (T_87, K_data_87, 2),
+            )
+            smooth_var_87 = np.random.default_rng(8702).uniform(
+                0.5, 2.0, (T_87, K_data_87, 2),
+            )
+            session_meta = {
+                "path": _Path("/fake/sess_xyzDeepCut.csv"),
+                "markers": ["a", "b", "c"],
+                "likelihoods": np.full((T_87, K_data_87), 0.9),
+            }
+            data_to_layout_87 = {"a": 0, "b": 1, "c": 2}
+            out_path_87, csv_fb, csv_reason = (
+                _build_and_write_session_output(
+                    session_meta, smooth_pos_87, smooth_var_87,
+                    data_to_layout_87, out_dir,
+                )
+            )
+            # When pyarrow not installed, parquet falls back to CSV
+            assert out_path_87 is not None
+            assert out_path_87.exists()
+            assert out_path_87.suffix in (".parquet", ".csv")
+            # Stem-stripping: "sess_xyzDeepCut" → "sess_xyz"
+            assert "sess_xyz_smoothed_v2" in out_path_87.stem
+
+            # output_dir_path=None should return out_path=None
+            out_path_none, _, _ = _build_and_write_session_output(
+                session_meta, smooth_pos_87, smooth_var_87,
+                data_to_layout_87, None,
+            )
+            assert out_path_none is None
+
+    print("smoke_kalman_pose_smoother_v2: 87/87 cases passed")
     return 0
 
 
