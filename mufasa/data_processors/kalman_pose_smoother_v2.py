@@ -566,10 +566,35 @@ class FittedLengths:
         for markers that are NOT the segment's distal-end
         marker. These are the rigid-attachment offsets fit
         from data.
+
+    Patch 120b — empirical drift calibration
+    -----------------------------------------
+    marker_r_drift : dict[str, float] or None
+        Per-marker target radius bound on |δ_m| (px),
+        computed as the empirical body-frame residual scatter
+        around the median offset. Robust estimator: stddev of
+        (x_local, y_local) - (median_x, median_y), combined
+        across axes. None when drift calibration was not run
+        (e.g., layout with_drift=False at fit time, or
+        loading an old model).
+    marker_q_drift : dict[str, float] or None
+        Per-marker continuous-time process-noise intensity
+        for the drift state (px²/s). Estimated from the
+        per-step variance of body-frame residual differences
+        scaled by 1/dt. None when drift calibration was not
+        run.
+
+    The drift dicts are populated only for non-distal markers
+    and only when there are enough valid frames to compute a
+    reliable estimate. Distal markers and markers below the
+    valid-frame threshold are absent from the dict (callers
+    treat absence as "no drift for this marker").
     """
     segment_lengths: Dict[str, float]
     segment_length_iqr: Dict[str, float]
     marker_offsets: Dict[str, Tuple[float, float]]
+    marker_r_drift: Optional[Dict[str, float]] = None
+    marker_q_drift: Optional[Dict[str, float]] = None
 
 
 def _segment_distal_marker(layout: BodyLayout, segment_name: str) -> Optional[str]:
@@ -592,6 +617,7 @@ def fit_body_lengths(
     layout: BodyLayout,
     marker_names: List[str],
     likelihood_threshold: float = _LENGTH_FIT_THRESHOLD,
+    dt: float = 1.0 / 30.0,
 ) -> FittedLengths:
     """Estimate per-segment lengths and per-marker offsets
     from observation data.
@@ -614,6 +640,17 @@ def fit_body_lengths(
     frame's orientation along the segment's parent direction
     and computing the offset in that approximate frame, then
     median-aggregating.
+
+    Patch 120b: alongside the median offset, the per-frame
+    body-frame coordinate residuals (relative to the median)
+    are summarized to give an empirical r_drift and q_drift
+    per marker. These are stored on FittedLengths and feed
+    into NoiseParamsV2.default when the layout has drift
+    enabled, replacing the design-doc heuristic
+    R_m = sigma_marker[m] which was over-permissive for
+    markers whose σ_marker had been inflated by the M-step
+    absorbing modeling error (e.g., tail markers whose
+    σ reached 75-312 px in real data).
 
     Marker → segment mapping is taken from the layout.
 
@@ -673,6 +710,16 @@ def fit_body_lengths(
         # IQR (q75 - q25), used to set process noise scale
         q25, q75 = float(np.percentile(dists, 25)), float(np.percentile(dists, 75))
         segment_length_iqr[seg_name] = q75 - q25
+
+    # Patch 120b: per-marker empirical drift calibration. The
+    # body-frame residuals around the median offset (computed
+    # below in the marker_offsets loop) tell us how far the
+    # marker actually wanders within the segment frame, which
+    # is what δ_m needs to absorb. Populated alongside
+    # marker_offsets; remains empty for distal markers and
+    # markers that didn't have enough valid frames.
+    marker_r_drift: Dict[str, float] = {}
+    marker_q_drift: Dict[str, float] = {}
 
     # Per non-distal-end marker: fit offset (length, angle) in
     # the attached segment's distal-end frame. The "frame" here
@@ -774,10 +821,48 @@ def fit_body_lengths(
             angle = np.arctan2(y_local, x_local)
 
             # Median for robustness
-            marker_offsets[marker] = (
-                float(np.median(length)),
-                float(np.median(angle)),
+            med_l = float(np.median(length))
+            med_a = float(np.median(angle))
+            marker_offsets[marker] = (med_l, med_a)
+
+            # Patch 120b: empirical drift calibration. The
+            # body-frame residual relative to the median offset
+            # is what δ_m would absorb. r_drift estimates the
+            # typical magnitude of that residual; q_drift is
+            # initialized from r_drift via the design-doc
+            # heuristic q = (r/5)² / dt, replacing the original
+            # heuristic q = (sigma_marker/5)² / dt. The latter
+            # was untrustworthy because sigma_marker can be
+            # inflated by the M-step absorbing modeling error.
+            #
+            # Robust scatter: per-axis IQR (q75 - q25) divided
+            # by 1.349 to convert to a Gaussian-equivalent
+            # stddev. Symmetric with how segment_length_iqr is
+            # computed; resistant to heavy tails (tail markers).
+            med_x = float(np.median(x_local))
+            med_y = float(np.median(y_local))
+            iqr_x = float(
+                np.percentile(x_local, 75)
+                - np.percentile(x_local, 25)
             )
+            iqr_y = float(
+                np.percentile(y_local, 75)
+                - np.percentile(y_local, 25)
+            )
+            # Per-axis Gaussian-equivalent stddev, then RMS
+            # combined across axes
+            sx = iqr_x / 1.349
+            sy = iqr_y / 1.349
+            r_emp = float(np.sqrt(0.5 * (sx ** 2 + sy ** 2)))
+            # Floor the radius so degenerate near-zero scatter
+            # doesn't produce vanishing q_drift; ceiling left
+            # to caller policy (NoiseParamsV2.default may apply
+            # a cap).
+            r_emp = max(r_emp, 0.5)
+            marker_r_drift[marker] = r_emp
+            # q_drift via design-doc heuristic, but with
+            # EMPIRICAL r in place of sigma_marker
+            marker_q_drift[marker] = (r_emp / 5.0) ** 2 / dt
 
     # For markers that are distal-end markers, offset is (0, 0)
     for seg in layout.segments:
@@ -789,7 +874,64 @@ def fit_body_lengths(
         segment_lengths=segment_lengths,
         segment_length_iqr=segment_length_iqr,
         marker_offsets=marker_offsets,
+        marker_r_drift=marker_r_drift if marker_r_drift else None,
+        marker_q_drift=marker_q_drift if marker_q_drift else None,
     )
+
+
+def apply_fitted_offsets_to_layout(
+    layout: BodyLayout,
+    fitted_lengths: FittedLengths,
+) -> None:
+    """Mutate ``layout`` so each marker uses its fitted offset.
+
+    Patch 119a — wires fitted marker offsets into runtime
+    forward kinematics. Without this call, FK reads marker
+    offsets via ``layout.marker_attachment(m)``, which returns
+    whatever values the layout was constructed with — the
+    crude initial guesses from ``standard_rat_layout`` such as
+    ``nose: (1.0, 0.0)``, ``ear_left: (0.5, π/3)``. Meanwhile
+    ``fit_body_lengths`` produces a ``FittedLengths`` whose
+    ``marker_offsets`` dict contains the actual best-fit
+    offsets — but those values are then only saved to disk
+    and never read back. The fit was effectively dead data.
+
+    This function applies the fit. After the call, every
+    subsequent ``layout.marker_attachment(m)`` returns the
+    fitted ``(length, angle)`` from ``fitted_lengths``,
+    and FK / observation / Jacobian behave accordingly.
+
+    Behavior
+    --------
+    - Only markers present in ``fitted_lengths.marker_offsets``
+      are updated. Markers absent from that dict (e.g., when
+      loading an old model that didn't fit them) keep their
+      current layout values. This is defensive against partial
+      fits.
+    - Distal-end markers round-trip correctly: ``fit_body_lengths``
+      writes ``(0, 0)`` for them at line ~786, so applying
+      doesn't disturb the structural ``(0, 0)`` invariant.
+    - The function is idempotent: applying twice with the same
+      ``FittedLengths`` produces the same layout. Safe to call
+      from both ``load_model_v2`` and the orchestrator's main
+      flow without double-counting.
+
+    Parameters
+    ----------
+    layout : BodyLayout
+        Mutated in place.
+    fitted_lengths : FittedLengths
+        Source of fitted offsets. Only ``marker_offsets`` is
+        read; ``segment_lengths`` and ``segment_length_iqr``
+        are ignored (they're applied elsewhere via state
+        initialization).
+    """
+    for seg in layout.segments:
+        for m in list(seg.markers.keys()):
+            if m in fitted_lengths.marker_offsets:
+                seg.markers[m] = tuple(
+                    fitted_lengths.marker_offsets[m]
+                )
 
 
 # ============================================================
@@ -1018,6 +1160,16 @@ def state_to_marker_positions(
         behavior is identical to previous patches (rigid
         offsets).
 
+    Patch 120b: when ``layout.with_drift`` is True, the
+    segment-local marker offset is augmented by the per-marker
+    drift δ_m read from the state vector before rotation
+    into the world frame. δ_m lives in the same frame as the
+    rigid offset (segment-local), so the world position is
+    P_distal[seg] + R_world[seg] @ (rigid_offset + δ_m).
+    Perspective scaling, when active, is applied to the
+    rigid offset only — drift is interpreted as an
+    arena-position-independent body-frame wobble.
+
     Returns
     -------
     (n_markers, 2) array
@@ -1046,6 +1198,10 @@ def state_to_marker_positions(
         ])
         if scales is not None:
             v_marker_local = v_marker_local * scales[i]
+        # Patch 120b: add per-marker drift in segment-local frame
+        if layout.with_drift:
+            drift_sl = layout.slice_marker_drift(marker)
+            v_marker_local = v_marker_local + state[drift_sl]
         positions[i] = (
             fk.P_distal[seg_name] + fk.R_world[seg_name] @ v_marker_local
         )
@@ -1242,6 +1398,19 @@ def state_to_marker_jacobian(
             H[row_y, col_cos] = d_p_d_cos[1]
             H[row_x, col_sin] = d_p_d_sin[0]
             H[row_y, col_sin] = d_p_d_sin[1]
+
+        # Patch 120b: per-marker drift partials. δ_m enters the
+        # observation as p_m = P_distal[seg] + R_world[seg] @
+        # (rigid_offset + δ_m), so ∂p_m/∂δ_m = R_world[seg] —
+        # constant in state, depends only on FK. Two columns of
+        # H per marker (the drift_x and drift_y entries).
+        if layout.with_drift:
+            drift_sl = layout.slice_marker_drift(marker)
+            R_seg = fk.R_world[seg_name]
+            H[row_x, drift_sl.start]     = R_seg[0, 0]
+            H[row_x, drift_sl.start + 1] = R_seg[0, 1]
+            H[row_y, drift_sl.start]     = R_seg[1, 0]
+            H[row_y, drift_sl.start + 1] = R_seg[1, 1]
 
     return H
 
@@ -1480,7 +1649,14 @@ def state_to_marker_positions_batch(
                     scales_per_marker[:, i:i+1] * v_local[None, :]
                 )
             else:
-                v_local_t = np.broadcast_to(v_local, (T, 2))
+                v_local_t = np.broadcast_to(
+                    v_local, (T, 2),
+                ).copy()
+            # Patch 120b: per-marker drift in segment-local
+            # frame, added to the rigid offset before rotation.
+            if layout.with_drift:
+                drift_sl = layout.slice_marker_drift(marker)
+                v_local_t = v_local_t + states[:, drift_sl]
             # rotated = R_world[seg] @ v_local_t per frame
             rotated = np.einsum(
                 "tij,tj->ti", R_world[seg_name], v_local_t,
@@ -1515,7 +1691,11 @@ def state_to_marker_positions_batch(
                 scales_per_marker[:, i:i+1] * v_local[None, :]
             )
         else:
-            v_local_t = v_local[None, :].expand(T, 2)
+            v_local_t = v_local[None, :].expand(T, 2).clone()
+        # Patch 120b: drift in segment-local frame
+        if layout.with_drift:
+            drift_sl = layout.slice_marker_drift(marker)
+            v_local_t = v_local_t + states_t[:, drift_sl]
         rotated = torch.einsum(
             "tij,tj->ti", R_world[seg_name], v_local_t,
         )
@@ -1750,6 +1930,17 @@ def state_to_marker_jacobian_batch(
             H[:, row_y, col_cos] = d_p_d_cos[:, 1]
             H[:, row_x, col_sin] = d_p_d_sin[:, 0]
             H[:, row_y, col_sin] = d_p_d_sin[:, 1]
+
+        # Patch 120b: per-marker drift partials. ∂p_m/∂δ_m =
+        # R_world[seg], constant in state. Two columns per
+        # marker.
+        if layout.with_drift:
+            drift_sl = layout.slice_marker_drift(marker)
+            R_seg_t = R_world[seg_name]  # (T, 2, 2)
+            H[:, row_x, drift_sl.start]     = R_seg_t[:, 0, 0]
+            H[:, row_x, drift_sl.start + 1] = R_seg_t[:, 0, 1]
+            H[:, row_y, drift_sl.start]     = R_seg_t[:, 1, 0]
+            H[:, row_y, drift_sl.start + 1] = R_seg_t[:, 1, 1]
 
     return H
 
@@ -1996,29 +2187,72 @@ class NoiseParamsV2:
         # value is ignored.
         dt: float = 1.0 / 30.0,
         alpha_drift: float = 0.05,
+        # Patch 120b: when fitted_lengths is supplied, use
+        # its empirical r_drift / q_drift instead of the
+        # design-doc heuristic. Optional cap on r_drift to
+        # prevent pathological markers (e.g. tail markers
+        # whose body-frame scatter genuinely is large) from
+        # producing drift radii that effectively disable the
+        # bound. None means no cap.
+        fitted_lengths: Optional["FittedLengths"] = None,
+        r_drift_cap: Optional[float] = 20.0,
     ) -> "NoiseParamsV2":
         """Build default noise params with uniform per-marker
         and per-segment values. Useful as initial values for
         EM.
 
-        When ``layout.with_drift=True``, also populates
-        q_drift / alpha_drift / r_drift per the design-doc
-        heuristic:
-            R_m       = sigma_marker
-            α_m       = alpha_drift (default 0.05)
-            q_drift_m = (R_m / 5)² / dt
+        When ``layout.with_drift=True``, drift parameters are
+        populated as follows:
+
+          - If ``fitted_lengths`` is provided AND it has
+            empirical drift calibration
+            (``marker_r_drift`` / ``marker_q_drift`` non-None),
+            use those values. Markers absent from the calibration
+            (distal markers, markers without enough data) fall
+            back to the heuristic.
+          - Otherwise, use the design-doc heuristic
+            R_m = sigma_marker, q_drift_m = (R_m / 5)^2 / dt.
+
+        ``r_drift_cap`` (default 20 px) limits R_m from above
+        regardless of source. Set to None to disable. Cap exists
+        because empirical r_drift can be large for markers whose
+        kinematic model is inadequate (the segment-orientation
+        DOF can't represent lateral tail undulation, so tail
+        markers' body-frame scatter is huge — capping prevents
+        drift state from absorbing more than ~20 px of motion
+        per marker, keeping it as "regularize within a body
+        radius" rather than "model arbitrary motion").
         """
         if layout.with_drift:
-            r_drift_d: Optional[Dict[str, float]] = {
-                m: sigma_marker for m in layout.marker_names
-            }
+            r_drift_d: Optional[Dict[str, float]] = {}
+            q_drift_d: Optional[Dict[str, float]] = {}
             alpha_drift_d: Optional[Dict[str, float]] = {
                 m: alpha_drift for m in layout.marker_names
             }
-            q_drift_d: Optional[Dict[str, float]] = {
-                m: (sigma_marker / 5.0) ** 2 / dt
-                for m in layout.marker_names
-            }
+            for m in layout.marker_names:
+                # Source: empirical from fitted_lengths if
+                # available, else heuristic from sigma_marker.
+                used_empirical = (
+                    fitted_lengths is not None
+                    and fitted_lengths.marker_r_drift is not None
+                    and m in fitted_lengths.marker_r_drift
+                )
+                if used_empirical:
+                    r_m = fitted_lengths.marker_r_drift[m]
+                    q_m = fitted_lengths.marker_q_drift.get(
+                        m, (r_m / 5.0) ** 2 / dt,
+                    )
+                else:
+                    r_m = sigma_marker
+                    q_m = (sigma_marker / 5.0) ** 2 / dt
+                # Apply cap on radius. Keep q proportional so
+                # the q/r relationship stays consistent.
+                if r_drift_cap is not None and r_m > r_drift_cap:
+                    scale = r_drift_cap / r_m
+                    r_m = r_drift_cap
+                    q_m = q_m * (scale ** 2)
+                r_drift_d[m] = r_m
+                q_drift_d[m] = q_m
         else:
             r_drift_d = None
             alpha_drift_d = None
@@ -2505,6 +2739,18 @@ def forward_filter_v2(
             # Length uncertainty: 1.0 px²
             P0[indices[seg_name]["length"], indices[seg_name]["length"]] = 1.0
             P0[indices[seg_name]["length_dot"], indices[seg_name]["length_dot"]] = 0.01
+        # Patch 120b: initial uncertainty for the drift block.
+        # Set to (r_drift/2)² per marker so the EKF's prior on
+        # δ_m matches the stationary half-radius. Without this,
+        # P0=I gives 1.0 px² regardless of the configured drift
+        # bound, which misrepresents prior knowledge for markers
+        # whose r_drift is much larger or smaller than 1.
+        if layout.with_drift and params.r_drift is not None:
+            for m in layout.marker_names:
+                sl = layout.slice_marker_drift(m)
+                r_m = params.r_drift.get(m, 1.0)
+                var = (r_m / 2.0) ** 2
+                P0[sl, sl] = var * np.eye(2)
     else:
         P0 = initial_cov
 
@@ -3364,6 +3610,22 @@ def finalize_m_step_v2(
         q_seg_ori=q_seg_ori,
         q_length=q_length,
         constraint_sigma=prev_params.constraint_sigma,
+        # Patch 120b: drift parameters pass through unchanged
+        # by the M-step (no q_drift learning yet — that's
+        # patch 120c). Preserve them so the next iteration's
+        # build_Q_v2 still sees a populated drift config.
+        q_drift=(
+            dict(prev_params.q_drift)
+            if prev_params.q_drift is not None else None
+        ),
+        alpha_drift=(
+            dict(prev_params.alpha_drift)
+            if prev_params.alpha_drift is not None else None
+        ),
+        r_drift=(
+            dict(prev_params.r_drift)
+            if prev_params.r_drift is not None else None
+        ),
     )
 
 
@@ -3618,6 +3880,20 @@ def finalize_m_step_v2_from_per_session(
         q_seg_ori=q_seg_ori,
         q_length=q_length,
         constraint_sigma=prev_params.constraint_sigma,
+        # Patch 120b: drift parameters pass through unchanged.
+        # See note on the per-session-fit finalizer above.
+        q_drift=(
+            dict(prev_params.q_drift)
+            if prev_params.q_drift is not None else None
+        ),
+        alpha_drift=(
+            dict(prev_params.alpha_drift)
+            if prev_params.alpha_drift is not None else None
+        ),
+        r_drift=(
+            dict(prev_params.r_drift)
+            if prev_params.r_drift is not None else None
+        ),
     )
 
 
@@ -3827,12 +4103,61 @@ def fit_initial_params_v2(
         else:
             q_length[seg_name] = _INIT_DEFAULT_Q_LENGTH
 
+    # Patch 120b: drift parameters when layout has drift
+    # enabled. Read from the empirical calibration on
+    # fitted_lengths if available; otherwise fall back to the
+    # design-doc heuristic with sigma_marker as the radius.
+    # NoiseParamsV2.default centralizes the cap and the
+    # heuristic, so we delegate via a one-shot construction
+    # to extract those drift dicts.
+    if layout.with_drift:
+        # Use sigma_marker computed above as the heuristic
+        # baseline. Per-marker σ varies in fit_initial_params_v2
+        # (unlike default()'s single scalar), so we build the
+        # drift dicts per-marker manually rather than using
+        # default().
+        dt = 1.0 / fps
+        alpha_drift_d: Optional[Dict[str, float]] = {
+            m: 0.05 for m in layout.marker_names
+        }
+        r_drift_d: Optional[Dict[str, float]] = {}
+        q_drift_d: Optional[Dict[str, float]] = {}
+        r_cap = 20.0
+        for m in layout.marker_names:
+            used_empirical = (
+                fitted_lengths.marker_r_drift is not None
+                and m in fitted_lengths.marker_r_drift
+            )
+            if used_empirical:
+                r_m = fitted_lengths.marker_r_drift[m]
+                q_m = fitted_lengths.marker_q_drift.get(
+                    m, (r_m / 5.0) ** 2 / dt,
+                )
+            else:
+                # Fall back to per-marker σ, not a global
+                # constant
+                r_m = sigma_marker.get(m, 3.0)
+                q_m = (r_m / 5.0) ** 2 / dt
+            if r_m > r_cap:
+                scale = r_cap / r_m
+                r_m = r_cap
+                q_m = q_m * (scale ** 2)
+            r_drift_d[m] = r_m
+            q_drift_d[m] = q_m
+    else:
+        alpha_drift_d = None
+        r_drift_d = None
+        q_drift_d = None
+
     return NoiseParamsV2(
         sigma_marker=sigma_marker,
         q_root_pos=q_root_pos,
         q_root_ori=q_root_ori,
         q_seg_ori=q_seg_ori,
         q_length=q_length,
+        q_drift=q_drift_d,
+        alpha_drift=alpha_drift_d,
+        r_drift=r_drift_d,
     )
 
 
@@ -4874,7 +5199,12 @@ def fit_noise_params_em_v2(
             device=device,
             pool=pool,
         )
-        # Update initial_params with warm-started σ
+        # Update initial_params with warm-started σ. Patch
+        # 120b: preserve any drift parameters from the prior
+        # initial_params (set by fit_initial_params_v2 when
+        # layout.with_drift). Without this, with_drift=True
+        # runs after warm-start lose q_drift/alpha_drift/
+        # r_drift and crash in build_Q_v2.
         initial_params = NoiseParamsV2(
             sigma_marker=sigma_warm,
             q_root_pos=initial_params.q_root_pos,
@@ -4882,6 +5212,18 @@ def fit_noise_params_em_v2(
             q_seg_ori=dict(initial_params.q_seg_ori),
             q_length=dict(initial_params.q_length),
             constraint_sigma=initial_params.constraint_sigma,
+            q_drift=(
+                dict(initial_params.q_drift)
+                if initial_params.q_drift is not None else None
+            ),
+            alpha_drift=(
+                dict(initial_params.alpha_drift)
+                if initial_params.alpha_drift is not None else None
+            ),
+            r_drift=(
+                dict(initial_params.r_drift)
+                if initial_params.r_drift is not None else None
+            ),
         )
         if verbose:
             sigma_changes = []
@@ -5606,6 +5948,48 @@ def save_model_v2(
         has_perspective=(perspective is not None),
     )
 
+    # Patch 120b: drift calibration on FittedLengths. Optional —
+    # only present when fit_body_lengths populated them. A
+    # boolean flag distinguishes "calibration was run, all
+    # zero" from "calibration was not run, fields absent".
+    has_drift_cal = (
+        fitted_lengths.marker_r_drift is not None
+        and fitted_lengths.marker_q_drift is not None
+    )
+    save_kwargs["has_drift_calibration"] = has_drift_cal
+    if has_drift_cal:
+        save_kwargs["fitted_marker_r_drift"] = np.array(
+            list(fitted_lengths.marker_r_drift.items()),
+            dtype=object,
+        )
+        save_kwargs["fitted_marker_q_drift"] = np.array(
+            list(fitted_lengths.marker_q_drift.items()),
+            dtype=object,
+        )
+
+    # Patch 120b: NoiseParamsV2 drift fields. Optional in the
+    # same way; present only when params has drift configured.
+    has_noise_drift = (
+        params.q_drift is not None
+        and params.alpha_drift is not None
+        and params.r_drift is not None
+    )
+    save_kwargs["has_noise_drift"] = has_noise_drift
+    if has_noise_drift:
+        save_kwargs["params_q_drift"] = np.array(
+            list(params.q_drift.items()), dtype=object,
+        )
+        save_kwargs["params_alpha_drift"] = np.array(
+            list(params.alpha_drift.items()), dtype=object,
+        )
+        save_kwargs["params_r_drift"] = np.array(
+            list(params.r_drift.items()), dtype=object,
+        )
+
+    # Patch 120b: layout's with_drift flag. Default False
+    # round-trips silently for backward compatibility.
+    save_kwargs["layout_with_drift"] = bool(layout.with_drift)
+
     if perspective is not None:
         save_kwargs["persp_coeffs"] = np.array(
             list(perspective.coeffs.items()), dtype=object,
@@ -5663,9 +6047,13 @@ def load_model_v2(
             markers=dict(sd["markers"]),
         ))
     layout = BodyLayout(segments=segments)
+    # Patch 120b: layout.with_drift flag. Defaults False for
+    # pre-120b model files where the field is absent.
+    if "layout_with_drift" in data.files:
+        layout.with_drift = bool(data["layout_with_drift"])
 
     # FittedLengths
-    fitted_lengths = FittedLengths(
+    fitted_lengths_kwargs: Dict = dict(
         segment_lengths={
             k: float(v) for k, v in data["fitted_segment_lengths"]
         },
@@ -5676,9 +6064,25 @@ def load_model_v2(
             k: tuple(v) for k, v in data["fitted_marker_offsets"]
         },
     )
+    # Patch 120b: drift calibration. Absent in pre-120b model
+    # files; presence is gated by has_drift_calibration so
+    # round-tripping a calibrated model preserves the values
+    # while old models load with None (caller falls back to
+    # heuristic in NoiseParamsV2.default).
+    if (
+        "has_drift_calibration" in data.files
+        and bool(data["has_drift_calibration"])
+    ):
+        fitted_lengths_kwargs["marker_r_drift"] = {
+            k: float(v) for k, v in data["fitted_marker_r_drift"]
+        }
+        fitted_lengths_kwargs["marker_q_drift"] = {
+            k: float(v) for k, v in data["fitted_marker_q_drift"]
+        }
+    fitted_lengths = FittedLengths(**fitted_lengths_kwargs)
 
     # NoiseParamsV2
-    params = NoiseParamsV2(
+    params_kwargs: Dict = dict(
         sigma_marker={
             k: float(v) for k, v in data["params_sigma_marker"]
         },
@@ -5692,6 +6096,22 @@ def load_model_v2(
         },
         constraint_sigma=float(data["params_constraint_sigma"]),
     )
+    # Patch 120b: NoiseParamsV2 drift fields. Pre-120b models
+    # have these absent; loaded NoiseParamsV2 keeps them None.
+    if (
+        "has_noise_drift" in data.files
+        and bool(data["has_noise_drift"])
+    ):
+        params_kwargs["q_drift"] = {
+            k: float(v) for k, v in data["params_q_drift"]
+        }
+        params_kwargs["alpha_drift"] = {
+            k: float(v) for k, v in data["params_alpha_drift"]
+        }
+        params_kwargs["r_drift"] = {
+            k: float(v) for k, v in data["params_r_drift"]
+        }
+    params = NoiseParamsV2(**params_kwargs)
 
     fps = float(data["fps"])
     likelihood_threshold = float(data["likelihood_threshold"])
@@ -5715,6 +6135,17 @@ def load_model_v2(
             arena_y_mean=float(data["persp_arena_y_mean"]),
             arena_y_range=float(data["persp_arena_y_range"]),
         )
+
+    # Patch 119a: apply fitted marker offsets to the layout
+    # so external callers (pose_viewer, downstream tools) get
+    # a layout whose marker_attachment() returns the fitted
+    # values. For old models saved before patch 119a, the
+    # layout's seg.markers dict held the construction defaults
+    # (e.g. nose=(1.0, 0.0)) while fitted_marker_offsets had
+    # the actual best-fit values; applying here unifies them.
+    # For models saved post-119a, the layout already carries
+    # the fitted values, so this is idempotent.
+    apply_fitted_offsets_to_layout(layout, fitted_lengths)
 
     return (
         layout, fitted_lengths, params, fps,
@@ -6002,13 +6433,43 @@ def smooth_pose_v2(
         fitted_lengths = fit_body_lengths(
             first_pos, first_likes, layout, layout_marker_names,
             likelihood_threshold,
+            dt=1.0 / fps,
         )
         if verbose:
+            seg_str = {
+                k: f'{v:.2f}'
+                for k, v in fitted_lengths.segment_lengths.items()
+            }
             print(
-                f"[smoother-v2] Fitted body lengths: "
-                f"{ {k: f'{v:.2f}' for k, v in fitted_lengths.segment_lengths.items()} }"
+                f"[smoother-v2] Fitted body lengths: {seg_str}"
             )
+            # Patch 120b: report empirical drift calibration
+            # when layout has drift enabled. Prints r_drift in
+            # px and q_drift in px²/s per marker so the user
+            # can spot pathological values (e.g. tail markers
+            # in real data) before EM.
+            if (
+                layout.with_drift
+                and fitted_lengths.marker_r_drift is not None
+            ):
+                drift_str = {
+                    m: f"r={fitted_lengths.marker_r_drift[m]:.2f}px"
+                    for m in fitted_lengths.marker_r_drift
+                }
+                print(
+                    f"[smoother-v2] Empirical drift radii: "
+                    f"{drift_str}"
+                )
         params = None  # will be set by EM below
+
+    # Patch 119a: apply the fitted marker offsets to the layout.
+    # Without this, FK reads layout.marker_attachment(m) which
+    # returns the layout's construction-time defaults — crude
+    # initial guesses like nose=(1.0, 0.0). Effect: the fit
+    # was previously dead data. Now FK uses the fitted values.
+    # No-op on the load path (load_model_v2 already applied),
+    # essential on the fresh-fit path.
+    apply_fitted_offsets_to_layout(layout, fitted_lengths)
 
     # ---------- Set up worker pool (if n_workers > 1) ----------
     # Pool is reused across warm-start σ, perspective fit, EM
@@ -6435,6 +6896,22 @@ def main(argv=None) -> int:
         "--verbose", "-v", action="store_true",
         help="Verbose logging",
     )
+    parser.add_argument(
+        "--with-drift", action="store_true",
+        help=(
+            "Patch 120b: enable per-marker latent drift "
+            "state. Each marker gains a 2D drift δ_m in "
+            "segment-local frame following mean-reverting "
+            "AR(1) dynamics, soft-bounded by an "
+            "empirically-fit radius. Captures within-session "
+            "marker motion (sniffing, fur compression, ear "
+            "flicks, spine flexion in 2D) that the rigid "
+            "kinematic model can't represent. Significantly "
+            "increases state dimension (e.g. +30 for the "
+            "standard rat layout, K=15) and ~3× EKF cost. "
+            "Off by default."
+        ),
+    )
     args = parser.parse_args(argv)
 
     layout = standard_rat_layout(
@@ -6443,6 +6920,8 @@ def main(argv=None) -> int:
         include_lateral=not args.no_lateral,
         include_center=not args.no_center,
     )
+    if args.with_drift:
+        layout.with_drift = True
 
     try:
         smooth_pose_v2(

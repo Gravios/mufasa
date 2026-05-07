@@ -3942,7 +3942,618 @@ def main() -> int:
     )
     assert abs(var_emp[1] - sigma2_inf) / sigma2_inf < 0.15
 
-    print("smoke_kalman_pose_smoother_v2: 106/106 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 119a: apply fitted marker offsets to the layout
+    # so that runtime forward kinematics actually uses them.
+    # Previously fit_body_lengths produced offsets that were
+    # only saved to disk, never read; FK kept using the
+    # layout's construction-time defaults.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        apply_fitted_offsets_to_layout as _apply_119a,
+        state_to_marker_positions as _stmp_119a,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 107: apply_fitted_offsets_to_layout updates each
+    # marker's (length, angle) in place.
+    # ---------------------------------------------------------- #
+    layout_107 = standard_rat_layout()
+    # Default nose offset is (1.0, 0.0) per standard_rat_layout
+    seg_name_pre, off_pre = layout_107.marker_attachment("nose")
+    assert off_pre == (1.0, 0.0), (
+        f"Test invariant: default nose offset is (1.0, 0.0); "
+        f"got {off_pre}"
+    )
+    fitted_107 = FittedLengths(
+        segment_lengths={
+            s: 30.0 for s in layout_107.non_root_topo_order
+        },
+        segment_length_iqr={
+            s: 1.0 for s in layout_107.non_root_topo_order
+        },
+        marker_offsets={
+            "nose": (1.7, 0.13),
+            "ear_left": (0.4, 1.2),
+            # other markers omitted to test the "leave alone"
+            # behavior in case 109
+        },
+    )
+    _apply_119a(layout_107, fitted_107)
+    seg_name_post, off_post = layout_107.marker_attachment("nose")
+    assert seg_name_post == seg_name_pre  # segment unchanged
+    assert off_post == (1.7, 0.13), (
+        f"nose offset should be (1.7, 0.13) after apply; "
+        f"got {off_post}"
+    )
+    _, ear_off = layout_107.marker_attachment("ear_left")
+    assert ear_off == (0.4, 1.2)
+
+    # ---------------------------------------------------------- #
+    # Case 108: distal markers round-trip correctly. fit_body_
+    # lengths writes (0, 0) for them, so applying preserves the
+    # structural distal-end-of-segment invariant.
+    # ---------------------------------------------------------- #
+    layout_108 = standard_rat_layout()
+    fitted_108 = fit_body_lengths(
+        # Build trivial synthetic data where every marker is
+        # at the rest pose (offsets in fit are computed from
+        # data, not pulled from layout)
+        np.zeros((50, layout_108.n_markers, 2)),
+        np.full((50, layout_108.n_markers), 0.95),
+        layout_108, layout_108.marker_names,
+    )
+    # back2 is the body's distal marker — must be (0, 0)
+    assert fitted_108.marker_offsets.get("back2") == (0.0, 0.0)
+    _apply_119a(layout_108, fitted_108)
+    _, back2_off = layout_108.marker_attachment("back2")
+    assert back2_off == (0.0, 0.0), (
+        f"distal marker back2 must stay at (0, 0) after "
+        f"apply; got {back2_off}"
+    )
+    # Same for headmid, tailbase, etc.
+    for distal in ("back4", "neck", "headmid", "tailbase"):
+        if distal in layout_108.marker_names:
+            _, off = layout_108.marker_attachment(distal)
+            assert off == (0.0, 0.0), (
+                f"distal marker {distal!r} should be (0, 0); "
+                f"got {off}"
+            )
+
+    # ---------------------------------------------------------- #
+    # Case 109: markers absent from fitted_lengths.marker_offsets
+    # keep their current layout values (defensive against partial
+    # fits or old saved models).
+    # ---------------------------------------------------------- #
+    layout_109 = standard_rat_layout()
+    _, lat_left_pre = layout_109.marker_attachment("lateral_left")
+    fitted_109 = FittedLengths(
+        segment_lengths={s: 30.0 for s in layout_109.non_root_topo_order},
+        segment_length_iqr={s: 1.0 for s in layout_109.non_root_topo_order},
+        marker_offsets={"nose": (1.7, 0.0)},  # only nose
+    )
+    _apply_119a(layout_109, fitted_109)
+    _, lat_left_post = layout_109.marker_attachment("lateral_left")
+    assert lat_left_post == lat_left_pre, (
+        f"lateral_left should be unchanged when not in "
+        f"fitted_lengths.marker_offsets; "
+        f"pre={lat_left_pre} post={lat_left_post}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 110: idempotency — applying the same FittedLengths
+    # twice produces the same layout.
+    # ---------------------------------------------------------- #
+    layout_110 = standard_rat_layout()
+    fitted_110 = FittedLengths(
+        segment_lengths={s: 30.0 for s in layout_110.non_root_topo_order},
+        segment_length_iqr={s: 1.0 for s in layout_110.non_root_topo_order},
+        marker_offsets={
+            "nose": (1.5, 0.1),
+            "ear_left": (0.6, 1.0),
+            "ear_right": (0.6, -1.0),
+        },
+    )
+    _apply_119a(layout_110, fitted_110)
+    snapshot_after_first = {
+        m: layout_110.marker_attachment(m)[1]
+        for m in layout_110.marker_names
+    }
+    _apply_119a(layout_110, fitted_110)
+    snapshot_after_second = {
+        m: layout_110.marker_attachment(m)[1]
+        for m in layout_110.marker_names
+    }
+    assert snapshot_after_first == snapshot_after_second, (
+        "apply_fitted_offsets_to_layout must be idempotent"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 111: behavior change — after apply, FK uses the
+    # fitted offset, not the layout's default. This is the
+    # core bug being fixed.
+    # ---------------------------------------------------------- #
+    layout_default = standard_rat_layout()
+    layout_fitted = standard_rat_layout()
+    # Hand-build a fitted offset for nose that's clearly
+    # different from the default (1.0, 0.0).
+    fitted_111 = FittedLengths(
+        segment_lengths={s: 30.0 for s in layout_fitted.non_root_topo_order},
+        segment_length_iqr={s: 1.0 for s in layout_fitted.non_root_topo_order},
+        marker_offsets={
+            m: layout_default.marker_attachment(m)[1]
+            for m in layout_default.marker_names
+        },
+    )
+    fitted_111.marker_offsets["nose"] = (2.5, 0.4)
+    _apply_119a(layout_fitted, fitted_111)
+
+    # Build a state where the body is at the origin pointing
+    # along +x (so the segment frames don't rotate the
+    # offsets), all segments at rest.
+    indices_111 = _pack_state_layout_indices(layout_default)
+    # Set non-root segments to rest pose so FK simplifies
+    state_111 = np.zeros(layout_default.state_dim)
+    state_111[indices_111["__root__"]["cos"]] = 1.0  # body cos=1
+    for seg_name in layout_default.non_root_topo_order:
+        seg_idx = indices_111[seg_name]
+        state_111[seg_idx["cos"]] = 1.0  # rest cos=1
+        state_111[seg_idx["length"]] = 30.0
+
+    pos_default = _stmp_119a(state_111, layout_default)
+    pos_fitted = _stmp_119a(state_111, layout_fitted)
+    nose_idx = layout_default.marker_names.index("nose")
+    # Default nose offset is (1.0, 0.0). After apply with
+    # (2.5, 0.4), the nose must end up at a different world
+    # position. Other markers (whose offsets we copied from
+    # default) must be the same.
+    assert not np.allclose(
+        pos_default[nose_idx], pos_fitted[nose_idx], atol=1e-6,
+    ), (
+        f"nose position must differ after apply with non-"
+        f"default offset; got default={pos_default[nose_idx]}, "
+        f"fitted={pos_fitted[nose_idx]}"
+    )
+    for i, m in enumerate(layout_default.marker_names):
+        if m == "nose":
+            continue
+        np.testing.assert_allclose(
+            pos_default[i], pos_fitted[i], atol=1e-9,
+            err_msg=(
+                f"marker {m!r} (offset unchanged) must yield "
+                f"the same FK position before and after apply"
+            ),
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 112: load_model_v2 round-trips fitted offsets into
+    # the returned layout. Save with fitted offsets applied,
+    # load, verify layout.marker_attachment returns the fitted
+    # values directly (no separate apply step needed by caller).
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        save_model_v2 as _save_119a,
+        load_model_v2 as _load_119a,
+    )
+    layout_112 = standard_rat_layout()
+    fitted_112 = FittedLengths(
+        segment_lengths={s: 30.0 for s in layout_112.non_root_topo_order},
+        segment_length_iqr={s: 1.0 for s in layout_112.non_root_topo_order},
+        marker_offsets={
+            m: layout_112.marker_attachment(m)[1]
+            for m in layout_112.marker_names
+        },
+    )
+    fitted_112.marker_offsets["ear_left"] = (0.77, 0.99)
+    _apply_119a(layout_112, fitted_112)
+    params_112 = NoiseParamsV2.default(layout_112, sigma_marker=2.0)
+
+    with _tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / "m.npz"
+        _save_119a(
+            save_path, layout_112, fitted_112, params_112,
+            fps=30.0, likelihood_threshold=0.7,
+        )
+        loaded_layout, _, _, _, _, _ = _load_119a(save_path)
+        _, ear_off_loaded = loaded_layout.marker_attachment("ear_left")
+        assert ear_off_loaded == (0.77, 0.99), (
+            f"load_model_v2 must apply fitted offsets to the "
+            f"returned layout; ear_left got {ear_off_loaded}"
+        )
+
+    # ---------------------------------------------------------- #
+    # Patch 120b: wire per-marker drift δ_m into FK + Jacobian,
+    # plus empirical drift calibration in fit_body_lengths,
+    # plus end-to-end save/load round-trip with backward compat.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        forward_kinematics as _fk_120b,
+        state_to_marker_positions_batch as _stmpb_120b,
+        state_to_marker_jacobian_batch as _stmjb_120b,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 113: with_drift=True, δ_m=0 reproduces the no-drift
+    # FK result exactly. Regression sentinel for the wiring.
+    # ---------------------------------------------------------- #
+    layout_113_no = standard_rat_layout()
+    layout_113_yes = standard_rat_layout()
+    layout_113_yes.with_drift = True
+
+    indices_113 = _pack_state_layout_indices(layout_113_no)
+    state_no = np.zeros(layout_113_no.state_dim)
+    state_no[indices_113["__root__"]["cos"]] = 1.0
+    state_no[indices_113["__root__"]["x"]] = 100.0
+    state_no[indices_113["__root__"]["y"]] = 100.0
+    for seg in layout_113_no.non_root_topo_order:
+        seg_idx = indices_113[seg]
+        state_no[seg_idx["cos"]] = 1.0
+        state_no[seg_idx["length"]] = 30.0
+
+    # Build a drift-enabled state with δ=0 for all markers
+    state_yes = np.zeros(layout_113_yes.state_dim)
+    state_yes[:layout_113_no.state_dim] = state_no  # body state copy
+    pos_no = _stmp_119a(state_no, layout_113_no)
+    pos_yes = _stmp_119a(state_yes, layout_113_yes)
+    np.testing.assert_allclose(
+        pos_no, pos_yes, atol=1e-12,
+        err_msg="δ=0 must reproduce no-drift FK exactly",
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 114: nonzero δ_m shifts only the corresponding marker
+    # by R_world[seg] @ δ_m. Verify per-marker independence.
+    # ---------------------------------------------------------- #
+    state_drift = state_yes.copy()
+    target_marker = "nose"
+    nose_idx = layout_113_yes.marker_names.index(target_marker)
+    nose_drift = np.array([0.7, -0.3])
+    drift_sl = layout_113_yes.slice_marker_drift(target_marker)
+    state_drift[drift_sl] = nose_drift
+
+    pos_baseline = _stmp_119a(state_yes, layout_113_yes)
+    pos_drifted = _stmp_119a(state_drift, layout_113_yes)
+    diff = pos_drifted - pos_baseline
+
+    # Only the target marker should have changed
+    for i, m in enumerate(layout_113_yes.marker_names):
+        if m == target_marker:
+            continue
+        np.testing.assert_allclose(
+            diff[i], 0.0, atol=1e-12,
+            err_msg=(
+                f"setting δ_{target_marker!r} should not move "
+                f"marker {m!r}"
+            ),
+        )
+    # The shift on the target marker is R_world[seg] @ δ in world
+    # frame. With body cos=1, sin=0, head and neck at rest cos=1
+    # → R_world[head] = identity, so the shift is just δ itself.
+    np.testing.assert_allclose(
+        diff[nose_idx], nose_drift, atol=1e-9,
+        err_msg=(
+            "nose shift should equal δ_nose under identity body "
+            "rotation"
+        ),
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 115: numerical vs analytical Jacobian for the drift
+    # block. The most important correctness check — if the
+    # drift partials are wrong, the EKF will silently misbehave.
+    # ---------------------------------------------------------- #
+    rng_115 = np.random.default_rng(115)
+    layout_115 = standard_rat_layout()
+    layout_115.with_drift = True
+    state_115 = np.zeros(layout_115.state_dim)
+    indices_115 = _pack_state_layout_indices(layout_115)
+    state_115[indices_115["__root__"]["cos"]] = np.cos(0.4)
+    state_115[indices_115["__root__"]["sin"]] = np.sin(0.4)
+    state_115[indices_115["__root__"]["x"]] = 50.0
+    state_115[indices_115["__root__"]["y"]] = 80.0
+    for seg in layout_115.non_root_topo_order:
+        seg_idx = indices_115[seg]
+        ang = rng_115.uniform(-0.3, 0.3)
+        state_115[seg_idx["cos"]] = np.cos(ang)
+        state_115[seg_idx["sin"]] = np.sin(ang)
+        state_115[seg_idx["length"]] = 30.0
+    # Random nonzero drift to ensure nonzero state vector entries
+    for m in layout_115.marker_names:
+        sl = layout_115.slice_marker_drift(m)
+        state_115[sl] = rng_115.normal(0, 1.0, 2)
+
+    H_analytic = state_to_marker_jacobian(state_115, layout_115)
+    # Numerical Jacobian via finite differences. We only check
+    # the drift columns — body-state columns are exercised by
+    # earlier tests.
+    eps = 1e-6
+    base_pos = _stmp_119a(state_115, layout_115).flatten()
+    for m in layout_115.marker_names:
+        sl = layout_115.slice_marker_drift(m)
+        for j, col in enumerate([sl.start, sl.start + 1]):
+            s_plus = state_115.copy()
+            s_plus[col] += eps
+            s_minus = state_115.copy()
+            s_minus[col] -= eps
+            num_col = (
+                _stmp_119a(s_plus, layout_115).flatten()
+                - _stmp_119a(s_minus, layout_115).flatten()
+            ) / (2 * eps)
+            ana_col = H_analytic[:, col]
+            np.testing.assert_allclose(
+                num_col, ana_col, atol=1e-7,
+                err_msg=(
+                    f"drift Jacobian column {col} (marker {m!r}, "
+                    f"axis {j}) disagrees with numerical"
+                ),
+            )
+
+    # ---------------------------------------------------------- #
+    # Case 116: batch FK with drift agrees with per-frame FK.
+    # ---------------------------------------------------------- #
+    T_116 = 5
+    states_batch = np.tile(state_115, (T_116, 1))
+    # Vary drift over time so the batch path actually exercises
+    # the per-frame drift lookup
+    rng_116 = np.random.default_rng(116)
+    for t in range(T_116):
+        for m in layout_115.marker_names:
+            sl = layout_115.slice_marker_drift(m)
+            states_batch[t, sl] = rng_116.normal(0, 1.0, 2)
+    pos_batch = _stmpb_120b(states_batch, layout_115, device="cpu")
+    for t in range(T_116):
+        pos_t = _stmp_119a(states_batch[t], layout_115)
+        np.testing.assert_allclose(
+            pos_batch[t], pos_t, atol=1e-12,
+            err_msg=f"batch FK frame {t} disagrees with per-frame",
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 117: batch Jacobian with drift agrees with per-frame
+    # Jacobian on the drift columns.
+    # ---------------------------------------------------------- #
+    H_batch = _stmjb_120b(states_batch, layout_115, device="cpu")
+    for t in range(T_116):
+        H_t = state_to_marker_jacobian(states_batch[t], layout_115)
+        # Check drift columns specifically
+        drift_block = layout_115.drift_block_slice
+        np.testing.assert_allclose(
+            H_batch[t, :, drift_block.start:drift_block.stop],
+            H_t[:, drift_block.start:drift_block.stop],
+            atol=1e-12,
+            err_msg=f"batch H drift cols frame {t} mismatch",
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 118: fit_body_lengths populates marker_r_drift /
+    # marker_q_drift, with values reflecting actual scatter.
+    # Synthesize markers at known offsets plus controlled noise;
+    # verify recovered r_drift is in the right ballpark.
+    # ---------------------------------------------------------- #
+    rng_118 = np.random.default_rng(118)
+    T_118 = 1000
+    layout_118 = standard_rat_layout()
+    K_118 = layout_118.n_markers
+    markers_118 = layout_118.marker_names
+
+    # Generate a static-pose dataset with realistic scatter:
+    # back2 at a fixed location, back1 forward, ear_l/r and
+    # nose at head offsets — all observed with controlled
+    # body-frame noise of stddev 2 px. The kinematic chain
+    # places each marker relative to its segment's distal
+    # endpoint; here we fold all of that into a single
+    # local→world rotation since the synthetic body+segments
+    # are at rest angles (everything points along +x).
+    pos_118 = np.zeros((T_118, K_118, 2))
+    likes_118 = np.full((T_118, K_118), 0.95)
+    body_dir = 0.0
+    cos_b, sin_b = np.cos(body_dir), np.sin(body_dir)
+    body_x_w = 100.0
+    body_y_w = 100.0
+    # Per-segment world offsets along +x at rest. We don't
+    # need to compute every segment exactly — the diagnostic
+    # only cares about marker world positions, and at rest
+    # all markers in a chain end up at body + (chain_length +
+    # marker_local_offset) along +x.
+    chain_offsets_at_rest = {
+        # marker → (chain_x, chain_y) of its segment's distal
+        # endpoint relative to body root
+        "back2": (0.0, 0.0),
+        "back1": (0.0, 0.0),       # body marker, no chain
+        "back3": (0.0, 0.0),
+        "lateral_left": (0.0, 0.0),
+        "lateral_right": (0.0, 0.0),
+        "center": (0.0, 0.0),
+        "back4": (-30.0, 0.0),     # back_rear extends rearward
+        "neck": (30.0, 0.0),       # neck extends forward
+        "headmid": (60.0, 0.0),    # head past neck
+        "nose": (60.0, 0.0),
+        "ear_left": (60.0, 0.0),
+        "ear_right": (60.0, 0.0),
+        "tailbase": (-60.0, 0.0),  # tail past back_rear
+        "tailmid": (-90.0, 0.0),
+        "tailend": (-120.0, 0.0),
+    }
+    scale = 30.0
+    for k, m in enumerate(markers_118):
+        seg, (l_off, a_off) = layout_118.marker_attachment(m)
+        # Marker position in segment-local frame
+        local_x = scale * l_off * np.cos(a_off)
+        local_y = scale * l_off * np.sin(a_off)
+        chain_x, chain_y = chain_offsets_at_rest.get(m, (0.0, 0.0))
+        # Rest pose: segment frames all aligned with body, so
+        # local coords add directly to chain offsets.
+        rest_x = chain_x + local_x
+        rest_y = chain_y + local_y
+        for t in range(T_118):
+            # Body-frame noise added before rotating into world
+            nx = rng_118.normal(0, 2.0)
+            ny = rng_118.normal(0, 2.0)
+            pos_118[t, k, 0] = body_x_w + cos_b * (rest_x + nx) - sin_b * (rest_y + ny)
+            pos_118[t, k, 1] = body_y_w + sin_b * (rest_x + nx) + cos_b * (rest_y + ny)
+
+    fitted_118 = fit_body_lengths(
+        pos_118, likes_118, layout_118, markers_118,
+        dt=1.0 / 30.0,
+    )
+    assert fitted_118.marker_r_drift is not None
+    assert fitted_118.marker_q_drift is not None
+    # For the back/head markers, recovered r_drift should be in
+    # [0.8, 6.0] px — reflects the 2 px body-frame noise we
+    # injected, plus noise compounding from the frame-direction
+    # estimation (back3→back2 / neck→headmid frames are also
+    # estimated from noisy markers, so the projected residuals
+    # see ~2× the per-marker noise).
+    for m in ("back1", "ear_left", "nose"):
+        if m in fitted_118.marker_r_drift:
+            r_m = fitted_118.marker_r_drift[m]
+            assert 0.8 <= r_m <= 6.0, (
+                f"r_drift for {m!r}: expected [0.8, 6], got {r_m:.2f}"
+            )
+
+    # ---------------------------------------------------------- #
+    # Case 119: NoiseParamsV2.default uses fitted_lengths.
+    # marker_r_drift when provided AND layout.with_drift=True.
+    # ---------------------------------------------------------- #
+    layout_119 = standard_rat_layout()
+    layout_119.with_drift = True
+    p_with_fit = NoiseParamsV2.default(
+        layout_119, sigma_marker=99.0,  # silly large
+        fitted_lengths=fitted_118,
+        dt=1.0 / 30.0,
+    )
+    p_without_fit = NoiseParamsV2.default(
+        layout_119, sigma_marker=99.0,
+        dt=1.0 / 30.0,
+    )
+    # With fit: r_drift for, say, back1 should be the empirical
+    # value (small, ~1-3), NOT 99 from sigma_marker
+    if "back1" in fitted_118.marker_r_drift:
+        emp_r = fitted_118.marker_r_drift["back1"]
+        assert abs(p_with_fit.r_drift["back1"] - emp_r) < 1e-9, (
+            f"r_drift should come from fitted_lengths; got "
+            f"{p_with_fit.r_drift['back1']} expected {emp_r}"
+        )
+    # Without fit: r_drift comes from sigma_marker, capped at
+    # r_drift_cap (default 20.0). 99 → 20.0.
+    assert p_without_fit.r_drift["back1"] == 20.0, (
+        f"r_drift cap should clamp 99 → 20; got "
+        f"{p_without_fit.r_drift['back1']}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 120: r_drift_cap clamps very large empirical values
+    # (e.g., tail markers with pathological body-frame scatter).
+    # ---------------------------------------------------------- #
+    fitted_with_huge = FittedLengths(
+        segment_lengths={s: 30.0 for s in layout_119.non_root_topo_order},
+        segment_length_iqr={s: 1.0 for s in layout_119.non_root_topo_order},
+        marker_offsets={m: (1.0, 0.0) for m in layout_119.marker_names},
+        marker_r_drift={"tailend": 312.0, "back1": 2.0},
+        marker_q_drift={
+            "tailend": (312.0 / 5.0) ** 2 / (1.0 / 30.0),
+            "back1":   (2.0 / 5.0) ** 2 / (1.0 / 30.0),
+        },
+    )
+    p_capped = NoiseParamsV2.default(
+        layout_119, sigma_marker=3.0,
+        fitted_lengths=fitted_with_huge,
+        dt=1.0 / 30.0,
+        r_drift_cap=20.0,
+    )
+    assert p_capped.r_drift["tailend"] == 20.0
+    assert abs(p_capped.r_drift["back1"] - 2.0) < 1e-9
+    # When uncapped, the empirical 312 comes through
+    p_uncapped = NoiseParamsV2.default(
+        layout_119, sigma_marker=3.0,
+        fitted_lengths=fitted_with_huge,
+        dt=1.0 / 30.0,
+        r_drift_cap=None,
+    )
+    assert abs(p_uncapped.r_drift["tailend"] - 312.0) < 1e-9
+
+    # ---------------------------------------------------------- #
+    # Case 121: save/load round-trip preserves with_drift,
+    # FittedLengths drift calibration, and NoiseParamsV2 drift
+    # fields. Backward compat: pre-120b model files (no drift
+    # keys present) load correctly with drift fields = None.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        save_model_v2 as _save_120b,
+        load_model_v2 as _load_120b,
+    )
+    layout_121 = standard_rat_layout()
+    layout_121.with_drift = True
+    fitted_121 = fitted_118  # has empirical drift cal
+    _apply_119a(layout_121, fitted_121)
+    params_121 = NoiseParamsV2.default(
+        layout_121, sigma_marker=2.0,
+        fitted_lengths=fitted_121,
+    )
+    with _tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / "m120b.npz"
+        _save_120b(
+            save_path, layout_121, fitted_121, params_121,
+            fps=30.0, likelihood_threshold=0.7,
+        )
+        loaded = _load_120b(save_path)
+        loaded_layout = loaded[0]
+        loaded_fitted = loaded[1]
+        loaded_params = loaded[2]
+        assert loaded_layout.with_drift is True
+        assert loaded_fitted.marker_r_drift is not None
+        assert loaded_fitted.marker_q_drift is not None
+        # Round-trip equality on at least one marker
+        for m in fitted_121.marker_r_drift:
+            assert abs(
+                loaded_fitted.marker_r_drift[m]
+                - fitted_121.marker_r_drift[m]
+            ) < 1e-12
+            assert abs(
+                loaded_fitted.marker_q_drift[m]
+                - fitted_121.marker_q_drift[m]
+            ) < 1e-12
+        assert loaded_params.q_drift is not None
+        assert loaded_params.alpha_drift is not None
+        assert loaded_params.r_drift is not None
+        for m in params_121.r_drift:
+            assert abs(
+                loaded_params.r_drift[m]
+                - params_121.r_drift[m]
+            ) < 1e-12
+
+    # ---------------------------------------------------------- #
+    # Case 122: backward compat — load a model saved without
+    # drift fields. Synthesize one by saving with with_drift=
+    # False (no drift fields populated), then load and verify
+    # the loaded layout/fitted/params have None for drift.
+    # ---------------------------------------------------------- #
+    layout_122 = standard_rat_layout()
+    # with_drift left at default False
+    fitted_122 = FittedLengths(
+        segment_lengths={s: 30.0 for s in layout_122.non_root_topo_order},
+        segment_length_iqr={s: 1.0 for s in layout_122.non_root_topo_order},
+        marker_offsets={m: (1.0, 0.0) for m in layout_122.marker_names},
+        # marker_r_drift / marker_q_drift remain None
+    )
+    params_122 = NoiseParamsV2.default(layout_122, sigma_marker=2.0)
+    with _tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / "m122.npz"
+        _save_120b(
+            save_path, layout_122, fitted_122, params_122,
+            fps=30.0, likelihood_threshold=0.7,
+        )
+        loaded_layout, loaded_fl, loaded_pp, _, _, _ = _load_120b(
+            save_path,
+        )
+        assert loaded_layout.with_drift is False
+        assert loaded_fl.marker_r_drift is None
+        assert loaded_fl.marker_q_drift is None
+        assert loaded_pp.q_drift is None
+        assert loaded_pp.alpha_drift is None
+        assert loaded_pp.r_drift is None
+
+    print("smoke_kalman_pose_smoother_v2: 122/122 cases passed")
     return 0
 
 
