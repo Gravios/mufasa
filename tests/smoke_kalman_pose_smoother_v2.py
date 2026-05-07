@@ -2829,7 +2829,157 @@ def main() -> int:
     # that's fine — main check is the strict mode is plumbed
     # through correctly)
 
-    print("smoke_kalman_pose_smoother_v2: 78/78 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 113: sparse Jacobian (marker_mask), deduped FK,
+    # device threading.
+    # ---------------------------------------------------------- #
+
+    # ---------------------------------------------------------- #
+    # Case 79: state_to_marker_jacobian with marker_mask returns
+    # the same rows for selected markers as the full Jacobian,
+    # and zeros for masked-out markers.
+    # ---------------------------------------------------------- #
+    rng_79 = np.random.default_rng(2103)
+    state_79 = np.zeros(layout.state_dim)
+    state_79[indices["__root__"]["x"]] = 100.0
+    state_79[indices["__root__"]["y"]] = 200.0
+    theta_79 = rng_79.uniform(-0.5, 0.5)
+    state_79[indices["__root__"]["cos"]] = np.cos(theta_79)
+    state_79[indices["__root__"]["sin"]] = np.sin(theta_79)
+    for s in layout.non_root_topo_order:
+        th = rng_79.uniform(-0.3, 0.3)
+        state_79[indices[s]["cos"]] = np.cos(th)
+        state_79[indices[s]["sin"]] = np.sin(th)
+        state_79[indices[s]["length"]] = rng_79.uniform(3, 7)
+
+    H_full_79 = state_to_marker_jacobian(state_79, layout)
+    K_79 = layout.n_markers
+
+    # Mask: include first 8 markers, exclude last 7
+    mask_79 = np.zeros(K_79, dtype=bool)
+    mask_79[:8] = True
+    H_masked_79 = state_to_marker_jacobian(
+        state_79, layout, marker_mask=mask_79,
+    )
+    assert H_masked_79.shape == H_full_79.shape, (
+        "Masked Jacobian must keep full (2K, D) shape"
+    )
+    # Selected marker rows must match full Jacobian exactly
+    for k in range(K_79):
+        if mask_79[k]:
+            assert np.allclose(
+                H_masked_79[2*k:2*k+2], H_full_79[2*k:2*k+2]
+            ), f"Marker {k} (selected) rows differ from full"
+        else:
+            assert np.all(H_masked_79[2*k:2*k+2] == 0.0), (
+                f"Marker {k} (masked out) rows should be zero"
+            )
+
+    # Same with perspective active
+    persp_79 = PerspectiveModelV2(
+        coeffs={
+            m: rng_79.uniform(-0.1, 0.1, 3)
+            for m in layout.marker_names
+        },
+        arena_x_mean=100.0, arena_x_range=200.0,
+        arena_y_mean=200.0, arena_y_range=200.0,
+    )
+    H_full_p = state_to_marker_jacobian(
+        state_79, layout, perspective=persp_79,
+    )
+    H_masked_p = state_to_marker_jacobian(
+        state_79, layout, perspective=persp_79,
+        marker_mask=mask_79,
+    )
+    for k in range(K_79):
+        if mask_79[k]:
+            assert np.allclose(
+                H_masked_p[2*k:2*k+2], H_full_p[2*k:2*k+2]
+            ), f"With persp, marker {k} (selected) differs from full"
+        else:
+            assert np.all(H_masked_p[2*k:2*k+2] == 0.0)
+
+    # ---------------------------------------------------------- #
+    # Case 80: All-True mask matches no-mask (regression check —
+    # the mask path should be a no-op when everything's True).
+    # ---------------------------------------------------------- #
+    all_true = np.ones(K_79, dtype=bool)
+    H_all_true = state_to_marker_jacobian(
+        state_79, layout, marker_mask=all_true,
+    )
+    assert np.allclose(H_all_true, H_full_79), (
+        "All-True mask must give same result as no mask"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 81: state_to_marker_variances accepts pre-computed
+    # H_batch and produces the same result as recomputing.
+    # ---------------------------------------------------------- #
+    T_81 = 30
+    states_81 = np.tile(state_79, (T_81, 1))
+    # Add some variation per frame so it's not degenerate
+    for t in range(T_81):
+        states_81[t, indices["__root__"]["x"]] += t * 0.5
+    P_smooth_81 = np.tile(
+        np.eye(layout.state_dim) * 0.1, (T_81, 1, 1),
+    )
+
+    # Recomputing inside variances
+    var_recomputed = state_to_marker_variances(
+        states_81, P_smooth_81, layout,
+    )
+
+    # Pre-computed H_batch path
+    H_batch_81 = state_to_marker_jacobian_batch(states_81, layout)
+    var_with_H = state_to_marker_variances(
+        states_81, P_smooth_81, layout, H_batch=H_batch_81,
+    )
+    assert np.allclose(var_recomputed, var_with_H), (
+        "variances with pre-computed H_batch must match "
+        "variances that recomputes internally"
+    )
+
+    # With perspective
+    var_recomputed_p = state_to_marker_variances(
+        states_81, P_smooth_81, layout, perspective=persp_79,
+    )
+    H_batch_p = state_to_marker_jacobian_batch(
+        states_81, layout, perspective=persp_79,
+    )
+    var_with_H_p = state_to_marker_variances(
+        states_81, P_smooth_81, layout, perspective=persp_79,
+        H_batch=H_batch_p,
+    )
+    assert np.allclose(var_recomputed_p, var_with_H_p)
+
+    # ---------------------------------------------------------- #
+    # Case 82: device parameter threads through smooth_session_v2
+    # without erroring (CPU path always works; GPU path skipped
+    # if torch unavailable).
+    # ---------------------------------------------------------- #
+    # Build minimal session
+    n_m = layout.n_markers
+    T_82 = 100
+    rng_82 = np.random.default_rng(2104)
+    true_pos_82 = state_to_marker_positions(state_79, layout)
+    pos_82 = np.zeros((T_82, n_m, 2))
+    likes_82 = np.full((T_82, n_m), 0.95)
+    for t in range(T_82):
+        pos_82[t] = true_pos_82 + rng_82.normal(0, 1.0, (n_m, 2))
+    fitted_82 = fit_body_lengths(
+        pos_82, likes_82, layout, layout.marker_names,
+    )
+    params_82 = NoiseParamsV2.default(layout, sigma_marker=1.5)
+
+    smoothed_pos_cpu, smoothed_var_cpu = smooth_session_v2(
+        pos_82, likes_82, layout, layout.marker_names,
+        fitted_82, params_82, fps=30.0, device="cpu",
+    )
+    assert smoothed_pos_cpu.shape == (T_82, n_m, 2)
+    assert smoothed_var_cpu.shape == (T_82, n_m, 2)
+    assert np.all(np.isfinite(smoothed_pos_cpu))
+
+    print("smoke_kalman_pose_smoother_v2: 82/82 cases passed")
     return 0
 
 
