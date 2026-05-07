@@ -3673,7 +3673,276 @@ def main() -> int:
         loaded = _load_94(save_path)
         assert loaded[0].n_markers == test_layout_94.n_markers
 
-    print("smoke_kalman_pose_smoother_v2: 94/94 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 120a: per-marker latent drift block in the state
+    # vector. Opt-in via BodyLayout(with_drift=True). When
+    # disabled (default), state dim and dynamics match patch
+    # 119 exactly. When enabled, F gains mean-reverting drift
+    # dynamics and Q gains a random-walk noise block.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        build_F_v2 as _build_F_120,
+        build_Q_v2 as _build_Q_120,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 95: with_drift=False (default) preserves state_dim
+    # exactly. Sanity guard: if some future patch changes the
+    # default we want this test to flag it.
+    # ---------------------------------------------------------- #
+    layout_no_drift = standard_rat_layout()
+    assert layout_no_drift.with_drift is False, (
+        "Default layout must have with_drift=False for "
+        "backward compat"
+    )
+    expected_no_drift = 8 + 6 * layout_no_drift.n_non_root_segments
+    assert layout_no_drift.state_dim == expected_no_drift, (
+        f"state_dim regression: expected {expected_no_drift}, "
+        f"got {layout_no_drift.state_dim}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 96: with_drift=True grows state_dim by exactly 2K
+    # and drift_block_slice covers the new region.
+    # ---------------------------------------------------------- #
+    layout_drift = standard_rat_layout()
+    layout_drift.with_drift = True
+    K = layout_drift.n_markers
+    expected_drift = 8 + 6 * layout_drift.n_non_root_segments + 2 * K
+    assert layout_drift.state_dim == expected_drift, (
+        f"with_drift state_dim: expected {expected_drift}, "
+        f"got {layout_drift.state_dim}"
+    )
+    drift_sl = layout_drift.drift_block_slice
+    assert drift_sl.start == 8 + 6 * layout_drift.n_non_root_segments
+    assert drift_sl.stop == drift_sl.start + 2 * K
+    # And without drift, drift_block_slice is empty so
+    # callers can use it unconditionally.
+    empty_sl = layout_no_drift.drift_block_slice
+    assert empty_sl.start == empty_sl.stop, (
+        "drift_block_slice must be empty when with_drift=False"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 97: slice_marker_drift returns 2-dim, non-overlapping
+    # slices in marker_names order.
+    # ---------------------------------------------------------- #
+    seen = []
+    for m in layout_drift.marker_names:
+        sl = layout_drift.slice_marker_drift(m)
+        assert sl.stop - sl.start == 2, (
+            f"slice_marker_drift({m!r}) must be 2-dim"
+        )
+        seen.append((m, sl.start, sl.stop))
+    # Strictly sequential, contiguous
+    starts = [s[1] for s in seen]
+    assert starts == sorted(starts), "slices must be ordered"
+    for (_, _, stop_a), (_, start_b, _) in zip(seen, seen[1:]):
+        assert stop_a == start_b, (
+            "marker drift slices must be contiguous"
+        )
+    # And cover exactly drift_block_slice
+    assert seen[0][1] == drift_sl.start
+    assert seen[-1][2] == drift_sl.stop
+
+    # ---------------------------------------------------------- #
+    # Case 98: slice_marker_drift raises when with_drift=False.
+    # ---------------------------------------------------------- #
+    try:
+        layout_no_drift.slice_marker_drift("back2")
+        assert False, "Expected RuntimeError"
+    except RuntimeError as e:
+        assert "with_drift" in str(e)
+
+    # ---------------------------------------------------------- #
+    # Case 99: NoiseParamsV2.default populates drift fields iff
+    # layout.with_drift, and applies the design-doc heuristic.
+    # ---------------------------------------------------------- #
+    p_no_drift = NoiseParamsV2.default(layout_no_drift, sigma_marker=2.0)
+    assert p_no_drift.q_drift is None
+    assert p_no_drift.alpha_drift is None
+    assert p_no_drift.r_drift is None
+
+    sigma_test = 2.5
+    dt_test = 1.0 / 30.0
+    p_drift = NoiseParamsV2.default(
+        layout_drift, sigma_marker=sigma_test, dt=dt_test,
+    )
+    assert p_drift.q_drift is not None
+    assert p_drift.alpha_drift is not None
+    assert p_drift.r_drift is not None
+    for m in layout_drift.marker_names:
+        # R_m = sigma_marker
+        assert p_drift.r_drift[m] == sigma_test
+        # α_m = 0.05 (default)
+        assert p_drift.alpha_drift[m] == 0.05
+        # q_drift_m = (R_m / 5)² / dt
+        expected_q = (sigma_test / 5.0) ** 2 / dt_test
+        assert abs(p_drift.q_drift[m] - expected_q) < 1e-9
+
+    # ---------------------------------------------------------- #
+    # Case 100: build_F_v2 with with_drift=False matches the
+    # patch-119 result exactly. Backward-compat sentinel.
+    # ---------------------------------------------------------- #
+    dt = 1.0 / 30.0
+    F_no_drift = _build_F_120(layout_no_drift, dt)
+    # Body-state shape unchanged
+    assert F_no_drift.shape == (
+        layout_no_drift.state_dim, layout_no_drift.state_dim,
+    )
+    # F should equal the version we'd build from scratch with
+    # only constant-velocity blocks. Spot-check a few entries.
+    assert F_no_drift[0, 2] == dt  # x ← x + vx*dt
+    assert F_no_drift[1, 3] == dt  # y ← y + vy*dt
+
+    # ---------------------------------------------------------- #
+    # Case 101: build_F_v2 with drift adds (1 - α_m) I_2 per
+    # marker on the drift block. The body-state submatrix is
+    # identical to the no-drift version.
+    # ---------------------------------------------------------- #
+    F_drift = _build_F_120(layout_drift, dt, params=p_drift)
+    D_body = 8 + 6 * layout_drift.n_non_root_segments
+    # Body submatrix matches the no-drift run (same body
+    # topology, so the body block of layout_drift's F should
+    # equal the entirety of layout_no_drift's F).
+    np.testing.assert_allclose(
+        F_drift[:D_body, :D_body], F_no_drift,
+        err_msg="Body-state F regressed when drift was enabled",
+    )
+    # Drift block is block-diagonal 2x2 with (1 - α) I_2.
+    for m in layout_drift.marker_names:
+        sl = layout_drift.slice_marker_drift(m)
+        block = F_drift[sl, sl]
+        alpha_m = p_drift.alpha_drift[m]
+        np.testing.assert_allclose(
+            block, (1.0 - alpha_m) * np.eye(2),
+            err_msg=f"drift F block for {m!r}",
+        )
+        # Off-diagonal between drift and body is zero
+        # (drift is independent of body state)
+        assert np.allclose(F_drift[sl, :D_body], 0.0)
+        assert np.allclose(F_drift[:D_body, sl], 0.0)
+
+    # ---------------------------------------------------------- #
+    # Case 102: build_F_v2 falls back to alpha=0.05 when no
+    # params is passed. Existing call sites pass only
+    # (layout, dt); they must keep working when callers later
+    # flip with_drift on without updating every callsite.
+    # ---------------------------------------------------------- #
+    F_drift_no_params = _build_F_120(layout_drift, dt)
+    for m in layout_drift.marker_names:
+        sl = layout_drift.slice_marker_drift(m)
+        np.testing.assert_allclose(
+            F_drift_no_params[sl, sl], 0.95 * np.eye(2),
+            err_msg=(
+                f"build_F_v2 must default alpha=0.05 when "
+                f"params=None (marker {m!r})"
+            ),
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 103: build_F_v2 rejects out-of-range alpha values.
+    # ---------------------------------------------------------- #
+    p_bad = NoiseParamsV2.default(layout_drift, sigma_marker=2.0)
+    p_bad.alpha_drift["back2"] = 1.0
+    try:
+        _build_F_120(layout_drift, dt, params=p_bad)
+        assert False, "Expected ValueError on alpha=1.0"
+    except ValueError as e:
+        assert "alpha_drift" in str(e)
+    p_bad.alpha_drift["back2"] = -0.1
+    try:
+        _build_F_120(layout_drift, dt, params=p_bad)
+        assert False, "Expected ValueError on negative alpha"
+    except ValueError as e:
+        assert "alpha_drift" in str(e)
+
+    # ---------------------------------------------------------- #
+    # Case 104: build_Q_v2 with drift gains a per-marker
+    # q_drift_m * dt * I_2 block; body-state Q is unchanged.
+    # ---------------------------------------------------------- #
+    Q_no_drift = _build_Q_120(layout_no_drift, p_no_drift, dt)
+    Q_drift = _build_Q_120(layout_drift, p_drift, dt)
+    np.testing.assert_allclose(
+        Q_drift[:D_body, :D_body], Q_no_drift,
+        err_msg="Body-state Q regressed when drift was enabled",
+    )
+    for m in layout_drift.marker_names:
+        sl = layout_drift.slice_marker_drift(m)
+        block = Q_drift[sl, sl]
+        q_d = p_drift.q_drift[m]
+        np.testing.assert_allclose(
+            block, q_d * dt * np.eye(2),
+            err_msg=f"drift Q block for {m!r}",
+        )
+    # Q stays symmetric and positive semi-definite
+    assert np.allclose(Q_drift, Q_drift.T), "Q must be symmetric"
+    eigs = np.linalg.eigvalsh(Q_drift)
+    assert eigs.min() >= -1e-10, (
+        f"Q must be PSD; min eigenvalue {eigs.min()}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 105: build_Q_v2 raises when with_drift=True but
+    # params.q_drift is None (caller forgot to set it).
+    # ---------------------------------------------------------- #
+    p_missing = NoiseParamsV2.default(layout_drift, sigma_marker=2.0)
+    p_missing.q_drift = None  # simulate omission
+    try:
+        _build_Q_120(layout_drift, p_missing, dt)
+        assert False, "Expected ValueError on missing q_drift"
+    except ValueError as e:
+        assert "q_drift" in str(e)
+
+    # ---------------------------------------------------------- #
+    # Case 106: stationary variance of the drift dynamics
+    # matches the analytical prediction. This validates that
+    # F and Q are jointly correct: simulating the AR(1) for
+    # many steps should converge to
+    # σ²_∞ = q_drift × dt / (1 - (1 - α)²)
+    #      = q_drift × dt / (2α - α²)
+    # ---------------------------------------------------------- #
+    rng_106 = np.random.default_rng(120)
+    layout_106 = standard_rat_layout()
+    layout_106.with_drift = True
+    sigma_106 = 3.0
+    p_106 = NoiseParamsV2.default(
+        layout_106, sigma_marker=sigma_106, dt=dt,
+    )
+    F_106 = _build_F_120(layout_106, dt, params=p_106)
+    Q_106 = _build_Q_120(layout_106, p_106, dt)
+
+    # Simulate just the drift block of the first marker for
+    # T_sim steps, then compare empirical variance to the
+    # closed-form stationary value.
+    m_test = layout_106.marker_names[0]
+    sl = layout_106.slice_marker_drift(m_test)
+    F_block = F_106[sl, sl]
+    Q_block = Q_106[sl, sl]
+    alpha = p_106.alpha_drift[m_test]
+    q_d = p_106.q_drift[m_test]
+
+    # Analytical stationary variance per axis
+    sigma2_inf = q_d * dt / (1.0 - (1.0 - alpha) ** 2)
+
+    T_sim = 10000
+    delta = np.zeros(2)
+    samples = np.zeros((T_sim, 2))
+    L = np.linalg.cholesky(Q_block)
+    for t in range(T_sim):
+        w = L @ rng_106.standard_normal(2)
+        delta = F_block @ delta + w
+        samples[t] = delta
+    # Use the second half (post burn-in) to estimate variance
+    var_emp = samples[T_sim // 2:].var(axis=0)
+    # Within 15% of analytical (10k samples per axis)
+    assert abs(var_emp[0] - sigma2_inf) / sigma2_inf < 0.15, (
+        f"drift stationary variance off: empirical {var_emp[0]:.4f} "
+        f"vs analytical {sigma2_inf:.4f}"
+    )
+    assert abs(var_emp[1] - sigma2_inf) / sigma2_inf < 0.15
+
+    print("smoke_kalman_pose_smoother_v2: 106/106 cases passed")
     return 0
 
 
