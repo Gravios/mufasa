@@ -3437,7 +3437,197 @@ def main() -> int:
         f"got {q_strong:.2f}"
     )
 
-    print("smoke_kalman_pose_smoother_v2: 89/89 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 117: spatial stratification — per-session-median
+    # M-step aggregation.
+    # ---------------------------------------------------------- #
+
+    # ---------------------------------------------------------- #
+    # Case 90: per_session_fit_from_stats produces sensible
+    # raw q estimates from a single session's stats.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        _PerSessionFitV2, per_session_fit_from_stats,
+        _aggregate_scalar, finalize_m_step_v2_from_per_session,
+    )
+    test_layout_90 = standard_rat_layout()
+    D_90 = test_layout_90.state_dim
+
+    # Build a stats with known q values
+    stats_90 = _MStepStatsV2.empty(test_layout_90)
+    stats_90.n_pairs = 1000
+    # Set tiny diagonals → small q_raw
+    stats_90.S11[2, 2] = 0.01 * stats_90.n_pairs
+    stats_90.S11[3, 3] = 0.01 * stats_90.n_pairs
+    # Some sigma stats too
+    for m in test_layout_90.marker_names:
+        stats_90.sigma_sum_sq[m] = 100.0  # sum of sq residuals
+        stats_90.sigma_n_obs[m] = 100  # 50 frames × 2 axes
+    fit_90 = per_session_fit_from_stats(
+        stats_90, test_layout_90, dt=1.0 / 30.0,
+    )
+    # q_root_pos = (0.01 + 0.01) / 2 / (1/900) = 9.0
+    assert abs(fit_90.q_root_pos - 9.0) < 0.01, (
+        f"q_root_pos expected ~9.0, got {fit_90.q_root_pos}"
+    )
+    # σ_marker = sqrt(100/100) = 1.0
+    for m in test_layout_90.marker_names:
+        assert abs(fit_90.sigma_marker[m] - 1.0) < 1e-9, (
+            f"σ for {m} expected 1.0, got {fit_90.sigma_marker[m]}"
+        )
+    assert fit_90.n_pairs == 1000
+    assert fit_90.n_obs_per_marker[
+        test_layout_90.marker_names[0]
+    ] == 100
+
+    # Empty stats → returns zeros
+    fit_empty = per_session_fit_from_stats(
+        _MStepStatsV2.empty(test_layout_90),
+        test_layout_90, dt=1.0 / 30.0,
+    )
+    assert fit_empty.q_root_pos == 0.0
+    assert fit_empty.n_pairs == 0
+
+    # ---------------------------------------------------------- #
+    # Case 91: _aggregate_scalar correctly applies median /
+    # mean / trimmed_mean to a list with outliers.
+    # ---------------------------------------------------------- #
+    # 9 normal values + 1 huge outlier
+    vals = [10.0] * 9 + [1e6]
+    weights = [1.0] * 10
+
+    median_result = _aggregate_scalar(vals, weights, "median")
+    mean_result = _aggregate_scalar(vals, weights, "mean")
+    trimmed_result = _aggregate_scalar(vals, weights, "trimmed_mean")
+
+    assert median_result == 10.0, (
+        f"median should ignore outlier, got {median_result}"
+    )
+    # mean should be heavily affected by the outlier
+    assert mean_result > 1000.0, (
+        f"mean should be dominated by outlier, got {mean_result}"
+    )
+    # trimmed_mean drops top/bottom 10% (= 1 value each side
+    # for n=10), so excludes the outlier
+    assert trimmed_result == 10.0, (
+        f"trimmed_mean should exclude outlier, got {trimmed_result}"
+    )
+
+    # Empty list returns 0
+    assert _aggregate_scalar([], None, "median") == 0.0
+
+    # ---------------------------------------------------------- #
+    # Case 92: finalize_m_step_v2_from_per_session aggregates
+    # per-session fits via median, robust to outliers.
+    # ---------------------------------------------------------- #
+    test_layout_92 = standard_rat_layout()
+    initial_params_92 = NoiseParamsV2.default(
+        test_layout_92, sigma_marker=2.0,
+    )
+    initial_params_92 = NoiseParamsV2(
+        sigma_marker=initial_params_92.sigma_marker,
+        q_root_pos=200.0,
+        q_root_ori=initial_params_92.q_root_ori,
+        q_seg_ori=dict(initial_params_92.q_seg_ori),
+        q_length=dict(initial_params_92.q_length),
+        constraint_sigma=initial_params_92.constraint_sigma,
+    )
+
+    # Build 5 well-behaved per-session fits + 1 outlier
+    fits_92: List[_PerSessionFitV2] = []
+    for i in range(5):
+        f = _PerSessionFitV2.empty(test_layout_92)
+        f.n_pairs = 1000
+        f.q_root_pos = 250.0  # close to initial 200
+        f.q_root_ori = 0.5
+        for s in test_layout_92.non_root_topo_order:
+            f.q_seg_ori[s] = 0.5
+            f.q_length[s] = 0.01
+        for m in test_layout_92.marker_names:
+            f.sigma_marker[m] = 2.5
+            f.n_obs_per_marker[m] = 200
+        fits_92.append(f)
+    # Outlier session
+    f_outlier = _PerSessionFitV2.empty(test_layout_92)
+    f_outlier.n_pairs = 1000
+    f_outlier.q_root_pos = 1e8  # absurd
+    f_outlier.q_root_ori = 1e6
+    for s in test_layout_92.non_root_topo_order:
+        f_outlier.q_seg_ori[s] = 1e6
+        f_outlier.q_length[s] = 1e6
+    for m in test_layout_92.marker_names:
+        f_outlier.sigma_marker[m] = 1000.0
+        f_outlier.n_obs_per_marker[m] = 200
+    fits_92.append(f_outlier)
+
+    # Median aggregation: outlier should NOT dominate
+    new_params_med = finalize_m_step_v2_from_per_session(
+        fits_92, test_layout_92,
+        prev_params=initial_params_92,
+        initial_params=initial_params_92,
+        aggregation="median",
+    )
+    # With 5 normal at 250 + 1 outlier at 1e8, median is 250
+    # (or somewhere near it depending on parity)
+    assert new_params_med.q_root_pos < 1000.0, (
+        f"Median agg should reject outlier; q_root_pos="
+        f"{new_params_med.q_root_pos}"
+    )
+    # σ similarly
+    for m in test_layout_92.marker_names:
+        assert new_params_med.sigma_marker[m] < 10.0, (
+            f"Median σ for {m}: {new_params_med.sigma_marker[m]} "
+            f"(should be ~2.5, NOT dominated by 1000)"
+        )
+
+    # Mean aggregation: outlier WOULD dominate, but ceiling
+    # clips it. Should hit ceiling at initial × 30.
+    new_params_mean = finalize_m_step_v2_from_per_session(
+        fits_92, test_layout_92,
+        prev_params=initial_params_92,
+        initial_params=initial_params_92,
+        aggregation="mean",
+    )
+    # Mean of [250, 250, 250, 250, 250, 1e8] ≈ 1.7e7,
+    # weighted: 6000/6 = 1000 + n_pairs * outlier => still huge.
+    # After clipping at 200 × 30 = 6000:
+    assert new_params_mean.q_root_pos == (
+        initial_params_92.q_root_pos * 30.0
+    ), (
+        f"Mean agg with outlier should hit ceiling 6000; "
+        f"got {new_params_mean.q_root_pos}"
+    )
+
+    # Trimmed mean: drops top + bottom 10% (= 1 each side
+    # for n=6), excludes the outlier
+    new_params_trim = finalize_m_step_v2_from_per_session(
+        fits_92, test_layout_92,
+        prev_params=initial_params_92,
+        initial_params=initial_params_92,
+        aggregation="trimmed_mean",
+    )
+    assert new_params_trim.q_root_pos < 1000.0, (
+        f"Trimmed mean should reject outlier; q_root_pos="
+        f"{new_params_trim.q_root_pos}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 93: Empty per-session fits list returns prev_params.
+    # ---------------------------------------------------------- #
+    new_params_empty = finalize_m_step_v2_from_per_session(
+        [], test_layout_92,
+        prev_params=initial_params_92,
+        initial_params=initial_params_92,
+        aggregation="median",
+    )
+    assert (
+        new_params_empty.q_root_pos == initial_params_92.q_root_pos
+    )
+    assert new_params_empty is initial_params_92, (
+        "With no valid sessions, returns prev_params unchanged"
+    )
+
+    print("smoke_kalman_pose_smoother_v2: 93/93 cases passed")
     return 0
 
 

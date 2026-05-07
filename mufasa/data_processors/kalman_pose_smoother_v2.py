@@ -2733,6 +2733,45 @@ class _MStepStatsV2:
         return self
 
 
+@dataclass
+class _PerSessionFitV2:
+    """Per-session raw parameter estimates from the M-step
+    formula applied to ONE session's stats. Aggregation across
+    sessions happens at the orchestrator level via either
+    pooled accumulation (sum of S00/S11/S10) or per-session
+    median (this dataclass).
+
+    Patch 117: spatial stratification — using per-session
+    median across the values stored here (instead of pooled
+    sums) makes the M-step robust to outlier sessions whose
+    smoothed transitions contain large jumps from EKF
+    NaN-recovery.
+
+    All values are RAW (not floored or clipped). Floors and
+    ceilings are applied at the orchestrator level after
+    median aggregation.
+    """
+    q_root_pos: float        # raw q from session's S00/S11/S10
+    q_root_ori: float
+    q_seg_ori: Dict[str, float]
+    q_length: Dict[str, float]
+    sigma_marker: Dict[str, float]   # sqrt(sum_sq[m] / n_obs[m])
+    n_pairs: int             # for weighting if desired
+    n_obs_per_marker: Dict[str, int]   # observation count per m
+
+    @classmethod
+    def empty(cls, layout: BodyLayout) -> "_PerSessionFitV2":
+        return cls(
+            q_root_pos=0.0,
+            q_root_ori=0.0,
+            q_seg_ori={s: 0.0 for s in layout.non_root_topo_order},
+            q_length={s: 0.0 for s in layout.non_root_topo_order},
+            sigma_marker={m: 0.0 for m in layout.marker_names},
+            n_pairs=0,
+            n_obs_per_marker={m: 0 for m in layout.marker_names},
+        )
+
+
 def accumulate_m_step_stats_v2(
     smooth_result: SmoothResultV2,
     positions: np.ndarray,
@@ -2847,6 +2886,89 @@ def accumulate_m_step_stats_v2(
         stats.sigma_n_obs[m] += int(n_obs_per_marker[k])
 
     return stats
+
+
+def per_session_fit_from_stats(
+    stats: _MStepStatsV2,
+    layout: BodyLayout,
+    dt: float,
+) -> _PerSessionFitV2:
+    """Convert a single session's accumulated stats into raw
+    per-session parameter estimates.
+
+    Patch 117: this is the per-session arm of the spatial-
+    stratification M-step. For per-session-median aggregation,
+    each worker calls this to get its session's raw q and σ
+    estimates. The orchestrator then takes the median across
+    sessions for each scalar parameter.
+
+    Output values are RAW — no floors, no ceilings, no damping.
+    Those are applied at the orchestrator level (in
+    finalize_m_step_v2_from_per_session) AFTER median
+    aggregation, so an outlier session's clipped values can't
+    bias the median.
+
+    Parameters
+    ----------
+    stats : _MStepStatsV2
+        Accumulated stats from ONE session.
+    layout : BodyLayout
+    dt : float
+
+    Returns
+    -------
+    _PerSessionFitV2
+    """
+    fit = _PerSessionFitV2.empty(layout)
+    fit.n_pairs = stats.n_pairs
+    if stats.n_pairs <= 0:
+        # Degenerate session — return zeros; will be filtered
+        # out at aggregation time
+        for m in layout.marker_names:
+            fit.n_obs_per_marker[m] = stats.sigma_n_obs.get(m, 0)
+        return fit
+
+    F = build_F_v2(layout, dt)
+    Q_hat = (
+        stats.S11
+        - stats.S10 @ F.T
+        - F @ stats.S10.T
+        + F @ stats.S00 @ F.T
+    ) / stats.n_pairs
+    Q_hat = 0.5 * (Q_hat + Q_hat.T)
+
+    indices = _pack_state_layout_indices(layout)
+    dt2 = dt * dt
+
+    def _q_from_4block(block: np.ndarray) -> float:
+        return float((block[2, 2] + block[3, 3]) / 2.0 / dt2)
+
+    def _q_from_2block(block: np.ndarray) -> float:
+        return float(block[1, 1] / dt2)
+
+    fit.q_root_pos = _q_from_4block(Q_hat[0:4, 0:4])
+    fit.q_root_ori = _q_from_4block(Q_hat[4:8, 4:8])
+
+    for seg_name in layout.non_root_topo_order:
+        sl_o = layout.slice_segment_orientation(seg_name)
+        fit.q_seg_ori[seg_name] = _q_from_4block(Q_hat[sl_o, sl_o])
+        sl_l = layout.slice_segment_length(seg_name)
+        fit.q_length[seg_name] = _q_from_2block(Q_hat[sl_l, sl_l])
+
+    # σ per marker: sqrt(sigma_sum_sq[m] / sigma_n_obs[m])
+    # (n_obs already counts 2 axes per frame)
+    for m in layout.marker_names:
+        n = stats.sigma_n_obs.get(m, 0)
+        fit.n_obs_per_marker[m] = n
+        if n >= 4:
+            sigma_sq = stats.sigma_sum_sq[m] / n
+            fit.sigma_marker[m] = float(
+                np.sqrt(max(sigma_sq, 0.0))
+            )
+        else:
+            fit.sigma_marker[m] = 0.0  # treated as missing
+
+    return fit
 
 
 def finalize_m_step_v2(
@@ -3054,6 +3176,231 @@ _INIT_FLOOR_Q_ROOT_POS_V2 = 100.0
 _INIT_DEFAULT_Q_ROOT_ORI = 1.0
 _INIT_DEFAULT_Q_SEG_ORI = 0.5
 _INIT_DEFAULT_Q_LENGTH = 0.01
+
+
+def _aggregate_scalar(
+    values: List[float],
+    weights: Optional[List[float]] = None,
+    method: str = "median",
+) -> float:
+    """Aggregate per-session scalar estimates into a single
+    value via the requested method.
+
+    Methods
+    -------
+    median: standard median, robust to outlier sessions.
+    mean: weighted (or unweighted) mean — equivalent to the
+          pooled sum-of-stats approach when weights are
+          n_pairs.
+    trimmed_mean: discard the top and bottom 10% of values,
+                  mean the rest. Compromise between robustness
+                  and efficiency.
+    """
+    if not values:
+        return 0.0
+    arr = np.asarray(values, dtype=float)
+    if method == "median":
+        return float(np.median(arr))
+    if method == "trimmed_mean":
+        n = len(arr)
+        cut = max(1, int(0.1 * n))
+        sorted_arr = np.sort(arr)
+        if n - 2 * cut <= 0:
+            return float(np.median(arr))
+        return float(np.mean(sorted_arr[cut: n - cut]))
+    # Default: mean (weighted if weights given)
+    if weights is None:
+        return float(np.mean(arr))
+    w = np.asarray(weights, dtype=float)
+    total_w = w.sum()
+    if total_w <= 0:
+        return float(np.mean(arr))
+    return float(np.sum(arr * w) / total_w)
+
+
+def finalize_m_step_v2_from_per_session(
+    per_session_fits: List[_PerSessionFitV2],
+    layout: BodyLayout,
+    prev_params: NoiseParamsV2,
+    initial_params: Optional[NoiseParamsV2] = None,
+    damping: Optional[float] = None,
+    aggregation: str = "median",
+) -> NoiseParamsV2:
+    """Aggregate per-session q + σ estimates into refined
+    NoiseParamsV2 using the requested aggregation method.
+
+    Patch 117: this is the spatial-stratification arm of the
+    M-step. Compared to the pooled ``finalize_m_step_v2``
+    (which sums all sessions' stats and computes one Q_hat),
+    this aggregates session-level q estimates via median (or
+    trimmed mean), so outlier sessions can't dominate the
+    update.
+
+    Floors and ceilings (from patch 116) are applied AFTER
+    median aggregation, so they bound the final result rather
+    than per-session intermediates.
+
+    Parameters
+    ----------
+    per_session_fits : list of _PerSessionFitV2
+        Per-session raw estimates from
+        ``per_session_fit_from_stats``.
+    layout : BodyLayout
+    prev_params : NoiseParamsV2
+        Previous iteration's params.
+    initial_params : NoiseParamsV2, optional
+        Used for floor/ceiling. Defaults to prev_params.
+    damping : float, optional
+        Damping factor (see ``finalize_m_step_v2``).
+    aggregation : "median" | "mean" | "trimmed_mean"
+
+    Returns
+    -------
+    NoiseParamsV2
+    """
+    if initial_params is None:
+        initial_params = prev_params
+
+    damping_factor = (
+        damping if damping is not None else _M_STEP_DAMPING_FACTOR
+    )
+    damping_factor = max(0.0, min(0.95, float(damping_factor)))
+
+    def _damp(prev_value: float, m_step_value: float) -> float:
+        if damping_factor <= 0.0:
+            return m_step_value
+        return (
+            damping_factor * prev_value
+            + (1.0 - damping_factor) * m_step_value
+        )
+
+    # Filter sessions with degenerate stats
+    valid_fits = [
+        f for f in per_session_fits if f.n_pairs > 0
+    ]
+    if not valid_fits:
+        # No valid sessions — return prev_params unchanged
+        return prev_params
+
+    n_pairs_per_sess = [f.n_pairs for f in valid_fits]
+
+    # ---------- q_root_pos ----------
+    q_root_pos_vals = [f.q_root_pos for f in valid_fits]
+    q_root_pos_raw = _aggregate_scalar(
+        q_root_pos_vals, weights=n_pairs_per_sess,
+        method=aggregation,
+    )
+    q_root_pos_floor = max(
+        _FLOOR_Q_ROOT_POS,
+        initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
+    )
+    q_root_pos_ceiling = (
+        initial_params.q_root_pos * _M_STEP_Q_CEILING_FACTOR
+    )
+    q_root_pos_clipped = max(
+        q_root_pos_floor, min(q_root_pos_ceiling, q_root_pos_raw)
+    )
+    q_root_pos = _damp(prev_params.q_root_pos, q_root_pos_clipped)
+
+    # ---------- q_root_ori ----------
+    q_root_ori_vals = [f.q_root_ori for f in valid_fits]
+    q_root_ori_raw = _aggregate_scalar(
+        q_root_ori_vals, weights=n_pairs_per_sess,
+        method=aggregation,
+    )
+    q_root_ori_floor = max(
+        _FLOOR_Q_ROOT_ORI,
+        initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
+    )
+    q_root_ori_ceiling = (
+        initial_params.q_root_ori * _M_STEP_Q_CEILING_FACTOR
+    )
+    q_root_ori_clipped = max(
+        q_root_ori_floor, min(q_root_ori_ceiling, q_root_ori_raw)
+    )
+    q_root_ori = _damp(prev_params.q_root_ori, q_root_ori_clipped)
+
+    # ---------- per-segment q_seg_ori ----------
+    q_seg_ori: Dict[str, float] = {}
+    for seg_name in layout.non_root_topo_order:
+        vals = [
+            f.q_seg_ori.get(seg_name, 0.0) for f in valid_fits
+        ]
+        q_raw = _aggregate_scalar(
+            vals, weights=n_pairs_per_sess, method=aggregation,
+        )
+        q_initial = initial_params.q_seg_ori.get(
+            seg_name, _FLOOR_Q_SEG_ORI,
+        )
+        q_floor = max(
+            _FLOOR_Q_SEG_ORI, q_initial * _M_STEP_Q_FLOOR_FACTOR,
+        )
+        q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR
+        q_clipped = max(q_floor, min(q_ceiling, q_raw))
+        q_prev = prev_params.q_seg_ori.get(seg_name, q_initial)
+        q_seg_ori[seg_name] = _damp(q_prev, q_clipped)
+
+    # ---------- per-segment q_length ----------
+    q_length: Dict[str, float] = {}
+    for seg_name in layout.non_root_topo_order:
+        vals = [
+            f.q_length.get(seg_name, 0.0) for f in valid_fits
+        ]
+        q_raw = _aggregate_scalar(
+            vals, weights=n_pairs_per_sess, method=aggregation,
+        )
+        q_initial = initial_params.q_length.get(
+            seg_name, _FLOOR_Q_LENGTH,
+        )
+        q_floor = max(
+            _FLOOR_Q_LENGTH, q_initial * _M_STEP_Q_FLOOR_FACTOR,
+        )
+        q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR
+        q_clipped = max(q_floor, min(q_ceiling, q_raw))
+        q_prev = prev_params.q_length.get(seg_name, q_initial)
+        q_length[seg_name] = _damp(q_prev, q_clipped)
+
+    # ---------- σ_marker ----------
+    # Per-session σ values come from sqrt(sum_sq / n_obs).
+    # Only include sessions where the marker had ≥4
+    # observations (n_obs check at per_session_fit_from_stats
+    # set σ to 0 for under-observed markers; treat 0 as
+    # missing here).
+    sigma_marker: Dict[str, float] = {}
+    for m in layout.marker_names:
+        vals: List[float] = []
+        weights: List[float] = []
+        for f in valid_fits:
+            n = f.n_obs_per_marker.get(m, 0)
+            if n >= 4:
+                vals.append(f.sigma_marker.get(m, 0.0))
+                weights.append(float(n))
+        if not vals:
+            sigma_marker[m] = prev_params.sigma_marker.get(m, 3.0)
+            continue
+        sigma_raw = _aggregate_scalar(
+            vals, weights=weights, method=aggregation,
+        )
+        sigma_floor = _M_STEP_FLOOR_SIGMA
+        sigma_initial = initial_params.sigma_marker.get(m, 3.0)
+        sigma_ceiling = (
+            _M_STEP_SIGMA_CEILING_FACTOR * sigma_initial
+        )
+        sigma_clipped = float(
+            max(sigma_floor, min(sigma_ceiling, sigma_raw))
+        )
+        sigma_marker[m] = _damp(
+            prev_params.sigma_marker.get(m, 3.0), sigma_clipped,
+        )
+
+    return NoiseParamsV2(
+        sigma_marker=sigma_marker,
+        q_root_pos=q_root_pos,
+        q_root_ori=q_root_ori,
+        q_seg_ori=q_seg_ori,
+        q_length=q_length,
+        constraint_sigma=prev_params.constraint_sigma,
+    )
 
 
 def fit_initial_params_v2(
@@ -3905,7 +4252,8 @@ def _pool_em_e_step(
         int, bool, bool, str, str,
     ],
 ) -> Tuple[
-    int, "_MStepStatsV2", List["_ValidationViolation"], float,
+    int, "_MStepStatsV2", "_PerSessionFitV2",
+    List["_ValidationViolation"], float,
 ]:
     """Per-session E-step in a worker process.
 
@@ -3922,7 +4270,14 @@ def _pool_em_e_step(
 
     Returns
     -------
-    (sess_idx, stats, violations, elapsed_s)
+    (sess_idx, stats, per_session_fit, violations, elapsed_s)
+
+    Patch 117: also returns per-session fit (raw q + σ
+    estimates from this session alone) so the orchestrator
+    can choose between pooled aggregation (sum stats across
+    sessions, single Q_hat) and per-session-median
+    aggregation (median of per-session q values, robust
+    to outlier sessions).
     """
     import time as _t
     (
@@ -3970,15 +4325,22 @@ def _pool_em_e_step(
             session_name=session_name,
         )
 
-    # M-step stats
+    # M-step stats (pooled accumulator)
     stats = accumulate_m_step_stats_v2(
         smooth, pos, likes, layout, likelihood_threshold,
         perspective=perspective,
         device=device,
     )
+    # Per-session raw fit (used by per-session-median
+    # aggregation in the orchestrator)
+    per_session_fit = per_session_fit_from_stats(
+        stats, layout, dt,
+    )
 
     elapsed = _t.time() - t0
-    return sess_idx, stats, violations, elapsed
+    return (
+        sess_idx, stats, per_session_fit, violations, elapsed,
+    )
 
 
 def _pool_warm_start_pass(
@@ -4211,6 +4573,7 @@ def fit_noise_params_em_v2(
     device: str = "cpu",
     pool: Optional[object] = None,
     damping: float = 0.0,
+    aggregation: str = "pooled",
 ) -> EMResultV2:
     """Multi-session EM for v2 noise parameters.
 
@@ -4392,11 +4755,17 @@ def fit_noise_params_em_v2(
             # would yield different bits run-to-run.
             results_by_idx: Dict[int, Tuple] = {}
             completed = 0
-            for sess_idx, sess_stats, sess_violations, sess_dt in (
+            for (
+                sess_idx, sess_stats, sess_per_session_fit,
+                sess_violations, sess_dt,
+            ) in (
                 pool.imap_unordered(_pool_em_e_step, task_args)
             ):
                 completed += 1
-                results_by_idx[sess_idx] = (sess_stats, sess_violations)
+                results_by_idx[sess_idx] = (
+                    sess_stats, sess_per_session_fit,
+                    sess_violations,
+                )
                 sess_times.append(sess_dt)
                 if verbose:
                     sess_label = (
@@ -4420,13 +4789,22 @@ def fit_noise_params_em_v2(
                         f"(ETA {remaining_wall/60:.1f}min wall)",
                         flush=True,
                     )
-            # Accumulate in session-index order for determinism
+            # Accumulate in session-index order for determinism.
+            # Both the pooled stats and the per-session fit list
+            # are built in sess_idx order. The orchestrator
+            # selects pooled vs median based on `aggregation`.
+            per_session_fits: List[_PerSessionFitV2] = []
             for sess_idx in range(n_sess_em):
-                sess_stats, sess_violations = results_by_idx[sess_idx]
+                (
+                    sess_stats, sess_per_session_fit,
+                    sess_violations,
+                ) = results_by_idx[sess_idx]
                 combined_stats += sess_stats
+                per_session_fits.append(sess_per_session_fit)
                 iter_violations.extend(sess_violations)
         else:
             # Serial path
+            per_session_fits: List[_PerSessionFitV2] = []
             for sess_idx, (pos, likes) in enumerate(sessions):
                 t_sess_start = _time_em.time()
                 sess_label = (
@@ -4471,13 +4849,19 @@ def fit_noise_params_em_v2(
                     )
                     iter_violations.extend(sess_violations)
 
-                # Accumulate M-step stats
+                # Accumulate M-step stats (pooled)
                 sess_stats = accumulate_m_step_stats_v2(
                     smooth, pos, likes, layout, likelihood_threshold,
                     perspective=perspective,
                     device=device,
                 )
                 combined_stats += sess_stats
+                # Per-session fit (median aggregation arm)
+                per_session_fits.append(
+                    per_session_fit_from_stats(
+                        sess_stats, layout, dt,
+                    )
+                )
 
                 sess_dt = _time_em.time() - t_sess_start
                 sess_times.append(sess_dt)
@@ -4524,12 +4908,24 @@ def fit_noise_params_em_v2(
                     flush=True,
                 )
 
-        # M-step finalization
-        new_params = finalize_m_step_v2(
-            combined_stats, layout, dt,
-            prev_params=params, initial_params=initial_params,
-            damping=damping,
-        )
+        # M-step finalization. Choose between pooled (sum
+        # all session stats, single Q_hat) and per-session
+        # aggregation (median across sessions, robust to
+        # outliers). Patch 117 added the per-session option.
+        if aggregation == "pooled":
+            new_params = finalize_m_step_v2(
+                combined_stats, layout, dt,
+                prev_params=params, initial_params=initial_params,
+                damping=damping,
+            )
+        else:
+            # "median" or "trimmed_mean" — per-session aggregation
+            new_params = finalize_m_step_v2_from_per_session(
+                per_session_fits, layout,
+                prev_params=params, initial_params=initial_params,
+                damping=damping,
+                aggregation=aggregation,
+            )
 
         max_rel = _max_param_change(new_params, params)
         sigmas = list(new_params.sigma_marker.values())
@@ -5120,6 +5516,7 @@ def smooth_pose_v2(
     device: str = "cpu",
     n_workers: int = 1,
     em_damping: float = 0.0,
+    em_aggregation: str = "pooled",
     verbose: bool = False,
 ) -> Dict:
     """Top-level user-facing function for v2 pose smoothing.
@@ -5440,6 +5837,7 @@ def smooth_pose_v2(
                 device=device,
                 pool=_pool,
                 damping=em_damping,
+                aggregation=em_aggregation,
             )
             params = em_result.params
             em_history = em_result.history
@@ -5755,6 +6153,28 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--em-aggregation",
+        choices=["pooled", "median", "trimmed_mean"],
+        default="pooled",
+        help=(
+            "How to aggregate per-session estimates in the "
+            "M-step. 'pooled' (default): sum stats across "
+            "sessions, compute one Q_hat from the pool. "
+            "'median': each session computes its own q + σ "
+            "estimates, then the orchestrator takes the "
+            "element-wise median across sessions. Robust to "
+            "outlier sessions (e.g. ones where EKF "
+            "NaN-recovery introduced large transition jumps "
+            "that would dominate a pooled estimate). "
+            "'trimmed_mean': discard top and bottom 10%% of "
+            "per-session values, average the rest. "
+            "Compromise between robustness and efficiency. "
+            "Patch 117: spatial-stratification fix for the "
+            "real-data divergence observed at iter 2 of the "
+            "first 67-session run."
+        ),
+    )
+    parser.add_argument(
         "--device", choices=["cpu", "cuda", "auto"],
         default="cpu",
         help=(
@@ -5819,6 +6239,7 @@ def main(argv=None) -> int:
             device=args.device,
             n_workers=args.workers,
             em_damping=args.em_damping,
+            em_aggregation=args.em_aggregation,
             verbose=args.verbose,
         )
     except Exception as e:
