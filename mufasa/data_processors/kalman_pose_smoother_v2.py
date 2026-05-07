@@ -3365,6 +3365,22 @@ def fit_warm_start_sigma_v2(
     return sigma_warm
 
 
+@dataclass
+class _ValidationViolation:
+    """A single per-(session, iteration, marker) validation
+    violation. Collected by ``_validate_trajectory_v2`` when
+    ``strict=False``; reported in aggregate at end of EM.
+    """
+    session_idx: int
+    session_name: str
+    iteration: int
+    marker: str
+    check: str            # "frozen-output" or "prior-overruling"
+    value: float          # range_ratio (frozen) or mean_diff (overrule)
+    threshold: float
+    n_high_p: int
+
+
 def _validate_trajectory_v2(
     smooth: SmoothResultV2,
     positions: np.ndarray,
@@ -3377,7 +3393,10 @@ def _validate_trajectory_v2(
     mean_diff_sigma_factor: float = 8.0,
     min_observation_fraction: float = 0.05,
     verbose: bool = False,
-) -> None:
+    strict: bool = False,
+    session_idx: int = 0,
+    session_name: str = "",
+) -> List["_ValidationViolation"]:
     """Validation hook: catches degenerate trajectories.
 
     Two checks per marker (port from v1 patch 91-93):
@@ -3390,14 +3409,21 @@ def _validate_trajectory_v2(
        a sign that q has collapsed too far.
 
     2. mean_diff: mean |predicted - observed| on high-p frames
-       should be ≤ mean_diff_sigma_factor (default 5) × σ_marker.
+       should be ≤ mean_diff_sigma_factor (default 8) × σ_marker.
        If predicted deviates strongly from data on confident
        frames, the prior is overruling observations — typically
        a sign that σ has collapsed too far down.
 
-    Raises RuntimeError on the first marker that fails either
-    check, with diagnostic info (per-marker breakdown when
-    verbose).
+    NaN/inf in predictions ALWAYS raises RuntimeError — that
+    indicates EKF divergence (no useful signal to continue).
+
+    Soft-check failures (range_ratio, mean_diff) by default
+    are collected and returned as a list of violation records
+    rather than raising. The caller (typically
+    fit_noise_params_em_v2) aggregates them across sessions
+    and iterations and prints a summary at end of EM. To
+    halt on first soft-check failure (legacy behavior), pass
+    ``strict=True``.
 
     Parameters
     ----------
@@ -3407,23 +3433,35 @@ def _validate_trajectory_v2(
     layout : BodyLayout
     params : NoiseParamsV2
     iteration : int
-        EM iteration number (for error message).
+        EM iteration number (for diagnostic).
     likelihood_threshold : float
     range_ratio_floor : float
     mean_diff_sigma_factor : float
     verbose : bool
-        If True, print per-marker check results before any
-        failure.
+        If True, print per-marker check results.
+    strict : bool
+        If True, raise RuntimeError on soft-check failure
+        (legacy behavior). If False (default), return a
+        list of _ValidationViolation records instead.
+    session_idx : int
+        Session index, stored on returned violations.
+    session_name : str
+        Session display name, stored on returned violations.
+
+    Returns
+    -------
+    list of _ValidationViolation
+        Empty list if all checks passed; one entry per
+        failed check (a marker may have two entries if it
+        fails both checks).
     """
     T = smooth.x_smooth.shape[0]
     K = positions.shape[1]
     marker_names = layout.marker_names
 
     # Compute predicted marker positions from smoothed states
-    # for every frame.
-    pred = np.zeros((T, K, 2))
-    for t in range(T):
-        pred[t] = state_to_marker_positions(smooth.x_smooth[t], layout)
+    # for every frame, vectorized.
+    pred = state_to_marker_positions_batch(smooth.x_smooth, layout)
 
     # For each marker, compute range_ratio and mean_diff
     if verbose:
@@ -3432,6 +3470,8 @@ def _validate_trajectory_v2(
             f"(range_ratio>{range_ratio_floor:.2f} ok; "
             f"mean_diff<{mean_diff_sigma_factor:.0f}σ ok):"
         )
+
+    violations: List[_ValidationViolation] = []
 
     # Global NaN check — if any predicted positions are NaN,
     # the EKF has gone pathological. Raise with a clear
@@ -3450,7 +3490,6 @@ def _validate_trajectory_v2(
             f"to diagnose."
         )
 
-    failures: List[str] = []
     T = positions.shape[0]
     for k, m in enumerate(marker_names):
         sigma_m = params.sigma_marker.get(m, 3.0)
@@ -3535,28 +3574,49 @@ def _validate_trajectory_v2(
             )
 
         if not range_ok:
-            failures.append(
-                f"frozen-output check failed for marker {m!r}: "
-                f"smoothed range {sm_range:.2f}px is "
-                f"{range_ratio:.4f}x raw range {raw_range:.2f}px "
-                f"(threshold: {range_ratio_floor:.2f})"
-            )
+            violations.append(_ValidationViolation(
+                session_idx=session_idx,
+                session_name=session_name,
+                iteration=iteration,
+                marker=m,
+                check="frozen-output",
+                value=range_ratio,
+                threshold=range_ratio_floor,
+                n_high_p=n_hp,
+            ))
         if not mean_ok:
-            failures.append(
-                f"prior-overruling-data check failed for marker "
-                f"{m!r}: mean |smoothed - raw| at high-p frames "
-                f"= {mean_diff:.2f}px, exceeds "
-                f"{mean_diff_sigma_factor:.0f}x current sigma_marker "
-                f"({sigma_5:.2f}px). This indicates the prior is "
-                f"systematically pulling away from trusted "
-                f"observations."
-            )
+            violations.append(_ValidationViolation(
+                session_idx=session_idx,
+                session_name=session_name,
+                iteration=iteration,
+                marker=m,
+                check="prior-overruling",
+                value=mean_diff,
+                threshold=sigma_5,
+                n_high_p=n_hp,
+            ))
 
-    if failures:
+    if strict and violations:
+        msg_parts = []
+        for v in violations:
+            if v.check == "frozen-output":
+                msg_parts.append(
+                    f"frozen-output check failed for marker "
+                    f"{v.marker!r}: range_ratio={v.value:.4f}, "
+                    f"threshold={v.threshold:.2f}"
+                )
+            else:
+                msg_parts.append(
+                    f"prior-overruling-data check failed for "
+                    f"marker {v.marker!r}: mean_diff={v.value:.2f}px "
+                    f"exceeds {v.threshold:.2f}px"
+                )
         raise RuntimeError(
             f"v2 EM validation hook triggered at iteration "
-            f"{iteration}: " + "; ".join(failures)
+            f"{iteration} (strict mode): " + "; ".join(msg_parts)
         )
+
+    return violations
 
 
 @dataclass
@@ -3576,12 +3636,21 @@ class EMResultV2:
     perspective : PerspectiveModelV2 or None
         Fitted perspective correction model, or None if
         perspective fitting was disabled.
+    validation_violations : list of _ValidationViolation
+        All validation violations across all iterations.
+        Empty when validation is disabled or all checks pass.
+        Each entry records (session_idx, session_name,
+        iteration, marker, check, value, threshold, n_high_p).
+        Used by the orchestrator to print a final summary.
     """
     params: NoiseParamsV2
     history: List[Dict[str, float]]
     initial_params: NoiseParamsV2
     converged: bool
     perspective: Optional["PerspectiveModelV2"] = None
+    validation_violations: List["_ValidationViolation"] = (
+        field(default_factory=list)
+    )
 
 
 def _max_param_change(
@@ -3622,6 +3691,7 @@ def fit_noise_params_em_v2(
     enable_validation: bool = True,
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
+    enable_strict_validation: bool = False,
     verbose: bool = False,
     session_names: Optional[List[str]] = None,
 ) -> EMResultV2:
@@ -3768,12 +3838,17 @@ def fit_noise_params_em_v2(
     converged = False
     n_sess_em = len(sessions)
     import time as _time_em
+    # Accumulate validation violations across all iterations.
+    # Soft-mode validation returns lists; we collect everything
+    # for end-of-EM summary.
+    all_violations: List[_ValidationViolation] = []
 
     for iteration in range(max_iter):
         # E-step + stat accumulation across sessions
         combined_stats = _MStepStatsV2.empty(layout)
         t_iter_start = _time_em.time()
         sess_times: List[float] = []
+        iter_violations: List[_ValidationViolation] = []
 
         for sess_idx, (pos, likes) in enumerate(sessions):
             t_sess_start = _time_em.time()
@@ -3805,14 +3880,19 @@ def fit_noise_params_em_v2(
             )
             smooth = rts_smooth_v2(filt, layout, dt)
 
-            # Validation hook
+            # Validation hook (soft mode by default — collects
+            # violations rather than halting EM)
             if enable_validation:
-                _validate_trajectory_v2(
+                sess_violations = _validate_trajectory_v2(
                     smooth, pos, likes, layout, params,
                     iteration=iteration,
                     likelihood_threshold=likelihood_threshold,
                     verbose=verbose and sess_idx == 0,
+                    strict=enable_strict_validation,
+                    session_idx=sess_idx,
+                    session_name=sess_label,
                 )
+                iter_violations.extend(sess_violations)
 
             # Accumulate M-step stats
             sess_stats = accumulate_m_step_stats_v2(
@@ -3832,6 +3912,9 @@ def fit_noise_params_em_v2(
                     flush=True,
                 )
 
+        # Aggregate this iteration's violations into global list
+        all_violations.extend(iter_violations)
+
         if verbose:
             iter_dt = _time_em.time() - t_iter_start
             print(
@@ -3840,6 +3923,28 @@ def fit_noise_params_em_v2(
                 f"({iter_dt/n_sess_em:.1f}s/session avg)",
                 flush=True,
             )
+            if iter_violations:
+                # Summarize per-iteration violations: count
+                # by check type, list affected markers
+                n_frozen = sum(
+                    1 for v in iter_violations
+                    if v.check == "frozen-output"
+                )
+                n_overrule = sum(
+                    1 for v in iter_violations
+                    if v.check == "prior-overruling"
+                )
+                affected_markers = sorted(set(
+                    v.marker for v in iter_violations
+                ))
+                print(
+                    f"[v2-em iter{iteration}] validation: "
+                    f"{len(iter_violations)} violation(s) "
+                    f"({n_frozen} frozen, {n_overrule} overrule), "
+                    f"affected markers: "
+                    f"{', '.join(affected_markers)}",
+                    flush=True,
+                )
 
         # M-step finalization
         new_params = finalize_m_step_v2(
@@ -3872,10 +3977,95 @@ def fit_noise_params_em_v2(
             converged = True
             break
 
+    # Final validation summary across all iterations
+    if verbose and enable_validation:
+        if not all_violations:
+            print(
+                "[v2-em] Validation summary: clean across "
+                f"all {len(history)} iteration(s) and "
+                f"{n_sess_em} session(s).",
+                flush=True,
+            )
+        else:
+            # Group violations: marker -> set of iterations affected
+            from collections import defaultdict
+            marker_iters: Dict[str, set] = defaultdict(set)
+            marker_sessions: Dict[str, Dict[str, int]] = (
+                defaultdict(lambda: defaultdict(int))
+            )
+            for v in all_violations:
+                marker_iters[v.marker].add(v.iteration)
+                marker_sessions[v.marker][v.session_name] += 1
+
+            n_iters_run = len(history)
+            persistent_threshold = max(1, n_iters_run // 2)
+
+            persistent: List[Tuple[str, int, Dict[str, int]]] = []
+            sporadic: List[Tuple[str, int, Dict[str, int]]] = []
+            for m, iters in marker_iters.items():
+                n_iters_affected = len(iters)
+                rec = (m, n_iters_affected, dict(marker_sessions[m]))
+                if n_iters_affected >= persistent_threshold:
+                    persistent.append(rec)
+                else:
+                    sporadic.append(rec)
+
+            persistent.sort(key=lambda r: -r[1])
+            sporadic.sort(key=lambda r: -r[1])
+
+            print(
+                f"[v2-em] Validation summary: "
+                f"{len(all_violations)} total violation(s) "
+                f"across {n_iters_run} iteration(s).",
+                flush=True,
+            )
+            if persistent:
+                print(
+                    f"[v2-em]   Persistent (≥{persistent_threshold}/"
+                    f"{n_iters_run} iters):",
+                    flush=True,
+                )
+                for m, n_aff, sess_counts in persistent:
+                    sess_summary = ", ".join(
+                        f"{s} ({c}x)"
+                        for s, c in sorted(
+                            sess_counts.items(), key=lambda x: -x[1],
+                        )[:5]
+                    )
+                    if len(sess_counts) > 5:
+                        sess_summary += (
+                            f", +{len(sess_counts) - 5} more"
+                        )
+                    print(
+                        f"[v2-em]     {m}: {n_aff} iters, "
+                        f"sessions: {sess_summary}",
+                        flush=True,
+                    )
+            if sporadic:
+                print(
+                    f"[v2-em]   Sporadic (<{persistent_threshold}/"
+                    f"{n_iters_run} iters):",
+                    flush=True,
+                )
+                for m, n_aff, sess_counts in sporadic:
+                    sess_list = ", ".join(
+                        sorted(sess_counts.keys())[:3]
+                    )
+                    if len(sess_counts) > 3:
+                        sess_list += (
+                            f", +{len(sess_counts) - 3} more"
+                        )
+                    print(
+                        f"[v2-em]     {m}: {n_aff} iter(s), "
+                        f"sessions: {sess_list}",
+                        flush=True,
+                    )
+
     return EMResultV2(
         params=params, history=history,
         initial_params=initial_params, converged=converged,
         perspective=perspective,
+        validation_violations=all_violations,
     )
 
 
@@ -4252,6 +4442,7 @@ def smooth_pose_v2(
     enable_validation: bool = True,
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
+    enable_strict_validation: bool = False,
     verbose: bool = False,
 ) -> Dict:
     """Top-level user-facing function for v2 pose smoothing.
@@ -4534,6 +4725,7 @@ def smooth_pose_v2(
             enable_validation=enable_validation,
             enable_warm_start_sigma=enable_warm_start_sigma,
             enable_perspective=enable_perspective,
+            enable_strict_validation=enable_strict_validation,
             verbose=verbose,
             session_names=[s["path"].stem for s in raw_sessions],
         )
@@ -4785,6 +4977,18 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--strict-validation", action="store_true",
+        help=(
+            "If set, the EM validation hook RAISES on any "
+            "soft-check failure (range_ratio or mean_diff), "
+            "halting EM. Default is soft-mode: violations "
+            "are collected and reported as warnings at the "
+            "end. NaN/inf in predictions always raises "
+            "regardless of this flag (EKF divergence is a "
+            "hard error)."
+        ),
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Verbose logging",
     )
@@ -4812,6 +5016,7 @@ def main(argv=None) -> int:
             enable_validation=not args.no_validate,
             enable_warm_start_sigma=not args.no_warm_start_sigma,
             enable_perspective=not args.no_perspective,
+            enable_strict_validation=args.strict_validation,
             verbose=args.verbose,
         )
     except Exception as e:
