@@ -969,6 +969,7 @@ def state_to_marker_jacobian(
     layout: BodyLayout,
     fk: Optional[ForwardKinematicsResult] = None,
     perspective: Optional["PerspectiveModelV2"] = None,
+    marker_mask: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """Compute the Jacobian of marker positions w.r.t. state.
 
@@ -995,6 +996,13 @@ def state_to_marker_jacobian(
           ∂p_m/∂root_x picks up R_world @ (offset_m * ∂scale/∂x)
           ∂p_m/∂root_y picks up R_world @ (offset_m * ∂scale/∂y)
         and existing offset terms get multiplied by scale.
+    marker_mask : (K,) bool array, optional
+        When provided, only Jacobian rows for markers where
+        ``marker_mask[i]`` is True are computed. The returned
+        array still has shape (2K, D); rows for masked-out
+        markers remain zero. This is the EKF-side optimization
+        for skipping unobserved markers (typically saves 25-50%
+        per call). When None, all markers are computed.
 
     Returns
     -------
@@ -1043,6 +1051,8 @@ def state_to_marker_jacobian(
     root_name = layout.root_segment.name
 
     for i, marker in enumerate(marker_names):
+        if marker_mask is not None and not marker_mask[i]:
+            continue
         seg_name, (l_off, a_off) = layout.marker_attachment(marker)
         scale_m = 1.0 if scales is None else scales[i]
         v_marker_local = np.array([
@@ -2129,11 +2139,28 @@ def _build_marker_observations(
     n_observed_markers : int
     """
     fk = forward_kinematics(state, layout)
+    # Build observation mask first — only compute Jacobian rows
+    # for markers that pass the likelihood + finiteness check.
+    # Saves ~25-50% of Jacobian work on real data where typically
+    # 8-12 of 15 markers are observed per frame.
+    K = layout.n_markers
+    marker_mask = np.zeros(K, dtype=bool)
+    for k in range(K):
+        x_obs = obs[k, 0]
+        y_obs = obs[k, 1]
+        p = likes[k]
+        if (
+            np.isfinite(x_obs) and np.isfinite(y_obs)
+            and p >= likelihood_threshold
+        ):
+            marker_mask[k] = True
+
     pred = state_to_marker_positions(
         state, layout, fk=fk, perspective=perspective,
     )
     H_full = state_to_marker_jacobian(
         state, layout, fk=fk, perspective=perspective,
+        marker_mask=marker_mask,
     )
     marker_names = layout.marker_names
 
@@ -2144,14 +2171,11 @@ def _build_marker_observations(
     n_obs = 0
 
     for k, m in enumerate(marker_names):
+        if not marker_mask[k]:
+            continue
         x_obs = obs[k, 0]
         y_obs = obs[k, 1]
         p = likes[k]
-        if (
-            not (np.isfinite(x_obs) and np.isfinite(y_obs))
-            or p < likelihood_threshold
-        ):
-            continue
         n_obs += 1
         z_list.append(np.array([x_obs, y_obs]))
         h_list.append(pred[k])
@@ -2698,6 +2722,7 @@ def accumulate_m_step_stats_v2(
     layout: BodyLayout,
     likelihood_threshold: float = 0.5,
     perspective: Optional["PerspectiveModelV2"] = None,
+    device: str = "cpu",
 ) -> _MStepStatsV2:
     """Accumulate sufficient statistics for the M-step from
     one session's smoother output.
@@ -2760,10 +2785,10 @@ def accumulate_m_step_stats_v2(
     # frames in batch, then accumulate per-marker stats with
     # masked array operations.
     pred_batch = state_to_marker_positions_batch(
-        x, layout, perspective=perspective,
+        x, layout, perspective=perspective, device=device,
     )  # (T, K, 2)
     H_batch = state_to_marker_jacobian_batch(
-        x, layout, perspective=perspective,
+        x, layout, perspective=perspective, device=device,
     )  # (T, 2K, D)
 
     # Residuals: (T, K, 2)
@@ -3201,6 +3226,7 @@ def fit_warm_start_sigma_v2(
     perspective: Optional["PerspectiveModelV2"] = None,
     verbose: bool = False,
     session_names: Optional[List[str]] = None,
+    device: str = "cpu",
 ) -> Dict[str, float]:
     """Warm-start σ_marker estimation: run filter+smoother
     once with current params, measure mean |smoothed - raw|
@@ -3298,6 +3324,7 @@ def fit_warm_start_sigma_v2(
         # Predicted marker positions per frame, vectorized
         pred_batch = state_to_marker_positions_batch(
             smooth.x_smooth, layout, perspective=perspective,
+            device=device,
         )  # (T, K, 2)
         # Per-frame validity mask
         valid_mask = (
@@ -3694,6 +3721,7 @@ def fit_noise_params_em_v2(
     enable_strict_validation: bool = False,
     verbose: bool = False,
     session_names: Optional[List[str]] = None,
+    device: str = "cpu",
 ) -> EMResultV2:
     """Multi-session EM for v2 noise parameters.
 
@@ -3773,6 +3801,7 @@ def fit_noise_params_em_v2(
             apply_constraints=apply_constraints,
             verbose=verbose,
             session_names=session_names,
+            device=device,
         )
         # Update initial_params with warm-started σ
         initial_params = NoiseParamsV2(
@@ -3898,6 +3927,7 @@ def fit_noise_params_em_v2(
             sess_stats = accumulate_m_step_stats_v2(
                 smooth, pos, likes, layout, likelihood_threshold,
                 perspective=perspective,
+                device=device,
             )
             combined_stats += sess_stats
 
@@ -4152,6 +4182,7 @@ def state_to_marker_variances(
     layout: BodyLayout,
     perspective: Optional["PerspectiveModelV2"] = None,
     device: str = "cpu",
+    H_batch: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """Compute per-marker per-frame variance from the smoothed
     state covariance.
@@ -4167,6 +4198,20 @@ def state_to_marker_variances(
 
     Vectorized across T frames.
 
+    Parameters
+    ----------
+    x_smooth : (T, D) array
+    P_smooth : (T, D, D) array
+    layout : BodyLayout
+    perspective : PerspectiveModelV2, optional
+    device : "cpu" | "cuda" | "auto"
+    H_batch : (T, 2K, D) array, optional
+        If provided, skip recomputing the Jacobian. Use when
+        the caller has already computed H for another purpose
+        (e.g., final smoother that also computes positions).
+        Must match the perspective and device used here. When
+        None, recomputes from x_smooth.
+
     Returns
     -------
     (T, K, 2) array
@@ -4176,9 +4221,10 @@ def state_to_marker_variances(
     T = x_smooth.shape[0]
     K = layout.n_markers
     D = layout.state_dim
-    H_batch = state_to_marker_jacobian_batch(
-        x_smooth, layout, perspective=perspective, device=device,
-    )  # (T, 2K, D)
+    if H_batch is None:
+        H_batch = state_to_marker_jacobian_batch(
+            x_smooth, layout, perspective=perspective, device=device,
+        )  # (T, 2K, D)
     H_per_marker = H_batch.reshape(T, K, 2, D)  # (T, K, 2, D)
     HP = np.einsum("tkij,tjl->tkil", H_per_marker, P_smooth)
     HPH = np.einsum("tkij,tklj->tkil", HP, H_per_marker)
@@ -4199,6 +4245,7 @@ def smooth_session_v2(
     likelihood_threshold: float = 0.7,
     apply_constraints: bool = True,
     perspective: Optional["PerspectiveModelV2"] = None,
+    device: str = "cpu",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Run forward filter + RTS smoother on one session, return
     smoothed marker positions and variances.
@@ -4237,13 +4284,22 @@ def smooth_session_v2(
     )
     smooth = rts_smooth_v2(filt, layout, dt)
 
-    # Compute marker positions from smoothed body state — vectorized
+    # Compute marker positions and Jacobian once each from
+    # smoothed body state. variances reuses the precomputed
+    # Jacobian so we don't recompute FK twice.
     smoothed_positions = state_to_marker_positions_batch(
         smooth.x_smooth, layout, perspective=perspective,
+        device=device,
+    )
+    H_batch = state_to_marker_jacobian_batch(
+        smooth.x_smooth, layout, perspective=perspective,
+        device=device,
     )
     smoothed_variances = state_to_marker_variances(
         smooth.x_smooth, smooth.P_smooth, layout,
         perspective=perspective,
+        device=device,
+        H_batch=H_batch,
     )
     return smoothed_positions, smoothed_variances
 
@@ -4443,6 +4499,7 @@ def smooth_pose_v2(
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
     enable_strict_validation: bool = False,
+    device: str = "cpu",
     verbose: bool = False,
 ) -> Dict:
     """Top-level user-facing function for v2 pose smoothing.
@@ -4728,6 +4785,7 @@ def smooth_pose_v2(
             enable_strict_validation=enable_strict_validation,
             verbose=verbose,
             session_names=[s["path"].stem for s in raw_sessions],
+            device=device,
         )
         params = em_result.params
         em_history = em_result.history
@@ -4783,6 +4841,7 @@ def smooth_pose_v2(
             likelihood_threshold=likelihood_threshold,
             apply_constraints=apply_constraints,
             perspective=perspective,
+            device=device,
         )
 
         # Build output DataFrame in DATA marker order (so it
@@ -4989,6 +5048,23 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--device", choices=["cpu", "cuda", "auto"],
+        default="cpu",
+        help=(
+            "Backend for vectorized FK/Jacobian computation. "
+            "'cpu' (default): NumPy CPU. 'cuda': PyTorch on "
+            "CUDA GPU (requires torch + CUDA-capable hardware). "
+            "'auto': cuda if torch+CUDA available and per-call "
+            "T >= 5000, else cpu. Note: the EKF forward filter "
+            "stays on CPU regardless (sequential dependency). "
+            "GPU helps the M-step accumulator, warm-start σ, "
+            "and final smoother passes. The Jacobian GPU path "
+            "is currently sub-optimal (does FK on GPU but the "
+            "per-marker chain walk on CPU); positions GPU path "
+            "is fully accelerated. Best results when T >> 5000."
+        ),
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Verbose logging",
     )
@@ -5017,6 +5093,7 @@ def main(argv=None) -> int:
             enable_warm_start_sigma=not args.no_warm_start_sigma,
             enable_perspective=not args.no_perspective,
             enable_strict_validation=args.strict_validation,
+            device=args.device,
             verbose=args.verbose,
         )
     except Exception as e:
@@ -5218,8 +5295,11 @@ def fit_perspective_model_v2(
         return PerspectiveModelV2.identity(layout)
 
     root_idx = name_to_idx[root_distal]
-    all_root_x: List[float] = []
-    all_root_y: List[float] = []
+    # Collect root x/y across all sessions for arena bounds.
+    # Use list-of-arrays + np.concatenate instead of
+    # extend(.tolist()), which is ~5× slower for large arrays.
+    all_root_x_arrs: List[np.ndarray] = []
+    all_root_y_arrs: List[np.ndarray] = []
     for pos, likes in sessions:
         m_x = pos[:, root_idx, 0]
         m_y = pos[:, root_idx, 1]
@@ -5228,8 +5308,12 @@ def fit_perspective_model_v2(
             (m_p >= likelihood_threshold)
             & np.isfinite(m_x) & np.isfinite(m_y)
         )
-        all_root_x.extend(m_x[mask].tolist())
-        all_root_y.extend(m_y[mask].tolist())
+        all_root_x_arrs.append(m_x[mask])
+        all_root_y_arrs.append(m_y[mask])
+    if not all_root_x_arrs:
+        return PerspectiveModelV2.identity(layout)
+    all_root_x = np.concatenate(all_root_x_arrs)
+    all_root_y = np.concatenate(all_root_y_arrs)
     if len(all_root_x) < 100:
         # Not enough data to fit perspective
         return PerspectiveModelV2.identity(layout)
@@ -5237,8 +5321,14 @@ def fit_perspective_model_v2(
     arena_x_mean = float(np.mean(all_root_x))
     arena_y_mean = float(np.mean(all_root_y))
     # Use 95th percentile spread to avoid outlier sensitivity
-    x_lo, x_hi = float(np.percentile(all_root_x, 2.5)), float(np.percentile(all_root_x, 97.5))
-    y_lo, y_hi = float(np.percentile(all_root_y, 2.5)), float(np.percentile(all_root_y, 97.5))
+    x_lo, x_hi = (
+        float(np.percentile(all_root_x, 2.5)),
+        float(np.percentile(all_root_x, 97.5)),
+    )
+    y_lo, y_hi = (
+        float(np.percentile(all_root_y, 2.5)),
+        float(np.percentile(all_root_y, 97.5)),
+    )
     arena_x_range = max(x_hi - x_lo, 10.0)
     arena_y_range = max(y_hi - y_lo, 10.0)
 
