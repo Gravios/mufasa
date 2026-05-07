@@ -3318,7 +3318,126 @@ def main() -> int:
             )
             assert out_path_none is None
 
-    print("smoke_kalman_pose_smoother_v2: 87/87 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 116: Q ceiling and damping in M-step.
+    # ---------------------------------------------------------- #
+
+    # ---------------------------------------------------------- #
+    # Case 88: M-step Q ceiling clamps runaway q estimates.
+    # ---------------------------------------------------------- #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        _MStepStatsV2, finalize_m_step_v2,
+        _M_STEP_Q_CEILING_FACTOR,
+    )
+    rng_88 = np.random.default_rng(8800)
+    test_layout_88 = standard_rat_layout()
+    D = test_layout_88.state_dim
+
+    # Build stats that would produce a HUGE q_root_pos via the
+    # standard M-step formula. Q_hat = (S11 - S10 F^T - F S10^T
+    # + F S00 F^T) / n_pairs. We stuff S11 with a giant value
+    # in the (vx, vy) diagonals.
+    stats = _MStepStatsV2.empty(test_layout_88)
+    stats.n_pairs = 1000
+    # Inflate the velocity-velocity diagonal of S11 enough that
+    # q_raw would be 100,000× initial (~10^7 if we started at 100)
+    huge_diag_value = 1e10  # px²
+    stats.S11[2, 2] = huge_diag_value * stats.n_pairs
+    stats.S11[3, 3] = huge_diag_value * stats.n_pairs
+
+    initial_params_88 = NoiseParamsV2.default(
+        test_layout_88, sigma_marker=2.0,
+    )
+    # Force initial q_root_pos to a known value
+    initial_params_88 = NoiseParamsV2(
+        sigma_marker=initial_params_88.sigma_marker,
+        q_root_pos=200.0,
+        q_root_ori=initial_params_88.q_root_ori,
+        q_seg_ori=dict(initial_params_88.q_seg_ori),
+        q_length=dict(initial_params_88.q_length),
+        constraint_sigma=initial_params_88.constraint_sigma,
+    )
+    new_params_88 = finalize_m_step_v2(
+        stats, test_layout_88, dt=1.0 / 30.0,
+        prev_params=initial_params_88,
+        initial_params=initial_params_88,
+    )
+    expected_ceiling = (
+        initial_params_88.q_root_pos * _M_STEP_Q_CEILING_FACTOR
+    )
+    assert new_params_88.q_root_pos <= expected_ceiling + 1e-6, (
+        f"q_root_pos exceeded ceiling: "
+        f"{new_params_88.q_root_pos} > {expected_ceiling}"
+    )
+    # Ceiling should have been hit (we deliberately produced
+    # a huge raw value)
+    assert new_params_88.q_root_pos == expected_ceiling, (
+        f"Expected ceiling exact, got {new_params_88.q_root_pos}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 89: Damping blends prev and M-step values.
+    # ---------------------------------------------------------- #
+    # Build stats that produce a moderate q_raw, then verify
+    # damping math. With a Q_hat block diagonal of D, q_raw =
+    # D / dt². We want q_raw moderate (not at ceiling), so
+    # we'll let the test inspect the actual undamped result.
+    stats_89 = _MStepStatsV2.empty(test_layout_88)
+    stats_89.n_pairs = 1000
+    # Tiny diagonals → q_raw small enough to be below ceiling
+    tiny_diag = 0.05  # px²
+    stats_89.S11[2, 2] = tiny_diag * stats_89.n_pairs
+    stats_89.S11[3, 3] = tiny_diag * stats_89.n_pairs
+
+    # Without damping
+    new_params_no_damp = finalize_m_step_v2(
+        stats_89, test_layout_88, dt=1.0 / 30.0,
+        prev_params=initial_params_88,
+        initial_params=initial_params_88,
+        damping=0.0,
+    )
+    q_no_damp = new_params_no_damp.q_root_pos
+    # Should be 0.05 × 900 = 45, but floored at q_initial × 0.1
+    # (= 200 × 0.1 = 20). So q_raw ≈ 45 > 20. q_no_damp ≈ 45.
+    # Verify it's roughly in the expected range
+    assert 20.0 <= q_no_damp <= 6000.0, (
+        f"q_no_damp out of expected range: {q_no_damp}"
+    )
+
+    # With damping=0.5: should be 0.5 × prev + 0.5 × q_no_damp
+    new_params_damp_half = finalize_m_step_v2(
+        stats_89, test_layout_88, dt=1.0 / 30.0,
+        prev_params=initial_params_88,
+        initial_params=initial_params_88,
+        damping=0.5,
+    )
+    q_damp_half = new_params_damp_half.q_root_pos
+    expected_half = 0.5 * 200.0 + 0.5 * q_no_damp
+    assert abs(q_damp_half - expected_half) < 0.5, (
+        f"Damped q expected ~{expected_half:.2f}, "
+        f"got {q_damp_half:.2f}"
+    )
+    # Should be strictly between prev and undamped
+    assert min(200.0, q_no_damp) <= q_damp_half <= max(200.0, q_no_damp), (
+        f"Damped q={q_damp_half} not between prev=200 "
+        f"and undamped={q_no_damp}"
+    )
+
+    # damping=1.0 internally clamps to 0.95
+    new_params_strong = finalize_m_step_v2(
+        stats_89, test_layout_88, dt=1.0 / 30.0,
+        prev_params=initial_params_88,
+        initial_params=initial_params_88,
+        damping=1.0,
+    )
+    q_strong = new_params_strong.q_root_pos
+    expected_strong = 0.95 * 200.0 + 0.05 * q_no_damp
+    assert abs(q_strong - expected_strong) < 1.0, (
+        f"damping=1.0 (→0.95) expected ~{expected_strong:.2f}, "
+        f"got {q_strong:.2f}"
+    )
+
+    print("smoke_kalman_pose_smoother_v2: 89/89 cases passed")
     return 0
 
 
