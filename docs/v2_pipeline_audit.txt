@@ -1,0 +1,252 @@
+======================================================================
+1. MODULE STRUCTURE
+======================================================================
+
+[orchestrator]
+  L5791  function  smooth_pose_v2
+
+[io]
+  L5365  function  _import_io_helpers
+  L5385  function  _arrays_to_df_v2
+  L5416  function  _build_and_write_session_output
+  L5594  function  save_model_v2
+  L5676  function  load_model_v2
+
+[layout]
+  L  80  class     BodySegment
+  L 124  class     BodyLayout
+  L 419  function  standard_rat_layout
+  L 575  function  _segment_distal_marker
+  L 931  function  _pack_state_layout_indices
+
+[noise_params]
+  L 549  class     FittedLengths
+  L 589  function  fit_body_lengths
+  L 795  function  apply_fitted_offsets_to_layout
+  L1966  class     NoiseParamsV2
+  L6588  class     PerspectiveModelV2
+
+[kinematics]
+  L 922  function  _R
+  L 969  class     ForwardKinematicsResult
+  L 987  function  forward_kinematics
+  L1049  function  state_to_marker_positions
+  L1110  function  state_to_marker_jacobian
+  L1485  function  state_to_marker_positions_batch
+  L1629  function  state_to_marker_jacobian_batch
+
+[dynamics]
+  L2094  function  build_F_v2
+  L2192  function  build_Q_v2
+
+[filter]
+  L2307  class     FilterResultV2
+  L2478  function  forward_filter_v2
+
+[m_step]
+  L2962  class     _MStepStatsV2
+  L3010  class     _PerSessionFitV2
+  L3048  function  accumulate_m_step_stats_v2
+  L3247  function  finalize_m_step_v2
+  L3494  function  finalize_m_step_v2_from_per_session
+
+[perspective]
+  L1581  function  _perspective_scales_batch_np
+  L1605  function  _perspective_scales_batch_torch
+  L4683  function  _pool_perspective_pass
+  L6675  function  fit_perspective_model_v2
+
+[worker_pool]
+  L4485  function  _pool_init
+
+[uncategorized]
+  L1339  function  _try_import_torch
+  L1353  function  _resolve_device
+  L1375  function  _state_to_world_transforms_batch_np
+  L1434  function  _state_to_world_transforms_batch_torch
+  L1812  function  initial_state_from_data
+  L2337  function  _build_constraint_observations
+  L2389  function  _build_marker_observations
+  L2692  function  _project_state_to_unit_circle
+  L2774  class     SmoothResultV2
+  L2793  function  rts_smooth_v2
+  L3164  function  per_session_fit_from_stats
+  L3454  function  _aggregate_scalar
+  L3679  function  fit_initial_params_v2
+  L3894  function  fit_warm_start_sigma_v2
+  L4125  class     _ValidationViolation
+  L4140  function  _validate_trajectory_v2
+  L4379  class     EMResultV2
+  L4412  function  _max_param_change
+  L4522  function  _pool_em_e_step
+  L4619  function  _pool_warm_start_pass
+  L4795  function  _pool_final_smooth
+  L4829  function  fit_noise_params_em_v2
+  L5466  function  state_to_marker_variances
+  L5524  function  smooth_session_v2
+  L6320  function  main
+
+======================================================================
+2. CLASS METHODS
+======================================================================
+
+[BodyLayout]  L124
+    L 215  BodyLayout.__post_init__
+    L 256  BodyLayout._compute_topo_order
+    L 278  BodyLayout.n_segments
+    L 282  BodyLayout.n_non_root_segments
+    L 286  BodyLayout.n_markers
+    L 290  BodyLayout.root_segment
+    L 297  BodyLayout.topo_order
+    L 302  BodyLayout.non_root_topo_order
+    L 309  BodyLayout.marker_names
+    L 320  BodyLayout.segment_by_name
+    L 326  BodyLayout.marker_attachment
+    L 341  BodyLayout.state_dim
+    L 352  BodyLayout.slice_root_pose
+    L 358  BodyLayout.slice_segment_orientation
+    L 371  BodyLayout.slice_segment_length
+    L 383  BodyLayout.slice_marker_drift
+    L 405  BodyLayout.drift_block_slice
+
+[NoiseParamsV2]  L1966
+    L2038  NoiseParamsV2.default
+
+[_MStepStatsV2]  L2962
+    L2984  _MStepStatsV2.empty
+    L2995  _MStepStatsV2.__iadd__
+
+[_PerSessionFitV2]  L3010
+    L3036  _PerSessionFitV2.empty
+
+[PerspectiveModelV2]  L6588
+    L6608  PerspectiveModelV2.identity
+    L6621  PerspectiveModelV2._normalize
+    L6633  PerspectiveModelV2.scale_for_position
+    L6653  PerspectiveModelV2.scale_partials
+
+======================================================================
+3. PIPELINE REACHABILITY FROM smooth_pose_v2
+======================================================================
+  64 reachable definitions, by role:
+
+  [orchestrator]
+    L5791  smooth_pose_v2
+
+  [io]
+    L5365  _import_io_helpers
+    L5385  _arrays_to_df_v2
+    L5416  _build_and_write_session_output
+    L5594  save_model_v2
+    L5676  load_model_v2
+
+  [layout]
+    L  80  BodySegment
+    L 124  BodyLayout
+    L 320  BodyLayout.segment_by_name
+    L 326  BodyLayout.marker_attachment
+    L 352  BodyLayout.slice_root_pose
+    L 358  BodyLayout.slice_segment_orientation
+    L 371  BodyLayout.slice_segment_length
+    L 383  BodyLayout.slice_marker_drift
+    L 419  standard_rat_layout
+    L 575  _segment_distal_marker
+    L 931  _pack_state_layout_indices
+
+  [noise_params]
+    L 549  FittedLengths
+    L 589  fit_body_lengths
+    L 795  apply_fitted_offsets_to_layout
+    L1966  NoiseParamsV2
+    L6588  PerspectiveModelV2
+    L6608  PerspectiveModelV2.identity
+    L6621  PerspectiveModelV2._normalize
+    L6633  PerspectiveModelV2.scale_for_position
+    L6653  PerspectiveModelV2.scale_partials
+
+  [kinematics]
+    L 922  _R
+    L 969  ForwardKinematicsResult
+    L 987  forward_kinematics
+    L1049  state_to_marker_positions
+    L1110  state_to_marker_jacobian
+    L1485  state_to_marker_positions_batch
+    L1629  state_to_marker_jacobian_batch
+
+  [dynamics]
+    L2094  build_F_v2
+    L2192  build_Q_v2
+
+  [filter]
+    L2307  FilterResultV2
+    L2478  forward_filter_v2
+
+  [m_step]
+    L3048  accumulate_m_step_stats_v2
+    L3247  finalize_m_step_v2
+    L3494  finalize_m_step_v2_from_per_session
+
+  [perspective]
+    L1581  _perspective_scales_batch_np
+    L1605  _perspective_scales_batch_torch
+    L6675  fit_perspective_model_v2
+
+  [uncategorized]
+    L1339  _try_import_torch
+    L1353  _resolve_device
+    L1375  _state_to_world_transforms_batch_np
+    L1434  _state_to_world_transforms_batch_torch
+    L1812  initial_state_from_data
+    L2337  _build_constraint_observations
+    L2389  _build_marker_observations
+    L2692  _project_state_to_unit_circle
+    L2774  SmoothResultV2
+    L2793  rts_smooth_v2
+    L3164  per_session_fit_from_stats
+    L3454  _aggregate_scalar
+    L3679  fit_initial_params_v2
+    L3894  fit_warm_start_sigma_v2
+    L4125  _ValidationViolation
+    L4140  _validate_trajectory_v2
+    L4379  EMResultV2
+    L4412  _max_param_change
+    L4829  fit_noise_params_em_v2
+    L5466  state_to_marker_variances
+    L5524  smooth_session_v2
+
+======================================================================
+4. PAIR-DISTANCE TOUCH POINTS
+======================================================================
+
+[A] Readers of layout.marker_attachment (FK / observation / Jacobian):
+    L1049  state_to_marker_positions
+    L1110  state_to_marker_jacobian
+    L1485  state_to_marker_positions_batch
+    L1629  state_to_marker_jacobian_batch
+    L4683  _pool_perspective_pass
+    L6675  fit_perspective_model_v2
+
+[B] Functions that build the observation vector / Jacobian H:
+    L2389  _build_marker_observations
+
+[C] M-step sufficient-stats accumulator (would gain pair-distance residuals if pseudo-obs added):
+    L2962  _MStepStatsV2
+    L2984  _MStepStatsV2.empty
+    L2995  _MStepStatsV2.__iadd__
+
+[D] save / load (would round-trip new pair-distance params):
+    L5594  save_model_v2
+    L5676  load_model_v2
+
+[E] Layout slice helpers (would gain a new helper for pair distance pseudo-observation indexing if state augmentation is chosen):
+    L 352  BodyLayout.slice_root_pose
+    L 358  BodyLayout.slice_segment_orientation
+    L 371  BodyLayout.slice_segment_length
+    L 383  BodyLayout.slice_marker_drift
+
+======================================================================
+5. STATE-VECTOR CONSTRUCTION / INITIAL STATE SITES
+======================================================================
+
+Functions that touch state-dim-sized arrays (state init / shape checks):
+    L1812  initial_state_from_data

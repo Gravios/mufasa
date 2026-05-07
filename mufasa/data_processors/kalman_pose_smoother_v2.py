@@ -154,6 +154,46 @@ class BodyLayout:
     Total state dim = 8 + 4*N + 2*N = 8 + 6*N where N is the
     number of non-root segments.
 
+    Patch 120a: optional per-marker drift block
+    -------------------------------------------
+
+    When ``with_drift=True``, a Block 4 is appended to the
+    state vector:
+
+        Block 4 (per-marker drift, 2 dims each):
+          for each marker m in topo order:
+            [δ_m_x, δ_m_y]
+
+    where δ_m(t) ∈ ℝ² lives in marker m's parent segment's
+    local frame and follows mean-reverting first-order
+    dynamics:
+
+        δ_m(t+1) = (1 - α_m) · δ_m(t) + w_m(t)
+        w_m(t)   ~ N(0, q_drift_m · dt · I_2)
+
+    Stationary stddev ≈ R_m / 2 when α_m is chosen so that
+    q_drift_m · dt / (2·α_m - α_m²) = R_m² / 4. This gives a
+    soft radius bound: each marker can wander within a ball
+    of radius ~R_m relative to its rigid attachment point,
+    capturing within-session marker drift (sniffing,
+    whisking, ear flicks, fur compression) that the rigid
+    offset model cannot represent.
+
+    With drift enabled,
+        state_dim = 8 + 6*N + 2*K
+    where K = ``n_markers``. For the standard rat layout
+    (N=6, K=15) this is 8 + 36 + 30 = 74, vs. 44 without
+    drift.
+
+    The drift block is OPT-IN. Default ``with_drift=False``
+    preserves the patch-119 state dim and exact behavior;
+    every existing test continues to pass without
+    modification. Patch 120a only adds the dimensions and
+    their dynamics — forward kinematics and observation
+    are unchanged in this patch, so even with drift
+    enabled the smoother behaves identically until a later
+    patch wires δ_m into ``state_to_marker_positions``.
+
     For the standard rat layout with 9 non-root segments
     (back1, back3, back4, lateral_l/r, neck, head, tail1/2/3),
     that's 8 + 6*9 = 62 state dims.
@@ -165,6 +205,12 @@ class BodyLayout:
     cause that marker's state to drift away from the others.
     """
     segments: List[BodySegment]
+    # Patch 120a: opt-in latent drift state. When True, the
+    # state vector is extended by a 2-dim block per marker
+    # with mean-reverting random-walk dynamics. See class
+    # docstring for details. Default False preserves the
+    # exact patch-119 state layout and behavior.
+    with_drift: bool = False
 
     def __post_init__(self) -> None:
         # Validate exactly one root
@@ -293,8 +339,15 @@ class BodyLayout:
 
     @property
     def state_dim(self) -> int:
-        """Total state dimension."""
-        return 8 + 6 * self.n_non_root_segments
+        """Total state dimension.
+
+        Patch 120a: when ``with_drift=True``, adds 2 dims
+        per marker for the latent drift block.
+        """
+        d = 8 + 6 * self.n_non_root_segments
+        if self.with_drift:
+            d += 2 * self.n_markers
+        return d
 
     def slice_root_pose(self) -> slice:
         """Slice for [root_x, root_y, root_vx, root_vy,
@@ -326,6 +379,41 @@ class BodyLayout:
         # All segment-length pairs come after all orientation blocks
         start = 8 + 4 * self.n_non_root_segments + 2 * idx
         return slice(start, start + 2)
+
+    def slice_marker_drift(self, marker_name: str) -> slice:
+        """Slice for [δ_m_x, δ_m_y] of a single marker.
+
+        Patch 120a. Only valid when ``with_drift=True``.
+        Marker order matches ``self.marker_names``.
+        """
+        if not self.with_drift:
+            raise RuntimeError(
+                "slice_marker_drift requires with_drift=True; "
+                "this layout has with_drift=False"
+            )
+        marker_names = self.marker_names
+        if marker_name not in marker_names:
+            raise KeyError(
+                f"Unknown marker {marker_name!r}; layout has "
+                f"{marker_names}"
+            )
+        idx = marker_names.index(marker_name)
+        start = 8 + 6 * self.n_non_root_segments + 2 * idx
+        return slice(start, start + 2)
+
+    @property
+    def drift_block_slice(self) -> slice:
+        """Slice covering the entire drift block (all markers).
+
+        Patch 120a. Returns ``slice(0, 0)`` (empty) when
+        ``with_drift=False``, so callers can write
+        ``Q[layout.drift_block_slice, layout.drift_block_slice]``
+        unconditionally.
+        """
+        if not self.with_drift:
+            return slice(0, 0)
+        start = 8 + 6 * self.n_non_root_segments
+        return slice(start, start + 2 * self.n_markers)
 
 
 def standard_rat_layout(
@@ -1853,6 +1941,31 @@ class NoiseParamsV2:
         Observation noise on the unit-norm constraint
         observations. Held fixed (not EM-fit); acts as
         regularization toward (cos² + sin²) = 1.
+
+    Patch 120a — per-marker latent drift parameters
+    -------------------------------------------------
+    All three drift fields are optional; they are only used
+    when the layout was constructed with ``with_drift=True``.
+    For a default layout (``with_drift=False``) they may be
+    None or empty dicts and are ignored by F/Q construction.
+
+    q_drift : dict[str, float], optional
+        Per-marker continuous-time process-noise intensity
+        on the latent drift δ_m, in px²/s. The one-step
+        random-walk increment has covariance
+        q_drift_m × dt × I_2.
+    alpha_drift : dict[str, float], optional
+        Per-marker mean-reversion rate (dimensionless,
+        per-step). Drives δ_m back toward zero each step:
+        δ_m(t+1) = (1 - α_m) δ_m(t) + w_m(t). Choose so
+        that the stationary stddev
+        sqrt(q_drift_m × dt / (2 α_m - α_m²)) ≈ R_m / 2.
+        Typical value 0.05.
+    r_drift : dict[str, float], optional
+        Per-marker target radius bound on |δ_m| (px). Used
+        to set the drift block's initial covariance and as
+        a sanity reference for q_drift / alpha_drift
+        choices. Typical value sigma_marker[m].
     """
     sigma_marker: Dict[str, float]
     q_root_pos: float
@@ -1860,6 +1973,11 @@ class NoiseParamsV2:
     q_seg_ori: Dict[str, float]
     q_length: Dict[str, float]
     constraint_sigma: float = _DEFAULT_CONSTRAINT_SIGMA
+    # Patch 120a: per-marker latent drift parameters. None
+    # when the layout doesn't have drift enabled.
+    q_drift: Optional[Dict[str, float]] = None
+    alpha_drift: Optional[Dict[str, float]] = None
+    r_drift: Optional[Dict[str, float]] = None
 
     @classmethod
     def default(
@@ -1871,11 +1989,40 @@ class NoiseParamsV2:
         q_seg_ori: float = 0.5,
         q_length: float = 0.01,
         constraint_sigma: float = _DEFAULT_CONSTRAINT_SIGMA,
+        # Patch 120a drift defaults. dt is needed only when
+        # layout.with_drift=True so q_drift can be expressed
+        # as a continuous-time intensity given the user's
+        # frame rate. If layout.with_drift=False the dt
+        # value is ignored.
+        dt: float = 1.0 / 30.0,
+        alpha_drift: float = 0.05,
     ) -> "NoiseParamsV2":
         """Build default noise params with uniform per-marker
         and per-segment values. Useful as initial values for
         EM.
+
+        When ``layout.with_drift=True``, also populates
+        q_drift / alpha_drift / r_drift per the design-doc
+        heuristic:
+            R_m       = sigma_marker
+            α_m       = alpha_drift (default 0.05)
+            q_drift_m = (R_m / 5)² / dt
         """
+        if layout.with_drift:
+            r_drift_d: Optional[Dict[str, float]] = {
+                m: sigma_marker for m in layout.marker_names
+            }
+            alpha_drift_d: Optional[Dict[str, float]] = {
+                m: alpha_drift for m in layout.marker_names
+            }
+            q_drift_d: Optional[Dict[str, float]] = {
+                m: (sigma_marker / 5.0) ** 2 / dt
+                for m in layout.marker_names
+            }
+        else:
+            r_drift_d = None
+            alpha_drift_d = None
+            q_drift_d = None
         return cls(
             sigma_marker={m: sigma_marker for m in layout.marker_names},
             q_root_pos=q_root_pos,
@@ -1883,10 +2030,17 @@ class NoiseParamsV2:
             q_seg_ori={s: q_seg_ori for s in layout.non_root_topo_order},
             q_length={s: q_length for s in layout.non_root_topo_order},
             constraint_sigma=constraint_sigma,
+            q_drift=q_drift_d,
+            alpha_drift=alpha_drift_d,
+            r_drift=r_drift_d,
         )
 
 
-def build_F_v2(layout: BodyLayout, dt: float) -> np.ndarray:
+def build_F_v2(
+    layout: BodyLayout,
+    dt: float,
+    params: Optional["NoiseParamsV2"] = None,
+) -> np.ndarray:
     """Build the state transition matrix F.
 
     F is block-diagonal:
@@ -1899,6 +2053,15 @@ def build_F_v2(layout: BodyLayout, dt: float) -> np.ndarray:
       - Per non-root segment length block (2×2):
         constant-velocity for (length, length_dot).
 
+    Patch 120a: when ``layout.with_drift`` is True, an
+    additional 2×2 block per marker is appended,
+    implementing mean-reverting random-walk dynamics
+    ``δ_m(t+1) = (1 - α_m) δ_m(t) + w_m``. The mean-
+    reversion rate α_m comes from
+    ``params.alpha_drift[m]`` if ``params`` is supplied;
+    otherwise a default of 0.05 is used (matches
+    ``NoiseParamsV2.default``).
+
     All velocities propagate by their corresponding rate ×
     dt; rates themselves are constant under this dynamics
     model (with process noise injected via Q).
@@ -1907,6 +2070,11 @@ def build_F_v2(layout: BodyLayout, dt: float) -> np.ndarray:
     ----------
     layout : BodyLayout
     dt : float
+    params : NoiseParamsV2, optional
+        Used only to read ``alpha_drift`` when
+        ``layout.with_drift=True``. Backward-compatible
+        with all existing call sites that pass only
+        ``(layout, dt)``.
 
     Returns
     -------
@@ -1938,6 +2106,30 @@ def build_F_v2(layout: BodyLayout, dt: float) -> np.ndarray:
     for seg_name in layout.non_root_topo_order:
         sl = layout.slice_segment_length(seg_name)
         F[sl.start, sl.start + 1] = dt
+
+    # Patch 120a: per-marker drift blocks. The np.eye(D)
+    # initialization gave each drift entry F[i,i]=1; replace
+    # with (1 - α_m) so the random walk is mean-reverting
+    # toward zero. α_m = 0 reduces to a standard random walk
+    # (no mean reversion); α_m = 1 would zero δ_m every step
+    # (drift state is useless).
+    if layout.with_drift:
+        for m in layout.marker_names:
+            sl = layout.slice_marker_drift(m)
+            if (
+                params is not None
+                and params.alpha_drift is not None
+                and m in params.alpha_drift
+            ):
+                alpha_m = params.alpha_drift[m]
+            else:
+                alpha_m = 0.05  # matches NoiseParamsV2.default
+            if not (0.0 <= alpha_m < 1.0):
+                raise ValueError(
+                    f"alpha_drift for marker {m!r} must be "
+                    f"in [0, 1); got {alpha_m}"
+                )
+            F[sl, sl] = (1.0 - alpha_m) * np.eye(2)
 
     return F
 
@@ -2026,6 +2218,32 @@ def build_Q_v2(
         sl = layout.slice_segment_length(seg_name)
         q_l = params.q_length.get(seg_name, _FLOOR_Q_LENGTH)
         Q[sl, sl] = _q2_block(q_l)
+
+    # Patch 120a: per-marker drift blocks. Unlike body-state
+    # blocks (which use constant-velocity dynamics with
+    # process noise on acceleration giving a dt^4 / dt^3 /
+    # dt^2 covariance pattern), the drift state is a
+    # mean-reverting random walk on POSITION directly. The
+    # one-step process-noise covariance is the standard
+    # random-walk form q × dt × I, where q is interpreted
+    # as a continuous-time variance intensity in px²/s.
+    if layout.with_drift:
+        if params.q_drift is None:
+            raise ValueError(
+                "build_Q_v2: layout.with_drift=True but "
+                "params.q_drift is None. Build params via "
+                "NoiseParamsV2.default(layout) so drift "
+                "fields are populated, or set them manually."
+            )
+        for m in layout.marker_names:
+            sl = layout.slice_marker_drift(m)
+            q_d = params.q_drift.get(m, 0.0)
+            if q_d < 0:
+                raise ValueError(
+                    f"q_drift for marker {m!r} must be >= 0; "
+                    f"got {q_d}"
+                )
+            Q[sl, sl] = q_d * dt * np.eye(2)
 
     return Q
 
