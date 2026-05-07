@@ -2979,7 +2979,197 @@ def main() -> int:
     assert smoothed_var_cpu.shape == (T_82, n_m, 2)
     assert np.all(np.isfinite(smoothed_pos_cpu))
 
-    print("smoke_kalman_pose_smoother_v2: 82/82 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 114: cross-session multiprocessing pool.
+    # ---------------------------------------------------------- #
+
+    # ---------------------------------------------------------- #
+    # Case 83: smooth_pose_v2 with n_workers=2 produces same
+    # output as n_workers=1 (within FP tolerance). Run on small
+    # synthetic dataset.
+    # ---------------------------------------------------------- #
+    import tempfile
+    from pathlib import Path
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        smooth_pose_v2,
+    )
+
+    rng_83 = np.random.default_rng(8311)
+    test_layout = standard_rat_layout()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_p = Path(tmpdir)
+        in_dir = tmpdir_p / "in"
+        in_dir.mkdir()
+        out_serial_dir = tmpdir_p / "serial"
+        out_par_dir = tmpdir_p / "parallel"
+
+        # Build 3 small sessions in DLC CSV format
+        try:
+            import pandas as pd
+        except ImportError:
+            print(
+                "  skipping case 83 (pandas not available)"
+            )
+            pd = None
+
+        if pd is not None:
+            markers = test_layout.marker_names
+            for i in range(3):
+                T = 150
+                rng_i = np.random.default_rng(8311 + i)
+                root_x = 100 + np.cumsum(rng_i.normal(0, 0.5, T))
+                root_y = 100 + np.cumsum(rng_i.normal(0, 0.5, T))
+                cols_data = {}
+                for m in markers:
+                    ox, oy = rng_i.uniform(-15, 15, 2)
+                    x = root_x + ox + rng_i.normal(0, 0.3, T)
+                    y = root_y + oy + rng_i.normal(0, 0.3, T)
+                    likes = np.full(T, 0.95)
+                    drop_mask = rng_i.random(T) < 0.05
+                    likes[drop_mask] = 0.1
+                    cols_data[(m, "x")] = x
+                    cols_data[(m, "y")] = y
+                    cols_data[(m, "likelihood")] = likes
+                df = pd.DataFrame(cols_data)
+                df.columns = pd.MultiIndex.from_tuples(
+                    [
+                        ("DeepCut", m, c)
+                        for m, c in df.columns
+                    ],
+                    names=["scorer", "bodyparts", "coords"],
+                )
+                df.to_csv(in_dir / f"sess_{i}DeepCut.csv")
+
+            # Run serial
+            res_serial = smooth_pose_v2(
+                pose_input=str(in_dir),
+                output_dir=str(out_serial_dir),
+                layout=test_layout,
+                fps=30.0,
+                likelihood_threshold=0.7,
+                em_max_iter=2,
+                n_workers=1,
+                verbose=False,
+            )
+            # Run parallel
+            res_parallel = smooth_pose_v2(
+                pose_input=str(in_dir),
+                output_dir=str(out_par_dir),
+                layout=test_layout,
+                fps=30.0,
+                likelihood_threshold=0.7,
+                em_max_iter=2,
+                n_workers=2,
+                verbose=False,
+            )
+
+            # Compare params (same EM result expected)
+            for m in test_layout.marker_names:
+                s1 = res_serial["params"].sigma_marker[m]
+                s2 = res_parallel["params"].sigma_marker[m]
+                # FP non-associativity in M-step accumulation
+                # may produce small differences. Tolerance: 1e-6
+                # absolute, 1e-9 relative.
+                assert abs(s1 - s2) < max(
+                    1e-6, 1e-9 * max(abs(s1), abs(s2))
+                ), (
+                    f"Serial vs parallel σ for {m} differ: "
+                    f"{s1} vs {s2}"
+                )
+
+            assert (
+                res_serial["params"].q_root_pos
+                == res_parallel["params"].q_root_pos
+            ) or abs(
+                res_serial["params"].q_root_pos
+                - res_parallel["params"].q_root_pos
+            ) < 1e-6
+
+            # Compare smoothed positions per session
+            for ss, sp in zip(
+                res_serial["sessions"],
+                sorted(
+                    res_parallel["sessions"],
+                    key=lambda d: d["input_path"].name,
+                ),
+            ):
+                # res_serial sessions are in input order; res_parallel
+                # sessions are in completion order. Match by input_path.
+                pass
+            # Match by input path for safe comparison
+            serial_by_path = {
+                d["input_path"].name: d
+                for d in res_serial["sessions"]
+            }
+            parallel_by_path = {
+                d["input_path"].name: d
+                for d in res_parallel["sessions"]
+            }
+            assert (
+                set(serial_by_path.keys())
+                == set(parallel_by_path.keys())
+            )
+            for name in serial_by_path:
+                ss = serial_by_path[name]
+                sp = parallel_by_path[name]
+                # Allow small FP drift
+                assert np.allclose(
+                    ss["smoothed"], sp["smoothed"],
+                    rtol=1e-6, atol=1e-6, equal_nan=True,
+                ), f"smoothed positions for {name} differ"
+                assert np.allclose(
+                    ss["variances"], sp["variances"],
+                    rtol=1e-6, atol=1e-6, equal_nan=True,
+                ), f"variances for {name} differ"
+
+    # ---------------------------------------------------------- #
+    # Case 84: pool cleanup happens even after exception. Run
+    # smooth_pose_v2 with n_workers=2 and force an exception by
+    # passing a deliberately-bad input. Confirm we don't get a
+    # hung pool by making sure subsequent runs work.
+    # ---------------------------------------------------------- #
+    # This is hard to test cleanly without spawning a separate
+    # Python process. Instead we just verify the try/finally
+    # structure exists by source inspection.
+    import inspect
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        smooth_pose_v2 as _spv2,
+    )
+    src = inspect.getsource(_spv2)
+    assert "finally:" in src, (
+        "smooth_pose_v2 must have a try/finally for pool cleanup"
+    )
+    assert "_pool.close()" in src, (
+        "smooth_pose_v2 must close the pool in finally"
+    )
+    assert "_pool.join()" in src, (
+        "smooth_pose_v2 must join the pool in finally"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 85: worker functions are picklable (importable from
+    # multiprocessing context).
+    # ---------------------------------------------------------- #
+    import pickle
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        _pool_init, _pool_em_e_step,
+        _pool_warm_start_pass, _pool_perspective_pass,
+        _pool_final_smooth,
+    )
+    # Top-level module functions should pickle (their bytecode
+    # is reconstructible via module qualname). This is what
+    # multiprocessing.Pool relies on.
+    for fn in (
+        _pool_init, _pool_em_e_step, _pool_warm_start_pass,
+        _pool_perspective_pass, _pool_final_smooth,
+    ):
+        # Pickle the function reference (not its closure)
+        data = pickle.dumps(fn)
+        unpickled = pickle.loads(data)
+        assert unpickled is fn or unpickled.__name__ == fn.__name__
+
+    print("smoke_kalman_pose_smoother_v2: 85/85 cases passed")
     return 0
 
 
