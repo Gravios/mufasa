@@ -3017,12 +3017,33 @@ def forward_filter_v2(
             innovation = z_full - h_full
             R_full = np.diag(R_diag_full)
             S = H_full @ P_p @ H_full.T + R_full
+            # Patch 121c: adaptive jitter to prevent singular
+            # matrices when prediction covariance has overflowed.
+            # The lambda scales with trace(S)/n_obs so it adapts
+            # to the natural scale rather than using a fixed
+            # tiny value. When P_p is well-conditioned (typical
+            # case), lambda is far smaller than R_full's diagonal
+            # and the EKF behaves identically. When P_p has
+            # blown up (q-runaway, long dropouts, tail markers),
+            # the jitter becomes the only thing keeping S
+            # invertible.
+            n_obs_S = S.shape[0]
+            trace_S = np.trace(S)
+            if n_obs_S > 0 and np.isfinite(trace_S) and trace_S > 0:
+                lam_S = max(
+                    _S_REG_FLOOR,
+                    _S_REG_REL_FACTOR * abs(trace_S) / n_obs_S,
+                )
+                S = S + lam_S * np.eye(n_obs_S)
             # Solve K = P_p @ H^T @ inv(S) via solve for stability
             try:
                 K = np.linalg.solve(S.T, H_full @ P_p.T).T
             except np.linalg.LinAlgError:
                 # Singular S — skip update for this frame.
-                # Shouldn't happen with constraint regularization.
+                # With patch 121c's adaptive regularization,
+                # this should be very rare (only when P_p
+                # itself is non-finite or trace_S < 0 from
+                # accumulated fp error).
                 x_filt[t] = x_p
                 P_filt[t] = P_p
                 x_prev = x_p
@@ -3243,23 +3264,64 @@ def rts_smooth_v2(
         # Symmetrize P_pred to guard against fp drift
         P_pred_tp1_sym = 0.5 * (P_pred_tp1 + P_pred_tp1.T)
 
-        # Smoother gain: G_t = P_filt_t @ F^T @ inv(P_pred_tp1)
-        # Solve via:
-        #   G_t @ P_pred_tp1 = P_filt_t @ F^T
-        # i.e., G_t.T = solve(P_pred_tp1.T, F @ P_filt_t.T)
-        # (using solve A^T G^T = (P_filt @ F^T)^T = F @ P_filt^T)
-        try:
-            G_t = np.linalg.solve(
-                P_pred_tp1_sym.T, F @ P_filt_t.T,
-            ).T
-        except np.linalg.LinAlgError:
-            # Singular P_pred — add small regularizer and retry
-            P_pred_reg = P_pred_tp1_sym + 1e-9 * np.eye(D)
-            G_t = np.linalg.solve(
-                P_pred_reg.T, F @ P_filt_t.T,
-            ).T
+        # Patch 121c: pre-emptively check finiteness. If
+        # P_pred is non-finite (overflow during prediction
+        # at this frame), the only safe move is to skip the
+        # smoothing update and let smoothed = filtered. The
+        # bad frame still contributes a flat estimate rather
+        # than poisoning the rest of the backward pass.
+        finite_pp = np.all(np.isfinite(P_pred_tp1_sym)) and np.all(
+            np.isfinite(x_pred_tp1)
+        )
+        gain_invalid = False
+        if not finite_pp:
+            G_t = np.zeros((D, D))
+            gain_invalid = True
+        else:
+            # Smoother gain: G_t = P_filt_t @ F^T @ inv(P_pred_tp1)
+            # Solve via:
+            #   G_t @ P_pred_tp1 = P_filt_t @ F^T
+            # i.e., G_t.T = solve(P_pred_tp1.T, F @ P_filt_t.T)
+            # (using solve A^T G^T = (P_filt @ F^T)^T = F @ P_filt^T)
+            #
+            # Patch 121c: regularize P_pred_tp1_sym proactively
+            # with adaptive jitter scaled to its own trace.
+            # When q has runaway during EM, P_pred can have
+            # trace ~10^7+; the previous fixed 1e-9 was useless
+            # at that scale. The adaptive form keeps the EKF
+            # well-conditioned without changing well-behaved
+            # cases (where the relative term is < the floor).
+            trace_pp = np.trace(P_pred_tp1_sym)
+            if trace_pp > 0:
+                lam_pp = max(
+                    _S_REG_FLOOR,
+                    _S_REG_REL_FACTOR * trace_pp / D,
+                )
+                P_pred_reg = P_pred_tp1_sym + lam_pp * np.eye(D)
+            else:
+                P_pred_reg = P_pred_tp1_sym + _S_REG_FLOOR * np.eye(D)
+            try:
+                G_t = np.linalg.solve(
+                    P_pred_reg.T, F @ P_filt_t.T,
+                ).T
+            except np.linalg.LinAlgError:
+                # Even regularized solve failed — fall back to
+                # G_t = 0 (smoothed = filtered at this frame).
+                G_t = np.zeros((D, D))
+                gain_invalid = True
 
-        # Smoothed mean and covariance
+        # Smoothed mean and covariance.
+        # Patch 121c: when the gain solve fell through, set
+        # smoothed = filtered directly. Multiplying G_t = 0
+        # against a non-finite x_pred_tp1 / P_pred_tp1_sym
+        # would produce NaN under IEEE 754 (0 * inf = NaN);
+        # the explicit guard avoids that.
+        if gain_invalid:
+            x_smooth[t] = x_filt_t
+            P_smooth[t] = P_filt_t
+            P_lag_one[t] = np.zeros((D, D))
+            continue
+
         x_smooth[t] = x_filt_t + G_t @ (x_smooth[t + 1] - x_pred_tp1)
         P_smooth_t = (
             P_filt_t + G_t @ (P_smooth[t + 1] - P_pred_tp1_sym) @ G_t.T
@@ -3346,10 +3408,41 @@ _M_STEP_Q_FLOOR_FACTOR = 0.1
 # a single iteration with bad smoothing can produce
 # astronomical q estimates that destabilize subsequent
 # iterations. Empirically chosen — patch 116 was triggered
-# by q_root_pos jumping 80× in one iteration. With this
-# ceiling, the worst case is a 30× single-step jump,
-# bounded.
-_M_STEP_Q_CEILING_FACTOR = 30.0
+# by q_root_pos jumping 80× in one iteration. Patch 121c
+# tightens this from 30 to 10 after a real-data run with
+# 67 sessions × 54k frames showed q_root_ori climbing 18.6×
+# (7.1 → 132.7) over EM, and q_root_pos hitting the 30×
+# cap exactly (4569 → 137068), with the resulting prediction
+# covariances overflowing float64 in the final smoother
+# pass. 10× is still 3× typical converged values, so
+# adaptation room is preserved.
+_M_STEP_Q_CEILING_FACTOR = 10.0
+
+# Patch 121c: absolute hard caps on the root q parameters.
+# These backstop the relative ceiling above for cases where
+# the initial q is already large (heavy-noise sessions push
+# initial fit upward, then the relative ceiling permits a
+# 10× multiplier on top of that). Calibrated against the
+# stability boundary at 30 fps with arena scales of 500-1000
+# px: beyond q_root_pos ~ 50000 px²/s³, even a moderate
+# dropout (1 second) produces prediction covariances on
+# the order of 50000 px² that approach the regime where
+# the EKF S = HPH^T + R loses conditioning. q_root_ori
+# beyond ~50 means the orientation prior over a few frames
+# of dropout already covers most of the unit circle —
+# the constraint observations can't keep cos²+sin²=1, and
+# the linearization point drifts off the manifold.
+_M_STEP_Q_ROOT_POS_HARD_CAP = 50000.0   # px²/s³
+_M_STEP_Q_ROOT_ORI_HARD_CAP = 50.0      # (cos/sin acceleration)
+
+# Patch 121c: adaptive jitter for the EKF/RTS solves.
+# Replaces the fixed 1e-9 used at the LinAlgError fallback,
+# which was meaningless when trace(P) ≫ 1. lam = max(floor,
+# rel_factor × trace / D). The relative term means jitter
+# scales with the natural scale of the matrix; the floor
+# protects against trace=0 degenerate cases.
+_S_REG_REL_FACTOR = 1e-10
+_S_REG_FLOOR = 1e-12
 
 # Damping factor for M-step parameter updates. New params =
 # alpha × prev + (1 - alpha) × M-step estimate. Set to 0.0
@@ -3736,8 +3829,10 @@ def finalize_m_step_v2(
         _FLOOR_Q_ROOT_POS,
         initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
     )
-    q_root_pos_ceiling = (
-        initial_params.q_root_pos * _M_STEP_Q_CEILING_FACTOR
+    q_root_pos_ceiling = min(
+        initial_params.q_root_pos * _M_STEP_Q_CEILING_FACTOR,
+        # Patch 121c: absolute cap regardless of initial scale
+        _M_STEP_Q_ROOT_POS_HARD_CAP,
     )
     q_root_pos_clipped = max(
         q_root_pos_floor, min(q_root_pos_ceiling, q_root_pos_raw)
@@ -3750,8 +3845,10 @@ def finalize_m_step_v2(
         _FLOOR_Q_ROOT_ORI,
         initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
     )
-    q_root_ori_ceiling = (
-        initial_params.q_root_ori * _M_STEP_Q_CEILING_FACTOR
+    q_root_ori_ceiling = min(
+        initial_params.q_root_ori * _M_STEP_Q_CEILING_FACTOR,
+        # Patch 121c: absolute cap regardless of initial scale
+        _M_STEP_Q_ROOT_ORI_HARD_CAP,
     )
     q_root_ori_clipped = max(
         q_root_ori_floor, min(q_root_ori_ceiling, q_root_ori_raw)
@@ -3999,8 +4096,10 @@ def finalize_m_step_v2_from_per_session(
         _FLOOR_Q_ROOT_POS,
         initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
     )
-    q_root_pos_ceiling = (
-        initial_params.q_root_pos * _M_STEP_Q_CEILING_FACTOR
+    q_root_pos_ceiling = min(
+        initial_params.q_root_pos * _M_STEP_Q_CEILING_FACTOR,
+        # Patch 121c: absolute cap regardless of initial scale
+        _M_STEP_Q_ROOT_POS_HARD_CAP,
     )
     q_root_pos_clipped = max(
         q_root_pos_floor, min(q_root_pos_ceiling, q_root_pos_raw)
@@ -4017,8 +4116,10 @@ def finalize_m_step_v2_from_per_session(
         _FLOOR_Q_ROOT_ORI,
         initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
     )
-    q_root_ori_ceiling = (
-        initial_params.q_root_ori * _M_STEP_Q_CEILING_FACTOR
+    q_root_ori_ceiling = min(
+        initial_params.q_root_ori * _M_STEP_Q_CEILING_FACTOR,
+        # Patch 121c: absolute cap regardless of initial scale
+        _M_STEP_Q_ROOT_ORI_HARD_CAP,
     )
     q_root_ori_clipped = max(
         q_root_ori_floor, min(q_root_ori_ceiling, q_root_ori_raw)
@@ -5337,11 +5438,19 @@ def _pool_final_smooth(
     args: Tuple[
         int, NoiseParamsV2, Optional["PerspectiveModelV2"], str,
     ],
-) -> Tuple[int, np.ndarray, np.ndarray, float]:
+) -> Tuple[int, Optional[np.ndarray], Optional[np.ndarray], float, Optional[str]]:
     """Per-session final smoother pass in a worker.
 
     Returns (sess_idx, smoothed_positions, smoothed_variances,
-    elapsed_s).
+    elapsed_s, error_message).
+
+    Patch 121c: catches exceptions from ``smooth_session_v2`` and
+    returns them as the ``error_message`` field rather than
+    re-raising. This prevents one pathological session (singular
+    matrix in the smoother, non-finite values in q-runaway EKF,
+    etc.) from killing the entire worker pool. The orchestrator
+    inspects ``error_message`` and skips writing for failed
+    sessions while preserving all completed outputs.
     """
     import time as _t
     sess_idx, params, perspective, device = args
@@ -5355,16 +5464,25 @@ def _pool_final_smooth(
     apply_constraints = state["apply_constraints"]
 
     t0 = _t.time()
-    smoothed_positions, smoothed_variances = smooth_session_v2(
-        pos, likes, layout, marker_names,
-        fitted_lengths, params, fps,
-        likelihood_threshold=likelihood_threshold,
-        apply_constraints=apply_constraints,
-        perspective=perspective,
-        device=device,
-    )
-    elapsed = _t.time() - t0
-    return sess_idx, smoothed_positions, smoothed_variances, elapsed
+    try:
+        smoothed_positions, smoothed_variances = smooth_session_v2(
+            pos, likes, layout, marker_names,
+            fitted_lengths, params, fps,
+            likelihood_threshold=likelihood_threshold,
+            apply_constraints=apply_constraints,
+            perspective=perspective,
+            device=device,
+        )
+        elapsed = _t.time() - t0
+        return (
+            sess_idx, smoothed_positions, smoothed_variances,
+            elapsed, None,
+        )
+    except Exception as exc:
+        elapsed = _t.time() - t0
+        # Capture exception type + message so the orchestrator
+        # can log it. Using repr to keep type information.
+        return sess_idx, None, None, elapsed, repr(exc)
 
 
 def fit_noise_params_em_v2(
@@ -6903,16 +7021,36 @@ def smooth_pose_v2(
         if _pool is not None:
             # Parallel path: scatter smoothing across workers,
             # process I/O serially as results come in.
+            #
+            # Patch 121c: workers return a 5-tuple where the
+            # last element is an error message (None on success).
+            # Failed sessions are logged with `! NUM/TOTAL` and
+            # skipped — the rest of the batch continues so a
+            # single bad session doesn't waste compute on the
+            # 60+ that worked.
             task_args = [
                 (sess_idx, params, perspective, device)
                 for sess_idx in range(n_sess_final)
             ]
             completed = 0
-            for sess_idx, smooth_pos, smooth_var, sess_dt in (
+            n_failed = 0
+            failed_sessions: List[Tuple[str, str]] = []
+            for sess_idx, smooth_pos, smooth_var, sess_dt, err in (
                 _pool.imap_unordered(_pool_final_smooth, task_args)
             ):
                 completed += 1
                 s = raw_sessions[sess_idx]
+                if err is not None:
+                    n_failed += 1
+                    failed_sessions.append((s["path"].stem, err))
+                    if verbose:
+                        print(
+                            f"[smoother-v2]  ! {completed:3d}/"
+                            f"{n_sess_final} {s['path'].stem} "
+                            f"FAILED after {sess_dt:.1f}s: {err}",
+                            flush=True,
+                        )
+                    continue
                 T = smooth_pos.shape[0]
 
                 out_path, _wrote_csv_fallback, _csv_fallback_reason = (
@@ -6959,8 +7097,23 @@ def smooth_pose_v2(
                         f"{extra}",
                         flush=True,
                     )
+            # Patch 121c: post-loop summary of failed sessions
+            if verbose and n_failed > 0:
+                print(
+                    f"[smoother-v2] WARNING: {n_failed} of "
+                    f"{n_sess_final} session(s) failed during "
+                    f"final smoothing pass:",
+                    flush=True,
+                )
+                for sess_name, err in failed_sessions:
+                    print(
+                        f"[smoother-v2]   - {sess_name}: {err}",
+                        flush=True,
+                    )
         else:
             # Serial path
+            n_failed_serial = 0
+            failed_sessions_serial: List[Tuple[str, str]] = []
             for sess_idx, (s, (pos, likes)) in enumerate(
                 zip(raw_sessions, sessions_arr)
             ):
@@ -6971,14 +7124,30 @@ def smooth_pose_v2(
                         f"{s['path'].stem} (T={pos.shape[0]}) ...",
                         end=" ", flush=True,
                     )
-                smooth_pos, smooth_var = smooth_session_v2(
-                    pos, likes, layout, layout_marker_names,
-                    fitted_lengths, params, fps,
-                    likelihood_threshold=likelihood_threshold,
-                    apply_constraints=apply_constraints,
-                    perspective=perspective,
-                    device=device,
-                )
+                # Patch 121c: per-session error isolation in
+                # serial path too. Same rationale as parallel —
+                # one pathological session shouldn't waste the
+                # whole run.
+                try:
+                    smooth_pos, smooth_var = smooth_session_v2(
+                        pos, likes, layout, layout_marker_names,
+                        fitted_lengths, params, fps,
+                        likelihood_threshold=likelihood_threshold,
+                        apply_constraints=apply_constraints,
+                        perspective=perspective,
+                        device=device,
+                    )
+                except Exception as exc:
+                    sess_dt = _time_smooth.time() - t_sess_start
+                    n_failed_serial += 1
+                    err = repr(exc)
+                    failed_sessions_serial.append((s["path"].stem, err))
+                    if verbose:
+                        print(
+                            f"FAILED after {sess_dt:.1f}s: {err}",
+                            flush=True,
+                        )
+                    continue
 
                 T = smooth_pos.shape[0]
                 out_path, _wrote_csv_fallback, _csv_fallback_reason = (
@@ -7015,6 +7184,18 @@ def smooth_pose_v2(
                     print(
                         f"{sess_dt:.1f}s "
                         f"(ETA {remaining/60:.1f}min){extra}",
+                        flush=True,
+                    )
+            if verbose and n_failed_serial > 0:
+                print(
+                    f"[smoother-v2] WARNING: {n_failed_serial} of "
+                    f"{n_sess_final} session(s) failed during "
+                    f"final smoothing pass:",
+                    flush=True,
+                )
+                for sess_name, err in failed_sessions_serial:
+                    print(
+                        f"[smoother-v2]   - {sess_name}: {err}",
                         flush=True,
                     )
 
