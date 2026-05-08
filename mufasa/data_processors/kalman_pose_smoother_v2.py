@@ -211,6 +211,28 @@ class BodyLayout:
     # docstring for details. Default False preserves the
     # exact patch-119 state layout and behavior.
     with_drift: bool = False
+    # Patch 121a: per-segment orientation drift. Segments
+    # listed here gain a 1-dim slow-varying angular bias
+    # δ_θ_seg in the state vector, with mean-reverting
+    # AR(1) dynamics:
+    #   δ_θ_seg(t+1) = (1 - α_θ_seg) δ_θ_seg(t) + w_θ_seg(t)
+    #   w_θ_seg(t)   ~ N(0, q_θ_drift_seg · dt)
+    # Used to absorb low-frequency unmodeled angular motion
+    # (body roll/pitch projected onto the image plane,
+    # head pitch, etc.) that the rigid kinematic chain can't
+    # represent. Without it, the M-step inflates q_root_ori
+    # to fit those residuals, and the body orientation
+    # process noise runs away. With drift on a segment,
+    # the slow component is absorbed at low frequency
+    # (bounded by r_θ_drift_seg) without inflating the
+    # high-frequency q.
+    #
+    # Empty list (default) preserves the patch-120 state
+    # layout and behavior. Names must match a segment in
+    # ``segments`` (validated in __post_init__). The order
+    # of names determines the order of dims in the
+    # orientation-drift block.
+    orientation_drift_segments: List[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # Validate exactly one root
@@ -230,6 +252,27 @@ class BodyLayout:
                     f"Segment {s.name!r} has parent {s.parent!r} "
                     f"which is not in the layout"
                 )
+
+        # Patch 121a: validate orientation_drift_segments names
+        # all refer to existing segments. Catch typos at
+        # construction time rather than at FK / Q-build time
+        # where the error would be confusing.
+        for sname in self.orientation_drift_segments:
+            if sname not in seg_names:
+                raise ValueError(
+                    f"orientation_drift_segments references "
+                    f"unknown segment {sname!r}; available: "
+                    f"{sorted(seg_names)}"
+                )
+        # Disallow duplicates so slice indexing is unambiguous
+        seen = set()
+        for sname in self.orientation_drift_segments:
+            if sname in seen:
+                raise ValueError(
+                    f"Duplicate segment {sname!r} in "
+                    f"orientation_drift_segments"
+                )
+            seen.add(sname)
 
         # Validate no cycles (DFS from root, every segment
         # reachable in topo order)
@@ -343,10 +386,14 @@ class BodyLayout:
 
         Patch 120a: when ``with_drift=True``, adds 2 dims
         per marker for the latent drift block.
+        Patch 121a: when ``orientation_drift_segments`` is
+        non-empty, adds 1 dim per listed segment for the
+        slow-varying angular bias δ_θ_seg.
         """
         d = 8 + 6 * self.n_non_root_segments
         if self.with_drift:
             d += 2 * self.n_markers
+        d += len(self.orientation_drift_segments)
         return d
 
     def slice_root_pose(self) -> slice:
@@ -414,6 +461,46 @@ class BodyLayout:
             return slice(0, 0)
         start = 8 + 6 * self.n_non_root_segments
         return slice(start, start + 2 * self.n_markers)
+
+    def slice_segment_orientation_drift(
+        self, segment_name: str,
+    ) -> slice:
+        """Slice for the 1-dim angular drift δ_θ of a segment.
+
+        Patch 121a. Only valid when
+        ``segment_name in orientation_drift_segments``.
+        """
+        if segment_name not in self.orientation_drift_segments:
+            raise RuntimeError(
+                f"slice_segment_orientation_drift: segment "
+                f"{segment_name!r} not in this layout's "
+                f"orientation_drift_segments "
+                f"({self.orientation_drift_segments})"
+            )
+        idx = self.orientation_drift_segments.index(segment_name)
+        # Block layout: [..., marker_drift?, segment_orient_drift]
+        start = 8 + 6 * self.n_non_root_segments
+        if self.with_drift:
+            start += 2 * self.n_markers
+        start += idx
+        return slice(start, start + 1)
+
+    @property
+    def orientation_drift_block_slice(self) -> slice:
+        """Slice covering the entire segment-orientation drift
+        block (all listed segments).
+
+        Patch 121a. Returns ``slice(0, 0)`` when no segments
+        are listed, so callers can index into ``Q`` /
+        ``F`` unconditionally.
+        """
+        n = len(self.orientation_drift_segments)
+        if n == 0:
+            return slice(0, 0)
+        start = 8 + 6 * self.n_non_root_segments
+        if self.with_drift:
+            start += 2 * self.n_markers
+        return slice(start, start + n)
 
 
 def standard_rat_layout(
@@ -2157,6 +2244,28 @@ class NoiseParamsV2:
         to set the drift block's initial covariance and as
         a sanity reference for q_drift / alpha_drift
         choices. Typical value sigma_marker[m].
+
+    Patch 121a — per-segment orientation drift parameters
+    -------------------------------------------------------
+    All three orientation-drift fields are optional; only
+    used when ``layout.orientation_drift_segments`` is
+    non-empty. Keyed by segment name.
+
+    q_theta_drift : dict[str, float], optional
+        Per-segment continuous-time process-noise intensity
+        on δ_θ_seg, in rad²/s. The one-step random-walk
+        increment has variance q_theta_drift_seg · dt.
+    alpha_theta_drift : dict[str, float], optional
+        Per-segment mean-reversion rate (dimensionless,
+        per-step). Drives δ_θ_seg back toward zero each
+        step. Typical value 0.05 — same as the marker drift
+        default; orientation drift uses the same dynamics
+        form, just on a different state dimension.
+    r_theta_drift : dict[str, float], optional
+        Per-segment target radius bound on |δ_θ_seg| (rad).
+        Used to set the orientation drift block's initial
+        covariance. Typical value 0.1 rad (~5.7°) — small
+        enough to be a "drift" not a "rotation".
     """
     sigma_marker: Dict[str, float]
     q_root_pos: float
@@ -2169,6 +2278,11 @@ class NoiseParamsV2:
     q_drift: Optional[Dict[str, float]] = None
     alpha_drift: Optional[Dict[str, float]] = None
     r_drift: Optional[Dict[str, float]] = None
+    # Patch 121a: per-segment orientation drift parameters.
+    # None when the layout has no orientation_drift_segments.
+    q_theta_drift: Optional[Dict[str, float]] = None
+    alpha_theta_drift: Optional[Dict[str, float]] = None
+    r_theta_drift: Optional[Dict[str, float]] = None
 
     @classmethod
     def default(
@@ -2196,6 +2310,11 @@ class NoiseParamsV2:
         # bound. None means no cap.
         fitted_lengths: Optional["FittedLengths"] = None,
         r_drift_cap: Optional[float] = 20.0,
+        # Patch 121a orientation-drift defaults. Used only
+        # when ``layout.orientation_drift_segments`` is
+        # non-empty.
+        r_theta_drift: float = 0.1,           # rad (~5.7°)
+        alpha_theta_drift: float = 0.05,      # per-step
     ) -> "NoiseParamsV2":
         """Build default noise params with uniform per-marker
         and per-segment values. Useful as initial values for
@@ -2222,6 +2341,15 @@ class NoiseParamsV2:
         drift state from absorbing more than ~20 px of motion
         per marker, keeping it as "regularize within a body
         radius" rather than "model arbitrary motion").
+
+        Patch 121a: when ``layout.orientation_drift_segments``
+        is non-empty, populates per-segment q_theta_drift /
+        alpha_theta_drift / r_theta_drift via the heuristic
+        q_θ = (r_θ / 5)² / dt, mirroring the marker drift
+        form. r_θ_drift defaults to 0.1 rad (~5.7°), small
+        enough to encode "drift" rather than "rotation".
+        Pass empirical or session-tuned values directly via
+        the dataclass constructor if more control is needed.
         """
         if layout.with_drift:
             r_drift_d: Optional[Dict[str, float]] = {}
@@ -2257,6 +2385,29 @@ class NoiseParamsV2:
             r_drift_d = None
             alpha_drift_d = None
             q_drift_d = None
+
+        # Patch 121a: orientation-drift dicts. Populated only
+        # when the layout has segments listed for orientation
+        # drift. Same heuristic shape as marker drift: q from r
+        # via (r/5)²/dt.
+        if layout.orientation_drift_segments:
+            r_theta_drift_d: Optional[Dict[str, float]] = {
+                s: r_theta_drift
+                for s in layout.orientation_drift_segments
+            }
+            alpha_theta_drift_d: Optional[Dict[str, float]] = {
+                s: alpha_theta_drift
+                for s in layout.orientation_drift_segments
+            }
+            q_theta_drift_d: Optional[Dict[str, float]] = {
+                s: (r_theta_drift / 5.0) ** 2 / dt
+                for s in layout.orientation_drift_segments
+            }
+        else:
+            r_theta_drift_d = None
+            alpha_theta_drift_d = None
+            q_theta_drift_d = None
+
         return cls(
             sigma_marker={m: sigma_marker for m in layout.marker_names},
             q_root_pos=q_root_pos,
@@ -2267,6 +2418,9 @@ class NoiseParamsV2:
             q_drift=q_drift_d,
             alpha_drift=alpha_drift_d,
             r_drift=r_drift_d,
+            q_theta_drift=q_theta_drift_d,
+            alpha_theta_drift=alpha_theta_drift_d,
+            r_theta_drift=r_theta_drift_d,
         )
 
 
@@ -2364,6 +2518,27 @@ def build_F_v2(
                     f"in [0, 1); got {alpha_m}"
                 )
             F[sl, sl] = (1.0 - alpha_m) * np.eye(2)
+
+    # Patch 121a: per-segment orientation drift blocks. Same
+    # form as marker drift, but 1×1 per segment instead of
+    # 2×2 per marker. F[i, i] = (1 - α_θ_seg) on each block's
+    # diagonal entry.
+    for sname in layout.orientation_drift_segments:
+        sl = layout.slice_segment_orientation_drift(sname)
+        if (
+            params is not None
+            and params.alpha_theta_drift is not None
+            and sname in params.alpha_theta_drift
+        ):
+            alpha_seg = params.alpha_theta_drift[sname]
+        else:
+            alpha_seg = 0.05  # matches NoiseParamsV2.default
+        if not (0.0 <= alpha_seg < 1.0):
+            raise ValueError(
+                f"alpha_theta_drift for segment {sname!r} "
+                f"must be in [0, 1); got {alpha_seg}"
+            )
+        F[sl.start, sl.start] = 1.0 - alpha_seg
 
     return F
 
@@ -2478,6 +2653,28 @@ def build_Q_v2(
                     f"got {q_d}"
                 )
             Q[sl, sl] = q_d * dt * np.eye(2)
+
+    # Patch 121a: per-segment orientation drift blocks. Same
+    # structural form as marker drift but 1-dim per segment.
+    # q × dt as the one-step variance.
+    if layout.orientation_drift_segments:
+        if params.q_theta_drift is None:
+            raise ValueError(
+                "build_Q_v2: layout.orientation_drift_segments "
+                "is non-empty but params.q_theta_drift is None. "
+                "Build params via NoiseParamsV2.default(layout) "
+                "so orientation drift fields are populated, or "
+                "set them manually."
+            )
+        for sname in layout.orientation_drift_segments:
+            sl = layout.slice_segment_orientation_drift(sname)
+            q_d = params.q_theta_drift.get(sname, 0.0)
+            if q_d < 0:
+                raise ValueError(
+                    f"q_theta_drift for segment {sname!r} "
+                    f"must be >= 0; got {q_d}"
+                )
+            Q[sl.start, sl.start] = q_d * dt
 
     return Q
 
@@ -2751,6 +2948,19 @@ def forward_filter_v2(
                 r_m = params.r_drift.get(m, 1.0)
                 var = (r_m / 2.0) ** 2
                 P0[sl, sl] = var * np.eye(2)
+        # Patch 121a: initial uncertainty for the orientation
+        # drift block. Same idea on the angular state — set
+        # variance to (r_θ_drift/2)² per segment so the EKF
+        # prior on δ_θ_seg matches the configured stationary
+        # half-radius.
+        if (
+            layout.orientation_drift_segments
+            and params.r_theta_drift is not None
+        ):
+            for sname in layout.orientation_drift_segments:
+                sl = layout.slice_segment_orientation_drift(sname)
+                r_seg = params.r_theta_drift.get(sname, 0.1)
+                P0[sl.start, sl.start] = (r_seg / 2.0) ** 2
     else:
         P0 = initial_cov
 
@@ -3626,6 +3836,21 @@ def finalize_m_step_v2(
             dict(prev_params.r_drift)
             if prev_params.r_drift is not None else None
         ),
+        # Patch 121a: orientation drift parameters pass
+        # through similarly. EM does not currently update
+        # q_theta_drift / alpha_theta_drift / r_theta_drift.
+        q_theta_drift=(
+            dict(prev_params.q_theta_drift)
+            if prev_params.q_theta_drift is not None else None
+        ),
+        alpha_theta_drift=(
+            dict(prev_params.alpha_theta_drift)
+            if prev_params.alpha_theta_drift is not None else None
+        ),
+        r_theta_drift=(
+            dict(prev_params.r_theta_drift)
+            if prev_params.r_theta_drift is not None else None
+        ),
     )
 
 
@@ -3894,6 +4119,20 @@ def finalize_m_step_v2_from_per_session(
             dict(prev_params.r_drift)
             if prev_params.r_drift is not None else None
         ),
+        # Patch 121a: orientation drift parameters pass through
+        # similarly.
+        q_theta_drift=(
+            dict(prev_params.q_theta_drift)
+            if prev_params.q_theta_drift is not None else None
+        ),
+        alpha_theta_drift=(
+            dict(prev_params.alpha_theta_drift)
+            if prev_params.alpha_theta_drift is not None else None
+        ),
+        r_theta_drift=(
+            dict(prev_params.r_theta_drift)
+            if prev_params.r_theta_drift is not None else None
+        ),
     )
 
 
@@ -4149,6 +4388,35 @@ def fit_initial_params_v2(
         r_drift_d = None
         q_drift_d = None
 
+    # Patch 121a: orientation drift parameters. Populated from
+    # the layout's orientation_drift_segments using the same
+    # heuristic q = (r/5)² / dt as marker drift, with
+    # r_θ = 0.1 rad (~5.7°) by default. fit_initial_params_v2
+    # has no empirical-residual analog yet for orientation
+    # drift, so all values come from the heuristic; future
+    # work could add a per-segment-residual estimator
+    # similar to the body-frame scatter computation in
+    # fit_body_lengths.
+    if layout.orientation_drift_segments:
+        r_theta_default = 0.1
+        alpha_theta_default = 0.05
+        q_theta_drift_d: Optional[Dict[str, float]] = {
+            s: (r_theta_default / 5.0) ** 2 / dt
+            for s in layout.orientation_drift_segments
+        }
+        alpha_theta_drift_d: Optional[Dict[str, float]] = {
+            s: alpha_theta_default
+            for s in layout.orientation_drift_segments
+        }
+        r_theta_drift_d: Optional[Dict[str, float]] = {
+            s: r_theta_default
+            for s in layout.orientation_drift_segments
+        }
+    else:
+        q_theta_drift_d = None
+        alpha_theta_drift_d = None
+        r_theta_drift_d = None
+
     return NoiseParamsV2(
         sigma_marker=sigma_marker,
         q_root_pos=q_root_pos,
@@ -4158,6 +4426,9 @@ def fit_initial_params_v2(
         q_drift=q_drift_d,
         alpha_drift=alpha_drift_d,
         r_drift=r_drift_d,
+        q_theta_drift=q_theta_drift_d,
+        alpha_theta_drift=alpha_theta_drift_d,
+        r_theta_drift=r_theta_drift_d,
     )
 
 
@@ -5205,6 +5476,8 @@ def fit_noise_params_em_v2(
         # layout.with_drift). Without this, with_drift=True
         # runs after warm-start lose q_drift/alpha_drift/
         # r_drift and crash in build_Q_v2.
+        # Patch 121a: same passthrough for orientation drift
+        # parameters.
         initial_params = NoiseParamsV2(
             sigma_marker=sigma_warm,
             q_root_pos=initial_params.q_root_pos,
@@ -5223,6 +5496,18 @@ def fit_noise_params_em_v2(
             r_drift=(
                 dict(initial_params.r_drift)
                 if initial_params.r_drift is not None else None
+            ),
+            q_theta_drift=(
+                dict(initial_params.q_theta_drift)
+                if initial_params.q_theta_drift is not None else None
+            ),
+            alpha_theta_drift=(
+                dict(initial_params.alpha_theta_drift)
+                if initial_params.alpha_theta_drift is not None else None
+            ),
+            r_theta_drift=(
+                dict(initial_params.r_theta_drift)
+                if initial_params.r_theta_drift is not None else None
             ),
         )
         if verbose:
@@ -5990,6 +6275,30 @@ def save_model_v2(
     # round-trips silently for backward compatibility.
     save_kwargs["layout_with_drift"] = bool(layout.with_drift)
 
+    # Patch 121a: layout.orientation_drift_segments and
+    # NoiseParamsV2 orientation-drift fields. Empty list /
+    # None on pre-121a models loads with no orientation drift
+    # configured.
+    save_kwargs["layout_orientation_drift_segments"] = np.array(
+        list(layout.orientation_drift_segments), dtype=object,
+    )
+    has_theta_drift = (
+        params.q_theta_drift is not None
+        and params.alpha_theta_drift is not None
+        and params.r_theta_drift is not None
+    )
+    save_kwargs["has_theta_drift"] = has_theta_drift
+    if has_theta_drift:
+        save_kwargs["params_q_theta_drift"] = np.array(
+            list(params.q_theta_drift.items()), dtype=object,
+        )
+        save_kwargs["params_alpha_theta_drift"] = np.array(
+            list(params.alpha_theta_drift.items()), dtype=object,
+        )
+        save_kwargs["params_r_theta_drift"] = np.array(
+            list(params.r_theta_drift.items()), dtype=object,
+        )
+
     if perspective is not None:
         save_kwargs["persp_coeffs"] = np.array(
             list(perspective.coeffs.items()), dtype=object,
@@ -6046,7 +6355,19 @@ def load_model_v2(
             rest_angle=float(sd["rest_angle"]),
             markers=dict(sd["markers"]),
         ))
-    layout = BodyLayout(segments=segments)
+    # Patch 121a: orientation_drift_segments must be passed at
+    # BodyLayout construction time (validated in __post_init__).
+    # Pre-121a models don't have this field; load empty list.
+    odd_segments: List[str] = []
+    if "layout_orientation_drift_segments" in data.files:
+        odd_segments = [
+            str(s) for s in
+            data["layout_orientation_drift_segments"]
+        ]
+    layout = BodyLayout(
+        segments=segments,
+        orientation_drift_segments=odd_segments,
+    )
     # Patch 120b: layout.with_drift flag. Defaults False for
     # pre-120b model files where the field is absent.
     if "layout_with_drift" in data.files:
@@ -6110,6 +6431,22 @@ def load_model_v2(
         }
         params_kwargs["r_drift"] = {
             k: float(v) for k, v in data["params_r_drift"]
+        }
+    # Patch 121a: NoiseParamsV2 orientation drift fields.
+    # Same backward-compat pattern: pre-121a models leave
+    # them None; post-121a presence gated by has_theta_drift.
+    if (
+        "has_theta_drift" in data.files
+        and bool(data["has_theta_drift"])
+    ):
+        params_kwargs["q_theta_drift"] = {
+            k: float(v) for k, v in data["params_q_theta_drift"]
+        }
+        params_kwargs["alpha_theta_drift"] = {
+            k: float(v) for k, v in data["params_alpha_theta_drift"]
+        }
+        params_kwargs["r_theta_drift"] = {
+            k: float(v) for k, v in data["params_r_theta_drift"]
         }
     params = NoiseParamsV2(**params_kwargs)
 
@@ -6912,6 +7249,27 @@ def main(argv=None) -> int:
             "Off by default."
         ),
     )
+    parser.add_argument(
+        "--orient-drift-segments", default="",
+        help=(
+            "Patch 121a: enable per-segment orientation "
+            "drift state on the listed segments. Comma-"
+            "separated segment names (e.g. 'body' or "
+            "'body,neck,head'). Each listed segment gains a "
+            "1D angular drift δ_θ_seg with mean-reverting "
+            "AR(1) dynamics, bounded by r_θ_drift (default "
+            "0.1 rad / ~5.7°). Used to absorb low-frequency "
+            "unmodeled angular motion (body roll/pitch "
+            "projected onto the image plane, head pitch) "
+            "that otherwise inflates q_root_ori during EM. "
+            "Adds 1 dim per listed segment (small cost). "
+            "Empty (default) preserves patch-120 behavior. "
+            "NOTE: in patch 121a δ_θ is only in the state "
+            "vector — it does not yet affect FK. The full "
+            "wiring lands in patch 121b. Use this flag in "
+            "121a only for testing the state extension."
+        ),
+    )
     args = parser.parse_args(argv)
 
     layout = standard_rat_layout(
@@ -6922,6 +7280,22 @@ def main(argv=None) -> int:
     )
     if args.with_drift:
         layout.with_drift = True
+    if args.orient_drift_segments:
+        # Parse the comma-separated list, strip whitespace
+        # per name. Empty entries (e.g. trailing comma) are
+        # filtered. Names are validated against the layout
+        # in BodyLayout.__post_init__ — but we already built
+        # the layout above, so re-attach the field and
+        # rebuild via dataclasses.replace to re-trigger
+        # __post_init__ validation.
+        import dataclasses as _dc
+        seg_names = [
+            s.strip() for s in args.orient_drift_segments.split(",")
+            if s.strip()
+        ]
+        layout = _dc.replace(
+            layout, orientation_drift_segments=seg_names,
+        )
 
     try:
         smooth_pose_v2(

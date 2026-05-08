@@ -4553,7 +4553,228 @@ def main() -> int:
         assert loaded_pp.alpha_drift is None
         assert loaded_pp.r_drift is None
 
-    print("smoke_kalman_pose_smoother_v2: 122/122 cases passed")
+    # ---------------------------------------------------------- #
+    # Patch 121a: per-segment orientation drift state extension.
+    # FK is NOT yet wired (that's 121b), so these tests cover
+    # only the state-vector mechanics: layout, slice helpers,
+    # F/Q blocks, NoiseParamsV2 fields, save/load.
+    # ---------------------------------------------------------- #
+    import dataclasses as _dc
+
+    # ---------------------------------------------------------- #
+    # Case 123: orientation_drift_segments rejects unknown
+    # segment names. Catches typos at construction time.
+    # ---------------------------------------------------------- #
+    try:
+        layout_bad = standard_rat_layout()
+        layout_bad = _dc.replace(
+            layout_bad, orientation_drift_segments=["body", "nonexistent"],
+        )
+        assert False, "expected ValueError for unknown segment"
+    except ValueError as e:
+        assert "nonexistent" in str(e)
+
+    # ---------------------------------------------------------- #
+    # Case 124: orientation_drift_segments rejects duplicates.
+    # ---------------------------------------------------------- #
+    try:
+        layout_bad2 = standard_rat_layout()
+        layout_bad2 = _dc.replace(
+            layout_bad2, orientation_drift_segments=["body", "body"],
+        )
+        assert False, "expected ValueError for duplicate segment"
+    except ValueError as e:
+        assert "Duplicate" in str(e) or "duplicate" in str(e)
+
+    # ---------------------------------------------------------- #
+    # Case 125: empty orientation_drift_segments (default).
+    # state_dim is unchanged from patch-120 form.
+    # ---------------------------------------------------------- #
+    layout_125 = standard_rat_layout()
+    base_dim = layout_125.state_dim
+    assert layout_125.orientation_drift_segments == []
+    assert layout_125.orientation_drift_block_slice == slice(0, 0)
+
+    # ---------------------------------------------------------- #
+    # Case 126: orientation_drift_segments adds 1 dim per name.
+    # ---------------------------------------------------------- #
+    layout_126 = standard_rat_layout()
+    layout_126 = _dc.replace(
+        layout_126,
+        orientation_drift_segments=["body", "neck", "head"],
+    )
+    assert layout_126.state_dim == base_dim + 3
+    block = layout_126.orientation_drift_block_slice
+    assert block.stop - block.start == 3
+
+    # ---------------------------------------------------------- #
+    # Case 127: slice_segment_orientation_drift returns correct
+    # slice; raises for segments not in the list.
+    # ---------------------------------------------------------- #
+    sl_body = layout_126.slice_segment_orientation_drift("body")
+    sl_neck = layout_126.slice_segment_orientation_drift("neck")
+    sl_head = layout_126.slice_segment_orientation_drift("head")
+    # Each is a 1-dim slice
+    assert sl_body.stop - sl_body.start == 1
+    assert sl_neck.stop - sl_neck.start == 1
+    assert sl_head.stop - sl_head.start == 1
+    # Order in the state vector matches order of the segment list
+    assert sl_neck.start == sl_body.start + 1
+    assert sl_head.start == sl_neck.start + 1
+    # Asking for a segment that's not configured raises
+    try:
+        layout_126.slice_segment_orientation_drift("back_rear")
+        assert False, "expected RuntimeError"
+    except RuntimeError:
+        pass
+
+    # ---------------------------------------------------------- #
+    # Case 128: NoiseParamsV2.default populates the theta-drift
+    # dicts from layout.orientation_drift_segments using the
+    # heuristic q = (r/5)² / dt.
+    # ---------------------------------------------------------- #
+    layout_128 = _dc.replace(
+        standard_rat_layout(),
+        orientation_drift_segments=["body"],
+    )
+    p128 = NoiseParamsV2.default(layout_128, dt=1.0/30.0)
+    assert p128.q_theta_drift is not None
+    assert p128.alpha_theta_drift is not None
+    assert p128.r_theta_drift is not None
+    assert "body" in p128.r_theta_drift
+    assert p128.r_theta_drift["body"] == 0.1  # default
+    assert p128.alpha_theta_drift["body"] == 0.05  # default
+    expected_q = (0.1 / 5.0) ** 2 / (1.0 / 30.0)
+    assert abs(p128.q_theta_drift["body"] - expected_q) < 1e-12
+    # When no segments configured, fields are None
+    p_no_seg = NoiseParamsV2.default(standard_rat_layout())
+    assert p_no_seg.q_theta_drift is None
+    assert p_no_seg.alpha_theta_drift is None
+    assert p_no_seg.r_theta_drift is None
+
+    # ---------------------------------------------------------- #
+    # Case 129: build_F_v2 sets (1 - α) on the orientation
+    # drift block's diagonal entries.
+    # ---------------------------------------------------------- #
+    p129 = NoiseParamsV2.default(layout_128, dt=1.0/30.0)
+    F129 = build_F_v2(layout_128, dt=1.0/30.0, params=p129)
+    sl = layout_128.slice_segment_orientation_drift("body")
+    expected_F = 1.0 - 0.05  # default alpha
+    assert abs(F129[sl.start, sl.start] - expected_F) < 1e-12
+    # All off-diagonal entries within the orientation drift
+    # block remain zero (block is 1x1, but the row/column
+    # outside should be zero too)
+    block = layout_128.orientation_drift_block_slice
+    for i in range(layout_128.state_dim):
+        if i == sl.start:
+            continue
+        assert abs(F129[sl.start, i]) < 1e-12, (
+            f"F[{sl.start}, {i}] should be 0; got {F129[sl.start, i]}"
+        )
+        assert abs(F129[i, sl.start]) < 1e-12, (
+            f"F[{i}, {sl.start}] should be 0; got {F129[i, sl.start]}"
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 130: build_Q_v2 sets q × dt on the orientation drift
+    # block's diagonal entries.
+    # ---------------------------------------------------------- #
+    Q130 = build_Q_v2(layout_128, dt=1.0/30.0, params=p129)
+    expected_q_block = expected_q * (1.0 / 30.0)
+    assert abs(Q130[sl.start, sl.start] - expected_q_block) < 1e-12
+
+    # ---------------------------------------------------------- #
+    # Case 131: alpha and q validation. Negative q → error;
+    # alpha out of [0, 1) → error.
+    # ---------------------------------------------------------- #
+    p_bad_q = NoiseParamsV2.default(layout_128, dt=1.0/30.0)
+    p_bad_q.q_theta_drift = {"body": -1.0}
+    try:
+        build_Q_v2(layout_128, dt=1.0/30.0, params=p_bad_q)
+        assert False, "expected ValueError for negative q_theta_drift"
+    except ValueError as e:
+        assert "q_theta_drift" in str(e)
+    p_bad_a = NoiseParamsV2.default(layout_128, dt=1.0/30.0)
+    p_bad_a.alpha_theta_drift = {"body": 1.5}
+    try:
+        build_F_v2(layout_128, dt=1.0/30.0, params=p_bad_a)
+        assert False, "expected ValueError for alpha out of range"
+    except ValueError as e:
+        assert "alpha_theta_drift" in str(e)
+
+    # ---------------------------------------------------------- #
+    # Case 132: save/load round-trip preserves
+    # orientation_drift_segments and theta-drift NoiseParamsV2
+    # fields. Backward compat: pre-121a models (no theta-drift
+    # keys present) load with empty segments and None fields.
+    # ---------------------------------------------------------- #
+    layout_132 = _dc.replace(
+        standard_rat_layout(),
+        orientation_drift_segments=["body", "neck"],
+    )
+    layout_132.with_drift = False  # focus on orientation drift only
+    fitted_132 = FittedLengths(
+        segment_lengths={
+            s: 30.0 for s in layout_132.non_root_topo_order
+        },
+        segment_length_iqr={
+            s: 1.0 for s in layout_132.non_root_topo_order
+        },
+        marker_offsets={
+            m: (1.0, 0.0) for m in layout_132.marker_names
+        },
+    )
+    params_132 = NoiseParamsV2.default(layout_132, dt=1.0/30.0)
+    with _tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / "m132.npz"
+        _save_120b(
+            save_path, layout_132, fitted_132, params_132,
+            fps=30.0, likelihood_threshold=0.7,
+        )
+        loaded_layout, loaded_fl, loaded_pp, _, _, _ = _load_120b(
+            save_path,
+        )
+        assert loaded_layout.orientation_drift_segments == [
+            "body", "neck",
+        ]
+        assert loaded_pp.q_theta_drift is not None
+        assert loaded_pp.alpha_theta_drift is not None
+        assert loaded_pp.r_theta_drift is not None
+        for s in ("body", "neck"):
+            assert abs(
+                loaded_pp.r_theta_drift[s]
+                - params_132.r_theta_drift[s]
+            ) < 1e-12
+            assert abs(
+                loaded_pp.q_theta_drift[s]
+                - params_132.q_theta_drift[s]
+            ) < 1e-12
+            assert abs(
+                loaded_pp.alpha_theta_drift[s]
+                - params_132.alpha_theta_drift[s]
+            ) < 1e-12
+
+    # Also save with NO orientation-drift segments — confirm
+    # loaded model has empty list and None fields.
+    layout_132_empty = standard_rat_layout()
+    params_132_empty = NoiseParamsV2.default(
+        layout_132_empty, dt=1.0/30.0,
+    )
+    with _tempfile.TemporaryDirectory() as tmpdir:
+        save_path = Path(tmpdir) / "m132e.npz"
+        _save_120b(
+            save_path, layout_132_empty, fitted_132,
+            params_132_empty, fps=30.0, likelihood_threshold=0.7,
+        )
+        loaded_layout, _, loaded_pp, _, _, _ = _load_120b(
+            save_path,
+        )
+        assert loaded_layout.orientation_drift_segments == []
+        assert loaded_pp.q_theta_drift is None
+        assert loaded_pp.alpha_theta_drift is None
+        assert loaded_pp.r_theta_drift is None
+
+    print("smoke_kalman_pose_smoother_v2: 132/132 cases passed")
     return 0
 
 
