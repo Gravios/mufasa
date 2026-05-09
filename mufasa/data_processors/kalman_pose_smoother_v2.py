@@ -234,6 +234,22 @@ class BodyLayout:
     # orientation-drift block.
     orientation_drift_segments: List[str] = field(default_factory=list)
 
+    # Patch 121d: per-segment constant-acceleration extension.
+    # When a segment name appears here, its kinematic state
+    # block grows by an acceleration block:
+    #   - root segment: +4 dims [ax, ay, root_cos_ddot, root_sin_ddot]
+    #     (both translation and orientation get accel)
+    #   - non-root segment: +2 dims [cos_ddot, sin_ddot]
+    #     (orientation only; lengths stay first-order)
+    # The new dims are appended at the END of the state vector
+    # (after orientation drift), so existing slice helpers,
+    # forward kinematics, and observation Jacobian are unchanged.
+    # Only F and Q are updated to add the integrator cross-terms
+    # (v_new = v + a*dt; x_new = x + v*dt + a*dt²/2) and the
+    # diagonal jerk-noise entries on the new accel slots.
+    # Empty list (default) preserves patch-121b/121c behavior.
+    const_accel_segments: List[str] = field(default_factory=list)
+
     def __post_init__(self) -> None:
         # Validate exactly one root
         roots = [s for s in self.segments if s.parent is None]
@@ -273,6 +289,23 @@ class BodyLayout:
                     f"orientation_drift_segments"
                 )
             seen.add(sname)
+
+        # Patch 121d: validate const_accel_segments
+        for sname in self.const_accel_segments:
+            if sname not in seg_names:
+                raise ValueError(
+                    f"const_accel_segments references unknown "
+                    f"segment {sname!r}; available: "
+                    f"{sorted(seg_names)}"
+                )
+        seen_ca = set()
+        for sname in self.const_accel_segments:
+            if sname in seen_ca:
+                raise ValueError(
+                    f"Duplicate segment {sname!r} in "
+                    f"const_accel_segments"
+                )
+            seen_ca.add(sname)
 
         # Validate no cycles (DFS from root, every segment
         # reachable in topo order)
@@ -389,11 +422,23 @@ class BodyLayout:
         Patch 121a: when ``orientation_drift_segments`` is
         non-empty, adds 1 dim per listed segment for the
         slow-varying angular bias δ_θ_seg.
+        Patch 121d: when ``const_accel_segments`` is
+        non-empty, adds 4 dims if the root is listed (both
+        translation and orientation accel) and 2 dims for
+        each listed non-root segment (orientation accel
+        only).
         """
         d = 8 + 6 * self.n_non_root_segments
         if self.with_drift:
             d += 2 * self.n_markers
         d += len(self.orientation_drift_segments)
+        # Patch 121d
+        for sname in self.const_accel_segments:
+            seg = self.segment_by_name(sname)
+            if seg.parent is None:
+                d += 4    # [ax, ay, root_cos_ddot, root_sin_ddot]
+            else:
+                d += 2    # [cos_ddot, sin_ddot]
         return d
 
     def slice_root_pose(self) -> slice:
@@ -501,6 +546,67 @@ class BodyLayout:
         if self.with_drift:
             start += 2 * self.n_markers
         return slice(start, start + n)
+
+    def _const_accel_dim_for(self, segment_name: str) -> int:
+        """Patch 121d: dim count contributed by a const-accel
+        segment. Root: 4 (translation + orientation accel);
+        non-root: 2 (orientation accel only).
+        """
+        seg = self.segment_by_name(segment_name)
+        return 4 if seg.parent is None else 2
+
+    def _const_accel_block_start(self) -> int:
+        """Patch 121d: where the const-accel block begins
+        in the state vector (after orientation drift).
+        """
+        start = 8 + 6 * self.n_non_root_segments
+        if self.with_drift:
+            start += 2 * self.n_markers
+        start += len(self.orientation_drift_segments)
+        return start
+
+    def slice_segment_const_accel(
+        self, segment_name: str,
+    ) -> slice:
+        """Patch 121d: slice for a segment's acceleration
+        sub-block. Length 4 for the root, 2 for non-root.
+
+        For the root: ``[ax, ay, root_cos_ddot, root_sin_ddot]``.
+        For non-root: ``[cos_ddot, sin_ddot]``.
+        """
+        if segment_name not in self.const_accel_segments:
+            raise RuntimeError(
+                f"slice_segment_const_accel: segment "
+                f"{segment_name!r} not in this layout's "
+                f"const_accel_segments "
+                f"({self.const_accel_segments})"
+            )
+        offset = 0
+        for sname in self.const_accel_segments:
+            d = self._const_accel_dim_for(sname)
+            if sname == segment_name:
+                start = self._const_accel_block_start() + offset
+                return slice(start, start + d)
+            offset += d
+        # unreachable (validated above)
+        raise RuntimeError(
+            f"internal: const_accel slice not found for "
+            f"{segment_name!r}"
+        )
+
+    @property
+    def const_accel_block_slice(self) -> slice:
+        """Patch 121d: slice covering the entire const-accel
+        block. Returns ``slice(0, 0)`` when none configured.
+        """
+        if not self.const_accel_segments:
+            return slice(0, 0)
+        start = self._const_accel_block_start()
+        total = sum(
+            self._const_accel_dim_for(s)
+            for s in self.const_accel_segments
+        )
+        return slice(start, start + total)
 
 
 def standard_rat_layout(
@@ -2483,6 +2589,17 @@ class NoiseParamsV2:
     q_theta_drift: Optional[Dict[str, float]] = None
     alpha_theta_drift: Optional[Dict[str, float]] = None
     r_theta_drift: Optional[Dict[str, float]] = None
+    # Patch 121d: const-accel jerk noise. None when the layout
+    # has no const_accel_segments. q_jerk_root_pos and
+    # q_jerk_root_ori are scalars (only meaningful when the
+    # root is in const_accel_segments). q_jerk_seg_ori is a
+    # per-segment dict, keyed by segment name. Units are
+    # px²/s⁵ (translation) or (cos/sin units)²/s⁵ (orientation).
+    # In 121d these are FIXED at the initial fitted/default
+    # values; M-step learning is deferred to a later patch.
+    q_jerk_root_pos: Optional[float] = None
+    q_jerk_root_ori: Optional[float] = None
+    q_jerk_seg_ori: Optional[Dict[str, float]] = None
 
     @classmethod
     def default(
@@ -2608,6 +2725,28 @@ class NoiseParamsV2:
             alpha_theta_drift_d = None
             q_theta_drift_d = None
 
+        # Patch 121d: const-accel jerk-noise defaults. Order-of-
+        # magnitude reasoning: with q_root_pos ~ 200 px²/s³, a
+        # 1-second timescale on acceleration variation suggests
+        # q_jerk_root_pos ~ q_root_pos × ~10 (so accel can vary
+        # by sqrt(q_jerk × dt) ≈ a few px/s² per frame, or tens
+        # of px/s² over a few frames — a plausible scale for
+        # rat motion). q_jerk_root_ori scaled similarly relative
+        # to q_root_ori. Per-segment q_jerk_seg_ori starts at a
+        # similar ratio to q_seg_ori. These are fixed in 121d
+        # (not learned by M-step); a later patch can fit them.
+        if layout.const_accel_segments:
+            q_jerk_root_pos_d: Optional[float] = q_root_pos * 10.0
+            q_jerk_root_ori_d: Optional[float] = q_root_ori * 10.0
+            q_jerk_seg_ori_d: Optional[Dict[str, float]] = {
+                s: q_seg_ori * 10.0
+                for s in layout.non_root_topo_order
+            }
+        else:
+            q_jerk_root_pos_d = None
+            q_jerk_root_ori_d = None
+            q_jerk_seg_ori_d = None
+
         return cls(
             sigma_marker={m: sigma_marker for m in layout.marker_names},
             q_root_pos=q_root_pos,
@@ -2621,6 +2760,9 @@ class NoiseParamsV2:
             q_theta_drift=q_theta_drift_d,
             alpha_theta_drift=alpha_theta_drift_d,
             r_theta_drift=r_theta_drift_d,
+            q_jerk_root_pos=q_jerk_root_pos_d,
+            q_jerk_root_ori=q_jerk_root_ori_d,
+            q_jerk_seg_ori=q_jerk_seg_ori_d,
         )
 
 
@@ -2739,6 +2881,43 @@ def build_F_v2(
                 f"must be in [0, 1); got {alpha_seg}"
             )
         F[sl.start, sl.start] = 1.0 - alpha_seg
+
+    # Patch 121d: const-accel coupling. For each segment in
+    # ``layout.const_accel_segments`` we add cross-block entries
+    # so that the existing position/velocity entries pick up
+    # the new acceleration entries:
+    #   x_new   = x   + vx*dt + ax*dt²/2
+    #   vx_new  = vx  + ax*dt
+    #   ax_new  = ax                          (random walk)
+    # The accel diagonals are already 1.0 from np.eye(D).
+    dt2_half = dt * dt / 2.0
+    for sname in layout.const_accel_segments:
+        seg = layout.segment_by_name(sname)
+        ca = layout.slice_segment_const_accel(sname)
+        if seg.parent is None:
+            # Root: translation accel at ca.start..start+2,
+            # orientation accel at ca.start+2..start+4.
+            ax_i, ay_i = ca.start, ca.start + 1
+            cdd_i, sdd_i = ca.start + 2, ca.start + 3
+            # Translation: pos(0,1) and vel(2,3) at fixed slots
+            F[0, ax_i] = dt2_half
+            F[1, ay_i] = dt2_half
+            F[2, ax_i] = dt
+            F[3, ay_i] = dt
+            # Orientation: cos/sin(4,5) and cos_dot/sin_dot(6,7)
+            F[4, cdd_i] = dt2_half
+            F[5, sdd_i] = dt2_half
+            F[6, cdd_i] = dt
+            F[7, sdd_i] = dt
+        else:
+            # Non-root: only orientation accel
+            cdd_i, sdd_i = ca.start, ca.start + 1
+            ori = layout.slice_segment_orientation(sname)
+            # ori = [cos, sin, cos_dot, sin_dot]
+            F[ori.start,     cdd_i] = dt2_half
+            F[ori.start + 1, sdd_i] = dt2_half
+            F[ori.start + 2, cdd_i] = dt
+            F[ori.start + 3, sdd_i] = dt
 
     return F
 
@@ -2875,6 +3054,56 @@ def build_Q_v2(
                     f"must be >= 0; got {q_d}"
                 )
             Q[sl.start, sl.start] = q_d * dt
+
+    # Patch 121d: const-accel jerk noise. Diagonal q × dt on
+    # the new acceleration entries. Cross-terms with the
+    # existing position/velocity entries are zero — this is
+    # the "discrete-time random walk on acceleration" model
+    # rather than the full continuous-time white-noise-jerk
+    # joint covariance. Both produce reasonable smoothing;
+    # the diagonal-only form is structurally simpler and
+    # avoids needing to modify F's pos/vel relationships.
+    if layout.const_accel_segments:
+        if (
+            params.q_jerk_root_pos is None
+            and params.q_jerk_root_ori is None
+            and params.q_jerk_seg_ori is None
+        ):
+            raise ValueError(
+                "build_Q_v2: layout.const_accel_segments is "
+                "non-empty but params.q_jerk_* fields are all "
+                "None. Build params via NoiseParamsV2.default("
+                "layout) so const-accel fields are populated."
+            )
+        for sname in layout.const_accel_segments:
+            seg = layout.segment_by_name(sname)
+            ca = layout.slice_segment_const_accel(sname)
+            if seg.parent is None:
+                # Root: 4 dims [ax, ay, root_cos_ddot, root_sin_ddot]
+                qp = params.q_jerk_root_pos or 0.0
+                qo = params.q_jerk_root_ori or 0.0
+                if qp < 0 or qo < 0:
+                    raise ValueError(
+                        f"q_jerk_root_pos / q_jerk_root_ori "
+                        f"must be >= 0; got pos={qp}, ori={qo}"
+                    )
+                Q[ca.start,     ca.start]     = qp * dt
+                Q[ca.start + 1, ca.start + 1] = qp * dt
+                Q[ca.start + 2, ca.start + 2] = qo * dt
+                Q[ca.start + 3, ca.start + 3] = qo * dt
+            else:
+                # Non-root: 2 dims [cos_ddot, sin_ddot]
+                qo = (
+                    params.q_jerk_seg_ori.get(sname, 0.0)
+                    if params.q_jerk_seg_ori is not None else 0.0
+                )
+                if qo < 0:
+                    raise ValueError(
+                        f"q_jerk_seg_ori[{sname!r}] must be "
+                        f">= 0; got {qo}"
+                    )
+                Q[ca.start,     ca.start]     = qo * dt
+                Q[ca.start + 1, ca.start + 1] = qo * dt
 
     return Q
 
@@ -3161,6 +3390,22 @@ def forward_filter_v2(
                 sl = layout.slice_segment_orientation_drift(sname)
                 r_seg = params.r_theta_drift.get(sname, 0.1)
                 P0[sl.start, sl.start] = (r_seg / 2.0) ** 2
+        # Patch 121d: initial uncertainty for const-accel
+        # entries. Acceleration starts at 0 with moderate
+        # uncertainty — translation accel ~ 100 px²/s⁴ (allows
+        # ~10 px/s² initial belief), orientation accel ~ 1.0
+        # in (cos/sin)²/s⁴.
+        for sname in layout.const_accel_segments:
+            seg = layout.segment_by_name(sname)
+            ca = layout.slice_segment_const_accel(sname)
+            if seg.parent is None:
+                P0[ca.start,     ca.start]     = 100.0
+                P0[ca.start + 1, ca.start + 1] = 100.0
+                P0[ca.start + 2, ca.start + 2] = 1.0
+                P0[ca.start + 3, ca.start + 3] = 1.0
+            else:
+                P0[ca.start,     ca.start]     = 1.0
+                P0[ca.start + 1, ca.start + 1] = 1.0
     else:
         P0 = initial_cov
 
@@ -4148,6 +4393,14 @@ def finalize_m_step_v2(
             dict(prev_params.r_theta_drift)
             if prev_params.r_theta_drift is not None else None
         ),
+        # Patch 121d: const-accel jerk parameters pass through.
+        # EM does not currently update them.
+        q_jerk_root_pos=prev_params.q_jerk_root_pos,
+        q_jerk_root_ori=prev_params.q_jerk_root_ori,
+        q_jerk_seg_ori=(
+            dict(prev_params.q_jerk_seg_ori)
+            if prev_params.q_jerk_seg_ori is not None else None
+        ),
     )
 
 
@@ -4434,6 +4687,13 @@ def finalize_m_step_v2_from_per_session(
             dict(prev_params.r_theta_drift)
             if prev_params.r_theta_drift is not None else None
         ),
+        # Patch 121d: const-accel jerk parameters pass through.
+        q_jerk_root_pos=prev_params.q_jerk_root_pos,
+        q_jerk_root_ori=prev_params.q_jerk_root_ori,
+        q_jerk_seg_ori=(
+            dict(prev_params.q_jerk_seg_ori)
+            if prev_params.q_jerk_seg_ori is not None else None
+        ),
     )
 
 
@@ -4718,6 +4978,22 @@ def fit_initial_params_v2(
         alpha_theta_drift_d = None
         r_theta_drift_d = None
 
+    # Patch 121d: q_jerk_* defaults when const_accel is enabled.
+    # 10× the corresponding q value, mirroring NoiseParamsV2.
+    # default(). Fixed at this initial value through EM (not
+    # learned by M-step in 121d).
+    if layout.const_accel_segments:
+        q_jerk_root_pos_d: Optional[float] = q_root_pos * 10.0
+        q_jerk_root_ori_d: Optional[float] = q_root_ori * 10.0
+        q_jerk_seg_ori_d: Optional[Dict[str, float]] = {
+            s: q_seg_ori.get(s, 0.5) * 10.0
+            for s in layout.non_root_topo_order
+        }
+    else:
+        q_jerk_root_pos_d = None
+        q_jerk_root_ori_d = None
+        q_jerk_seg_ori_d = None
+
     return NoiseParamsV2(
         sigma_marker=sigma_marker,
         q_root_pos=q_root_pos,
@@ -4730,6 +5006,9 @@ def fit_initial_params_v2(
         q_theta_drift=q_theta_drift_d,
         alpha_theta_drift=alpha_theta_drift_d,
         r_theta_drift=r_theta_drift_d,
+        q_jerk_root_pos=q_jerk_root_pos_d,
+        q_jerk_root_ori=q_jerk_root_ori_d,
+        q_jerk_seg_ori=q_jerk_seg_ori_d,
     )
 
 
@@ -6617,6 +6896,32 @@ def save_model_v2(
             list(params.r_theta_drift.items()), dtype=object,
         )
 
+    # Patch 121d: layout.const_accel_segments and the
+    # corresponding q_jerk fields. Empty list / None on
+    # pre-121d models loads with no const-accel configured.
+    save_kwargs["layout_const_accel_segments"] = np.array(
+        list(layout.const_accel_segments), dtype=object,
+    )
+    has_const_accel = (
+        params.q_jerk_root_pos is not None
+        or params.q_jerk_root_ori is not None
+        or params.q_jerk_seg_ori is not None
+    )
+    save_kwargs["has_const_accel"] = has_const_accel
+    if has_const_accel:
+        save_kwargs["params_q_jerk_root_pos"] = (
+            params.q_jerk_root_pos
+            if params.q_jerk_root_pos is not None else 0.0
+        )
+        save_kwargs["params_q_jerk_root_ori"] = (
+            params.q_jerk_root_ori
+            if params.q_jerk_root_ori is not None else 0.0
+        )
+        if params.q_jerk_seg_ori is not None:
+            save_kwargs["params_q_jerk_seg_ori"] = np.array(
+                list(params.q_jerk_seg_ori.items()), dtype=object,
+            )
+
     if perspective is not None:
         save_kwargs["persp_coeffs"] = np.array(
             list(perspective.coeffs.items()), dtype=object,
@@ -6682,9 +6987,16 @@ def load_model_v2(
             str(s) for s in
             data["layout_orientation_drift_segments"]
         ]
+    # Patch 121d: const_accel_segments. Same pattern.
+    ca_segments: List[str] = []
+    if "layout_const_accel_segments" in data.files:
+        ca_segments = [
+            str(s) for s in data["layout_const_accel_segments"]
+        ]
     layout = BodyLayout(
         segments=segments,
         orientation_drift_segments=odd_segments,
+        const_accel_segments=ca_segments,
     )
     # Patch 120b: layout.with_drift flag. Defaults False for
     # pre-120b model files where the field is absent.
@@ -6766,6 +7078,22 @@ def load_model_v2(
         params_kwargs["r_theta_drift"] = {
             k: float(v) for k, v in data["params_r_theta_drift"]
         }
+    # Patch 121d: NoiseParamsV2 const-accel jerk fields.
+    if (
+        "has_const_accel" in data.files
+        and bool(data["has_const_accel"])
+    ):
+        params_kwargs["q_jerk_root_pos"] = float(
+            data["params_q_jerk_root_pos"]
+        )
+        params_kwargs["q_jerk_root_ori"] = float(
+            data["params_q_jerk_root_ori"]
+        )
+        if "params_q_jerk_seg_ori" in data.files:
+            params_kwargs["q_jerk_seg_ori"] = {
+                k: float(v)
+                for k, v in data["params_q_jerk_seg_ori"]
+            }
     params = NoiseParamsV2(**params_kwargs)
 
     fps = float(data["fps"])
@@ -7655,6 +7983,31 @@ def main(argv=None) -> int:
             "where root-orientation noise lives."
         ),
     )
+    parser.add_argument(
+        "--const-accel-segments", default="",
+        help=(
+            "Patch 121d: enable constant-acceleration "
+            "dynamics on the listed segments. Comma-separated "
+            "segment names (e.g. 'body' or 'body,head'). The "
+            "existing model is constant-velocity — over a "
+            "long dropout the predictor extrapolates linearly "
+            "from velocity, which produces lagged/over-"
+            "smoothed motion when the rat is actually "
+            "accelerating (turning, accelerating from rest, "
+            "decelerating into a stop). Listing a segment "
+            "here adds an acceleration block: the predictor "
+            "then extrapolates with curvature, and the "
+            "smoother needs less prior fighting against the "
+            "observations. For the root segment ('body'), "
+            "both translation and rotational accel are added "
+            "(+4 state dims). For non-root segments, only "
+            "rotational accel is added (+2 dims each). "
+            "Lengths stay first-order. Empty (default) "
+            "preserves patch-121bc behavior. "
+            "Recommended starting point if motion looks "
+            "lagged or over-smoothed: 'body,head'."
+        ),
+    )
     args = parser.parse_args(argv)
 
     layout = standard_rat_layout(
@@ -7680,6 +8033,18 @@ def main(argv=None) -> int:
         ]
         layout = _dc.replace(
             layout, orientation_drift_segments=seg_names,
+        )
+
+    # Patch 121d: const-accel flag plumbing. Same pattern as
+    # orient-drift above.
+    if args.const_accel_segments:
+        import dataclasses as _dc
+        ca_names = [
+            s.strip() for s in args.const_accel_segments.split(",")
+            if s.strip()
+        ]
+        layout = _dc.replace(
+            layout, const_accel_segments=ca_names,
         )
 
     try:
