@@ -1169,6 +1169,21 @@ def forward_kinematics(
     positions through the chain. O(M) where M is number of
     segments.
 
+    Patch 121b: when ``layout.orientation_drift_segments`` is
+    non-empty, each listed segment's world rotation is augmented
+    by an extra angular drift δ_θ_seg read from the state vector.
+    For the root, ``R_world[root] = R(θ_kin) @ R(δ_θ_root)``
+    pivoting on ``P_distal[root] = root_pos`` (the root's position
+    is unchanged). For non-root segments, ``R_world[seg] =
+    R_world[parent] @ R(δ_θ_seg) @ R(θ_seg_kin)`` and
+    ``P_distal[seg] = P_distal[parent] + R_world[parent] @ R(δ) @
+    v_seg_local`` — i.e. the drift rotates the segment vector
+    around its proximal end (``P_distal[parent]``) before applying
+    the parent's world rotation. In 2D, this commutes with the
+    parent's rotation, so children of a drift-enabled segment
+    automatically pick up the same δ as a post-multiply on their
+    R_world.
+
     Parameters
     ----------
     state : (state_dim,) array
@@ -1188,6 +1203,12 @@ def forward_kinematics(
     P_distal: Dict[str, np.ndarray] = {}
     R_world: Dict[str, np.ndarray] = {}
 
+    # Patch 121b: pre-compute the set of drift-enabled segments
+    # for fast membership tests. orientation_drift_segments is
+    # validated to contain only existing segment names by
+    # BodyLayout.__post_init__.
+    drift_set = set(layout.orientation_drift_segments)
+
     # Root
     root = layout.root_segment
     P_distal[root.name] = np.array([
@@ -1198,6 +1219,18 @@ def forward_kinematics(
         state[idx["__root__"]["cos"]],
         state[idx["__root__"]["sin"]],
     )
+    # Patch 121b: when the root segment has orientation drift,
+    # post-multiply the kinematic root rotation by R(δ_θ_root).
+    # In 2D, R(θ) @ R(δ) = R(θ + δ), so this is equivalent to
+    # treating the effective root angle as θ_kin + δ. The root
+    # position itself is NOT shifted by drift — δ_θ pivots on
+    # the root's position.
+    if root.name in drift_set:
+        sl = layout.slice_segment_orientation_drift(root.name)
+        delta = state[sl.start]
+        R_world[root.name] = R_world[root.name] @ _R(
+            np.cos(delta), np.sin(delta),
+        )
 
     # Non-root in topo order
     for seg_name in layout.non_root_topo_order:
@@ -1207,14 +1240,41 @@ def forward_kinematics(
         s_cos = state[idx[seg_name]["cos"]]
         s_sin = state[idx[seg_name]["sin"]]
         s_length = state[idx[seg_name]["length"]]
-        # Segment vector in parent frame
-        v_s_local = np.array([s_length * s_cos, s_length * s_sin])
+        # Patch 121b: when seg has orientation drift, the
+        # segment's effective rotation in its parent's frame
+        # is R(δ_θ_seg) @ R(θ_seg_kin). The segment vector
+        # (which determines the proximal-to-distal direction
+        # in the parent's frame) is rotated by R(δ) before
+        # being applied via R_world[parent]:
+        #   v_s_local = R(δ) @ (L * (cos_kin, sin_kin))
+        # The world rotation composes as:
+        #   R_world[seg] = R_world[parent] @ R(δ) @ R(θ_kin)
+        # Children of seg pick up R(δ) automatically through
+        # R_world[seg]; in 2D rotations commute, so the same
+        # δ acts as a post-multiply on every descendant's
+        # R_world. The pivot for δ_θ_seg is the segment's
+        # proximal end, i.e. P_distal[parent].
+        if seg_name in drift_set:
+            sl = layout.slice_segment_orientation_drift(seg_name)
+            delta = state[sl.start]
+            cos_d = np.cos(delta)
+            sin_d = np.sin(delta)
+            R_d = _R(cos_d, sin_d)
+            v_kin_local = np.array(
+                [s_length * s_cos, s_length * s_sin]
+            )
+            v_s_local = R_d @ v_kin_local
+            R_local_s = R_d @ _R(s_cos, s_sin)
+        else:
+            v_s_local = np.array(
+                [s_length * s_cos, s_length * s_sin]
+            )
+            R_local_s = _R(s_cos, s_sin)
         # World position
         P_distal[seg_name] = (
             P_distal[parent_name] + R_world[parent_name] @ v_s_local
         )
         # World rotation
-        R_local_s = _R(s_cos, s_sin)
         R_world[seg_name] = R_world[parent_name] @ R_local_s
 
     return ForwardKinematicsResult(P_distal=P_distal, R_world=R_world)
@@ -1499,6 +1559,45 @@ def state_to_marker_jacobian(
             H[row_y, drift_sl.start]     = R_seg[1, 0]
             H[row_y, drift_sl.start + 1] = R_seg[1, 1]
 
+        # Patch 121b: per-segment orientation drift partials.
+        # For each drift-enabled segment s in marker i's
+        # ancestor chain (root → marker's segment, inclusive),
+        # the partial is:
+        #   ∂p_m / ∂δ_θ_s = J_perp @ (p_m - pivot_s)
+        # where J_perp = [[0, -1], [1, 0]] and pivot_s is the
+        # segment's rotation pivot:
+        #   - for root segment with drift: pivot = P_distal[root]
+        #     (= root position; the root's δ_θ pivots on its own
+        #     position)
+        #   - for non-root segment with drift: pivot =
+        #     P_distal[parent(s)] (the segment's proximal end,
+        #     which is unchanged by δ_θ_s)
+        # The formula is exact at any operating point (not just
+        # δ=0): in 2D, J_perp commutes with rotations, so
+        # ∂p_m/∂δ_θ_s = J_perp @ (p_m - pivot) holds wherever
+        # δ_θ_s is evaluated. Markers whose ancestor chain does
+        # NOT include s see ∂p_m/∂δ_θ_s = 0; we only assign
+        # rows for those markers within the chain.
+        if layout.orientation_drift_segments:
+            # The chain we walked above already lists every
+            # segment from root to seg_name. Filter for those
+            # with drift enabled.
+            for s_name in chain:
+                if s_name not in layout.orientation_drift_segments:
+                    continue
+                s_seg = layout.segment_by_name(s_name)
+                if s_seg.parent is None:
+                    pivot = fk.P_distal[s_name]
+                else:
+                    pivot = fk.P_distal[s_seg.parent]
+                sl = layout.slice_segment_orientation_drift(s_name)
+                # J_perp @ (p_m - pivot) = (-(p_m_y - piv_y),
+                #                            (p_m_x - piv_x))
+                diff_x = p_m[0] - pivot[0]
+                diff_y = p_m[1] - pivot[1]
+                H[row_x, sl.start] = -diff_y
+                H[row_y, sl.start] =  diff_x
+
     return H
 
 
@@ -1581,11 +1680,17 @@ def _state_to_world_transforms_batch_np(
     NumPy. Returns:
       P_distal: dict seg_name -> (T, 2)
       R_world: dict seg_name -> (T, 2, 2)
+
+    Patch 121b: when ``layout.orientation_drift_segments`` is
+    non-empty, the per-segment angular drift δ_θ_seg is applied
+    as documented for the per-frame ``forward_kinematics``.
     """
     idx = _pack_state_layout_indices(layout)
     T = states.shape[0]
     P_distal: Dict[str, np.ndarray] = {}
     R_world: Dict[str, np.ndarray] = {}
+
+    drift_set = set(layout.orientation_drift_segments)
 
     # Root
     root = layout.root_segment
@@ -1601,6 +1706,20 @@ def _state_to_world_transforms_batch_np(
     R_root[:, 0, 1] = -s_r
     R_root[:, 1, 0] = s_r
     R_root[:, 1, 1] = c_r
+    # Patch 121b: post-multiply by R(δ_θ_root) when root has
+    # orientation drift. P_distal[root] is unchanged — drift
+    # pivots on the root's own position.
+    if root.name in drift_set:
+        sl = layout.slice_segment_orientation_drift(root.name)
+        delta = states[:, sl.start]
+        cos_d = np.cos(delta)
+        sin_d = np.sin(delta)
+        R_d = np.empty((T, 2, 2))
+        R_d[:, 0, 0] = cos_d
+        R_d[:, 0, 1] = -sin_d
+        R_d[:, 1, 0] = sin_d
+        R_d[:, 1, 1] = cos_d
+        R_root = np.einsum("tij,tjk->tik", R_root, R_d)
     R_world[root.name] = R_root
 
     # Non-root segments in topo order
@@ -1610,20 +1729,40 @@ def _state_to_world_transforms_batch_np(
         c = states[:, idx[seg_name]["cos"]]
         s = states[:, idx[seg_name]["sin"]]
         L = states[:, idx[seg_name]["length"]]
-        # v_local = (L*c, L*s) per frame
-        v_local = np.stack([L * c, L * s], axis=1)  # (T, 2)
+        # R_local_kin = [[c, -s], [s, c]] across T
+        R_local_kin = np.empty((T, 2, 2))
+        R_local_kin[:, 0, 0] = c
+        R_local_kin[:, 0, 1] = -s
+        R_local_kin[:, 1, 0] = s
+        R_local_kin[:, 1, 1] = c
+        # Patch 121b: when seg has orientation drift, apply
+        # R(δ) as a pre-multiply on both the segment vector
+        # and the local rotation. See per-frame
+        # forward_kinematics for the math.
+        if seg_name in drift_set:
+            sl = layout.slice_segment_orientation_drift(seg_name)
+            delta = states[:, sl.start]
+            cos_d = np.cos(delta)
+            sin_d = np.sin(delta)
+            R_d = np.empty((T, 2, 2))
+            R_d[:, 0, 0] = cos_d
+            R_d[:, 0, 1] = -sin_d
+            R_d[:, 1, 0] = sin_d
+            R_d[:, 1, 1] = cos_d
+            v_kin = np.stack([L * c, L * s], axis=1)  # (T, 2)
+            v_local = np.einsum("tij,tj->ti", R_d, v_kin)
+            R_local = np.einsum(
+                "tij,tjk->tik", R_d, R_local_kin,
+            )
+        else:
+            v_local = np.stack([L * c, L * s], axis=1)  # (T, 2)
+            R_local = R_local_kin
         # P_distal[seg] = P_distal[parent] + R_world[parent] @ v_local
         # einsum: (T,2,2) @ (T,2) -> (T,2)
         rotated = np.einsum(
             "tij,tj->ti", R_world[parent_name], v_local,
         )
         P_distal[seg_name] = P_distal[parent_name] + rotated
-        # R_local = [[c, -s], [s, c]] across T
-        R_local = np.empty((T, 2, 2))
-        R_local[:, 0, 0] = c
-        R_local[:, 0, 1] = -s
-        R_local[:, 1, 0] = s
-        R_local[:, 1, 1] = c
         # R_world[seg] = R_world[parent] @ R_local
         R_world[seg_name] = np.einsum(
             "tij,tjk->tik", R_world[parent_name], R_local,
@@ -1638,6 +1777,10 @@ def _state_to_world_transforms_batch_torch(
 ):
     """Same as _state_to_world_transforms_batch_np but using
     torch on the device of `states` (typically cuda).
+
+    Patch 121b: orientation drift δ_θ_seg is applied to the
+    segments listed in ``layout.orientation_drift_segments``,
+    using the same composition as the numpy / per-frame paths.
     """
     torch = _try_import_torch()
     idx = _pack_state_layout_indices(layout)
@@ -1646,6 +1789,8 @@ def _state_to_world_transforms_batch_torch(
     dtype = states.dtype
     P_distal: Dict[str, "torch.Tensor"] = {}
     R_world: Dict[str, "torch.Tensor"] = {}
+
+    drift_set = set(layout.orientation_drift_segments)
 
     root = layout.root_segment
     P_distal[root.name] = torch.stack([
@@ -1659,6 +1804,17 @@ def _state_to_world_transforms_batch_torch(
     R_root[:, 0, 1] = -s_r
     R_root[:, 1, 0] = s_r
     R_root[:, 1, 1] = c_r
+    if root.name in drift_set:
+        sl = layout.slice_segment_orientation_drift(root.name)
+        delta = states[:, sl.start]
+        cos_d = torch.cos(delta)
+        sin_d = torch.sin(delta)
+        R_d = torch.empty((T, 2, 2), dtype=dtype, device=device)
+        R_d[:, 0, 0] = cos_d
+        R_d[:, 0, 1] = -sin_d
+        R_d[:, 1, 0] = sin_d
+        R_d[:, 1, 1] = cos_d
+        R_root = torch.einsum("tij,tjk->tik", R_root, R_d)
     R_world[root.name] = R_root
 
     for seg_name in layout.non_root_topo_order:
@@ -1667,16 +1823,37 @@ def _state_to_world_transforms_batch_torch(
         c = states[:, idx[seg_name]["cos"]]
         s = states[:, idx[seg_name]["sin"]]
         L = states[:, idx[seg_name]["length"]]
-        v_local = torch.stack([L * c, L * s], dim=1)
+        R_local_kin = torch.empty(
+            (T, 2, 2), dtype=dtype, device=device,
+        )
+        R_local_kin[:, 0, 0] = c
+        R_local_kin[:, 0, 1] = -s
+        R_local_kin[:, 1, 0] = s
+        R_local_kin[:, 1, 1] = c
+        if seg_name in drift_set:
+            sl = layout.slice_segment_orientation_drift(seg_name)
+            delta = states[:, sl.start]
+            cos_d = torch.cos(delta)
+            sin_d = torch.sin(delta)
+            R_d = torch.empty(
+                (T, 2, 2), dtype=dtype, device=device,
+            )
+            R_d[:, 0, 0] = cos_d
+            R_d[:, 0, 1] = -sin_d
+            R_d[:, 1, 0] = sin_d
+            R_d[:, 1, 1] = cos_d
+            v_kin = torch.stack([L * c, L * s], dim=1)
+            v_local = torch.einsum("tij,tj->ti", R_d, v_kin)
+            R_local = torch.einsum(
+                "tij,tjk->tik", R_d, R_local_kin,
+            )
+        else:
+            v_local = torch.stack([L * c, L * s], dim=1)
+            R_local = R_local_kin
         rotated = torch.einsum(
             "tij,tj->ti", R_world[parent_name], v_local,
         )
         P_distal[seg_name] = P_distal[parent_name] + rotated
-        R_local = torch.empty((T, 2, 2), dtype=dtype, device=device)
-        R_local[:, 0, 0] = c
-        R_local[:, 0, 1] = -s
-        R_local[:, 1, 0] = s
-        R_local[:, 1, 1] = c
         R_world[seg_name] = torch.einsum(
             "tij,tjk->tik", R_world[parent_name], R_local,
         )
@@ -2028,6 +2205,29 @@ def state_to_marker_jacobian_batch(
             H[:, row_x, drift_sl.start + 1] = R_seg_t[:, 0, 1]
             H[:, row_y, drift_sl.start]     = R_seg_t[:, 1, 0]
             H[:, row_y, drift_sl.start + 1] = R_seg_t[:, 1, 1]
+
+        # Patch 121b: per-segment orientation drift partials.
+        # For each drift-enabled segment s in marker i's
+        # ancestor chain:
+        #   ∂p_m / ∂δ_θ_s = J_perp @ (p_m - pivot_s)
+        # See the per-frame state_to_marker_jacobian for the
+        # full derivation. pivot_s is P_distal[parent(s)] for
+        # non-root segments, P_distal[s] for the root.
+        if layout.orientation_drift_segments:
+            chain = chain_per_seg[seg_name]
+            for s_name in chain:
+                if s_name not in layout.orientation_drift_segments:
+                    continue
+                s_seg = layout.segment_by_name(s_name)
+                if s_seg.parent is None:
+                    pivot = P_distal[s_name]      # (T, 2)
+                else:
+                    pivot = P_distal[s_seg.parent]  # (T, 2)
+                sl = layout.slice_segment_orientation_drift(s_name)
+                diff = p_m - pivot  # (T, 2)
+                # J_perp @ (dx, dy) = (-dy, dx)
+                H[:, row_x, sl.start] = -diff[:, 1]
+                H[:, row_y, sl.start] =  diff[:, 0]
 
     return H
 
@@ -7433,7 +7633,7 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--orient-drift-segments", default="",
         help=(
-            "Patch 121a: enable per-segment orientation "
+            "Patch 121: enable per-segment orientation "
             "drift state on the listed segments. Comma-"
             "separated segment names (e.g. 'body' or "
             "'body,neck,head'). Each listed segment gains a "
@@ -7445,10 +7645,14 @@ def main(argv=None) -> int:
             "that otherwise inflates q_root_ori during EM. "
             "Adds 1 dim per listed segment (small cost). "
             "Empty (default) preserves patch-120 behavior. "
-            "NOTE: in patch 121a δ_θ is only in the state "
-            "vector — it does not yet affect FK. The full "
-            "wiring lands in patch 121b. Use this flag in "
-            "121a only for testing the state extension."
+            "As of patch 121b, δ_θ is fully wired into both "
+            "forward kinematics and the observation Jacobian, "
+            "so listing segments here changes the smoothed "
+            "output. The drift is bounded (mean-reverting "
+            "AR(1) on a small radius), so a misconfigured "
+            "list cannot blow up — but use it deliberately, "
+            "starting with the body segment since that's "
+            "where root-orientation noise lives."
         ),
     )
     args = parser.parse_args(argv)
