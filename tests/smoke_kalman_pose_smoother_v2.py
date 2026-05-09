@@ -5367,7 +5367,309 @@ def main() -> int:
             ),
         )
 
-    print("smoke_kalman_pose_smoother_v2: 144/144 cases passed")
+    # ============================================================ #
+    # Patch 121d: constant-acceleration extension. Adds an
+    # acceleration block to listed segments so the predictor
+    # can extrapolate with curvature. Lengths stay first-order;
+    # FK and Jacobian unchanged (observation depends only on
+    # position).
+    # ============================================================ #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        build_F_v2 as _F_121d,
+        build_Q_v2 as _Q_121d,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 145: empty const_accel_segments preserves prior
+    # state_dim, F, and Q exactly. The 121d additions are pure
+    # opt-in.
+    # ---------------------------------------------------------- #
+    layout_145_off = standard_rat_layout()
+    layout_145_on = _dc.replace(
+        standard_rat_layout(),
+        const_accel_segments=[],
+    )
+    assert layout_145_off.state_dim == layout_145_on.state_dim, (
+        "Empty const_accel_segments must not change state_dim"
+    )
+    params_145 = NoiseParamsV2.default(
+        layout_145_off, sigma_marker=2.0,
+    )
+    F_145_off = _F_121d(layout_145_off, 1.0/30.0, params=params_145)
+    F_145_on = _F_121d(layout_145_on, 1.0/30.0, params=params_145)
+    np.testing.assert_array_equal(
+        F_145_off, F_145_on,
+        err_msg="empty const_accel must produce identical F",
+    )
+    Q_145_off = _Q_121d(layout_145_off, params_145, 1.0/30.0)
+    Q_145_on = _Q_121d(layout_145_on, params_145, 1.0/30.0)
+    np.testing.assert_array_equal(
+        Q_145_off, Q_145_on,
+        err_msg="empty const_accel must produce identical Q",
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 146: F gets the right integrator cross-terms when
+    # const_accel is enabled. For the root with const-accel:
+    #   F[x, ax]   = dt²/2
+    #   F[vx, ax]  = dt
+    #   F[cos, root_cos_ddot] = dt²/2
+    #   F[cos_dot, root_cos_ddot] = dt
+    # For non-root head:
+    #   F[head_cos, head_cos_ddot] = dt²/2
+    #   F[head_cos_dot, head_cos_ddot] = dt
+    # Acceleration entries themselves stay at F[a, a] = 1
+    # (random walk, already from np.eye(D)).
+    # ---------------------------------------------------------- #
+    layout_146 = _dc.replace(
+        standard_rat_layout(),
+        const_accel_segments=["body", "head"],
+    )
+    dt_146 = 1.0 / 30.0
+    params_146 = NoiseParamsV2.default(
+        layout_146, sigma_marker=2.0,
+    )
+    F_146 = _F_121d(layout_146, dt_146, params=params_146)
+    dt2_half_146 = dt_146 * dt_146 / 2.0
+
+    # Root translation accel (ax, ay) at body's accel block
+    ca_body = layout_146.slice_segment_const_accel("body")
+    np.testing.assert_allclose(F_146[0, ca_body.start], dt2_half_146)
+    np.testing.assert_allclose(F_146[1, ca_body.start + 1], dt2_half_146)
+    np.testing.assert_allclose(F_146[2, ca_body.start], dt_146)
+    np.testing.assert_allclose(F_146[3, ca_body.start + 1], dt_146)
+    # Root orientation accel (root_cos_ddot, root_sin_ddot)
+    np.testing.assert_allclose(F_146[4, ca_body.start + 2], dt2_half_146)
+    np.testing.assert_allclose(F_146[5, ca_body.start + 3], dt2_half_146)
+    np.testing.assert_allclose(F_146[6, ca_body.start + 2], dt_146)
+    np.testing.assert_allclose(F_146[7, ca_body.start + 3], dt_146)
+    # Head non-root: only orientation accel
+    ca_head = layout_146.slice_segment_const_accel("head")
+    head_ori = layout_146.slice_segment_orientation("head")
+    np.testing.assert_allclose(
+        F_146[head_ori.start, ca_head.start], dt2_half_146,
+    )
+    np.testing.assert_allclose(
+        F_146[head_ori.start + 2, ca_head.start], dt_146,
+    )
+    # Accel entries on diagonal (from np.eye)
+    np.testing.assert_allclose(F_146[ca_body.start, ca_body.start], 1.0)
+    np.testing.assert_allclose(F_146[ca_head.start, ca_head.start], 1.0)
+    # No off-diagonal coupling on the accel block itself
+    np.testing.assert_allclose(
+        F_146[ca_body.start, ca_body.start + 1], 0.0,
+    )
+
+    # Q diagonal jerk noise — verify entries match params × dt
+    Q_146 = _Q_121d(layout_146, params_146, dt_146)
+    qjp_146 = params_146.q_jerk_root_pos
+    qjo_146 = params_146.q_jerk_root_ori
+    np.testing.assert_allclose(
+        Q_146[ca_body.start, ca_body.start], qjp_146 * dt_146,
+    )
+    np.testing.assert_allclose(
+        Q_146[ca_body.start + 2, ca_body.start + 2],
+        qjo_146 * dt_146,
+    )
+    qjs_head = params_146.q_jerk_seg_ori["head"]
+    np.testing.assert_allclose(
+        Q_146[ca_head.start, ca_head.start], qjs_head * dt_146,
+    )
+    # No cross-terms between accel and pos/vel in Q (random-walk
+    # on accel model rather than full WN-jerk joint covariance)
+    np.testing.assert_allclose(Q_146[0, ca_body.start], 0.0)
+    np.testing.assert_allclose(Q_146[2, ca_body.start], 0.0)
+
+    # ---------------------------------------------------------- #
+    # Case 147: predictor extrapolates with curvature. Given
+    # initial state with non-zero acceleration, propagating
+    # x[t+1] = F @ x[t] should produce
+    #   v[t+1] = v[t] + a*dt
+    #   x[t+1] = x[t] + v[t]*dt + a*dt²/2
+    # Compare against constant-velocity predictor (no const-
+    # accel): the CA predictor produces a curved trajectory
+    # while CV produces a straight line.
+    # ---------------------------------------------------------- #
+    layout_147 = _dc.replace(
+        standard_rat_layout(),
+        const_accel_segments=["body"],
+    )
+    dt_147 = 1.0 / 30.0
+    indices_147 = _pack_121b(layout_147)
+    F_147 = _F_121d(layout_147, dt_147, params=NoiseParamsV2.default(
+        layout_147, sigma_marker=2.0,
+    ))
+    state_147 = np.zeros(layout_147.state_dim)
+    state_147[indices_147["__root__"]["x"]] = 100.0
+    state_147[indices_147["__root__"]["y"]] = 200.0
+    state_147[indices_147["__root__"]["vx"]] = 50.0  # px/s
+    state_147[indices_147["__root__"]["vy"]] = 0.0
+    # Set acceleration (px/s²)
+    ca_body_147 = layout_147.slice_segment_const_accel("body")
+    state_147[ca_body_147.start] = 200.0     # ax
+    state_147[ca_body_147.start + 1] = 0.0   # ay
+    state_147[indices_147["__root__"]["cos"]] = 1.0
+    state_147[indices_147["__root__"]["sin"]] = 0.0
+    for s in layout_147.non_root_topo_order:
+        state_147[indices_147[s]["cos"]] = 1.0
+        state_147[indices_147[s]["length"]] = 30.0
+
+    # One-step prediction
+    pred_1 = F_147 @ state_147
+    expected_x_1 = 100.0 + 50.0 * dt_147 + 200.0 * dt_147**2 / 2
+    expected_vx_1 = 50.0 + 200.0 * dt_147
+    np.testing.assert_allclose(
+        pred_1[indices_147["__root__"]["x"]], expected_x_1,
+        err_msg="CA predictor must include a*dt²/2 in position",
+    )
+    np.testing.assert_allclose(
+        pred_1[indices_147["__root__"]["vx"]], expected_vx_1,
+        err_msg="CA predictor must include a*dt in velocity",
+    )
+    # Acceleration unchanged (random walk)
+    np.testing.assert_allclose(
+        pred_1[ca_body_147.start], 200.0,
+    )
+
+    # 30-frame extrapolation: ax=200 px/s² for 1s should give
+    # x(1s) = 100 + 50*1 + 200*1²/2 = 100 + 50 + 100 = 250 px
+    state_t = state_147.copy()
+    for _ in range(30):
+        state_t = F_147 @ state_t
+    expected_x_30 = 100.0 + 50.0 * 1.0 + 200.0 * 1.0**2 / 2.0
+    np.testing.assert_allclose(
+        state_t[indices_147["__root__"]["x"]], expected_x_30,
+        atol=1e-9, rtol=1e-9,
+        err_msg=(
+            "30-frame CA extrapolation must follow x(t) = "
+            "x_0 + v_0*t + a*t²/2 exactly"
+        ),
+    )
+    expected_vx_30 = 50.0 + 200.0 * 1.0
+    np.testing.assert_allclose(
+        state_t[indices_147["__root__"]["vx"]], expected_vx_30,
+        atol=1e-9, rtol=1e-9,
+    )
+
+    # Compare against CV predictor (no const-accel): the same
+    # initial state propagated by CV F gives a straight-line
+    # extrapolation x(1s) = 100 + 50 = 150, NOT 250.
+    layout_147_cv = standard_rat_layout()
+    indices_147_cv = _pack_121b(layout_147_cv)
+    F_147_cv = _F_121d(layout_147_cv, dt_147, params=NoiseParamsV2.default(
+        layout_147_cv, sigma_marker=2.0,
+    ))
+    state_147_cv = np.zeros(layout_147_cv.state_dim)
+    state_147_cv[indices_147_cv["__root__"]["x"]] = 100.0
+    state_147_cv[indices_147_cv["__root__"]["y"]] = 200.0
+    state_147_cv[indices_147_cv["__root__"]["vx"]] = 50.0
+    state_147_cv[indices_147_cv["__root__"]["cos"]] = 1.0
+    for s in layout_147_cv.non_root_topo_order:
+        state_147_cv[indices_147_cv[s]["cos"]] = 1.0
+        state_147_cv[indices_147_cv[s]["length"]] = 30.0
+    state_cv_t = state_147_cv.copy()
+    for _ in range(30):
+        state_cv_t = F_147_cv @ state_cv_t
+    expected_x_cv_30 = 150.0
+    np.testing.assert_allclose(
+        state_cv_t[indices_147_cv["__root__"]["x"]],
+        expected_x_cv_30,
+        atol=1e-9, rtol=1e-9,
+    )
+    # Confirm the difference: CA extrapolates 100 px farther
+    # than CV in 1 second (because of the 200 px/s² accel)
+    diff = (
+        state_t[indices_147["__root__"]["x"]]
+        - state_cv_t[indices_147_cv["__root__"]["x"]]
+    )
+    np.testing.assert_allclose(diff, 100.0, atol=1e-9)
+
+    # ---------------------------------------------------------- #
+    # Case 148: model save/load round-trips const_accel fields.
+    # Pre-121d models (no const_accel_segments key) load with
+    # an empty list, preserving backward compatibility.
+    # ---------------------------------------------------------- #
+    import tempfile as _tf
+    import pathlib as _pl
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        save_model_v2 as _save_148,
+        load_model_v2 as _load_148,
+        FittedLengths as _FL_148,
+    )
+
+    layout_148 = _dc.replace(
+        standard_rat_layout(),
+        const_accel_segments=["body", "head"],
+    )
+    fitted_148 = _FL_148(
+        segment_lengths={
+            s: 30.0 for s in layout_148.non_root_topo_order
+        },
+        segment_length_iqr={
+            s: 1.0 for s in layout_148.non_root_topo_order
+        },
+        marker_offsets={
+            m: (1.0, 0.0) for m in layout_148.marker_names
+        },
+    )
+    params_148 = NoiseParamsV2.default(
+        layout_148, sigma_marker=2.0, fitted_lengths=fitted_148,
+    )
+    assert params_148.q_jerk_root_pos is not None
+    assert params_148.q_jerk_root_ori is not None
+    assert params_148.q_jerk_seg_ori is not None
+    assert "head" in params_148.q_jerk_seg_ori
+
+    with _tf.TemporaryDirectory() as td:
+        model_path = _pl.Path(td) / "model_148.npz"
+        _save_148(
+            model_path, layout_148, fitted_148, params_148,
+            fps=30.0, likelihood_threshold=0.5,
+        )
+        (
+            loaded_layout, loaded_fitted, loaded_params,
+            loaded_fps, loaded_lt, loaded_persp,
+        ) = _load_148(model_path)
+        assert (
+            loaded_layout.const_accel_segments
+            == ["body", "head"]
+        )
+        np.testing.assert_allclose(
+            loaded_params.q_jerk_root_pos,
+            params_148.q_jerk_root_pos,
+        )
+        np.testing.assert_allclose(
+            loaded_params.q_jerk_root_ori,
+            params_148.q_jerk_root_ori,
+        )
+        for s, v in params_148.q_jerk_seg_ori.items():
+            np.testing.assert_allclose(
+                loaded_params.q_jerk_seg_ori[s], v,
+            )
+
+    # Also verify pre-121d compatibility: a layout with empty
+    # const_accel_segments saves and loads with the field still
+    # empty, no q_jerk_* populated.
+    layout_148b = standard_rat_layout()
+    params_148b = NoiseParamsV2.default(
+        layout_148b, sigma_marker=2.0, fitted_lengths=fitted_148,
+    )
+    assert params_148b.q_jerk_root_pos is None
+    assert params_148b.q_jerk_seg_ori is None
+    with _tf.TemporaryDirectory() as td:
+        model_path_b = _pl.Path(td) / "model_148b.npz"
+        _save_148(
+            model_path_b, layout_148b, fitted_148, params_148b,
+            fps=30.0, likelihood_threshold=0.5,
+        )
+        (
+            ll, _, lp, _, _, _,
+        ) = _load_148(model_path_b)
+        assert ll.const_accel_segments == []
+        assert lp.q_jerk_root_pos is None
+        assert lp.q_jerk_seg_ori is None
+
+    print("smoke_kalman_pose_smoother_v2: 148/148 cases passed")
     return 0
 
 
