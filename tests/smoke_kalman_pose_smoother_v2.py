@@ -5054,7 +5054,320 @@ def main() -> int:
         f"the error-isolation 5-tuple; got {ann_repr}"
     )
 
-    print("smoke_kalman_pose_smoother_v2: 138/138 cases passed")
+    # ============================================================ #
+    # Patch 121b: per-segment orientation drift wiring into FK
+    # and the observation Jacobian. 121a left δ_θ in the state
+    # vector but disconnected from the marker-prediction
+    # equation; 121b makes FK actually consume it.
+    #
+    # Note: this section is logically the 121b suite, but is
+    # numbered 139-144 to come after 121c's 133-138 in this
+    # stacked-patch ordering (121c lands first as the numerical
+    # hardening prerequisite).
+    # ============================================================ #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        forward_kinematics as _fk_121b,
+        state_to_marker_positions as _stmp_121b,
+        state_to_marker_jacobian as _stmj_121b,
+        state_to_marker_positions_batch as _stmpb_121b,
+        state_to_marker_jacobian_batch as _stmjb_121b,
+        _pack_state_layout_indices as _pack_121b,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 139: zero δ_θ reproduces no-orientation-drift FK
+    # exactly. With δ=0 in the state vector, every world rotation
+    # and distal position must be bit-identical to a layout
+    # without orientation_drift_segments configured.
+    # ---------------------------------------------------------- #
+    rng_139 = np.random.default_rng(133)
+    layout_no_drift_139 = standard_rat_layout()
+    layout_with_drift_139 = _dc.replace(
+        standard_rat_layout(),
+        orientation_drift_segments=["body", "neck", "head"],
+    )
+    state_zero_drift = np.zeros(layout_with_drift_139.state_dim)
+    indices_139_d = _pack_121b(layout_with_drift_139)
+    indices_139_n = _pack_121b(layout_no_drift_139)
+    state_no_drift = np.zeros(layout_no_drift_139.state_dim)
+    state_no_drift[indices_139_n["__root__"]["x"]] = 50.0
+    state_no_drift[indices_139_n["__root__"]["y"]] = 80.0
+    state_no_drift[indices_139_n["__root__"]["cos"]] = np.cos(0.4)
+    state_no_drift[indices_139_n["__root__"]["sin"]] = np.sin(0.4)
+    state_zero_drift[indices_139_d["__root__"]["x"]] = 50.0
+    state_zero_drift[indices_139_d["__root__"]["y"]] = 80.0
+    state_zero_drift[indices_139_d["__root__"]["cos"]] = np.cos(0.4)
+    state_zero_drift[indices_139_d["__root__"]["sin"]] = np.sin(0.4)
+    for seg in layout_no_drift_139.non_root_topo_order:
+        ang = rng_139.uniform(-0.3, 0.3)
+        state_no_drift[indices_139_n[seg]["cos"]] = np.cos(ang)
+        state_no_drift[indices_139_n[seg]["sin"]] = np.sin(ang)
+        state_no_drift[indices_139_n[seg]["length"]] = 30.0
+        state_zero_drift[indices_139_d[seg]["cos"]] = np.cos(ang)
+        state_zero_drift[indices_139_d[seg]["sin"]] = np.sin(ang)
+        state_zero_drift[indices_139_d[seg]["length"]] = 30.0
+    pos_no = _stmp_121b(state_no_drift, layout_no_drift_139)
+    pos_zd = _stmp_121b(state_zero_drift, layout_with_drift_139)
+    np.testing.assert_allclose(
+        pos_no, pos_zd, atol=1e-12,
+        err_msg="δ_θ=0 should reproduce no-orientation-drift FK exactly",
+    )
+    fk_no = _fk_121b(state_no_drift, layout_no_drift_139)
+    fk_zd = _fk_121b(state_zero_drift, layout_with_drift_139)
+    for seg_name in layout_no_drift_139.topo_order:
+        np.testing.assert_allclose(
+            fk_no.P_distal[seg_name], fk_zd.P_distal[seg_name],
+            atol=1e-12,
+            err_msg=f"P_distal[{seg_name}] differs at δ=0",
+        )
+        np.testing.assert_allclose(
+            fk_no.R_world[seg_name], fk_zd.R_world[seg_name],
+            atol=1e-12,
+            err_msg=f"R_world[{seg_name}] differs at δ=0",
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 140: nonzero δ_θ on the root rotates EVERY marker by
+    # R(δ_θ_root) around the root position.
+    # ---------------------------------------------------------- #
+    layout_140 = _dc.replace(
+        standard_rat_layout(),
+        orientation_drift_segments=["body"],  # body = root
+    )
+    indices_140 = _pack_121b(layout_140)
+    state_140 = np.zeros(layout_140.state_dim)
+    state_140[indices_140["__root__"]["x"]] = 100.0
+    state_140[indices_140["__root__"]["y"]] = 200.0
+    state_140[indices_140["__root__"]["cos"]] = np.cos(0.2)
+    state_140[indices_140["__root__"]["sin"]] = np.sin(0.2)
+    for seg in layout_140.non_root_topo_order:
+        ang = 0.1
+        state_140[indices_140[seg]["cos"]] = np.cos(ang)
+        state_140[indices_140[seg]["sin"]] = np.sin(ang)
+        state_140[indices_140[seg]["length"]] = 30.0
+    pos_zero = _stmp_121b(state_140, layout_140)
+    sl_body = layout_140.slice_segment_orientation_drift("body")
+    state_140_drift = state_140.copy()
+    state_140_drift[sl_body.start] = 0.07
+    pos_drift = _stmp_121b(state_140_drift, layout_140)
+    delta = 0.07
+    R_d = np.array([
+        [np.cos(delta), -np.sin(delta)],
+        [np.sin(delta),  np.cos(delta)],
+    ])
+    root_pos = np.array([100.0, 200.0])
+    pos_predicted = (pos_zero - root_pos) @ R_d.T + root_pos
+    np.testing.assert_allclose(
+        pos_drift, pos_predicted, atol=1e-12,
+        err_msg=(
+            "δ_θ on root should rotate all markers by R(δ) "
+            "around root_pos"
+        ),
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 141: nonzero δ_θ on a non-root segment rotates only
+    # the descendant subtree's markers by R(δ_θ_seg) around the
+    # segment's proximal endpoint (P_distal[parent(seg)]).
+    # Markers on segments NOT in the descendant subtree are
+    # unchanged.
+    # ---------------------------------------------------------- #
+    layout_141 = _dc.replace(
+        standard_rat_layout(),
+        orientation_drift_segments=["neck"],
+    )
+    indices_141 = _pack_121b(layout_141)
+    state_141 = np.zeros(layout_141.state_dim)
+    state_141[indices_141["__root__"]["x"]] = 50.0
+    state_141[indices_141["__root__"]["y"]] = 80.0
+    state_141[indices_141["__root__"]["cos"]] = np.cos(0.3)
+    state_141[indices_141["__root__"]["sin"]] = np.sin(0.3)
+    for seg in layout_141.non_root_topo_order:
+        ang = 0.05
+        state_141[indices_141[seg]["cos"]] = np.cos(ang)
+        state_141[indices_141[seg]["sin"]] = np.sin(ang)
+        state_141[indices_141[seg]["length"]] = 30.0
+    pos_zero_141 = _stmp_121b(state_141, layout_141)
+    fk_zero_141 = _fk_121b(state_141, layout_141)
+    pivot_neck = fk_zero_141.P_distal["body"]
+    delta_n = 0.06
+    sl_neck = layout_141.slice_segment_orientation_drift("neck")
+    state_141_drift = state_141.copy()
+    state_141_drift[sl_neck.start] = delta_n
+    pos_drift_141 = _stmp_121b(state_141_drift, layout_141)
+    descendants = {"neck", "head"}
+    R_n = np.array([
+        [np.cos(delta_n), -np.sin(delta_n)],
+        [np.sin(delta_n),  np.cos(delta_n)],
+    ])
+    for i, marker in enumerate(layout_141.marker_names):
+        seg_of_marker, _ = layout_141.marker_attachment(marker)
+        if seg_of_marker in descendants:
+            expected = (
+                pos_zero_141[i] - pivot_neck
+            ) @ R_n.T + pivot_neck
+            np.testing.assert_allclose(
+                pos_drift_141[i], expected, atol=1e-12,
+                err_msg=(
+                    f"δ_neck should rotate descendant marker "
+                    f"{marker!r} by R(δ) around P_distal[body]"
+                ),
+            )
+        else:
+            np.testing.assert_allclose(
+                pos_drift_141[i], pos_zero_141[i], atol=1e-12,
+                err_msg=(
+                    f"δ_neck must NOT affect non-descendant "
+                    f"marker {marker!r}"
+                ),
+            )
+
+    # ---------------------------------------------------------- #
+    # Case 142: numerical vs analytical Jacobian on the
+    # orientation drift columns. The most important correctness
+    # check for 121b — if the partials are wrong the EKF
+    # silently misbehaves.
+    # ---------------------------------------------------------- #
+    rng_142 = np.random.default_rng(142)
+    layout_142 = _dc.replace(
+        standard_rat_layout(),
+        orientation_drift_segments=["body", "neck", "head"],
+    )
+    indices_142 = _pack_121b(layout_142)
+    state_142 = np.zeros(layout_142.state_dim)
+    state_142[indices_142["__root__"]["cos"]] = np.cos(0.4)
+    state_142[indices_142["__root__"]["sin"]] = np.sin(0.4)
+    state_142[indices_142["__root__"]["x"]] = 50.0
+    state_142[indices_142["__root__"]["y"]] = 80.0
+    for seg in layout_142.non_root_topo_order:
+        seg_idx = indices_142[seg]
+        ang = rng_142.uniform(-0.3, 0.3)
+        state_142[seg_idx["cos"]] = np.cos(ang)
+        state_142[seg_idx["sin"]] = np.sin(ang)
+        state_142[seg_idx["length"]] = 30.0
+    for sname in layout_142.orientation_drift_segments:
+        sl = layout_142.slice_segment_orientation_drift(sname)
+        state_142[sl.start] = rng_142.uniform(-0.05, 0.05)
+
+    H_analytic_142 = _stmj_121b(state_142, layout_142)
+    eps = 1e-6
+    for sname in layout_142.orientation_drift_segments:
+        sl = layout_142.slice_segment_orientation_drift(sname)
+        col = sl.start
+        s_plus = state_142.copy()
+        s_plus[col] += eps
+        s_minus = state_142.copy()
+        s_minus[col] -= eps
+        num_col = (
+            _stmp_121b(s_plus, layout_142).flatten()
+            - _stmp_121b(s_minus, layout_142).flatten()
+        ) / (2 * eps)
+        ana_col = H_analytic_142[:, col]
+        np.testing.assert_allclose(
+            num_col, ana_col, atol=1e-7,
+            err_msg=(
+                f"orientation drift Jacobian column for {sname!r} "
+                f"disagrees with numerical"
+            ),
+        )
+
+    # Zero-partial check for markers outside the descendant subtree
+    layout_142b = _dc.replace(
+        standard_rat_layout(),
+        orientation_drift_segments=["head"],
+    )
+    indices_142b = _pack_121b(layout_142b)
+    state_142b = np.zeros(layout_142b.state_dim)
+    state_142b[indices_142b["__root__"]["cos"]] = np.cos(0.4)
+    state_142b[indices_142b["__root__"]["sin"]] = np.sin(0.4)
+    state_142b[indices_142b["__root__"]["x"]] = 50.0
+    state_142b[indices_142b["__root__"]["y"]] = 80.0
+    for seg in layout_142b.non_root_topo_order:
+        seg_idx = indices_142b[seg]
+        ang = rng_142.uniform(-0.3, 0.3)
+        state_142b[seg_idx["cos"]] = np.cos(ang)
+        state_142b[seg_idx["sin"]] = np.sin(ang)
+        state_142b[seg_idx["length"]] = 30.0
+    H_142b = _stmj_121b(state_142b, layout_142b)
+    sl_head = layout_142b.slice_segment_orientation_drift("head")
+    head_descendants = {"head"}
+    for i, marker in enumerate(layout_142b.marker_names):
+        seg_of_marker, _ = layout_142b.marker_attachment(marker)
+        if seg_of_marker in head_descendants:
+            partial = H_142b[2 * i : 2 * i + 2, sl_head.start]
+            assert np.linalg.norm(partial) > 1e-9, (
+                f"marker {marker!r} (on head) should have non-zero "
+                f"partial w.r.t. δ_head; got {partial}"
+            )
+        else:
+            partial = H_142b[2 * i : 2 * i + 2, sl_head.start]
+            np.testing.assert_allclose(
+                partial, np.zeros(2), atol=1e-12,
+                err_msg=(
+                    f"marker {marker!r} (not on head subtree) "
+                    f"must have zero partial w.r.t. δ_head"
+                ),
+            )
+
+    # ---------------------------------------------------------- #
+    # Case 143: batch FK with orientation drift agrees with the
+    # per-frame variant.
+    # ---------------------------------------------------------- #
+    T_143 = 7
+    layout_143 = _dc.replace(
+        standard_rat_layout(),
+        orientation_drift_segments=["body", "neck"],
+    )
+    indices_143 = _pack_121b(layout_143)
+    rng_143 = np.random.default_rng(143)
+    states_batch_143 = np.zeros((T_143, layout_143.state_dim))
+    for t in range(T_143):
+        states_batch_143[t, indices_143["__root__"]["x"]] = 50.0
+        states_batch_143[t, indices_143["__root__"]["y"]] = 80.0
+        states_batch_143[t, indices_143["__root__"]["cos"]] = np.cos(0.4)
+        states_batch_143[t, indices_143["__root__"]["sin"]] = np.sin(0.4)
+        for seg in layout_143.non_root_topo_order:
+            seg_idx = indices_143[seg]
+            ang = rng_143.uniform(-0.3, 0.3)
+            states_batch_143[t, seg_idx["cos"]] = np.cos(ang)
+            states_batch_143[t, seg_idx["sin"]] = np.sin(ang)
+            states_batch_143[t, seg_idx["length"]] = 30.0
+        for sname in layout_143.orientation_drift_segments:
+            sl = layout_143.slice_segment_orientation_drift(sname)
+            states_batch_143[t, sl.start] = rng_143.uniform(-0.08, 0.08)
+    pos_batch_143 = _stmpb_121b(
+        states_batch_143, layout_143, device="cpu",
+    )
+    for t in range(T_143):
+        pos_t = _stmp_121b(states_batch_143[t], layout_143)
+        np.testing.assert_allclose(
+            pos_batch_143[t], pos_t, atol=1e-12,
+            err_msg=(
+                f"batch FK frame {t} disagrees with per-frame "
+                f"under orientation drift"
+            ),
+        )
+
+    # ---------------------------------------------------------- #
+    # Case 144: batch Jacobian with orientation drift agrees
+    # with per-frame Jacobian on the orientation drift columns.
+    # ---------------------------------------------------------- #
+    H_batch_144 = _stmjb_121b(
+        states_batch_143, layout_143, device="cpu",
+    )
+    block_144 = layout_143.orientation_drift_block_slice
+    for t in range(T_143):
+        H_t = _stmj_121b(states_batch_143[t], layout_143)
+        np.testing.assert_allclose(
+            H_batch_144[t, :, block_144.start:block_144.stop],
+            H_t[:, block_144.start:block_144.stop],
+            atol=1e-12,
+            err_msg=(
+                f"batch H orientation-drift cols frame {t} mismatch"
+            ),
+        )
+
+    print("smoke_kalman_pose_smoother_v2: 144/144 cases passed")
     return 0
 
 
