@@ -3880,6 +3880,16 @@ _M_STEP_Q_CEILING_FACTOR = 10.0
 _M_STEP_Q_ROOT_POS_HARD_CAP = 50000.0   # px²/s³
 _M_STEP_Q_ROOT_ORI_HARD_CAP = 50.0      # (cos/sin acceleration)
 
+# Patch 121e: hard caps for the const-accel jerk q. Same
+# rationale as 121c's caps on q_root_pos / q_root_ori — when
+# EM learns q_jerk_* from data, a pathological session can
+# push the estimate to numerically-unstable values. The 10×
+# scaling between q_jerk and q_root in NoiseParamsV2.default
+# motivates these caps being roughly 10× the q_root caps.
+_M_STEP_Q_JERK_ROOT_POS_HARD_CAP = 500000.0   # px²/s⁵
+_M_STEP_Q_JERK_ROOT_ORI_HARD_CAP = 500.0
+_M_STEP_Q_JERK_SEG_ORI_HARD_CAP = 500.0
+
 # Patch 121c: adaptive jitter for the EKF/RTS solves.
 # Replaces the fixed 1e-9 used at the LinAlgError fallback,
 # which was meaningless when trace(P) ≫ 1. lam = max(floor,
@@ -4355,6 +4365,103 @@ def finalize_m_step_v2(
             max(sigma_floor, min(sigma_ceiling, sigma_raw))
         )
 
+    # ---------- Patch 121e: q_jerk from M-step ----------
+    # The Q_hat block diagonals at the const-accel slots already
+    # encode the M-step estimate of jerk variance. Since each
+    # accel slot has Q[a, a] = q_jerk * dt in build_Q_v2 (random-
+    # walk on acceleration), the estimator is q_jerk = Q_hat[a, a]
+    # / dt. For the root, average over (ax, ay) for translation
+    # and (root_cos_ddot, root_sin_ddot) for orientation. For
+    # non-root, average over (cos_ddot, sin_ddot).
+    q_jerk_root_pos: Optional[float] = None
+    q_jerk_root_ori: Optional[float] = None
+    q_jerk_seg_ori: Optional[Dict[str, float]] = None
+    if layout.const_accel_segments:
+        q_jerk_seg_ori = {}
+        for sname in layout.const_accel_segments:
+            seg = layout.segment_by_name(sname)
+            ca = layout.slice_segment_const_accel(sname)
+            if seg.parent is None:
+                # Root: 4 dims [ax, ay, root_cos_ddot, root_sin_ddot]
+                qjp_raw = float(
+                    (Q_hat[ca.start, ca.start]
+                     + Q_hat[ca.start + 1, ca.start + 1]) / 2.0 / dt
+                )
+                qjo_raw = float(
+                    (Q_hat[ca.start + 2, ca.start + 2]
+                     + Q_hat[ca.start + 3, ca.start + 3]) / 2.0 / dt
+                )
+                q_initial_p = (
+                    initial_params.q_jerk_root_pos
+                    if initial_params.q_jerk_root_pos is not None
+                    else 1000.0
+                )
+                q_initial_o = (
+                    initial_params.q_jerk_root_ori
+                    if initial_params.q_jerk_root_ori is not None
+                    else 0.1
+                )
+                q_floor_p = q_initial_p * _M_STEP_Q_FLOOR_FACTOR
+                q_ceiling_p = min(
+                    q_initial_p * _M_STEP_Q_CEILING_FACTOR,
+                    _M_STEP_Q_JERK_ROOT_POS_HARD_CAP,
+                )
+                q_clipped_p = max(
+                    q_floor_p, min(q_ceiling_p, qjp_raw)
+                )
+                q_floor_o = q_initial_o * _M_STEP_Q_FLOOR_FACTOR
+                q_ceiling_o = min(
+                    q_initial_o * _M_STEP_Q_CEILING_FACTOR,
+                    _M_STEP_Q_JERK_ROOT_ORI_HARD_CAP,
+                )
+                q_clipped_o = max(
+                    q_floor_o, min(q_ceiling_o, qjo_raw)
+                )
+                q_jerk_root_pos = _damp(
+                    prev_params.q_jerk_root_pos
+                    if prev_params.q_jerk_root_pos is not None
+                    else q_initial_p,
+                    q_clipped_p,
+                )
+                q_jerk_root_ori = _damp(
+                    prev_params.q_jerk_root_ori
+                    if prev_params.q_jerk_root_ori is not None
+                    else q_initial_o,
+                    q_clipped_o,
+                )
+            else:
+                # Non-root: 2 dims [cos_ddot, sin_ddot]
+                qjs_raw = float(
+                    (Q_hat[ca.start, ca.start]
+                     + Q_hat[ca.start + 1, ca.start + 1]) / 2.0 / dt
+                )
+                q_initial_s = (
+                    initial_params.q_jerk_seg_ori.get(sname, 0.1)
+                    if initial_params.q_jerk_seg_ori is not None
+                    else 0.1
+                )
+                q_floor_s = q_initial_s * _M_STEP_Q_FLOOR_FACTOR
+                q_ceiling_s = min(
+                    q_initial_s * _M_STEP_Q_CEILING_FACTOR,
+                    _M_STEP_Q_JERK_SEG_ORI_HARD_CAP,
+                )
+                q_clipped_s = max(
+                    q_floor_s, min(q_ceiling_s, qjs_raw)
+                )
+                q_jerk_seg_ori[sname] = _damp(
+                    prev_params.q_jerk_seg_ori.get(sname, q_initial_s)
+                    if prev_params.q_jerk_seg_ori is not None
+                    else q_initial_s,
+                    q_clipped_s,
+                )
+        # For non-listed segments, preserve any existing value
+        # so downstream code that indexes by all non-root
+        # segments still works (build_Q_v2 only reads listed).
+        if prev_params.q_jerk_seg_ori is not None:
+            for s, v in prev_params.q_jerk_seg_ori.items():
+                if s not in q_jerk_seg_ori:
+                    q_jerk_seg_ori[s] = v
+
     return NoiseParamsV2(
         sigma_marker=sigma_marker,
         q_root_pos=q_root_pos,
@@ -4393,14 +4500,11 @@ def finalize_m_step_v2(
             dict(prev_params.r_theta_drift)
             if prev_params.r_theta_drift is not None else None
         ),
-        # Patch 121d: const-accel jerk parameters pass through.
-        # EM does not currently update them.
-        q_jerk_root_pos=prev_params.q_jerk_root_pos,
-        q_jerk_root_ori=prev_params.q_jerk_root_ori,
-        q_jerk_seg_ori=(
-            dict(prev_params.q_jerk_seg_ori)
-            if prev_params.q_jerk_seg_ori is not None else None
-        ),
+        # Patch 121e: q_jerk values learned from M-step when
+        # the layout has const_accel_segments. None otherwise.
+        q_jerk_root_pos=q_jerk_root_pos,
+        q_jerk_root_ori=q_jerk_root_ori,
+        q_jerk_seg_ori=q_jerk_seg_ori,
     )
 
 
