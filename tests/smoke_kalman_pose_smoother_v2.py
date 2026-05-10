@@ -5669,7 +5669,239 @@ def main() -> int:
         assert lp.q_jerk_root_pos is None
         assert lp.q_jerk_seg_ori is None
 
-    print("smoke_kalman_pose_smoother_v2: 148/148 cases passed")
+    # ============================================================ #
+    # Patch 121e: M-step learning of q_jerk_*. 121d added the
+    # const-accel state extension with q_jerk fixed at the
+    # initial fitted value (10× the corresponding q). 121e wires
+    # q_jerk into the pooled M-step finalizer: each EM iteration
+    # now reads the M-step estimate from Q_hat's accel-block
+    # diagonals and applies floor/ceiling/hard-cap logic in the
+    # 121c style.
+    # ============================================================ #
+    from mufasa.data_processors.kalman_pose_smoother_v2 import (
+        finalize_m_step_v2 as _finalize_121e,
+        _MStepStatsV2 as _Stats_121e,
+        build_F_v2 as _F_121e,
+        build_Q_v2 as _Q_121e,
+        _M_STEP_Q_JERK_ROOT_POS_HARD_CAP,
+        _M_STEP_Q_JERK_ROOT_ORI_HARD_CAP,
+        _M_STEP_Q_JERK_SEG_ORI_HARD_CAP,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 149: with const_accel disabled (empty list), the
+    # M-step finalizer's returned q_jerk_* fields are None
+    # (no learning to do). Confirms the 121e changes are
+    # opt-in and don't break the no-const-accel path.
+    # ---------------------------------------------------------- #
+    layout_149 = standard_rat_layout()
+    initial_149 = NoiseParamsV2.default(layout_149, sigma_marker=2.0)
+    stats_149 = _Stats_121e.empty(layout_149)
+    stats_149.n_pairs = 100
+    # Identity-ish stats so Q_hat ends up around q_initial
+    # (irrelevant: just exercise the no-const-accel branch)
+    D_149 = layout_149.state_dim
+    stats_149.S00 = 1.0 * np.eye(D_149)
+    stats_149.S11 = 1.0 * np.eye(D_149)
+    stats_149.S10 = 0.99 * np.eye(D_149)
+    new_149 = _finalize_121e(
+        stats_149, layout_149, dt=1.0/30.0,
+        prev_params=initial_149, initial_params=initial_149,
+    )
+    assert new_149.q_jerk_root_pos is None
+    assert new_149.q_jerk_root_ori is None
+    assert new_149.q_jerk_seg_ori is None
+
+    # ---------------------------------------------------------- #
+    # Case 150: with const_accel enabled, the M-step extracts
+    # q_jerk from the accel-block diagonal of Q_hat. Direct
+    # construction: feed S00/S11/S10 such that Q_hat at the
+    # accel slot is exactly some target value × dt; the M-step
+    # estimate should round-trip to that value.
+    # ---------------------------------------------------------- #
+    layout_150 = _dc.replace(
+        standard_rat_layout(),
+        const_accel_segments=["body", "head"],
+    )
+    dt_150 = 1.0 / 30.0
+    initial_150 = NoiseParamsV2.default(
+        layout_150, sigma_marker=2.0,
+    )
+    F_150 = _F_121e(layout_150, dt_150, params=initial_150)
+    D_150 = layout_150.state_dim
+
+    # Build stats so that Q_hat = X (a known matrix). The
+    # M-step formula is:
+    #   Q_hat = (S11 - S10 F^T - F S10^T + F S00 F^T) / n_pairs
+    # If we set S00 = S11 = 0 and S10 = -X * n_pairs / 2,
+    # then Q_hat = (-S10 F^T - F S10^T) / n_pairs
+    # Easier: set S00 = S11 = 0, S10 = -F.T @ X * n_pairs / 2,
+    # but X must be symmetric for the result to be symmetric.
+    # Simplest approach: Q_hat is computed inside the finalizer;
+    # we directly set S11 such that Q_hat target diagonal
+    # matches.
+    # If S00 = 0, S10 = 0, n_pairs = N, then
+    #   Q_hat = S11 / N
+    # So set S11[i, i] = q_jerk_target * dt * N for the slot
+    # we care about.
+    n_pairs_150 = 1000
+    target_qjp = 5000.0  # target q_jerk_root_pos
+    target_qjo = 5.0
+    target_qjs = 5.0
+    stats_150 = _Stats_121e.empty(layout_150)
+    stats_150.n_pairs = n_pairs_150
+    stats_150.S00 = np.zeros((D_150, D_150))
+    stats_150.S10 = np.zeros((D_150, D_150))
+    S11_150 = np.zeros((D_150, D_150))
+    ca_body = layout_150.slice_segment_const_accel("body")
+    ca_head = layout_150.slice_segment_const_accel("head")
+    # Body root translation accel slots
+    S11_150[ca_body.start, ca_body.start] = (
+        target_qjp * dt_150 * n_pairs_150
+    )
+    S11_150[ca_body.start + 1, ca_body.start + 1] = (
+        target_qjp * dt_150 * n_pairs_150
+    )
+    # Body root orientation accel slots
+    S11_150[ca_body.start + 2, ca_body.start + 2] = (
+        target_qjo * dt_150 * n_pairs_150
+    )
+    S11_150[ca_body.start + 3, ca_body.start + 3] = (
+        target_qjo * dt_150 * n_pairs_150
+    )
+    # Head orientation accel slots
+    S11_150[ca_head.start, ca_head.start] = (
+        target_qjs * dt_150 * n_pairs_150
+    )
+    S11_150[ca_head.start + 1, ca_head.start + 1] = (
+        target_qjs * dt_150 * n_pairs_150
+    )
+    stats_150.S11 = S11_150
+    # Set initial values high so neither the floor nor ceiling
+    # clips at the target values
+    initial_150.q_jerk_root_pos = 1000.0
+    initial_150.q_jerk_root_ori = 1.0
+    if initial_150.q_jerk_seg_ori is None:
+        initial_150.q_jerk_seg_ori = {}
+    for s in layout_150.non_root_topo_order:
+        initial_150.q_jerk_seg_ori[s] = 1.0
+    new_150 = _finalize_121e(
+        stats_150, layout_150, dt=dt_150,
+        prev_params=initial_150, initial_params=initial_150,
+    )
+    # Floor on q_jerk_root_pos: 1000 × 0.1 = 100; ceiling: 1000 × 10 = 10000
+    # Target 5000 is within bounds → no clipping
+    np.testing.assert_allclose(
+        new_150.q_jerk_root_pos, target_qjp, rtol=1e-9,
+        err_msg="q_jerk_root_pos M-step should round-trip target",
+    )
+    np.testing.assert_allclose(
+        new_150.q_jerk_root_ori, target_qjo, rtol=1e-9,
+    )
+    # Head's q_jerk_seg_ori should also match
+    np.testing.assert_allclose(
+        new_150.q_jerk_seg_ori["head"], target_qjs, rtol=1e-9,
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 151: hard caps fire when target exceeds limit. With
+    # initial × 10 = 1000 × 10 = 10000, the ceiling allows up
+    # to 10000. But the absolute cap _M_STEP_Q_JERK_ROOT_POS_
+    # HARD_CAP = 500000 only fires for very high initial values.
+    # To exercise it: initial = 100000 → relative ceiling
+    # 1000000, hard cap 500000 wins.
+    # ---------------------------------------------------------- #
+    layout_151 = _dc.replace(
+        standard_rat_layout(),
+        const_accel_segments=["body"],
+    )
+    D_151 = layout_151.state_dim
+    initial_151 = NoiseParamsV2.default(
+        layout_151, sigma_marker=2.0,
+    )
+    initial_151.q_jerk_root_pos = 100000.0
+    initial_151.q_jerk_root_ori = 100.0
+    n_pairs_151 = 1000
+    stats_151 = _Stats_121e.empty(layout_151)
+    stats_151.n_pairs = n_pairs_151
+    stats_151.S00 = np.zeros((D_151, D_151))
+    stats_151.S10 = np.zeros((D_151, D_151))
+    S11_151 = np.zeros((D_151, D_151))
+    # Set extremely high target (1e10) so the cap clamps
+    ca_body_151 = layout_151.slice_segment_const_accel("body")
+    for i in range(4):
+        S11_151[ca_body_151.start + i, ca_body_151.start + i] = (
+            1e10 * dt_150 * n_pairs_151
+        )
+    stats_151.S11 = S11_151
+    new_151 = _finalize_121e(
+        stats_151, layout_151, dt=dt_150,
+        prev_params=initial_151, initial_params=initial_151,
+    )
+    assert (
+        new_151.q_jerk_root_pos == _M_STEP_Q_JERK_ROOT_POS_HARD_CAP
+    ), (
+        f"q_jerk_root_pos hard cap should fire; got "
+        f"{new_151.q_jerk_root_pos}"
+    )
+    assert (
+        new_151.q_jerk_root_ori == _M_STEP_Q_JERK_ROOT_ORI_HARD_CAP
+    ), (
+        f"q_jerk_root_ori hard cap should fire; got "
+        f"{new_151.q_jerk_root_ori}"
+    )
+
+    # ---------------------------------------------------------- #
+    # Case 152: q_jerk for non-listed segments is preserved
+    # from prev_params, not learned. With const_accel only on
+    # body, but prev_params having q_jerk_seg_ori for head
+    # (perhaps from a previous run where head was listed),
+    # the head value should pass through unchanged.
+    # ---------------------------------------------------------- #
+    layout_152 = _dc.replace(
+        standard_rat_layout(),
+        const_accel_segments=["body"],  # only body
+    )
+    D_152 = layout_152.state_dim
+    initial_152 = NoiseParamsV2.default(
+        layout_152, sigma_marker=2.0,
+    )
+    # Manually populate head as if prev had it
+    if initial_152.q_jerk_seg_ori is None:
+        initial_152.q_jerk_seg_ori = {}
+    initial_152.q_jerk_seg_ori["head"] = 7.5
+    prev_152 = NoiseParamsV2.default(
+        layout_152, sigma_marker=2.0,
+    )
+    if prev_152.q_jerk_seg_ori is None:
+        prev_152.q_jerk_seg_ori = {}
+    prev_152.q_jerk_seg_ori["head"] = 7.5
+    stats_152 = _Stats_121e.empty(layout_152)
+    stats_152.n_pairs = 1000
+    stats_152.S00 = np.zeros((D_152, D_152))
+    stats_152.S10 = np.zeros((D_152, D_152))
+    stats_152.S11 = np.zeros((D_152, D_152))
+    ca_body_152 = layout_152.slice_segment_const_accel("body")
+    for i in range(4):
+        stats_152.S11[
+            ca_body_152.start + i, ca_body_152.start + i,
+        ] = 100.0
+    new_152 = _finalize_121e(
+        stats_152, layout_152, dt=dt_150,
+        prev_params=prev_152, initial_params=initial_152,
+    )
+    # head should pass through (it's in q_jerk_seg_ori but not
+    # in const_accel_segments so it's not learned)
+    assert "head" in new_152.q_jerk_seg_ori
+    np.testing.assert_allclose(
+        new_152.q_jerk_seg_ori["head"], 7.5,
+        err_msg=(
+            "non-const-accel segment's q_jerk should pass "
+            "through from prev_params"
+        ),
+    )
+
+    print("smoke_kalman_pose_smoother_v2: 152/152 cases passed")
     return 0
 
 
