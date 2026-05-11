@@ -31,6 +31,10 @@ from PySide6.QtWidgets import QApplication
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.workbench import MufasaWorkbench
 from mufasa.ui_qt.pages.video_processing_page import build_video_processing_page
+from mufasa.ui_qt.recent_project import (
+    save_recent_project as _save_recent_project,
+    load_recent_project as _load_recent_project,
+)
 
 
 def build_workbench(project_config_path: Optional[str] = None
@@ -101,6 +105,10 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     p.add_argument("--no-auto-discover", action="store_true",
                    help="disable auto-discovery of project_config.ini "
                         "in the current directory or its ancestors")
+    p.add_argument("--no-recent", action="store_true",
+                   help="disable fallback to ~/.config/mufasa/recent "
+                        "when neither --project nor auto-discovery "
+                        "produces a project to load")
     return p.parse_args(argv)
 
 
@@ -183,6 +191,28 @@ def main(argv: Optional[list[str]] = None) -> int:
                 file=sys.stderr,
             )
             project_config_path = str(discovered)
+
+    # Patch 121i: recent-project fallback. Layered AFTER auto-
+    # discovery so CWD-local projects always win over the
+    # persisted recent entry (the auto-discover behavior is
+    # what most users expect when launched from inside a
+    # project tree). When CWD is unrelated to any project and
+    # no --project flag was given, fall back to the last
+    # project the user actually opened.
+    if project_config_path is None and not args.no_recent:
+        recent = _load_recent_project()
+        if recent is not None:
+            print(
+                f"Loading recent project: {recent}",
+                file=sys.stderr,
+            )
+            project_config_path = str(recent)
+
+    # Patch 121i: whenever we resolved a project (by any path),
+    # remember it. Persists across launches so File→Open and
+    # auto-discovery both update the "recent" pointer.
+    if project_config_path is not None:
+        _save_recent_project(project_config_path)
 
     wb = build_workbench(project_config_path=project_config_path)
     # Track the workbench on the QApplication so File → New/Open project

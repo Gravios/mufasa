@@ -406,7 +406,13 @@ class MufasaWorkbench(QMainWindow):
             self._switch_to_project(self.project_config_path)
 
     def _switch_to_project(self, config_path: str) -> None:
+        # Patch 121i: persist the freshly-opened project so the
+        # next launch picks it up. Imports recent_project directly
+        # rather than going through workbench_app (which would be
+        # circular — workbench_app imports workbench).
         from mufasa.ui_qt.workbench_app import build_workbench
+        from mufasa.ui_qt.recent_project import save_recent_project
+        save_recent_project(config_path)
         new_wb = build_workbench(project_config_path=config_path)
         new_wb.show()
         # Keep a reference on the QApplication so it's not GC'd, then
