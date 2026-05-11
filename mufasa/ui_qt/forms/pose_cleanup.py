@@ -46,6 +46,34 @@ from mufasa.ui_qt.workbench import OperationForm
 
 
 # --------------------------------------------------------------------------- #
+# Patch 121h: standard location for fitted v2 models.
+# --------------------------------------------------------------------------- #
+def _default_model_dir() -> str:
+    """User-level home for fitted Kalman v2 models.
+
+    Lives at ``~/.config/mufasa/models/`` (XDG-style config
+    path on Linux; same path on macOS via expanduser; mostly
+    fine on Windows too via the userprofile expansion).
+    Created on first access. Used as the default destination
+    for saved models and the starting directory for the
+    'load model' browse dialog.
+
+    Centralizing the location means a model trained once is
+    discoverable from any project on the same machine, and
+    deleting the dir wipes all cached models in one place.
+    """
+    p = Path.home() / ".config" / "mufasa" / "models"
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Read-only home, network share quirks, etc. — silently
+        # degrade; the form will still work, the user just has
+        # to type a path manually.
+        pass
+    return str(p)
+
+
+# --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
 def _load_animal_bps(config_path: str) -> dict[str, list[str]]:
@@ -723,10 +751,642 @@ class EgocentricAlignmentForm(OperationForm):
         aligner.run()
 
 
+# --------------------------------------------------------------------------- #
+# KalmanV2SmoothingForm — patch 121e wiring
+# --------------------------------------------------------------------------- #
+class KalmanV2SmoothingForm(OperationForm):
+    """Kalman v2 (forward-filter / RTS smoother) on pose data.
+
+    Two operating modes:
+
+    * **Train new model** — fit NoiseParamsV2 via EM on a chosen
+      training set (all input files by default, or a subset),
+      smooth all input files with the fitted model, optionally
+      save the model for later reuse.
+    * **Load saved model** — load a previously-fitted model and
+      smooth input files without running EM. Layout extensions
+      (per-marker drift, orientation drift, const-accel) are
+      restored from the saved model and not re-configurable.
+
+    Recent feature flags exposed in train mode:
+
+    * **per-marker drift** (patch 120) — fit per-marker bias to
+      absorb tracker offset.
+    * **per-segment orientation drift** (patch 121b) — absorb
+      low-frequency angular residuals (body roll/pitch projected
+      onto the image plane). Recommended starting point: ``body``.
+    * **constant-acceleration dynamics** (patch 121d/e) —
+      predictor extrapolates with curvature instead of straight-
+      line velocity. Recommended if motion looks lagged: ``body,head``.
+
+    The form invokes :func:`smooth_pose_v2` directly via Python
+    API so errors surface cleanly in the workbench's progress
+    dialog.
+    """
+
+    title = "Kalman v2 smoothing"
+    description = (
+        "Skeletal-model EM smoother (forward-filter + RTS). "
+        "Slower than Savitzky-Golay but handles missing frames, "
+        "tracker dropouts, and per-marker bias. Train a new "
+        "model on your data or load a previously-fitted one."
+    )
+
+    # Pose-file extensions discovered in the input dir for the
+    # training subset picker. Matches what
+    # discover_pose_files / smooth_pose_v2 will pick up.
+    _POSE_EXTS = (".parquet", ".csv", ".tsv")
+
+    def build(self) -> None:
+        from PySide6.QtWidgets import (
+            QHBoxLayout, QRadioButton, QButtonGroup,
+            QAbstractItemView,
+        )
+        outer_form = QFormLayout()
+        outer_form.setLabelAlignment(Qt.AlignRight)
+
+        # ---- Common: Input dir ----
+        in_row = QHBoxLayout()
+        self.input_dir = QLineEdit(self)
+        self.input_dir.setPlaceholderText(
+            "Pose data directory (parquet preferred, CSV fallback)"
+        )
+        self.input_dir.textChanged.connect(self._refresh_file_list)
+        in_row.addWidget(self.input_dir)
+        in_browse = QPushButton("Browse…", self)
+        in_browse.clicked.connect(self._browse_input)
+        in_row.addWidget(in_browse)
+        outer_form.addRow("Input dir:", in_row)
+
+        # ---- Common: Output dir ----
+        out_row = QHBoxLayout()
+        self.output_dir = QLineEdit(self)
+        self.output_dir.setPlaceholderText(
+            "Where to write *_smoothed_v2.parquet files"
+        )
+        out_row.addWidget(self.output_dir)
+        out_browse = QPushButton("Browse…", self)
+        out_browse.clicked.connect(self._browse_output)
+        out_row.addWidget(out_browse)
+        outer_form.addRow("Output dir:", out_row)
+
+        # ---- Common: FPS ----
+        self.fps = QDoubleSpinBox(self)
+        self.fps.setRange(1.0, 1000.0)
+        self.fps.setValue(30.0)
+        self.fps.setSuffix(" Hz")
+        outer_form.addRow("Frame rate:", self.fps)
+
+        # ---- Common: Likelihood threshold ----
+        self.lik_thr = QDoubleSpinBox(self)
+        self.lik_thr.setRange(0.0, 1.0)
+        self.lik_thr.setSingleStep(0.05)
+        self.lik_thr.setDecimals(2)
+        self.lik_thr.setValue(0.5)
+        outer_form.addRow("Likelihood threshold:", self.lik_thr)
+
+        # ---- Common: Workers ----
+        try:
+            import multiprocessing as _mp
+            cpu_default = max(1, _mp.cpu_count() - 1)
+        except Exception:
+            cpu_default = 4
+        self.workers = QSpinBox(self)
+        self.workers.setRange(1, 64)
+        self.workers.setValue(min(cpu_default, 12))
+        outer_form.addRow("Worker processes:", self.workers)
+
+        # ---- Mode selector ----
+        mode_group = QGroupBox("Mode", self)
+        mode_layout = QHBoxLayout(mode_group)
+        self.mode_train = QRadioButton(
+            "Train new model", self,
+        )
+        self.mode_load = QRadioButton(
+            "Load saved model", self,
+        )
+        self.mode_train.setChecked(True)
+        self.mode_btn_group = QButtonGroup(self)
+        self.mode_btn_group.addButton(self.mode_train)
+        self.mode_btn_group.addButton(self.mode_load)
+        mode_layout.addWidget(self.mode_train)
+        mode_layout.addWidget(self.mode_load)
+        mode_layout.addStretch()
+        self.mode_train.toggled.connect(self._update_mode_visibility)
+        outer_form.addRow(mode_group)
+
+        # ---- TRAIN-mode group ----
+        self.train_group = QGroupBox("Training", self)
+        train_form = QFormLayout(self.train_group)
+        train_form.setLabelAlignment(Qt.AlignRight)
+
+        # Training file subset
+        self.train_subset = QCheckBox(
+            "Train on a subset of input files (default: use all)",
+            self,
+        )
+        self.train_subset.setChecked(False)
+        self.train_subset.toggled.connect(
+            self._update_subset_visibility
+        )
+        train_form.addRow("", self.train_subset)
+
+        # File list (multi-select, initially hidden)
+        self.train_file_list = QListWidget(self)
+        self.train_file_list.setSelectionMode(
+            QAbstractItemView.ExtendedSelection
+        )
+        self.train_file_list.setMaximumHeight(150)
+        self.train_file_list.setVisible(False)
+        train_form.addRow("Files for EM:", self.train_file_list)
+
+        # Refresh / select-all / clear buttons row
+        self.train_btn_row = QWidget(self)
+        btn_layout = QHBoxLayout(self.train_btn_row)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        refresh_btn = QPushButton("Refresh", self)
+        refresh_btn.clicked.connect(self._refresh_file_list)
+        select_all_btn = QPushButton("Select all", self)
+        select_all_btn.clicked.connect(
+            self.train_file_list.selectAll
+        )
+        clear_btn = QPushButton("Clear", self)
+        clear_btn.clicked.connect(
+            self.train_file_list.clearSelection
+        )
+        btn_layout.addWidget(refresh_btn)
+        btn_layout.addWidget(select_all_btn)
+        btn_layout.addWidget(clear_btn)
+        btn_layout.addStretch()
+        self.train_btn_row.setVisible(False)
+        train_form.addRow("", self.train_btn_row)
+
+        # EM parameters
+        self.em_iter = QSpinBox(self)
+        self.em_iter.setRange(1, 100)
+        self.em_iter.setValue(20)
+        train_form.addRow("EM iterations:", self.em_iter)
+
+        self.em_tol = QDoubleSpinBox(self)
+        self.em_tol.setRange(1e-6, 1.0)
+        self.em_tol.setDecimals(6)
+        self.em_tol.setSingleStep(0.001)
+        self.em_tol.setValue(0.001)
+        train_form.addRow(
+            "EM tolerance (max Δ/x):", self.em_tol,
+        )
+
+        self.em_damping = QDoubleSpinBox(self)
+        self.em_damping.setRange(0.0, 0.95)
+        self.em_damping.setDecimals(2)
+        self.em_damping.setSingleStep(0.05)
+        self.em_damping.setValue(0.0)
+        train_form.addRow(
+            "EM damping (0 = full M-step):", self.em_damping,
+        )
+
+        self.em_aggregation = QComboBox(self)
+        self.em_aggregation.addItems(["pooled", "per-session"])
+        train_form.addRow(
+            "M-step aggregation:", self.em_aggregation,
+        )
+
+        self.warm_start_sigma = QCheckBox(
+            "Run warm-start σ pass (recommended)",
+            self,
+        )
+        self.warm_start_sigma.setChecked(True)
+        train_form.addRow("", self.warm_start_sigma)
+
+        self.use_perspective = QCheckBox(
+            "Fit perspective model",
+            self,
+        )
+        self.use_perspective.setChecked(True)
+        train_form.addRow("", self.use_perspective)
+
+        self.use_validation = QCheckBox(
+            "Run validation hook each EM iteration",
+            self,
+        )
+        self.use_validation.setChecked(True)
+        train_form.addRow("", self.use_validation)
+
+        # Save-model checkbox + path
+        self.save_model_chk = QCheckBox(
+            "Save fitted model to:", self,
+        )
+        self.save_model_chk.setChecked(True)
+        self.save_model_chk.toggled.connect(
+            self._update_save_model_visibility
+        )
+        train_form.addRow("", self.save_model_chk)
+
+        save_row = QHBoxLayout()
+        self.save_model_path = QLineEdit(self)
+        self.save_model_path.setPlaceholderText(
+            "~/.config/mufasa/models/v2_model.npz"
+        )
+        save_row.addWidget(self.save_model_path)
+        save_browse = QPushButton("Browse…", self)
+        save_browse.clicked.connect(self._browse_save_model)
+        save_row.addWidget(save_browse)
+        self.save_model_path_label = QLabel("Path:", self)
+        train_form.addRow(
+            self.save_model_path_label, save_row,
+        )
+
+        # Layout extensions sub-group (training mode only)
+        ext_group = QGroupBox(
+            "Model extensions (defines a new model)", self,
+        )
+        ext_form = QFormLayout(ext_group)
+        ext_form.setLabelAlignment(Qt.AlignRight)
+        self.with_drift = QCheckBox(
+            "Per-marker drift (patch 120 — absorbs per-marker "
+            "tracker offset)",
+            self,
+        )
+        self.with_drift.setChecked(True)
+        ext_form.addRow("", self.with_drift)
+        self.orient_drift = QLineEdit(self)
+        self.orient_drift.setPlaceholderText(
+            "comma-separated, e.g. body,head"
+        )
+        ext_form.addRow(
+            "Orientation drift segments:", self.orient_drift,
+        )
+        self.const_accel = QLineEdit(self)
+        self.const_accel.setPlaceholderText(
+            "comma-separated, e.g. body,head"
+        )
+        ext_form.addRow(
+            "Constant-accel segments:", self.const_accel,
+        )
+        train_form.addRow(ext_group)
+
+        outer_form.addRow(self.train_group)
+
+        # ---- LOAD-mode group ----
+        self.load_group = QGroupBox("Load saved model", self)
+        load_form = QFormLayout(self.load_group)
+        load_form.setLabelAlignment(Qt.AlignRight)
+
+        load_row = QHBoxLayout()
+        self.load_model_path = QLineEdit(self)
+        self.load_model_path.setPlaceholderText(
+            "Path to v2_model.npz from a previous run"
+        )
+        load_row.addWidget(self.load_model_path)
+        load_browse = QPushButton("Browse…", self)
+        load_browse.clicked.connect(self._browse_load_model)
+        load_row.addWidget(load_browse)
+        load_form.addRow("Model file:", load_row)
+
+        load_form.addRow("", QLabel(
+            "Layout extensions (per-marker drift, orientation\n"
+            "drift, const-accel) are restored from the saved\n"
+            "model and not re-configurable here.",
+            self,
+        ))
+
+        outer_form.addRow(self.load_group)
+
+        self.body_layout.addLayout(outer_form)
+
+        # Initial visibility
+        self._update_mode_visibility(self.mode_train.isChecked())
+        self._update_save_model_visibility(
+            self.save_model_chk.isChecked()
+        )
+
+        # Pre-populate input/output if config_path resolves a project
+        if self.config_path:
+            try:
+                cfg = configparser.ConfigParser()
+                cfg.read(self.config_path)
+                project_path = cfg.get(
+                    "General settings", "project_path",
+                    fallback=None,
+                )
+                if project_path:
+                    default_in = os.path.join(
+                        project_path, "csv", "input_csv",
+                    )
+                    if os.path.isdir(default_in):
+                        self.input_dir.setText(default_in)
+                    default_out = os.path.join(
+                        project_path, "csv", "smoothed_v2",
+                    )
+                    self.output_dir.setText(default_out)
+            except Exception:
+                pass
+
+    # ------------------------------------------------------------------ #
+    # Visibility / refresh helpers
+    # ------------------------------------------------------------------ #
+    def _update_mode_visibility(self, train_mode: bool) -> None:
+        """Show training group when 'Train new model' is
+        selected; load group when 'Load saved model' is.
+        """
+        self.train_group.setVisible(train_mode)
+        self.load_group.setVisible(not train_mode)
+
+    def _update_subset_visibility(self, on: bool) -> None:
+        """Show/hide the file-list picker based on the 'train
+        on subset' checkbox.
+        """
+        self.train_file_list.setVisible(on)
+        self.train_btn_row.setVisible(on)
+        if on:
+            # Trigger an initial scan when the user opts in
+            self._refresh_file_list()
+
+    def _update_save_model_visibility(self, on: bool) -> None:
+        """Show/hide the save-model path field."""
+        self.save_model_path.setVisible(on)
+        self.save_model_path_label.setVisible(on)
+
+    def _refresh_file_list(self) -> None:
+        """Populate the training file list from the input dir.
+        Called when input_dir changes or user clicks Refresh.
+        """
+        self.train_file_list.clear()
+        in_dir = self.input_dir.text().strip()
+        if not in_dir or not os.path.isdir(in_dir):
+            return
+        try:
+            entries = sorted(os.listdir(in_dir))
+        except OSError:
+            return
+        for name in entries:
+            full = os.path.join(in_dir, name)
+            if not os.path.isfile(full):
+                continue
+            if not name.lower().endswith(self._POSE_EXTS):
+                continue
+            item = QListWidgetItem(name, self.train_file_list)
+            item.setData(Qt.UserRole, full)
+
+    # ------------------------------------------------------------------ #
+    # Browse callbacks
+    # ------------------------------------------------------------------ #
+    def _browse_input(self) -> None:
+        d = QFileDialog.getExistingDirectory(
+            self, "Choose pose data directory",
+            self.input_dir.text() or os.getcwd(),
+        )
+        if d:
+            self.input_dir.setText(d)
+
+    def _browse_output(self) -> None:
+        d = QFileDialog.getExistingDirectory(
+            self, "Choose output directory",
+            self.output_dir.text() or os.getcwd(),
+        )
+        if d:
+            self.output_dir.setText(d)
+
+    def _browse_save_model(self) -> None:
+        # Patch 121h: default to ~/.config/mufasa/models/
+        suggested = (
+            self.save_model_path.text().strip()
+            or os.path.join(
+                _default_model_dir(), "v2_model.npz",
+            )
+        )
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save fitted model as", suggested,
+            "NumPy archive (*.npz);;All files (*)",
+        )
+        if path:
+            self.save_model_path.setText(path)
+
+    def _browse_load_model(self) -> None:
+        # Patch 121h: default browse start to the model dir
+        # so previously-saved models surface immediately.
+        start = (
+            self.load_model_path.text().strip()
+            or _default_model_dir()
+        )
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Choose model file", start,
+            "NumPy archive (*.npz);;All files (*)",
+        )
+        if path:
+            self.load_model_path.setText(path)
+
+    # ------------------------------------------------------------------ #
+    # collect_args / target
+    # ------------------------------------------------------------------ #
+    def collect_args(self) -> dict:
+        in_dir = self.input_dir.text().strip()
+        out_dir = self.output_dir.text().strip()
+        if not in_dir:
+            raise RuntimeError("Input directory is required.")
+        if not os.path.isdir(in_dir):
+            raise RuntimeError(
+                f"Input directory does not exist: {in_dir}"
+            )
+        if not out_dir:
+            raise RuntimeError(
+                "Output directory is required (will be "
+                "created if missing)."
+            )
+
+        train_mode = self.mode_train.isChecked()
+
+        # Mode-specific validation & arg packing
+        if train_mode:
+            # Training file subset
+            training_files: Optional[list[str]] = None
+            if self.train_subset.isChecked():
+                selected = self.train_file_list.selectedItems()
+                if not selected:
+                    raise RuntimeError(
+                        "'Train on a subset' is checked but "
+                        "no files are selected. Either pick "
+                        "files in the list, or uncheck the "
+                        "subset option to train on all files."
+                    )
+                training_files = [
+                    item.data(Qt.UserRole) for item in selected
+                ]
+
+            # Save-model path
+            save_path: Optional[str] = None
+            if self.save_model_chk.isChecked():
+                save_path = self.save_model_path.text().strip()
+                if not save_path:
+                    # Patch 121h: default to ~/.config/mufasa/models/
+                    save_path = os.path.join(
+                        _default_model_dir(), "v2_model.npz",
+                    )
+
+            # Layout extensions
+            def _parse_csv(s: str) -> list[str]:
+                return [
+                    p.strip() for p in s.split(",") if p.strip()
+                ]
+
+            return {
+                "mode":                 "train",
+                "input_dir":            in_dir,
+                "output_dir":           out_dir,
+                "fps":                  float(self.fps.value()),
+                "likelihood_threshold": float(self.lik_thr.value()),
+                "n_workers":            int(self.workers.value()),
+                "training_files":       training_files,
+                "em_max_iter":          int(self.em_iter.value()),
+                "em_tol":               float(self.em_tol.value()),
+                "em_damping":           float(self.em_damping.value()),
+                "em_aggregation":
+                    self.em_aggregation.currentText(),
+                "warm_start_sigma":
+                    bool(self.warm_start_sigma.isChecked()),
+                "use_perspective":
+                    bool(self.use_perspective.isChecked()),
+                "use_validation":
+                    bool(self.use_validation.isChecked()),
+                "save_model_path":      save_path,
+                "with_drift":
+                    bool(self.with_drift.isChecked()),
+                "orient_drift_segments":
+                    _parse_csv(self.orient_drift.text()),
+                "const_accel_segments":
+                    _parse_csv(self.const_accel.text()),
+            }
+
+        # Load mode
+        load_path = self.load_model_path.text().strip()
+        if not load_path:
+            raise RuntimeError(
+                "Model file is required when loading a saved "
+                "model."
+            )
+        if not os.path.isfile(load_path):
+            raise RuntimeError(
+                f"Model file does not exist: {load_path}"
+            )
+        return {
+            "mode":                 "load",
+            "input_dir":            in_dir,
+            "output_dir":           out_dir,
+            "fps":                  float(self.fps.value()),
+            "likelihood_threshold": float(self.lik_thr.value()),
+            "n_workers":            int(self.workers.value()),
+            "load_model_path":      load_path,
+        }
+
+    def target(self, *, mode: str, **kwargs) -> None:
+        # Late import — keeps GUI startup snappy and avoids
+        # forcing the entire numerics stack on workbench users
+        # who never run smoothing.
+        import dataclasses as _dc
+        from mufasa.data_processors.kalman_pose_smoother_v2 import (
+            smooth_pose_v2, standard_rat_layout,
+        )
+
+        if mode == "train":
+            # Build the layout with the requested feature flags.
+            layout = standard_rat_layout()
+            replacements: dict = {}
+            if kwargs["with_drift"]:
+                replacements["with_drift"] = True
+            if kwargs["orient_drift_segments"]:
+                replacements["orientation_drift_segments"] = (
+                    kwargs["orient_drift_segments"]
+                )
+            if kwargs["const_accel_segments"]:
+                replacements["const_accel_segments"] = (
+                    kwargs["const_accel_segments"]
+                )
+            if replacements:
+                layout = _dc.replace(layout, **replacements)
+
+            # Two-pass workflow when training on a subset:
+            # (1) fit on training_files with save_model
+            # (2) load that model, smooth all input files
+            # When no subset, single call does both EM and smoothing.
+            training_files = kwargs.get("training_files")
+            save_path = kwargs.get("save_model_path")
+
+            if training_files:
+                # Pass 1: fit on subset, write model
+                if not save_path:
+                    # Patch 121h: two-pass workflow needs a path
+                    # for the intermediate model. Default to the
+                    # standard model dir.
+                    save_path = os.path.join(
+                        _default_model_dir(), "v2_model.npz",
+                    )
+                smooth_pose_v2(
+                    pose_input=training_files,
+                    output_dir=None,  # don't write smoothed output
+                    layout=layout,
+                    fps=kwargs["fps"],
+                    likelihood_threshold=kwargs["likelihood_threshold"],
+                    em_max_iter=kwargs["em_max_iter"],
+                    em_tol=kwargs["em_tol"],
+                    em_damping=kwargs["em_damping"],
+                    em_aggregation=kwargs["em_aggregation"],
+                    enable_warm_start_sigma=kwargs["warm_start_sigma"],
+                    enable_perspective=kwargs["use_perspective"],
+                    enable_validation=kwargs["use_validation"],
+                    n_workers=kwargs["n_workers"],
+                    save_model=save_path,
+                    verbose=True,
+                )
+                # Pass 2: load model, smooth all input
+                smooth_pose_v2(
+                    pose_input=kwargs["input_dir"],
+                    output_dir=kwargs["output_dir"],
+                    fps=kwargs["fps"],
+                    likelihood_threshold=kwargs["likelihood_threshold"],
+                    n_workers=kwargs["n_workers"],
+                    load_model=save_path,
+                    verbose=True,
+                )
+            else:
+                # Single-pass: train + smooth on all input
+                smooth_pose_v2(
+                    pose_input=kwargs["input_dir"],
+                    output_dir=kwargs["output_dir"],
+                    layout=layout,
+                    fps=kwargs["fps"],
+                    likelihood_threshold=kwargs["likelihood_threshold"],
+                    em_max_iter=kwargs["em_max_iter"],
+                    em_tol=kwargs["em_tol"],
+                    em_damping=kwargs["em_damping"],
+                    em_aggregation=kwargs["em_aggregation"],
+                    enable_warm_start_sigma=kwargs["warm_start_sigma"],
+                    enable_perspective=kwargs["use_perspective"],
+                    enable_validation=kwargs["use_validation"],
+                    n_workers=kwargs["n_workers"],
+                    save_model=save_path,
+                    verbose=True,
+                )
+
+        elif mode == "load":
+            # Load mode: skip EM, just smooth.
+            smooth_pose_v2(
+                pose_input=kwargs["input_dir"],
+                output_dir=kwargs["output_dir"],
+                fps=kwargs["fps"],
+                likelihood_threshold=kwargs["likelihood_threshold"],
+                n_workers=kwargs["n_workers"],
+                load_model=kwargs["load_model_path"],
+                verbose=True,
+            )
+        else:
+            raise RuntimeError(f"Unknown mode: {mode!r}")
+
+
 __all__ = [
     "SmoothingForm",
     "InterpolateForm",
     "OutlierSettingsForm",
     "DropBodypartsForm",
     "EgocentricAlignmentForm",
+    "KalmanV2SmoothingForm",
 ]

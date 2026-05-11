@@ -28,6 +28,7 @@ from typing import Optional
 from mufasa.ui_qt.forms.pose_cleanup import (DropBodypartsForm,
                                              EgocentricAlignmentForm,
                                              InterpolateForm,
+                                             KalmanV2SmoothingForm,
                                              OutlierSettingsForm,
                                              SmoothingForm)
 from mufasa.ui_qt.workbench import WorkflowPage
@@ -40,6 +41,7 @@ def build_pose_cleanup_page(workbench,
     page = workbench.add_page("Pose cleanup", icon_name="outlier")
 
     page.add_section("Smoothing",                  [(SmoothingForm, {})])
+    page.add_section("Kalman v2 smoothing",        [(KalmanV2SmoothingForm, {})])
     page.add_section("Interpolate missing frames", [(InterpolateForm, {})])
     page.add_section("Outlier correction settings",[(OutlierSettingsForm, {})])
     page.add_section("Drop body-parts",            [(DropBodypartsForm, {})])
