@@ -33,7 +33,6 @@ Two analysis-specific reusable widgets live here:
 """
 from __future__ import annotations
 
-import configparser
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
@@ -53,16 +52,20 @@ from mufasa.ui_qt.workbench import OperationForm
 # Classifier picker
 # --------------------------------------------------------------------------- #
 def _load_classifier_names(config_path: str) -> list[str]:
-    """Read ``SML settings.target_name_N`` → list of classifier names."""
-    cfg = configparser.ConfigParser()
-    cfg.read(config_path)
-    n = cfg.getint("SML settings", "no_targets", fallback=0)
-    names = []
-    for i in range(1, n + 1):
-        k = f"target_name_{i}"
-        if cfg.has_option("SML settings", k):
-            names.append(cfg.get("SML settings", k))
-    return names
+    """Return the project's classifier names (v1 + legacy).
+
+    Patch 122f: layout-agnostic via
+    :func:`project_metadata_from_config`. v1 reads
+    ``[classifiers].targets`` from ``project.toml``; legacy parses
+    ``[SML settings] target_name_N`` from the INI.
+    """
+    from mufasa.project_layout import project_metadata_from_config
+    try:
+        return list(
+            project_metadata_from_config(config_path)["classifier_targets"]
+        )
+    except (ValueError, OSError, KeyError):
+        return []
 
 
 class _ClassifierPicker(QWidget):

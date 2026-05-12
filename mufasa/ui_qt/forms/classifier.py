@@ -19,7 +19,7 @@ Left as dedicated dialogs for now (interactive / long-running):
 """
 from __future__ import annotations
 
-import configparser
+from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
@@ -29,6 +29,52 @@ from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout, QLabel,
                                QHBoxLayout)
 
 from mufasa.ui_qt.workbench import OperationForm
+
+
+# --------------------------------------------------------------------------- #
+# Layout-agnostic classifier-list helpers (patch 122f)
+# --------------------------------------------------------------------------- #
+# These wrap the read-modify-write of classifier target names so the form
+# methods don't have to branch on v1 vs legacy. v1 reads/writes
+# ``[classifiers].targets`` in project.toml; legacy reads/writes
+# ``[SML settings] target_name_N`` in project_config.ini.
+
+def _read_classifiers(config_path: str) -> list[str]:
+    from mufasa.project_layout import project_metadata_from_config
+    try:
+        return list(
+            project_metadata_from_config(config_path)["classifier_targets"]
+        )
+    except (ValueError, OSError, KeyError):
+        return []
+
+
+def _write_classifiers(config_path: str, targets: list[str]) -> None:
+    cp = Path(config_path)
+    if str(cp).lower().endswith(".toml"):
+        from mufasa.project_layout import (
+            read_project_toml, write_project_toml,
+        )
+        data = read_project_toml(cp)
+        classifiers = dict(data.get("classifiers", {}))
+        classifiers["targets"] = list(targets)
+        data["classifiers"] = classifiers
+        write_project_toml(cp, data)
+        return
+    # Legacy: rewrite the [SML settings] target_name_N keys + no_targets.
+    import configparser as _cp
+    cfg = _cp.ConfigParser()
+    cfg.read(cp)
+    if not cfg.has_section("SML settings"):
+        cfg.add_section("SML settings")
+    n = cfg.getint("SML settings", "no_targets", fallback=0)
+    for i in range(1, n + 1):
+        cfg.remove_option("SML settings", f"target_name_{i}")
+    for j, v in enumerate(targets, start=1):
+        cfg.set("SML settings", f"target_name_{j}", v)
+    cfg.set("SML settings", "no_targets", str(len(targets)))
+    with open(cp, "w") as f:
+        cfg.write(f)
 
 
 class _AddClfPanel(QWidget):
@@ -129,18 +175,7 @@ class ClassifierManageForm(OperationForm):
             self._refresh_remove_options()
 
     def _refresh_remove_options(self) -> None:
-        names: list[str] = []
-        if self.config_path:
-            try:
-                cfg = configparser.ConfigParser()
-                cfg.read(self.config_path)
-                n = cfg.getint("SML settings", "no_targets", fallback=0)
-                for i in range(1, n + 1):
-                    key = f"target_name_{i}"
-                    if cfg.has_option("SML settings", key):
-                        names.append(cfg.get("SML settings", key))
-            except Exception:
-                pass
+        names = _read_classifiers(self.config_path) if self.config_path else []
         self.remove_panel.set_options(names)
 
     def collect_args(self) -> dict:
@@ -175,39 +210,20 @@ class ClassifierManageForm(OperationForm):
     # ------------------------------------------------------------------ #
     def _add_classifier(self, name: str) -> None:
         if not self.config_path:
-            raise RuntimeError("No project_config.ini loaded.")
-        cfg = configparser.ConfigParser()
-        cfg.read(self.config_path)
-        n = cfg.getint("SML settings", "no_targets", fallback=0)
-        # Deduplicate
-        existing = [cfg.get("SML settings", f"target_name_{i}", fallback="")
-                    for i in range(1, n + 1)]
+            raise RuntimeError("No project loaded.")
+        existing = _read_classifiers(self.config_path)
         if name in existing:
             raise ValueError(f"'{name}' already exists in this project.")
-        cfg.set("SML settings", "no_targets", str(n + 1))
-        cfg.set("SML settings", f"target_name_{n + 1}", name)
-        with open(self.config_path, "w") as f:
-            cfg.write(f)
+        _write_classifiers(self.config_path, existing + [name])
         # Refresh the dropdown for follow-up removes
         self._refresh_remove_options()
 
     def _remove_classifier(self, name: str) -> None:
         if not self.config_path:
-            raise RuntimeError("No project_config.ini loaded.")
-        cfg = configparser.ConfigParser()
-        cfg.read(self.config_path)
-        n = cfg.getint("SML settings", "no_targets", fallback=0)
-        kept = []
-        for i in range(1, n + 1):
-            val = cfg.get("SML settings", f"target_name_{i}", fallback="")
-            if val and val != name:
-                kept.append(val)
-            cfg.remove_option("SML settings", f"target_name_{i}")
-        for j, v in enumerate(kept, start=1):
-            cfg.set("SML settings", f"target_name_{j}", v)
-        cfg.set("SML settings", "no_targets", str(len(kept)))
-        with open(self.config_path, "w") as f:
-            cfg.write(f)
+            raise RuntimeError("No project loaded.")
+        existing = _read_classifiers(self.config_path)
+        kept = [t for t in existing if t != name]
+        _write_classifiers(self.config_path, kept)
         self._refresh_remove_options()
 
     def _print_model(self, path: str) -> None:

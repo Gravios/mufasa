@@ -731,3 +731,211 @@ def resolve_v1_project_root(
         if (c / PROJECT_CONFIG_FILENAME).is_file():
             return c.resolve()
     return None
+
+
+# ---------------------------------------------------------------------------
+# Layout-agnostic project paths (patch 122f)
+# ---------------------------------------------------------------------------
+#
+# Forms used to reach into ``configparser`` directly to look up
+# ``[General settings] project_path`` and then compose
+# ``<project_path>/videos/``, ``<project_path>/csv/input_csv/`` etc.
+# Those compositions assumed the legacy SimBA layout and break for
+# v1 projects (which have ``sources/videos/``, ``sources/pose/``,
+# ``derived/...``). The helpers below return the right paths for
+# either layout so forms can stop branching themselves.
+#
+# Detection rule: ``config_path`` ending in ``.toml`` → v1; anything
+# else → legacy. Same rule used by :func:`read_config_file`,
+# :class:`ConfigReader`, and the InputSourcePicker discovery.
+
+
+def project_paths_from_config(
+    config_path: Union[str, Path],
+) -> Dict[str, str]:
+    """Return a dict of conventional project paths, working for
+    both v1 ``project.toml`` and legacy ``project_config.ini``.
+
+    Keys returned (all values are absolute paths as strings):
+
+    * ``project_root`` — the v1 root (parent of project.toml) for
+      v1; the legacy ``project_path`` (read from
+      ``[General settings].project_path``) for legacy.
+    * ``video_dir`` — ``<root>/sources/videos/`` (v1) or
+      ``<project_path>/videos/`` (legacy).
+    * ``input_pose_dir`` — ``<root>/sources/pose/`` (v1) or
+      ``<project_path>/csv/input_csv/`` (legacy).
+    * ``logs_dir`` — ``<root>/logs/`` (v1) or
+      ``<project_path>/logs/`` (legacy).
+    * ``video_info_path`` — ``<root>/sources/video_info.csv`` (v1)
+      or ``<project_path>/logs/video_info.csv`` (legacy).
+    * ``models_dir`` — ``<root>/models/`` (v1) or
+      ``<project_path>/../models/`` (legacy).
+
+    Caller is responsible for creating directories as needed; this
+    function returns paths even when they don't exist on disk.
+
+    :raises ValueError: if ``config_path`` is unreadable / can't be
+        resolved to a project at all.
+    """
+    cp = Path(config_path)
+    cp_str = str(cp).lower()
+    if cp_str.endswith(".toml"):
+        root = cp.parent.resolve()
+        return {
+            "project_root":    str(root),
+            "video_dir":       str(root / "sources" / "videos"),
+            "input_pose_dir":  str(root / "sources" / "pose"),
+            "logs_dir":        str(root / "logs"),
+            "video_info_path": str(root / "sources" / "video_info.csv"),
+            "models_dir":      str(root / "models"),
+        }
+    # Legacy: parse the [General settings] project_path.
+    import configparser as _cp
+    parser = _cp.ConfigParser()
+    try:
+        parser.read(config_path)
+    except _cp.Error as exc:
+        raise ValueError(
+            f"Cannot parse legacy project config {config_path}: {exc}"
+        )
+    project_path = parser.get(
+        "General settings", "project_path", fallback="",
+    ).strip()
+    if not project_path:
+        raise ValueError(
+            f"{config_path} has no [General settings].project_path. "
+            f"Is this a valid Mufasa project_config.ini?"
+        )
+    proj = Path(project_path)
+    return {
+        "project_root":    str(proj),
+        "video_dir":       str(proj / "videos"),
+        "input_pose_dir":  str(proj / "csv" / "input_csv"),
+        "logs_dir":        str(proj / "logs"),
+        "video_info_path": str(proj / "logs" / "video_info.csv"),
+        "models_dir":      str(proj.parent / "models"),
+    }
+
+
+def project_metadata_from_config(
+    config_path: Union[str, Path],
+) -> Dict[str, Any]:
+    """Return the project's metadata (animal count, body parts,
+    file type, classifier targets, animal IDs) for either layout.
+
+    Schema of the returned dict:
+
+    * ``animal_count`` — int
+    * ``file_type``    — str (``"csv"``, ``"parquet"``, ``"h5"``)
+    * ``body_parts``   — list[str], in order
+    * ``animal_ids``   — list[str]
+    * ``classifier_targets`` — list[str]
+    * ``pose_config_code`` — str (the legacy preset code, e.g.
+      ``"7"``, ``"user_defined"``)
+
+    Used by forms that need project metadata without going through
+    the full :class:`ConfigReader` (which pulls cv2, h5py, etc.).
+
+    :raises ValueError: if the config can't be parsed.
+    """
+    cp = Path(config_path)
+    cp_str = str(cp).lower()
+    if cp_str.endswith(".toml"):
+        try:
+            data = read_project_toml(cp)
+        except Exception as exc:
+            raise ValueError(
+                f"Cannot parse v1 project.toml {config_path}: {exc}"
+            )
+        pose = data.get("pose", {})
+        classifiers = data.get("classifiers", {})
+        return {
+            "animal_count":       int(pose.get("animal_count", 1)),
+            "file_type":          str(pose.get("file_type", "csv")),
+            "body_parts":         list(pose.get("body_parts", [])),
+            "animal_ids":         list(pose.get("animal_ids", [])),
+            "classifier_targets": list(classifiers.get("targets", [])),
+            "pose_config_code":   str(pose.get(
+                "pose_config_code", "user_defined",
+            )),
+        }
+    # Legacy
+    import configparser as _cp
+    parser = _cp.ConfigParser()
+    try:
+        parser.read(config_path)
+    except _cp.Error as exc:
+        raise ValueError(
+            f"Cannot parse legacy project config {config_path}: {exc}"
+        )
+    # animal_no
+    animal_count = parser.getint(
+        "General settings", "animal_no", fallback=1,
+    )
+    file_type = parser.get(
+        "General settings", "file_type", fallback="csv",
+    )
+    # Classifier names
+    n_targets = parser.getint(
+        "SML settings", "no_targets", fallback=0,
+    )
+    classifier_targets = [
+        parser.get("SML settings", f"target_name_{i+1}", fallback="")
+        for i in range(n_targets)
+    ]
+    classifier_targets = [t for t in classifier_targets if t]
+    # animal IDs — comma-separated in [Multi animal IDs] id_list
+    id_list = parser.get(
+        "Multi animal IDs", "id_list", fallback="",
+    ).strip()
+    if id_list and id_list != "NaN" and id_list != "None":
+        animal_ids = [s.strip() for s in id_list.split(",") if s.strip()]
+    else:
+        animal_ids = [f"Animal_{i+1}" for i in range(animal_count)]
+    # body_parts — read from logs/measures/pose_configs/bp_names/
+    project_path = parser.get(
+        "General settings", "project_path", fallback="",
+    )
+    body_parts: List[str] = []
+    if project_path:
+        bp_csv = (
+            Path(project_path)
+            / "logs" / "measures" / "pose_configs"
+            / "bp_names" / "project_bp_names.csv"
+        )
+        if bp_csv.is_file():
+            try:
+                text = bp_csv.read_text().strip()
+            except OSError:
+                text = ""
+            if text:
+                # Tolerate both one-per-line and old-style
+                # comma-separated single-row formats. Older
+                # SimBA projects use the comma row; newer use
+                # one body-part per line. Pick by inspecting the
+                # first line.
+                first_line = text.splitlines()[0]
+                if "," in first_line:
+                    body_parts = [
+                        x.strip() for x in first_line.split(",")
+                        if x.strip()
+                    ]
+                else:
+                    body_parts = [
+                        ln.strip() for ln in text.splitlines()
+                        if ln.strip()
+                    ]
+    pose_config_code = parser.get(
+        "create ensemble settings",
+        "pose_estimation_body_parts",
+        fallback="user_defined",
+    )
+    return {
+        "animal_count":       animal_count,
+        "file_type":          file_type,
+        "body_parts":         body_parts,
+        "animal_ids":         animal_ids,
+        "classifier_targets": classifier_targets,
+        "pose_config_code":   pose_config_code,
+    }

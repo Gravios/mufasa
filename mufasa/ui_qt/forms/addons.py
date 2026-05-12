@@ -41,12 +41,23 @@ from mufasa.ui_qt.workbench import OperationForm
 # Shared helper — cue-light names field
 # --------------------------------------------------------------------------- #
 def _load_cue_light_names(config_path: str) -> list[str]:
-    """Read ``ROI settings.cue_light_N`` → list of cue-light ROI names.
+    """Read cue-light ROI names from a project config.
 
-    SimBA stores cue-light ROI names as numbered keys. If the config
-    doesn't have them yet, returns empty list; the form surfaces a
-    note asking the user to define cue-lights via the ROI page first.
+    SimBA stores cue-light ROI names as numbered keys under
+    ``[ROI settings]`` or ``[Cue light settings]``. For legacy
+    projects, this function parses them out of
+    ``project_config.ini``. For v1 projects (``project.toml``),
+    cue-light metadata isn't part of the schema yet — returns
+    an empty list so the form falls back to free-text entry.
+
+    Patch 122f: legacy branch is the only remaining configparser
+    use in this module; v1 detection is by suffix.
     """
+    if str(config_path).lower().endswith(".toml"):
+        # v1: cue-light ROI names aren't in project.toml's schema;
+        # the form surfaces a note + free-text entry until / unless
+        # cue-light metadata gets a v1 home.
+        return []
     cfg = configparser.ConfigParser()
     cfg.read(config_path)
     names: list[str] = []

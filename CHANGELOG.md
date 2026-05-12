@@ -6,6 +6,214 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ---
 
+## Session 2026-05-12 — TOML-aware ConfigReader + configparser removal from forms
+
+Two patches: **122e** makes `ConfigReader` (959 lines, inherited
+by 268+ files across the codebase) read v1 `project.toml` while
+preserving its legacy attribute surface, so every backend
+continues to work transparently against v1 projects without
+per-file modification. **122f** removes direct `configparser`
+usage from every UI form method, encapsulating the legacy INI
+branch in a handful of layout-agnostic helpers.
+
+Directional commitment: as of this session, Mufasa no longer
+depends on `project_config.ini` for any production code path.
+INI parsing is kept alive in three places only — the migration
+tool (`legacy_layout.py` + `migrate_project.py`), the
+`read_config_file` fallback for legacy projects opened post-
+migration, and the encapsulated legacy branches of the new
+read/write helpers.
+
+### Shipped
+
+#### TOML-aware ConfigReader (patch 122e)
+
+New module **`mufasa/utils/toml_to_configparser.py`** translates
+a parsed v1 `project.toml` into a synthetic
+`configparser.ConfigParser` populated with the legacy section
+and key names. Coverage:
+
+- `[General settings]` — `project_path` (= v1 root, not a
+  `project_folder/` subdir), `project_name`, `file_type`,
+  `workflow_file_type`, `animal_no`, `os_system`
+- `[SML settings]` — `model_dir`, `no_targets`, `target_name_N`,
+  `model_path_N` for each classifier
+- `[threshold_settings]`, `[Minimum_bout_lengths]` — per-
+  classifier placeholders (`"NaN"`)
+- `[create ensemble settings]` — pose preset code +
+  ML-training placeholders (`"NaN"` for unset)
+- `[Multi animal IDs]` — comma-joined `id_list`
+- `[Outlier settings]` — movement / location criteria
+- Plus `[Frame settings]`, `[Line plot settings]`,
+  `[Path plot settings]`, `[ROI settings]`, `[Directionality
+  settings]`, `[process movement settings]` (empty placeholders
+  the legacy creator wrote)
+
+Missing TOML values default to `"NaN"` (the legacy
+`Dtypes.NONE` sentinel) so existing
+`read_config_entry(..., default_value=...)` calls behave
+identically.
+
+**`mufasa/utils/read_write.py`** — `read_config_file` now
+branches on the suffix: `.toml` → delegates to the shim;
+anything else → the original INI parser. Case-insensitive
+(`.TOML` works too). Legacy projects opened after a migration
+keep their existing path verbatim.
+
+**`mufasa/mixins/config_reader.py`** — `ConfigReader.__init__`
+detects v1 by suffix, pre-loads the parsed TOML on
+`self._v1_toml_data`, and routes the body-parts handling
+through TOML rather than the `project_bp_names.csv` file. A
+new method `_apply_v1_path_overrides` runs early in `__init__`
+(before any filesystem read) and rewrites the 30+ path
+attributes — `input_csv_dir`, `outlier_corrected_dir`,
+`features_dir`, `targets_folder`, `machine_results_dir`,
+`video_dir`, `video_info_path`, all the plot dirs, the SHAP /
+directionality / ROI / clf-validation dirs, plus `logs_path`
+and `roi_coordinates_path` — to v1 equivalents under
+`sources/`, `derived/`, `models/`, `logs/`. Multi-run stages
+(outlier_corrected, features, classifications) resolve to the
+**latest run** subdir (`derived/<stage>/<run_id>/`) when any
+exist, falling back to the stage parent. File lists are re-
+globbed against the new paths.
+
+#### configparser removal from ui_qt forms (patch 122f)
+
+Two new helpers in **`mufasa/project_layout.py`**:
+
+- `project_paths_from_config(config_path)` → dict mapping
+  `project_root`, `video_dir`, `input_pose_dir`, `logs_dir`,
+  `video_info_path`, `models_dir` to v1 or legacy equivalents
+  depending on the config suffix.
+- `project_metadata_from_config(config_path)` → dict with
+  `animal_count`, `file_type`, `body_parts`, `animal_ids`,
+  `classifier_targets`, `pose_config_code`. v1 reads from
+  `project.toml` directly; legacy parses the INI plus the
+  `project_bp_names.csv` file.
+
+Forms migrated (every direct `configparser.ConfigParser()` call
+in form methods replaced):
+
+- **pose_cleanup.py** — `SmoothingForm.target`,
+  `InterpolateForm.target`, `OutlierSettingsForm.build/target`,
+  `EgocentricAlignmentForm.build/collect_args`,
+  `KalmanV2SmoothingForm.build` (legacy fallback),
+  `RunOutlierCorrectionForm.build/target`. The
+  read-modify-write of outlier settings is encapsulated in two
+  module-level helpers `_read_outlier_settings` and
+  `_write_outlier_settings`. v1's TOML schema gains a nested
+  `[outlier_settings.references]` table
+  (`Animal_X = ["bp1", "bp2"]`) mirroring the legacy
+  per-animal reference keys.
+- **classifier.py** — `_refresh_remove_options`,
+  `_add_classifier`, `_remove_classifier` now use two
+  module-level helpers `_read_classifiers` and
+  `_write_classifiers`. v1 read-modify-writes `project.toml`'s
+  `[classifiers].targets`.
+- **analysis.py** — `_load_classifier_names` delegates to
+  `project_metadata_from_config`. Top-level `import
+  configparser` removed.
+- **visualizations.py** — the data-paths auto-population path
+  uses `project_paths_from_config` + `project_metadata_from_config`.
+  Inline `import configparser` inside `target` removed.
+- **addons.py** — `_load_cue_light_names` branches on suffix.
+  v1 returns `[]` (cue-light ROI names aren't in the v1 schema
+  yet; form falls back to free-text entry).
+- **annotation.py**, **roi.py** — dead `import configparser`
+  lines removed (no other use).
+
+Net effect: every form *method* is `configparser`-free.
+`configparser` references that remain are in three places, all
+encapsulated:
+
+1. `pose_cleanup.py` — legacy branches of `_read_outlier_settings`
+   and `_write_outlier_settings`
+2. `classifier.py` — legacy branch of `_write_classifiers`
+3. `addons.py` — legacy branch of `_load_cue_light_names`
+
+### Test counts at session end
+
+| suite                                    | count    |
+|------------------------------------------|----------|
+| smoke_project_layout                     |   9/9    |
+| smoke_migrate_project                    |   5/5    |
+| smoke_recent_project                     |   6/6    |
+| smoke_pose_cleanup_v2_wiring             |   2/2    |
+| smoke_model_dual_save                    |  23/23   |
+| smoke_input_source_picker                |  29/29   |
+| smoke_outlier_forms_wiring               |  40/40   |
+| smoke_empty_classifier                   |   1/1    |
+| smoke_config_creator_v1                  |  38/38   |
+| smoke_v1_configreader (NEW, 122e)        |  69/69   |
+| smoke_v1_form_configparser_removal       |  37/37   |
+| (NEW, 122f)                              |          |
+
+### Sandbox testing limitation
+
+ConfigReader itself can't be instantiated in this sandbox —
+its import chain pulls cv2, h5py, trafaret, and tkinter, none
+of which are available. The 122e test exercises the three
+layers it can reach (the TOML shim behaviorally, the
+`read_config_file` routing via AST, the ConfigReader v1 logic
+via AST). Full behavioral verification — actually constructing
+a `ConfigReader(config_path=project.toml)` and inspecting its
+attribute surface against the expected v1 paths — is the
+user's to confirm on a real install. The wiring is testable
+even if the runtime isn't.
+
+### Deliberately deferred
+
+**Backend writes leak provenance.** ConfigReader's
+`_apply_v1_path_overrides` resolves multi-run stage attributes
+to the **latest run** subdir. That's correct for reads but wrong
+for writes — a backend that does `os.makedirs(self.outlier_corrected_dir,
+exist_ok=True)` and then writes files there will mutate the
+prior run's directory in place, corrupting provenance. Each
+writing backend needs `ProjectPaths.stage_run_dir(...)`
+allocation at run time instead. Track as the "v1-aware backend
+writes" thread.
+
+**Configs directory.** `configs_meta_dir` falls back to
+`<root>/configs/` for v1; the v1 layout doesn't model a configs
+dir yet.
+
+**Body-parts path in v1.** `body_parts_path` is set to the
+project.toml path itself (informational only — v1 reads body
+parts from TOML data directly). Any legacy code that tries to
+parse this file as a CSV will fail loudly.
+
+**reconfigure_project_user_defined.** Still INI-only.
+Currently unreachable from CreateProjectDialog. Kept for the
+File → Reconfigure menu action; v1 rewrite is a small patch
+when needed.
+
+**Cue-light ROI metadata in v1.** `addons.py._load_cue_light_names`
+returns `[]` for v1. If cue-lights matter going forward, the v1
+schema needs a `[roi.cue_lights]` table plus form-side writers.
+
+### Pickup checklist for next session
+
+1. Confirm tests green:
+   ```bash
+   for t in tests/smoke_*.py; do PYTHONPATH=. python "$t"; done
+   ```
+2. **Full ConfigReader behavioral verification** on a real
+   install — instantiate against a v1 project.toml and walk
+   the attribute surface. Anything still under `csv/` instead
+   of `sources/`/`derived/` is a missed override.
+3. **v1-aware backend writes** — the highest-priority deferred
+   thread. Each writing backend (outlier correction, feature
+   extraction, classifier training, visualization) needs
+   `ProjectPaths.stage_run_dir(...)` allocation at run time
+   instead of reading a "latest" path from ConfigReader.
+4. **Batch pipeline through inference** — still the original
+   ask from session 2026-05-11; never started.
+5. **Migration prompt on legacy projects** — when
+   `detect_layout(project) == 'legacy'`, dialog at workbench
+   launch offering migration. Small patch.
+
+---
+
 ## Session 2026-05-11 — Dual-save model store + InputSourcePicker + pose-cleanup redesign + v1-only new projects
 
 Three patch series landed: **122b** factors model provenance and
