@@ -59,6 +59,17 @@ class ConfigReader(object):
 
         self.timer = SimbaTimer(start=True)
         self.config_path = config_path
+        # Patch 122e: v1 projects use project.toml instead of
+        # project_config.ini. Detect by suffix and pre-load the
+        # parsed TOML so downstream branches don't have to
+        # re-open the file. _v1_toml_data is None on legacy
+        # projects.
+        self._is_v1 = str(config_path).lower().endswith(".toml")
+        self._v1_toml_data: Optional[Dict[str, Any]] = None
+        if self._is_v1:
+            import tomllib
+            with open(config_path, "rb") as _f:
+                self._v1_toml_data = tomllib.load(_f)
         self.config = read_config_file(config_path=config_path)
         self.datetime = datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -159,10 +170,32 @@ class ConfigReader(object):
         self.cpu_cnt, self.cpu_to_use = find_core_cnt()
         self.machine_results_paths = glob.glob(self.machine_results_dir + f"/*.{self.file_type}")
         self.logs_path = os.path.join(self.project_path, "logs")
-        self.body_parts_path = os.path.join(self.project_path, Paths.BP_NAMES.value)
-        check_file_exist_and_readable(file_path=self.body_parts_path)
-        self.body_parts_lst = (pd.read_csv(self.body_parts_path, header=None).iloc[:, 0].to_list())
-        self.body_parts_lst = [x for x in self.body_parts_lst if str(x) != "nan"]
+        # Patch 122e: v1 path overrides happen here, before
+        # body_parts handling and before any read that touches
+        # the filesystem (video_info_df read at end of __init__,
+        # for instance). Up to this point ConfigReader has set
+        # 30+ path attributes assuming the legacy layout. For v1
+        # projects those paths don't exist; we override the
+        # attributes plus re-glob the file lists so dependent
+        # backends operate on the right locations.
+        if self._is_v1:
+            self._apply_v1_path_overrides()
+            # v1 sources body parts from project.toml directly.
+            # body_parts_path is left pointing at the source TOML
+            # so any downstream code that prints the path in an
+            # error message still names a real file.
+            self.body_parts_path = str(self.config_path)
+            self.body_parts_lst = [
+                bp for bp in (self._v1_toml_data or {})
+                                  .get("pose", {})
+                                  .get("body_parts", [])
+                if str(bp) != "nan"
+            ]
+        else:
+            self.body_parts_path = os.path.join(self.project_path, Paths.BP_NAMES.value)
+            check_file_exist_and_readable(file_path=self.body_parts_path)
+            self.body_parts_lst = (pd.read_csv(self.body_parts_path, header=None).iloc[:, 0].to_list())
+            self.body_parts_lst = [x for x in self.body_parts_lst if str(x) != "nan"]
         self.get_body_part_names()
         self.get_bp_headers()
         self.bp_col_names = self.x_cols + self.y_cols + self.p_cols
@@ -216,6 +249,186 @@ class ConfigReader(object):
         self.min_draw_display_ratio_w = self.read_config_entry(config=self.config, section=ConfigKey.DISPLAY_SETTINGS.value, option=ConfigKey.MIN_ROI_DISPLAY_WIDTH.value, default_value=0.20, data_type=Dtypes.FLOAT.value)
         self.max_draw_display_ratio_h = self.read_config_entry(config=self.config, section=ConfigKey.DISPLAY_SETTINGS.value, option=ConfigKey.MAX_ROI_DISPLAY_HEIGHT.value, default_value=0.75, data_type=Dtypes.FLOAT.value)
         self.max_draw_display_ratio_w = self.read_config_entry(config=self.config, section=ConfigKey.DISPLAY_SETTINGS.value, option=ConfigKey.MAX_ROI_DISPLAY_WIDTH.value, default_value=0.50, data_type=Dtypes.FLOAT.value)
+
+    # ------------------------------------------------------------------ #
+    # Patch 122e: v1 path overrides
+    # ------------------------------------------------------------------ #
+    def _apply_v1_path_overrides(self) -> None:
+        """Replace legacy filesystem path attributes with v1 equivalents.
+
+        Called from ``__init__`` when ``self._is_v1`` is True (i.e.
+        ``config_path`` ends in ``.toml``). Up to the point this runs,
+        ``__init__`` has set all path attributes assuming the legacy
+        ``<root>/project_folder/csv/...`` tree. This method overwrites
+        those with v1-equivalent paths under ``<root>/sources/``,
+        ``<root>/derived/``, ``<root>/models/``, ``<root>/logs/`` —
+        then re-runs the file-list globs against the new locations.
+
+        Path mapping
+        ------------
+        Source-of-truth attributes (raw pose, video info, videos):
+
+        * ``input_csv_dir``        → ``<root>/sources/pose/``
+        * ``video_dir``            → ``<root>/sources/videos/``
+        * ``video_info_path``      → ``<root>/sources/video_info.csv``
+
+        Multi-run stages — point at the latest run directory if any
+        exist, else the stage parent. "Latest" by run-id sort
+        (run-ids are timestamp-prefixed, lexically sortable):
+
+        * ``outlier_corrected_dir``         → latest under
+          ``<root>/derived/outlier_corrected/``
+        * ``outlier_corrected_movement_dir``→ same as above (v1
+          collapses the two-stage legacy split)
+        * ``features_dir``                  → latest under
+          ``<root>/derived/features/``
+        * ``targets_folder``                → latest under
+          ``<root>/derived/classifications/``
+        * ``machine_results_dir``           → same as targets_folder
+
+        Single-location dirs:
+
+        * ``input_frames_dir``     → ``<root>/derived/frames/extracted/``
+        * ``frames_output_dir``    → ``<root>/derived/frames/annotated/``
+        * ``logs_path``            → ``<root>/logs/``
+        * ``roi_coordinates_path`` → ``<root>/logs/roi_definitions.h5``
+
+        Plot output dirs — coalesced under ``derived/plots/``:
+
+        * ``line_plot_dir``, ``gantt_plot_dir``, ``path_plot_dir``,
+          ``probability_plot_dir``, ``heatmap_clf_location_dir``,
+          ``heatmap_location_dir``, ``sklearn_plot_dir``
+
+        Miscellaneous derived outputs:
+
+        * ``shap_logs_path``, ``directionality_df_dir``,
+          ``body_part_directionality_df_dir``, ``roi_features_save_dir``,
+          ``directing_animals_video_output_path``,
+          ``directing_body_part_animal_video_output_path``,
+          ``detailed_roi_data_dir``, ``clf_validation_dir``,
+          ``clf_data_validation_dir``, ``cue_lights_data_dir``
+
+        Caveats
+        -------
+        * Backends that *write* into "latest run" attributes will
+          mutate that prior run's directory in place rather than
+          allocating a fresh run. That's incorrect provenance and
+          will be fixed per-backend in subsequent patches (the
+          "iceberg below the waterline" thread in CHANGELOG).
+          For now, reads work; writes leak.
+        * Some derived paths (``shap_logs_path``,
+          ``directing_*_path``) point at directories that don't
+          exist until the corresponding stage runs. Backends
+          create them with ``os.makedirs(exist_ok=True)``.
+        * ``configs_meta_dir`` is set to ``<root>/configs/`` (not
+          v1-native; we don't currently model a configs directory
+          in the v1 layout). Will be revisited when the few
+          backends that use it migrate.
+        """
+        from pathlib import Path
+        from mufasa.project_layout import is_run_id
+
+        root = Path(self.project_path)
+
+        # ----- Source data --------------------------------------------- #
+        self.input_csv_dir = str(root / "sources" / "pose")
+        self.video_dir = str(root / "sources" / "videos")
+        self.video_info_path = str(root / "sources" / "video_info.csv")
+
+        # ----- Multi-run stage resolution ------------------------------ #
+        def _latest_run_or_parent(stage_parent: Path) -> str:
+            """Pick the newest run subdir under ``stage_parent`` if
+            any exist; else return the parent itself. Sort key is
+            the directory name — v1 run-ids are timestamp-prefixed
+            so lexical sort == chronological sort."""
+            if stage_parent.is_dir():
+                runs = sorted(
+                    d for d in stage_parent.iterdir()
+                    if d.is_dir() and is_run_id(d.name)
+                )
+                if runs:
+                    return str(runs[-1])
+            return str(stage_parent)
+
+        self.outlier_corrected_dir = _latest_run_or_parent(
+            root / "derived" / "outlier_corrected",
+        )
+        self.outlier_corrected_movement_dir = self.outlier_corrected_dir
+        self.features_dir = _latest_run_or_parent(
+            root / "derived" / "features",
+        )
+        self.targets_folder = _latest_run_or_parent(
+            root / "derived" / "classifications",
+        )
+        self.machine_results_dir = self.targets_folder
+
+        # ----- Frames -------------------------------------------------- #
+        self.input_frames_dir = str(
+            root / "derived" / "frames" / "extracted"
+        )
+        self.frames_output_dir = str(
+            root / "derived" / "frames" / "annotated"
+        )
+
+        # ----- Plots --------------------------------------------------- #
+        plots = root / "derived" / "plots"
+        self.line_plot_dir          = str(plots / "lines")
+        self.gantt_plot_dir         = str(plots / "gantt")
+        self.path_plot_dir          = str(plots / "paths")
+        self.probability_plot_dir   = str(plots / "probabilities")
+        self.heatmap_clf_location_dir = str(plots / "heatmaps_clf")
+        self.heatmap_location_dir   = str(plots / "heatmaps_location")
+        self.sklearn_plot_dir       = str(plots / "sklearn")
+
+        # ----- Miscellaneous derived ----------------------------------- #
+        derived = root / "derived"
+        self.shap_logs_path         = str(derived / "shap")
+        self.directionality_df_dir  = str(derived / "directionality")
+        self.body_part_directionality_df_dir = str(
+            derived / "body_part_directionality",
+        )
+        self.roi_features_save_dir  = str(derived / "roi_features")
+        self.directing_animals_video_output_path = str(
+            derived / "directing_animals",
+        )
+        self.directing_body_part_animal_video_output_path = str(
+            derived / "directing_body_parts",
+        )
+        self.detailed_roi_data_dir  = str(derived / "roi_detailed")
+        self.clf_validation_dir     = str(derived / "clf_validation")
+        self.clf_data_validation_dir = str(derived / "clf_data_validation")
+        self.cue_lights_data_dir    = str(derived / "cue_lights")
+
+        # ----- Logs / ROI definitions / configs ------------------------ #
+        self.logs_path           = str(root / "logs")
+        self.roi_coordinates_path = str(
+            root / "logs" / "roi_definitions.h5"
+        )
+        self.configs_meta_dir    = str(root / "configs")
+
+        # ----- Re-glob file lists with the new paths ------------------- #
+        ft = self.file_type
+        self.input_csv_paths = glob.glob(
+            self.input_csv_dir + f"/*.{ft}"
+        )
+        self.feature_file_paths = glob.glob(
+            self.features_dir + f"/*.{ft}"
+        )
+        self.target_file_paths = glob.glob(
+            self.targets_folder + f"/*.{ft}"
+        )
+        self.outlier_corrected_paths = glob.glob(
+            self.outlier_corrected_dir + f"/*.{ft}"
+        )
+        self.outlier_corrected_movement_paths = glob.glob(
+            self.outlier_corrected_movement_dir + f"/*.{ft}"
+        )
+        self.machine_results_paths = glob.glob(
+            self.machine_results_dir + f"/*.{ft}"
+        )
+        self.body_part_directionality_paths = glob.glob(
+            self.body_part_directionality_df_dir + f"/*.{ft}"
+        )
 
     def read_roi_data(self) -> None:
         """
