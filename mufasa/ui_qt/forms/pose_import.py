@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
+from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox,
                                QFileDialog, QFormLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QVBoxLayout, QWidget)
@@ -108,9 +108,10 @@ class PoseImportForm(OperationForm):
         # Likelihood threshold (optional — default off = 0.0).
         # Points with DLC confidence below this value get their (x, y)
         # zeroed; the likelihood column itself is preserved. Combined
-        # with interpolation, this is the primary tool for dealing
-        # with bad DLC frames. Default 0.0 (no mask) to keep behaviour
-        # unchanged for users who don't know about this.
+        # with the Preprocessing page's Interpolate form, this is the
+        # primary tool for dealing with bad DLC frames. Default 0.0
+        # (no mask) to keep behaviour unchanged for users who don't
+        # know about this.
         self._p_threshold = QDoubleSpinBox()
         self._p_threshold.setRange(0.0, 1.0)
         self._p_threshold.setSingleStep(0.05)
@@ -118,37 +119,30 @@ class PoseImportForm(OperationForm):
         self._p_threshold.setValue(0.0)
         self._p_threshold.setToolTip(
             "Body-parts with DLC likelihood strictly below this value "
-            "are marked as missing (x=y=0). Enable interpolation below "
-            "to fill them in. 0.0 disables the filter (all points kept "
-            "verbatim). Typical starting value: 0.5."
+            "are marked as missing (x=y=0). Run Interpolate on the "
+            "Preprocessing page to fill them in. 0.0 disables the "
+            "filter (all points kept verbatim). Typical starting "
+            "value: 0.5."
         )
         form.addRow("Likelihood threshold:", self._p_threshold)
         thresh_hint = QLabel(
-            "If you set a threshold &gt; 0, <b>enable interpolation</b> "
-            "below — masked points are left at (0, 0) otherwise, which "
-            "corrupts movement features."
+            "If you set a threshold &gt; 0, run "
+            "<b>Preprocessing → Interpolate missing frames</b> after "
+            "import — masked points are left at (0, 0) otherwise, "
+            "which corrupts movement features."
         )
         thresh_hint.setTextFormat(Qt.RichText)
         thresh_hint.setWordWrap(True)
         thresh_hint.setStyleSheet("color: palette(mid); padding: 4px;")
         form.addRow("", thresh_hint)
 
-        # Interpolation (optional)
-        self._interp_enable = QCheckBox("Enable interpolation")
-        self._interp_type = QComboBox()
-        self._interp_type.addItems(["body-parts", "animals"])
-        self._interp_method = QComboBox()
-        self._interp_method.addItems(["linear", "nearest", "quadratic"])
-        form.addRow("", self._interp_enable)
-        form.addRow("  Interpolation type:",   self._interp_type)
-        form.addRow("  Interpolation method:", self._interp_method)
-
-        # Smoothing intentionally not exposed here: the Preprocessing
-        # page (formerly "Pose cleanup") has the full smoothing
-        # surface (Kalman v2, plus legacy Savitzky / Gaussian under
-        # Advanced). Duplicating a stripped-down smoothing toggle at
-        # import time was redundant and surfaced a worse default
-        # (Gaussian / Savitzky) than the page's primary choice.
+        # Interpolation and smoothing intentionally not exposed here:
+        # the Preprocessing page (formerly "Pose cleanup") has the
+        # canonical surfaces for both, with strictly more options
+        # (user-controllable copy_originals, auto-detected multi-
+        # index headers, picker-driven input source). Duplicating
+        # stripped-down toggles at import time was redundant and
+        # surfaced worse defaults — see patches 122g, 122h.
 
         self.body_layout.addLayout(form)
 
@@ -189,18 +183,10 @@ class PoseImportForm(OperationForm):
         label = self._route_combo.currentText()
         route = POSE_IMPORT_ROUTES[label]
 
-        interpolation_settings: Optional[dict] = None
-        if self._interp_enable.isChecked():
-            interpolation_settings = {
-                "type":   self._interp_type.currentText(),
-                "method": self._interp_method.currentText(),
-            }
-
         return {
             "route": route,
             "config_path": self.config_path,
             "source_path": source,
-            "interpolation_settings": interpolation_settings,
             "p_threshold": float(self._p_threshold.value()),
         }
 
@@ -208,20 +194,20 @@ class PoseImportForm(OperationForm):
     # Execution
     # ------------------------------------------------------------------ #
     def target(self, *, route: dict, config_path: str, source_path: str,
-               interpolation_settings: Optional[dict],
                p_threshold: float) -> None:
         km = route["kwargs_map"]
         kwargs = {
             "config_path": config_path,
             km.get("source_path", "source_path"): source_path,
-            "interpolation_settings": interpolation_settings,
             "p_threshold": p_threshold,
         }
         # Defensive filter — same reasoning as the other forms.
         # Backends that don't accept p_threshold (e.g. future CSV /
         # SLEAP routes) will silently drop it via the filter.
-        # Importer backends still accept smoothing_settings; we
-        # simply never pass one, so they use their default (None).
+        # Importer backends still accept interpolation_settings and
+        # smoothing_settings as optional parameters; we never pass
+        # them, so they use the default (None). Users run those
+        # passes on the Preprocessing page instead.
         from mufasa.ui_qt.forms._backend_dispatch import filter_kwargs
         kwargs = filter_kwargs(route["backend"], kwargs)
         runner = route["backend"](**kwargs)
