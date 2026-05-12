@@ -37,7 +37,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout,
-                               QGroupBox, QLabel, QLineEdit,
+                               QGroupBox, QHBoxLayout, QLabel, QLineEdit,
                                QListWidget, QListWidgetItem, QMessageBox,
                                QSpinBox, QDoubleSpinBox, QVBoxLayout, QWidget,
                                QPushButton, QFileDialog)
@@ -1493,6 +1493,378 @@ class KalmanV2SmoothingForm(OperationForm):
         else:
             raise RuntimeError(f"Unknown mode: {mode!r}")
 
+# --------------------------------------------------------------------------- #
+# RunOutlierCorrectionForm — patch 122c
+# --------------------------------------------------------------------------- #
+class RunOutlierCorrectionForm(OperationForm):
+    """Run the SimBA outlier-correction pipeline on the chosen pose data.
+
+    SimBA's outlier correction is two stages:
+
+    * **Movement correction** —
+      :class:`mufasa.outlier_tools.outlier_corrector_movement.OutlierCorrecterMovement`
+      walks frame-to-frame distances per reference body-part and
+      replaces points that jumped further than the configured
+      criterion with the previous (in-bounds) value.
+    * **Location correction** —
+      :class:`mufasa.outlier_tools.outlier_corrector_location.OutlierCorrecterLocation`
+      then walks within-frame distances between body-parts and
+      replaces points whose distance to their reference body-part
+      exceeded the criterion.
+
+    The legacy SimBA workflow always runs both in sequence
+    (movement → location) and writes the final result to
+    ``csv/outlier_corrected_movement_location/``. The two stages
+    are exposed as separate checkboxes here so users can disable
+    one if their criteria don't apply to it (e.g. movement
+    correction is unhelpful for high-confidence DLC + Kalman
+    smoothed data, but a wide location criterion still catches
+    swapped body-parts).
+
+    The thresholds and reference body-parts themselves are
+    configured in the **Outlier correction settings** form
+    (which writes to ``project_config.ini``). This form just
+    runs the backends; it doesn't surface the criteria.
+    """
+
+    title = "Run outlier correction"
+    description = (
+        "Run movement + location outlier correction on the chosen "
+        "pose data. Thresholds and reference body-parts are "
+        "configured in 'Outlier correction settings' (under "
+        "Advanced / legacy)."
+    )
+
+    def build(self) -> None:
+        from mufasa.ui_qt.input_source_picker import (
+            InputSourcePicker, SourceKinds,
+        )
+        # Outlier correction usually runs before smoothing, so the
+        # raw pose is the preferred input. Reorder the picker's
+        # default-preference accordingly. (Users who explicitly
+        # outlier-correct smoothed data can still pick a smoother
+        # output from the dropdown.)
+        prefer_raw = (
+            SourceKinds.RAW,
+            SourceKinds.OUTLIER_CORRECTED,
+            SourceKinds.SMOOTHED_KALMAN_V2,
+            SourceKinds.SMOOTHED_SAVITZKY,
+        )
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignRight)
+
+        self.source_picker = InputSourcePicker(
+            self,
+            config_path=self.config_path,
+            prefer_order=prefer_raw,
+        )
+        form.addRow("Input data source:", self.source_picker)
+
+        # Save directory. Pre-fill with the legacy outlier-
+        # corrected_movement_location dir for legacy projects; for
+        # v1 projects, leave blank and let the form compute a
+        # fresh derived/outlier_corrected/<run_id>/ at run time
+        # (so re-running doesn't trample the prior output).
+        save_row = QHBoxLayout()
+        self.save_dir_edit = QLineEdit(self)
+        save_default = ""
+        if self.config_path:
+            try:
+                cfg = configparser.ConfigParser()
+                cfg.read(self.config_path)
+                project_path = cfg.get(
+                    "General settings", "project_path", fallback=None,
+                )
+                if project_path:
+                    save_default = os.path.join(
+                        project_path, "csv",
+                        "outlier_corrected_movement_location",
+                    )
+            except (configparser.Error, OSError):
+                pass
+        self.save_dir_edit.setText(save_default)
+        self.save_dir_edit.setPlaceholderText(
+            "Leave blank to auto-generate "
+            "derived/outlier_corrected/<run_id>/ (v1 projects)"
+        )
+        save_row.addWidget(self.save_dir_edit)
+        save_browse = QPushButton("Browse…", self)
+        save_browse.clicked.connect(self._browse_save_dir)
+        save_row.addWidget(save_browse)
+        form.addRow("Save directory:", save_row)
+
+        self.do_movement = QCheckBox(
+            "Apply movement correction (frame-to-frame jumps)", self,
+        )
+        self.do_movement.setChecked(True)
+        form.addRow("", self.do_movement)
+
+        self.do_location = QCheckBox(
+            "Apply location correction (within-frame distances)", self,
+        )
+        self.do_location.setChecked(True)
+        form.addRow("", self.do_location)
+
+        self.body_layout.addLayout(form)
+
+    def _browse_save_dir(self) -> None:
+        d = QFileDialog.getExistingDirectory(
+            self, "Choose output directory",
+            self.save_dir_edit.text() or os.getcwd(),
+        )
+        if d:
+            self.save_dir_edit.setText(d)
+
+    def collect_args(self) -> dict:
+        if not self.config_path:
+            raise RuntimeError("No project loaded.")
+        if not (self.do_movement.isChecked()
+                or self.do_location.isChecked()):
+            raise RuntimeError(
+                "Enable at least one of movement / location "
+                "correction (or use 'Skip outlier correction' to "
+                "bypass the stage entirely)."
+            )
+        try:
+            data_dir = str(self.source_picker.selected_path())
+        except ValueError as exc:
+            raise RuntimeError(str(exc))
+        save_dir = self.save_dir_edit.text().strip()
+        # For v1 projects we allow blank save_dir — the target
+        # method will compute a fresh run directory. For legacy
+        # projects, the field was prefilled so it'll always be set.
+        # If the user blanked it for a legacy project, fall back
+        # to the prefilled default at run time.
+        return {
+            "config_path":  self.config_path,
+            "data_dir":     data_dir,
+            "save_dir":     save_dir or None,
+            "do_movement":  bool(self.do_movement.isChecked()),
+            "do_location":  bool(self.do_location.isChecked()),
+        }
+
+    def target(self, *, config_path: str, data_dir: str,
+               save_dir: Optional[str], do_movement: bool,
+               do_location: bool) -> None:
+        from mufasa.outlier_tools.outlier_corrector_movement import (
+            OutlierCorrecterMovement,
+        )
+        from mufasa.outlier_tools.outlier_corrector_location import (
+            OutlierCorrecterLocation,
+        )
+
+        # Resolve save_dir. For v1 projects with no explicit
+        # target, allocate a fresh derived/outlier_corrected/<run>/.
+        v1_root = resolve_v1_project_root(config_path)
+        run_id: Optional[str] = None
+        if save_dir is None:
+            if v1_root is not None:
+                from mufasa.project_layout import (
+                    ProjectPaths, Stages, generate_run_id,
+                )
+                run_id = generate_run_id()
+                paths = ProjectPaths(v1_root)
+                save_dir = str(paths.stage_run_dir(
+                    Stages.OUTLIER_CORRECTED, run_id=run_id,
+                ))
+            else:
+                # Legacy with no save_dir — fall back to the
+                # canonical SimBA destination so downstream stages
+                # find the output.
+                cfg = configparser.ConfigParser()
+                cfg.read(config_path)
+                project_path = cfg.get(
+                    "General settings", "project_path", fallback="",
+                )
+                if not project_path:
+                    raise RuntimeError(
+                        "No save directory specified and "
+                        "project_path missing from "
+                        "project_config.ini — cannot infer a "
+                        "default output location."
+                    )
+                save_dir = os.path.join(
+                    project_path, "csv",
+                    "outlier_corrected_movement_location",
+                )
+        os.makedirs(save_dir, exist_ok=True)
+
+        # Chain the two stages. When both are enabled, movement
+        # writes to a sibling intermediate dir and location reads
+        # from there. When only one is enabled, it writes directly
+        # to save_dir.
+        if do_movement and do_location:
+            movement_intermediate = os.path.join(
+                save_dir, "_movement_intermediate",
+            )
+            os.makedirs(movement_intermediate, exist_ok=True)
+            print(
+                f"[outlier] movement correction: {data_dir} → "
+                f"{movement_intermediate}"
+            )
+            OutlierCorrecterMovement(
+                config_path=config_path,
+                data_dir=data_dir,
+                save_dir=movement_intermediate,
+            ).run()
+            print(
+                f"[outlier] location correction: "
+                f"{movement_intermediate} → {save_dir}"
+            )
+            OutlierCorrecterLocation(
+                config_path=config_path,
+                data_dir=movement_intermediate,
+                save_dir=save_dir,
+            ).run()
+        elif do_movement:
+            print(
+                f"[outlier] movement correction only: "
+                f"{data_dir} → {save_dir}"
+            )
+            OutlierCorrecterMovement(
+                config_path=config_path,
+                data_dir=data_dir,
+                save_dir=save_dir,
+            ).run()
+        elif do_location:
+            print(
+                f"[outlier] location correction only: "
+                f"{data_dir} → {save_dir}"
+            )
+            OutlierCorrecterLocation(
+                config_path=config_path,
+                data_dir=data_dir,
+                save_dir=save_dir,
+            ).run()
+
+        # Write run.toml provenance if we're in a v1 project.
+        if v1_root is not None and run_id is not None:
+            try:
+                from mufasa.project_layout import (
+                    RUN_PROVENANCE_FILENAME, write_run_toml,
+                )
+                write_run_toml(
+                    Path(save_dir) / RUN_PROVENANCE_FILENAME,
+                    stage="outlier_corrected",
+                    run_id=run_id,
+                    params={
+                        "data_dir":    data_dir,
+                        "do_movement": do_movement,
+                        "do_location": do_location,
+                    },
+                )
+                print(
+                    f"[outlier] wrote run.toml: "
+                    f"{Path(save_dir) / RUN_PROVENANCE_FILENAME}"
+                )
+            except Exception as exc:
+                # Provenance is a nice-to-have; don't fail the run.
+                print(
+                    f"[outlier] WARNING: could not write run.toml "
+                    f"({exc}); output at {save_dir} is intact."
+                )
+
+
+# --------------------------------------------------------------------------- #
+# SkipOutlierCorrectionForm — patch 122c
+# --------------------------------------------------------------------------- #
+class SkipOutlierCorrectionForm(OperationForm):
+    """Bypass outlier correction by copying the raw pose into the
+    outlier-corrected destination unchanged.
+
+    Useful when:
+
+    * pose data is already clean (e.g. hand-curated DLC or
+      Kalman-v2-smoothed output that's already handling outliers
+      via likelihood weighting),
+    * the SimBA outlier-correction criteria don't translate well
+      to the species or arena being studied,
+    * the downstream pipeline assumes the
+      ``outlier_corrected_movement_location/`` directory exists
+      and is non-empty.
+
+    Wraps
+    :class:`mufasa.outlier_tools.skip_outlier_correction.OutlierCorrectionSkipper`,
+    which reads from ``csv/input_csv/`` and writes to
+    ``csv/outlier_corrected_movement_location/`` while
+    standardizing pose-data headers. The form has no fields —
+    behavior is fixed by the backend.
+    """
+
+    title = "Skip outlier correction"
+    description = (
+        "Copy raw pose data into the outlier-corrected directory "
+        "unchanged. Use when your pose is already clean (e.g. "
+        "hand-curated or Kalman-v2-smoothed)."
+    )
+
+    def build(self) -> None:
+        note = QLabel(
+            "<i>No options — this stage just standardizes pose-data "
+            "headers and copies <code>csv/input_csv/</code> into "
+            "<code>csv/outlier_corrected_movement_location/</code>. "
+            "Run this if downstream stages expect outlier-corrected "
+            "output but you don't want SimBA's outlier criteria "
+            "applied.</i>",
+            self,
+        )
+        note.setTextFormat(Qt.RichText)
+        note.setWordWrap(True)
+        self.body_layout.addWidget(note)
+
+    def collect_args(self) -> dict:
+        if not self.config_path:
+            raise RuntimeError("No project loaded.")
+        return {"config_path": self.config_path}
+
+    def target(self, *, config_path: str) -> None:
+        from mufasa.outlier_tools.skip_outlier_correction import (
+            OutlierCorrectionSkipper,
+        )
+        OutlierCorrectionSkipper(config_path=config_path).run()
+
+        # Write a run.toml stub if this is a v1 project — even a
+        # skipped run is a run, and reproducing the experiment
+        # later requires knowing that outlier correction was
+        # deliberately skipped.
+        v1_root = resolve_v1_project_root(config_path)
+        if v1_root is not None:
+            try:
+                from mufasa.project_layout import (
+                    ProjectPaths, RUN_PROVENANCE_FILENAME, Stages,
+                    generate_run_id, write_run_toml,
+                )
+                run_id = generate_run_id()
+                paths = ProjectPaths(v1_root)
+                run_dir = paths.stage_run_dir(
+                    Stages.OUTLIER_CORRECTED, run_id=run_id,
+                )
+                write_run_toml(
+                    run_dir / RUN_PROVENANCE_FILENAME,
+                    stage="outlier_corrected",
+                    run_id=run_id,
+                    params={"skipped": True},
+                )
+                # Drop a marker file so downstream auto-detection
+                # of the latest run knows this is a skip-run (no
+                # pose data lives inside this run dir — the legacy
+                # csv/outlier_corrected_movement_location/ is the
+                # real output until v1-aware downstream forms land).
+                (run_dir / "SKIPPED").write_text(
+                    "outlier correction was skipped; pose data "
+                    "lives at csv/outlier_corrected_movement_location/\n"
+                )
+                print(
+                    f"[outlier-skip] wrote run.toml: "
+                    f"{run_dir / RUN_PROVENANCE_FILENAME}"
+                )
+            except Exception as exc:
+                print(
+                    f"[outlier-skip] WARNING: could not write "
+                    f"run.toml ({exc}); skip operation completed."
+                )
+
 
 __all__ = [
     "SmoothingForm",
@@ -1501,4 +1873,6 @@ __all__ = [
     "DropBodypartsForm",
     "EgocentricAlignmentForm",
     "KalmanV2SmoothingForm",
+    "RunOutlierCorrectionForm",
+    "SkipOutlierCorrectionForm",
 ]
