@@ -2,72 +2,62 @@
 mufasa.ui_qt.pages.project_setup_page
 =====================================
 
-Project setup workbench page. Hosts archive + batch-preprocess
-surfaces; registers the About-Mufasa Help menu action.
+Projects workbench page (file kept named ``project_setup_page``
+for module-import compatibility; the user-facing label became
+"Projects" in patch 122i).
 
-When the workbench is launched without a ``config_path``, we surface
-a top banner pointing the user at File → New project / File → Open
-project so it's obvious how to proceed from a cold start.
+Layout:
 
-Patch 122d: banner text references ``project.toml`` rather than the
-legacy ``project_config.ini``, matching the v1 layout that
-:class:`ProjectConfigCreator` now produces.
+* When a project is loaded:
+
+  - **Project information** — read-only summary
+    (:class:`ProjectInfoForm`) showing layout, name, root,
+    animals, body parts, classifiers, plus quick run-counts
+    under ``derived/``.
+  - **Archive processed files** — :class:`ArchiveFilesForm`.
+
+* When no project is loaded:
+
+  - **Create or open project** — empty-state surface
+    (:class:`NewProjectForm`) with inline New / Open buttons
+    and a one-click "Open most recent" shortcut when a recent
+    project is on disk.
+
+Sections moved away from this page in patch 122i:
+
+* **Batch pre-process videos** moved to the Data Import page
+  (:mod:`mufasa.ui_qt.pages.data_import_page`). Batch
+  pre-processing is part of preparing input media, not
+  configuring the project, and grouping it with Import pose
+  data + Video parameters & calibration makes the user's
+  pre-pipeline checklist live on one page.
 """
 from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
-
+from mufasa.ui_qt.forms.project_info import (NewProjectForm,
+                                             ProjectInfoForm)
 from mufasa.ui_qt.forms.project_setup import (ArchiveFilesForm,
-                                              BatchPreProcessLauncher,
                                               register_project_menu_actions)
 from mufasa.ui_qt.workbench import WorkflowPage
-
-
-def _build_no_project_banner(workbench) -> QFrame:
-    """Prominent banner shown on the Project Setup page when no project
-    is loaded. Provides two inline buttons — New / Open — that dispatch
-    to the same slots the File menu does."""
-    banner = QFrame()
-    banner.setFrameShape(QFrame.StyledPanel)
-    banner.setStyleSheet(
-        "QFrame { background: palette(alternate-base); "
-        "border: 1px solid palette(mid); border-radius: 4px; padding: 12px; }"
-    )
-    lay = QHBoxLayout(banner)
-    msg = QLabel(
-        "<b>No project loaded.</b><br>"
-        "Create a new project, or open an existing "
-        "<code>project.toml</code> (v1) or "
-        "<code>project_config.ini</code> (legacy)."
-    )
-    msg.setTextFormat(Qt.RichText)
-    msg.setWordWrap(True)
-    lay.addWidget(msg, 1)
-
-    new_btn = QPushButton("New project…")
-    new_btn.clicked.connect(workbench._on_new_project)
-    lay.addWidget(new_btn)
-
-    open_btn = QPushButton("Open project…")
-    open_btn.clicked.connect(workbench._on_open_project)
-    lay.addWidget(open_btn)
-    return banner
 
 
 def build_project_setup_page(workbench,
                              config_path: Optional[str] = None
                              ) -> WorkflowPage:
-    page = workbench.add_page("Project setup", icon_name="settings")
-    if not config_path:
-        # Use the page's top-level layout to surface the banner above
-        # any form sections. WorkflowPage exposes a scrollable body;
-        # inserting the banner at the top row keeps it prominent.
-        page.add_banner(_build_no_project_banner(workbench))
-    page.add_section("Archive processed files", [(ArchiveFilesForm, {})])
-    page.add_section("Batch pre-process videos", [(BatchPreProcessLauncher, {})])
+    """Build and return the Projects page."""
+    page = workbench.add_page("Projects", icon_name="settings")
+    if config_path:
+        page.add_section("Project information",
+                         [(ProjectInfoForm, {})])
+    else:
+        # NewProjectForm needs a workbench reference to wire its
+        # New / Open buttons to the same slots the File menu uses.
+        page.add_section("Create or open project",
+                         [(NewProjectForm, {"workbench": workbench})])
+    page.add_section("Archive processed files",
+                     [(ArchiveFilesForm, {})])
     # Register Help → About action (idempotent — safe if called multiple
     # times by re-entering the page builder).
     register_project_menu_actions(workbench)
