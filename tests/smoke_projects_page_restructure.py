@@ -96,20 +96,12 @@ def main() -> int:
     check("build_project_setup_page exists", builder is not None)
     if builder is not None:
         body_src = ast.unparse(builder)
+        # NewProjectForm should be registered unconditionally
+        # (always at the top of the page after patch 122k), not
+        # gated behind an `if not config_path:` branch.
         check(
-            "builder branches on config_path",
-            "if config_path" in body_src
-            or "if not config_path" in body_src,
-        )
-        check(
-            "builder registers 'Project information' section "
-            "(when config_path is set)",
-            "Project information" in body_src
-            and "ProjectInfoForm" in body_src,
-        )
-        check(
-            "builder registers 'Create or open project' section "
-            "(when config_path is None)",
+            "builder registers 'Create or open project' "
+            "unconditionally (always at top, post-122k)",
             "Create or open project" in body_src
             and "NewProjectForm" in body_src,
         )
@@ -118,10 +110,32 @@ def main() -> int:
             "'workbench': workbench" in body_src
             or '"workbench": workbench' in body_src,
         )
+        # Project information section gated on config_path
+        check(
+            "builder branches on config_path to register "
+            "'Project information' (only when a project is loaded)",
+            "if config_path" in body_src
+            and "Project information" in body_src
+            and "ProjectInfoForm" in body_src,
+        )
+        # Focus the Project information section when present —
+        # users continuing on a recent project want to land there.
+        check(
+            "builder focuses Project information via setCurrentIndex(1)",
+            "setCurrentIndex(1)" in body_src,
+        )
         check(
             "builder still registers Archive processed files",
             "Archive processed files" in body_src
             and "ArchiveFilesForm" in body_src,
+        )
+        # Sanity: no stray duplicate add_section for the Create
+        # surface. Count only quoted occurrences — the function
+        # docstring may mention the section name in prose.
+        check(
+            "builder doesn't duplicate add_section('Create or open project', ...)",
+            body_src.count("'Create or open project'") == 1
+            or body_src.count('"Create or open project"') == 1,
         )
 
     # ------------------------------------------------------------------

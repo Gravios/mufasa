@@ -337,15 +337,27 @@ class NewProjectForm(QWidget):
         outer.setContentsMargins(12, 8, 12, 8)
         outer.setSpacing(10)
 
-        msg = QLabel(
-            "<b>No project loaded.</b><br>"
-            "Create a new v1 project (<code>project.toml</code> + "
-            "<code>sources/</code>, <code>derived/</code>, "
-            "<code>models/</code>, <code>logs/</code>) or open an "
-            "existing one. Legacy <code>project_config.ini</code> "
-            "projects are still supported via Open.",
-            self,
-        )
+        # Patch 122k: this form is now always visible at the top
+        # of the Projects page, not just as an empty-state surface.
+        # Tailor the framing message to the current state.
+        if self.config_path:
+            msg = QLabel(
+                "Create a new v1 project (<code>project.toml</code> + "
+                "<code>sources/</code>, <code>derived/</code>, "
+                "<code>models/</code>, <code>logs/</code>), open a "
+                "different one, or switch back to the most recent.",
+                self,
+            )
+        else:
+            msg = QLabel(
+                "<b>No project loaded.</b><br>"
+                "Create a new v1 project (<code>project.toml</code> + "
+                "<code>sources/</code>, <code>derived/</code>, "
+                "<code>models/</code>, <code>logs/</code>) or open an "
+                "existing one. Legacy <code>project_config.ini</code> "
+                "projects are still supported via Open.",
+                self,
+            )
         msg.setTextFormat(Qt.RichText)
         msg.setWordWrap(True)
         outer.addWidget(msg)
@@ -376,33 +388,51 @@ class NewProjectForm(QWidget):
             recent = load_recent_project()
         except Exception:
             recent = None
+
+        # Patch 122k: hide the recent shortcut when it would be
+        # a no-op (recent path == currently-loaded project) or
+        # when no recent exists. Both cases would leave a button
+        # that either does nothing or doesn't apply.
         if recent is not None:
-            recent_row = QHBoxLayout()
-            recent_btn = QPushButton(
-                f"Open most recent: {recent.name}", self,
+            current_resolved: Optional[Path] = None
+            if self.config_path:
+                try:
+                    current_resolved = Path(self.config_path).resolve()
+                except OSError:
+                    current_resolved = None
+            recent_is_self = (
+                current_resolved is not None
+                and recent.resolve() == current_resolved
             )
-            recent_btn.setToolTip(str(recent))
-            recent_btn.setStyleSheet("padding: 6px 10px;")
-            if self._workbench is not None:
-                # The workbench's _on_open_project asks for a path
-                # via QFileDialog; we have one already, so dispatch
-                # directly to the load helper if available.
-                def _open_recent() -> None:
-                    handler = getattr(
-                        self._workbench, "_load_project", None,
-                    )
-                    if handler is not None:
-                        handler(str(recent))
-                    else:
-                        # Fallback: still call _on_open_project so the
-                        # workbench's normal Open dialog handles it.
-                        self._workbench._on_open_project()
-                recent_btn.clicked.connect(_open_recent)
-            else:
-                recent_btn.setEnabled(False)
-            recent_row.addWidget(recent_btn)
-            recent_row.addStretch()
-            outer.addLayout(recent_row)
+            if not recent_is_self:
+                recent_row = QHBoxLayout()
+                recent_btn = QPushButton(
+                    f"Open most recent: {recent.name}", self,
+                )
+                recent_btn.setToolTip(str(recent))
+                recent_btn.setStyleSheet("padding: 6px 10px;")
+                if self._workbench is not None:
+                    # The workbench's _on_open_project asks for a
+                    # path via QFileDialog; we have one already, so
+                    # dispatch directly to the load helper if
+                    # available.
+                    def _open_recent() -> None:
+                        handler = getattr(
+                            self._workbench, "_load_project", None,
+                        )
+                        if handler is not None:
+                            handler(str(recent))
+                        else:
+                            # Fallback: still call _on_open_project
+                            # so the workbench's normal Open dialog
+                            # handles it.
+                            self._workbench._on_open_project()
+                    recent_btn.clicked.connect(_open_recent)
+                else:
+                    recent_btn.setEnabled(False)
+                recent_row.addWidget(recent_btn)
+                recent_row.addStretch()
+                outer.addLayout(recent_row)
 
         outer.addStretch()
 
