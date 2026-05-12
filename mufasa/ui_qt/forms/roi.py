@@ -54,7 +54,6 @@ so we don't need to paper over UI-control divergence.
 """
 from __future__ import annotations
 
-import configparser
 import os
 from pathlib import Path
 from typing import Any, Optional

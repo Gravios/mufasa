@@ -40,12 +40,16 @@ def main() -> int:
             break
     func_src = "".join(func_lines)
 
-    # Provide the imports the helper needs
+    # Provide the imports the helper needs. After patch 122f
+    # _load_flat_bps delegates to project_metadata_from_config; we
+    # supply that plus the imports the function body references.
     ns = {}
     import configparser
     from pathlib import Path as P
+    from mufasa.project_layout import project_metadata_from_config
     ns["configparser"] = configparser
     ns["Path"] = P
+    ns["project_metadata_from_config"] = project_metadata_from_config
     exec(func_src, ns)
     _load_flat_bps = ns["_load_flat_bps"]
 

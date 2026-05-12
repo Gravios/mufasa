@@ -756,8 +756,10 @@ class VisualizationForm(OperationForm):
                source: Optional[str], video: Optional[str],
                save: Optional[str], extras: dict, common: dict,
                cores: int) -> None:
-        import configparser
         from pathlib import Path as _P
+        from mufasa.project_layout import (
+            project_metadata_from_config, project_paths_from_config,
+        )
 
         km = route.kwargs_map
         kwargs: dict = {}
@@ -776,22 +778,29 @@ class VisualizationForm(OperationForm):
         # Many plotting backends iterate per-video CSVs they can't
         # synthesise themselves; declaring data_paths_source on the
         # route lets us fill this in without a picker widget.
+        #
+        # Patch 122f: layout-agnostic project resolution. For v1
+        # projects the legacy ``csv/<subdir>`` composition won't
+        # resolve to a real directory (v1 has no top-level ``csv/``)
+        # — the form raises a clear "data source directory not
+        # found" error in that case, surfaced the same way as a
+        # missing-pipeline-output error in legacy.
         if route.data_paths_source or route.data_path_source:
             if not config_path:
                 raise RuntimeError(
                     f"{route.label!r} requires a loaded project "
                     "(config_path) to locate its data files."
                 )
-            cfg = configparser.ConfigParser()
-            cfg.read(config_path)
-            proj = cfg.get("General settings", "project_path", fallback=None)
-            file_type = cfg.get("General settings", "workflow_file_type",
-                                fallback="csv")
-            if not proj:
+            try:
+                paths = project_paths_from_config(config_path)
+                meta = project_metadata_from_config(config_path)
+            except (ValueError, OSError) as exc:
                 raise RuntimeError(
-                    f"{route.label!r}: project_config.ini missing "
-                    "General settings → project_path."
+                    f"{route.label!r}: cannot parse project config: "
+                    f"{exc}"
                 )
+            proj = paths["project_root"]
+            file_type = meta["file_type"]
             subdir = route.data_paths_source or route.data_path_source
             src_dir = _P(proj) / "csv" / subdir
             if not src_dir.is_dir():

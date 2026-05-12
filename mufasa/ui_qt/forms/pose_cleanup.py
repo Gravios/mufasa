@@ -46,6 +46,8 @@ from mufasa.ui_qt.workbench import OperationForm
 from mufasa.project_layout import (
     import_model_into_project,
     mirror_model_to_global_cache,
+    project_metadata_from_config,
+    project_paths_from_config,
     resolve_v1_project_root,
 )
 
@@ -81,47 +83,160 @@ def _default_model_dir() -> str:
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
-def _load_animal_bps(config_path: str) -> dict[str, list[str]]:
-    """Parse project_config.ini and return ``{animal_name: [bp_names]}``.
+def _read_outlier_settings(config_path: str) -> dict[str, Any]:
+    """Return the outlier-correction settings stored in a project
+    config, working for both v1 (``project.toml``) and legacy
+    (``project_config.ini``).
 
-    Does this without instantiating :class:`ConfigReader` (which pulls
-    numba). Reads the ``Multi animal IDs`` / ``project_bp_names.csv``
-    path the same way the legacy popups do.
+    Returned dict keys (all flat, lowercased; missing values are
+    simply absent):
+
+    * ``movement_criterion``  — str / float
+    * ``location_criterion``  — str / float
+    * ``aggregation_method``  — str
+    * ``<animal>_location_bp_1`` — str (per-animal reference)
+    * ``<animal>_location_bp_2`` — str
+
+    The per-animal reference keys mirror the legacy INI key
+    naming so the calling form code stays uniform. For v1 the
+    references come from ``[outlier_settings.references]`` as
+    a nested table mapping ``Animal_X = ["bp1", "bp2"]``.
+
+    Returns an empty dict if the config is unreadable.
     """
+    cp = Path(config_path)
+    cp_str = str(cp).lower()
+    out: dict[str, Any] = {}
+    if cp_str.endswith(".toml"):
+        try:
+            import tomllib
+            with open(cp, "rb") as f:
+                data = tomllib.load(f)
+        except (OSError, tomllib.TOMLDecodeError):
+            return {}
+        settings = data.get("outlier_settings", {})
+        for key in ("movement_criterion", "location_criterion",
+                    "aggregation_method"):
+            if key in settings:
+                out[key] = settings[key]
+        # Nested per-animal references: [outlier_settings.references]
+        refs = settings.get("references", {})
+        if isinstance(refs, dict):
+            for animal, bps in refs.items():
+                if isinstance(bps, list) and len(bps) >= 1:
+                    key = f"{animal}_location_bp_1".lower().replace(" ", "_")
+                    out[key] = bps[0]
+                if isinstance(bps, list) and len(bps) >= 2:
+                    key = f"{animal}_location_bp_2".lower().replace(" ", "_")
+                    out[key] = bps[1]
+        return out
+    # Legacy INI
     cfg = configparser.ConfigParser()
-    cfg.read(config_path)
-    project_path = cfg.get("General settings", "project_path", fallback=None)
-    # Animal IDs
-    animal_ids_raw = cfg.get(
-        "Multi animal IDs", "id_list", fallback=""
-    ).strip()
-    animals = [a.strip() for a in animal_ids_raw.split(",") if a.strip()]
-    if not animals:
-        animals = ["Animal_1"]
-    # Body parts from logs/measures/pose_configs/bp_names/project_bp_names.csv
-    bp_file = None
-    if project_path:
-        p = Path(project_path) / "logs" / "measures" / "pose_configs" \
-            / "bp_names" / "project_bp_names.csv"
-        if p.is_file():
-            bp_file = p
-    bps_per_animal = {}
-    if bp_file:
-        all_bps = [ln.strip() for ln in bp_file.read_text().splitlines() if ln.strip()]
-        # Heuristic: if N animals × M body-parts, split by prefix or round-robin
-        # Most SimBA projects name bps as "animal1_nose", "animal1_ear", etc.
+    try:
+        cfg.read(cp)
+    except configparser.Error:
+        return {}
+    if not cfg.has_section("Outlier settings"):
+        return {}
+    for key, _ in cfg.items("Outlier settings"):
+        out[key] = cfg.get("Outlier settings", key)
+    return out
+
+
+def _write_outlier_settings(
+    config_path: str,
+    *,
+    location_criterion: float,
+    movement_criterion: float,
+    aggregation: str,
+    refs: dict[str, tuple[str, str]],
+) -> None:
+    """Persist outlier-correction settings back to a project's
+    config, working for both v1 (``project.toml``) and legacy
+    (``project_config.ini``).
+
+    v1: read-modify-write the project.toml's ``[outlier_settings]``
+    table, including the nested ``[outlier_settings.references]``
+    sub-table with per-animal body-part pairs.
+
+    Legacy: rewrite the INI's ``Outlier settings`` section. Other
+    sections are untouched (Audit A2 fix, preserved).
+    """
+    from mufasa.project_layout import (
+        read_project_toml, write_project_toml,
+    )
+    cp = Path(config_path)
+    cp_str = str(cp).lower()
+    if cp_str.endswith(".toml"):
+        data = read_project_toml(cp)
+        outlier = dict(data.get("outlier_settings", {}))
+        outlier["movement_criterion"] = float(movement_criterion)
+        outlier["location_criterion"] = float(location_criterion)
+        outlier["aggregation_method"] = aggregation
+        outlier["references"] = {
+            animal: [bp1, bp2]
+            for animal, (bp1, bp2) in refs.items()
+        }
+        data["outlier_settings"] = outlier
+        write_project_toml(cp, data)
+        return
+    # Legacy INI
+    cfg = configparser.ConfigParser()
+    cfg.read(cp)
+    sect = "Outlier settings"
+    if cfg.has_section(sect):
+        cfg.remove_section(sect)
+    cfg.add_section(sect)
+    cfg.set(sect, "location_criterion", f"{location_criterion:g}")
+    cfg.set(sect, "movement_criterion", f"{movement_criterion:g}")
+    cfg.set(sect, "aggregation_method", aggregation)
+    for animal, (bp1, bp2) in refs.items():
+        key1 = f"{animal}_location_bp_1".lower().replace(" ", "_")
+        key2 = f"{animal}_location_bp_2".lower().replace(" ", "_")
+        cfg.set(sect, key1, bp1)
+        cfg.set(sect, key2, bp2)
+    with open(cp, "w") as f:
+        cfg.write(f)
+
+
+def _load_animal_bps(config_path: str) -> dict[str, list[str]]:
+    """Return ``{animal_name: [bp_names]}`` for a project, working
+    for both v1 (``project.toml``) and legacy (``project_config.ini``)
+    layouts.
+
+    Patch 122f: replaced direct ``configparser`` use with the
+    layout-agnostic ``project_metadata_from_config`` helper. v1
+    metadata comes from ``project.toml``'s ``[pose]`` section
+    directly; legacy is parsed from the INI plus the
+    ``project_bp_names.csv`` file as before.
+
+    Falls back to ``["Animal_1"]`` with empty body-parts when the
+    metadata is missing or unparseable, so callers can render a
+    "no project loaded" empty state cleanly rather than crashing.
+    """
+    try:
+        meta = project_metadata_from_config(config_path)
+    except (ValueError, OSError):
+        return {"Animal_1": []}
+    animals = meta["animal_ids"] or [
+        f"Animal_{i+1}" for i in range(meta["animal_count"])
+    ]
+    all_bps = meta["body_parts"]
+    bps_per_animal: dict[str, list[str]] = {}
+    if all_bps:
         for animal in animals:
+            # Prefer animal-prefixed body-parts when the project
+            # uses that convention; fall back to giving every
+            # animal the full list (the user still picks which
+            # body-part is which reference).
             prefixed = [bp for bp in all_bps if bp.startswith(animal)]
             if prefixed:
-                # Strip prefix for display
-                bps_per_animal[animal] = [bp.removeprefix(f"{animal}_")
-                                          for bp in prefixed]
+                bps_per_animal[animal] = [
+                    bp.removeprefix(f"{animal}_") for bp in prefixed
+                ]
             else:
-                # Fall back to giving every animal the full list — the user
-                # still picks which bodypart is which reference
-                bps_per_animal[animal] = all_bps
+                bps_per_animal[animal] = list(all_bps)
     else:
-        # No bp file found → empty; the form will raise clearly.
         for a in animals:
             bps_per_animal[a] = []
     return bps_per_animal
@@ -174,11 +289,9 @@ class SmoothingForm(OperationForm):
     def target(self, *, config_path: str, method: str, time_window: int,
                copy_originals: bool) -> None:
         from mufasa.data_processors.smoothing import Smoothing
-        cfg = configparser.ConfigParser(); cfg.read(config_path)
-        input_dir = os.path.join(
-            cfg.get("General settings", "project_path"),
-            "csv", "input_csv",
-        )
+        # Patch 122f: layout-agnostic input dir
+        # (sources/pose/ for v1, csv/input_csv/ for legacy).
+        input_dir = project_paths_from_config(config_path)["input_pose_dir"]
         Smoothing(
             config_path=config_path,
             data_path=input_dir,
@@ -234,11 +347,8 @@ class InterpolateForm(OperationForm):
     def target(self, *, config_path: str, type: str, method: str,
                copy_originals: bool) -> None:
         from mufasa.data_processors.interpolate import Interpolate
-        cfg = configparser.ConfigParser(); cfg.read(config_path)
-        input_dir = os.path.join(
-            cfg.get("General settings", "project_path"),
-            "csv", "input_csv",
-        )
+        # Patch 122f: layout-agnostic input dir.
+        input_dir = project_paths_from_config(config_path)["input_pose_dir"]
         Interpolate(
             config_path=config_path,
             data_path=input_dir,
@@ -309,25 +419,25 @@ class OutlierSettingsForm(OperationForm):
             animal_bps = _load_animal_bps(self.config_path)
         except Exception:
             return
-        # Pull in existing values from config if present so the form
-        # isn't destructive on re-open
-        cfg = configparser.ConfigParser(); cfg.read(self.config_path)
+        # Patch 122f: pull in existing values via a layout-agnostic
+        # reader so re-opening the form is non-destructive on both
+        # v1 and legacy projects. Returns a flat dict keyed by the
+        # legacy INI key names (with the per-animal references
+        # normalised under "<animal>_location_bp_N").
+        existing = _read_outlier_settings(self.config_path)
         for r, (animal, bps) in enumerate(animal_bps.items(), start=1):
             self._refs_layout.addWidget(QLabel(animal), r, 0)
             cb1 = QComboBox(self.refs_box); cb1.addItems(bps)
             cb2 = QComboBox(self.refs_box); cb2.addItems(bps)
             # Try to restore existing selection
-            sect = "Outlier settings"
             key1 = f"{animal}_location_bp_1".lower().replace(" ", "_")
             key2 = f"{animal}_location_bp_2".lower().replace(" ", "_")
-            if cfg.has_option(sect, key1):
-                prev1 = cfg.get(sect, key1)
-                if prev1 in bps:
-                    cb1.setCurrentText(prev1)
-            if cfg.has_option(sect, key2):
-                prev2 = cfg.get(sect, key2)
-                if prev2 in bps:
-                    cb2.setCurrentText(prev2)
+            prev1 = existing.get(key1)
+            prev2 = existing.get(key2)
+            if prev1 and prev1 in bps:
+                cb1.setCurrentText(prev1)
+            if prev2 and prev2 in bps:
+                cb2.setCurrentText(prev2)
             elif len(bps) > 1:
                 cb2.setCurrentIndex(1)  # default to second bp
             self._refs_layout.addWidget(cb1, r, 1)
@@ -364,23 +474,18 @@ class OutlierSettingsForm(OperationForm):
     def target(self, *, config_path: str, location_criterion: float,
                movement_criterion: float, aggregation: str,
                refs: dict[str, tuple[str, str]]) -> None:
-        # Write the "Outlier settings" section only. Audit A2 fix:
-        # nothing else in the config is touched.
-        cfg = configparser.ConfigParser(); cfg.read(config_path)
-        sect = "Outlier settings"
-        if cfg.has_section(sect):
-            cfg.remove_section(sect)
-        cfg.add_section(sect)
-        cfg.set(sect, "location_criterion", f"{location_criterion:g}")
-        cfg.set(sect, "movement_criterion", f"{movement_criterion:g}")
-        cfg.set(sect, "aggregation_method", aggregation)
-        for animal, (bp1, bp2) in refs.items():
-            key1 = f"{animal}_location_bp_1".lower().replace(" ", "_")
-            key2 = f"{animal}_location_bp_2".lower().replace(" ", "_")
-            cfg.set(sect, key1, bp1)
-            cfg.set(sect, key2, bp2)
-        with open(config_path, "w") as f:
-            cfg.write(f)
+        # Patch 122f: layout-agnostic write. The helper handles
+        # both v1 (project.toml [outlier_settings] with nested
+        # [outlier_settings.references]) and legacy INI write-back.
+        # Audit A2 fix preserved: only the outlier_settings
+        # section is touched.
+        _write_outlier_settings(
+            config_path,
+            location_criterion=location_criterion,
+            movement_criterion=movement_criterion,
+            aggregation=aggregation,
+            refs=refs,
+        )
         # Confirmation log — the form is config-write-only (settings
         # are applied later by the corrector during feature extraction),
         # so without an explicit summary the user sees only "complete"
@@ -399,7 +504,7 @@ class OutlierSettingsForm(OperationForm):
             "(run as part of feature extraction)."
         )
         stdout_success(
-            msg="Outlier correction settings saved to project_config.ini",
+            msg="Outlier correction settings saved to project config.",
         )
 
 
@@ -489,25 +594,17 @@ class DropBodypartsForm(OperationForm):
 # --------------------------------------------------------------------------- #
 def _load_flat_bps(config_path: str) -> list[str]:
     """Return the project's body-parts as a flat list, in the order
-    they appear in ``project_bp_names.csv``. Reads the project's
-    config the same lightweight way :func:`_load_animal_bps` does
-    (no ConfigReader / numba pull-in)."""
-    cfg = configparser.ConfigParser()
-    cfg.read(config_path)
-    project_path = cfg.get("General settings", "project_path", fallback=None)
-    if not project_path:
+    they appear in the project config (v1 ``project.toml`` /
+    legacy ``project_config.ini`` + ``project_bp_names.csv``).
+
+    Patch 122f: now delegates to ``project_metadata_from_config``;
+    returns ``[]`` for unparseable or missing configs so the form
+    can render a clear "no project loaded" empty state.
+    """
+    try:
+        return list(project_metadata_from_config(config_path)["body_parts"])
+    except (ValueError, OSError, KeyError):
         return []
-    bp_file = (Path(project_path) / "logs" / "measures"
-               / "pose_configs" / "bp_names" / "project_bp_names.csv")
-    if not bp_file.is_file():
-        return []
-    text = bp_file.read_text().strip()
-    if not text:
-        return []
-    # Tolerate both one-per-line and old-style comma-separated single row.
-    if "," in text.splitlines()[0]:
-        return [x.strip() for x in text.splitlines()[0].split(",") if x.strip()]
-    return [ln.strip() for ln in text.splitlines() if ln.strip()]
 
 
 # Standard 8 named colors used by the Tk popup. Mufasa's color_dict
@@ -646,12 +743,14 @@ class EgocentricAlignmentForm(OperationForm):
         self.save_dir_edit = QLineEdit(self)
         self.save_dir_edit.setReadOnly(True)
         save_default = ""
-        cfg = configparser.ConfigParser()
-        cfg.read(self.config_path)
-        project_path = cfg.get("General settings", "project_path",
-                               fallback=None)
-        if project_path:
-            save_default = os.path.join(project_path, "rotated")
+        # Patch 122f: layout-agnostic project root resolution.
+        try:
+            project_root = project_paths_from_config(
+                self.config_path,
+            )["project_root"]
+            save_default = os.path.join(project_root, "rotated")
+        except (ValueError, OSError):
+            pass
         self.save_dir_edit.setText(save_default)
         save_btn = QPushButton("Browse…", self)
         save_btn.clicked.connect(self._pick_save_dir)
@@ -678,12 +777,15 @@ class EgocentricAlignmentForm(OperationForm):
         save_dir = self.save_dir_edit.text().strip()
         if not save_dir:
             raise RuntimeError("Pick a save directory.")
-        cfg = configparser.ConfigParser()
-        cfg.read(self.config_path)
-        project_path = cfg.get("General settings", "project_path",
-                               fallback=None)
-        if not project_path:
-            raise RuntimeError("project_path missing from project_config.ini")
+        # Patch 122f: layout-agnostic resolution. project_root for
+        # the save-dir != videos check; videos_dir for the same.
+        try:
+            paths = project_paths_from_config(self.config_path)
+        except (ValueError, OSError) as exc:
+            raise RuntimeError(
+                f"Could not parse project config: {exc}"
+            )
+        videos_dir = paths["video_dir"]
         # Patch 122b: input directory comes from the data-source
         # picker instead of being hard-coded. The picker raises
         # ValueError for "no choice / invalid path", which we
@@ -696,7 +798,6 @@ class EgocentricAlignmentForm(OperationForm):
             raise RuntimeError(
                 f"Selected input directory does not exist: {data_dir}"
             )
-        videos_dir = os.path.join(project_path, "videos")
         if save_dir in (data_dir, videos_dir):
             raise RuntimeError(
                 "Save directory must differ from the data and video "
@@ -1111,25 +1212,21 @@ class KalmanV2SmoothingForm(OperationForm):
                 )
             else:
                 # Legacy project — fall back to the SimBA-style
-                # csv/ tree. Same behaviour as before patch 122d.
+                # csv/ tree. Patch 122f: use the layout-agnostic
+                # helper so this branch also stops touching
+                # configparser directly.
                 try:
-                    cfg = configparser.ConfigParser()
-                    cfg.read(self.config_path)
-                    project_path = cfg.get(
-                        "General settings", "project_path",
-                        fallback=None,
+                    paths = project_paths_from_config(self.config_path)
+                    default_in = paths["input_pose_dir"]
+                    if os.path.isdir(default_in):
+                        self.input_dir.setText(default_in)
+                    # smoothed_v2 sibling of input_csv in legacy
+                    # projects — keep the original convention.
+                    default_out = os.path.join(
+                        paths["project_root"], "csv", "smoothed_v2",
                     )
-                    if project_path:
-                        default_in = os.path.join(
-                            project_path, "csv", "input_csv",
-                        )
-                        if os.path.isdir(default_in):
-                            self.input_dir.setText(default_in)
-                        default_out = os.path.join(
-                            project_path, "csv", "smoothed_v2",
-                        )
-                        self.output_dir.setText(default_out)
-                except Exception:
+                    self.output_dir.setText(default_out)
+                except (ValueError, OSError):
                     pass
 
     # ------------------------------------------------------------------ #
@@ -1651,23 +1748,23 @@ class RunOutlierCorrectionForm(OperationForm):
         # v1 projects, leave blank and let the form compute a
         # fresh derived/outlier_corrected/<run_id>/ at run time
         # (so re-running doesn't trample the prior output).
+        # Patch 122f: layout-agnostic path resolution.
         save_row = QHBoxLayout()
         self.save_dir_edit = QLineEdit(self)
         save_default = ""
         if self.config_path:
-            try:
-                cfg = configparser.ConfigParser()
-                cfg.read(self.config_path)
-                project_path = cfg.get(
-                    "General settings", "project_path", fallback=None,
-                )
-                if project_path:
+            # Only set a legacy default for actual legacy projects.
+            # v1 projects intentionally leave the field blank so
+            # target() can allocate a fresh run dir.
+            if not str(self.config_path).lower().endswith(".toml"):
+                try:
+                    paths = project_paths_from_config(self.config_path)
                     save_default = os.path.join(
-                        project_path, "csv",
+                        paths["project_root"], "csv",
                         "outlier_corrected_movement_location",
                     )
-            except (configparser.Error, OSError):
-                pass
+                except (ValueError, OSError):
+                    pass
         self.save_dir_edit.setText(save_default)
         self.save_dir_edit.setPlaceholderText(
             "Leave blank to auto-generate "
@@ -1756,18 +1853,16 @@ class RunOutlierCorrectionForm(OperationForm):
             else:
                 # Legacy with no save_dir — fall back to the
                 # canonical SimBA destination so downstream stages
-                # find the output.
-                cfg = configparser.ConfigParser()
-                cfg.read(config_path)
-                project_path = cfg.get(
-                    "General settings", "project_path", fallback="",
-                )
-                if not project_path:
+                # find the output. Patch 122f: layout-agnostic
+                # helper, no more direct configparser.
+                try:
+                    paths = project_paths_from_config(config_path)
+                    project_path = paths["project_root"]
+                except (ValueError, OSError) as exc:
                     raise RuntimeError(
-                        "No save directory specified and "
-                        "project_path missing from "
-                        "project_config.ini — cannot infer a "
-                        "default output location."
+                        "No save directory specified and the "
+                        "project config could not be parsed to "
+                        f"infer one: {exc}"
                     )
                 save_dir = os.path.join(
                     project_path, "csv",
