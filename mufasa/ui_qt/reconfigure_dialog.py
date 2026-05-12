@@ -79,7 +79,7 @@ class ReconfigureProjectDialog(QDialog):
         fr.addWidget(browse)
 
         self._count_label = QLabel(" ")
-        self._count_label.setStyleSheet("color: palette(mid);")
+        self._count_label.setStyleSheet("color: palette(placeholder-text);")
 
         self._bp_list = QListWidget()
         self._bp_list.setAlternatingRowColors(True)

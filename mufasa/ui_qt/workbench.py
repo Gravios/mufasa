@@ -117,7 +117,7 @@ class OperationForm(QWidget):
         if self.description:
             desc = QLabel(self.description, self)
             desc.setWordWrap(True)
-            desc.setStyleSheet("color: #666; font-size: 10pt;")
+            desc.setStyleSheet("color: palette(placeholder-text); font-size: 10pt;")
             outer.addWidget(desc)
 
         # Body — subclass fills this

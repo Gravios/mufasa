@@ -180,7 +180,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             "<i>If n_workers &gt; 1: verify against sequential output "
             "first via <code>tests/smoke_feature_parallel_verify.py</code>.</i>"
         )
-        hint.setStyleSheet("color: #666; font-size: 9pt;")
+        hint.setStyleSheet("color: palette(placeholder-text); font-size: 9pt;")
         hint.setWordWrap(True)
         form.addRow("", hint)
 

@@ -268,7 +268,7 @@ class ROIDefinePanel(QDialog):
 
         self.frame_label = QLabel("Frame 0", self)
         self.frame_label.setMinimumWidth(120)
-        self.frame_label.setStyleSheet("color: palette(mid);")
+        self.frame_label.setStyleSheet("color: palette(placeholder-text);")
         nav_row.addWidget(self.frame_label)
 
         right_layout.addLayout(nav_row)
@@ -323,7 +323,7 @@ class ROIDefinePanel(QDialog):
         bot.addStretch(1)
 
         self.save_status = QLabel("", self)
-        self.save_status.setStyleSheet("color: palette(mid);")
+        self.save_status.setStyleSheet("color: palette(placeholder-text);")
         bot.addWidget(self.save_status)
         bot.addSpacing(20)
 
@@ -739,7 +739,7 @@ class ROIDefinePanel(QDialog):
         if error:
             self.save_status.setStyleSheet("color: #c44;")
         else:
-            self.save_status.setStyleSheet("color: palette(mid);")
+            self.save_status.setStyleSheet("color: palette(placeholder-text);")
         self.save_status.setText(msg)
 
 

@@ -109,8 +109,13 @@ class ProjectInfoForm(QWidget):
             self._form_layout.removeRow(self._form_layout.rowCount() - 1)
 
     def _add_row(self, label: str, value: str) -> None:
+        # Labels are proper form labels — keep them at the theme's
+        # default text color (which inherits from palette(text), the
+        # high-contrast text role). Earlier versions dimmed these with
+        # palette(mid) — that's a structural UI color, not a text
+        # color, and reads as illegible-grey in both light and dark
+        # themes on Ubuntu (Yaru / Adwaita) and many other systems.
         lbl = QLabel(label + ":")
-        lbl.setStyleSheet("color: palette(mid);")
         val = QLabel(value)
         val.setTextFormat(Qt.RichText)
         val.setWordWrap(True)
@@ -209,7 +214,7 @@ class ProjectInfoForm(QWidget):
             tail = (
                 ""
                 if len(bps) <= 8
-                else f" <span style='color:palette(mid)'>(+{len(bps) - 8} more)</span>"
+                else f" <span style='color:palette(placeholder-text)'>(+{len(bps) - 8} more)</span>"
             )
             self._add_row("Body parts", f"{head}{tail}")
         else:
@@ -233,7 +238,7 @@ class ProjectInfoForm(QWidget):
             n_pose = 0
         self._add_row(
             "Source pose files",
-            f"{n_pose} <span style='color:palette(mid)'>"
+            f"{n_pose} <span style='color:palette(placeholder-text)'>"
             f"in <code>{pose_dir.name}/</code></span>",
         )
 
@@ -290,7 +295,7 @@ class ProjectInfoForm(QWidget):
         latest = run_dirs[-1].name
         return (
             f"{len(run_dirs)} "
-            f"<span style='color:palette(mid)'>latest: "
+            f"<span style='color:palette(placeholder-text)'>latest: "
             f"<code>{latest}</code></span>"
         )
 
