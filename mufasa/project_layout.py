@@ -506,3 +506,228 @@ def read_run_toml(path: Path) -> Dict[str, Any]:
     """
     with open(path, "rb") as f:
         return tomllib.load(f)
+
+
+# ---------------------------------------------------------------------------
+# Model store (dual-save: project + global cache)
+# ---------------------------------------------------------------------------
+#
+# Two model locations coexist:
+#
+# * **Global cache** at ``~/.config/mufasa/models/<name>.npz``.
+#   Cross-project library; a model trained once is discoverable
+#   from any project on the same machine. Flat layout — files,
+#   not directories.
+#
+# * **Project store** at ``<project>/models/<name>/model.npz``
+#   with a sibling ``card.toml`` carrying provenance. Each model
+#   lives under its own subdirectory so future per-model artifacts
+#   (eval reports, training-data manifests, classifier
+#   confusion matrices) have a place to land.
+#
+# Whenever a model crosses from one side to the other it gets
+# copied so both have it: training flows mirror saved models to
+# the global cache, and loading a model from outside a project
+# imports it into the project's store. The project store is the
+# source of truth for "what produced this output"; the global
+# cache exists to make models easy to find.
+#
+# Identity is content-hash (SHA-256). If a model with the same
+# name already exists at the destination AND its hash matches,
+# the import is a no-op (idempotent). If the hash differs the
+# import raises ``FileExistsError`` rather than silently
+# overwriting — callers decide whether to overwrite or rename.
+
+
+GLOBAL_MODEL_CACHE_DIRNAME = ".config/mufasa/models"
+MODEL_CARD_FILENAME = "card.toml"
+MODEL_BLOB_FILENAME = "model.npz"
+
+
+def global_model_cache_dir() -> Path:
+    """Return ``~/.config/mufasa/models/`` (created if missing).
+
+    Tolerates read-only-home and similar OS quirks by returning the
+    expected path without raising — callers should still try the
+    actual write and handle failure there. Centralizing the path
+    here keeps callers in sync if the location ever changes.
+    """
+    p = Path.home() / GLOBAL_MODEL_CACHE_DIRNAME
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return p
+
+
+def file_sha256(path: Path) -> str:
+    """SHA-256 of ``path`` as a lowercase hex string.
+
+    Streams the file in 1 MiB chunks; safe for the npz blobs we
+    care about here (a few hundred MB at most).
+    """
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _model_name_from_path(path: Path) -> str:
+    """Derive the canonical model name from a .npz path.
+
+    Strips ``.npz`` (and the legacy ``v2_`` prefix the form writes
+    by default — a model named "v2_model.npz" becomes simply
+    "model" which is unhelpful; preserve the "v2_" so it survives
+    the round-trip).
+    """
+    name = path.stem
+    if not name:
+        raise ValueError(f"Cannot derive model name from {path!r}")
+    return name
+
+
+def import_model_into_project(
+    src_path: Path,
+    project_root: Path,
+    *,
+    model_name: Optional[str] = None,
+    overwrite: bool = False,
+) -> Path:
+    """Copy ``src_path`` into ``<project>/models/<model_name>/model.npz``
+    and write a ``card.toml`` recording where it came from.
+
+    Returns the in-project path to ``model.npz``. Idempotent on
+    matching content hash (re-importing the same model is a no-op).
+    Raises ``FileExistsError`` if a different-content model with the
+    same name already exists, unless ``overwrite=True``.
+
+    The project doesn't need to be fully constructed — ``project_root``
+    just needs to exist; this function creates the ``models/`` subtree
+    as needed. The caller is responsible for ensuring the project is
+    actually a v1 layout (use ``detect_layout`` if unsure).
+    """
+    import shutil
+
+    src_path = Path(src_path)
+    if not src_path.is_file():
+        raise FileNotFoundError(f"Model file not found: {src_path}")
+    project_root = Path(project_root)
+    if model_name is None:
+        model_name = _model_name_from_path(src_path)
+
+    paths = ProjectPaths(project_root)
+    model_dir = paths.model_dir(model_name)
+    dst_npz = model_dir / MODEL_BLOB_FILENAME
+    card_path = model_dir / MODEL_CARD_FILENAME
+
+    src_hash = file_sha256(src_path)
+
+    if dst_npz.is_file():
+        existing_hash = file_sha256(dst_npz)
+        if existing_hash == src_hash:
+            # Same content → no-op. Touch card.toml's "last seen"
+            # if it exists, otherwise leave the dir as-is.
+            return dst_npz
+        if not overwrite:
+            raise FileExistsError(
+                f"{dst_npz} already exists with different content "
+                f"(existing sha={existing_hash[:12]}, "
+                f"new sha={src_hash[:12]}). "
+                f"Pass overwrite=True to replace, or supply a "
+                f"different model_name."
+            )
+
+    # Copy blob, write card.
+    shutil.copy2(src_path, dst_npz)
+    try:
+        import mufasa
+        mufasa_version = getattr(mufasa, "__version__", "unknown")
+    except Exception:
+        mufasa_version = "unknown"
+    write_project_toml(card_path, {
+        "model_name":     model_name,
+        "source_path":    str(src_path),
+        "sha256":         src_hash,
+        "copied_at":      time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "mufasa_version": mufasa_version,
+    })
+    return dst_npz
+
+
+def mirror_model_to_global_cache(
+    src_path: Path,
+    *,
+    model_name: Optional[str] = None,
+) -> Optional[Path]:
+    """Copy ``src_path`` to ``~/.config/mufasa/models/<name>.npz``.
+
+    Returns the cache path on success, ``None`` if the cache dir
+    couldn't be written (read-only home, etc.) — failure is silent
+    by design; the global cache is a convenience, not a correctness
+    requirement. Idempotent on matching content hash.
+
+    If ``src_path`` is already inside the cache, returns it
+    unchanged.
+    """
+    import shutil
+
+    src_path = Path(src_path).resolve()
+    if not src_path.is_file():
+        raise FileNotFoundError(f"Model file not found: {src_path}")
+    if model_name is None:
+        model_name = _model_name_from_path(src_path)
+
+    cache_dir = global_model_cache_dir()
+    dst = (cache_dir / f"{model_name}.npz").resolve()
+
+    # Already in the cache → nothing to do.
+    if src_path == dst:
+        return dst
+
+    try:
+        if dst.is_file() and file_sha256(dst) == file_sha256(src_path):
+            return dst
+        shutil.copy2(src_path, dst)
+        return dst
+    except OSError:
+        # Read-only / permission / disk-full — degrade silently.
+        return None
+
+
+def resolve_v1_project_root(
+    config_path: Optional[str],
+) -> Optional[Path]:
+    """Best-effort: locate the v1 project root reachable from
+    ``config_path``, or ``None``.
+
+    Handles three cases:
+
+    * ``config_path`` is itself ``project.toml`` → parent is the root.
+    * ``config_path`` is a legacy ``project_config.ini`` whose
+      enclosing directory (or its parent, for the
+      ``<project>/project_folder/project_config.ini`` layout) has
+      a ``project.toml`` sibling → that directory is the root.
+      This is the post-migration case where a project has both
+      files transiently.
+    * Neither — return ``None``. Forms running under a pure legacy
+      project should treat ``None`` as "no v1 store available; skip
+      v1-only behaviors."
+    """
+    if not config_path:
+        return None
+    cp = Path(config_path)
+    candidates: List[Path] = []
+    if cp.name == PROJECT_CONFIG_FILENAME:
+        candidates.append(cp.parent)
+    elif cp.name == "project_config.ini":
+        candidates.append(cp.parent)
+        candidates.append(cp.parent.parent)
+    else:
+        # Caller passed something exotic; nothing we can resolve.
+        return None
+    for c in candidates:
+        if (c / PROJECT_CONFIG_FILENAME).is_file():
+            return c.resolve()
+    return None

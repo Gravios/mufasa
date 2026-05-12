@@ -37,12 +37,17 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout,
-                               QGroupBox, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMessageBox, QSpinBox,
-                               QDoubleSpinBox, QVBoxLayout, QWidget,
+                               QGroupBox, QLabel, QLineEdit,
+                               QListWidget, QListWidgetItem, QMessageBox,
+                               QSpinBox, QDoubleSpinBox, QVBoxLayout, QWidget,
                                QPushButton, QFileDialog)
 
 from mufasa.ui_qt.workbench import OperationForm
+from mufasa.project_layout import (
+    import_model_into_project,
+    mirror_model_to_global_cache,
+    resolve_v1_project_root,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -590,6 +595,18 @@ class EgocentricAlignmentForm(OperationForm):
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight)
 
+        # Patch 122b: data-source picker replaces the previous
+        # hard-coded auto-detect of csv/outlier_corrected_*/ vs
+        # csv/input_csv/. Lets the user pick raw / outlier-
+        # corrected / Kalman-v2-smoothed / Savitzky-Golay / custom.
+        # The default-marked source is the most-processed available
+        # output (see _DEFAULT_PREFER_ORDER in input_source_picker).
+        from mufasa.ui_qt.input_source_picker import InputSourcePicker
+        self.source_picker = InputSourcePicker(
+            self, config_path=self.config_path,
+        )
+        form.addRow("Input data source:", self.source_picker)
+
         self.center_cb = QComboBox(self)
         self.center_cb.addItems(bps)
         self.center_cb.setCurrentText(default_center)
@@ -667,23 +684,17 @@ class EgocentricAlignmentForm(OperationForm):
                                fallback=None)
         if not project_path:
             raise RuntimeError("project_path missing from project_config.ini")
-        # Source: outlier_corrected_movement_location/ if it exists
-        # and contains files; otherwise input_csv/ (covers the common
-        # case where outlier correction hasn't been run yet).
-        outlier_dir = os.path.join(
-            project_path, "csv", "outlier_corrected_movement_location",
-        )
-        input_dir = os.path.join(project_path, "csv", "input_csv")
-        if os.path.isdir(outlier_dir) and any(
-            f for f in os.listdir(outlier_dir) if not f.startswith(".")
-        ):
-            data_dir = outlier_dir
-        else:
-            data_dir = input_dir
+        # Patch 122b: input directory comes from the data-source
+        # picker instead of being hard-coded. The picker raises
+        # ValueError for "no choice / invalid path", which we
+        # convert into the form's standard RuntimeError surface.
+        try:
+            data_dir = str(self.source_picker.selected_path())
+        except ValueError as exc:
+            raise RuntimeError(str(exc))
         if not os.path.isdir(data_dir):
             raise RuntimeError(
-                f"No data directory found at {input_dir}. "
-                "Import pose data first."
+                f"Selected input directory does not exist: {data_dir}"
             )
         videos_dir = os.path.join(project_path, "videos")
         if save_dir in (data_dir, videos_dir):
@@ -1287,6 +1298,56 @@ class KalmanV2SmoothingForm(OperationForm):
             smooth_pose_v2, standard_rat_layout,
         )
 
+        # Patch 122b: dual-save provenance. Any model that crosses
+        # an organizational boundary (filesystem ↔ project,
+        # project ↔ project) gets copied so the destination has
+        # its own copy. Two helpers used at the end of training
+        # and at the start of loading.
+        v1_root = resolve_v1_project_root(self.config_path)
+
+        def _post_train_dual_save(saved_path: Optional[str]) -> None:
+            """Mirror a freshly-saved model to the global cache and
+            (if a v1 project is reachable) into the project's
+            ``models/`` store.
+
+            Both copies are overwrite-on-collision for training output
+            — the user just produced this model, it wins. Load-time
+            imports use the default no-overwrite behavior so trained
+            models can't be silently clobbered by a stale load.
+            """
+            if not saved_path or not os.path.isfile(saved_path):
+                return
+            src = Path(saved_path)
+            try:
+                cache_path = mirror_model_to_global_cache(src)
+                if cache_path is not None and cache_path != src.resolve():
+                    print(
+                        f"[dual-save] mirrored model to global cache: "
+                        f"{cache_path}"
+                    )
+            except OSError as exc:
+                print(
+                    f"[dual-save] WARNING: could not mirror to global "
+                    f"cache ({exc}); the saved file at {src} is still "
+                    f"intact."
+                )
+            if v1_root is not None:
+                try:
+                    in_proj = import_model_into_project(
+                        src, v1_root, overwrite=True,
+                    )
+                    if in_proj.resolve() != src.resolve():
+                        print(
+                            f"[dual-save] imported model into project: "
+                            f"{in_proj}"
+                        )
+                except (OSError, ValueError) as exc:
+                    print(
+                        f"[dual-save] WARNING: could not import to "
+                        f"project models/ ({exc}); the saved file at "
+                        f"{src} is still intact."
+                    )
+
         if mode == "train":
             # Build the layout with the requested feature flags.
             layout = standard_rat_layout()
@@ -1337,6 +1398,8 @@ class KalmanV2SmoothingForm(OperationForm):
                     save_model=save_path,
                     verbose=True,
                 )
+                # Patch 122b: mirror freshly-trained model.
+                _post_train_dual_save(save_path)
                 # Pass 2: load model, smooth all input
                 smooth_pose_v2(
                     pose_input=kwargs["input_dir"],
@@ -1366,8 +1429,57 @@ class KalmanV2SmoothingForm(OperationForm):
                     save_model=save_path,
                     verbose=True,
                 )
+                # Patch 122b: mirror freshly-trained model.
+                _post_train_dual_save(save_path)
 
         elif mode == "load":
+            # Patch 122b: if a v1 project is reachable and the
+            # model came from outside its models/ store, import a
+            # copy so future "what model produced this run?"
+            # questions are answerable from the project alone.
+            # Substitute the in-project path as the actual load
+            # source.
+            load_path = kwargs["load_model_path"]
+            if v1_root is not None:
+                load_abs = Path(load_path).resolve()
+                models_root = (v1_root / "models").resolve()
+                try:
+                    is_inside_project = (
+                        models_root in load_abs.parents
+                        or load_abs == models_root
+                    )
+                except Exception:
+                    is_inside_project = False
+                if not is_inside_project:
+                    try:
+                        in_proj = import_model_into_project(
+                            Path(load_path), v1_root,
+                        )
+                        if in_proj.resolve() != load_abs:
+                            print(
+                                f"[dual-save] imported loaded model "
+                                f"into project: {in_proj}"
+                            )
+                        load_path = str(in_proj)
+                    except FileExistsError as exc:
+                        # A different-content model with the same
+                        # name already lives in the project. Surface
+                        # loudly rather than silently using either.
+                        raise RuntimeError(
+                            f"Cannot import model: {exc}. "
+                            "Either remove the existing model from "
+                            "this project's models/ folder, or "
+                            "rename the model file you are loading."
+                        )
+                    except (OSError, ValueError) as exc:
+                        # Soft failure — we still want the smoother
+                        # to run, just without the project copy.
+                        print(
+                            f"[dual-save] WARNING: could not import "
+                            f"loaded model into project ({exc}); "
+                            f"using original path {load_path}."
+                        )
+
             # Load mode: skip EM, just smooth.
             smooth_pose_v2(
                 pose_input=kwargs["input_dir"],
@@ -1375,7 +1487,7 @@ class KalmanV2SmoothingForm(OperationForm):
                 fps=kwargs["fps"],
                 likelihood_threshold=kwargs["likelihood_threshold"],
                 n_workers=kwargs["n_workers"],
-                load_model=kwargs["load_model_path"],
+                load_model=load_path,
                 verbose=True,
             )
         else:
