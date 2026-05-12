@@ -450,16 +450,43 @@ def read_video_info_csv(file_path: Union[str, os.PathLike], raise_error: bool = 
 
 def read_config_file(config_path: Union[str, os.PathLike]) -> configparser.ConfigParser:
     """
-    Helper to parse SimBA project project_config.ini file
+    Helper to parse a Mufasa project config file.
 
-    :parameter Union[str, os.PathLike] config_path: Path to project_config.ini file
-    :return: parsed project_config.ini file
-    :rtype: configparser.ConfigParser
-    :raise MissingProjectConfigEntryError: Invalid file format.
+    Handles two file formats:
 
-    :example:
-    >>> read_config_file(config_path='project_folder/project_config.ini')
+    * **v1 ``project.toml``** (patch 122d+) — parsed and translated
+      to a synthetic :class:`configparser.ConfigParser` with legacy
+      section/key names via
+      :func:`mufasa.utils.toml_to_configparser.read_project_toml_as_configparser`.
+      This keeps the 268+ ConfigReader-dependent backends working
+      against v1 projects without code changes.
+    * **Legacy ``project_config.ini``** — parsed directly with
+      ``configparser`` as before. Behavior is identical to the
+      pre-122e shape.
+
+    Detection is by file suffix. Anything ending in ``.toml`` goes
+    through the TOML path; anything else (including paths with no
+    extension, for backwards-compat) goes through the INI path.
+
+    :param config_path: path to ``project.toml`` (v1) or
+        ``project_config.ini`` (legacy)
+    :return: parsed configuration as a :class:`ConfigParser`
+    :raises MissingProjectConfigEntryError: invalid file format
     """
+    cp_str = str(config_path)
+    if cp_str.lower().endswith(".toml"):
+        try:
+            from mufasa.utils.toml_to_configparser import (
+                read_project_toml_as_configparser,
+            )
+            return read_project_toml_as_configparser(config_path)
+        except Exception as e:
+            print(e.args)
+            raise MissingProjectConfigEntryError(
+                msg=f"{config_path} is not a valid v1 project.toml "
+                    f"file: {type(e).__name__}: {e}",
+                source=read_config_entry.__name__,
+            )
 
     config = ConfigParser()
     try:
