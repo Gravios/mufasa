@@ -4,73 +4,24 @@ mufasa.ui_qt.forms.project_setup
 
 Inline forms for project-level actions.
 
-* :class:`ArchiveFilesForm` — wraps :func:`archive_processed_files`.
-  Replaces :class:`ArchiveFilesPopUp`.
 * :class:`BatchPreProcessLauncher` — launcher for
   :class:`BatchProcessFrame`. Replaces :class:`BatchPreProcessPopUp`.
+
+Patch 122m: removed :class:`ArchiveFilesForm` (and its backing
+``archive_processed_files`` helper). The legacy "shuffle outputs
+into named subfolders" model assumes the SimBA INI layout's
+``csv/<stage>/`` tree which doesn't exist in v1; the function
+would have crashed on v1 projects on a missing ``csv/`` dir,
+and the use-case it solved (clearing shared stage dirs between
+experiments) is now subsumed by v1's per-run
+``derived/<stage>/<run_id>/`` provenance.
 
 The About dialog isn't a form at all — it becomes a Help-menu action
 (registered by :func:`register_project_menu_actions`).
 """
 from __future__ import annotations
 
-from typing import Optional
-
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QFormLayout, QLineEdit, QMessageBox)
-
 from mufasa.ui_qt.forms.annotation import _LauncherForm
-from mufasa.ui_qt.workbench import OperationForm
-
-
-# --------------------------------------------------------------------------- #
-# ArchiveFilesForm
-# --------------------------------------------------------------------------- #
-class ArchiveFilesForm(OperationForm):
-    """Archive processed project files under a named folder.
-
-    Wraps :func:`mufasa.utils.read_write.archive_processed_files`. One
-    field; one button. Kept as a form (not a menu action) because the
-    archive name is user-specified and benefits from inline
-    validation/feedback.
-    """
-
-    title = "Archive processed files"
-    description = ("Move processed project files (features_extracted, "
-                   "targets_inserted, machine_results, logs) into a "
-                   "named archive folder to clean up the working "
-                   "directory before a new experiment.")
-
-    def build(self) -> None:
-        form = QFormLayout()
-        form.setLabelAlignment(Qt.AlignRight)
-        self.archive_name = QLineEdit(self)
-        self.archive_name.setPlaceholderText(
-            "Archive folder name, e.g. 'experiment_1_2025'"
-        )
-        form.addRow("Archive name:", self.archive_name)
-        self.body_layout.addLayout(form)
-
-    def collect_args(self) -> dict:
-        if not self.config_path:
-            raise RuntimeError("No project loaded.")
-        name = self.archive_name.text().strip()
-        if not name:
-            raise ValueError("Archive name is required.")
-        # Sanity-check the name — no slashes, no whitespace-only, no
-        # filesystem-nasty characters. Matches the legacy popup's
-        # validation.
-        if any(c in name for c in "/\\:<>|*?\""):
-            raise ValueError(
-                f"Archive name '{name}' contains filesystem-reserved "
-                f"characters. Use letters, numbers, '_' or '-' only."
-            )
-        return {"config_path": self.config_path, "archive_name": name}
-
-    def target(self, *, config_path: str, archive_name: str) -> None:
-        from mufasa.utils.read_write import archive_processed_files
-        archive_processed_files(config_path=config_path,
-                                archive_name=archive_name)
 
 
 # --------------------------------------------------------------------------- #
@@ -118,7 +69,6 @@ def register_project_menu_actions(workbench) -> None:
 
 
 __all__ = [
-    "ArchiveFilesForm",
     "BatchPreProcessLauncher",
     "register_project_menu_actions",
 ]
