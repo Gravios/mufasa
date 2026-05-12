@@ -2,7 +2,10 @@
 mufasa.ui_qt.pages.pose_cleanup_page
 ====================================
 
-Pose-data cleanup workbench page. Runs early in the pipeline:
+Preprocessing workbench page (file name kept as
+``pose_cleanup_page`` for historical compatibility; the
+user-facing label is now "Preprocessing"). Runs early in the
+pipeline:
 
     raw pose → [ interpolate → smooth → outlier-correct → align ]
              → feature extraction → classifier
@@ -10,7 +13,7 @@ Pose-data cleanup workbench page. Runs early in the pipeline:
 Section ordering (patch 122c redesign)
 --------------------------------------
 
-The page now reflects the actual conceptual order of operations,
+The page reflects the actual conceptual order of operations,
 with the modern (Kalman v2 + InputSourcePicker) forms at the top
 and the legacy SimBA forms folded into an "Advanced / legacy"
 section at the bottom:
@@ -46,6 +49,16 @@ The legacy "Outlier correction settings" form remains in the
 Advanced section because the Run/Skip forms above read the
 thresholds it writes to ``project_config.ini``. Editing
 thresholds without exposing the dependency would be confusing.
+
+Page-label history
+------------------
+Originally labeled "Pose cleanup". Renamed to "Preprocessing"
+because the page covers more than cleanup (smoothing,
+egocentric alignment, etc. are upstream-of-features but not
+strictly "cleanup"), and because pose-cleanup-specific
+operations like smoothing were also being duplicated on the
+Data import page — making it clearer that this is *the*
+preprocessing surface reduces that confusion.
 """
 from __future__ import annotations
 
@@ -65,8 +78,8 @@ from mufasa.ui_qt.workbench import WorkflowPage
 def build_pose_cleanup_page(workbench,
                             config_path: Optional[str] = None
                             ) -> WorkflowPage:
-    """Build and return the Pose Cleanup page."""
-    page = workbench.add_page("Pose cleanup", icon_name="outlier")
+    """Build and return the Preprocessing page."""
+    page = workbench.add_page("Preprocessing", icon_name="outlier")
 
     page.add_section("Interpolate missing frames",
                      [(InterpolateForm, {})])

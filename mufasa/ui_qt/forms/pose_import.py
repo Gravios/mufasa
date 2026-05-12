@@ -143,16 +143,12 @@ class PoseImportForm(OperationForm):
         form.addRow("  Interpolation type:",   self._interp_type)
         form.addRow("  Interpolation method:", self._interp_method)
 
-        # Smoothing (optional)
-        self._smooth_enable = QCheckBox("Enable smoothing")
-        self._smooth_method = QComboBox()
-        self._smooth_method.addItems(["gaussian", "savitzky-golay"])
-        self._smooth_window = QLineEdit()
-        self._smooth_window.setPlaceholderText("time window in ms (integer)")
-        self._smooth_window.setText("500")
-        form.addRow("", self._smooth_enable)
-        form.addRow("  Smoothing method:", self._smooth_method)
-        form.addRow("  Smoothing window (ms):", self._smooth_window)
+        # Smoothing intentionally not exposed here: the Preprocessing
+        # page (formerly "Pose cleanup") has the full smoothing
+        # surface (Kalman v2, plus legacy Savitzky / Gaussian under
+        # Advanced). Duplicating a stripped-down smoothing toggle at
+        # import time was redundant and surfaced a worse default
+        # (Gaussian / Savitzky) than the page's primary choice.
 
         self.body_layout.addLayout(form)
 
@@ -200,27 +196,11 @@ class PoseImportForm(OperationForm):
                 "method": self._interp_method.currentText(),
             }
 
-        smoothing_settings: Optional[dict] = None
-        if self._smooth_enable.isChecked():
-            try:
-                tw = int(self._smooth_window.text().strip())
-            except ValueError:
-                raise RuntimeError(
-                    "Smoothing window must be an integer (milliseconds)."
-                )
-            if tw < 1:
-                raise RuntimeError("Smoothing window must be >= 1 ms.")
-            smoothing_settings = {
-                "method":      self._smooth_method.currentText(),
-                "time_window": tw,
-            }
-
         return {
             "route": route,
             "config_path": self.config_path,
             "source_path": source,
             "interpolation_settings": interpolation_settings,
-            "smoothing_settings": smoothing_settings,
             "p_threshold": float(self._p_threshold.value()),
         }
 
@@ -229,19 +209,19 @@ class PoseImportForm(OperationForm):
     # ------------------------------------------------------------------ #
     def target(self, *, route: dict, config_path: str, source_path: str,
                interpolation_settings: Optional[dict],
-               smoothing_settings: Optional[dict],
                p_threshold: float) -> None:
         km = route["kwargs_map"]
         kwargs = {
             "config_path": config_path,
             km.get("source_path", "source_path"): source_path,
             "interpolation_settings": interpolation_settings,
-            "smoothing_settings": smoothing_settings,
             "p_threshold": p_threshold,
         }
         # Defensive filter — same reasoning as the other forms.
         # Backends that don't accept p_threshold (e.g. future CSV /
         # SLEAP routes) will silently drop it via the filter.
+        # Importer backends still accept smoothing_settings; we
+        # simply never pass one, so they use their default (None).
         from mufasa.ui_qt.forms._backend_dispatch import filter_kwargs
         kwargs = filter_kwargs(route["backend"], kwargs)
         runner = route["backend"](**kwargs)
