@@ -168,7 +168,7 @@ class VideoInfoForm(OperationForm):
         # or hints (e.g. "no project loaded"). Doesn't change the
         # form's required height much; just text.
         self.status_label = QLabel("", self)
-        self.status_label.setStyleSheet("color: #666; font-size: 9pt;")
+        self.status_label.setStyleSheet("color: palette(placeholder-text); font-size: 9pt;")
         self.status_label.setWordWrap(True)
         self.body_layout.addWidget(self.status_label)
 

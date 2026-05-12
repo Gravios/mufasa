@@ -465,7 +465,7 @@ class ROIManageForm(OperationForm):
         )
         fmt_hint.setTextFormat(Qt.RichText)
         fmt_hint.setWordWrap(True)
-        fmt_hint.setStyleSheet("color: palette(mid); padding: 4px;")
+        fmt_hint.setStyleSheet("color: palette(placeholder-text); padding: 4px;")
         imp_form.addRow("", fmt_hint)
         self.stack.addWidget(imp_host)
 

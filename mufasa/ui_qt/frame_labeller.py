@@ -157,7 +157,7 @@ class FrameLabellerDialog(QDialog):
             "Shift+← / Shift+→ jog 10 · Space = next frame · Ctrl+S save</i>",
             self,
         )
-        hint.setStyleSheet("color: #555;")
+        hint.setStyleSheet("color: palette(placeholder-text);")
         outer.addWidget(hint)
 
         self.status = QLabel("Ready.", self)

@@ -81,7 +81,7 @@ class CreateProjectDialog(QDialog):
         # count spinner is forced to 1. Accept handler uses user_defined.
         self._autodetected_bps: list[str] = []
         self._autodetect_label = QLabel("—")
-        self._autodetect_label.setStyleSheet("color: palette(mid);")
+        self._autodetect_label.setStyleSheet("color: palette(placeholder-text);")
         autodetect_btn = QPushButton("Auto-detect from DLC file…")
         autodetect_btn.clicked.connect(self._autodetect_from_dlc)
         clear_btn = QPushButton("Clear")

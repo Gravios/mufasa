@@ -133,7 +133,7 @@ class PoseImportForm(OperationForm):
         )
         thresh_hint.setTextFormat(Qt.RichText)
         thresh_hint.setWordWrap(True)
-        thresh_hint.setStyleSheet("color: palette(mid); padding: 4px;")
+        thresh_hint.setStyleSheet("color: palette(placeholder-text); padding: 4px;")
         form.addRow("", thresh_hint)
 
         # Interpolation and smoothing intentionally not exposed here:
@@ -155,7 +155,7 @@ class PoseImportForm(OperationForm):
             )
             hint.setTextFormat(Qt.RichText)
             hint.setWordWrap(True)
-            hint.setStyleSheet("color: palette(mid); padding: 6px;")
+            hint.setStyleSheet("color: palette(placeholder-text); padding: 6px;")
             self.body_layout.addWidget(hint)
             self.run_btn.setEnabled(False)
 

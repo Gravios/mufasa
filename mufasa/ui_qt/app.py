@@ -106,7 +106,7 @@ class LauncherWindow(QMainWindow):
             f"{linux_env.detect_display_server()}",
             central,
         )
-        subtitle.setStyleSheet("color: #888;")
+        subtitle.setStyleSheet("color: palette(placeholder-text);")
         lay.addWidget(title)
         lay.addWidget(subtitle)
 
@@ -244,7 +244,7 @@ class ProjectWindow(QMainWindow):
             stub = QLabel(
                 f"<i>Tab '{spec['label']}' has no actions ported yet.</i>", w
             )
-            stub.setStyleSheet("color: #888;")
+            stub.setStyleSheet("color: palette(placeholder-text);")
             lay.addWidget(stub)
             lay.addStretch()
             return w
