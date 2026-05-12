@@ -1,15 +1,23 @@
 """
-tests/smoke_data_import_no_smoothing.py
-=======================================
+tests/smoke_data_import_minimal.py
+==================================
 
-Patch 122g: regression guard.
+Patches 122g + 122h: regression guard.
 
-* PoseImportForm no longer exposes smoothing widgets — the
-  Preprocessing page (formerly "Pose cleanup") is the canonical
-  smoothing surface and the duplicate import-time toggle was
-  redundant.
-* The Preprocessing page registers itself under the label
-  "Preprocessing", not the historical "Pose cleanup".
+PoseImportForm now exposes only:
+
+* Route picker (DLC H5, DLC CSV, etc.)
+* Source directory + Browse
+* Likelihood threshold (p_threshold)
+
+Smoothing widgets (122g) and interpolation widgets (122h) were
+removed — the Preprocessing page (formerly "Pose cleanup") is
+the canonical surface for both, with strictly more options
+(user-controllable copy_originals, auto-detected multi-index
+headers, picker-driven input source).
+
+Also asserts the Preprocessing page registers under the
+"Preprocessing" label rather than the historical "Pose cleanup".
 """
 from __future__ import annotations
 
@@ -36,18 +44,21 @@ def check(label: str, cond: bool, *, detail: str = "") -> None:
 
 def main() -> int:
     # ------------------------------------------------------------------
-    # 1. PoseImportForm: no smoothing widgets, no smoothing param
+    # 1. PoseImportForm — no smoothing widgets, no interpolation
+    #    widgets, no smoothing_settings / interpolation_settings in
+    #    the form's collect_args or target signature.
     # ------------------------------------------------------------------
     pose_import_src = (
         REPO_ROOT / "mufasa" / "ui_qt" / "forms" / "pose_import.py"
     ).read_text()
     pose_import_tree = ast.parse(pose_import_src)
 
-    # No `self._smooth_*` widget attributes assigned anywhere
+    # No widget attributes for either feature
     forbidden_attrs = (
-        "self._smooth_enable",
-        "self._smooth_method",
-        "self._smooth_window",
+        # 122g
+        "self._smooth_enable", "self._smooth_method", "self._smooth_window",
+        # 122h
+        "self._interp_enable", "self._interp_type", "self._interp_method",
     )
     for attr in forbidden_attrs:
         check(
@@ -56,22 +67,27 @@ def main() -> int:
             detail="found a still-attached widget assignment",
         )
 
-    # No "Enable smoothing" / "Smoothing method:" / "Smoothing window"
-    # UI labels — these are the user-visible strings that would tell
-    # us the duplicate surface is back
-    for ui_label in (
+    # No user-visible labels for either feature
+    forbidden_labels = (
+        # 122g
         '"Enable smoothing"',
         '"Smoothing method:"',
         '"  Smoothing method:"',
         '"Smoothing window (ms):"',
         '"  Smoothing window (ms):"',
-    ):
+        # 122h
+        '"Enable interpolation"',
+        '"Interpolation type:"',
+        '"  Interpolation type:"',
+        '"Interpolation method:"',
+        '"  Interpolation method:"',
+    )
+    for ui_label in forbidden_labels:
         check(
             f"PoseImportForm UI: {ui_label} not present",
             ui_label not in pose_import_src,
         )
 
-    # PoseImportForm class found
     pif_cls = None
     for node in ast.walk(pose_import_tree):
         if (
@@ -87,28 +103,49 @@ def main() -> int:
             n.name: n for n in pif_cls.body
             if isinstance(n, ast.FunctionDef)
         }
-        # target() no longer takes smoothing_settings
+        # target() signature minimal
         if "target" in methods:
             args = methods["target"].args
             arg_names = (
                 [a.arg for a in args.args]
                 + [a.arg for a in args.kwonlyargs]
             )
+            for forbidden in (
+                "smoothing_settings",
+                "interpolation_settings",
+            ):
+                check(
+                    f"PoseImportForm.target signature has no "
+                    f"{forbidden!r} parameter",
+                    forbidden not in arg_names,
+                    detail=f"got args: {arg_names}",
+                )
+            # The remaining kwonly args should be exactly the
+            # minimal four: route, config_path, source_path,
+            # p_threshold. (self is in args.args, not kwonlyargs.)
+            kwonly = [a.arg for a in args.kwonlyargs]
             check(
-                "PoseImportForm.target signature has no "
-                "smoothing_settings parameter",
-                "smoothing_settings" not in arg_names,
-                detail=f"got args: {arg_names}",
+                "PoseImportForm.target kwonly args = "
+                "{route, config_path, source_path, p_threshold}",
+                set(kwonly) == {
+                    "route", "config_path", "source_path", "p_threshold",
+                },
+                detail=f"got: {kwonly}",
             )
-            # collect_args returns no smoothing_settings key
+        # collect_args returns no smoothing_settings /
+        # interpolation_settings keys
         if "collect_args" in methods:
             body_src = ast.unparse(methods["collect_args"])
-            check(
-                "PoseImportForm.collect_args does not return "
-                "'smoothing_settings'",
-                "'smoothing_settings'" not in body_src
-                and '"smoothing_settings"' not in body_src,
-            )
+            for forbidden in (
+                "smoothing_settings",
+                "interpolation_settings",
+            ):
+                check(
+                    f"PoseImportForm.collect_args does not return "
+                    f"{forbidden!r}",
+                    f"'{forbidden}'" not in body_src
+                    and f'"{forbidden}"' not in body_src,
+                )
 
     # ------------------------------------------------------------------
     # 2. Preprocessing page label
@@ -127,7 +164,7 @@ def main() -> int:
     )
 
     print(
-        f"smoke_data_import_no_smoothing: "
+        f"smoke_data_import_minimal: "
         f"{CHECKS_PASSED}/{CHECKS_TOTAL} checks passed"
     )
     return 0 if CHECKS_PASSED == CHECKS_TOTAL else 1
