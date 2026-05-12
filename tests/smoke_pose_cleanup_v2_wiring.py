@@ -187,6 +187,35 @@ def _check_form_module() -> None:
         "save and load workflows"
     )
 
+    # Patch 122b: dual-save wiring. The form imports the three
+    # project_layout helpers and the target() method calls
+    # mirror + import on both train and load paths.
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.module and "project_layout" in node.module:
+                for alias in node.names:
+                    imported.add(alias.name)
+    for name in (
+        "import_model_into_project",
+        "mirror_model_to_global_cache",
+        "resolve_v1_project_root",
+    ):
+        assert name in imported, (
+            f"form should import {name!r} from mufasa.project_layout "
+            f"for the patch-122b dual-save flow; got {sorted(imported)}"
+        )
+    # The target() body should mention each helper at least once.
+    for name in (
+        "mirror_model_to_global_cache",
+        "import_model_into_project",
+        "resolve_v1_project_root",
+    ):
+        assert name in target_src, (
+            f"target() should call {name!r} so dual-save runs "
+            f"on every save/load path"
+        )
+
 
 def _check_page_registration() -> None:
     """The pose_cleanup_page builder must add a section that
