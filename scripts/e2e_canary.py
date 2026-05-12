@@ -274,11 +274,9 @@ def collect_individual_targets() -> list[BackendTarget]:
                                 "append_to_features_extracted",
                                 "append_to_targets_inserted")))
 
-    # Project setup
-    out.append(T(form="project_setup.ArchiveFilesForm",
-                 modpath="mufasa.utils.read_write",
-                 symbol="archive_processed_files",
-                 kwargs_passed=("config_path", "archive_name")))
+    # Project setup — Archive form removed in patch 122m; no canary
+    # entry needed (legacy archive_processed_files helper is gone,
+    # v1 per-run provenance subsumes the use case).
 
     # Add-ons
     out += [

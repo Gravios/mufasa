@@ -6,7 +6,7 @@ Projects workbench page (file kept named ``project_setup_page``
 for module-import compatibility; user-facing label became
 "Projects" in patch 122i).
 
-Section layout (patch 122k):
+Section layout (patch 122m):
 
 1. **Create or open project** — :class:`NewProjectForm`.
    Always at the top. Inline buttons (New, Open, Open most
@@ -20,7 +20,15 @@ Section layout (patch 122k):
    time — that's where users continuing work on an existing
    project want to land first. The "Create or open" section
    stays collapsed but reachable.
-3. **Archive processed files** — :class:`ArchiveFilesForm`.
+
+Removed in patch 122m:
+
+* **Archive processed files** — the legacy "shuffle outputs
+  into named subfolders" model assumed the SimBA INI ``csv/``
+  tree and would have crashed on v1 projects. The use-case it
+  solved (clearing shared stage dirs between experiments) is
+  now subsumed by v1's per-run
+  ``derived/<stage>/<run_id>/`` provenance.
 
 Removed in patch 122i:
 
@@ -35,8 +43,7 @@ from typing import Optional
 
 from mufasa.ui_qt.forms.project_info import (NewProjectForm,
                                              ProjectInfoForm)
-from mufasa.ui_qt.forms.project_setup import (ArchiveFilesForm,
-                                              register_project_menu_actions)
+from mufasa.ui_qt.forms.project_setup import register_project_menu_actions
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
@@ -75,9 +82,6 @@ def build_project_setup_page(workbench,
         # WorkflowPage's lazy instantiation hook — section gets
         # built immediately, no stale-form risk.
         page.toolbox.setCurrentIndex(1)
-
-    page.add_section("Archive processed files",
-                     [(ArchiveFilesForm, {})])
 
     # Register Help → About action (idempotent — safe if called
     # multiple times by re-entering the page builder).

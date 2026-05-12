@@ -125,9 +125,11 @@ def main() -> int:
             "setCurrentIndex(1)" in body_src,
         )
         check(
-            "builder still registers Archive processed files",
-            "Archive processed files" in body_src
-            and "ArchiveFilesForm" in body_src,
+            "builder no longer registers 'Archive processed files' "
+            "(removed in patch 122m — legacy model doesn't fit v1 "
+            "per-run provenance)",
+            "Archive processed files" not in body_src
+            and "ArchiveFilesForm" not in body_src,
         )
         # Sanity: no stray duplicate add_section for the Create
         # surface. Count only quoted occurrences — the function

@@ -63,7 +63,6 @@ from mufasa.ui.pop_ups.append_roi_features_animals_pop_up import \
     AppendROIFeaturesByAnimalPopUp
 from mufasa.ui.pop_ups.append_roi_features_bodypart_pop_up import \
     AppendROIFeaturesByBodyPartPopUp
-from mufasa.ui.pop_ups.archive_files_pop_up import ArchiveProcessedFilesPopUp
 from mufasa.ui.pop_ups.batch_preprocess_pop_up import BatchPreProcessPopUp
 from mufasa.ui.pop_ups.blob_visualizer_pop_up import BlobVisualizerPopUp
 from mufasa.ui.pop_ups.boolean_conditional_slicer_pup_up import \
@@ -345,7 +344,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         import_frm_dir_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="IMPORT FRAMES DIRECTORY TO SIMBA PROJECT", txt_clr='blue', compound='right', img='import', font=Formats.FONT_REGULAR.value, cmd=ImportFrameDirectoryPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         add_clf_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="ADD CLASSIFIER TO SIMBA PROJECT", txt_clr='blue', compound='right', img='plus', font=Formats.FONT_REGULAR.value, cmd=AddClfPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         remove_clf_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="REMOVE CLASSIFIER FROM SIMBA PROJECT", txt_clr='blue', compound='right', img='trash', font=Formats.FONT_REGULAR.value, cmd=RemoveAClassifierPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
-        archive_files_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="ARCHIVE PROCESSED FILES IN SIMBA PROJECT", txt_clr='blue', compound='right', img='archive', font=Formats.FONT_REGULAR.value, cmd=ArchiveProcessedFilesPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         reverse_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="REVERSE TRACKING IDENTITIES IN SIMBA PROJECT", txt_clr='blue', compound='right', img='reverse_blue', font=Formats.FONT_REGULAR.value, cmd=None)
         interpolate_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="INTERPOLATE POSE IN SIMBA PROJECT", txt_clr='blue', compound='right', img='line_chart_blue', font=Formats.FONT_REGULAR.value, cmd=InterpolatePopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         smooth_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="SMOOTH POSE IN SIMBA PROJECT", txt_clr='blue', compound='right', img='wand_blue', font=Formats.FONT_REGULAR.value, cmd=SmoothingPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
@@ -564,7 +562,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         import_frm_dir_btn.grid(row=2, column=0, sticky=NW)
         add_clf_btn.grid(row=3, column=0, sticky=NW)
         remove_clf_btn.grid(row=4, column=0, sticky=NW)
-        archive_files_btn.grid(row=5, column=0, sticky=NW)
         reverse_btn.grid(row=6, column=0, sticky=NW)
         interpolate_btn.grid(row=7, column=0, sticky=NW)
         smooth_btn.grid(row=8, column=0, sticky=NW)
