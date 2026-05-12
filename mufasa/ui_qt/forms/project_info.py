@@ -33,9 +33,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QFormLayout, QHBoxLayout, QLabel,
-                               QPushButton, QSizePolicy, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QFormLayout, QFrame, QGroupBox,
+                               QHBoxLayout, QLabel, QPushButton,
+                               QSizePolicy, QVBoxLayout, QWidget)
 
 
 # --------------------------------------------------------------------------- #
@@ -335,64 +335,67 @@ class NewProjectForm(QWidget):
     def _build_shell(self) -> None:
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 8, 12, 8)
-        outer.setSpacing(10)
+        outer.setSpacing(12)
 
-        # Patch 122k: this form is now always visible at the top
-        # of the Projects page, not just as an empty-state surface.
-        # Tailor the framing message to the current state.
+        # ---------------------------------------------------------- #
+        # Intro / framing text — adapts to project-loaded state
+        # ---------------------------------------------------------- #
+        # Patch 122k: contextual messaging (no project vs loaded).
+        # Patch 122l: trimmed to one short sentence; the per-group
+        # framing (QGroupBox titles + inner hints) carries the
+        # rest, so the intro doesn't repeat what's right below it.
         if self.config_path:
-            msg = QLabel(
-                "Create a new v1 project (<code>project.toml</code> + "
-                "<code>sources/</code>, <code>derived/</code>, "
-                "<code>models/</code>, <code>logs/</code>), open a "
-                "different one, or switch back to the most recent.",
+            intro = QLabel(
+                "Switch to a different project, or create a new one.",
                 self,
             )
         else:
-            msg = QLabel(
-                "<b>No project loaded.</b><br>"
-                "Create a new v1 project (<code>project.toml</code> + "
-                "<code>sources/</code>, <code>derived/</code>, "
-                "<code>models/</code>, <code>logs/</code>) or open an "
-                "existing one. Legacy <code>project_config.ini</code> "
-                "projects are still supported via Open.",
+            intro = QLabel(
+                "<b>No project loaded.</b> Open an existing project "
+                "or create a new one below.",
                 self,
             )
-        msg.setTextFormat(Qt.RichText)
-        msg.setWordWrap(True)
-        outer.addWidget(msg)
+        intro.setTextFormat(Qt.RichText)
+        intro.setWordWrap(True)
+        outer.addWidget(intro)
+
+        # ---------------------------------------------------------- #
+        # Group 1: Open existing project
+        # ---------------------------------------------------------- #
+        open_group = QGroupBox("Open existing project", self)
+        open_lay = QVBoxLayout(open_group)
+        open_lay.setSpacing(8)
+
+        open_hint = QLabel(
+            "Open a v1 <code>project.toml</code> or a legacy "
+            "<code>project_config.ini</code> from disk. Use "
+            "<b>Open most recent</b> to jump back to the previous "
+            "project without browsing for it.",
+            open_group,
+        )
+        open_hint.setTextFormat(Qt.RichText)
+        open_hint.setWordWrap(True)
+        open_hint.setStyleSheet("color: palette(placeholder-text);")
+        open_lay.addWidget(open_hint)
 
         actions = QHBoxLayout()
-        new_btn = QPushButton("New project…", self)
-        new_btn.setMinimumWidth(140)
-        if self._workbench is not None:
-            new_btn.clicked.connect(self._workbench._on_new_project)
-        else:
-            new_btn.setEnabled(False)
-            new_btn.setToolTip("Workbench reference missing.")
-        actions.addWidget(new_btn)
-
-        open_btn = QPushButton("Open project…", self)
+        open_btn = QPushButton("Open project…", open_group)
         open_btn.setMinimumWidth(140)
         if self._workbench is not None:
             open_btn.clicked.connect(self._workbench._on_open_project)
         else:
             open_btn.setEnabled(False)
+            open_btn.setToolTip("Workbench reference missing.")
         actions.addWidget(open_btn)
-        actions.addStretch()
-        outer.addLayout(actions)
 
         # Recent-project quick-open. Soft-fails on read errors.
+        # Hidden when no recent exists OR when recent == current
+        # (would be a no-op).
         try:
             from mufasa.ui_qt.recent_project import load_recent_project
             recent = load_recent_project()
         except Exception:
             recent = None
-
-        # Patch 122k: hide the recent shortcut when it would be
-        # a no-op (recent path == currently-loaded project) or
-        # when no recent exists. Both cases would leave a button
-        # that either does nothing or doesn't apply.
         if recent is not None:
             current_resolved: Optional[Path] = None
             if self.config_path:
@@ -405,36 +408,90 @@ class NewProjectForm(QWidget):
                 and recent.resolve() == current_resolved
             )
             if not recent_is_self:
-                recent_row = QHBoxLayout()
                 recent_btn = QPushButton(
-                    f"Open most recent: {recent.name}", self,
+                    f"Open most recent: {recent.name}", open_group,
                 )
                 recent_btn.setToolTip(str(recent))
-                recent_btn.setStyleSheet("padding: 6px 10px;")
                 if self._workbench is not None:
-                    # The workbench's _on_open_project asks for a
-                    # path via QFileDialog; we have one already, so
-                    # dispatch directly to the load helper if
-                    # available.
                     def _open_recent() -> None:
-                        handler = getattr(
+                        # Prefer _switch_to_project (the workbench's
+                        # post-creation / post-open code path) when
+                        # present; fall back to _load_project if a
+                        # downstream variant exposes that instead;
+                        # final fallback is the normal Open dialog.
+                        switch = getattr(
+                            self._workbench, "_switch_to_project", None,
+                        )
+                        if switch is not None:
+                            switch(str(recent))
+                            return
+                        loader = getattr(
                             self._workbench, "_load_project", None,
                         )
-                        if handler is not None:
-                            handler(str(recent))
-                        else:
-                            # Fallback: still call _on_open_project
-                            # so the workbench's normal Open dialog
-                            # handles it.
-                            self._workbench._on_open_project()
+                        if loader is not None:
+                            loader(str(recent))
+                            return
+                        self._workbench._on_open_project()
                     recent_btn.clicked.connect(_open_recent)
                 else:
                     recent_btn.setEnabled(False)
-                recent_row.addWidget(recent_btn)
-                recent_row.addStretch()
-                outer.addLayout(recent_row)
+                actions.addWidget(recent_btn)
+        actions.addStretch()
+        open_lay.addLayout(actions)
+        outer.addWidget(open_group)
+
+        # ---------------------------------------------------------- #
+        # Group 2: Create new project — embed ProjectCreateForm
+        # ---------------------------------------------------------- #
+        # Patch 122l: the create flow is now inline rather than a
+        # modal dialog. ProjectCreateForm draws its own Create
+        # button at the bottom (show_create_button=True). On
+        # successful creation it emits project_created with the
+        # new config_path; we route that to the workbench's
+        # switch-to-project handler so the workbench reopens
+        # pointed at the new project.
+        from mufasa.ui_qt.forms.project_create import ProjectCreateForm
+
+        create_group = QGroupBox("Create new project", self)
+        create_lay = QVBoxLayout(create_group)
+        create_lay.setSpacing(8)
+
+        create_hint = QLabel(
+            "Creates a v1 project directory tree "
+            "(<code>project.toml</code> + <code>sources/</code>, "
+            "<code>derived/</code>, <code>models/</code>, "
+            "<code>logs/</code>). The workbench will reopen on "
+            "the new project.",
+            create_group,
+        )
+        create_hint.setTextFormat(Qt.RichText)
+        create_hint.setWordWrap(True)
+        create_hint.setStyleSheet("color: palette(placeholder-text);")
+        create_lay.addWidget(create_hint)
+
+        self._create_form = ProjectCreateForm(
+            create_group, show_create_button=True,
+        )
+        self._create_form.project_created.connect(
+            self._on_project_created,
+        )
+        create_lay.addWidget(self._create_form)
+        outer.addWidget(create_group)
 
         outer.addStretch()
+
+    # ------------------------------------------------------------------ #
+    # Slots
+    # ------------------------------------------------------------------ #
+    def _on_project_created(self, config_path: str) -> None:
+        """The inline create form succeeded. Switch the workbench
+        to point at the new project so all the other pages
+        rebuild with its config_path."""
+        if self._workbench is None:
+            return
+        switch = getattr(self._workbench, "_switch_to_project", None)
+        if switch is not None:
+            switch(config_path)
 
 
 __all__ = ["ProjectInfoForm", "NewProjectForm"]
