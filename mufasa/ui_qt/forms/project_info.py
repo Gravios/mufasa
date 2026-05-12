@@ -53,7 +53,7 @@ class ProjectInfoForm(QWidget):
     * **Animals**      — animal count + ID list
     * **File type**    — csv / parquet / h5
     * **Body parts**   — flat list, truncated with "(+N more)" if long
-    * **Classifiers**  — list of target names (or "none configured")
+    * **Classifiers**  — list of target names (or "none")
     * **Source files** — count of pose files in input_pose_dir
     * **Smoothed runs** — count of v1 runs under
       derived/smoothed/<flavor>/ (v1 only; legacy shows "-")
@@ -92,11 +92,39 @@ class ProjectInfoForm(QWidget):
 
         row = QHBoxLayout()
         row.addStretch()
+        # Patch 122n: Edit button — opens EditProjectMetadataDialog
+        # so users can fix file type / body parts / animal IDs /
+        # classifier targets without leaving the page. v1 only;
+        # the dialog refuses on legacy projects with a clear
+        # message.
+        self._edit_btn = QPushButton("Edit…", self)
+        self._edit_btn.setMinimumWidth(100)
+        self._edit_btn.clicked.connect(self._open_edit_dialog)
+        row.addWidget(self._edit_btn)
         self._refresh_btn = QPushButton("Refresh", self)
         self._refresh_btn.setMinimumWidth(100)
         self._refresh_btn.clicked.connect(self._populate)
         row.addWidget(self._refresh_btn)
         outer.addLayout(row)
+
+    # ------------------------------------------------------------------ #
+    # Slots
+    # ------------------------------------------------------------------ #
+    def _open_edit_dialog(self) -> None:
+        """Open the project-metadata editor. On successful save,
+        re-populate the displayed rows so the change shows up
+        without requiring a manual Refresh click."""
+        if not self.config_path:
+            return
+        # Lazy import — avoids pulling the dialog code when the
+        # button isn't used (and avoids a circular import risk
+        # since the dialog reads project_layout helpers).
+        from mufasa.ui_qt.dialogs.edit_project_metadata_dialog import (
+            EditProjectMetadataDialog,
+        )
+        dlg = EditProjectMetadataDialog(self.config_path, self)
+        dlg.metadata_updated.connect(lambda _path: self._populate())
+        dlg.exec()
 
     # ------------------------------------------------------------------ #
     # Population
@@ -218,7 +246,7 @@ class ProjectInfoForm(QWidget):
             )
             self._add_row("Body parts", f"{head}{tail}")
         else:
-            self._add_row("Body parts", "<i>none configured</i>")
+            self._add_row("Body parts", "<i>none</i>")
 
         clf = meta.get("classifier_targets") or []
         if clf:
@@ -226,7 +254,7 @@ class ProjectInfoForm(QWidget):
         else:
             self._add_row(
                 "Classifiers",
-                "<i>none configured</i>",
+                "<i>none</i>",
             )
 
         # File counts. Cheap glob; tolerate non-existent dirs.
