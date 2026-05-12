@@ -216,6 +216,35 @@ def _check_form_module() -> None:
             f"on every save/load path"
         )
 
+    # Patch 122d: v1-aware path defaults. build() must resolve
+    # the v1 root (if present) and prefill input_dir to
+    # sources/pose and output_dir to a smoothed_run_dir,
+    # using a build-time-allocated run_id reused in target()'s
+    # run.toml write.
+    assert "_v1_run_id" in build_src, (
+        "build() should allocate _v1_run_id when in a v1 project "
+        "for run.toml provenance"
+    )
+    assert (
+        "sources_pose" in build_src
+        and "smoothed_run_dir" in build_src
+    ), (
+        "build() should default input_dir to sources/pose and "
+        "output_dir to a smoothed_run_dir under a v1 project"
+    )
+    assert "generate_run_id" in build_src, (
+        "build() should allocate a fresh run_id at build time so "
+        "the displayed output_dir matches what target() writes"
+    )
+    # target() must write run.toml for v1
+    assert "write_run_toml" in target_src, (
+        "target() should write run.toml provenance for v1 projects"
+    )
+    assert "smoothed.kalman_v2" in target_src, (
+        "target()'s run.toml entry should tag the stage "
+        "'smoothed.kalman_v2'"
+    )
+
 
 def _check_page_registration() -> None:
     """The pose_cleanup_page builder must add a section that

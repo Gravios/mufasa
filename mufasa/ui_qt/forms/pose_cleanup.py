@@ -1071,27 +1071,66 @@ class KalmanV2SmoothingForm(OperationForm):
             self.save_model_chk.isChecked()
         )
 
-        # Pre-populate input/output if config_path resolves a project
+        # Patch 122d: v1-aware path defaults. Generate a fresh
+        # run_id at build time so the displayed output_dir matches
+        # exactly what the form will write on Run. Closing and
+        # reopening the form gives a new run_id; rebuilding the
+        # form doesn't overwrite previous runs.
+        #
+        # In a v1 project:
+        #   input_dir       → <root>/sources/pose/
+        #   output_dir      → <root>/derived/smoothed/kalman_v2/<run_id>/
+        #   save_model_path → <output_dir>/model.npz   (co-located
+        #                     with the smoothed pose data)
+        #
+        # The save_model_path default is set on save_model_path
+        # itself rather than the placeholder so dual-save's
+        # `import_model_into_project` lands the model under
+        # `<project>/models/<run-id-named>/` in addition to the
+        # in-run-dir copy.
+        #
+        # Legacy fallback for projects still on project_config.ini.
+        self._v1_run_id: Optional[str] = None
         if self.config_path:
-            try:
-                cfg = configparser.ConfigParser()
-                cfg.read(self.config_path)
-                project_path = cfg.get(
-                    "General settings", "project_path",
-                    fallback=None,
+            v1_root = resolve_v1_project_root(self.config_path)
+            if v1_root is not None:
+                from mufasa.project_layout import (
+                    ProjectPaths, SmoothingFlavors, generate_run_id,
                 )
-                if project_path:
-                    default_in = os.path.join(
-                        project_path, "csv", "input_csv",
+                paths = ProjectPaths(v1_root)
+                self._v1_run_id = generate_run_id()
+                default_in = paths.sources_pose
+                run_dir = paths.smoothed_run_dir(
+                    SmoothingFlavors.KALMAN_V2,
+                    run_id=self._v1_run_id,
+                )
+                self.input_dir.setText(str(default_in))
+                self.output_dir.setText(str(run_dir))
+                self.save_model_path.setText(
+                    str(run_dir / "model.npz"),
+                )
+            else:
+                # Legacy project — fall back to the SimBA-style
+                # csv/ tree. Same behaviour as before patch 122d.
+                try:
+                    cfg = configparser.ConfigParser()
+                    cfg.read(self.config_path)
+                    project_path = cfg.get(
+                        "General settings", "project_path",
+                        fallback=None,
                     )
-                    if os.path.isdir(default_in):
-                        self.input_dir.setText(default_in)
-                    default_out = os.path.join(
-                        project_path, "csv", "smoothed_v2",
-                    )
-                    self.output_dir.setText(default_out)
-            except Exception:
-                pass
+                    if project_path:
+                        default_in = os.path.join(
+                            project_path, "csv", "input_csv",
+                        )
+                        if os.path.isdir(default_in):
+                            self.input_dir.setText(default_in)
+                        default_out = os.path.join(
+                            project_path, "csv", "smoothed_v2",
+                        )
+                        self.output_dir.setText(default_out)
+                except Exception:
+                    pass
 
     # ------------------------------------------------------------------ #
     # Visibility / refresh helpers
@@ -1304,6 +1343,10 @@ class KalmanV2SmoothingForm(OperationForm):
         # its own copy. Two helpers used at the end of training
         # and at the start of loading.
         v1_root = resolve_v1_project_root(self.config_path)
+        # Patch 122d: the build-time-allocated run_id is reused
+        # here for run.toml provenance so the dir on disk matches
+        # the toml's run_id field. None on legacy projects.
+        v1_run_id = getattr(self, "_v1_run_id", None)
 
         def _post_train_dual_save(saved_path: Optional[str]) -> None:
             """Mirror a freshly-saved model to the global cache and
@@ -1492,6 +1535,48 @@ class KalmanV2SmoothingForm(OperationForm):
             )
         else:
             raise RuntimeError(f"Unknown mode: {mode!r}")
+
+        # Patch 122d: write run.toml provenance for v1 projects.
+        # Fires for both train and load modes after smoothing
+        # finishes successfully. Soft-fails (logged but not
+        # raised) so a provenance hiccup doesn't invalidate
+        # results that are already on disk.
+        if v1_root is not None and v1_run_id is not None:
+            output_dir = kwargs.get("output_dir")
+            if output_dir and os.path.isdir(output_dir):
+                try:
+                    from mufasa.project_layout import (
+                        RUN_PROVENANCE_FILENAME, write_run_toml,
+                    )
+                    # Trim kwargs to JSON-friendly scalars for
+                    # the params block; lists pass through, the
+                    # rest stringifies.
+                    safe_params: dict = {}
+                    for k, v in kwargs.items():
+                        if isinstance(
+                            v, (str, int, float, bool, list),
+                        ) or v is None:
+                            safe_params[k] = v
+                        else:
+                            safe_params[k] = repr(v)
+                    safe_params["mode"] = mode
+                    write_run_toml(
+                        Path(output_dir) / RUN_PROVENANCE_FILENAME,
+                        stage="smoothed.kalman_v2",
+                        run_id=v1_run_id,
+                        params=safe_params,
+                    )
+                    print(
+                        f"[v1] wrote run.toml: "
+                        f"{Path(output_dir) / RUN_PROVENANCE_FILENAME}"
+                    )
+                except Exception as exc:
+                    print(
+                        f"[v1] WARNING: could not write run.toml "
+                        f"({exc}); smoothed output at {output_dir} "
+                        f"is intact."
+                    )
+
 
 # --------------------------------------------------------------------------- #
 # RunOutlierCorrectionForm — patch 122c

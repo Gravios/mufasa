@@ -6,6 +6,353 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ---
 
+## Session 2026-05-11 — Dual-save model store + InputSourcePicker + pose-cleanup redesign + v1-only new projects
+
+Three patch series landed: **122b** factors model provenance and
+input-source selection into reusable primitives; **122c** uses
+them to redesign the pose-cleanup page with explicit Run / Skip
+outlier-correction forms and the legacy forms folded into an
+"Advanced / legacy" section; **122d** cuts new-project creation
+over to v1-only and makes the Kalman v2 form v1-aware so the
+fresh-project pose-cleanup workflow runs end-to-end without
+touching legacy paths.
+
+### Shipped
+
+#### Dual-save model store (patch 122b)
+
+Trained models now live in two places. The **global cache** at
+`~/.config/mufasa/models/<name>.npz` is a cross-project library
+— a model trained once is discoverable from any project on the
+same machine. The **project store** at `<project>/models/<name>/`
+holds `model.npz` plus a `card.toml` carrying provenance
+(`source_path`, `sha256`, `copied_at`, `mufasa_version`). Both
+get a copy on every save / load crossing.
+
+- New `project_layout.py` helpers: `import_model_into_project`,
+  `mirror_model_to_global_cache`, `file_sha256`,
+  `global_model_cache_dir`, `resolve_v1_project_root`.
+  Content-hash idempotence: re-importing/mirroring the same
+  model is a no-op. Different-content collision raises
+  `FileExistsError` rather than silently overwriting (training
+  output passes `overwrite=True`; load-side imports use the
+  default no-overwrite to protect known-good models).
+- `KalmanV2SmoothingForm.target`: a `_post_train_dual_save()`
+  closure runs after every `smooth_pose_v2(save_model=...)`
+  call (both single-pass and two-pass training paths); the
+  load branch imports the chosen model into the project's
+  `models/` before passing it to the smoother. Failures in
+  either are soft — logged, but the original `.npz` is left
+  intact.
+
+#### InputSourcePicker (patch 122b)
+
+New module `mufasa/ui_qt/input_source_picker.py`.
+
+- `discover_input_sources(config_path, project_root)` — pure
+  function. Walks both layouts: legacy `csv/{input_csv,
+  outlier_corrected_movement, outlier_corrected_movement_location,
+  smoothed_v2}/` and v1 `sources/pose/` + `derived/smoothed/
+  <flavor>/<run>/` + `derived/outlier_corrected/<run>/`. v1
+  candidates come first when both are present (post-migration
+  transient). Multi-run stages list one entry per run, newest
+  first. Empty / nonexistent dirs are skipped silently.
+- `_DEFAULT_PREFER_ORDER`: kalman_v2 → outlier_corrected →
+  savitzky → raw. Exactly one source is marked `is_default`.
+  Overridable per call (the new `RunOutlierCorrectionForm`
+  prefers raw, since outlier correction usually precedes
+  smoothing).
+- `InputSourcePicker` Qt widget: combobox + path field + browse
+  + refresh (`↻`). Custom-path sentinel un-greys the path field.
+  PySide6 imported lazily so the pure discovery function tests
+  headless.
+- **First consumer**: `EgocentricAlignmentForm`. The previous
+  auto-detect of `csv/outlier_corrected_movement_location/`-vs-
+  `csv/input_csv/` is gone; users can now feed egocentric
+  alignment any prior stage's output, including a specific
+  Kalman v2 run.
+
+#### Pose cleanup redesign (patch 122c)
+
+- New `RunOutlierCorrectionForm`. Chains
+  `OutlierCorrecterMovement` → `OutlierCorrecterLocation`. Input
+  via `InputSourcePicker` (preference RAW). Per-stage checkboxes
+  let users disable movement or location independently. Output
+  dir auto-generates `derived/outlier_corrected/<run_id>/` on v1
+  projects (with `run.toml` provenance written after) and falls
+  back to legacy `csv/outlier_corrected_movement_location/`
+  otherwise. When both stages run, movement writes to a
+  `_movement_intermediate/` sibling that location reads from.
+- New `SkipOutlierCorrectionForm`. Thin wrapper around
+  `OutlierCorrectionSkipper` — no fields, just a Run button.
+  Writes `run.toml` with `params.skipped = true` and a
+  `SKIPPED` marker file when run inside a v1 project so future
+  layout-aware tooling can distinguish "skipped" from "missing"
+  runs.
+- Pose cleanup page sections reordered to match the conceptual
+  pipeline:
+
+  ```
+  1. Interpolate missing frames
+  2. Kalman v2 smoothing
+  3. Run outlier correction         ← NEW
+  4. Skip outlier correction        ← NEW
+  5. Egocentric alignment           (now picker-driven)
+  6. Advanced / legacy              (stacks SmoothingForm,
+                                     OutlierSettingsForm,
+                                     DropBodypartsForm)
+  ```
+
+  Legacy `Smoothing` / `Outlier correction settings` /
+  `Drop body-parts` top-level sections are gone; their forms
+  still exist (settings is still consumed by the new outlier
+  forms — it writes the thresholds they read) but they're
+  folded into one Advanced section using
+  `WorkflowPage._instantiate`'s existing form-stacking.
+
+#### v1-only new projects + Kalman v2 v1-awareness (patch 122d)
+
+`ProjectConfigCreator` was rewritten end-to-end. The legacy
+SimBA tree generator (the `__create_directories` /
+`__create_configparser_config` pair that built `project_folder/
+csv/{input_csv, outlier_corrected_*, features_extracted, ...}`
++ `project_config.ini`) is gone. New projects land as v1:
+
+```
+<parent>/<project_name>/
+├── project.toml                       (new)
+├── sources/{videos,pose,annotations}/  (via ProjectPaths.ensure_skeleton)
+├── derived/
+├── models/
+└── logs/
+```
+
+The new `project.toml` schema is small and explicit:
+
+- top-level: `project_layout_version`, `project_name`,
+  `created`, `mufasa_version`, `os_platform`
+- `[pose]`: `animal_count`, `file_type`, `body_parts` (list,
+  in order), `pose_config_code`, `pose_config_idx`, `animal_ids`
+- `[classifiers]`: `targets` (may be empty)
+- `[outlier_settings]`: `movement_criterion`, `location_criterion`
+  (initial `"NaN"` matches the legacy `Dtypes.NONE` sentinel
+  so existing settings code can read it verbatim once it's TOML-
+  aware)
+
+The Qt create-project dialog (`CreateProjectDialog`) was
+simplified accordingly: the previous "create with placeholder
+preset, then call `reconfigure_project_user_defined` to patch
+in the autodetected body parts" two-step is gone. Both the
+preset and autodetect paths now funnel body parts directly into
+`ProjectConfigCreator` via the new `body_parts=` parameter, so
+the project is fully configured on first write. The dialog's
+docstring and the project-setup-page banner were updated to
+say `project.toml` instead of `project_config.ini` (with the
+banner still acknowledging legacy `project_config.ini` for
+projects opened from before this cutover).
+
+`KalmanV2SmoothingForm` was made v1-aware so the fresh-project
+pose-cleanup workflow runs end-to-end on v1 without any legacy
+path resolution:
+
+- **Input dir** defaults to `<project>/sources/pose/`.
+- **Output dir** defaults to
+  `<project>/derived/smoothed/kalman_v2/<run_id>/`. A fresh
+  `run_id` is allocated at form-build time (cached on
+  `self._v1_run_id`) so the path the user sees in the field is
+  exactly what gets written on Run. Closing and reopening the
+  form gives a fresh `run_id`; the form never overwrites a
+  prior run.
+- **Save-model path** defaults to `<run_dir>/model.npz`,
+  co-located with the smoothed pose data. The 122b dual-save
+  flow still mirrors to `~/.config/mufasa/models/model.npz` and
+  imports into `<project>/models/model/` on top.
+- After smoothing completes, the form writes a
+  `<run_dir>/run.toml` provenance file tagged
+  `stage = "smoothed.kalman_v2"`, with `params` capturing every
+  scalar/list kwarg passed to `smooth_pose_v2` plus the mode
+  (`"train"` or `"load"`). Soft-fails (logged) if anything goes
+  wrong — pose data already on disk is left intact.
+
+Legacy projects still work via the existing `configparser`
+fallback in `build()`. `resolve_v1_project_root` distinguishes
+the two cases.
+
+Net effect: the data flow for the v1 pose-cleanup pipeline is
+now self-consistent — raw pose lives at `sources/pose/`, the
+Kalman v2 smoother writes to
+`derived/smoothed/kalman_v2/<run_id>/`, and the egocentric
+alignment form's `InputSourcePicker` surfaces both raw and any
+prior smoothed run as candidates (with the most-processed run
+as the default). Subsequent pose-cleanup operations read from
+raw or smoothed exactly as intended.
+
+### Test counts at session end
+
+| suite                          | count    |
+|--------------------------------|----------|
+| smoke_kalman_pose_smoother_v2  | 152/152  |
+| smoke_project_layout           |   9/9    |
+| smoke_migrate_project          |   5/5    |
+| smoke_recent_project           |   6/6    |
+| smoke_pose_cleanup_v2_wiring   |   2/2    |
+| smoke_model_dual_save          |  23/23   |
+| smoke_input_source_picker      |  29/29   |
+| smoke_outlier_forms_wiring     |  40/40   |
+| smoke_empty_classifier         |   1/1    |
+| smoke_config_creator_v1        |  38/38   |
+
+`smoke_model_dual_save` redirects `HOME` so it doesn't pollute
+the real `~/.config/mufasa/models/`. `smoke_input_source_picker`
+covers the pure discovery function behaviorally and the Qt
+widget at AST level (PySide6-free sandbox). The wiring tests
+are AST-only. `smoke_empty_classifier` was rewritten from its
+legacy INI shape into a v1-`project.toml` shape; the original
+contract (empty `target_list` is accepted) is preserved.
+
+### Deliberately deferred
+
+**Model store**
+
+- Trained-model auto-naming. The form's default save path is
+  now `<run_dir>/model.npz` for v1 projects (one model per run,
+  collision-free by construction); the global cache still flat-
+  names them as `model.npz` which IS collision-prone. Probably
+  want to use the run_id as the global-cache name too.
+- Card.toml schema is minimal — `model_name`, `source_path`,
+  `sha256`, `copied_at`, `mufasa_version`. No training params,
+  no eval metrics, no fingerprint of the training data. The
+  changelog's earlier note on `card.toml` for classifiers still
+  applies; this is the v0.
+
+**InputSourcePicker**
+
+- Picker doesn't show file counts or last-modified time per
+  source. For a project with many runs it'd be useful to know
+  which has data and how fresh it is. Two lines per item in the
+  combobox would do it.
+- No source preview / inspect button. Picking a run and seeing
+  its `run.toml` parameters before committing would help.
+
+**Pose cleanup**
+
+- "Drop body-parts" still lives in Advanced / legacy. It's
+  really a project-setup decision, not a per-run cleanup step.
+  Move it to the project-setup page once that's the right
+  surface.
+- `RunOutlierCorrectionForm` writes `run.toml` for v1 but
+  doesn't yet enumerate the actual input file list (params has
+  the `data_dir`, not the per-file paths). The `write_run_toml`
+  `inputs` field accepts a list; populating it would make
+  full reproducibility checkable.
+- `SkipOutlierCorrectionForm` writes a v1 `run.toml` next to a
+  `SKIPPED` marker file but doesn't actually populate the v1
+  `derived/outlier_corrected/<run>/` with the skip-copied
+  files. That's because `OutlierCorrectionSkipper` writes to
+  the legacy `csv/outlier_corrected_movement_location/` and
+  isn't yet v1-aware. Fixing this is part of the broader
+  "make each backend v1-aware" thread.
+- The legacy `SmoothingForm` (Savitzky-Golay) is still mounted
+  in Advanced. Once we're confident Kalman v2 covers every
+  pre-Kalman use case the dataset hit, this form can be
+  removed entirely.
+
+**v1 cutover (122d) — the iceberg below the waterline**
+
+The 122d patch makes new projects v1, but the downstream forms
+that consume those projects are still mostly INI-driven. The
+**only** form that fully works in a fresh v1 project right now
+is `KalmanV2SmoothingForm` (because its target reads pose
+directly from `input_dir` without ever touching
+`config_path`). Every other form — `InterpolateForm`,
+`RunOutlierCorrectionForm`, `SkipOutlierCorrectionForm`,
+`EgocentricAlignmentForm`, the legacy three, plus every form
+on every other page — calls into a backend that uses
+`ConfigReader` to parse `config_path` as an INI. In a v1
+project `config_path` points to `project.toml`, and those
+backends will fail to read it.
+
+The migration thread that fixes this:
+
+1. Add a `ConfigReader` subclass (or a `read_project_toml`
+   helper) that reads `project.toml` and exposes the same
+   attributes the legacy ConfigReader does (`animal_cnt`,
+   `body_parts`, `file_type`, `input_csv_dir`, etc.). For v1,
+   `input_csv_dir` resolves to `sources/pose/`,
+   `outlier_corrected_dir` to a latest-run path under
+   `derived/outlier_corrected/`, and so on.
+2. Route every `ConfigReader`-using backend through the
+   subclass.
+3. Make each form's `target()` pass the right v1 paths down
+   so its backend never has to guess.
+
+That's a multi-session thread; the priority order matches the
+pose-cleanup page's section order (Interpolate, Outlier-Run,
+Outlier-Skip, Egocentric backend, Advanced/legacy).
+
+Until that's done, the practical v1 workflow is:
+
+- Drop raw pose into `<project>/sources/pose/`.
+- Run **Kalman v2 smoothing** — produces
+  `derived/smoothed/kalman_v2/<run>/`.
+- (Other pose-cleanup forms will fail with a config error.)
+- Egocentric alignment partially works — the form constructs
+  fine (no INI needed in the form itself, since the picker
+  drives the data path), but its backend
+  (`EgocentricalAligner`) reads `config_path` and may fall
+  over depending on how deeply it relies on the INI.
+
+In short: **122d unlocks the smoother in v1 mode; the rest of
+the pipeline catches up patch by patch.**
+
+### Open questions
+
+- Should `RunOutlierCorrectionForm`'s save_dir picker accept a
+  v1 run directory the user already created (rather than always
+  auto-generating)? Useful for re-running with tweaked
+  thresholds in the same provenance dir. Currently auto-gen
+  only.
+- The InputSourcePicker shows v1 runs newest-first. For a
+  project with dozens of runs this could get unwieldy. A
+  "latest only" toggle (showing just the most recent run per
+  flavor) would help; the full list could be reachable via an
+  "All runs…" entry. Not urgent.
+- The legacy `reconfigure_project_user_defined` helper still
+  exists but isn't called by `CreateProjectDialog` anymore.
+  Keep it for the File → Reconfigure project from DLC file…
+  menu action, or retire it entirely? Probably keep until the
+  v1-aware reconfigure equivalent exists.
+
+### Pickup checklist for next session
+
+1. Confirm tests still green:
+   ```bash
+   PYTHONPATH=. python tests/smoke_project_layout.py && \
+   PYTHONPATH=. python tests/smoke_migrate_project.py && \
+   PYTHONPATH=. python tests/smoke_recent_project.py && \
+   PYTHONPATH=. python tests/smoke_pose_cleanup_v2_wiring.py && \
+   PYTHONPATH=. python tests/smoke_model_dual_save.py && \
+   PYTHONPATH=. python tests/smoke_input_source_picker.py && \
+   PYTHONPATH=. python tests/smoke_outlier_forms_wiring.py && \
+   PYTHONPATH=. python tests/smoke_empty_classifier.py && \
+   PYTHONPATH=. python tests/smoke_config_creator_v1.py
+   ```
+2. Three threads ready to pick up:
+   - **v1-aware ConfigReader.** Highest priority — every form
+     beyond Kalman v2 fails in a fresh v1 project until this
+     exists. See "iceberg below the waterline" section above.
+   - **Batch pipeline through inference** (still the original
+     ask from this session — scoped out, never started).
+     Schema for `pipeline.toml`, CLI scaffold, ephemeral-project
+     synthesizer, four stage adapters. Estimated 1500–2500 LOC
+     across one or two sessions.
+   - **Migration prompt on legacy projects.** Original
+     deferred item from 122a: when `detect_layout(project) ==
+     'legacy'`, surface a dialog at workbench launch offering
+     migration. Small patch.
+
+---
+
 ## Session 2026-05-08 to 2026-05-11 — Kalman v2 smoother feature completion + workbench wiring + project-layout redesign
 
 ### Shipped
