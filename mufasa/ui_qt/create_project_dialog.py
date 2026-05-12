@@ -13,7 +13,10 @@ that matches the legacy Tk flow:
 * classifier names (newline-separated; blank lines skipped)
 * file type (csv / parquet)
 
-On success returns the full path to the generated ``project_config.ini``.
+Patch 122d: the dialog now produces only the v1 project layout
+(``project.toml`` + ``sources/``, ``derived/``, ``models/``,
+``logs/``). On success ``self.config_path`` is the absolute path
+to the generated ``project.toml``.
 """
 from __future__ import annotations
 
@@ -34,9 +37,9 @@ from mufasa.utils.lookups import get_bp_config_codes
 
 
 class CreateProjectDialog(QDialog):
-    """Modal dialog that creates a new project. Use ``config_path``
-    after ``exec()`` returns ``QDialog.Accepted`` to retrieve the path
-    to the generated ``project_config.ini``."""
+    """Modal dialog that creates a new v1-layout Mufasa project. Use
+    ``config_path`` after ``exec()`` returns ``QDialog.Accepted`` to
+    retrieve the path to the generated ``project.toml``."""
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -242,20 +245,22 @@ class CreateProjectDialog(QDialog):
         # target_list — all clf-settings loops become no-ops and
         # TARGET_CNT is set to "0".
 
-        # Branch on autodetect vs preset. We still go through
-        # ProjectConfigCreator for both paths (it builds the directory
-        # tree etc.), then for autodetect we reconfigure the freshly-
-        # created project to user_defined + our detected bps.
+        # Branch on autodetect vs preset. Both paths funnel into
+        # the same v1 ProjectConfigCreator call with body_parts
+        # provided explicitly — autodetect uses the parsed list
+        # from the DLC file; preset uses an arbitrary tree-stub
+        # preset (the bps are passed in via body_parts so the
+        # preset_idx is essentially a record-keeping field).
         if self._autodetected_bps:
-            # Pick an arbitrary 1-animal preset just to get the tree
-            # created; we'll overwrite the pose_estimation fields right
-            # after. '1 animal; 7 body-parts' is first, exists in all
-            # forks — doesn't matter which, it's getting overwritten.
-            preset = "1 animal; 7 body-parts"
-            config_code = self._preset_codes.get(preset, "7")
-            preset_idx = (self._preset_names.index(preset)
-                          if preset in self._preset_names else 1)
+            # Autodetect: body_parts comes from the parsed DLC
+            # file. Use the canonical user_defined preset code in
+            # project.toml so downstream tooling that branches on
+            # the preset can distinguish autodetect from a fixed
+            # preset selection.
+            config_code = "user_defined"
+            preset_idx = 0
             animal_cnt = 1
+            body_parts = list(self._autodetected_bps)
         else:
             preset = self._preset_combo.currentText()
             animal_cnt = int(self._animal_count.value())
@@ -268,8 +273,13 @@ class CreateProjectDialog(QDialog):
                 )
                 return
             preset_idx = self._preset_names.index(preset)
+            body_parts = None  # ProjectConfigCreator will look up
+                               # the preset row in bp_names.csv.
 
-        # Actually create it
+        # Actually create it — v1 layout, project.toml at
+        # creator.config_path. The previous reconfigure-after-
+        # create dance is gone: body_parts goes in at creation
+        # time so the project is fully configured on first write.
         from mufasa.utils.config_creator import ProjectConfigCreator
         try:
             creator = ProjectConfigCreator(
@@ -280,39 +290,14 @@ class CreateProjectDialog(QDialog):
                 body_part_config_idx=preset_idx,
                 animal_cnt=animal_cnt,
                 file_type=file_type,
+                body_parts=body_parts,
             )
-        except Exception as exc:  # broad: config_creator raises many flavours
+        except Exception as exc:  # broad: creator raises many flavours
             QMessageBox.critical(
                 self, "Project creation failed",
                 f"{type(exc).__name__}: {exc}",
             )
             return
-
-        # If autodetect was used, immediately reconfigure the fresh
-        # project to user_defined + detected body parts. This keeps
-        # the two paths (create + reconfigure) sharing the same
-        # reconfigure helper, which has its own tests.
-        if self._autodetected_bps:
-            from mufasa.utils.project_reconfigure import (
-                ProjectReconfigureError,
-                reconfigure_project_user_defined,
-            )
-            try:
-                reconfigure_project_user_defined(
-                    config_path=creator.config_path,
-                    body_parts=self._autodetected_bps,
-                    animal_cnt=1,
-                )
-            except ProjectReconfigureError as exc:
-                QMessageBox.critical(
-                    self, "Autodetect reconfigure failed",
-                    f"Project directory was created, but body-part "
-                    f"reconfigure failed: {exc}. You can still open the "
-                    f"project and run File → Reconfigure project from "
-                    f"DLC file… to retry.",
-                )
-                # Still accept — the project exists, it's just on a
-                # preset that doesn't match the data.
 
         self.config_path = creator.config_path
         self.accept()

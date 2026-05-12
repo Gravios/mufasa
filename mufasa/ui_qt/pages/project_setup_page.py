@@ -8,6 +8,10 @@ surfaces; registers the About-Mufasa Help menu action.
 When the workbench is launched without a ``config_path``, we surface
 a top banner pointing the user at File → New project / File → Open
 project so it's obvious how to proceed from a cold start.
+
+Patch 122d: banner text references ``project.toml`` rather than the
+legacy ``project_config.ini``, matching the v1 layout that
+:class:`ProjectConfigCreator` now produces.
 """
 from __future__ import annotations
 
@@ -35,8 +39,9 @@ def _build_no_project_banner(workbench) -> QFrame:
     lay = QHBoxLayout(banner)
     msg = QLabel(
         "<b>No project loaded.</b><br>"
-        "Create a new project or open an existing "
-        "<code>project_config.ini</code> to begin."
+        "Create a new project, or open an existing "
+        "<code>project.toml</code> (v1) or "
+        "<code>project_config.ini</code> (legacy)."
     )
     msg.setTextFormat(Qt.RichText)
     msg.setWordWrap(True)

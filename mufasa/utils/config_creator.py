@@ -1,287 +1,313 @@
-__author__ = "Simon Nilsson; sronilsson@gmail.com"
+"""
+mufasa.utils.config_creator
+===========================
+
+Patch 122d: rewritten to produce **only** the v1 project layout
+defined in :mod:`mufasa.project_layout`. The previous legacy
+SimBA tree (``project_folder/csv/{input_csv,
+outlier_corrected_*,...}`` + ``project_config.ini``) is gone for
+new projects; existing legacy projects still work via the
+unchanged :mod:`mufasa.legacy_layout` reader and
+:mod:`mufasa.cli.migrate_project` migration tool.
+
+A fresh project lands as::
+
+    <parent>/<project_name>/
+    ├── project.toml                     # this module writes this
+    ├── sources/{videos,pose,annotations}/   # ensure_skeleton() creates these
+    ├── derived/                         # empty; populated by pose-cleanup
+    ├── models/                          # trained models land here
+    └── logs/
+
+Consumers
+---------
+
+* :class:`mufasa.ui_qt.create_project_dialog.CreateProjectDialog`
+  drives this from the workbench's File → New project flow.
+* The ``__main__`` block at the bottom of this file gives a CLI
+  entry point: ``python -m mufasa.utils.config_creator
+  --project_path ... --project_name ...``.
+
+Both paths set ``ProjectConfigCreator.config_path`` to the
+absolute path of the freshly-written ``project.toml``; callers
+hand that off to the workbench like they used to with the legacy
+INI path. Any form that still parses ``config_path`` as an INI
+will break under v1 — those forms are the target of the
+"v1-aware form" thread (see CHANGELOG).
+"""
+from __future__ import annotations
 
 import argparse
 import csv
 import os
 import platform
 import sys
-from configparser import ConfigParser
-from typing import List
+import time
+from pathlib import Path
+from typing import List, Optional
 
 import mufasa
-from mufasa.utils.enums import ConfigKey, DirNames, Dtypes, MLParamKeys, Paths
-from mufasa.utils.errors import DirectoryExistError
-from mufasa.utils.printing import SimbaTimer, stdout_success
+from mufasa.project_layout import (
+    PROJECT_CONFIG_FILENAME,
+    PROJECT_LAYOUT_VERSION,
+    ProjectPaths,
+    write_project_toml,
+)
+from mufasa.utils.enums import Paths
 
 
-class ProjectConfigCreator(object):
+def _read_preset_body_parts(
+    body_part_config_idx: int,
+) -> List[str]:
+    """Look up the body-part list at row ``body_part_config_idx``
+    of the canonical ``pose_configurations/bp_names/bp_names.csv``.
+
+    The file is comma-separated, one preset per row, with trailing
+    empty columns padded out to a fixed width. The dialog's preset
+    dropdown displays the human-readable name from
+    ``pose_config_names.csv`` at the same row index.
     """
-    Create SimBA project directory tree and associated project_config.ini config file.
+    simba_dir = Path(mufasa.__file__).parent
+    bp_dir_path = simba_dir / Paths.SIMBA_BP_CONFIG_PATH.value
+    with open(bp_dir_path, "r", encoding="utf8") as f:
+        rows = list(csv.reader(f, delimiter=","))
+    if body_part_config_idx < 0 or body_part_config_idx >= len(rows):
+        raise ValueError(
+            f"body_part_config_idx={body_part_config_idx} is out of "
+            f"range for {bp_dir_path} ({len(rows)} rows)."
+        )
+    chosen = [bp for bp in rows[body_part_config_idx] if bp]
+    if not chosen:
+        raise ValueError(
+            f"Preset at row {body_part_config_idx} of {bp_dir_path} "
+            f"is empty."
+        )
+    return chosen
 
-    .. note::
-       `Tutorial <https://github.com/sgoldenlab/mufasa/blob/master/docs/tutorial.md#part-1-create-a-new-project-1>`__.
 
-    :param str project_path: path to directory where to save the SimBA project directory tree
-    :param str project_name: Name of the SimBA project
-    :param List[str] target_list: Classifier names in the SimBA project
-    :param str pose_estimation_bp_cnt: String representing the number of body-parts in the pose-estimation data used in the mufasa project. E.g., '4', '7', '8', '9', '14', '16' or 'user_defined', '3D_user_defined'.
-    :param int body_part_config_idx: The index of the SimBA GUI dropdown pose-estimation selection. E.g., ``1``. I.e., the row representing your pose-estimated body-parts in `this file <https://github.com/sgoldenlab/mufasa/blob/master/mufasa/pose_configurations/bp_names/bp_names.csv>`_.
-    :param int animal_cnt: Number of animals tracked in the input pose-estimation data.
-    :param str file_type: The SimBA project file type. OPTIONS: ``csv`` or ``parquet``.
+class ProjectConfigCreator:
+    """Create a v1-layout Mufasa project.
 
-    .. note::
-       For example `project_config.ini` files, see `https://github.com/sgoldenlab/mufasa/tree/master/tests/data/test_projects`.
+    :param str project_path: directory under which to create the
+        project. The new project lives at ``<project_path>/<project_name>/``.
+    :param str project_name: project folder name (and the
+        ``project_name`` field in the resulting ``project.toml``).
+    :param List[str] target_list: classifier names. May be empty —
+        classifiers can be added later from the Classifier page.
+    :param str pose_estimation_bp_cnt: SimBA-style body-part count
+        code (``"7"``, ``"14"``, ``"16"``, ``"user_defined"``,
+        ``"3D_user_defined"``, …). Kept as a project.toml field
+        so downstream tooling that still expects the preset code
+        can read it.
+    :param int body_part_config_idx: row in
+        ``pose_configurations/bp_names/bp_names.csv`` whose body-
+        part names should be baked into the project. Ignored
+        when ``body_parts`` is given.
+    :param int animal_cnt: animal count.
+    :param str file_type: pose file extension. ``"csv"`` /
+        ``"parquet"`` / ``"h5"``. Persisted in
+        ``project.toml`` for downstream consumers.
+    :param Optional[List[str]] body_parts: explicit body-part
+        list. If passed, ``body_part_config_idx`` is ignored and
+        the project gets exactly these body parts (preserved in
+        order). The autodetect flow in
+        :class:`CreateProjectDialog` uses this.
 
-    :example:
-    >>> _ = ProjectConfigCreator(project_path = 'project/path', project_name='project_name', target_list=['Attack'], pose_estimation_bp_cnt='16', body_part_config_idx=9, animal_cnt=2, file_type='csv')
-
+    Attributes
+    ----------
+    config_path : str
+        Absolute path to the written ``project.toml``. Callers
+        hand this to the workbench (or to any tool that expects
+        a project locator) the same way they did with the legacy
+        INI path.
+    project_root : Path
+        ``<project_path>/<project_name>/``. The v1 layout root.
     """
 
-    def __init__(self,
-                  project_path: str,
-                  project_name: str,
-                  target_list: List[str],
-                  pose_estimation_bp_cnt: str,
-                  body_part_config_idx: int,
-                  animal_cnt: int,
-                  file_type: str = "csv"):
+    def __init__(
+        self,
+        project_path: str,
+        project_name: str,
+        target_list: List[str],
+        pose_estimation_bp_cnt: str,
+        body_part_config_idx: int,
+        animal_cnt: int,
+        file_type: str = "csv",
+        body_parts: Optional[List[str]] = None,
+    ) -> None:
+        if not project_name or any(
+            c in project_name for c in r" /\:<>|*?\""
+        ):
+            raise ValueError(
+                f"project_name={project_name!r} contains shell-unfriendly "
+                f"characters or is empty."
+            )
+        if animal_cnt < 1:
+            raise ValueError(
+                f"animal_cnt must be >= 1, got {animal_cnt}"
+            )
+        if file_type not in ("csv", "parquet", "h5"):
+            raise ValueError(
+                f"file_type must be csv, parquet, or h5; got {file_type!r}"
+            )
 
-
-        self.simba_dir = os.path.dirname(mufasa.__file__)
-        self.animal_cnt = animal_cnt
-        self.os_platform = platform.system()
         self.project_path = project_path
         self.project_name = project_name
-        self.target_list = target_list
+        self.target_list = list(target_list)
         self.pose_estimation_bp_cnt = pose_estimation_bp_cnt
         self.body_part_config_idx = body_part_config_idx
+        self.animal_cnt = animal_cnt
         self.file_type = file_type
-        self.timer = SimbaTimer(start=True)
-        self.__create_directories()
-        self.__create_configparser_config()
+        self.os_platform = platform.system()
 
-    def __create_directories(self):
-        self.project_folder = os.path.join(
-            self.project_path, self.project_name, DirNames.PROJECT.value
-        )
-        self.models_folder = os.path.join(
-            self.project_path, self.project_name, DirNames.MODEL.value
-        )
-        self.config_folder = os.path.join(self.project_folder, DirNames.CONFIGS.value)
-        self.csv_folder = os.path.join(self.project_folder, DirNames.CSV.value)
-        self.frames_folder = os.path.join(self.project_folder, DirNames.FRAMES.value)
-        self.logs_folder = os.path.join(self.project_folder, DirNames.LOGS.value)
-        self.measures_folder = os.path.join(self.logs_folder, DirNames.MEASURES.value)
-        self.pose_configs_folder = os.path.join(
-            self.measures_folder, DirNames.POSE_CONFIGS.value
-        )
-        self.bp_names_folder = os.path.join(
-            self.pose_configs_folder, DirNames.BP_NAMES.value
-        )
-        self.videos_folder = os.path.join(self.project_folder, DirNames.VIDEOS.value)
-        self.features_extracted_folder = os.path.join(
-            self.csv_folder, DirNames.FEATURES_EXTRACTED.value
-        )
-        self.input_csv_folder = os.path.join(self.csv_folder, DirNames.INPUT_CSV.value)
-        self.machine_results_folder = os.path.join(
-            self.csv_folder, DirNames.MACHINE_RESULTS.value
-        )
-        self.outlier_corrected_movement_folder = os.path.join(
-            self.csv_folder, DirNames.OUTLIER_MOVEMENT.value
-        )
-        self.outlier_corrected_location_folder = os.path.join(
-            self.csv_folder, DirNames.OUTLIER_MOVEMENT_LOCATION.value
-        )
-        self.targets_inserted_folder = os.path.join(
-            self.csv_folder, DirNames.TARGETS_INSERTED.value
-        )
-        self.input_folder = os.path.join(self.frames_folder, DirNames.INPUT.value)
-        self.output_folder = os.path.join(self.frames_folder, DirNames.OUTPUT.value)
-
-        folder_lst = [
-            self.project_folder,
-            self.models_folder,
-            self.config_folder,
-            self.csv_folder,
-            self.frames_folder,
-            self.logs_folder,
-            self.videos_folder,
-            self.features_extracted_folder,
-            self.input_csv_folder,
-            self.machine_results_folder,
-            self.outlier_corrected_movement_folder,
-            self.outlier_corrected_location_folder,
-            self.targets_inserted_folder,
-            self.input_folder,
-            self.output_folder,
-            self.measures_folder,
-            self.pose_configs_folder,
-            self.bp_names_folder,
-        ]
-
-        for folder_path in folder_lst:
-            if os.path.isdir(folder_path):
-                raise DirectoryExistError(
-                    msg=f"SimBA tried to create {folder_path}, but it already exists. Please create your SimBA project in a new path, or move/delete your previous SimBA project"
+        # Resolve body_parts: explicit override > preset lookup.
+        if body_parts is not None:
+            if not body_parts:
+                raise ValueError(
+                    "body_parts list, when provided, must be non-empty."
                 )
-            else:
-                os.makedirs(folder_path)
+            self.body_parts = list(body_parts)
+        else:
+            self.body_parts = _read_preset_body_parts(
+                body_part_config_idx,
+            )
 
-    def __create_configparser_config(self):
-        self.config = ConfigParser(allow_no_value=True)
-        self.config.add_section(ConfigKey.GENERAL_SETTINGS.value)
-        self.config[ConfigKey.GENERAL_SETTINGS.value][ConfigKey.PROJECT_PATH.value] = self.project_folder
-        self.config[ConfigKey.GENERAL_SETTINGS.value][ConfigKey.PROJECT_NAME.value] = self.project_name
-        self.config[ConfigKey.GENERAL_SETTINGS.value][ConfigKey.FILE_TYPE.value] = self.file_type
-        self.config[ConfigKey.GENERAL_SETTINGS.value][ConfigKey.ANIMAL_CNT.value] = str(self.animal_cnt)
-        self.config[ConfigKey.GENERAL_SETTINGS.value][ConfigKey.OS.value] = self.os_platform
+        # Resolve project_root and refuse to clobber an existing
+        # project. ProjectPaths.ensure_skeleton() is idempotent
+        # on partial trees, but a complete project shouldn't be
+        # overwritten — that's a user error.
+        self.project_root = (
+            Path(self.project_path) / self.project_name
+        ).resolve()
+        if (self.project_root / PROJECT_CONFIG_FILENAME).exists():
+            raise FileExistsError(
+                f"{self.project_root} already contains "
+                f"{PROJECT_CONFIG_FILENAME}. Pick a different name "
+                f"or remove the existing project first."
+            )
 
-        self.config.add_section(ConfigKey.SML_SETTINGS.value)
-        self.config[ConfigKey.SML_SETTINGS.value][ConfigKey.MODEL_DIR.value] = self.models_folder
-        for clf_cnt in range(len(self.target_list)):
-            self.config[ConfigKey.SML_SETTINGS.value]["model_path_{}".format(str(clf_cnt + 1))] = os.path.join(self.models_folder, str(self.target_list[clf_cnt]) + ".sav")
+        self._create_skeleton()
+        self._write_project_toml()
 
-        self.config[ConfigKey.SML_SETTINGS.value][ConfigKey.TARGET_CNT.value] = str(len(self.target_list))
-        for clf_cnt in range(len(self.target_list)):
-            self.config[ConfigKey.SML_SETTINGS.value]["target_name_{}".format(str(clf_cnt + 1))] = str(self.target_list[clf_cnt])
+    # ----------------------------------------------------------- #
+    # Skeleton creation
+    # ----------------------------------------------------------- #
+    def _create_skeleton(self) -> None:
+        """Build ``sources/``, ``derived/``, ``models/``, ``logs/``
+        under ``project_root`` via the canonical ProjectPaths
+        helper. Idempotent — re-running on a partial skeleton is
+        safe.
+        """
+        self.project_root.mkdir(parents=True, exist_ok=True)
+        paths = ProjectPaths(self.project_root)
+        paths.ensure_skeleton()
 
-        self.config.add_section(ConfigKey.THRESHOLD_SETTINGS.value)
-        for clf_cnt in range(len(self.target_list)):
-            self.config[ConfigKey.THRESHOLD_SETTINGS.value]["threshold_{}".format(str(clf_cnt + 1))] = Dtypes.NONE.value
-        self.config[ConfigKey.THRESHOLD_SETTINGS.value][ConfigKey.SKLEARN_BP_PROB_THRESH.value] = str(0.00)
+    # ----------------------------------------------------------- #
+    # project.toml writer
+    # ----------------------------------------------------------- #
+    def _write_project_toml(self) -> None:
+        """Write the project.toml. Schema mirrors what was in the
+        legacy INI but TOML-native and explicit. Sections:
 
-        self.config.add_section(ConfigKey.MIN_BOUT_LENGTH.value)
-        for clf_cnt in range(len(self.target_list)):
-            self.config[ConfigKey.MIN_BOUT_LENGTH.value]["min_bout_{}".format(str(clf_cnt + 1))] = Dtypes.NONE.value
+        Top-level fields
+            ``project_layout_version``, ``project_name``,
+            ``created``, ``mufasa_version``, ``os_platform``.
 
-        self.config.add_section(ConfigKey.FRAME_SETTINGS.value)
-        self.config[ConfigKey.FRAME_SETTINGS.value][ConfigKey.DISTANCE_MM.value] = 0.00
-        self.config.add_section(ConfigKey.LINE_PLOT_SETTINGS.value)
-        self.config.add_section(ConfigKey.PATH_PLOT_SETTINGS.value)
-        self.config.add_section(ConfigKey.ROI_SETTINGS.value)
-        self.config.add_section(ConfigKey.DIRECTIONALITY_SETTINGS.value)
-        self.config.add_section(ConfigKey.PROCESS_MOVEMENT_SETTINGS.value)
+        ``[pose]``
+            Animal count, file type, body-parts list (in order),
+            preset name / code, configured animal IDs.
 
-        self.config.add_section(ConfigKey.CREATE_ENSEMBLE_SETTINGS.value)
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][ConfigKey.POSE_SETTING.value] = str(self.pose_estimation_bp_cnt)
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.CLASSIFIER.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.TT_SIZE.value
-        ] = str(0.20)
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.UNDERSAMPLE_SETTING.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.UNDERSAMPLE_RATIO.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.OVERSAMPLE_SETTING.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.OVERSAMPLE_RATIO.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.RF_ESTIMATORS.value
-        ] = str(2000)
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.MIN_LEAF.value
-        ] = str(1)
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.RF_MAX_FEATURES.value
-        ] = Dtypes.SQRT.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            ConfigKey.RF_JOBS.value
-        ] = str(-1)
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.RF_CRITERION.value
-        ] = Dtypes.ENTROPY.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.RF_METADATA.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.EX_DECISION_TREE.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.EX_DECISION_TREE_FANCY.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.IMPORTANCE_LOG.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.IMPORTANCE_BAR_CHART.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.PERMUTATION_IMPORTANCE.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.LEARNING_CURVE.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.PRECISION_RECALL.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.IMPORTANCE_BARS_N.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.LEARNING_CURVE_K_SPLITS.value
-        ] = Dtypes.NONE.value
-        self.config[ConfigKey.CREATE_ENSEMBLE_SETTINGS.value][
-            MLParamKeys.LEARNING_DATA_SPLITS.value
-        ] = Dtypes.NONE.value
+        ``[classifiers]``
+            ``targets`` — list of classifier names; may be empty.
+            (Other classifier knobs land here as forms migrate.)
 
-        self.config.add_section(ConfigKey.MULTI_ANIMAL_ID_SETTING.value)
-        self.config[ConfigKey.MULTI_ANIMAL_ID_SETTING.value][
-            ConfigKey.MULTI_ANIMAL_IDS.value
-        ] = Dtypes.NONE.value
+        ``[outlier_settings]``
+            Movement / location criteria. Initial value
+            ``"NaN"`` mirrors the legacy ``Dtypes.NONE`` sentinel
+            so existing outlier-settings code paths can keep
+            reading them verbatim once they're TOML-aware.
+        """
+        try:
+            mufasa_version = getattr(mufasa, "__version__", "unknown")
+        except Exception:
+            mufasa_version = "unknown"
 
-        self.config.add_section(ConfigKey.OUTLIER_SETTINGS.value)
-        self.config[ConfigKey.OUTLIER_SETTINGS.value][ConfigKey.MOVEMENT_CRITERION.value] = Dtypes.NONE.value
-        self.config[ConfigKey.OUTLIER_SETTINGS.value][ConfigKey.LOCATION_CRITERION.value] = Dtypes.NONE.value
-
-        self.config_path = os.path.join(self.project_folder, "project_config.ini")
-        with open(self.config_path, "w") as file:
-            self.config.write(file)
-
-        bp_dir_path = os.path.join(self.simba_dir, Paths.SIMBA_BP_CONFIG_PATH.value)
-        with open(bp_dir_path, "r", encoding="utf8") as f:
-            cr = csv.reader(f, delimiter=",")  # , is default
-            rows = list(cr)  # create a list of rows for instance
-
-        chosen_bps = rows[self.body_part_config_idx]
-        chosen_bps = list(filter(None, chosen_bps))
-
-        project_bp_file_path = os.path.join(
-            self.bp_names_folder, "project_bp_names.csv"
+        data: dict = {
+            "project_layout_version": PROJECT_LAYOUT_VERSION,
+            "project_name":           self.project_name,
+            "created":                time.strftime(
+                "%Y-%m-%dT%H:%M:%S%z",
+            ),
+            "mufasa_version":         mufasa_version,
+            "os_platform":            self.os_platform,
+            "pose": {
+                "animal_count":      self.animal_cnt,
+                "file_type":         self.file_type,
+                "body_parts":        self.body_parts,
+                "pose_config_code":  str(self.pose_estimation_bp_cnt),
+                "pose_config_idx":   int(self.body_part_config_idx),
+                # animal_ids defaults to ["Animal_1", ...] —
+                # exposes the same naming surface the legacy
+                # multi_animal IDs section had, in case
+                # downstream tooling sets explicit names later.
+                "animal_ids": [
+                    f"Animal_{i+1}" for i in range(self.animal_cnt)
+                ],
+            },
+            "classifiers": {
+                "targets": list(self.target_list),
+            },
+            "outlier_settings": {
+                # "NaN" matches the legacy Dtypes.NONE.value
+                # sentinel that downstream readers expect for
+                # "not configured yet."
+                "movement_criterion": "NaN",
+                "location_criterion": "NaN",
+            },
+        }
+        self.config_path = str(
+            self.project_root / PROJECT_CONFIG_FILENAME
         )
-        f = open(project_bp_file_path, "w+")
-        for i in chosen_bps:
-            f.write(i + "\n")
-        f.close()
-        self.timer.stop_timer()
-
-        stdout_success(
-            msg=f"Project directory tree and project_config.ini created in {self.project_folder}",
-            elapsed_time=self.timer.elapsed_time_str,
-        )
+        write_project_toml(Path(self.config_path), data)
 
 
-if __name__ == "__main__" and not hasattr(sys, 'ps1'):
-    parser = argparse.ArgumentParser(description="Create a SimBA project from CLI.")
-    parser.add_argument('--project_path', type=str, required=True, help='Path to directory where to save the SimBA project directory tree.')
-    parser.add_argument('--project_name', type=str, required=True, help='Name of the SimBA project.')
-    parser.add_argument('--target_list', type=str, nargs='+', default='ATTACK', required=True, help='Classifier names in the SimBA project')
-    parser.add_argument('--pose_estimation_bp_cnt', type=int, default=14, help="String representing the number of body-parts in the pose-estimation data used in the mufasa project.")
-    parser.add_argument('--body_part_config_idx', type=int, default=6, help="The index of the SimBA GUI dropdown pose-estimation selection. E.g., ``1``. I.e., the row representing your pose-estimated body-parts")
-    parser.add_argument('--animal_cnt', type=int, default=2, help="Number of animals tracked in the input pose-estimation data.")
-    parser.add_argument('--file_type', type=str, default='csv', help='The SimBA project file type. OPTIONS: ``csv`` or ``parquet``.')
+# --------------------------------------------------------------------------- #
+# CLI entry point
+# --------------------------------------------------------------------------- #
+if __name__ == "__main__" and not hasattr(sys, "ps1"):
+    parser = argparse.ArgumentParser(
+        description="Create a Mufasa v1-layout project from the CLI.",
+    )
+    parser.add_argument("--project_path", type=str, required=True,
+                        help="Parent directory for the new project.")
+    parser.add_argument("--project_name", type=str, required=True,
+                        help="Project name (becomes the subdirectory name).")
+    parser.add_argument("--target_list", type=str, nargs="*", default=[],
+                        help="Classifier names (may be empty).")
+    parser.add_argument("--pose_estimation_bp_cnt", type=str, default="7",
+                        help="Body-part count code (e.g. '7', '14', "
+                             "'user_defined').")
+    parser.add_argument("--body_part_config_idx", type=int, default=1,
+                        help="Row index into pose_configurations/bp_names/"
+                             "bp_names.csv.")
+    parser.add_argument("--animal_cnt", type=int, default=1,
+                        help="Number of animals.")
+    parser.add_argument("--file_type", type=str, default="csv",
+                        choices=("csv", "parquet", "h5"))
+    parser.add_argument("--body_parts", type=str, nargs="*", default=None,
+                        help="Explicit body-part list (overrides "
+                             "--body_part_config_idx if given).")
     args = parser.parse_args()
 
-    _ = ProjectConfigCreator(project_path=args.project_path,
-                             project_name=args.project_name,
-                             target_list=args.target_list,
-                             pose_estimation_bp_cnt=args.pose_estimation_bp_cnt,
-                             body_part_config_idx=args.body_part_config_idx,
-                             animal_cnt=args.animal_cnt,
-                             file_type=args.file_type)
+    creator = ProjectConfigCreator(
+        project_path=args.project_path,
+        project_name=args.project_name,
+        target_list=args.target_list,
+        pose_estimation_bp_cnt=args.pose_estimation_bp_cnt,
+        body_part_config_idx=args.body_part_config_idx,
+        animal_cnt=args.animal_cnt,
+        file_type=args.file_type,
+        body_parts=args.body_parts,
+    )
+    print(f"Created project at {creator.project_root}")
+    print(f"  project.toml: {creator.config_path}")
