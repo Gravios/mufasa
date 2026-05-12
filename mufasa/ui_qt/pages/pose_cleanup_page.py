@@ -4,22 +4,48 @@ mufasa.ui_qt.pages.pose_cleanup_page
 
 Pose-data cleanup workbench page. Runs early in the pipeline:
 
-    raw pose → [ smooth → interpolate → outlier correction → drop bps
-                 → egocentric alignment ]
+    raw pose → [ interpolate → smooth → outlier-correct → align ]
              → feature extraction → classifier
 
-Sections
---------
+Section ordering (patch 122c redesign)
+--------------------------------------
 
-* **Smooth** — :class:`SmoothingForm` (1 legacy popup).
-* **Interpolate missing frames** — :class:`InterpolateForm` (1 popup).
-* **Outlier correction settings** — :class:`OutlierSettingsForm`
-  (1 popup).
-* **Drop body-parts** — :class:`DropBodypartsForm` (1 popup).
-* **Egocentric alignment** — :class:`EgocentricAlignmentForm`
-  (1 popup, formerly a launcher placeholder).
+The page now reflects the actual conceptual order of operations,
+with the modern (Kalman v2 + InputSourcePicker) forms at the top
+and the legacy SimBA forms folded into an "Advanced / legacy"
+section at the bottom:
 
-**5 popups → 5 inline forms.**
+1. **Interpolate missing frames** — fill tracker dropouts before
+   anything else looks at the data.
+2. **Kalman v2 smoothing** — the recommended smoother. Handles
+   missing frames, per-marker bias, and (with const-accel
+   segments) curvature in motion. Patch 121a–e.
+3. **Run outlier correction** — chains movement + location
+   correction on the chosen input source. Patch 122c.
+4. **Skip outlier correction** — bypass stage entirely while
+   still populating the outlier-corrected output dir so
+   downstream stages find data. Patch 122c.
+5. **Egocentric alignment** — rotate pose (and optionally
+   video) to a chosen frame of reference. Now consumes any
+   prior stage's output via the picker. Patch 122b.
+6. **Advanced / legacy** — three stacked legacy forms:
+     - Savitzky-Golay smoother (use Kalman v2 above instead)
+     - Outlier correction settings (writes thresholds / reference
+       body-parts to project_config.ini; consumed by the
+       "Run outlier correction" form)
+     - Drop body-parts (project-setup decision; will move to
+       project setup once that page exists)
+
+Sections 3 + 4 are mutually exclusive in practice — pick one or
+the other for a given run. The picker default in section 3 is
+RAW input (since outlier correction usually runs before
+smoothing); section 5's picker defaults to the most-processed
+available output.
+
+The legacy "Outlier correction settings" form remains in the
+Advanced section because the Run/Skip forms above read the
+thresholds it writes to ``project_config.ini``. Editing
+thresholds without exposing the dependency would be confusing.
 """
 from __future__ import annotations
 
@@ -30,6 +56,8 @@ from mufasa.ui_qt.forms.pose_cleanup import (DropBodypartsForm,
                                              InterpolateForm,
                                              KalmanV2SmoothingForm,
                                              OutlierSettingsForm,
+                                             RunOutlierCorrectionForm,
+                                             SkipOutlierCorrectionForm,
                                              SmoothingForm)
 from mufasa.ui_qt.workbench import WorkflowPage
 
@@ -40,12 +68,24 @@ def build_pose_cleanup_page(workbench,
     """Build and return the Pose Cleanup page."""
     page = workbench.add_page("Pose cleanup", icon_name="outlier")
 
-    page.add_section("Smoothing",                  [(SmoothingForm, {})])
-    page.add_section("Kalman v2 smoothing",        [(KalmanV2SmoothingForm, {})])
-    page.add_section("Interpolate missing frames", [(InterpolateForm, {})])
-    page.add_section("Outlier correction settings",[(OutlierSettingsForm, {})])
-    page.add_section("Drop body-parts",            [(DropBodypartsForm, {})])
-    page.add_section("Egocentric alignment",       [(EgocentricAlignmentForm, {})])
+    page.add_section("Interpolate missing frames",
+                     [(InterpolateForm, {})])
+    page.add_section("Kalman v2 smoothing",
+                     [(KalmanV2SmoothingForm, {})])
+    page.add_section("Run outlier correction",
+                     [(RunOutlierCorrectionForm, {})])
+    page.add_section("Skip outlier correction",
+                     [(SkipOutlierCorrectionForm, {})])
+    page.add_section("Egocentric alignment",
+                     [(EgocentricAlignmentForm, {})])
+    # All three legacy forms share one section. WorkflowPage's
+    # _instantiate() stacks them with bold class-title headers,
+    # which is enough visual separation without adding nested
+    # toolbox machinery.
+    page.add_section("Advanced / legacy",
+                     [(SmoothingForm, {}),
+                      (OutlierSettingsForm, {}),
+                      (DropBodypartsForm, {})])
 
     return page
 
