@@ -1512,7 +1512,16 @@ def copy_single_video_to_project(
             source=copy_single_video_to_project.__name__,
         )
     new_filename = os.path.join(file_name + file_ext)
-    destination = os.path.join(os.path.dirname(simba_ini_path), "videos", new_filename)
+    # Patch 122o: layout-aware destination resolution. Legacy code
+    # hardcoded ``os.path.dirname(simba_ini_path)/videos`` which is
+    # the right path for SimBA INI projects but wrong for v1, where
+    # videos live under ``<root>/sources/videos/``. The helper now
+    # delegates to ``project_paths_from_config`` so the same call
+    # works for both layouts.
+    from mufasa.project_layout import project_paths_from_config
+    video_dir = project_paths_from_config(simba_ini_path)["video_dir"]
+    os.makedirs(video_dir, exist_ok=True)
+    destination = os.path.join(video_dir, new_filename)
     if os.path.isfile(destination) and not overwrite:
         raise FileExistError(
             msg=f"{file_name} already exist in SimBA project. To import, delete this video file before importing the new video file with the same name.",
@@ -1575,7 +1584,11 @@ def copy_multiple_videos_to_project(config_path: Union[str, os.PathLike],
         video_path_lst = list(video_path_lst.values())
     if len(video_path_lst) == 0:
         raise NoFilesFoundError(msg=f"SIMBA ERROR: No videos found in {source} directory of file-type {file_type}", source=copy_multiple_videos_to_project.__name__,)
-    destination_dir = os.path.join(os.path.dirname(config_path), "videos")
+    # Patch 122o: layout-aware destination — see notes on
+    # copy_single_video_to_project for the rationale.
+    from mufasa.project_layout import project_paths_from_config
+    destination_dir = project_paths_from_config(config_path)["video_dir"]
+    os.makedirs(destination_dir, exist_ok=True)
     for file_cnt, file_path in enumerate(video_path_lst):
         timer = SimbaTimer(start=True)
         dir_name, filebasename, file_extension = get_fn_ext(file_path)
