@@ -4,7 +4,7 @@ mufasa.ui_qt.pages.data_import_page
 
 Data Import workbench page. Four sections:
 
-* **Import pose-estimation data** — :class:`PoseImportForm`.
+* **Import Pose Data** — :class:`PoseImportForm`.
   Loads pose data into the currently-open project's
   ``sources/pose/`` (v1) or ``csv/input_csv/`` (legacy) tree.
 * **Import video** — :class:`VideoImportForm`. Single video or
@@ -35,6 +35,13 @@ Patch 122o: page label capitalised from ``Data import`` to
 ``Data Import`` for consistency with the title-cased sidebar
 entries on other pages ("Preprocessing", "Projects", "Tools",
 "Visualizations").
+
+Patch 122w: section title shortened from
+``Import pose-estimation data`` to ``Import Pose Data`` to
+match the shorter user-facing labels on the other Data Import
+sections; the underlying :class:`PoseImportForm` title and
+description updated to mention both v1 and legacy destination
+directories explicitly.
 """
 from __future__ import annotations
 
@@ -51,7 +58,7 @@ def build_data_import_page(workbench,
                            config_path: Optional[str] = None
                            ) -> WorkflowPage:
     page = workbench.add_page("Data Import", icon_name="pose")
-    page.add_section("Import pose-estimation data",
+    page.add_section("Import Pose Data",
                      [(PoseImportForm, {})])
     page.add_section("Import video",
                      [(VideoImportForm, {})])
