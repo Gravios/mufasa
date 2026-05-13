@@ -130,7 +130,8 @@ from mufasa.ui.pop_ups.multiple_videos_to_frames_popup import \
 from mufasa.ui.pop_ups.mutual_exclusivity_pop_up import MutualExclusivityPupUp
 from mufasa.ui.pop_ups.path_plot_pop_up import PathPlotPopUp
 from mufasa.ui.pop_ups.pose_bp_drop_pop_up import DropTrackingDataPopUp
-from mufasa.ui.pop_ups.pose_reorganizer_pop_up import PoseReorganizerPopUp
+# Patch 122ac: pose_reorganizer_pop_up module deleted — Qt
+# PoseReorganizerForm covers it on the Tools page.
 from mufasa.ui.pop_ups.print_video_meta_popup import PrintVideoMetaDataPopUp
 from mufasa.ui.pop_ups.pup_retrieval_pop_up import PupRetrievalPopUp
 from mufasa.ui.pop_ups.quick_path_plot_pop_up import QuickLineplotPopup
@@ -155,8 +156,8 @@ from mufasa.ui.pop_ups.single_video_to_frames_popup import \
     SingleVideo2FramesPopUp
 from mufasa.ui.pop_ups.sleap_annotations_to_yolo_popup import \
     SLEAPAnnotations2YoloPopUp
-from mufasa.ui.pop_ups.sleap_csv_predictions_to_yolo_popup import \
-    SLEAPcsvInference2Yolo
+# Patch 122ac: sleap_csv_predictions_to_yolo_popup module deleted —
+# Qt SLEAPToYoloForm covers it on the Tools page.
 from mufasa.ui.pop_ups.sleap_h5_inference_to_yolo_popup import \
     SLEAPH5Inference2YoloPopUp
 from mufasa.ui.pop_ups.smoothing_popup import SmoothingPopUp
@@ -870,7 +871,9 @@ class App(object):
         convert_pose_file_format_menu.add_command(label="DLC annotations -> Labelme key-points", compound="left", image=self.menu_icons["dlc_2"]["img"], command=DLC2LabelmePopUp, font=Formats.FONT_REGULAR.value)
         convert_pose_file_format_menu.add_command(label="DLC annotations -> YOLO pose-estimation annotations", compound="left", image=self.menu_icons["dlc_2"]["img"], command=DLCYoloKeypointsPopUp, font=Formats.FONT_REGULAR.value)
         convert_pose_file_format_menu.add_command(label="DLC H5 inference -> YOLO pose-estimation annotations", compound="left", image=self.menu_icons["dlc_2"]["img"], command=DLCH5Inference2YoloPopUp, font=Formats.FONT_REGULAR.value)
-        convert_pose_file_format_menu.add_command(label="SLEAP CSV inference -> YOLO pose-estimation annotations", compound="left", image=self.menu_icons["sleap_small"]["img"], command=SLEAPcsvInference2Yolo, font=Formats.FONT_REGULAR.value)
+        # Patch 122ac: 'SLEAP CSV inference -> YOLO' menu entry
+        # removed — Qt SLEAPToYoloForm covers it on the Tools
+        # page → 'SLEAP → YOLO conversion' section.
         convert_pose_file_format_menu.add_command(label="SLEAP H5 inference -> YOLO pose-estimation annotations", compound="left", image=self.menu_icons["sleap_small"]["img"], command=SLEAPH5Inference2YoloPopUp, font=Formats.FONT_REGULAR.value)
         convert_pose_file_format_menu.add_command(label="SLEAP SLP annotations -> YOLO pose-estimation annotations", compound="left", image=self.menu_icons["sleap_small"]["img"], command=SLEAPAnnotations2YoloPopUp, font=Formats.FONT_REGULAR.value)
         convert_pose_file_format_menu.add_command(label="SimBA ROI -> YOLO bounding-box annotations", compound="left", image=self.menu_icons["SimBA_logo_3_small"]["img"], command=SimBAROIs2YOLOPopUp, font=Formats.FONT_REGULAR.value)
@@ -918,7 +921,9 @@ class App(object):
         video_process_menu.add_command(label="Show video file(s) meta data", compound="left", image=self.menu_icons["print"]["img"], command=PrintVideoMetaDataPopUp, font=Formats.FONT_REGULAR.value)
 
 
-        video_process_menu.add_cascade(label="Reorganize Tracking Data", compound="left", image=self.menu_icons["reorganize"]["img"], command=PoseReorganizerPopUp, font=Formats.FONT_REGULAR.value)
+        # Patch 122ac: 'Reorganize Tracking Data' menu entry
+        # removed — Qt PoseReorganizerForm covers it on the
+        # Tools page → 'Re-order pose keypoints' section.
 
         rotate_menu = Menu(menu)
         rotate_menu.add_command(label="Rotate videos", compound="left", image=self.menu_icons["flip_red"]["img"], command=RotateVideoSetDegreesPopUp, font=Formats.FONT_REGULAR.value)
