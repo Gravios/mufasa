@@ -20,16 +20,23 @@ Patch 122z notes
   selection in two QGroupBoxes so users see the two categories
   separately. ROI features won't compute without ROI definitions
   in the project; the ROI group's frame note says so.
-* Destination radio labels now reference both the v1 layout
-  (``derived/features/<run_id>/``,
-  ``derived/classifications/<run_id>/``) and the legacy layout
-  (``csv/features_extracted/``, ``csv/targets_inserted/``). The
-  underlying backend still writes to the legacy paths regardless
-  of layout — making per-write paths run-id-aware is one of the
-  larger deferred items in the v1 migration. The form labels
-  honestly call out both so v1 users know what to expect (the
-  on-disk output ends up under the legacy subtree under their
-  v1 root for now).
+* Destination radio labels previously referenced both the v1
+  layout and the legacy layout with a deferred-runid caveat.
+
+Patch 122ae-3 supersedes the 122z destination notes
+----------------------------------------------------
+* New default destination: **write per-family parquet** to
+  ``derived/features/<family_slug>/<video>.parquet`` (the v1-
+  native shape, in line with the parquet-only foundation laid
+  in 122ae-1).
+* The two legacy append modes
+  (``csv/features_extracted/`` / ``csv/targets_inserted/``)
+  remain available for the transition window but no longer
+  carry the "deferred run-id allocation" caveat — the v1
+  layout question is answered by the per-family layout, so
+  there's no run-id question to defer.
+* The standalone-save-dir mode is unchanged: write wide files
+  to a user-picked directory outside the project tree.
 """
 from __future__ import annotations
 
@@ -181,8 +188,24 @@ class FeatureSubsetExtractorForm(OperationForm):
         dest_label = QLabel("<b>Destination:</b>", self)
         form.addRow("", dest_label)
 
-        # Mode 1: save_dir — write standalone files containing
-        # ONLY the new feature columns. Doesn't modify project files.
+        # Mode 0 (new in 122ae-3, default): per-family parquet
+        # under the v1 derived/features/ tree. Each feature family
+        # gets its own subdirectory; one parquet file per video per
+        # family. Reads happen transparently via the shared
+        # load_features_for_video() helper (122ae-2). This is the
+        # native v1 shape and the path forward for the parquet-
+        # only direction.
+        self.dest_derived_parquet = QRadioButton(
+            "Write per-family parquet to "
+            "<code>derived/features/&lt;family&gt;/&lt;video&gt;.parquet</code>"
+            " <i>(recommended, v1-native)</i>", self,
+        )
+        form.addRow("", self.dest_derived_parquet)
+
+        # Mode 1 (legacy): save_dir — write standalone wide files
+        # containing ONLY the new feature columns. Doesn't modify
+        # project files. Useful as an escape hatch for export to a
+        # custom directory outside the project tree.
         self.dest_save_dir = QRadioButton(
             "Save standalone files (new columns only) to:", self,
         )
@@ -193,48 +216,48 @@ class FeatureSubsetExtractorForm(OperationForm):
         )
         form.addRow("", self.save_dir)
 
-        # Mode 2: append to features_extracted — merge new columns
-        # into project's per-video feature files. Path note: the
-        # backend currently writes to the legacy 'csv/features_extracted/'
-        # subtree regardless of project layout — for v1 projects
-        # that means the files land under '<root>/csv/features_extracted/'
-        # rather than '<root>/derived/features/<run_id>/'. Plumbing
-        # per-write run-id allocation is a deferred v1 task; the
-        # label is honest about the present-day path.
+        # Mode 2 (legacy): append to features_extracted — merge
+        # new columns into project's per-video wide feature files
+        # under the legacy 'csv/features_extracted/' subtree.
+        # Patch 122ae-3 removed the 'deferred run-id allocation'
+        # caveat from this label: the v1 layout decision lands as
+        # per-family files via the new default mode above, so
+        # there's no run-id question to defer. The append mode
+        # stays for users who want the legacy wide-file shape.
         self.dest_append_features = QRadioButton(
-            "Append new columns to per-video feature files "
-            "(<code>csv/features_extracted/</code>; v1: "
-            "<code>derived/features/&lt;run_id&gt;/</code> once "
-            "run-id-aware writes land)", self,
+            "Append new columns to legacy per-video feature files "
+            "(<code>csv/features_extracted/</code>)", self,
         )
         form.addRow("", self.dest_append_features)
 
-        # Mode 3: append to targets_inserted — same as features
-        # mode but writes to the targets tree. Used when the
-        # project has classifier targets already inserted and you
-        # want the new features alongside them.
+        # Mode 3 (legacy): append to targets_inserted — same as
+        # features mode but writes to the targets tree. Used when
+        # the project has classifier targets already inserted and
+        # you want the new features alongside them. 122ae-3 dropped
+        # the deferred-runid caveat here too for the same reason.
         self.dest_append_targets = QRadioButton(
-            "Append new columns to per-video targets files "
-            "(<code>csv/targets_inserted/</code>; v1: "
-            "<code>derived/classifications/&lt;run_id&gt;/</code> "
-            "once run-id-aware writes land)", self,
+            "Append new columns to legacy per-video targets files "
+            "(<code>csv/targets_inserted/</code>)", self,
         )
         form.addRow("", self.dest_append_targets)
 
-        # Group enforces single-choice. Default to save_dir mode
-        # (safest — doesn't touch project tree). User must pick a
-        # path explicitly to actually run.
+        # Group enforces single-choice. Default to per-family
+        # parquet (v1-native, the recommended path). save_dir,
+        # append-features, append-targets remain available as
+        # explicit opt-ins during the migration window.
         self._dest_group = QButtonGroup(self)
-        self._dest_group.addButton(self.dest_save_dir, 0)
-        self._dest_group.addButton(self.dest_append_features, 1)
-        self._dest_group.addButton(self.dest_append_targets, 2)
-        self.dest_save_dir.setChecked(True)
+        self._dest_group.addButton(self.dest_derived_parquet, 0)
+        self._dest_group.addButton(self.dest_save_dir, 1)
+        self._dest_group.addButton(self.dest_append_features, 2)
+        self._dest_group.addButton(self.dest_append_targets, 3)
+        self.dest_derived_parquet.setChecked(True)
 
         # Disable the path field unless save_dir mode is selected.
         # Visual feedback that the field is only relevant in that
         # mode. Connect to update enabled state on toggle.
         def _update_save_dir_enabled() -> None:
             self.save_dir.setEnabled(self.dest_save_dir.isChecked())
+        self.dest_derived_parquet.toggled.connect(lambda _: _update_save_dir_enabled())
         self.dest_save_dir.toggled.connect(lambda _: _update_save_dir_enabled())
         self.dest_append_features.toggled.connect(lambda _: _update_save_dir_enabled())
         self.dest_append_targets.toggled.connect(lambda _: _update_save_dir_enabled())
@@ -333,11 +356,31 @@ class FeatureSubsetExtractorForm(OperationForm):
             raise ValueError("Select at least one feature family.")
 
         # Derive backend kwargs from radio button state. Single-
-        # choice radio means at most one of the three is True at
-        # any time. The save_dir backend param is only set when
-        # the save_dir radio is selected; the two append flags
-        # mirror the other radios.
-        if self.dest_save_dir.isChecked():
+        # choice radio means at most one of the four is True at
+        # any time.
+        # Patch 122ae-3 added the derived_parquet mode as the new
+        # default. The legacy 3 modes are unchanged.
+        derived_features_dir = None
+        if self.dest_derived_parquet.isChecked():
+            # Look up the v1 path via project_paths_from_config —
+            # works for both v1 (project.toml) and legacy
+            # (project_config.ini) projects. For legacy projects
+            # this resolves to '<project>/derived/features/' which
+            # didn't exist before but is created on-demand by
+            # process_one_video.
+            from mufasa.project_layout import project_paths_from_config
+            try:
+                paths = project_paths_from_config(self.config_path)
+            except Exception as exc:
+                raise ValueError(
+                    f"Couldn't resolve project paths from "
+                    f"{self.config_path!r}: {exc}",
+                )
+            derived_features_dir = paths["derived_features_dir"]
+            save_dir_value = None
+            append_features = False
+            append_targets = False
+        elif self.dest_save_dir.isChecked():
             save_dir_value = self.save_dir.path or None
             append_features = False
             append_targets = False
@@ -345,7 +388,7 @@ class FeatureSubsetExtractorForm(OperationForm):
                 raise ValueError(
                     "Save destination is required: pick a directory "
                     "in the 'Save standalone files' field, or switch "
-                    "the destination to one of the append modes."
+                    "the destination to one of the other modes."
                 )
         elif self.dest_append_features.isChecked():
             save_dir_value = None
@@ -370,6 +413,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             "save_dir":         save_dir_value,
             "append_features":  append_features,
             "append_targets":   append_targets,
+            "derived_features_dir": derived_features_dir,
             "n_workers":        int(self.n_workers.value()),
             "overwrite_existing": False,  # default; on_run may flip
         }
@@ -407,6 +451,7 @@ class FeatureSubsetExtractorForm(OperationForm):
         print(
             f"[on_run] FeatureSubsetExtractorForm dispatching: "
             f"save_dir={kwargs['save_dir']!r}, "
+            f"derived_features_dir={kwargs['derived_features_dir']!r}, "
             f"append_features={kwargs['append_features']}, "
             f"append_targets={kwargs['append_targets']}, "
             f"families={len(kwargs['feature_families'])}"
@@ -541,6 +586,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             data_dir=None,
             append_to_features_extracted=kwargs["append_features"],
             append_to_targets_inserted=kwargs["append_targets"],
+            derived_features_dir=kwargs["derived_features_dir"],
             n_workers=kwargs["n_workers"],
             overwrite_existing=False,  # preflight runs in non-overwrite mode
         )
@@ -549,6 +595,7 @@ class FeatureSubsetExtractorForm(OperationForm):
     def target(self, *, config_path: str, feature_families: list[str],
                file_checks: bool, save_dir: Optional[str],
                append_features: bool, append_targets: bool,
+               derived_features_dir: Optional[str],
                n_workers: int, overwrite_existing: bool = False) -> None:
         from mufasa.feature_extractors.feature_subsets import (
             FeatureSubsetsCalculator,
@@ -561,6 +608,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             data_dir=None,
             append_to_features_extracted=append_features,
             append_to_targets_inserted=append_targets,
+            derived_features_dir=derived_features_dir,
             n_workers=n_workers,
             overwrite_existing=overwrite_existing,
         ).run()
