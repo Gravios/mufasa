@@ -74,7 +74,9 @@ from mufasa.ui_qt.forms.video_processing import (ClipVideosForm,
 from mufasa.ui_qt.forms.video_editing import (CropVideosForm, ResizeVideosForm,
                                               RotateFlipForm)
 from mufasa.ui_qt.forms.video_filters import VideoFiltersForm
-from mufasa.ui_qt.forms.video_frames import ExtractFramesForm
+from mufasa.ui_qt.forms.video_frames import (ExtractFramesForm,
+                                              ImportFrameDirectoryForm,
+                                              MergeFramesToVideoForm)
 from mufasa.ui_qt.forms.video_join import JoinVideosForm
 from mufasa.ui_qt.forms.image_conversion import (AverageFrameForm,
                                                  ImageFormatConverterForm)
@@ -95,6 +97,10 @@ def build_video_processing_page(workbench,
     page.add_section("Filters & enhancement",   [(VideoFiltersForm, {})])
     page.add_section("Overlay / burn-in",       [(VideoOverlayForm, {})])
     page.add_section("Frame extraction",        [(ExtractFramesForm, {})])
+    # Patch 122s: frames ↔ video round-trip — merge frames into a
+    # video and import a frame directory into a project tree.
+    page.add_section("Merge frames → video",    [(MergeFramesToVideoForm, {})])
+    page.add_section("Import frame directory",  [(ImportFrameDirectoryForm, {})])
     page.add_section("Join & transition",       [(JoinVideosForm, {})])
     page.add_section("Image format conversion", [(ImageFormatConverterForm, {})])
     page.add_section("Metadata & audit",        [(AverageFrameForm, {})])
