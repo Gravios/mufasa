@@ -501,69 +501,8 @@ class MultiShortenPopUp(PopUpMixin):
 #_ = MultiShortenPopUp()
 
 
-class ChangeImageFormatPopUp(PopUpMixin):
-    def __init__(self):
-        super().__init__(title="CHANGE IMAGE FORMAT")
-
-        self.input_folder_selected = FolderSelect(self.main_frm, "Image directory", title="Select folder with images:")
-        set_input_format_frm = LabelFrame(self.main_frm, text="Original image format", font=Formats.FONT_HEADER.value, padx=15, pady=5)
-        set_output_format_frm = LabelFrame(self.main_frm, text="Output image format", font=Formats.FONT_HEADER.value, padx=15, pady=5)
-
-        self.input_file_type, self.out_file_type = StringVar(), StringVar()
-        input_png_rb = Radiobutton(set_input_format_frm, text=".png", variable=self.input_file_type, value="png", font=Formats.FONT_REGULAR.value)
-        input_jpeg_rb = Radiobutton(
-            set_input_format_frm,
-            text=".jpg",
-            variable=self.input_file_type,
-            value="jpg",
-            font=Formats.FONT_REGULAR.value,
-        )
-        input_bmp_rb = Radiobutton(
-            set_input_format_frm,
-            text=".bmp",
-            variable=self.input_file_type,
-            value="bmp",
-            font=Formats.FONT_REGULAR.value,
-        )
-        output_png_rb = Radiobutton(
-            set_output_format_frm, text=".png", font=Formats.FONT_REGULAR.value, variable=self.out_file_type, value="png"
-        )
-        output_jpeg_rb = Radiobutton(
-            set_output_format_frm, text=".jpg", font=Formats.FONT_REGULAR.value, variable=self.out_file_type, value="jpg"
-        )
-        output_bmp_rb = Radiobutton(
-            set_output_format_frm, text=".bmp", font=Formats.FONT_REGULAR.value, variable=self.out_file_type, value="bmp"
-        )
-        run_btn = Button(
-            self.main_frm,
-            text="Convert image file format",
-            font=Formats.FONT_REGULAR.value,
-            command=lambda: self.run_img_conversion(),
-        )
-        self.input_folder_selected.grid(row=0, column=0)
-        set_input_format_frm.grid(row=1, column=0, pady=5)
-        set_output_format_frm.grid(row=2, column=0, pady=5)
-        input_png_rb.grid(row=0, column=0)
-        input_jpeg_rb.grid(row=1, column=0)
-        input_bmp_rb.grid(row=2, column=0)
-        output_png_rb.grid(row=0, column=0)
-        output_jpeg_rb.grid(row=1, column=0)
-        output_bmp_rb.grid(row=2, column=0)
-        run_btn.grid(row=3, pady=5)
-
-    def run_img_conversion(self):
-        if len(os.listdir(self.input_folder_selected.folder_path)) == 0:
-            raise NoFilesFoundError(
-                msg="SIMBA ERROR: The input folder {} contains ZERO files.".format(
-                    self.input_folder_selected.folder_path
-                ),
-                source=self.__class__.__name__,
-            )
-        change_img_format(
-            directory=self.input_folder_selected.folder_path,
-            file_type_in=self.input_file_type.get(),
-            file_type_out=self.out_file_type.get(),
-        )
+# ChangeImageFormatPopUp: removed in patch 122r — Qt replacement is ImageFormatConverterForm in mufasa.ui_qt.forms.image_conversion.
+# (was 63 lines of legacy Tk widget construction and ffmpeg dispatch.)
 
 
 #_ = ChangeImageFormatPopUp()
@@ -2264,164 +2203,25 @@ class DownsampleMultipleVideosPopUp(PopUpMixin):
 
 #DownsampleMultipleVideosPopUp()
 
-class Convert2jpegPopUp(PopUpMixin):
-    def __init__(self):
-        super().__init__(title="CONVERT IMAGES TO JPEG", icon='jpeg')
-        settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-
-        self.quality_scale = SimBAScaleBar(parent=settings_frm, label="JPEG OUTPUT QUALITY: ", orient=HORIZONTAL, length=200, value=95, label_width=25, lbl_img='pct_2')
-        settings_frm.grid(row=0, column=0, sticky="NW")
-        self.quality_scale.grid(row=0, column=0, sticky="NW")
-
-        img_dir_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CONVERT IMAGE DIRECTORY TO JPEG", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_frame_dir = FolderSelect(img_dir_frm, "IMAGE DIRECTORY PATH:", title="Select a image directory", lblwidth=25, lbl_icon='folder')
-
-        run_btn_dir = SimbaButton(parent=img_dir_frm, txt="RUN DIRECTORY JPEG CONVERSION", img='rocket', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=self.run_dir)
-        img_dir_frm.grid(row=1, column=0, sticky="NW")
-        self.selected_frame_dir.grid(row=0, column=0, sticky="NW")
-        run_btn_dir.grid(row=1, column=0, sticky="NW")
-
-        img_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CONVERT IMAGE TO JPEG", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_file = FileSelect(img_frm, "IMAGE PATH:", title="Select an image file", lblwidth=25, file_types=[("VIDEO FILE", Options.ALL_IMAGE_FORMAT_OPTIONS.value)], lbl_icon='frames')
-
-        run_btn_img = SimbaButton(parent=img_frm, txt="RUN IMAGE JPEG CONVERSION", img='rocket', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=self.run_img)
-        img_frm.grid(row=2, column=0, sticky="NW")
-        self.selected_file.grid(row=0, column=0, sticky="NW")
-        run_btn_img.grid(row=1, column=0, sticky="NW")
-
-    def run_dir(self):
-        folder_path = self.selected_frame_dir.folder_path
-        check_if_dir_exists(in_dir=folder_path)
-        _ = convert_to_jpeg(path=folder_path, quality=int(self.quality_scale.get_value()), verbose=True)
-
-    def run_img(self):
-        file_path = self.selected_file.file_path
-        check_file_exist_and_readable(file_path)
-        _ = convert_to_jpeg(path=file_path, quality=int(self.quality_scale.get_value()), verbose=True)
+# Convert2jpegPopUp: removed in patch 122r — Qt replacement is ImageFormatConverterForm in mufasa.ui_qt.forms.image_conversion.
+# (was 34 lines of legacy Tk widget construction and ffmpeg dispatch.)
 
 
-class Convert2bmpPopUp(PopUpMixin):
-    def __init__(self):
-        super().__init__(title="CONVERT IMAGES TO BMP", icon='bmp')
-        img_dir_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CONVERT IMAGE DIRECTORY TO BMP", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_frame_dir = FolderSelect(img_dir_frm, "IMAGE DIRECTORY PATH:", title="Select a image directory", lblwidth=25, lbl_icon='folder')
-
-        run_btn_dir = SimbaButton(parent=img_dir_frm, txt="RUN DIRECTORY BMP CONVERSION", img='rocket', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=self.run_dir)
-        img_dir_frm.grid(row=0, column=0, sticky="NW")
-        self.selected_frame_dir.grid(row=0, column=0, sticky="NW")
-        run_btn_dir.grid(row=1, column=0, sticky="NW")
-
-        img_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CONVERT IMAGE TO BMP", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_file = FileSelect(img_frm, "IMAGE PATH:", title="Select an image file", lblwidth=25, file_types=[("VIDEO FILE", Options.ALL_IMAGE_FORMAT_OPTIONS.value)], lbl_icon='bmp')
-        run_btn_img = SimbaButton(parent=img_frm, txt="RUN IMAGE BMP CONVERSION", img='rocket', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=lambda: self.run_img())
-
-        img_frm.grid(row=1, column=0, sticky="NW")
-        self.selected_file.grid(row=0, column=0, sticky="NW")
-        run_btn_img.grid(row=1, column=0, sticky="NW")
-
-    def run_dir(self):
-        folder_path = self.selected_frame_dir.folder_path
-        check_if_dir_exists(in_dir=folder_path)
-        _ = convert_to_bmp(path=folder_path, verbose=True)
-
-    def run_img(self):
-        file_path = self.selected_file.file_path
-        check_file_exist_and_readable(file_path)
-        _ = convert_to_bmp(path=file_path, verbose=True)
+# Convert2bmpPopUp: removed in patch 122r — Qt replacement is ImageFormatConverterForm in mufasa.ui_qt.forms.image_conversion.
+# (was 28 lines of legacy Tk widget construction and ffmpeg dispatch.)
 
 
-class Convert2WEBPPopUp(PopUpMixin):
-    def __init__(self):
-        super().__init__(title="CONVERT IMAGES TO WEBP", icon='webp')
-        settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.quality_scale = SimBAScaleBar(parent=settings_frm, from_=0, to=100, length=200, label='WEBP QUALITY: ', label_clr='black', lbl_font=Formats.FONT_REGULAR.value, value=95, tickinterval=25, sliderrelief='raised', showvalue=True, lbl_img='pct')
-        settings_frm.grid(row=0, column=0, sticky="NW")
-        self.quality_scale.grid(row=0, column=0, sticky="NW")
-
-        convert_dir_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CONVERT IMAGE DIRECTORY TO WEBP", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_frame_dir = FolderSelect(convert_dir_frm, "IMAGE DIRECTORY PATH:", title="Select a image directory", lblwidth=25, lbl_icon='browse')
-
-        run_btn_dir = SimbaButton(parent=convert_dir_frm, txt="RUN IMAGE DIRECTORY WEBP CONVERSION", img='rocket', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=self.run_dir)
-
-        convert_dir_frm.grid(row=1, column=0, sticky="NW")
-        self.selected_frame_dir.grid(row=0, column=0, sticky="NW")
-        run_btn_dir.grid(row=1, column=0, sticky="NW")
-
-        convert_img_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CONVERT IMAGE FILE TO WEBP", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_file = FileSelect(convert_img_frm, "IMAGE PATH:", title="Select an image file", lblwidth=25, file_types=[("VIDEO FILE", Options.ALL_IMAGE_FORMAT_OPTIONS.value)], lbl_icon='file_type')
-
-        run_btn_frm = SimbaButton(parent=convert_img_frm, txt="RUN IMAGE WEBP CONVERSION", img='rocket', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=self.run_img)
-        convert_img_frm.grid(row=2, column=0, sticky="NW")
-        self.selected_file.grid(row=0, column=0, sticky="NW")
-        run_btn_frm.grid(row=1, column=0, sticky="NW")
-
-        #self.main_frm.mainloop()
-
-    def run_dir(self):
-        folder_path = self.selected_frame_dir.folder_path
-        check_if_dir_exists(in_dir=folder_path)
-        quality = int(self.quality_scale.get_value())
-        _ = convert_to_webp(path=folder_path, quality=quality, verbose=True)
-
-    def run_img(self):
-        file_path = self.selected_file.file_path
-        check_file_exist_and_readable(file_path)
-        quality = int(self.quality_scale.get_value())
-        _ = convert_to_webp(path=file_path, quality=quality, verbose=True)
+# Convert2WEBPPopUp: removed in patch 122r — Qt replacement is ImageFormatConverterForm in mufasa.ui_qt.forms.image_conversion.
+# (was 38 lines of legacy Tk widget construction and ffmpeg dispatch.)
 
 
 #Convert2WEBPPopUp()
 
-class Convert2TIFFPopUp(PopUpMixin):
-    def __init__(self):
-        super().__init__(title="CONVERT IMAGE DIRECTORY TO TIFF", icon='tiff')
-        settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_frame_dir = FolderSelect(settings_frm, "IMAGE DIRECTORY PATH:", title="Select a image directory", lblwidth=25, lbl_icon='browse')
-        self.compression_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['raw', 'tiff_deflate', 'tiff_lzw'], label="COMPRESSION:", label_width=25, dropdown_width=25, value='raw', img='file_type')
-        self.stack_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['FALSE', 'TRUE'], label="STACK:", label_width=25, dropdown_width=25, value='FALSE', img='stack')
-        self.create_run_frm(run_function=self.run, title='RUN TIFF CONVERSION')
+# Convert2TIFFPopUp: removed in patch 122r — Qt replacement is ImageFormatConverterForm in mufasa.ui_qt.forms.image_conversion.
+# (was 20 lines of legacy Tk widget construction and ffmpeg dispatch.)
 
-        settings_frm.grid(row=0, column=0, sticky="NW")
-        self.selected_frame_dir.grid(row=0, column=0, sticky="NW")
-        self.compression_dropdown.grid(row=1, column=0, sticky="NW")
-        self.stack_dropdown.grid(row=2, column=0, sticky="NW")
-        #self.main_frm.mainloop()
-
-    def run(self):
-        folder_path = self.selected_frame_dir.folder_path
-        check_if_dir_exists(in_dir=folder_path)
-        stack = str_2_bool(self.stack_dropdown.get_value())
-        convert_to_tiff(directory=folder_path, compression=self.compression_dropdown.get_value(), verbose=True, stack=stack)
-
-class Convert2PNGPopUp(PopUpMixin):
-    def __init__(self):
-        super().__init__(title="CONVERT IMAGE TO PNG", icon='png')
-        img_dir_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CONVERT IMAGE DIRECTORY TO PNG", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_frame_dir = FolderSelect(img_dir_frm, "IMAGE DIRECTORY PATH:", title="Select a image directory", lblwidth=25, lbl_icon='folder')
-        run_btn_dir = SimbaButton(parent=img_dir_frm, txt="RUN DIRECTORY PNG CONVERSION", img='rocket', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=lambda: self.run_dir())
-
-        img_dir_frm.grid(row=0, column=0, sticky="NW")
-        self.selected_frame_dir.grid(row=0, column=0, sticky="NW")
-        run_btn_dir.grid(row=1, column=0, sticky="NW")
-
-        img_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CONVERT IMAGE TO PNG", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_file_dir = FileSelect(img_frm, "IMAGE PATH:", title="Select a video file", lblwidth=25, file_types=[("VIDEO FILE", Options.ALL_IMAGE_FORMAT_OPTIONS.value)], lbl_icon='file_type')
-        run_btn_img = SimbaButton(parent=img_frm, txt="RUN IMAGE PNG CONVERSION", img='rocket', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=lambda: self.run_img())
-
-        img_frm.grid(row=1, column=0, sticky="NW")
-        self.selected_file_dir.grid(row=0, column=0, sticky="NW")
-        run_btn_img.grid(row=1, column=0, sticky="NW")
-        self.main_frm.mainloop()
-
-    def run_dir(self):
-        folder_path = self.selected_frame_dir.folder_path
-        check_if_dir_exists(in_dir=folder_path)
-        _ = convert_to_png(path=folder_path, verbose=True)
-
-    def run_img(self):
-        file_path = self.selected_file_dir.file_path
-        check_file_exist_and_readable(file_path)
-        _ = convert_to_png(path=file_path, verbose=True)
+# Convert2PNGPopUp: removed in patch 122r — Qt replacement is ImageFormatConverterForm in mufasa.ui_qt.forms.image_conversion.
+# (was 29 lines of legacy Tk widget construction and ffmpeg dispatch.)
 class Convert2MP4PopUp(PopUpMixin):
     """
     :example:

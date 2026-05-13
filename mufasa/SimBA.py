@@ -172,8 +172,8 @@ from mufasa.ui.pop_ups.video_processing_pop_up import (
     ChangeFpsMultipleVideosPopUp, ChangeFpsSingleVideoPopUp, CLAHEPopUp,
     ClipSingleVideoByFrameNumbers, ClipVideoPopUp, ConcatenatingVideosPopUp,
     ConcatenatorPopUp, Convert2AVIPopUp, Convert2BlackWhitePopUp,
-    Convert2bmpPopUp, Convert2jpegPopUp, Convert2MOVPopUp, Convert2MP4PopUp,
-    Convert2PNGPopUp, Convert2TIFFPopUp, Convert2WEBMPopUp, Convert2WEBPPopUp,
+    Convert2MOVPopUp, Convert2MP4PopUp,
+    Convert2WEBMPopUp,
     ConvertROIDefinitionsPopUp, CreateAverageFramePopUp, CreateGIFPopUP,
     CropVideoCirclesPopUp, CropVideoPolygonsPopUp, CropVideoPopUp,
     CrossfadeVideosPopUp, DownsampleMultipleVideosPopUp,
@@ -837,21 +837,17 @@ class App(object):
         video_process_menu.add_cascade(label="Crop videos...", compound="left", image=self.menu_icons["crop"]["img"], menu=crop_video_menu, font=Formats.FONT_REGULAR.value)
 
         format_menu = Menu(video_process_menu)
-        img_format_menu = Menu(format_menu)
         video_format_menu = Menu(format_menu)
 
 
 
-        img_format_menu.add_command(label="Convert images to PNG", compound="left",  image=self.menu_icons["png"]["img"], command=Convert2PNGPopUp, font=Formats.FONT_REGULAR.value)
-        img_format_menu.add_command(label="Convert images  to JPEG", compound="left", image=self.menu_icons["jpeg"]["img"], command=Convert2jpegPopUp, font=Formats.FONT_REGULAR.value)
-        img_format_menu.add_command(label="Convert images to BMP", compound="left",  image=self.menu_icons["bmp"]["img"], command=Convert2bmpPopUp, font=Formats.FONT_REGULAR.value)
-        img_format_menu.add_command(label="Convert images  to TIFF", compound="left",  image=self.menu_icons["tiff"]["img"], command=Convert2TIFFPopUp, font=Formats.FONT_REGULAR.value)
-        img_format_menu.add_command(label="Convert images  to WEBP", compound="left",  image=self.menu_icons["webp"]["img"], command=Convert2WEBPPopUp, font=Formats.FONT_REGULAR.value)
         video_format_menu.add_command(label="Convert videos to MP4", compound="left",  image=self.menu_icons["mp4"]["img"], command=Convert2MP4PopUp, font=Formats.FONT_REGULAR.value)
         video_format_menu.add_command(label="Convert videos to AVI", compound="left",  image=self.menu_icons["avi"]["img"], command=Convert2AVIPopUp, font=Formats.FONT_REGULAR.value)
         video_format_menu.add_command(label="Convert videos to WEBM", compound="left",  image=self.menu_icons["webm"]["img"], command=Convert2WEBMPopUp, font=Formats.FONT_REGULAR.value)
         video_format_menu.add_command(label="Convert videos to MOV", compound="left",  image=self.menu_icons["mov"]["img"], command=Convert2MOVPopUp, font=Formats.FONT_REGULAR.value)
-        format_menu.add_cascade(label="Convert image file formats...", compound="left",  image=self.menu_icons["image"]["img"], menu=img_format_menu, font=Formats.FONT_REGULAR.value)
+        # patch 122r: image-format conversion entries removed — Qt
+        # ImageFormatConverterForm is the supported surface (Video
+        # Processing page → "Image format conversion" section).
         format_menu.add_cascade(label="Change video file formats...", compound="left", image=self.menu_icons["video_2"]["img"], menu=video_format_menu, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_cascade(label="Convert file formats...", compound="left", image=self.menu_icons["convert"]["img"], menu=format_menu, font=Formats.FONT_REGULAR.value)
 
