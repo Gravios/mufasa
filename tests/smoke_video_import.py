@@ -151,7 +151,10 @@ def main() -> int:
         or '"Import video"' in di_src,
     )
 
-    # Builder body — order of sections
+    # Builder body — order of sections.
+    # Post 122w + 122x: Data Import page is now just two sections,
+    # 'Import Pose Data' then 'Import video'. Video Calibration +
+    # Preprocess Videos moved to the Preprocessing page.
     builder = None
     for node in ast.walk(di_tree):
         if (isinstance(node, ast.FunctionDef)
@@ -160,22 +163,15 @@ def main() -> int:
             break
     if builder is not None:
         body_src = ast.unparse(builder)
-        # Find indices of the four section labels in body_src to
-        # verify Import video lands between pose-import and
-        # video calibration.
-        idx_pose = body_src.find("Import pose-estimation data")
+        idx_pose = body_src.find("Import Pose Data")
         idx_video = body_src.find("Import video")
-        idx_calib = body_src.find("Video parameters & calibration")
-        idx_batch = body_src.find("Batch pre-process videos")
         check(
-            "section order: pose import → import video → "
-            "calibration → batch pre-process",
+            "section order: Import Pose Data → Import video "
+            "(post-122x Data Import has two sections)",
             idx_pose != -1 and idx_video != -1
-            and idx_calib != -1 and idx_batch != -1
-            and idx_pose < idx_video < idx_calib < idx_batch,
+            and idx_pose < idx_video,
             detail=(
-                f"indices: pose={idx_pose} video={idx_video} "
-                f"calib={idx_calib} batch={idx_batch}"
+                f"indices: pose={idx_pose} video={idx_video}"
             ),
         )
 

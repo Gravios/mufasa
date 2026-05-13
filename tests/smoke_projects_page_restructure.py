@@ -141,28 +141,43 @@ def main() -> int:
         )
 
     # ------------------------------------------------------------------
-    # 2. Data Import page picks up Batch pre-process
+    # 2. Batch pre-process moved off Project Setup. As of:
+    #    - 122i: relocated to Data Import page.
+    #    - 122x: moved again, now to the Preprocessing page where it
+    #            sits alongside the other upstream-of-features stages.
+    #    Both moves agree the section is NOT on Project Setup; this
+    #    block now verifies it's on Preprocessing (the current home).
     # ------------------------------------------------------------------
+    pcp_path = (
+        REPO_ROOT / "mufasa" / "ui_qt" / "pages"
+        / "pose_cleanup_page.py"
+    )
+    pcp_src = pcp_path.read_text()
+    check(
+        "Preprocessing page imports BatchPreProcessLauncher "
+        "(post-122x home)",
+        "BatchPreProcessLauncher" in pcp_src,
+    )
+    check(
+        "Preprocessing page registers 'Preprocess Videos' section "
+        "(post-122x rename)",
+        '"Preprocess Videos"' in pcp_src,
+    )
+
+    # Data Import page should now host the renamed Pose Data section
+    # (122w) but NOT the calibration / batch sections (moved in 122x).
     di_path = (
         REPO_ROOT / "mufasa" / "ui_qt" / "pages" / "data_import_page.py"
     )
     di_src = di_path.read_text()
     check(
-        "data_import_page imports BatchPreProcessLauncher",
-        "BatchPreProcessLauncher" in di_src,
+        "data_import_page has 'Import Pose Data' (post-122w rename)",
+        '"Import Pose Data"' in di_src,
     )
     check(
-        "data_import_page registers 'Batch pre-process videos' section",
-        '"Batch pre-process videos"' in di_src,
-    )
-    # The existing two sections must still be there
-    check(
-        "data_import_page still has 'Import pose-estimation data'",
-        '"Import pose-estimation data"' in di_src,
-    )
-    check(
-        "data_import_page still has 'Video parameters & calibration'",
-        '"Video parameters & calibration"' in di_src,
+        "data_import_page no longer registers 'Video parameters & "
+        "calibration' (moved to Preprocessing in 122x)",
+        'add_section("Video parameters & calibration"' not in di_src,
     )
 
     # ------------------------------------------------------------------
