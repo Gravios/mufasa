@@ -239,25 +239,58 @@ class VideoInfoForm(OperationForm):
             )
 
     def _video_info_path(self) -> str:
-        """Path to logs/video_info.csv for the current project.
-        Doesn't require the file to exist."""
-        # ConfigReader stores VIDEO_INFO under Paths enum but we
-        # don't need to instantiate ConfigReader (slow + checks
-        # files). Hardcode the relative path; matches what
-        # config_reader.py does.
-        project_folder = os.path.dirname(self.config_path)
-        return os.path.join(project_folder, "logs", "video_info.csv")
+        """Path to the project's video_info.csv. v1 keeps it at
+        ``sources/video_info.csv``; legacy at ``logs/video_info.csv``.
+        Doesn't require the file to exist.
+
+        Patch 122ag (hotfix on 122x): the move to the Preprocessing
+        tab surfaced that this method was still hardcoded to the
+        legacy 'logs/video_info.csv' path, which made the calibration
+        table show 'No existing video_info.csv' on v1 projects even
+        when the file existed at the v1 path. Routed through
+        :func:`project_paths_from_config` so both layouts resolve
+        correctly.
+        """
+        try:
+            from mufasa.project_layout import project_paths_from_config
+            return project_paths_from_config(
+                self.config_path,
+            )["video_info_path"]
+        except Exception:
+            # Defensive fallback — preserves the pre-122ag behaviour
+            # for malformed configs so the form doesn't crash on
+            # mount. The status-line error message below will tell
+            # the user the file isn't found.
+            project_folder = os.path.dirname(self.config_path)
+            return os.path.join(project_folder, "logs", "video_info.csv")
 
     def _discover_rows(self) -> List[Tuple[str, str]]:
         """List of (video_name, video_path) for the current project.
 
-        Looks in ``project_folder/videos/`` first. Falls back to
-        deriving names from ``csv/input_csv/`` entries if the
-        videos directory is empty (videos may not be copied into
-        the project tree in some workflows).
+        Looks in the project's videos directory first
+        (``sources/videos/`` on v1, ``videos/`` on legacy). Falls
+        back to deriving names from the pose directory's entries
+        if the videos directory is empty (videos may not be copied
+        into the project tree in some workflows).
+
+        Patch 122ag (hotfix on 122x): formerly hardcoded
+        ``project_folder/videos/`` and ``project_folder/csv/input_csv/``
+        — both wrong for v1 projects, which gave the empty
+        Preprocessing → Video Calibration table the user reported.
+        Routed through :func:`project_paths_from_config` so both
+        layouts work.
         """
-        project_folder = os.path.dirname(self.config_path)
-        videos_dir = os.path.join(project_folder, "videos")
+        try:
+            from mufasa.project_layout import project_paths_from_config
+            paths = project_paths_from_config(self.config_path)
+            videos_dir = paths["video_dir"]
+            pose_dir = paths["input_pose_dir"]
+        except Exception:
+            # Defensive fallback for malformed configs.
+            project_folder = os.path.dirname(self.config_path)
+            videos_dir = os.path.join(project_folder, "videos")
+            pose_dir = os.path.join(project_folder, "csv", "input_csv")
+
         rows: List[Tuple[str, str]] = []
         if os.path.isdir(videos_dir):
             for entry in sorted(os.listdir(videos_dir)):
@@ -268,18 +301,15 @@ class VideoInfoForm(OperationForm):
                                        ".webm"):
                         rows.append((name, full))
         if not rows:
-            # Fallback: derive from csv/input_csv/ filenames so the
-            # form is at least useful for projects where videos
-            # haven't been copied in.
-            input_csv_dir = os.path.join(
-                project_folder, "csv", "input_csv",
-            )
-            if os.path.isdir(input_csv_dir):
-                for entry in sorted(os.listdir(input_csv_dir)):
-                    full = os.path.join(input_csv_dir, entry)
+            # Fallback: derive from pose-dir filenames so the form
+            # is at least useful for projects where videos haven't
+            # been copied / symlinked in.
+            if os.path.isdir(pose_dir):
+                for entry in sorted(os.listdir(pose_dir)):
+                    full = os.path.join(pose_dir, entry)
                     if os.path.isfile(full) and not entry.startswith("."):
                         name, ext = os.path.splitext(entry)
-                        if ext.lower() in (".csv", ".parquet"):
+                        if ext.lower() in (".csv", ".parquet", ".h5"):
                             # No path to the actual video file —
                             # auto-fill from video meta won't work
                             # for these rows. The user fills FPS
