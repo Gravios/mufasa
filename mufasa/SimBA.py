@@ -176,7 +176,7 @@ from mufasa.ui.pop_ups.video_processing_pop_up import (
     Convert2WEBMPopUp,
     ConvertROIDefinitionsPopUp, CreateAverageFramePopUp, CreateGIFPopUP,
     CropVideoCirclesPopUp, CropVideoPolygonsPopUp, CropVideoPopUp,
-    CrossfadeVideosPopUp, DownsampleMultipleVideosPopUp,
+    DownsampleMultipleVideosPopUp,
     DownsampleSingleVideoPopUp,
     FlipVideosPopUp, GreyscaleSingleVideoPopUp,
     InitiateClipMultipleVideosByFrameNumbersPopUp,
@@ -941,7 +941,9 @@ class App(object):
         temporal_join_videos.add_command(label="Temporal join selected videos", command=ManualTemporalJoinPopUp, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_cascade(label="Temporal join videos...", compound="left", image=self.menu_icons["stopwatch"]["img"], menu=temporal_join_videos, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_command(label="Box blur videos", compound="left", image=self.menu_icons["blur"]["img"], command=BoxBlurPopUp, font=Formats.FONT_REGULAR.value)
-        video_process_menu.add_command(label="Cross-fade videos", compound="left", image=self.menu_icons["crossfade"]["img"], command=CrossfadeVideosPopUp, font=Formats.FONT_REGULAR.value)
+        # Patch 122t: 'Cross-fade videos' menu entry removed — Qt
+        # CrossfadeVideosForm covers it on the Video Processing page
+        # → 'Join & transition' section.
         video_process_menu.add_command(label="Create average frames from videos", compound="left", image=self.menu_icons["average"]["img"], command=CreateAverageFramePopUp, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_command(label="Validate video seekability", compound="left", image=self.menu_icons["search"]["img"], command=CheckVideoSeekablePopUp, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_command(label="Visualize pose-estimation in folder...", compound="left", image=self.menu_icons["visualize"]["img"], command=VisualizePoseInFolderPopUp, font=Formats.FONT_REGULAR.value)
