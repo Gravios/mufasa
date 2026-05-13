@@ -815,36 +815,8 @@ class CreateGIFPopUP(PopUpMixin):
                                             fps=fps,
                                             quality=int(quality))).start()
 
-class CalculatePixelsPerMMInVideoPopUp(PopUpMixin):
-
-    """
-    .. video:: _static/img/GetPixelsPerMillimeterInterface.webm
-       :width: 800
-       :autoplay:
-       :loop:
-       :muted:
-       :align: center
-    """
-
-    def __init__(self):
-        PopUpMixin.__init__(self, title="CALCULATE PIXELS PER MILLIMETER IN VIDEO", size=(550, 550), icon='distance')
-        settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.video_path = FileSelect(settings_frm, "SELECT VIDEO FILE: ",  title="Select a video file", file_types=[("VIDEO", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)], lblwidth=40, lbl_icon='browse')
-        self.known_distance = Entry_Box(settings_frm, "KNOWN REAL LIFE METRIC DISTANCE (mm): ", labelwidth=40, validation="numeric", img='distance')
-        run_btn = SimbaButton(parent=settings_frm, txt="GET PIXELS PER MILLIMETER", img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.run)
-        settings_frm.grid(row=0, column=0, sticky=NW)
-        self.video_path.grid(row=0, column=0, sticky=NW)
-        self.known_distance.grid(row=1, column=0, sticky=NW)
-        run_btn.grid(row=2, column=0, sticky=NW)
-        self.main_frm.mainloop()
-
-    def run(self):
-        check_file_exist_and_readable(file_path=self.video_path.file_path)
-        check_int(name="Distance", value=self.known_distance.entry_get, min_value=1)
-        _ = get_video_meta_data(video_path=self.video_path.file_path)
-        px_per_mm_interface = GetPixelsPerMillimeterInterface(video_path=self.video_path.file_path, known_metric_mm=float(self.known_distance.entry_get))
-        px_per_mm_interface.run()
-        print(f"ONE (1) PIXEL REPRESENTS {round(px_per_mm_interface.ppm, 4)} MILLIMETERS IN VIDEO {os.path.basename(self.video_path.file_path)}.")
+# CalculatePixelsPerMMInVideoPopUp: removed in patch 122u — Qt replacement is PixelsPerMMForm in mufasa.ui_qt.forms.video_utilities.
+# (was 30 lines of legacy Tk widget plumbing.)
 
 
 #_ = CalculatePixelsPerMMInVideoPopUp()
@@ -3077,53 +3049,8 @@ class UpsampleVideosPopUp(PopUpMixin):
 
 
 
-class ReverseVideoPopUp(PopUpMixin):
-    def __init__(self):
-        PopUpMixin.__init__(self, title="REVERSE VIDEOS", icon='reverse_blue')
-        settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.MP4_CODEC_LK = {'HEVC (H.265)': 'libx265', 'H.264 (AVC)': 'libx264', 'VP9': 'vp9'}
-        gpu_state = NORMAL if check_nvidea_gpu_available(raise_error=False) else DISABLED
-        self.quality_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=list(range(10, 110, 10)), label="OUTPUT VIDEO QUALITY:", label_width=25, dropdown_width=25, value=60, img='pct_2', tooltip_key='OUTPUT_VIDEO_QUALITY')
-        self.codec_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=list(self.MP4_CODEC_LK.keys()), label="COMPRESSION CODEC:", label_width=25, dropdown_width=25, value='HEVC (H.265)', img='file_type')
-        self.gpu_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="USE GPU:", label_width=25, dropdown_width=25, value='FALSE', img='gpu_3', state=gpu_state, tooltip_key='USE_GPU')
-
-        settings_frm.grid(row=0, column=0, sticky=NW)
-        self.quality_dropdown.grid(row=0, column=0, sticky=NW)
-        self.codec_dropdown.grid(row=1, column=0, sticky=NW)
-        self.gpu_dropdown.grid(row=2, column=0, sticky=NW)
-
-        single_video_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SINGLE VIDEO - REVERSE", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_video = FileSelect(single_video_frm, "VIDEO PATH:", title="Select a video file", lblwidth=25, file_types=[("VIDEO FILE", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)])
-        single_video_run = SimbaButton(parent=single_video_frm, txt="RUN - SINGLE VIDEO", img='rocket', txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=lambda: self.run(multiple=False))
-
-        single_video_frm.grid(row=1, column=0, sticky="NW")
-        self.selected_video.grid(row=0, column=0, sticky="NW")
-        single_video_run.grid(row=1, column=0, sticky="NW")
-
-        multiple_videos_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="MULTIPLE VIDEOS - REVERSE", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.selected_video_dir = FolderSelect(multiple_videos_frm, "VIDEO DIRECTORY PATH:", title="Select a video directory", lblwidth=25)
-        multiple_videos_run = SimbaButton(parent=multiple_videos_frm, txt="RUN - MULTIPLE VIDEOS", img='rocket', txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=lambda: self.run(multiple=True))
-
-        multiple_videos_frm.grid(row=2, column=0, sticky="NW")
-        self.selected_video_dir.grid(row=0, column=0, sticky="NW")
-        multiple_videos_run.grid(row=1, column=0, sticky="NW")
-        #self.main_frm.mainloop()
-
-    def run(self, multiple: bool):
-        target_quality = int(self.quality_dropdown.get_value())
-        codec = self.MP4_CODEC_LK[self.codec_dropdown.get_value()]
-        gpu = str_2_bool(self.gpu_dropdown.get_value())
-        if not multiple:
-            data_path = self.selected_video.file_path
-            check_file_exist_and_readable(file_path=data_path)
-        else:
-            data_path = self.selected_video_dir.folder_path
-            check_if_dir_exists(in_dir=data_path)
-
-        reverse_videos(path=data_path,
-                       quality=target_quality,
-                       codec=codec,
-                       gpu=gpu)
+# ReverseVideoPopUp: removed in patch 122u — Qt replacement is ReverseVideoForm in mufasa.ui_qt.forms.video_utilities.
+# (was 47 lines of legacy Tk widget plumbing.)
 
 class Convert2BlackWhitePopUp(PopUpMixin):
     def __init__(self):

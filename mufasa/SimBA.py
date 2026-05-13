@@ -64,7 +64,9 @@ from mufasa.ui.pop_ups.batch_preprocess_pop_up import BatchPreProcessPopUp
 from mufasa.ui.pop_ups.blob_visualizer_pop_up import BlobVisualizerPopUp
 from mufasa.ui.pop_ups.boolean_conditional_slicer_pup_up import \
     BooleanConditionalSlicerPopUp
-from mufasa.ui.pop_ups.change_speed_popup import ChangeSpeedPopup
+# Patch 122u: change_speed_popup module deleted — Qt
+# ChangeSpeedForm covers it on the Video Processing page →
+# 'Utilities' section.
 from mufasa.ui.pop_ups.check_videos_seekable_pop_up import \
     CheckVideoSeekablePopUp
 from mufasa.ui.pop_ups.clf_add_remove_print_pop_up import (
@@ -168,7 +170,7 @@ from mufasa.ui.pop_ups.third_party_annotator_appender_pop_up import \
 from mufasa.ui.pop_ups.validation_plot_pop_up import ValidationVideoPopUp
 from mufasa.ui.pop_ups.video_processing_pop_up import (
     BackgroundRemoverDirectoryPopUp, BackgroundRemoverSingleVideoPopUp,
-    BoxBlurPopUp, BrightnessContrastPopUp, CalculatePixelsPerMMInVideoPopUp,
+    BoxBlurPopUp, BrightnessContrastPopUp,
     ChangeFpsMultipleVideosPopUp, ChangeFpsSingleVideoPopUp, CLAHEPopUp,
     ClipSingleVideoByFrameNumbers, ClipVideoPopUp, ConcatenatingVideosPopUp,
     ConcatenatorPopUp, Convert2AVIPopUp, Convert2BlackWhitePopUp,
@@ -182,7 +184,7 @@ from mufasa.ui.pop_ups.video_processing_pop_up import (
     InitiateClipMultipleVideosByFrameNumbersPopUp,
     InitiateClipMultipleVideosByTimestampsPopUp, InteractiveClahePopUp,
     ManualTemporalJoinPopUp, MultiCropPopUp,
-    MultiShortenPopUp, ReverseVideoPopUp, RotateVideoSetDegreesPopUp,
+    MultiShortenPopUp, RotateVideoSetDegreesPopUp,
     SuperImposeFrameCountPopUp, SuperimposeProgressBarPopUp,
     SuperimposeTextPopUp, SuperimposeTimerPopUp, SuperimposeVideoNamesPopUp,
     SuperimposeVideoPopUp, SuperimposeWatermarkPopUp, UpsampleVideosPopUp,
@@ -902,12 +904,16 @@ class App(object):
 
         video_process_menu.add_command(label="Create GIFs", compound="left", image=self.menu_icons["gif"]["img"], command=CreateGIFPopUP, font=Formats.FONT_REGULAR.value)
 
-        video_process_menu.add_command(label="Get metric conversion factor (pixels/millimeter)", compound="left", image=self.menu_icons["calipher"]["img"], command=CalculatePixelsPerMMInVideoPopUp, font=Formats.FONT_REGULAR.value)
+        # Patch 122u: 'Get metric conversion factor (pixels/millimeter)'
+        # menu entry removed — Qt PixelsPerMMForm covers it on the
+        # Video Processing page → 'Utilities' section.
         video_process_menu.add_command(label="Change video brightness / contrast", compound="left", image=self.menu_icons["brightness"]["img"], command=BrightnessContrastPopUp, font=Formats.FONT_REGULAR.value)
         # Patch 122s: 'Merge frames to video' menu entry removed —
         # Qt MergeFramesToVideoForm covers this on the Video
         # Processing page → 'Merge frames → video' section.
-        video_process_menu.add_command(label="Playback speed (video)", compound="left", image=self.menu_icons["run"]["img"], command=ChangeSpeedPopup, font=Formats.FONT_REGULAR.value)
+        # Patch 122u: 'Playback speed (video)' menu entry removed
+        # — Qt ChangeSpeedForm covers it on the Video Processing
+        # page → 'Utilities' section.
         video_process_menu.add_command(label="Print classifier info", compound="left", image=self.menu_icons["print"]["img"], command=PrintModelInfoPopUp, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_command(label="Show video file(s) meta data", compound="left", image=self.menu_icons["print"]["img"], command=PrintVideoMetaDataPopUp, font=Formats.FONT_REGULAR.value)
 
@@ -918,7 +924,9 @@ class App(object):
         rotate_menu.add_command(label="Rotate videos", compound="left", image=self.menu_icons["flip_red"]["img"], command=RotateVideoSetDegreesPopUp, font=Formats.FONT_REGULAR.value)
         rotate_menu.add_command(label="Interactively rotate videos",  compound="left", image=self.menu_icons["flip_red"]["img"], command=VideoRotatorPopUp, font=Formats.FONT_REGULAR.value)
         rotate_menu.add_command(label="Flip videos",  compound="left", image=self.menu_icons["flip_green"]["img"], command=FlipVideosPopUp, font=Formats.FONT_REGULAR.value)
-        rotate_menu.add_command(label="Reverse videos",  compound="left", image=self.menu_icons["reverse_blue"]["img"], command=ReverseVideoPopUp, font=Formats.FONT_REGULAR.value)
+        # Patch 122u: 'Reverse videos' menu entry removed — Qt
+        # ReverseVideoForm covers it on the Video Processing page
+        # → 'Utilities' section.
         video_process_menu.add_cascade(label="Rotate / flip / reverse videos...", compound="left", image=self.menu_icons["rotate"]["img"], menu=rotate_menu, font=Formats.FONT_REGULAR.value)
 
         superimpose_menu = Menu(menu)
