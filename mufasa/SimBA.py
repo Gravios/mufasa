@@ -60,7 +60,9 @@ from mufasa.ui.pop_ups.append_roi_features_animals_pop_up import \
     AppendROIFeaturesByAnimalPopUp
 from mufasa.ui.pop_ups.append_roi_features_bodypart_pop_up import \
     AppendROIFeaturesByBodyPartPopUp
-from mufasa.ui.pop_ups.batch_preprocess_pop_up import BatchPreProcessPopUp
+# Patch 122ad: batch_preprocess_pop_up module deleted — Qt
+# BatchPreProcessLauncher covers it on the Preprocessing page →
+# 'Preprocess Videos' section.
 from mufasa.ui.pop_ups.blob_visualizer_pop_up import BlobVisualizerPopUp
 from mufasa.ui.pop_ups.boolean_conditional_slicer_pup_up import \
     BooleanConditionalSlicerPopUp
@@ -104,8 +106,9 @@ from mufasa.ui.pop_ups.dlc_h5_inference_to_yolo_popup import \
 from mufasa.ui.pop_ups.dlc_to_labelme_popup import DLC2LabelmePopUp
 from mufasa.ui.pop_ups.dlc_to_yolo_keypoints_popup import DLCYoloKeypointsPopUp
 from mufasa.ui.pop_ups.egocentric_alignment_pop_up import EgocentricAlignPopUp
-from mufasa.ui.pop_ups.extract_annotation_frames_pop_up import \
-    ExtractAnnotationFramesPopUp
+# Patch 122ad: extract_annotation_frames_pop_up module deleted —
+# Qt ExtractFramesForm covers it on the Video Processing page →
+# 'Frame extraction' section.
 from mufasa.ui.pop_ups.ez_path_plot_popup import EzPathPlotPopUp
 from mufasa.ui.pop_ups.fsttc_pop_up import FSTTCPopUp
 from mufasa.ui.pop_ups.gantt_pop_up import GanttPlotPopUp
@@ -462,7 +465,11 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         targeted_clip_annotator_btn = SimbaButton(parent=targeted_clip_annotator_frm, txt="Select video", cmd=select_labelling_video_targeted_clips, cmd_kwargs={'config_path': lambda:self.config_path}, thread=False)
 
         lbl_tools_frm = CreateLabelFrameWithIcon(parent=tab7, header="LABELLING TOOLS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.ADVANCED_LBL.value, bg=Formats.LABELFRAME_GREY.value, padx=5, pady=5)
-        visualize_annotation_img_btn = SimbaButton(parent=lbl_tools_frm, width=Formats.BUTTON_WIDTH_XS.value, txt="VISUALIZE ANNOTATIONS FRAMES", cmd=ExtractAnnotationFramesPopUp, cmd_kwargs={'config_path': lambda:self.config_path}, thread=False)
+        # Patch 122ad: 'VISUALIZE ANNOTATIONS FRAMES' button +
+        # ExtractAnnotationFramesPopUp removed — Qt
+        # ExtractFramesForm covers it on the Video Processing
+        # page → 'Frame extraction' section (with the SEQ + range
+        # + format / greyscale / clahe options surfaced).
         visualize_annotation_video_btn = SimbaButton(parent=lbl_tools_frm, width=Formats.BUTTON_WIDTH_XS.value, txt="VISUALIZE ANNOTATION VIDEO BOUTS", txt_clr='blue', cmd=AnnotatedBoutsVideoPopUp, cmd_kwargs={'config_path': lambda:self.config_path}, thread=False)
         third_party_annotations_btn = SimbaButton(parent=lbl_tools_frm, width=Formats.BUTTON_WIDTH_XS.value, txt="APPEND THIRD-PARTY ANNOTATIONS", txt_clr='purple', cmd=ThirdPartyAnnotatorAppenderPopUp, cmd_kwargs={'config_path': lambda:self.config_path}, thread=False)
         remove_roi_features_from_annotation_set = SimbaButton(parent=lbl_tools_frm, width=Formats.BUTTON_WIDTH_XS.value, txt="REMOVE ROI FEATURES FROM LABEL SET", txt_clr='darkred', cmd=RemoveROIFeaturesPopUp, cmd_kwargs={'config_path': lambda:self.config_path, 'dataset': lambda:'targets_inserted'}, thread=False)
@@ -599,7 +606,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         import_observer_btn.grid(row=2, column=1, sticky=NW)
 
         lbl_tools_frm.grid(row=10, column=0, sticky=NW, padx=10, pady=10)
-        visualize_annotation_img_btn.grid(row=0, column=0, sticky=NW)
         visualize_annotation_video_btn.grid(row=0, column=1, sticky=NW)
         third_party_annotations_btn.grid(row=1, column=0, sticky=NW)
         remove_roi_features_from_annotation_set.grid(row=1, column=1, sticky=NW)
@@ -798,7 +804,10 @@ class App(object):
 
         batch_process_menu = Menu(menu)
         menu.add_cascade(label="Process Videos", menu=batch_process_menu)
-        batch_process_menu.add_command(label="Batch pre-process videos", compound="left", image=self.menu_icons["factory"]["img"], command=lambda: BatchPreProcessPopUp(), font=Formats.FONT_REGULAR.value)
+        # Patch 122ad: 'Batch pre-process videos' menu entry
+        # removed — Qt BatchPreProcessLauncher covers it on the
+        # Preprocessing page → 'Preprocess Videos' section (moved
+        # there from the Data Import page by patch 122x).
 
         blob_tracking_menu = Menu(batch_process_menu)
         blob_tracking_menu.add_command(label="Perform blob tracking", compound="left", image=self.menu_icons["bubble_green"]["img"], command=InitializeBlobTrackerPopUp, font=Formats.FONT_REGULAR.value)
