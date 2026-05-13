@@ -79,6 +79,9 @@ from mufasa.ui_qt.forms.video_frames import (ExtractFramesForm,
                                               MergeFramesToVideoForm)
 from mufasa.ui_qt.forms.video_join import (CrossfadeVideosForm,
                                             JoinVideosForm)
+from mufasa.ui_qt.forms.video_utilities import (ChangeSpeedForm,
+                                                 PixelsPerMMForm,
+                                                 ReverseVideoForm)
 from mufasa.ui_qt.forms.image_conversion import (AverageFrameForm,
                                                  ImageFormatConverterForm)
 from mufasa.ui_qt.workbench import WorkflowPage
@@ -110,6 +113,12 @@ def build_video_processing_page(workbench,
     page.add_section("Join & transition",       [(JoinVideosForm, {}),
                                                  (CrossfadeVideosForm, {})])
     page.add_section("Image format conversion", [(ImageFormatConverterForm, {})])
+    # Patch 122u: three small single-utility ports (Reverse video,
+    # Change speed, Pixels-per-mm calibration) live together in a
+    # Utilities section. Each replaces exactly one legacy popup.
+    page.add_section("Utilities",               [(ReverseVideoForm, {}),
+                                                 (ChangeSpeedForm, {}),
+                                                 (PixelsPerMMForm, {})])
     page.add_section("Metadata & audit",        [(AverageFrameForm, {})])
 
     register_video_processing_menu_actions(workbench)
