@@ -88,16 +88,18 @@ class FrameLabellingLauncher(OperationForm):
     Patch 122aa: button text shortened from
     'Select video and launch labeller…' to 'Label' to match the
     sidebar entries on other pages; description rewritten to
-    acknowledge the legacy-only path resolution in
-    :mod:`mufasa.ui_qt.frame_labeller` so v1 users aren't
-    misled. The backend reads ``project_path`` from
-    ``[General settings]`` of the legacy INI and joins it with
-    literal ``csv/features_extracted/`` /
-    ``csv/targets_inserted/`` / ``csv/machine_results/``
-    subtrees. For v1 projects this means labels and features
-    land under those legacy paths beneath the v1 project root
-    until a follow-up patch plumbs the backend through
-    :func:`project_paths_from_config`.
+    document the path conventions.
+
+    Patch 122ab: the labeller backend (frame_labeller.py) now
+    routes path resolution through
+    :func:`mufasa.project_layout.project_paths_from_config`
+    instead of reading the legacy ``[General settings].project_path``
+    directly. v1 ``project.toml`` projects work end-to-end —
+    previously the labeller would crash on the missing INI
+    section. For both layouts, labels save under
+    ``<root>/csv/targets_inserted/`` and pseudo-labels seed
+    from ``<root>/csv/machine_results/`` (paths returned by the
+    layout helper).
     """
 
     title = "Frame labelling"
@@ -111,11 +113,10 @@ class FrameLabellingLauncher(OperationForm):
         "<b>Path note:</b> features come from "
         "<code>csv/features_extracted/</code>, labels save to "
         "<code>csv/targets_inserted/</code>, pseudo-labels seed "
-        "from <code>csv/machine_results/</code>. These paths "
-        "are joined with the project root in both v1 and legacy "
-        "layouts (v1 stores them under the project root "
-        "directly; layout-aware run-id allocation is a deferred "
-        "v1 migration item)."
+        "from <code>csv/machine_results/</code>, all under the "
+        "active project root. Works for both v1 "
+        "(<code>project.toml</code>) and legacy "
+        "(<code>project_config.ini</code>) layouts."
     )
 
     MODES = [("New labelling",        "new"),

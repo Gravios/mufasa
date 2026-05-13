@@ -35,7 +35,6 @@ working without modification.
 """
 from __future__ import annotations
 
-import configparser
 import os
 from pathlib import Path
 from typing import Optional
@@ -101,25 +100,33 @@ class FrameLabellerDialog(QDialog):
     # Project metadata loading
     # ------------------------------------------------------------------ #
     def _load_project_metadata(self) -> None:
-        """Discover classifier list + project paths from config."""
+        """Discover classifier list + project paths from config.
+
+        Patch 122ab: routes through
+        :func:`mufasa.project_layout.project_paths_from_config` +
+        :func:`project_metadata_from_config` so v1 ``project.toml``
+        projects work end-to-end. Previously the loader read the
+        legacy ``[General settings].project_path`` directly via
+        :mod:`configparser`, which silently parsed zero sections
+        out of a TOML file and then crashed on the missing
+        ``[General settings]`` section. v1 users couldn't launch
+        the labeller at all.
+        """
         self._classifier_names = _load_classifier_names(self.config_path)
         if not self._classifier_names:
             raise RuntimeError(
-                "No classifiers defined in project_config.ini. Add at "
+                "No classifiers defined in the project. Add at "
                 "least one via the Classifier → Manage page before "
                 "labelling."
             )
-        cfg = configparser.ConfigParser()
-        cfg.read(self.config_path)
-        project_path = cfg.get("General settings", "project_path")
-        self.file_type = cfg.get("General settings", "workflow_file_type",
-                                 fallback="csv")
-        self.features_dir = os.path.join(project_path, "csv",
-                                         "features_extracted")
-        self.targets_dir = os.path.join(project_path, "csv",
-                                        "targets_inserted")
-        self.machine_results_dir = os.path.join(project_path, "csv",
-                                                "machine_results")
+        from mufasa.project_layout import (project_metadata_from_config,
+                                           project_paths_from_config)
+        paths = project_paths_from_config(self.config_path)
+        meta = project_metadata_from_config(self.config_path)
+        self.file_type = meta.get("file_type", "csv")
+        self.features_dir = paths["features_extracted_dir"]
+        self.targets_dir = paths["targets_inserted_dir"]
+        self.machine_results_dir = paths["machine_results_dir"]
         os.makedirs(self.targets_dir, exist_ok=True)
 
     # ------------------------------------------------------------------ #
