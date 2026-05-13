@@ -114,7 +114,6 @@ from mufasa.ui.pop_ups.heatmap_clf_pop_up import HeatmapClfPopUp
 from mufasa.ui.pop_ups.heatmap_location_pop_up import HeatmapLocationPopup
 from mufasa.ui.pop_ups.initialize_blob_tracking_pop_up import \
     InitializeBlobTrackerPopUp
-from mufasa.ui.pop_ups.interpolate_pop_up import InterpolatePopUp
 from mufasa.ui.pop_ups.kleinberg_pop_up import KleinbergPopUp
 from mufasa.ui.pop_ups.labelme_bbox_to_yolo_bbox_popup import \
     LabelmeBbox2YoloBboxPopUp
@@ -130,7 +129,6 @@ from mufasa.ui.pop_ups.movement_analysis_time_bins_pop_up import \
 from mufasa.ui.pop_ups.multiple_videos_to_frames_popup import \
     MultipleVideos2FramesPopUp
 from mufasa.ui.pop_ups.mutual_exclusivity_pop_up import MutualExclusivityPupUp
-from mufasa.ui.pop_ups.outlier_settings_pop_up import OutlierSettingsPopUp
 from mufasa.ui.pop_ups.path_plot_pop_up import PathPlotPopUp
 from mufasa.ui.pop_ups.pose_bp_drop_pop_up import DropTrackingDataPopUp
 from mufasa.ui.pop_ups.pose_reorganizer_pop_up import PoseReorganizerPopUp
@@ -202,7 +200,6 @@ from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         SimBADropDown, SimBALabel,
                                         hxtScrollbar)
 from mufasa.ui.utils import position_window
-from mufasa.ui.video_info_ui import VideoInfoTable
 from mufasa.utils.checks import (check_ffmpeg_available,
                                 check_file_exist_and_readable, check_int)
 from mufasa.utils.custom_feature_extractor import CustomFeatureExtractor
@@ -345,7 +342,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         add_clf_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="ADD CLASSIFIER TO SIMBA PROJECT", txt_clr='blue', compound='right', img='plus', font=Formats.FONT_REGULAR.value, cmd=AddClfPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         remove_clf_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="REMOVE CLASSIFIER FROM SIMBA PROJECT", txt_clr='blue', compound='right', img='trash', font=Formats.FONT_REGULAR.value, cmd=RemoveAClassifierPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         reverse_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="REVERSE TRACKING IDENTITIES IN SIMBA PROJECT", txt_clr='blue', compound='right', img='reverse_blue', font=Formats.FONT_REGULAR.value, cmd=None)
-        interpolate_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="INTERPOLATE POSE IN SIMBA PROJECT", txt_clr='blue', compound='right', img='line_chart_blue', font=Formats.FONT_REGULAR.value, cmd=InterpolatePopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         smooth_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="SMOOTH POSE IN SIMBA PROJECT", txt_clr='blue', compound='right', img='wand_blue', font=Formats.FONT_REGULAR.value, cmd=SmoothingPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         egocentric_align_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="EGOCENTRICALLY ALIGN POSE AND VIDEO", txt_clr='blue', compound='right', img='mouse_small', font=Formats.FONT_REGULAR.value, cmd=EgocentricAlignPopUp, cmd_kwargs={'config_path': lambda: self.config_path})
 
@@ -353,7 +349,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         self.distance_in_mm_eb = Entry_Box(label_setscale, "KNOWN DISTANCE (MILLIMETERS): ",  labelwidth=35, validation="numeric", entry_box_width=35)
         button_setdistanceinmm = SimbaButton(parent=label_setscale, txt="AUTO-POPULATE", txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=self.set_distance_mm)
 
-        button_setscale = SimbaButton(parent=label_setscale, txt="CONFIGURE VIDEO PARAMETERS", txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=self.create_video_info_table, img='calipher')
         self.new_ROI_frm = CreateLabelFrameWithIcon(parent=tab6, header="SIMBA ROI INTERFACE", icon_name='shapes_small', icon_link=Links.ROI.value, bg='#DCDCDC', padx=5, pady=5)
         self.start_new_ROI = SimbaButton(parent=self.new_ROI_frm, width=Formats.BUTTON_WIDTH_L.value, txt="DEFINE ROIs", txt_clr='green', font=Formats.FONT_REGULAR.value, img='roi', cmd=ROIVideoTable, cmd_kwargs={'config_path': lambda:self.config_path})
 
@@ -410,7 +405,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         button_distances_timebins.grid(row=11, sticky=NW)
 
         label_outliercorrection = CreateLabelFrameWithIcon(parent=tab4, header="OUTLIER CORRECTION", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.OUTLIERS_DOC.value, bg=Formats.LABELFRAME_GREY.value, padx=5, pady=5)
-        button_settings_outlier = SimbaButton(parent=label_outliercorrection, width=Formats.BUTTON_WIDTH_L.value, txt="SETTINGS", txt_clr='blue', img='settings', font=Formats.FONT_REGULAR.value, cmd=OutlierSettingsPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
 
         button_outliercorrection = SimbaButton(parent=label_outliercorrection, width=Formats.BUTTON_WIDTH_L.value, txt="RUN OUTLIER CORRECTION", txt_clr='green', img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.correct_outlier, thread=False)
         button_skipOC = SimbaButton(parent=label_outliercorrection, width=Formats.BUTTON_WIDTH_L.value, txt="SKIP OUTLIER CORRECTION (CAUTION)", txt_clr='red', img='skip_2', font=Formats.FONT_REGULAR.value, cmd=self.initiate_skip_outlier_correction, thread=False)
@@ -563,17 +557,14 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         add_clf_btn.grid(row=3, column=0, sticky=NW)
         remove_clf_btn.grid(row=4, column=0, sticky=NW)
         reverse_btn.grid(row=6, column=0, sticky=NW)
-        interpolate_btn.grid(row=7, column=0, sticky=NW)
         smooth_btn.grid(row=8, column=0, sticky=NW)
         egocentric_align_btn.grid(row=9, column=0, sticky=NW)
 
         label_setscale.grid(row=0, sticky=NW, pady=20, padx=20)
         self.distance_in_mm_eb.grid(row=0, column=0, sticky=NW)
         button_setdistanceinmm.grid(row=0, column=1, sticky=NW)
-        button_setscale.grid(row=1, column=0, sticky=NW)
 
         label_outliercorrection.grid(row=0, sticky=W, padx=10, pady=10)
-        button_settings_outlier.grid(row=0, sticky=W)
         button_outliercorrection.grid(row=1, sticky=W)
         button_skipOC.grid(row=2, sticky=W, pady=5)
 
@@ -664,10 +655,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
             unsupervised_btn = Button(lbl_addon, text="Unsupervised analysis", fg="purple", font=Formats.FONT_REGULAR.value, command=lambda: UnsupervisedGUI(config_path=self.config_path))
             unsupervised_btn.grid(row=3, sticky=NW)
         write_to_recent_project_paths(config_path=self.config_path)
-
-    def create_video_info_table(self):
-        video_info_tabler = VideoInfoTable(config_path=self.config_path)
-        video_info_tabler.run()
 
     def initiate_skip_outlier_correction(self):
         outlier_correction_skipper = OutlierCorrectionSkipper(config_path=self.config_path)

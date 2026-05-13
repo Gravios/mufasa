@@ -53,8 +53,10 @@ REFERENCED_NAMES = [
         "Qt PixelCalibrationDialog",
         "mufasa/ui_qt/dialogs/pixel_calibration.py",
     ),
-    # Legacy Tk video info table
-    ("Tk VideoInfoTable", "mufasa/ui/video_info_ui.py"),
+    # Legacy Tk video info table — deleted in patch 122p (Qt
+    # VideoInfoForm above is the supported surface). The Tk launcher
+    # below still ships for users who depend on legacy entry points
+    # but no longer wires this calibration table in.
     # The legacy launcher
     ("Tk launcher", "mufasa/SimBA.py"),
 ]
