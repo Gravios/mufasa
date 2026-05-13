@@ -10,6 +10,26 @@ The legacy popup lets the user pick which feature families
 whether to append the result to the existing features_extracted/
 targets_inserted CSVs. Same in the Qt form, with the feature-family
 list populated from the backend's constants.
+
+Patch 122z notes
+----------------
+* Feature families are now split into two grouped frames —
+  **Subject features** (within-animal: distances, angles, hulls,
+  movements) and **ROI features** (distance-to-ROI, body-parts-
+  inside-ROIs). Same backend; the form just renders the
+  selection in two QGroupBoxes so users see the two categories
+  separately. ROI features won't compute without ROI definitions
+  in the project; the ROI group's frame note says so.
+* Destination radio labels now reference both the v1 layout
+  (``derived/features/<run_id>/``,
+  ``derived/classifications/<run_id>/``) and the legacy layout
+  (``csv/features_extracted/``, ``csv/targets_inserted/``). The
+  underlying backend still writes to the legacy paths regardless
+  of layout — making per-write paths run-id-aware is one of the
+  larger deferred items in the v1 migration. The form labels
+  honestly call out both so v1 users know what to expect (the
+  on-disk output ends up under the legacy subtree under their
+  v1 root for now).
 """
 from __future__ import annotations
 
@@ -39,30 +59,112 @@ _DEFAULT_FAMILIES = [
 ]
 
 
+def _is_roi_family(name: str) -> bool:
+    """Classify a feature-family name as ROI-related.
+
+    Heuristic: the family name contains the case-insensitive
+    substring ``ROI``. Works for every entry in
+    ``_DEFAULT_FAMILIES`` and for the canonical SimBA family
+    names exposed by the backend's ``FEATURE_FAMILIES`` constant.
+    If the backend adds families that don't follow this naming
+    convention (none currently do), they'll land in the Subject
+    group by default — which is the safer fallback since Subject
+    features don't require ROI definitions to compute.
+    """
+    return "ROI" in name
+
+
 class FeatureSubsetExtractorForm(OperationForm):
     """Compute a subset of feature families and merge into existing
     feature CSVs."""
 
     title = "Compute feature subsets"
-    description = ("Recompute one or more feature families and "
-                   "optionally append them to the existing "
-                   "feature/targets CSVs. Useful when new feature "
-                   "families are introduced without re-running the full "
-                   "extractor.")
+    description = (
+        "Recompute one or more feature families and optionally "
+        "append them to the existing feature / targets CSVs. "
+        "Useful when new feature families are introduced without "
+        "re-running the full extractor. "
+        "<br><br>"
+        "<b>Subject features</b> (within-animal distances, angles, "
+        "hulls, movements) and <b>ROI features</b> (distance to "
+        "ROI centers, body-parts inside ROIs) live in separate "
+        "frames below — pick zero, one, or many from either or "
+        "both. ROI features need ROI definitions in the project; "
+        "draw or import them on the ROI page first."
+    )
 
     def build(self) -> None:
+        from PySide6.QtWidgets import QGroupBox
         outer = QVBoxLayout()
 
-        # Feature-family multi-select
-        outer.addWidget(self._bold("Feature families"))
-        self.families = QListWidget(self)
-        self.families.setSelectionMode(QListWidget.MultiSelection)
-        self.families.setMinimumHeight(180)
-        for fam in self._discover_families():
+        # ----- Feature families: two grouped frames ----- #
+        # Patch 122z: previously one big multi-select list. Split
+        # into Subject vs ROI families so users see the two
+        # categories distinctly. Two QListWidgets feeding one
+        # combined selection in collect_args().
+        families = self._discover_families()
+        subject_families = [f for f in families
+                            if not _is_roi_family(f)]
+        roi_families = [f for f in families if _is_roi_family(f)]
+
+        # Subject frame
+        subj_box = QGroupBox("Subject features", self)
+        subj_layout = QVBoxLayout(subj_box)
+        subj_layout.setContentsMargins(8, 8, 8, 8)
+        self.subject_families = QListWidget(self)
+        self.subject_families.setSelectionMode(
+            QListWidget.MultiSelection,
+        )
+        self.subject_families.setMinimumHeight(140)
+        for fam in subject_families:
             item = QListWidgetItem(fam)
             item.setData(Qt.UserRole, fam)
-            self.families.addItem(item)
-        outer.addWidget(self.families)
+            self.subject_families.addItem(item)
+        subj_layout.addWidget(self.subject_families)
+        subj_hint = QLabel(
+            "<i>Within-animal geometry: distances, angles, "
+            "convex hulls, frame-to-frame body-part movements. "
+            "Need only pose data.</i>",
+            self,
+        )
+        subj_hint.setStyleSheet("color: palette(placeholder-text);")
+        subj_hint.setWordWrap(True)
+        subj_layout.addWidget(subj_hint)
+        outer.addWidget(subj_box)
+
+        # ROI frame
+        roi_box = QGroupBox("ROI features", self)
+        roi_layout = QVBoxLayout(roi_box)
+        roi_layout.setContentsMargins(8, 8, 8, 8)
+        self.roi_families = QListWidget(self)
+        self.roi_families.setSelectionMode(
+            QListWidget.MultiSelection,
+        )
+        self.roi_families.setMinimumHeight(90)
+        for fam in roi_families:
+            item = QListWidgetItem(fam)
+            item.setData(Qt.UserRole, fam)
+            self.roi_families.addItem(item)
+        roi_layout.addWidget(self.roi_families)
+        roi_hint = QLabel(
+            "<i>Require ROI definitions in the current project. "
+            "Draw or import ROIs on the ROI page first; results "
+            "are written into the same CSV alongside the subject "
+            "features.</i>",
+            self,
+        )
+        roi_hint.setStyleSheet("color: palette(placeholder-text);")
+        roi_hint.setWordWrap(True)
+        roi_layout.addWidget(roi_hint)
+        outer.addWidget(roi_box)
+
+        # Back-compat alias: some external code (and the prior
+        # smoke test) reads self.families. Expose a combined
+        # convenience reference. Selection is read directly off
+        # the two child lists in collect_args, so this is purely
+        # for "did the form build a families list" structural
+        # checks.
+        self.families = self.subject_families  # historical handle
 
         # Options
         form = QFormLayout()
@@ -92,21 +194,30 @@ class FeatureSubsetExtractorForm(OperationForm):
         form.addRow("", self.save_dir)
 
         # Mode 2: append to features_extracted — merge new columns
-        # into project's per-video files in csv/features_extracted/.
-        # Existing data preserved; new columns added side-by-side.
+        # into project's per-video feature files. Path note: the
+        # backend currently writes to the legacy 'csv/features_extracted/'
+        # subtree regardless of project layout — for v1 projects
+        # that means the files land under '<root>/csv/features_extracted/'
+        # rather than '<root>/derived/features/<run_id>/'. Plumbing
+        # per-write run-id allocation is a deferred v1 task; the
+        # label is honest about the present-day path.
         self.dest_append_features = QRadioButton(
-            "Append new columns to project files in "
-            "csv/features_extracted/", self,
+            "Append new columns to per-video feature files "
+            "(<code>csv/features_extracted/</code>; v1: "
+            "<code>derived/features/&lt;run_id&gt;/</code> once "
+            "run-id-aware writes land)", self,
         )
         form.addRow("", self.dest_append_features)
 
         # Mode 3: append to targets_inserted — same as features
-        # mode but writes to csv/targets_inserted/. Used when the
+        # mode but writes to the targets tree. Used when the
         # project has classifier targets already inserted and you
         # want the new features alongside them.
         self.dest_append_targets = QRadioButton(
-            "Append new columns to project files in "
-            "csv/targets_inserted/", self,
+            "Append new columns to per-video targets files "
+            "(<code>csv/targets_inserted/</code>; v1: "
+            "<code>derived/classifications/&lt;run_id&gt;/</code> "
+            "once run-id-aware writes land)", self,
         )
         form.addRow("", self.dest_append_targets)
 
@@ -208,8 +319,16 @@ class FeatureSubsetExtractorForm(OperationForm):
     def collect_args(self) -> dict:
         if not self.config_path:
             raise RuntimeError("No project loaded.")
-        selected = [it.data(Qt.UserRole)
-                    for it in self.families.selectedItems()]
+        # Patch 122z: read from BOTH subject and ROI lists. Order:
+        # subject first, then ROI — matches the visual top-to-
+        # bottom layout. Duplicates impossible because the two
+        # lists are disjoint by _is_roi_family classification.
+        selected = (
+            [it.data(Qt.UserRole)
+             for it in self.subject_families.selectedItems()]
+            + [it.data(Qt.UserRole)
+               for it in self.roi_families.selectedItems()]
+        )
         if not selected:
             raise ValueError("Select at least one feature family.")
 

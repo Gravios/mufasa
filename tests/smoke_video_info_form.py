@@ -189,15 +189,22 @@ def main() -> int:
     assert "videos" in discover_src
 
     # ------------------------------------------------------------------ #
-    # Case 9: Data Import page wires the new form in as a section
+    # Case 9: VideoInfoForm wired into a workbench page. Originally
+    # the Data Import page; moved to the Preprocessing page in patch
+    # 122x. The section title was also renamed
+    # ('Video parameters & calibration' → 'Video Calibration') in
+    # the same move.
     # ------------------------------------------------------------------ #
-    page_src = Path("mufasa/ui_qt/pages/data_import_page.py").read_text()
+    page_src = Path(
+        "mufasa/ui_qt/pages/pose_cleanup_page.py"
+    ).read_text()
     assert "VideoInfoForm" in page_src, (
-        "Data Import page must register VideoInfoForm"
+        "Preprocessing page (post-122x) must register VideoInfoForm"
     )
-    assert "Video parameters & calibration" in page_src or \
-           "video parameters" in page_src.lower(), (
-        "Section title should mention video parameters / calibration"
+    assert ("Video Calibration" in page_src
+            or "video calibration" in page_src.lower()), (
+        "Section title should mention 'Video Calibration' "
+        "(post-122x rename)"
     )
 
     # ------------------------------------------------------------------ #
