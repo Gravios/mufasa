@@ -6,16 +6,30 @@ Project-level pose import form. Distinct from
 :mod:`mufasa.ui_qt.forms.data_import` (which is for cross-format
 *converters* like DLC→YOLO); this form takes pose-estimation files
 produced by an external tracker and loads them into the currently-open
-project's ``csv/input_csv/`` directory.
+project's pose tree:
 
-As of 6.0.0.dev4 only one route is surfaced — single-animal DLC H5 —
-because that's the importer we had to add; other trackers (CSV DLC,
-maDLC H5, SLEAP, FaceMap, etc.) can be wired in here incrementally
-with the same declarative route pattern.
+* v1 projects (``project.toml``): ``<root>/sources/pose/``
+* Legacy projects (``project_config.ini``): ``<project>/csv/input_csv/``
+
+The branching is delegated to
+:func:`mufasa.project_layout.project_paths_from_config` via the
+underlying ``mufasa.pose_importers.*`` backends; the form itself
+doesn't need to know which layout is active.
+
+As of 6.0.0.dev4 two routes are surfaced — single-animal DLC H5 and
+single-animal DLC CSV. Other trackers (maDLC H5, SLEAP, FaceMap,
+etc.) can be wired in incrementally with the same declarative route
+pattern.
 
 Requires an open project (``config_path``). If no project is loaded
 the form disables itself with a hint pointing at File → New /
 Open project.
+
+Patch 122w: section title renamed from
+'Import pose-estimation data' to 'Import Pose Data' to match the
+shorter user-facing labels used on other Data Import sections; the
+description updated to mention both v1 and legacy destination
+directories explicitly.
 """
 from __future__ import annotations
 
@@ -72,11 +86,14 @@ class PoseImportForm(OperationForm):
     project's ``csv/input_csv/``. The ``config_path`` supplied at
     construction binds the form to the open project."""
 
-    title = "Import pose-estimation data"
+    title = "Import Pose Data"
     description = (
         "Load pose tracking output into the current project. "
-        "Files are normalized to SimBA's multi-index CSV/parquet "
-        "layout and written to <code>project_folder/csv/input_csv/</code>."
+        "Files are normalised to Mufasa's multi-index CSV/parquet "
+        "layout and written to <code>sources/pose/</code> for v1 "
+        "projects or <code>csv/input_csv/</code> for legacy "
+        "projects. The destination is resolved automatically from "
+        "the active project's layout."
     )
 
     # ------------------------------------------------------------------ #
