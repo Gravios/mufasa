@@ -174,6 +174,9 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                  data_dir: Optional[Union[str, os.PathLike]] = None,
                  append_to_features_extracted: bool = False,
                  append_to_targets_inserted: bool = False,
+                 derived_features_dir: Optional[
+                     Union[str, os.PathLike]
+                 ] = None,
                  n_workers: int = 1,
                  raise_on_error: bool = False,
                  overwrite_existing: bool = False):
@@ -193,10 +196,17 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             )
         if save_dir is not None:
             check_if_dir_exists(in_dir=save_dir)
+        # Patch 122ae-3: derived_features_dir gets created on-demand
+        # by process_one_video (one subdir per family), so we don't
+        # check_if_dir_exists here — just normalise to str-or-None
+        # for serialisation into the worker config.
+        if derived_features_dir is not None:
+            derived_features_dir = str(derived_features_dir)
         check_valid_lst(data=feature_families, source=f'{self.__class__.__name__} feature_families', valid_dtypes=(str,), valid_values=FEATURE_FAMILIES, min_len=1, raise_error=True)
         self.file_checks, self.feature_families, self.save_dir = file_checks, feature_families, save_dir
         self.append_to_features_extracted = append_to_features_extracted
         self.append_to_targets_inserted = append_to_targets_inserted
+        self.derived_features_dir = derived_features_dir
         self.n_workers = n_workers
         self.raise_on_error = raise_on_error
         self.overwrite_existing = overwrite_existing
@@ -207,16 +217,24 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         # compute. The Qt form's placeholder text "blank = project log
         # dir" was misleading: blank meant `None` meant discard.
         # This check fails fast before any work happens.
+        #
+        # Patch 122ae-3: derived_features_dir also counts as a
+        # destination. With it set, process_one_video writes per-
+        # family parquet under <derived_features_dir>/<slug>/, the
+        # new v1-native shape.
         if (self.save_dir is None
                 and not self.append_to_features_extracted
-                and not self.append_to_targets_inserted):
+                and not self.append_to_targets_inserted
+                and self.derived_features_dir is None):
             raise InvalidInputError(
                 msg=(
                     "No save destination specified. Feature output "
                     "would be silently discarded after compute. "
                     "Pass one of:\n"
-                    "  - save_dir=<path>  (writes per-video files to "
-                    "<path>)\n"
+                    "  - derived_features_dir=<path>  (recommended, "
+                    "writes per-family parquet to <path>/<family>/)\n"
+                    "  - save_dir=<path>  (writes per-video wide "
+                    "files to <path>)\n"
                     "  - append_to_features_extracted=True  (appends "
                     f"into {self.features_dir})\n"
                     "  - append_to_targets_inserted=True  (appends "
@@ -502,6 +520,10 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                 or FRAME_BP_INSIDE_ROI in self.feature_families
             ) else None,
             video_info_df=self.video_info_df,
+            # Patch 122ae-3: per-family parquet write destination.
+            # None disables the new branch; legacy callers see no
+            # change.
+            derived_features_dir=self.derived_features_dir,
         )
 
     def preflight_check(self) -> Dict[str, List[str]]:

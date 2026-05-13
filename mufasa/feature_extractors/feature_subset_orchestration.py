@@ -121,6 +121,16 @@ class VideoProcessingConfig:
     # cheap and it keeps the per-video function signature simple.
     video_info_df: Optional[pd.DataFrame] = None
 
+    # Patch 122ae-3: when set, process_one_video also writes per-
+    # family parquet files under this directory, organized as:
+    #   <derived_features_dir>/<family_slug>/<video>.parquet
+    # …where family_slug comes from mufasa.utils.feature_io.
+    # The legacy wide-temp-file write to temp_dir continues
+    # unchanged regardless — this is purely additive so downstream
+    # legacy-append paths (features_extracted / targets_inserted)
+    # keep working during the migration window. None disables it.
+    derived_features_dir: Optional[str] = None
+
 
 def _read_video_info_for(
     video_info_df: pd.DataFrame, video_name: str,
@@ -212,8 +222,22 @@ def process_one_video(
     df = read_df(file_path=file_path, file_type=config.file_type)
     df = _clip_pose_coords_to_frame(df, video_width, video_height)
 
-    # Run requested feature family kernels
+    # Run requested feature family kernels.
+    # Patch 122ae-3: we now track two parallel structures:
+    #   * results            — flat dict of all column→array pairs;
+    #                          drives the legacy wide write to
+    #                          temp_dir (preserves existing
+    #                          append-to-features_extracted /
+    #                          append-to-targets_inserted paths
+    #                          downstream).
+    #   * results_by_family  — {family_name: {col: array}}; drives
+    #                          the new per-family parquet write
+    #                          under config.derived_features_dir.
+    # In each branch we bind the kernel return to ``fam_result``
+    # first, then update both maps in a single block after the
+    # branch chain. The legacy wide write's bytes are unchanged.
     results: dict[str, np.ndarray] = {}
+    results_by_family: dict[str, dict[str, np.ndarray]] = {}
     for family_idx, family in enumerate(config.feature_families):
         if print_progress:
             print(
@@ -221,80 +245,88 @@ def process_one_video(
                 f"(Video {file_idx + 1}/{n_total_files}, "
                 f"Family {family_idx + 1}/{len(config.feature_families)})..."
             )
+        fam_result: dict[str, np.ndarray] = {}
         if family == TWO_POINT_BP_DISTANCES:
-            results.update(compute_two_point_distances(
+            fam_result = compute_two_point_distances(
                 df=df,
                 two_point_combs=config.two_point_combs,
                 px_per_mm=px_per_mm,
-            ))
+            )
         elif family == WITHIN_ANIMAL_THREE_POINT_ANGLES:
-            results.update(compute_three_point_angles(
+            fam_result = compute_three_point_angles(
                 df=df,
                 within_animal_three_point_combs=(
                     config.within_animal_three_point_combs
                 ),
-            ))
+            )
         elif family == WITHIN_ANIMAL_THREE_POINT_HULL:
-            results.update(compute_three_point_hulls(
+            fam_result = compute_three_point_hulls(
                 df=df,
                 within_animal_three_point_combs=(
                     config.within_animal_three_point_combs
                 ),
                 px_per_mm=px_per_mm,
-            ))
+            )
         elif family == WITHIN_ANIMAL_FOUR_POINT_HULL:
-            results.update(compute_four_point_hulls(
+            fam_result = compute_four_point_hulls(
                 df=df,
                 within_animal_four_point_combs=(
                     config.within_animal_four_point_combs
                 ),
                 px_per_mm=px_per_mm,
-            ))
+            )
         elif family == ANIMAL_CONVEX_HULL_PERIMETER:
-            results.update(compute_animal_convex_hulls(
+            fam_result = compute_animal_convex_hulls(
                 df=df, animal_bps=config.animal_bps,
                 px_per_mm=px_per_mm, method="perimeter",
-            ))
+            )
         elif family == ANIMAL_CONVEX_HULL_AREA:
-            results.update(compute_animal_convex_hulls(
+            fam_result = compute_animal_convex_hulls(
                 df=df, animal_bps=config.animal_bps,
                 px_per_mm=px_per_mm, method="area",
-            ))
+            )
         elif family == FRAME_BP_MOVEMENT:
-            results.update(compute_framewise_movement(
+            fam_result = compute_framewise_movement(
                 df=df, animal_bps=config.animal_bps,
                 px_per_mm=px_per_mm, source=str(file_path),
-            ))
+            )
         elif family == FRAME_BP_TO_ROI_CENTER:
             if config.roi_dict is None or video_name not in config.roi_dict:
                 raise RuntimeError(
                     f"FRAME_BP_TO_ROI_CENTER requested but no ROI "
                     f"data for {video_name}."
                 )
-            results.update(compute_roi_center_distances(
+            fam_result = compute_roi_center_distances(
                 df=df, animal_bps=config.animal_bps,
                 px_per_mm=px_per_mm,
                 video_roi_dict=config.roi_dict[video_name],
                 source=str(file_path),
-            ))
+            )
         elif family == FRAME_BP_INSIDE_ROI:
             if config.roi_dict is None or video_name not in config.roi_dict:
                 raise RuntimeError(
                     f"FRAME_BP_INSIDE_ROI requested but no ROI "
                     f"data for {video_name}."
                 )
-            results.update(compute_inside_roi(
+            fam_result = compute_inside_roi(
                 df=df, animal_bps=config.animal_bps,
                 video_roi_dict=config.roi_dict[video_name],
                 source=str(file_path),
-            ))
+            )
         elif family == ARENA_EDGE:
-            results.update(compute_distances_to_frame_edge(
+            fam_result = compute_distances_to_frame_edge(
                 df=df, animal_bps=config.animal_bps,
                 px_per_mm=px_per_mm,
                 video_width=video_width, video_height=video_height,
                 source=str(file_path),
-            ))
+            )
+
+        # Update both maps. Empty fam_result (family not matched,
+        # or kernel produced nothing) is silently ignored — neither
+        # map gets bogus entries.
+        if fam_result:
+            results.update(fam_result)
+            results_by_family[family] = fam_result
 
     # Build the results dataframe with the legacy column-name layout:
     # add _FEATURE_SUBSET suffix, sort columns, fill NaN with -1.
@@ -306,6 +338,34 @@ def process_one_video(
         file_type=config.file_type,
         save_path=save_path,
     )
+
+    # Patch 122ae-3: optional per-family parquet write under the
+    # v1 derived/features/<family_slug>/ tree. Triggered only when
+    # the caller passes config.derived_features_dir; legacy callers
+    # see no change. The per-family files use the same column
+    # naming (_FEATURE_SUBSET suffix, sorted, fillna(-1)) as the
+    # wide write, so consumers reading via load_features_for_video
+    # see the same schema regardless of which write path produced
+    # the file.
+    if config.derived_features_dir is not None:
+        # Local import — keeps the per-video worker's serialised
+        # footprint small and avoids forcing every legacy caller
+        # to pay the feature_io import cost.
+        from mufasa.utils.feature_io import family_slug
+        for family, fam_columns in results_by_family.items():
+            slug = family_slug(family)
+            out_dir = os.path.join(
+                config.derived_features_dir, slug,
+            )
+            os.makedirs(out_dir, exist_ok=True)
+            fam_df = pd.DataFrame(fam_columns)
+            fam_df = fam_df.add_suffix("_FEATURE_SUBSET")
+            fam_df = fam_df[sorted(fam_df.columns)]
+            fam_df = fam_df.fillna(-1)
+            fam_df.to_parquet(
+                os.path.join(out_dir, f"{video_name}.parquet"),
+                index=False,
+            )
     timer.stop_timer()
     if print_progress:
         print(

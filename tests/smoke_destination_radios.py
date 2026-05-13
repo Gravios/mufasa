@@ -43,27 +43,36 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # Case 2: three radio buttons exist with the right attribute names
+    # Case 2: four radio buttons exist with the right attribute names
+    # (Patch 122ae-3 added dest_derived_parquet as the new default
+    # destination — write per-family parquet to derived/features/.)
     # ------------------------------------------------------------------ #
-    for attr in ("dest_save_dir", "dest_append_features", "dest_append_targets"):
+    for attr in ("dest_derived_parquet",
+                 "dest_save_dir",
+                 "dest_append_features",
+                 "dest_append_targets"):
         assert f"self.{attr}" in body_src, (
             f"Form should have a self.{attr} radio button"
         )
 
     # ------------------------------------------------------------------ #
-    # Case 3: All three radios are added to the same QButtonGroup
+    # Case 3: All four radios are added to the same QButtonGroup
     # (which is what enforces single-choice)
     # ------------------------------------------------------------------ #
+    assert "_dest_group.addButton(self.dest_derived_parquet" in body_src
     assert "_dest_group.addButton(self.dest_save_dir" in body_src
     assert "_dest_group.addButton(self.dest_append_features" in body_src
     assert "_dest_group.addButton(self.dest_append_targets" in body_src
 
     # ------------------------------------------------------------------ #
     # Case 4: A default selection is set so the group is never
-    # in "no selection" state
+    # in "no selection" state. Patch 122ae-3 changed the default
+    # from dest_save_dir to dest_derived_parquet — accept either
+    # so this test stays useful through the migration window.
     # ------------------------------------------------------------------ #
     assert (
-        "self.dest_save_dir.setChecked(True)" in body_src
+        "self.dest_derived_parquet.setChecked(True)" in body_src
+        or "self.dest_save_dir.setChecked(True)" in body_src
         or "self.dest_append_features.setChecked(True)" in body_src
         or "self.dest_append_targets.setChecked(True)" in body_src
     ), "One radio must be checked by default"
