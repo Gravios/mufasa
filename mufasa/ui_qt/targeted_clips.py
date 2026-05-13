@@ -35,7 +35,6 @@ loads any existing ``clips.json`` on open.
 """
 from __future__ import annotations
 
-import configparser
 import json
 import os
 from pathlib import Path
@@ -112,21 +111,41 @@ class TargetedClipsDialog(QDialog):
     # Project metadata
     # ------------------------------------------------------------------ #
     def _load_project_metadata(self) -> None:
-        cfg = configparser.ConfigParser()
-        cfg.read(self.config_path)
-        project_path = cfg.get("General settings", "project_path")
-        self.file_type = cfg.get("General settings", "workflow_file_type",
-                                 fallback="csv")
-        # Staging dir mirrors the legacy popup's behaviour
+        """Resolve project paths + file_type for both v1 and legacy.
+
+        Patch 122ah: route through
+        :func:`mufasa.project_layout.project_paths_from_config` and
+        :func:`project_metadata_from_config` rather than reading
+        ``[General settings].project_path`` directly via configparser.
+        Same bug shape that 122ab (frame_labeller) and 122ag
+        (clip_review) fixed elsewhere — configparser silently parses
+        zero sections out of a TOML file and then crashes at the
+        subsequent ``cfg.get()``, so v1 users couldn't open the
+        targeted clip annotator at all.
+
+        Paths used here:
+
+        * ``target_dir`` — staging dir for clip extractions. Lives
+          at ``<project_root>/frames/input/advanced_clip_annotator/
+          <video_name>/`` under both v1 and legacy roots. Not
+          currently a key in the layout helper since this is the
+          only consumer; could be added if more emerge.
+        * ``machine_results_dir`` — already in the helper from 122ab.
+        """
+        from mufasa.project_layout import (project_metadata_from_config,
+                                           project_paths_from_config)
+        paths = project_paths_from_config(self.config_path)
+        meta = project_metadata_from_config(self.config_path)
+        self.file_type = meta.get("file_type", "csv")
+        # Staging dir mirrors the legacy popup's behaviour, anchored
+        # on the resolved project root (sources/ vs legacy direct).
         self.target_dir = os.path.join(
-            project_path, "frames", "input", "advanced_clip_annotator",
-            self.video_name,
+            paths["project_root"], "frames", "input",
+            "advanced_clip_annotator", self.video_name,
         )
         os.makedirs(self.target_dir, exist_ok=True)
         self.clips_json = os.path.join(self.target_dir, "clips.json")
-        self.machine_results_dir = os.path.join(
-            project_path, "csv", "machine_results",
-        )
+        self.machine_results_dir = paths["machine_results_dir"]
 
     def _load_existing_clips(self) -> None:
         if not os.path.isfile(self.clips_json):
