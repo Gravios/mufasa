@@ -621,65 +621,8 @@ class ConvertVideoPopUp(PopUpMixin):
             )
 
 
-class ExtractSpecificFramesPopUp(PopUpMixin):
-    def __init__(self):
-        PopUpMixin.__init__(self, title="EXTRACT DEFINED FRAME RANGE FROM SINGLE VIDEO", icon='frames')
-        self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm,header="SETTINGS", icon_name=Keys.DOCUMENTATION.value,icon_link=Links.VIDEO_TOOLS.value)
-        self.video_file_selected = FileSelect(self.settings_frm , "VIDEO PATH:", title="Select a video file", file_types=[("VIDEO FILE", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)], lblwidth=40, lbl_icon='video_2')
-        self.save_dir = FolderSelect(self.settings_frm, "SAVE DIRECTORY: ", lblwidth=40, tooltip_txt='Optional directory where to save the images. \n If None, images are saved in a folder with the suffix `_frames` \n within the same directory as the video file', lbl_icon='folder')
-
-        self.format_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['jpeg', 'png', 'webp'], label="SAVE FORMAT: ", label_width=40, dropdown_width=25, value='png', img='file_type')
-        self.grey_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=40, dropdown_width=25, value='FALSE', img='grey')
-        self.clahe_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=40, dropdown_width=25, value='FALSE', img='clahe')
-        self.include_fn_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label="INCLUDE VIDEO NAME IN IMAGE NAME: ", label_width=40, dropdown_width=25, value='FALSE', img='id_card_2')
-        self.start_frm = Entry_Box(parent=self.settings_frm, fileDescription="START FRAME NUMBER:", labelwidth=40, validation='numeric', width=25, img='play')
-        self.end_frm = Entry_Box(parent=self.settings_frm, fileDescription="END FRAME NUMBER:", labelwidth=40, validation='numeric', width=25, img='stop')
-
-
-        self.settings_frm.grid(row=0, column=0, sticky=NW)
-        self.video_file_selected.grid(row=0, column=0, sticky=NW)
-        self.save_dir.grid(row=1, column=0, sticky=NW)
-        self.format_dropdown.grid(row=2, column=0, sticky=NW)
-        self.grey_dropdown.grid(row=3, column=0, sticky=NW)
-        self.clahe_dropdown.grid(row=4, column=0, sticky=NW)
-        self.include_fn_dropdown.grid(row=5, column=0, sticky=NW)
-        self.start_frm.grid(row=6, column=0, sticky=NW)
-        self.end_frm.grid(row=7, column=0, sticky=NW)
-
-        run_btn = SimbaButton(parent=self.main_frm, txt="RUN", img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.start_frm_extraction)
-        run_btn.grid(row=1, column=0, pady=5, sticky=NW)
-        self.main_frm.mainloop()
-
-    def start_frm_extraction(self):
-        start_frame = self.start_frm.entry_get
-        end_frame = self.end_frm.entry_get
-        video_path = self.video_file_selected.file_path
-        check_file_exist_and_readable(file_path=video_path)
-        check_int(name="Start frame", value=start_frame)
-        check_int(name="End frame", value=end_frame)
-        if int(end_frame) < int(start_frame):
-            raise FrameRangeError(msg=f"SIMBA ERROR: The end frame ({end_frame}) cannot come before the start frame ({start_frame})", source=self.__class__.__name__)
-        video_meta_data = get_video_meta_data(video_path=self.video_file_selected.file_path)
-        if int(start_frame) > video_meta_data["frame_count"]:
-            raise FrameRangeError(msg=f"SIMBA ERROR: The start frame ({start_frame}) is larger than the number of frames in the video ({video_meta_data['frame_count']})", source=self.__class__.__name__)
-        if int(end_frame) > video_meta_data["frame_count"]:
-            raise FrameRangeError(msg=f"SIMBA ERROR: The end frame ({end_frame}) is larger than the number of frames in the video ({video_meta_data['frame_count']})", source=self.__class__.__name__)
-        grey = str_2_bool(self.grey_dropdown.get_value())
-        clahe = str_2_bool(self.clahe_dropdown.get_value())
-        include_fn = str_2_bool(self.include_fn_dropdown.get_value())
-        save_dir = self.save_dir.folder_path
-        save_dir = save_dir if os.path.isdir(save_dir) else None
-        img_format = self.format_dropdown.get_value()
-
-
-        extract_frame_range(file_path=video_path,
-                            start_frame=int(start_frame),
-                            end_frame=int(end_frame),
-                            save_dir=save_dir,
-                            greyscale=grey,
-                            clahe=clahe,
-                            img_format=img_format,
-                            include_fn=include_fn)
+# ExtractSpecificFramesPopUp: removed in patch 122s — Qt replacement lives in mufasa.ui_qt.forms.video_frames.
+# (was 59 lines of legacy Tk widget plumbing + backend dispatch.)
 
 
 #ExtractSpecificFramesPopUp()
@@ -800,62 +743,12 @@ class ChangeFpsMultipleVideosPopUp(PopUpMixin):
 #_ = ChangeFpsMultipleVideosPopUp()
 
 
-class ExtractSEQFramesPopUp(PopUpMixin):
-    def __init__(self):
-        PopUpMixin.__init__(
-            self, title="EXTRACT ALL FRAMES FROM SEQ FILE", size=(200, 200)
-        )
-        video_path = FileSelect(
-            self.main_frm,
-            "Video Path",
-            title="Select a video file: ",
-            file_types=[("VIDEO FILE", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)],
-        )
-        run_btn = Button(
-            self.main_frm,
-            text="Extract All Frames",
-            font=Formats.FONT_REGULAR.value,
-            command=lambda: extract_seq_frames(video_path.file_path),
-        )
-        video_path.grid(row=0)
-        run_btn.grid(row=1)
+# ExtractSEQFramesPopUp: removed in patch 122s — Qt replacement lives in mufasa.ui_qt.forms.video_frames.
+# (was 19 lines of legacy Tk widget plumbing + backend dispatch.)
 
 
-class MergeFrames2VideoPopUp(PopUpMixin):
-    def __init__(self):
-        PopUpMixin.__init__(self, title="MERGE IMAGE DIRECTORY INTO VIDEO", icon='video')
-        settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.folder_path = FolderSelect(settings_frm, "IMAGE DIRECTORY: ", title="Select directory with frames: ", lblwidth=25)
-        self.video_fps_dropdown = DropDownMenu(settings_frm, "VIDEO FPS:", list(range(1, 101, 1)), labelwidth=25)
-        self.video_quality_dropdown = DropDownMenu(settings_frm, "VIDEO QUALITY:", list(range(10, 110, 10)), labelwidth=25)
-        self.video_format_dropdown = DropDownMenu(settings_frm, "VIDEO FORMAT:", ['mp4', 'avi', 'webm'], labelwidth=25)
-        gpu_cb, self.gpu_var = SimbaCheckbox(parent=settings_frm, txt="Use GPU (reduced runtime)", txt_img='gpu_2')
-        self.video_quality_dropdown.setChoices(60)
-        self.video_format_dropdown.setChoices('mp4')
-        self.video_fps_dropdown.setChoices(30)
-
-        settings_frm.grid(row=0, column=0, sticky=NW)
-        self.folder_path.grid(row=0, column=0, sticky=NW)
-        self.video_fps_dropdown.grid(row=1, column=0, sticky=NW)
-        self.video_quality_dropdown.grid(row=2, column=0, sticky=NW)
-        self.video_format_dropdown.grid(row=3, column=0, sticky=NW)
-        gpu_cb.grid(row=4, column=0, sticky=NW)
-        self.create_run_frm(run_function=self.run)
-        self.main_frm.mainloop()
-
-
-    def run(self):
-        directory = self.folder_path.folder_path
-        _ = find_files_of_filetypes_in_directory(directory=directory, extensions=Options.ALL_IMAGE_FORMAT_OPTIONS.value, raise_error=True, raise_warning=False)
-        fps = int(self.video_fps_dropdown.getChoices())
-        quality = int(self.video_quality_dropdown.getChoices())
-        gpu = self.gpu_var.get()
-        format = self.video_format_dropdown.getChoices()
-        threading.Thread(frames_to_movie(directory=self.folder_path.folder_path,
-                                         fps=fps,
-                                         quality=quality,
-                                         out_format=format,
-                                         gpu=gpu)).start()
+# MergeFrames2VideoPopUp: removed in patch 122s — Qt replacement lives in mufasa.ui_qt.forms.video_frames.
+# (was 35 lines of legacy Tk widget plumbing + backend dispatch.)
 
 
 class CreateGIFPopUP(PopUpMixin):
@@ -1202,25 +1095,8 @@ class VideoTemporalJoinPopUp(PopUpMixin):
 #VideoTemporalJoinPopUp()
 
 
-class ImportFrameDirectoryPopUp(PopUpMixin, ConfigReader):
-    def __init__(self, config_path: str):
-        PopUpMixin.__init__(self, title="IMPORT FRAME DIRECTORY", icon='import')
-        ConfigReader.__init__(self, config_path=config_path)
-        self.frame_folder = FolderSelect(self.main_frm, "FRAME DIRECTORY:", title="Select the main directory with frame folders")
-        import_btn  = SimbaButton(parent=self.main_frm, txt="IMPORT FRAMES", img='import', txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=self.run)
-        self.frame_folder.grid(row=0, column=0, sticky=NW)
-        import_btn.grid(row=1, column=0, sticky=NW)
-        self.main_frm.mainloop()
-
-    def run(self):
-        if not os.path.isdir(self.frame_folder.folder_path):
-            raise NotDirectoryError(
-                msg=f"SIMBA ERROR: {self.frame_folder.folder_path} is not a valid directory.",
-                source=self.__class__.__name__,
-            )
-        copy_img_folder(
-            config_path=self.config_path, source=self.frame_folder.folder_path
-        )
+# ImportFrameDirectoryPopUp: removed in patch 122s — Qt replacement lives in mufasa.ui_qt.forms.video_frames.
+# (was 19 lines of legacy Tk widget plumbing + backend dispatch.)
 
 
 #ImportFrameDirectoryPopUp(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")

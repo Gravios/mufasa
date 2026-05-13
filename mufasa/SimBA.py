@@ -177,11 +177,11 @@ from mufasa.ui.pop_ups.video_processing_pop_up import (
     ConvertROIDefinitionsPopUp, CreateAverageFramePopUp, CreateGIFPopUP,
     CropVideoCirclesPopUp, CropVideoPolygonsPopUp, CropVideoPopUp,
     CrossfadeVideosPopUp, DownsampleMultipleVideosPopUp,
-    DownsampleSingleVideoPopUp, ExtractSEQFramesPopUp,
-    ExtractSpecificFramesPopUp, FlipVideosPopUp, GreyscaleSingleVideoPopUp,
-    ImportFrameDirectoryPopUp, InitiateClipMultipleVideosByFrameNumbersPopUp,
+    DownsampleSingleVideoPopUp,
+    FlipVideosPopUp, GreyscaleSingleVideoPopUp,
+    InitiateClipMultipleVideosByFrameNumbersPopUp,
     InitiateClipMultipleVideosByTimestampsPopUp, InteractiveClahePopUp,
-    ManualTemporalJoinPopUp, MergeFrames2VideoPopUp, MultiCropPopUp,
+    ManualTemporalJoinPopUp, MultiCropPopUp,
     MultiShortenPopUp, ReverseVideoPopUp, RotateVideoSetDegreesPopUp,
     SuperImposeFrameCountPopUp, SuperimposeProgressBarPopUp,
     SuperimposeTextPopUp, SuperimposeTimerPopUp, SuperimposeVideoNamesPopUp,
@@ -335,7 +335,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
 
         further_methods_frm = CreateLabelFrameWithIcon(parent=import_frm, header="FURTHER METHODS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.ADDITIONAL_IMPORTS.value, bg=Formats.LABELFRAME_GREY.value, padx=5, pady=5)
         extract_frm_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="EXTRACT FRAMES FOR ALL VIDEOS IN SIMBA PROJECT", txt_clr='blue', compound='right', img='image', font=Formats.FONT_REGULAR.value, cmd=extract_frames_from_all_videos_in_directory, cmd_kwargs={'config_path': lambda:self.config_path, 'directory': lambda:self.video_dir, 'confirm_popup': True})
-        import_frm_dir_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="IMPORT FRAMES DIRECTORY TO SIMBA PROJECT", txt_clr='blue', compound='right', img='import', font=Formats.FONT_REGULAR.value, cmd=ImportFrameDirectoryPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         add_clf_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="ADD CLASSIFIER TO SIMBA PROJECT", txt_clr='blue', compound='right', img='plus', font=Formats.FONT_REGULAR.value, cmd=AddClfPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         remove_clf_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="REMOVE CLASSIFIER FROM SIMBA PROJECT", txt_clr='blue', compound='right', img='trash', font=Formats.FONT_REGULAR.value, cmd=RemoveAClassifierPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         reverse_btn = SimbaButton(parent=further_methods_frm, width=Formats.BUTTON_WIDTH_XL.value, txt="REVERSE TRACKING IDENTITIES IN SIMBA PROJECT", txt_clr='blue', compound='right', img='reverse_blue', font=Formats.FONT_REGULAR.value, cmd=None)
@@ -548,7 +547,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         anchored_roi_analysis_btn = SimbaButton(parent=lbl_addon, txt="ANIMAL-ANCHORED ROIs", txt_clr='orange', cmd=BoundaryMenus, cmd_kwargs={'config_path': lambda:self.config_path})
         further_methods_frm.grid(row=0, column=1, sticky=NW, pady=10, padx=10)
         extract_frm_btn.grid(row=1, column=0, sticky=NW)
-        import_frm_dir_btn.grid(row=2, column=0, sticky=NW)
         add_clf_btn.grid(row=3, column=0, sticky=NW)
         remove_clf_btn.grid(row=4, column=0, sticky=NW)
         reverse_btn.grid(row=6, column=0, sticky=NW)
@@ -893,17 +891,22 @@ class App(object):
         video_process_menu.add_cascade(label="Down-sample video...", compound="left", image=self.menu_icons["sample"]["img"], menu=downsample_video_menu, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_cascade(label="Drop body-parts from tracking data", compound="left", image=self.menu_icons["trash"]["img"], command=DropTrackingDataPopUp, font=Formats.FONT_REGULAR.value)
         extract_frames_menu = Menu(video_process_menu, font=Formats.FONT_REGULAR.value)
-        extract_frames_menu.add_command(label="Extract defined frames", command=ExtractSpecificFramesPopUp, font=Formats.FONT_REGULAR.value, image=self.menu_icons["frames"]["img"], compound="left")
+        # Patch 122s: 'Extract defined frames' (ExtractSpecificFramesPopUp)
+        # and 'Extract frames from seq files' (ExtractSEQFramesPopUp)
+        # menu entries removed — Qt ExtractFramesForm covers both cases
+        # via a unified range / SEQ-auto-detect surface (Video Processing
+        # page → 'Frame extraction').
         extract_frames_menu.add_command(label="Extract frames from single video", command=SingleVideo2FramesPopUp, font=Formats.FONT_REGULAR.value, image=self.menu_icons["frames_2"]["img"], compound="left")
         extract_frames_menu.add_command(label="Extract frames from multiple videos", command=MultipleVideos2FramesPopUp, font=Formats.FONT_REGULAR.value, image=self.menu_icons["stack"]["img"], compound="left")
-        extract_frames_menu.add_command(label="Extract frames from seq files", command=ExtractSEQFramesPopUp, font=Formats.FONT_REGULAR.value, image=self.menu_icons["fire"]["img"], compound="left")
         video_process_menu.add_cascade(label="Extract frames...", compound="left", image=self.menu_icons["frames"]["img"], menu=extract_frames_menu, font=Formats.FONT_REGULAR.value)
 
         video_process_menu.add_command(label="Create GIFs", compound="left", image=self.menu_icons["gif"]["img"], command=CreateGIFPopUP, font=Formats.FONT_REGULAR.value)
 
         video_process_menu.add_command(label="Get metric conversion factor (pixels/millimeter)", compound="left", image=self.menu_icons["calipher"]["img"], command=CalculatePixelsPerMMInVideoPopUp, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_command(label="Change video brightness / contrast", compound="left", image=self.menu_icons["brightness"]["img"], command=BrightnessContrastPopUp, font=Formats.FONT_REGULAR.value)
-        video_process_menu.add_command(label="Merge frames to video", compound="left", image=self.menu_icons["merge"]["img"], command=MergeFrames2VideoPopUp, font=Formats.FONT_REGULAR.value)
+        # Patch 122s: 'Merge frames to video' menu entry removed —
+        # Qt MergeFramesToVideoForm covers this on the Video
+        # Processing page → 'Merge frames → video' section.
         video_process_menu.add_command(label="Playback speed (video)", compound="left", image=self.menu_icons["run"]["img"], command=ChangeSpeedPopup, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_command(label="Print classifier info", compound="left", image=self.menu_icons["print"]["img"], command=PrintModelInfoPopUp, font=Formats.FONT_REGULAR.value)
         video_process_menu.add_command(label="Show video file(s) meta data", compound="left", image=self.menu_icons["print"]["img"], command=PrintVideoMetaDataPopUp, font=Formats.FONT_REGULAR.value)
