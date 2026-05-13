@@ -9,8 +9,11 @@ PySide6 main window.
 The launcher presents two actions:
 
 1. **Load Project** — pick an existing ``project_config.ini``.
-2. **Create Project** — create a fresh one (delegates to the existing
-   ``ProjectCreatorPopUp`` once ported; for now, tagged as TODO).
+2. **Create Project** — open the Qt :class:`CreateProjectDialog`
+   (modal wrapper around :class:`ProjectCreateForm`); on success
+   reopens the launcher pointing at the new project. Same flow
+   the workbench's File → New project menu and the Projects
+   page's inline create surface use (patch 122l).
 
 After loading, the main window displays a :class:`QTabWidget` mirroring
 the legacy 10-tab layout (Further imports / Video parameters / Outlier
@@ -157,14 +160,29 @@ class LauncherWindow(QMainWindow):
         self.close()
 
     def _new_project_stub(self) -> None:
-        # Placeholder until ProjectCreatorPopUp is ported to Qt.
-        QMessageBox.information(
-            self,
-            "Not yet ported",
-            "Project creation has not yet been ported to the Qt UI. "
-            "For now, create a project with the legacy Tk UI\n"
-            "(mufasa-tk) and then load the resulting project_config.ini here.",
-        )
+        """Open the Qt create-project dialog. On success, load the
+        new project the same way Load Project does (saves to recent,
+        opens the workbench, closes this launcher).
+
+        Renamed-in-place: kept ``_new_project_stub`` so the existing
+        ``self.new_btn.clicked.connect(self._new_project_stub)`` wire
+        keeps working. Despite the name, this is the real path now
+        (patch 122q removed the legacy Tk fallback).
+        """
+        from mufasa.ui_qt.create_project_dialog import CreateProjectDialog
+        dlg = CreateProjectDialog(self)
+        if dlg.exec() != dlg.Accepted:
+            return
+        path = dlg.config_path
+        if not path:
+            return
+        # Same finish as _load_picked — write recent, open the main
+        # window, close the launcher.
+        from mufasa.ui_qt.workbench import MufasaWorkbench
+        win = MufasaWorkbench(config_path=path)
+        _write_recent_project(path)
+        win.show()
+        self.close()
 
 
 # --------------------------------------------------------------------------- #

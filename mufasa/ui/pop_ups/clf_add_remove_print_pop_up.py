@@ -6,7 +6,6 @@ from typing import Union
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
-from mufasa.pose_processors.pose_reset import PoseResetter
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         FileSelect, SimbaButton, SimBADropDown,
                                         TwoOptionQuestionPopUp)
@@ -104,26 +103,12 @@ class PrintModelInfoPopUp(PopUpMixin):
         btn_print_info.grid(row=1, sticky=W)
 
 
-class PoseResetterPopUp:
-    def __init__(self):
-        # PopUpMixin.__init__(self, title="WARNING!", size=(300, 100))
-        # popupframe = LabelFrame(self.main_frm)
-        # label = Label(popupframe, text="Do you want to remove user-defined pose-configurations?")
-        # label.grid(row=0, columnspan=2)
-        # B1 = Button(popupframe,text="YES",fg="blue",command=lambda: PoseResetter(master=self.main_frm))
-        # B2 = Button(popupframe, text="NO", fg="red", command=self.main_frm.destroy)
-        question = TwoOptionQuestionPopUp(
-            title="WARNING!",
-            question="Do you want to remove user-defined pose-configurations?",
-            option_one="YES",
-            option_two="NO",
-        )
-        if question.selected_option == "YES":
-            _ = PoseResetter(master=None)
-        else:
-            pass
-
-        # popupframe.grid(row=0, columnspan=2)
-        # B1.grid(row=1, column=0, sticky=W)
-        # B2.grid(row=1, column=1, sticky=W)
-        # self.main_frm.mainloop()
+# PoseResetterPopUp removed in patch 122q. It only had one entry
+# point — the "RESET USER DEFINED POSE-CONFIGS" button on the
+# legacy ProjectCreatorPopUp, which was itself deleted as part
+# of decommissioning the Tk new-project flow. The backing
+# PoseResetter class in mufasa.pose_processors.pose_reset is
+# also gone (it had no other callers). User-defined pose
+# configurations are now created via the inline
+# ProjectCreateForm's "Auto-detect from DLC file…" path on the
+# Projects page (patch 122l).

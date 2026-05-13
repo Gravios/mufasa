@@ -50,9 +50,6 @@ from mufasa.third_party_label_appenders.ethovision_import import \
 from mufasa.third_party_label_appenders.observer_importer import \
     NoldusObserverImporter
 from mufasa.third_party_label_appenders.solomon_importer import SolomonImporter
-from mufasa.ui.create_project_ui import ProjectCreatorPopUp
-from mufasa.ui.import_pose_frame import ImportPoseFrame
-from mufasa.ui.import_videos_frame import ImportVideosFrame
 from mufasa.ui.machine_model_settings_ui import MachineModelSettingsPopUp
 from mufasa.ui.pop_ups.about_simba_pop_up import AboutSimBAPopUp
 from mufasa.ui.pop_ups.animal_directing_other_animals_pop_up import \
@@ -549,8 +546,6 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
 
 
         anchored_roi_analysis_btn = SimbaButton(parent=lbl_addon, txt="ANIMAL-ANCHORED ROIs", txt_clr='orange', cmd=BoundaryMenus, cmd_kwargs={'config_path': lambda:self.config_path})
-        ImportVideosFrame(parent_frm=import_frm, config_path=config_path, idx_row=0, idx_column=0)
-        ImportPoseFrame(parent_frm=import_frm, idx_row=1, idx_column=0, config_path=config_path)
         further_methods_frm.grid(row=0, column=1, sticky=NW, pady=10, padx=10)
         extract_frm_btn.grid(row=1, column=0, sticky=NW)
         import_frm_dir_btn.grid(row=2, column=0, sticky=NW)
@@ -785,7 +780,6 @@ class App(object):
         self.root.config(menu=menu)
         self.file_menu = Menu(menu)
         menu.add_cascade(label="File", menu=self.file_menu)
-        self.file_menu.add_command(label="Create a new project", compound="left", image=self.menu_icons["create"]["img"], command=lambda: ProjectCreatorPopUp(), font=Formats.FONT_REGULAR.value)
         self.file_menu.add_command(label="Load project", compound="left", image=self.menu_icons["load"]["img"], command=lambda: LoadProjectPopUp(), font=Formats.FONT_REGULAR.value)
         self.file_menu.add_separator()
         self.recent_projects_menu = Menu(menu)
