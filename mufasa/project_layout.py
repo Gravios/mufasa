@@ -20,7 +20,9 @@ This module defines a replacement layout::
     ├── derived/                         # generated; safe to delete
     │   ├── smoothed/<flavor>/<run_id>/
     │   ├── outlier_corrected/<run_id>/
-    │   ├── features/<run_id>/
+    │   ├── features/<family>/<video>.parquet   # 122ae: per-family
+    │   ├── labels/<video>.parquet              # 122ae: split from
+    │   │                                       #         targets_inserted
     │   ├── classifications/<run_id>/
     │   └── frames/{extracted,annotated}/
     ├── models/                          # trained classifiers
@@ -30,6 +32,20 @@ This module defines a replacement layout::
 Each ``<run_id>`` directory carries a ``run.toml`` file with the
 parameters, mufasa version, input file list, and timing. This
 makes "what produced this output" answerable a year later.
+
+Patch 122ae departs from the ``<run_id>`` convention for the
+**features** and **labels** trees: those operations don't fit
+the per-run provenance model (features are updated incrementally
+as new family extractors land; labels are hand-edited in place).
+They live under flat per-family / per-video subtrees instead.
+The run_id convention stays in place for smoothing, outlier
+correction, and classifications (the operations that DO have
+fresh-extract-from-pose semantics).
+
+Internal storage under ``derived/`` is parquet-only as of the
+122ae series. CSV and H5 stay as IMPORT formats — the user's
+``import_file_type`` project setting controls what the importers
+expect to ingest, not what's stored on disk after extraction.
 
 Backward compatibility with the legacy layout lives in
 ``mufasa.legacy_layout``; a migration tool sits at
@@ -798,6 +814,40 @@ def project_paths_from_config(
     consistent with how 122aa described the labeller's behaviour
     to users.
 
+    Patch 122ae-1 adds two keys that scope the per-family
+    parquet trees for derived data:
+
+    * ``derived_features_dir`` — ``<root>/derived/features/``
+      (both layouts). Per-family subdirectories live underneath
+      (e.g. ``derived/features/distances/<video>.parquet``).
+      Writers in patches 122ae-3 and 122ae-4 will target this
+      tree; readers from 122ae-2 onwards consult it before
+      falling back to the legacy ``csv/features_extracted/``
+      subtree. Created by the writer on first use — this
+      function returns the path even when the directory doesn't
+      exist yet.
+    * ``derived_labels_dir`` — ``<root>/derived/labels/`` (both
+      layouts). New home for hand-edited classifier labels,
+      separated from the legacy ``csv/targets_inserted/`` tree
+      (which conflates labels with the features they're paired
+      with). The labels split lands in 122ae-3.5; this key
+      reserves the path so the directory shape is stable
+      from 122ae-1 forward.
+
+    Rationale for the parquet-only direction (122ae series):
+    parquet's native column projection makes "load just these
+    columns" 5-10× faster than scanning a wide CSV; type round-
+    tripping is exact (categoricals stay categorical, ints stay
+    ints) where CSVs round-trip everything through strings;
+    pyarrow is already a hard install dep, so making parquet
+    the only on-disk storage format drops one branch from every
+    read_df / write_df call site in the codebase without
+    requiring new dependencies. CSV and H5 stay as IMPORT
+    formats (the project_metadata_from_config 'file_type' /
+    'import_file_type' values), but internal storage under
+    ``derived/`` will be parquet-only once the writer patches
+    land.
+
     Caller is responsible for creating directories as needed; this
     function returns paths even when they don't exist on disk.
 
@@ -821,6 +871,9 @@ def project_paths_from_config(
             "machine_results_dir":    str(root / "csv" / "machine_results"),
             "roi_definitions_path":   str(root / "logs" / "measures"
                                           / "ROI_definitions.h5"),
+            # Patch 122ae-1: per-family parquet trees for derived data.
+            "derived_features_dir":   str(root / "derived" / "features"),
+            "derived_labels_dir":     str(root / "derived" / "labels"),
         }
     # Legacy: parse the [General settings] project_path.
     import configparser as _cp
@@ -853,6 +906,9 @@ def project_paths_from_config(
         "machine_results_dir":    str(proj / "csv" / "machine_results"),
         "roi_definitions_path":   str(proj / "logs" / "measures"
                                       / "ROI_definitions.h5"),
+        # Patch 122ae-1: per-family parquet trees for derived data.
+        "derived_features_dir":   str(proj / "derived" / "features"),
+        "derived_labels_dir":     str(proj / "derived" / "labels"),
     }
 
 
@@ -865,7 +921,18 @@ def project_metadata_from_config(
     Schema of the returned dict:
 
     * ``animal_count`` — int
-    * ``file_type``    — str (``"csv"``, ``"parquet"``, ``"h5"``)
+    * ``file_type``    — str (``"csv"``, ``"parquet"``, ``"h5"``).
+      The format the project's IMPORTER expects to ingest — e.g.
+      ``"csv"`` means pose data + third-party annotations arrive
+      as CSV files. Going forward (patch 122ae and follow-ups)
+      this is decoupled from internal storage, which is always
+      parquet under ``derived/``.
+    * ``import_file_type`` — str. Alias for ``file_type`` with
+      the semantic spelled out. Added in 122ae-1 to disambiguate
+      the importer-format from the storage-format now that
+      derived data is parquet-only. Same value as ``file_type``;
+      both keys present for back-compat across the ~10 consumers
+      that already read ``file_type``.
     * ``body_parts``   — list[str], in order
     * ``animal_ids``   — list[str]
     * ``classifier_targets`` — list[str]
@@ -888,9 +955,11 @@ def project_metadata_from_config(
             )
         pose = data.get("pose", {})
         classifiers = data.get("classifiers", {})
+        file_type_val = str(pose.get("file_type", "csv"))
         return {
             "animal_count":       int(pose.get("animal_count", 1)),
-            "file_type":          str(pose.get("file_type", "csv")),
+            "file_type":          file_type_val,
+            "import_file_type":   file_type_val,   # 122ae-1 alias
             "body_parts":         list(pose.get("body_parts", [])),
             "animal_ids":         list(pose.get("animal_ids", [])),
             "classifier_targets": list(classifiers.get("targets", [])),
@@ -972,6 +1041,7 @@ def project_metadata_from_config(
     return {
         "animal_count":       animal_count,
         "file_type":          file_type,
+        "import_file_type":   file_type,   # 122ae-1 alias
         "body_parts":         body_parts,
         "animal_ids":         animal_ids,
         "classifier_targets": classifier_targets,
