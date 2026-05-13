@@ -10,39 +10,50 @@ pipeline:
     raw pose → [ interpolate → smooth → outlier-correct → align ]
              → feature extraction → classifier
 
-Section ordering (patch 122c redesign)
+Section ordering (patches 122c + 122x)
 --------------------------------------
 
 The page reflects the actual conceptual order of operations,
-with the modern (Kalman v2 + InputSourcePicker) forms at the top
-and the legacy SimBA forms folded into an "Advanced / legacy"
-section at the bottom:
+with media-side prep (video calibration, batch pre-process) at
+the top, the modern pose-cleanup forms in the middle, and the
+legacy SimBA forms folded into an "Advanced / legacy" section
+at the bottom.
 
-1. **Interpolate missing frames** — fill tracker dropouts before
+Sections:
+
+1. **Video Calibration** (patch 122x) — per-video FPS,
+   resolution, and pixels/mm calibration used by all
+   distance-based feature kernels. Without it, distance
+   features come out in pixels rather than millimeters. Moved
+   from the Data Import page.
+2. **Preprocess Videos** (patch 122x) — multi-step video
+   pre-processing wizard (crop → downsample → greyscale →
+   flip/rotate → clip). Moved from the Data Import page.
+3. **Interpolate missing frames** — fill tracker dropouts before
    anything else looks at the data.
-2. **Kalman v2 smoothing** — the recommended smoother. Handles
+4. **Kalman v2 smoothing** — the recommended smoother. Handles
    missing frames, per-marker bias, and (with const-accel
    segments) curvature in motion. Patch 121a–e.
-3. **Run outlier correction** — chains movement + location
+5. **Run outlier correction** — chains movement + location
    correction on the chosen input source. Patch 122c.
-4. **Skip outlier correction** — bypass stage entirely while
+6. **Skip outlier correction** — bypass stage entirely while
    still populating the outlier-corrected output dir so
    downstream stages find data. Patch 122c.
-5. **Egocentric alignment** — rotate pose (and optionally
+7. **Egocentric alignment** — rotate pose (and optionally
    video) to a chosen frame of reference. Now consumes any
    prior stage's output via the picker. Patch 122b.
-6. **Advanced / legacy** — three stacked legacy forms:
+8. **Advanced / legacy** — three stacked legacy forms:
      - Savitzky-Golay smoother (use Kalman v2 above instead)
-     - Outlier correction settings (writes thresholds / reference
-       body-parts to project_config.ini; consumed by the
-       "Run outlier correction" form)
+     - Outlier correction settings (writes thresholds /
+       reference body-parts to project_config.ini; consumed
+       by the "Run outlier correction" form)
      - Drop body-parts (project-setup decision; will move to
        project setup once that page exists)
 
-Sections 3 + 4 are mutually exclusive in practice — pick one or
-the other for a given run. The picker default in section 3 is
+Sections 5 + 6 are mutually exclusive in practice — pick one or
+the other for a given run. The picker default in section 5 is
 RAW input (since outlier correction usually runs before
-smoothing); section 5's picker defaults to the most-processed
+smoothing); section 7's picker defaults to the most-processed
 available output.
 
 The legacy "Outlier correction settings" form remains in the
@@ -58,7 +69,10 @@ egocentric alignment, etc. are upstream-of-features but not
 strictly "cleanup"), and because pose-cleanup-specific
 operations like smoothing were also being duplicated on the
 Data import page — making it clearer that this is *the*
-preprocessing surface reduces that confusion.
+preprocessing surface reduces that confusion. Patch 122x
+extends the page's scope by absorbing video calibration and
+batch video pre-processing from the Data Import page — same
+rationale.
 """
 from __future__ import annotations
 
@@ -72,6 +86,8 @@ from mufasa.ui_qt.forms.pose_cleanup import (DropBodypartsForm,
                                              RunOutlierCorrectionForm,
                                              SkipOutlierCorrectionForm,
                                              SmoothingForm)
+from mufasa.ui_qt.forms.project_setup import BatchPreProcessLauncher
+from mufasa.ui_qt.forms.video_info import VideoInfoForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
@@ -81,6 +97,13 @@ def build_pose_cleanup_page(workbench,
     """Build and return the Preprocessing page."""
     page = workbench.add_page("Preprocessing", icon_name="outlier")
 
+    # Patch 122x: media-side prep at the top.
+    page.add_section("Video Calibration",
+                     [(VideoInfoForm, {})])
+    page.add_section("Preprocess Videos",
+                     [(BatchPreProcessLauncher, {})])
+
+    # Pose-side flow.
     page.add_section("Interpolate missing frames",
                      [(InterpolateForm, {})])
     page.add_section("Kalman v2 smoothing",
