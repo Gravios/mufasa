@@ -772,6 +772,32 @@ def project_paths_from_config(
     * ``models_dir`` — ``<root>/models/`` (v1) or
       ``<project_path>/../models/`` (legacy).
 
+    Patch 122ab adds four keys consumed by the frame-labeller and
+    ROI dialogs. For v1 these intentionally mirror the legacy
+    layout under the v1 project root rather than under v1's
+    ``derived/<stage>/<run_id>/`` provenance tree:
+
+    * ``features_extracted_dir`` — ``<root>/csv/features_extracted/``
+      (both layouts).
+    * ``targets_inserted_dir`` — ``<root>/csv/targets_inserted/``
+      (both layouts).
+    * ``machine_results_dir`` — ``<root>/csv/machine_results/``
+      (both layouts).
+    * ``roi_definitions_path`` — ``<root>/logs/measures/ROI_definitions.h5``
+      (both layouts).
+
+    Rationale for the v1 paths: hand-edited annotations, ROI
+    definitions, and per-video classification outputs don't fit
+    cleanly into the ``derived/<stage>/<run_id>/`` model that
+    suits computed feature stages — they're project-level state,
+    edited in place, not the output of a single reproducible
+    run. Until the v1 schema decides on canonical homes for
+    these (with or without per-edit run-id allocation), the
+    backends use the conventional ``csv/`` and ``logs/measures/``
+    subtrees under whichever project root is active. This is
+    consistent with how 122aa described the labeller's behaviour
+    to users.
+
     Caller is responsible for creating directories as needed; this
     function returns paths even when they don't exist on disk.
 
@@ -783,12 +809,18 @@ def project_paths_from_config(
     if cp_str.endswith(".toml"):
         root = cp.parent.resolve()
         return {
-            "project_root":    str(root),
-            "video_dir":       str(root / "sources" / "videos"),
-            "input_pose_dir":  str(root / "sources" / "pose"),
-            "logs_dir":        str(root / "logs"),
-            "video_info_path": str(root / "sources" / "video_info.csv"),
-            "models_dir":      str(root / "models"),
+            "project_root":           str(root),
+            "video_dir":              str(root / "sources" / "videos"),
+            "input_pose_dir":         str(root / "sources" / "pose"),
+            "logs_dir":               str(root / "logs"),
+            "video_info_path":        str(root / "sources" / "video_info.csv"),
+            "models_dir":             str(root / "models"),
+            # Patch 122ab: labeller / ROI paths under the v1 root.
+            "features_extracted_dir": str(root / "csv" / "features_extracted"),
+            "targets_inserted_dir":   str(root / "csv" / "targets_inserted"),
+            "machine_results_dir":    str(root / "csv" / "machine_results"),
+            "roi_definitions_path":   str(root / "logs" / "measures"
+                                          / "ROI_definitions.h5"),
         }
     # Legacy: parse the [General settings] project_path.
     import configparser as _cp
@@ -809,12 +841,18 @@ def project_paths_from_config(
         )
     proj = Path(project_path)
     return {
-        "project_root":    str(proj),
-        "video_dir":       str(proj / "videos"),
-        "input_pose_dir":  str(proj / "csv" / "input_csv"),
-        "logs_dir":        str(proj / "logs"),
-        "video_info_path": str(proj / "logs" / "video_info.csv"),
-        "models_dir":      str(proj.parent / "models"),
+        "project_root":           str(proj),
+        "video_dir":              str(proj / "videos"),
+        "input_pose_dir":         str(proj / "csv" / "input_csv"),
+        "logs_dir":               str(proj / "logs"),
+        "video_info_path":        str(proj / "logs" / "video_info.csv"),
+        "models_dir":             str(proj.parent / "models"),
+        # Patch 122ab: labeller / ROI paths under the legacy root.
+        "features_extracted_dir": str(proj / "csv" / "features_extracted"),
+        "targets_inserted_dir":   str(proj / "csv" / "targets_inserted"),
+        "machine_results_dir":    str(proj / "csv" / "machine_results"),
+        "roi_definitions_path":   str(proj / "logs" / "measures"
+                                      / "ROI_definitions.h5"),
     }
 
 

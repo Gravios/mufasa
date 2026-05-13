@@ -391,18 +391,17 @@ class ROIManageForm(OperationForm):
     :class:`QStackedWidget`.
 
     Patch 122y: the description and the draw-action note were
-    reworked to reflect both v1 and legacy directory layouts:
+    reworked to reflect both v1 and legacy directory layouts.
 
-    * Source videos live in ``sources/videos/`` (v1) or
-      ``videos/`` under the project root (legacy).
-    * ROI definitions persist to
-      ``<project>/logs/measures/ROI_definitions.h5`` regardless of
-      layout. The path is computed by joining the project root
-      with the conventional ``logs/measures/`` subtree — both v1
-      and legacy keep that structure under their own roots. (A
-      future patch should plumb this through
-      :func:`project_paths_from_config` for completeness; for now
-      the description matches the on-disk reality.)
+    Patch 122ab: the underlying ROI video table dialog
+    (:class:`mufasa.ui_qt.dialogs.roi_video_table.ROIVideoTableDialog`)
+    now resolves the project's video directory + ROI definitions
+    path through
+    :func:`mufasa.project_layout.project_paths_from_config`, so
+    v1 ``project.toml`` projects launch the dialog cleanly. Prior
+    to 122ab the dialog read
+    ``[General settings].project_path`` directly via configparser
+    and silently fell back to an empty project root on v1.
     """
 
     title = "ROI definitions — draw / import / standardise"

@@ -43,7 +43,6 @@ Compatibility
 """
 from __future__ import annotations
 
-import configparser
 import os
 import sys
 from pathlib import Path
@@ -70,18 +69,42 @@ COL_STATUS = 6
 COLUMNS = ["#", "Preview", "Video", "", "", "", "Status"]
 
 
-def _project_path_from_config(config_path: str) -> Optional[str]:
-    """Light-weight lookup of project_path that doesn't pull
-    :class:`ConfigReader` (and therefore numba) into the import graph."""
-    cfg = configparser.ConfigParser()
-    cfg.read(config_path)
-    return cfg.get("General settings", "project_path", fallback=None)
+def _project_paths_lite(config_path: str) -> dict:
+    """Light-weight resolution of project paths that doesn't pull
+    :class:`ConfigReader` (and therefore numba) into the import
+    graph. Delegates to
+    :func:`mufasa.project_layout.project_paths_from_config` —
+    which works for both v1 ``project.toml`` and legacy
+    ``project_config.ini`` files — and returns an empty dict on
+    failure so the dialog can render a polite "no project" state
+    instead of crashing.
+
+    Patch 122ab: previously this read ``[General settings].project_path``
+    directly via :mod:`configparser`. configparser silently parses
+    zero sections out of a TOML file, then the subsequent
+    ``cfg.get(...)`` returned None on legacy and crashed on v1.
+    Routing through the layout helper closes the gap.
+    """
+    try:
+        from mufasa.project_layout import project_paths_from_config
+        return project_paths_from_config(config_path)
+    except Exception:
+        return {}
 
 
 def _list_project_videos(project_path: str) -> list[str]:
-    """Return absolute paths of all videos in ``project_folder/videos/``,
-    sorted alphabetically. Non-recursive."""
-    vid_dir = os.path.join(project_path, "videos")
+    """Return absolute paths of all videos in the project's video
+    tree, sorted alphabetically. Non-recursive.
+
+    Patch 122ab: the ``project_path`` argument is now the
+    canonical video directory itself
+    (``project_paths_from_config['video_dir']``) rather than the
+    project root joined with literal ``videos/``. Callers updated
+    to pass the resolved video_dir directly. Naming kept for
+    minimal call-site churn; future cleanup can rename to
+    ``_list_videos_in_dir``.
+    """
+    vid_dir = project_path
     if not os.path.isdir(vid_dir):
         return []
     out = []
@@ -165,9 +188,20 @@ class ROIVideoTableDialog(QDialog):
                  ) -> None:
         super().__init__(parent)
         self.config_path = config_path
-        self.project_path = _project_path_from_config(config_path) or ""
-        self.roi_h5_path = os.path.join(
-            self.project_path, "logs", "measures", "ROI_definitions.h5",
+        # Patch 122ab: resolve project paths through the layout
+        # helper so v1 (project.toml) and legacy (project_config.ini)
+        # both work. ``self.project_path`` retained as a header-bar
+        # display string ('Project: <path>') showing the project
+        # root; ``self.video_dir`` is the actual videos directory
+        # used for the table population.
+        paths = _project_paths_lite(config_path)
+        self.project_path = paths.get("project_root", "")
+        self.video_dir = paths.get("video_dir", "")
+        self.roi_h5_path = paths.get(
+            "roi_definitions_path",
+            # Worst-case fallback: empty so the watcher's missing-
+            # file branch fires cleanly.
+            "",
         )
         self._child_procs: list = []   # keep refs so they aren't GC'd
 
@@ -271,7 +305,7 @@ class ROIVideoTableDialog(QDialog):
         self.table.setRowCount(0)
         if not self.project_path:
             return
-        videos = _list_project_videos(self.project_path)
+        videos = _list_project_videos(self.video_dir)
         if not videos:
             return
         videos_with_rois = _videos_with_rois(self.roi_h5_path)
