@@ -389,13 +389,35 @@ class ROIManageForm(OperationForm):
 
     Two actions — each has its own set of inputs, switched via
     :class:`QStackedWidget`.
+
+    Patch 122y: the description and the draw-action note were
+    reworked to reflect both v1 and legacy directory layouts:
+
+    * Source videos live in ``sources/videos/`` (v1) or
+      ``videos/`` under the project root (legacy).
+    * ROI definitions persist to
+      ``<project>/logs/measures/ROI_definitions.h5`` regardless of
+      layout. The path is computed by joining the project root
+      with the conventional ``logs/measures/`` subtree — both v1
+      and legacy keep that structure under their own roots. (A
+      future patch should plumb this through
+      :func:`project_paths_from_config` for completeness; for now
+      the description matches the on-disk reality.)
     """
 
     title = "ROI definitions — draw / import / standardise"
-    description = ("Draw ROIs interactively on each video, import "
-                   "previously-saved ROI definitions from CSV, or "
-                   "re-scale all ROIs to match a reference video's "
-                   "pixels-per-mm calibration.")
+    description = (
+        "Manage ROIs for the open project. Three actions: "
+        "<b>Draw</b> them interactively on a frame from each "
+        "video, <b>Import</b> previously-saved definitions from "
+        "CSV, or <b>Standardise</b> all ROIs to a single "
+        "reference video's pixels-per-mm calibration so sizes "
+        "stay consistent across recordings. "
+        "Source videos are read from <code>sources/videos/</code> "
+        "(v1) or <code>videos/</code> (legacy); ROI definitions "
+        "persist to <code>logs/measures/ROI_definitions.h5</code> "
+        "under the project root in both layouts."
+    )
 
     ACTIONS = [("Draw ROIs (interactive)", "draw"),
                ("Import from CSV",         "import"),
@@ -415,22 +437,27 @@ class ROIManageForm(OperationForm):
 
         # --- Draw panel --- #
         # The drawing canvas is an OpenCV window driven by the Tk
-        # ROIVideoTable picker (project_folder/videos listing → click
-        # a row → draw on the frame). Mixing Tk and Qt event loops in
-        # the same process is fragile, so we launch it as a separate
-        # python subprocess. The user closes the Tk window when done;
-        # ROI definitions get saved to project_folder/logs/measures/
-        # ROI_definitions.h5 and are immediately picked up by the rest
-        # of the ROI page on next access.
+        # ROIVideoTable picker. It lists every video in the project's
+        # video tree — sources/videos/ for v1, videos/ for legacy —
+        # then opens the OpenCV canvas on the selected video's first
+        # frame so the user can draw rectangles, circles, or polygons
+        # with the mouse. Mixing Tk and Qt event loops in the same
+        # process is fragile, so we launch the picker as a separate
+        # python subprocess. ROI definitions get saved to
+        # <project>/logs/measures/ROI_definitions.h5 (same path in
+        # both layouts) and are immediately picked up by the rest of
+        # the ROI page on next access.
         draw_host = QWidget()
         draw_form = QFormLayout(draw_host); draw_form.setContentsMargins(0, 0, 0, 0)
         draw_note = QLabel(
             "Click <b>Run</b> to open the ROI drawing window. It will "
-            "list every video in <code>project_folder/videos</code>; "
-            "click a row to launch the OpenCV canvas, draw rectangles, "
-            "circles, or polygons with the mouse, save, and close. "
-            "ROI definitions persist in <code>logs/measures/"
-            "ROI_definitions.h5</code>."
+            "list every video in the project's video tree "
+            "(<code>sources/videos/</code> for v1, "
+            "<code>videos/</code> for legacy); click a row to launch "
+            "the OpenCV canvas, draw rectangles, circles, or "
+            "polygons with the mouse, save, and close. ROI "
+            "definitions persist in <code>logs/measures/"
+            "ROI_definitions.h5</code> under the project root."
         )
         draw_note.setTextFormat(Qt.RichText)
         draw_note.setWordWrap(True)
