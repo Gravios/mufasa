@@ -2,26 +2,39 @@
 mufasa.ui_qt.forms.video_join
 =============================
 
-Inline form for joining/combining multiple videos.
+Inline forms for joining and transitioning between videos:
 
-Replaces:
+* :class:`JoinVideosForm` — N-video temporal (end-to-end),
+  horizontal (side-by-side), vertical (stacked), or mosaic (grid)
+  concatenation. Replaces:
+  - :class:`ConcatenatingVideosPopUp` (2-video concat special case)
+  - :class:`ConcatenatorPopUp` (N-video horizontal/vertical/mosaic)
+  - :class:`VideoTemporalJoinPopUp` (automatic end-to-end)
+  - :class:`ManualTemporalJoinPopUp` (manual ordering — collapses
+    to "temporal mode + drag-reorder the list").
 
-* :class:`ConcatenatingVideosPopUp` (2-video concat special case)
-* :class:`ConcatenatorPopUp` (N-video horizontal/vertical/mosaic)
-* :class:`VideoTemporalJoinPopUp` (automatic end-to-end)
-* :class:`ManualTemporalJoinPopUp` (manual ordering)
+* :class:`CrossfadeVideosForm` — 2-video crossfade transition with
+  configurable method (18 ffmpeg xfade modes), duration, and
+  offset. Replaces :class:`CrossfadeVideosPopUp`. Patch 122t.
 
-Mode selector drives which backend is called; the same file list /
-scope picker feeds each mode.
+Mode selector drives which backend is called; the same file list
+feeds each mode of the join form. The crossfade form is separate
+because it has a strict 2-video constraint and a transition-style
+parameter set (method / duration / offset) that doesn't fit
+naturally as a fifth mode on the join form.
 """
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout,
-                               QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-                               QPushButton, QSpinBox, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout,
+                               QHBoxLayout, QLabel, QLineEdit,
+                               QListWidget, QListWidgetItem,
+                               QPushButton, QSpinBox, QVBoxLayout,
+                               QWidget)
 
 from mufasa.ui_qt.workbench import OperationForm
 
@@ -91,6 +104,14 @@ class JoinVideosForm(OperationForm):
     based on a dropdown — same here, but without a separate window.
     ``ManualTemporalJoinPopUp`` collapses to "temporal mode + re-order
     the list via drag-and-drop" (the list widget is reorderable).
+
+    Patch 122t notes:
+
+    * The previously-collected ``normalize`` flag was a stub — never
+      passed to any backend. Removed.
+    * Mosaic backend takes grid shape as (width_idx, height_idx) in
+      tiles, not a single ``rows`` kwarg. UI ``rows`` maps to
+      height_idx; width_idx is derived by packing the videos.
     """
 
     title = "Join videos"
@@ -124,13 +145,6 @@ class JoinVideosForm(OperationForm):
         form.addRow("Mosaic rows:", self.mosaic_rows)
         self._mosaic_row_index = form.rowCount() - 1
 
-        # Normalisation
-        self.normalize = QCheckBox(
-            "Normalise input resolution / fps before join", self,
-        )
-        self.normalize.setChecked(True)
-        form.addRow("", self.normalize)
-
         self.body_layout.addLayout(form)
         self._on_mode_changed(0)
 
@@ -147,21 +161,19 @@ class JoinVideosForm(OperationForm):
         if mode == "mosaic" and len(paths) < 4:
             raise ValueError("Mosaic join needs at least 4 videos.")
         return {
-            "paths":     paths,
-            "mode":      mode,
-            "rows":      int(self.mosaic_rows.value()),
-            "normalize": bool(self.normalize.isChecked()),
+            "paths": paths,
+            "mode":  mode,
+            "rows":  int(self.mosaic_rows.value()),
         }
 
-    def target(self, *, paths: list[str], mode: str, rows: int,
-               normalize: bool) -> None:
+    def target(self, *, paths: list[str], mode: str,
+               rows: int) -> None:
         import math
-        from pathlib import Path as _P
         from mufasa.video_processors import video_processing as _vp
 
         # All four concatenators require explicit save_path (no default
         # in the backend). Derive next to the first input video.
-        first = _P(paths[0])
+        first = Path(paths[0])
         save_path = str(first.parent / f"{first.stem}_joined_{mode}.mp4")
 
         if mode == "temporal":
@@ -183,4 +195,164 @@ class JoinVideosForm(OperationForm):
                                     width_idx=width_idx)
 
 
-__all__ = ["JoinVideosForm"]
+# --------------------------------------------------------------------------- #
+# CrossfadeVideosForm (patch 122t)
+# --------------------------------------------------------------------------- #
+class CrossfadeVideosForm(OperationForm):
+    """Apply a 2-video crossfade transition.
+
+    Replaces :class:`CrossfadeVideosPopUp`. Backend:
+    :func:`mufasa.video_processors.video_processing.crossfade_two_videos`,
+    which wraps ffmpeg's ``xfade`` filter — 18+ transition methods
+    (fade, fadeblack, wipe*, smooth*, circlecrop, rectcrop, …).
+
+    Strict 2-video constraint: this is a transition, not a
+    concatenation, so it's intentionally NOT a fifth mode on
+    :class:`JoinVideosForm`.
+
+    Offset parameter accepts the legacy HH:MM:SS string form (matches
+    the popup's behaviour and the backend's
+    ``check_if_hhmmss_timestamp_is_valid_part_of_video`` validator).
+    The backend type hint says ``int`` but accepts the string form.
+    """
+
+    title = "Crossfade two videos"
+    description = (
+        "Smoothly transition between two videos using one of 18+ "
+        "ffmpeg xfade methods. Duration is the visible crossfade "
+        "length; offset is where in video 1 the transition starts "
+        "(HH:MM:SS)."
+    )
+
+    _OFFSET_RE = re.compile(r"^\d{2}:\d{2}:\d{2}$")
+
+    def build(self) -> None:
+        from mufasa.utils.lookups import get_ffmpeg_crossfade_methods
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignRight)
+
+        # Two file pickers — strict 2-video.
+        self.video_1_edit = self._build_file_row(form, "Video 1:")
+        self.video_2_edit = self._build_file_row(form, "Video 2:")
+
+        # Crossfade method — pulled from lookups so we stay in sync
+        # with the canonical list.
+        self.method_cb = QComboBox(self)
+        try:
+            methods = list(get_ffmpeg_crossfade_methods())
+        except Exception:
+            # If lookup fails (test sandbox, etc.) fall back to a
+            # minimal set rather than blocking form build.
+            methods = ["fade", "fadeblack", "fadewhite", "wipeleft"]
+        for m in methods:
+            self.method_cb.addItem(m)
+        # Default to 'fade' if present.
+        if "fade" in methods:
+            self.method_cb.setCurrentText("fade")
+        form.addRow("Crossfade method:", self.method_cb)
+
+        # Duration (seconds). Legacy popup offered 2..20 step 2;
+        # widen to 1..60 with step 1 so unusual durations are reachable.
+        self.duration = QSpinBox(self)
+        self.duration.setRange(1, 60)
+        self.duration.setValue(6)
+        self.duration.setSuffix(" s")
+        form.addRow("Crossfade duration:", self.duration)
+
+        # Offset — HH:MM:SS string. The backend validates it against
+        # the actual length of video 1, so the form doesn't pre-clamp.
+        self.offset_edit = QLineEdit(self)
+        self.offset_edit.setText("00:00:00")
+        self.offset_edit.setPlaceholderText("HH:MM:SS")
+        form.addRow("Crossfade offset:", self.offset_edit)
+
+        # Output options
+        self.quality = QSpinBox(self)
+        self.quality.setRange(10, 100)
+        self.quality.setSingleStep(10)
+        self.quality.setValue(60)
+        self.quality.setSuffix(" %")
+        form.addRow("Output quality:", self.quality)
+
+        self.format_cb = QComboBox(self)
+        self.format_cb.addItems(["mp4", "avi", "webm"])
+        form.addRow("Output format:", self.format_cb)
+
+        self.body_layout.addLayout(form)
+
+    def _build_file_row(self, form: QFormLayout,
+                        label: str) -> QLineEdit:
+        """Helper: file picker row with Browse button. Returns the
+        QLineEdit so collect_args can read the value."""
+        edit = QLineEdit(self)
+        edit.setReadOnly(True)
+        edit.setPlaceholderText("Pick a video file…")
+        browse = QPushButton("Browse…", self)
+
+        def _pick() -> None:
+            path, _ = QFileDialog.getOpenFileName(
+                self, f"Pick {label.rstrip(':')}", "",
+                "Video files (*.mp4 *.avi *.mov *.mkv *.webm);;"
+                "All files (*)",
+            )
+            if path:
+                edit.setText(path)
+        browse.clicked.connect(_pick)
+
+        row = QHBoxLayout()
+        row.addWidget(edit, 1)
+        row.addWidget(browse)
+        form.addRow(label, row)
+        return edit
+
+    def collect_args(self) -> dict:
+        v1 = self.video_1_edit.text().strip()
+        v2 = self.video_2_edit.text().strip()
+        if not v1:
+            raise ValueError("Pick a Video 1 path.")
+        if not v2:
+            raise ValueError("Pick a Video 2 path.")
+        if not Path(v1).is_file():
+            raise ValueError(f"Video 1 is not a file: {v1}")
+        if not Path(v2).is_file():
+            raise ValueError(f"Video 2 is not a file: {v2}")
+        if Path(v1).resolve() == Path(v2).resolve():
+            raise ValueError(
+                "Video 1 and Video 2 are the same file. Pick two "
+                "different videos.",
+            )
+        offset = self.offset_edit.text().strip()
+        if not self._OFFSET_RE.match(offset):
+            raise ValueError(
+                f"Crossfade offset {offset!r} must be HH:MM:SS "
+                "(e.g. 00:00:05). Backend validates against video 1's "
+                "length on run.",
+            )
+        return {
+            "video_path_1":       v1,
+            "video_path_2":       v2,
+            "crossfade_method":   self.method_cb.currentText(),
+            "crossfade_duration": int(self.duration.value()),
+            "crossfade_offset":   offset,
+            "quality":            int(self.quality.value()),
+            "out_format":         self.format_cb.currentText(),
+        }
+
+    def target(self, *, video_path_1: str, video_path_2: str,
+               crossfade_method: str, crossfade_duration: int,
+               crossfade_offset: str, quality: int,
+               out_format: str) -> None:
+        from mufasa.video_processors import video_processing as _vp
+        _vp.crossfade_two_videos(
+            video_path_1=video_path_1,
+            video_path_2=video_path_2,
+            crossfade_duration=crossfade_duration,
+            crossfade_method=crossfade_method,
+            crossfade_offset=crossfade_offset,
+            quality=quality,
+            out_format=out_format,
+        )
+
+
+__all__ = ["JoinVideosForm", "CrossfadeVideosForm"]

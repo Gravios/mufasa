@@ -3293,55 +3293,8 @@ class ManualTemporalJoinPopUp(PopUpMixin):
 #ManualTemporalJoinPopUp()
 
 
-class CrossfadeVideosPopUp(PopUpMixin):
-    def __init__(self):
-        PopUpMixin.__init__(self, title="CROSS-FADE VIDEOS", icon='crossfade')
-        crossfade_methods = get_ffmpeg_crossfade_methods()
-        settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="NUMBER OF VIDEOS TO JOIN", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.video_path_1 = FileSelect(settings_frm, f"VIDEO PATH 1:", title="Select a video file", lblwidth=25, file_types=[("VIDEO FILE", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)], lbl_icon='file', tooltip_key='CROSSFADE_VIDEO_PATH_1')
-        self.video_path_2 = FileSelect(settings_frm, f"VIDEO PATH 2:", title="Select a video file", lblwidth=25, file_types=[("VIDEO FILE", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)], lbl_icon='file', tooltip_key='CROSSFADE_VIDEO_PATH_2')
-        self.quality_dropdown = SimBADropDown(parent=settings_frm, label="OUTPUT VIDEO QUALITY:", dropdown_options=list(range(10, 110, 10)), label_width=25, img='pct', dropdown_width=35, value=60, tooltip_key='OUTPUT_VIDEO_QUALITY')
-        self.out_format_dropdown = SimBADropDown(parent=settings_frm, label="OUTPUT VIDEO FORMAT:", dropdown_options=['mp4', 'avi', 'webm'], label_width=25, img='file_type', dropdown_width=35, value='mp4', tooltip_key='CROSSFADE_OUTPUT_FORMAT')
-        self.fade_method_dropdown = SimBADropDown(parent=settings_frm, label="CROSS-FADE METHOD:", dropdown_options=crossfade_methods, label_width=25, img='crossfade', dropdown_width=35, value='fade', tooltip_key='CROSSFADE_METHOD')
-        self.duration_dropdown = SimBADropDown(parent=settings_frm, label="CROSS-FADE DURATION:", dropdown_options=list(range(2, 22, 2)), label_width=25, img='timer', dropdown_width=35, value=6, tooltip_key='CROSSFADE_DURATION')
-        self.offset_eb = Entry_Box(settings_frm, fileDescription="CROSS-FADE OFFSET:", labelwidth=25, value='00:00:00', img='timer_2', entry_box_width=35, justify='center', tooltip_key='CROSSFADE_OFFSET')
-
-        settings_frm.grid(row=0, column=0, sticky=NW)
-        self.video_path_1.grid(row=0, column=0, sticky=NW)
-        self.video_path_2.grid(row=1, column=0, sticky=NW)
-        self.quality_dropdown.grid(row=2, column=0, sticky=NW)
-        self.out_format_dropdown.grid(row=3, column=0, sticky=NW)
-        self.fade_method_dropdown.grid(row=4, column=0, sticky=NW)
-        self.duration_dropdown.grid(row=5, column=0, sticky=NW)
-        self.offset_eb.grid(row=6, column=0, sticky=NW)
-        self.create_run_frm(run_function=self.run)
-        self.main_frm.mainloop()
-
-    def run(self):
-        video_1_path, video_2_path = self.video_path_1.file_path, self.video_path_2.file_path
-        quality = int(self.quality_dropdown.getChoices())
-        format = self.out_format_dropdown.getChoices()
-        fade_method = self.fade_method_dropdown.getChoices()
-        offset = self.offset_eb.entry_get
-        check_if_string_value_is_valid_video_timestamp(value=offset, name='offset')
-        duration = int(self.duration_dropdown.getChoices())
-        check_if_hhmmss_timestamp_is_valid_part_of_video(timestamp=offset, video_path=video_1_path)
-        offset = timestamp_to_seconds(timestamp=offset)
-        for video_path in [video_1_path, video_2_path]:
-            video_meta_data = get_video_meta_data(video_path=video_path)
-            if video_meta_data['video_length_s'] < duration:
-                raise FrameRangeError(msg=f'Video {video_meta_data["video_name"]} is shorter {video_meta_data["video_length_s"]} than the crossfade duration {duration}.', source=self.__class__.__name__)
-            if video_meta_data['video_length_s'] < offset:
-                raise FrameRangeError(msg=f'Video {video_meta_data["video_name"]} is shorter {video_meta_data["video_length_s"]} than the crossfade offset {offset}.',source=self.__class__.__name__)
-
-
-        threading.Thread(crossfade_two_videos(video_path_1=video_1_path,
-                                              video_path_2=video_2_path,
-                                              crossfade_duration=duration,
-                                              crossfade_method=fade_method,
-                                              crossfade_offset=offset,
-                                              out_format=format,
-                                              quality=quality)).start()
+# CrossfadeVideosPopUp: removed in patch 122t — Qt replacement is CrossfadeVideosForm in mufasa.ui_qt.forms.video_join.
+# (was 49 lines of legacy Tk widget construction.)
 
 
 

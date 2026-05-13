@@ -77,7 +77,8 @@ from mufasa.ui_qt.forms.video_filters import VideoFiltersForm
 from mufasa.ui_qt.forms.video_frames import (ExtractFramesForm,
                                               ImportFrameDirectoryForm,
                                               MergeFramesToVideoForm)
-from mufasa.ui_qt.forms.video_join import JoinVideosForm
+from mufasa.ui_qt.forms.video_join import (CrossfadeVideosForm,
+                                            JoinVideosForm)
 from mufasa.ui_qt.forms.image_conversion import (AverageFrameForm,
                                                  ImageFormatConverterForm)
 from mufasa.ui_qt.workbench import WorkflowPage
@@ -101,7 +102,13 @@ def build_video_processing_page(workbench,
     # video and import a frame directory into a project tree.
     page.add_section("Merge frames → video",    [(MergeFramesToVideoForm, {})])
     page.add_section("Import frame directory",  [(ImportFrameDirectoryForm, {})])
-    page.add_section("Join & transition",       [(JoinVideosForm, {})])
+    # Patch 122t: Join & transition section gains CrossfadeVideosForm.
+    # JoinVideosForm covers N-video concatenation; CrossfadeVideosForm
+    # covers the strict 2-video xfade transition (different parameter
+    # shape — method, duration, offset — so it doesn't fit as a fifth
+    # mode on the join form).
+    page.add_section("Join & transition",       [(JoinVideosForm, {}),
+                                                 (CrossfadeVideosForm, {})])
     page.add_section("Image format conversion", [(ImageFormatConverterForm, {})])
     page.add_section("Metadata & audit",        [(AverageFrameForm, {})])
 
