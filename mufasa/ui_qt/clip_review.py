@@ -33,7 +33,6 @@ Existing rating files are loaded on dialog open so reviews can resume.
 """
 from __future__ import annotations
 
-import configparser
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -294,16 +293,26 @@ class ClipReviewDialog(QDialog):
         self._classifier_names = _load_classifier_names(self.config_path)
         if not self._classifier_names:
             raise RuntimeError(
-                "No classifiers defined in project_config.ini. Add at "
+                "No classifiers defined in the project. Add at "
                 "least one via the Classifier → Manage page."
             )
-        cfg = configparser.ConfigParser()
-        cfg.read(self.config_path)
-        project_path = cfg.get("General settings", "project_path")
-        self.file_type = cfg.get("General settings", "workflow_file_type",
-                                 fallback="csv")
-        self.validation_dir = os.path.join(project_path, "csv",
-                                           "validation_results")
+        # Patch 122ag (hotfix on 122ab): route through the layout
+        # helpers so v1 (project.toml) projects work. The legacy
+        # path read '[General settings].project_path' via
+        # configparser, which raised on v1 TOML projects (same
+        # bug shape that 122ab fixed for the frame_labeller).
+        # validation_results lives under '<root>/csv/validation_results/'
+        # for both layouts (it's not currently surfaced as a key in
+        # project_paths_from_config — derived from project_root +
+        # convention).
+        from mufasa.project_layout import (project_metadata_from_config,
+                                           project_paths_from_config)
+        paths = project_paths_from_config(self.config_path)
+        meta = project_metadata_from_config(self.config_path)
+        self.file_type = meta.get("file_type", "csv")
+        self.validation_dir = os.path.join(
+            paths["project_root"], "csv", "validation_results",
+        )
         os.makedirs(self.validation_dir, exist_ok=True)
         self.ratings_path = os.path.join(
             self.validation_dir, f"{self.video_name}.csv",
@@ -569,16 +578,26 @@ def launch_clip_review(parent: QWidget, config_path: str) -> None:
     )
     if not video_path:
         return
-    # Try to auto-locate the machine_results CSV next to the project
-    cfg = configparser.ConfigParser()
-    cfg.read(config_path)
-    project_path = cfg.get("General settings", "project_path", fallback=None)
-    file_type = cfg.get("General settings", "workflow_file_type",
-                        fallback="csv")
+    # Try to auto-locate the machine_results CSV next to the project.
+    # Patch 122ag: route through project_paths_from_config +
+    # project_metadata_from_config rather than reading the legacy
+    # INI directly, so v1 TOML projects work.
+    from mufasa.project_layout import (project_metadata_from_config,
+                                       project_paths_from_config)
+    try:
+        paths = project_paths_from_config(config_path)
+        meta = project_metadata_from_config(config_path)
+        project_path = paths.get("project_root")
+        file_type = meta.get("file_type", "csv")
+        machine_results_dir = paths.get("machine_results_dir")
+    except Exception:
+        project_path = None
+        file_type = "csv"
+        machine_results_dir = None
     default_mr = None
-    if project_path:
+    if machine_results_dir:
         auto = os.path.join(
-            project_path, "csv", "machine_results",
+            machine_results_dir,
             f"{Path(video_path).stem}.{file_type}",
         )
         if os.path.isfile(auto):

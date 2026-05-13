@@ -70,8 +70,13 @@ from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox,
 from mufasa.roi_tools.roi_logic import (CIRCLE, POLYGON, RECTANGLE,
                                         ROILogic)
 from mufasa.ui_qt.dialogs.roi_canvas import ROICanvas
+# Patch 122ag (hotfix on 122ab): the v1-awareness rename of
+# _project_path_from_config → _project_paths_lite (returns a paths
+# dict instead of a bare string) and the signature change of
+# _list_project_videos (now takes a video_dir directly) missed this
+# import call site. Updated to use the new helper API.
 from mufasa.ui_qt.dialogs.roi_video_table import (_list_project_videos,
-                                                  _project_path_from_config,
+                                                  _project_paths_lite,
                                                   _videos_with_rois)
 
 
@@ -112,13 +117,21 @@ class ROIDefinePanel(QDialog):
                  parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
-        self.project_path = _project_path_from_config(config_path) or ""
+        # Patch 122ag: resolve project paths through the layout
+        # helper so v1 (project.toml) and legacy (project_config.ini)
+        # both work. The dialog needs project_path for the header
+        # bar display and video_dir for the table population.
+        paths = _project_paths_lite(config_path)
+        self.project_path = paths.get("project_root", "")
+        self.video_dir = paths.get("video_dir", "")
 
-        # Discover videos
-        self._videos: list[str] = _list_project_videos(self.project_path)
+        # Discover videos — _list_project_videos takes the video
+        # directory directly (post-122ab signature change), so we
+        # pass video_dir rather than project_path + 'videos/'.
+        self._videos: list[str] = _list_project_videos(self.video_dir)
         if not self._videos:
             raise RuntimeError(
-                f"No videos found in {self.project_path}/videos/"
+                f"No videos found in {self.video_dir or '<no project>'}"
             )
         # Pick starting video
         if video_path is not None and video_path in self._videos:
@@ -360,8 +373,11 @@ class ROIDefinePanel(QDialog):
         """Rebuild the left-side video list with current ROI status."""
         self.video_list.blockSignals(True)
         self.video_list.clear()
-        roi_h5 = os.path.join(
-            self.project_path, "logs", "measures", "ROI_definitions.h5",
+        # Patch 122ag: resolve through the layout helper rather than
+        # hardcoding 'logs/measures/' — the helper already returns
+        # the right path for both v1 and legacy layouts.
+        roi_h5 = _project_paths_lite(self.config_path).get(
+            "roi_definitions_path", "",
         )
         videos_with_rois = _videos_with_rois(roi_h5)
         for vpath in self._videos:
