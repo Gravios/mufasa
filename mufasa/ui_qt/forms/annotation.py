@@ -84,14 +84,39 @@ class FrameLabellingLauncher(OperationForm):
     covers all three pathways the legacy UI supported: fresh
     annotation, continue previous annotation, or pseudo-labelling
     from an existing machine_results file.
+
+    Patch 122aa: button text shortened from
+    'Select video and launch labeller…' to 'Label' to match the
+    sidebar entries on other pages; description rewritten to
+    acknowledge the legacy-only path resolution in
+    :mod:`mufasa.ui_qt.frame_labeller` so v1 users aren't
+    misled. The backend reads ``project_path`` from
+    ``[General settings]`` of the legacy INI and joins it with
+    literal ``csv/features_extracted/`` /
+    ``csv/targets_inserted/`` / ``csv/machine_results/``
+    subtrees. For v1 projects this means labels and features
+    land under those legacy paths beneath the v1 project root
+    until a follow-up patch plumbs the backend through
+    :func:`project_paths_from_config`.
     """
 
     title = "Frame labelling"
-    description = ("Frame-by-frame behavioural annotation. Opens a "
-                   "scrubber + per-classifier checkboxes dialog. "
-                   "Use <b>Continue</b> to resume a prior session, or "
-                   "<b>Pseudo</b> to seed labels from an existing "
-                   "classifier inference file.")
+    description = (
+        "Frame-by-frame behavioural annotation. Opens a "
+        "scrubber + per-classifier checkboxes dialog. Use "
+        "<b>Continue</b> to resume a prior session, or "
+        "<b>Pseudo</b> to seed labels from an existing "
+        "classifier inference file. "
+        "<br><br>"
+        "<b>Path note:</b> features come from "
+        "<code>csv/features_extracted/</code>, labels save to "
+        "<code>csv/targets_inserted/</code>, pseudo-labels seed "
+        "from <code>csv/machine_results/</code>. These paths "
+        "are joined with the project root in both v1 and legacy "
+        "layouts (v1 stores them under the project root "
+        "directly; layout-aware run-id allocation is a deferred "
+        "v1 migration item)."
+    )
 
     MODES = [("New labelling",        "new"),
              ("Continue labelling",   "continue"),
@@ -106,7 +131,12 @@ class FrameLabellingLauncher(OperationForm):
         form.addRow("Mode:", self.mode_cb)
         self.body_layout.addLayout(form)
 
-        launch = QPushButton("  Select video and launch labeller…", self)
+        # Patch 122aa: 'Select video and launch labeller…' →
+        # 'Label'. Matches the short verb-based labels users
+        # expect on action buttons; the verbose original was
+        # carry-over from the legacy popup which had no other
+        # surrounding context.
+        launch = QPushButton("  Label", self)
         launch.setStyleSheet("padding: 8px 16px; font-size: 11pt;")
         launch.clicked.connect(self._launch)
         self.body_layout.addWidget(launch)
@@ -119,7 +149,8 @@ class FrameLabellingLauncher(OperationForm):
         if not self.config_path:
             QMessageBox.warning(
                 self.window(), "No project",
-                "Load a project (project_config.ini) before labelling.",
+                "Load a project (project.toml for v1 or "
+                "project_config.ini for legacy) before labelling.",
             )
             return
         mode = self.MODES[self.mode_cb.currentIndex()][1]
@@ -425,23 +456,35 @@ class ClipReviewLauncher(OperationForm):
     the user just wants to walk through bouts and mark them valid /
     invalid; batch rendering is better when the output needs to
     leave the workstation.
+
+    Patch 122aa: button text shortened to 'Review' for parity with
+    the FrameLabellingLauncher rename; project-load error message
+    accepts both v1 (``project.toml``) and legacy
+    (``project_config.ini``) projects.
     """
 
     title = "Review classifier predictions (interactive)"
-    description = ("Step through each classifier-predicted bout and "
-                   "mark it valid / invalid / unsure. Ratings are "
-                   "saved to <code>validation_results/{video}.csv</code>.")
+    description = (
+        "Step through each classifier-predicted bout and mark "
+        "it valid / invalid / unsure. Ratings are saved to "
+        "<code>validation_results/{video}.csv</code> under the "
+        "project root."
+    )
 
     def build(self) -> None:
         hint = QLabel(
-            "<i>Select a video + its machine_results CSV. The dialog "
-            "shows each bout on a timeline, with a scrubber to verify "
-            "each detection.</i>", self,
+            "<i>Select a video + its machine_results CSV "
+            "(from <code>csv/machine_results/</code>). The "
+            "dialog shows each bout on a timeline, with a "
+            "scrubber to verify each detection.</i>", self,
         )
         hint.setWordWrap(True)
         self.body_layout.addWidget(hint)
 
-        launch = QPushButton("  Select video and launch reviewer…", self)
+        # Patch 122aa: 'Select video and launch reviewer…' →
+        # 'Review'. Same short verb-based label rationale as the
+        # FrameLabellingLauncher rename.
+        launch = QPushButton("  Review", self)
         launch.setStyleSheet("padding: 8px 16px; font-size: 11pt;")
         launch.clicked.connect(self._launch)
         self.body_layout.addWidget(launch)
@@ -452,7 +495,8 @@ class ClipReviewLauncher(OperationForm):
         if not self.config_path:
             QMessageBox.warning(
                 self.window(), "No project",
-                "Load a project (project_config.ini) before reviewing.",
+                "Load a project (project.toml for v1 or "
+                "project_config.ini for legacy) before reviewing.",
             )
             return
         from mufasa.ui_qt.clip_review import launch_clip_review
