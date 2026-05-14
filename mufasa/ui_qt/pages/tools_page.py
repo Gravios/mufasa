@@ -23,12 +23,21 @@ otherwise clutter project-scoped pages. Current sections:
   YOLOv8 keypoint annotations. Replaces legacy
   :class:`SLEAPcsvInference2Yolo`.
 
+* **Export to CSV** (patch 122ae-6) —
+  :class:`ExportToCSVForm`. Export v1-layout features / labels /
+  combined as wide CSVs at a user-picked destination. Project-
+  scoped (needs an open project to know what to export); reads
+  whatever's currently on disk via load_features_for_video +
+  load_labels_for_video, so works transparently across v1 and
+  legacy layouts.
+
 Add other project-less utilities here as they show up.
 """
 from __future__ import annotations
 
 from typing import Optional
 
+from mufasa.ui_qt.forms.data_export import ExportToCSVForm
 from mufasa.ui_qt.forms.data_import import ConverterForm
 from mufasa.ui_qt.forms.pose_tools import (PoseReorganizerForm,
                                             SLEAPToYoloForm)
@@ -46,6 +55,10 @@ def build_tools_page(workbench,
                      [(PoseReorganizerForm, {})])
     page.add_section("SLEAP → YOLO conversion",
                      [(SLEAPToYoloForm, {})])
+    # Patch 122ae-6: v1 → CSV export. Project-scoped — uses the
+    # workbench's currently-open config_path via OperationForm.
+    page.add_section("Export to CSV",
+                     [(ExportToCSVForm, {})])
     return page
 
 
