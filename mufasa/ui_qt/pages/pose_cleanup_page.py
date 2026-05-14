@@ -10,25 +10,29 @@ pipeline:
     raw pose → [ interpolate → smooth → outlier-correct → align ]
              → feature extraction → classifier
 
-Section ordering (patches 122c + 122x)
---------------------------------------
+Section ordering (patches 122c + 122x + 122al)
+----------------------------------------------
 
 The page reflects the actual conceptual order of operations,
-with media-side prep (video calibration, batch pre-process) at
-the top, the modern pose-cleanup forms in the middle, and the
-legacy SimBA forms folded into an "Advanced / legacy" section
-at the bottom.
+with media-side prep at the top, pose-cleanup in the middle,
+and legacy SimBA forms folded into an "Advanced / legacy"
+section at the bottom.
 
 Sections:
 
-1. **Video Calibration** (patch 122x) — per-video FPS,
+1. **Preprocess Videos** (patch 122al) — multi-step video
+   pre-processing wizard (crop → downsample → greyscale →
+   flip/rotate → clip → FPS → CLAHE). Ported from Tk to a
+   Qt form that's both inline (renders as a normal page
+   section) AND pop-out-dockable into a floating window.
+   Moved to the FIRST position because raw video
+   pre-processing happens before anything else in the
+   pipeline — including pixel/mm calibration, since
+   downsampling changes the pixel scale.
+2. **Video Calibration** (patch 122x) — per-video FPS,
    resolution, and pixels/mm calibration used by all
    distance-based feature kernels. Without it, distance
-   features come out in pixels rather than millimeters. Moved
-   from the Data Import page.
-2. **Preprocess Videos** (patch 122x) — multi-step video
-   pre-processing wizard (crop → downsample → greyscale →
-   flip/rotate → clip). Moved from the Data Import page.
+   features come out in pixels rather than millimeters.
 3. **Interpolate missing frames** — fill tracker dropouts before
    anything else looks at the data.
 4. **Kalman v2 smoothing** — the recommended smoother. Handles
@@ -86,7 +90,7 @@ from mufasa.ui_qt.forms.pose_cleanup import (DropBodypartsForm,
                                              RunOutlierCorrectionForm,
                                              SkipOutlierCorrectionForm,
                                              SmoothingForm)
-from mufasa.ui_qt.forms.project_setup import BatchPreProcessLauncher
+from mufasa.ui_qt.forms.batch_pre_process import BatchPreProcessForm
 from mufasa.ui_qt.forms.video_info import VideoInfoForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
@@ -97,11 +101,18 @@ def build_pose_cleanup_page(workbench,
     """Build and return the Preprocessing page."""
     page = workbench.add_page("Preprocessing", icon_name="outlier")
 
-    # Patch 122x: media-side prep at the top.
+    # Patch 122al: Preprocess Videos is now the FIRST section —
+    # before any pose-side work, before video calibration. This
+    # matches the natural workflow: raw videos in → preprocessed
+    # videos out → calibration → pose cleanup. The Tk launcher
+    # has been replaced with an inline (and pop-out-dockable) Qt
+    # form, BatchPreProcessForm.
+    page.add_section("Preprocess Videos",
+                     [(BatchPreProcessForm, {})])
+
+    # Patch 122x: media-side prep — now position 2.
     page.add_section("Video Calibration",
                      [(VideoInfoForm, {})])
-    page.add_section("Preprocess Videos",
-                     [(BatchPreProcessLauncher, {})])
 
     # Pose-side flow.
     page.add_section("Interpolate missing frames",
