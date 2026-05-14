@@ -2,19 +2,13 @@
 mufasa.utils.label_io
 =====================
 
-Single read/write API for per-video classifier labels. Reads from
-``derived/labels/<video>.parquet`` first; falls back to extracting
-the classifier-target columns from the legacy wide
-``csv/targets_inserted/<video>.<ext>`` file. Writes only to the
-new per-video parquet location.
+v1-native read/write API for per-video classifier labels.
+Reads from and writes to ``derived/labels/<video>.parquet``
+only. The legacy ``csv/targets_inserted/`` fallback was
+removed in patch 122ak; v1 layout is the only supported
+layout.
 
-Shipped in patch 122ae-3.5. The labels split from
-``csv/targets_inserted`` (which conflated labels with the
-features they were paired with) into a focused per-video parquet
-under ``derived/labels/`` is one of the v1 layout decisions
-reified in 122ae-1. This module is the API surface; the
-frame-labeller retarget that actually wires these helpers up
-lands in 122ae-5.
+Shipped in patch 122ae-3.5. v1-only in 122ak.
 
 Public API
 ----------
@@ -26,6 +20,9 @@ Public API
     video to ``derived/labels/<video>.parquet``. Optionally
     merges with existing labels rather than overwriting.
 
+:func:`list_video_stems_with_labels` — enumerate video stems
+    with labels under ``derived/labels/``.
+
 Schema on disk
 --------------
 Per-video parquet at ``derived/labels/<video_name>.parquet``:
@@ -36,20 +33,12 @@ Per-video parquet at ``derived/labels/<video_name>.parquet``:
   as a column. Consumers join with feature data by row position.
 * Values: Int64 nullable. 0 / 1 mean the frame was annotated as
   not-occurring / occurring. ``pd.NA`` means the frame was never
-  annotated (annotator skipped over it, or the labeller hasn't
-  visited it yet).
+  annotated.
 
-Legacy fallback (read-only)
----------------------------
-Reading from ``csv/targets_inserted/<video>.<ext>`` extracts only
-the classifier-target columns. Other columns (features, pose
-data) are discarded — they don't belong in the labels file.
-
-Writes ONLY go to the new location. There's no write-back to the
-legacy wide file. After 122ae-5 lands and the labeller switches
-to ``save_labels_for_video``, projects accumulate labels under
-``derived/labels/`` and the legacy ``csv/targets_inserted/`` tree
-stops being updated.
+The 122ae-5c dual-write to legacy ``csv/targets_inserted/``
+and the corresponding legacy read fallback are both gone after
+122ak. The labellers write labels-only to ``derived/labels/``
+and that's the only place labels live.
 """
 from __future__ import annotations
 
@@ -78,26 +67,8 @@ def _strip_video_ext(video_name: str) -> str:
     return Path(video_name).stem
 
 
-def _read_legacy(path: str) -> pd.DataFrame:
-    """Read a legacy wide targets file. Same extension dispatch as
-    feature_io._read_legacy, and same leading-pad-column strip
-    for CSVs to match :func:`mufasa.utils.read_write.read_df`'s
-    default behaviour (see 122ae-5 note in feature_io._read_legacy
-    for the rationale).
-    """
-    ext = Path(path).suffix.lower()
-    if ext == ".csv":
-        df = pd.read_csv(path)
-        if df.shape[1] > 0:
-            df = df.iloc[:, 1:]
-        return df
-    if ext == ".parquet":
-        return pd.read_parquet(path)
-    if ext in (".h5", ".hdf5"):
-        return pd.read_hdf(path)
-    raise ValueError(
-        f"Unsupported legacy targets extension {ext!r} at {path}",
-    )
+# Patch 122ak: _read_legacy removed. v1 layout
+# (derived/labels/<video>.parquet) is the only supported source.
 
 
 def load_labels_for_video(
@@ -165,23 +136,15 @@ def load_labels_for_video(
         df = pd.read_parquet(v1_path)
         return _project_to_targets(df, requested)
 
-    # ---- Legacy fallback ----
-    legacy_dir = paths.get("targets_inserted_dir")
-    import_ft = meta.get(
-        "import_file_type", meta.get("file_type", "csv"),
-    )
-    legacy_path = (
-        os.path.join(legacy_dir, f"{stem}.{import_ft}")
-        if legacy_dir else None
-    )
-    if legacy_path and os.path.isfile(legacy_path):
-        wide = _read_legacy(legacy_path)
-        return _project_to_targets(wide, requested)
-
+    # Patch 122ak: legacy fallback removed. v1 layout
+    # (derived/labels/<video>.parquet) is the only supported
+    # source. Annotate at least one frame before calling
+    # load_labels_for_video, or use the labellers' "from scratch"
+    # mode which doesn't require any existing labels.
     raise FileNotFoundError(
         f"No labels found for video {stem!r}. Looked at "
-        f"{v1_path!r} (v1 per-video parquet) and "
-        f"{legacy_path!r} (legacy wide targets file)."
+        f"{v1_path!r} (v1 per-video parquet). Annotate this "
+        f"video first."
     )
 
 
@@ -359,16 +322,7 @@ def list_video_stems_with_labels(config_path: str) -> list[str]:
             if name.endswith(".parquet"):
                 stems.add(Path(name).stem)
 
-    legacy_dir = paths.get("targets_inserted_dir")
-    if legacy_dir and os.path.isdir(legacy_dir):
-        for name in os.listdir(legacy_dir):
-            full = os.path.join(legacy_dir, name)
-            if not os.path.isfile(full):
-                continue
-            if name.startswith("."):
-                continue
-            ext = Path(name).suffix.lower()
-            if ext in (".csv", ".parquet", ".h5", ".hdf5"):
-                stems.add(Path(name).stem)
+    # Patch 122ak: legacy csv/targets_inserted/ scan removed.
+    # v1 layout (derived/labels/) is the only source of truth.
 
     return sorted(stems)

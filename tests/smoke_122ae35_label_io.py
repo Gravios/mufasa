@@ -156,7 +156,7 @@ def main() -> int:
         )
 
     # ==================================================================
-    # 2. Legacy CSV fallback
+    # 2. Legacy CSV no longer consulted (patch 122ak — v1-only)
     # ==================================================================
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
@@ -166,38 +166,29 @@ def main() -> int:
         )
         legacy = tmp / "csv" / "targets_inserted"
         legacy.mkdir(parents=True)
-        # Wide CSV: features + pose + label columns mixed
         wide = pd.DataFrame({
             "nose_x":        [10.0, 11.0, 12.0, 13.0],
-            "nose_y":        [20.0, 21.0, 22.0, 23.0],
             "feature_alpha": [0.1, 0.2, 0.3, 0.4],
             "sniff":         [1, 0, 1, 0],
             "rear":          [0, 0, 1, 1],
         })
         wide.to_csv(legacy / "video_002.csv", index=False)
 
-        result = load_labels_for_video("video_002", str(toml))
+        # Patch 122ak: legacy fallback removed. Seeding only
+        # legacy data must raise FileNotFoundError.
+        raised = False
+        try:
+            load_labels_for_video("video_002", str(toml))
+        except FileNotFoundError:
+            raised = True
         check(
-            "legacy fallback: only classifier columns returned "
-            "(features + pose discarded)",
-            set(result.columns) == {"sniff", "rear"},
-            detail=f"got {list(result.columns)}",
-        )
-        check(
-            "legacy fallback: row count matches input (4)",
-            len(result) == 4,
-        )
-        check(
-            "legacy fallback: values projected correctly",
-            result["sniff"].tolist() == [1, 0, 1, 0],
-        )
-        check(
-            "legacy fallback: dtype coerced to Int64 on read",
-            result["sniff"].dtype.name == "Int64",
+            "legacy-only project (v1-only patch): raises "
+            "FileNotFoundError instead of silently reading legacy",
+            raised,
         )
 
     # ==================================================================
-    # 3. Precedence — v1 wins when both exist
+    # 3. v1 file returned, legacy ignored when both exist
     # ==================================================================
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
@@ -208,7 +199,7 @@ def main() -> int:
         pd.DataFrame({"sniff": [9, 9, 9]}).astype("Int64").to_parquet(
             labels_dir / "video_003.parquet", index=False,
         )
-        # Legacy
+        # Legacy that should be ignored
         legacy = tmp / "csv" / "targets_inserted"
         legacy.mkdir(parents=True)
         pd.DataFrame({"sniff": [1, 2, 3]}).to_csv(
@@ -217,13 +208,12 @@ def main() -> int:
 
         result = load_labels_for_video("video_003", str(toml))
         check(
-            "precedence: v1 parquet wins over legacy when both "
-            "exist",
+            "v1-only patch: v1 data returned, legacy ignored",
             result["sniff"].tolist() == [9, 9, 9],
         )
 
     # ==================================================================
-    # 4. Missing on both — FileNotFoundError
+    # 4. Missing — FileNotFoundError mentions v1 path
     # ==================================================================
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
@@ -235,11 +225,10 @@ def main() -> int:
         except FileNotFoundError as exc:
             raised = True
             msg = str(exc)
-        check("missing-on-both: raises FileNotFoundError", raised)
+        check("missing: raises FileNotFoundError", raised)
         check(
-            "missing-on-both: error mentions both probed paths",
-            "derived" in msg and "labels" in msg
-            and "targets_inserted" in msg,
+            "missing: error mentions derived/labels path",
+            "derived" in msg and "labels" in msg,
             detail=f"got {msg!r}",
         )
 
@@ -453,11 +442,8 @@ def main() -> int:
         "label_io reads 'derived_labels_dir' from helper",
         "derived_labels_dir" in src,
     )
-    check(
-        "label_io reads 'targets_inserted_dir' for legacy "
-        "fallback",
-        "targets_inserted_dir" in src,
-    )
+    # Patch 122ak: targets_inserted_dir was the legacy fallback
+    # path; it's gone now.
     check(
         "label_io docstring records the 122ae-3.5 patch number",
         "122ae-3.5" in src,

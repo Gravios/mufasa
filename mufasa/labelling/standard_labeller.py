@@ -455,16 +455,9 @@ class LabellingInterface(ConfigReader):
         self.data_df_targets[clf_name].loc[frame_idx] = int(self.clf_cbs[clf_name].get())
 
     def __save_results(self):
-        self.save_df = pd.concat([self.data_df, self.data_df_targets], axis=1)
-        try:
-            write_df(self.save_df, self.file_type, self.targets_inserted_file_path)
-        except Exception as e:
-            raise SimbaError(msg=f"Annotation file for video {self.video_name} could not be saved at {self.targets_inserted_file_path}. {e}", source=self.__class__.__name__)
-        # Patch 122ae-5c: sidecar v1-native labels write. Dual-
-        # write transition, see labelling_interface for rationale.
-        # data_df_targets is the projection of data_df to
-        # classifier-target columns (set at construction line ~181);
-        # exactly the right shape for save_labels_for_video.
+        """Patch 122ak: labels-only save via save_labels_for_video.
+        See labelling_interface.__save_results for rationale.
+        """
         try:
             save_labels_for_video(
                 video_name=self.video_name,
@@ -472,12 +465,8 @@ class LabellingInterface(ConfigReader):
                 labels=self.data_df_targets,
             )
         except Exception as exc:
-            print(
-                f"[122ae-5c] Sidecar labels write to "
-                f"derived/labels/ failed for {self.video_name}: "
-                f"{exc}. Legacy targets_inserted save succeeded."
-            )
-        stdout_success(msg=f"SAVED: Annotation file for video {self.video_name} saved within the {self.targets_folder} directory at file path: {self.targets_inserted_file_path}.", source=self.__class__.__name__)
+            raise SimbaError(msg=f"Labels for video {self.video_name} could not be saved: {exc}", source=self.__class__.__name__)
+        stdout_success(msg=f"SAVED: Labels for video {self.video_name} saved.", source=self.__class__.__name__)
         if not self.config.has_section("Last saved frames"):
             self.config.add_section("Last saved frames")
         self.config.set("Last saved frames", str(self.video_name), str(self.img_idx-1))

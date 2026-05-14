@@ -400,27 +400,12 @@ class LabellingInterface(ConfigReader):
         self.data_df_targets[clf_name].loc[frame_idx] = int(self.clf_cbs[clf_name].get())
 
     def __save_results(self):
-        # Patch 122ae-5: layout-aware feature read for the save
-        # path (writes features+labels combined to legacy
-        # targets_inserted; the per-video labels parquet write
-        # via save_labels_for_video lands in 122ae-5-followup).
-        self.features_df = load_features_for_video(
-            self.video_name, self.config_path,
-        )
-        self.save_df = pd.concat([self.features_df, self.data_df_targets], axis=1)
-        try:
-            write_df(self.save_df, self.file_type, self.targets_inserted_file_path)
-        except Exception as e:
-            print(e, f"SIMBA ERROR: File for video {get_fn_ext(self.features_extracted_file_path)[1]} could not be saved.")
-            raise FileExistsError
-        # Patch 122ae-5c: sidecar v1-native labels write. The
-        # legacy combined features+labels file above stays as-is
-        # for back-compat with classifier training (which still
-        # reads from csv/targets_inserted/). Failures here don't
-        # abort the save — the labeller's primary contract is the
-        # legacy file, and the sidecar is the new layout's view of
-        # the same data. We log and continue so a sidecar failure
-        # doesn't make the user lose their annotation work.
+        """Patch 122ak: labels-only save via save_labels_for_video.
+        Features stay where the bulk extractor put them
+        (derived/features/<video>.parquet); classifier training
+        reads them via load_features_for_video when it needs them.
+        No combined features+labels file is written.
+        """
         try:
             save_labels_for_video(
                 video_name=self.video_name,
@@ -428,12 +413,9 @@ class LabellingInterface(ConfigReader):
                 labels=self.data_df_targets,
             )
         except Exception as exc:
-            print(
-                f"[122ae-5c] Sidecar labels write to "
-                f"derived/labels/ failed for {self.video_name}: "
-                f"{exc}. Legacy targets_inserted save succeeded."
-            )
-        stdout_success(msg=f"SAVED: Annotation file for video {self.video_name} saved within the {self.targets_folder} directory.", source=self.__class__.__name__)
+            print(f"SIMBA ERROR: labels save failed for {self.video_name}: {exc}")
+            raise FileExistsError
+        stdout_success(msg=f"SAVED: Labels for video {self.video_name} saved.", source=self.__class__.__name__)
         if not self.config.has_section("Last saved frames"):
             self.config.add_section("Last saved frames")
         self.config.set("Last saved frames", str(self.video_name), str(self.img_idx))

@@ -178,38 +178,38 @@ def main() -> int:
         )
 
     # ==================================================================
-    # 2. Legacy CSV fallback branch
+    # 2. Legacy CSV no longer consulted (patch 122ak — v1-only)
     # ==================================================================
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
         toml = _make_v1_project(tmp, file_type="csv")
 
+        # Seed only a legacy CSV — no v1 parquet.
         legacy_dir = tmp / "csv" / "features_extracted"
         legacy_dir.mkdir(parents=True)
         legacy_df = pd.DataFrame({
-            "Unnamed: 0":     [0, 1, 2, 3],   # mimics legacy index col
+            "Unnamed: 0":     [0, 1, 2, 3],
             "feature_alpha":  [10.0, 20.0, 30.0, 40.0],
             "feature_beta":   ["x", "y", "z", "w"],
         })
         legacy_df.to_csv(legacy_dir / "video_002.csv", index=False)
 
-        result = load_features_for_video("video_002", str(toml))
+        # Patch 122ak: load_features_for_video no longer falls back
+        # to legacy CSV. Seeding only legacy data must raise.
+        raised = False
+        try:
+            load_features_for_video("video_002", str(toml))
+        except FileNotFoundError:
+            raised = True
         check(
-            "legacy fallback: returns a DataFrame",
-            isinstance(result, pd.DataFrame),
-        )
-        check(
-            "legacy fallback: source columns preserved",
-            {"feature_alpha", "feature_beta"}.issubset(set(result.columns)),
-            detail=f"got {set(result.columns)}",
-        )
-        check(
-            "legacy fallback: row count matches input (4)",
-            len(result) == 4,
+            "legacy-only project (v1-only patch): raises "
+            "FileNotFoundError instead of silently reading legacy",
+            raised,
         )
 
     # ==================================================================
-    # 3. Both present — per-family branch wins
+    # 3. Per-family branch returns the per-family data (no legacy
+    #    consulted even when present)
     # ==================================================================
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
@@ -223,7 +223,7 @@ def main() -> int:
             feat_dir / slug / "video_003.parquet",
         )
 
-        # Legacy
+        # Also drop a legacy CSV to confirm it's ignored.
         legacy_dir = tmp / "csv" / "features_extracted"
         legacy_dir.mkdir(parents=True)
         pd.DataFrame({"old_col": [1, 2, 3]}).to_csv(
@@ -232,13 +232,14 @@ def main() -> int:
 
         result = load_features_for_video("video_003", str(toml))
         check(
-            "precedence: per-family branch wins when both exist",
+            "v1-only patch: per-family data returned, legacy "
+            "ignored",
             "new_col" in result.columns and "old_col" not in result.columns,
             detail=f"got {set(result.columns)}",
         )
 
     # ==================================================================
-    # 4. Neither present — FileNotFoundError with both paths named
+    # 4. Neither present — FileNotFoundError mentions v1 paths
     # ==================================================================
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
@@ -250,19 +251,14 @@ def main() -> int:
         except FileNotFoundError as exc:
             raised = True
             msg = str(exc)
-        check("missing-on-both: raises FileNotFoundError", raised)
+        check("missing: raises FileNotFoundError", raised)
         check(
-            "missing-on-both: error message mentions per-family path",
+            "missing: error message mentions derived/features",
             "derived" in msg and "features" in msg,
             detail=f"got: {msg!r}",
         )
         check(
-            "missing-on-both: error message mentions legacy path",
-            "features_extracted" in msg,
-            detail=f"got: {msg!r}",
-        )
-        check(
-            "missing-on-both: error message names the video stem",
+            "missing: error message names the video stem",
             "video_missing" in msg,
         )
 
@@ -377,16 +373,10 @@ def main() -> int:
         "feature_io imports project_paths_from_config",
         "project_paths_from_config" in src,
     )
-    check(
-        "feature_io imports project_metadata_from_config",
-        "project_metadata_from_config" in src,
-    )
-    check(
-        "feature_io reads 'import_file_type' as primary key "
-        "(file_type as fallback)",
-        '"import_file_type"' in src
-        and '"file_type"' in src,
-    )
+    # Patch 122ak: project_metadata_from_config import + the
+    # 'import_file_type' lookup were both part of the legacy CSV
+    # fallback (resolving the legacy file's extension). Both are
+    # gone now.
     check(
         "feature_io docstring records the 122ae-2 patch number",
         "122ae-2" in src,

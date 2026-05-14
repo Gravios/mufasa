@@ -185,7 +185,9 @@ class FrameLabellerWidget(QWidget):
         self.features_dir = paths["features_extracted_dir"]
         self.targets_dir = paths["targets_inserted_dir"]
         self.machine_results_dir = paths["machine_results_dir"]
-        os.makedirs(self.targets_dir, exist_ok=True)
+        # Patch 122ak: no longer write to targets_dir, so don't
+        # auto-create it. derived/labels/ is auto-created by
+        # save_labels_for_video on first write.
 
     # ------------------------------------------------------------------ #
     # UI construction
@@ -381,83 +383,32 @@ class FrameLabellerWidget(QWidget):
     # Save
     # ------------------------------------------------------------------ #
     def _save(self) -> None:
-        """Dual-write save: legacy combined features+labels to
-        csv/targets_inserted/, plus v1 labels-only sidecar via
-        save_labels_for_video. Sidecar failure logged but doesn't
-        abort the primary legacy write."""
+        """Write the label matrix to derived/labels/<video>.parquet
+        via save_labels_for_video. Labels-only — features stay in
+        derived/features/ where the bulk extractor put them, and
+        classifier training reads them via load_features_for_video
+        when it needs them. No combined features+labels file is
+        written; the legacy csv/targets_inserted/ layout is gone.
+        """
         try:
             import pandas as pd
-            target_path = os.path.join(
-                self.targets_dir, f"{self.video_name}.{self.file_type}",
+            from mufasa.utils.label_io import save_labels_for_video
+            labels_df = pd.DataFrame({
+                name: self._labels[name].astype(np.int64)
+                for name in self._classifier_names
+            })
+            out_path = save_labels_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                labels=labels_df,
             )
-            feat_path = os.path.join(
-                self.features_dir,
-                f"{self.video_name}.{self.file_type}",
-            )
-            df = None
-            if os.path.isfile(feat_path):
-                df = self._read_df_best_effort(feat_path)
-            if df is None:
-                df = pd.DataFrame(index=range(self.scrubber.total_frames))
-            else:
-                n = self.scrubber.total_frames
-                if len(df) != n:
-                    df = df.iloc[:n].reset_index(drop=True)
-                    while len(df) < n:
-                        df.loc[len(df)] = 0
-            for name in self._classifier_names:
-                df[name] = self._labels[name]
-            self._write_df_best_effort(df, target_path)
-            # Patch 122aj: v1 sidecar via save_labels_for_video.
-            # Failure here doesn't abort the save — the legacy file
-            # above is the primary contract; the sidecar is the new
-            # layout's view of the same data.
-            try:
-                from mufasa.utils.label_io import save_labels_for_video
-                labels_df = pd.DataFrame({
-                    name: self._labels[name].astype(np.int64)
-                    for name in self._classifier_names
-                })
-                save_labels_for_video(
-                    video_name=self.video_name,
-                    config_path=self.config_path,
-                    labels=labels_df,
-                )
-            except Exception as exc:
-                print(
-                    f"[122aj] Sidecar labels write to "
-                    f"derived/labels/ failed for "
-                    f"{self.video_name}: {exc}. Legacy "
-                    f"targets_inserted save succeeded."
-                )
             self._dirty = False
-            self.status.setText(f"Saved → {target_path}")
+            self.status.setText(f"Saved → {out_path}")
         except Exception as exc:
             QMessageBox.critical(
                 self, "Save failed",
                 f"Could not save labels: {exc}",
             )
-
-    def _read_df_best_effort(self, path: str):
-        """Read a project data file. CSVs go through pandas
-        directly to avoid the historical read_df quirks; other
-        types via read_df."""
-        if self.file_type.lower() == "csv":
-            import pandas as pd
-            return pd.read_csv(path)
-        from mufasa.utils.read_write import read_df
-        return read_df(path, self.file_type)
-
-    def _write_df_best_effort(self, df, path: str) -> None:
-        try:
-            from mufasa.utils.read_write import write_df
-            write_df(df, self.file_type, path)
-            return
-        except Exception:
-            if self.file_type.lower() == "csv":
-                df.to_csv(path, index=False)
-                return
-            raise
 
     def _request_close(self) -> None:
         """Close button clicked. Walk up to the host container and
