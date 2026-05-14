@@ -50,7 +50,11 @@ from mufasa.utils.feature_io import load_features_for_video
 # reads the legacy file); this helper also writes labels-only
 # to derived/labels/<video>.parquet so v1 consumers reading
 # via load_labels_for_video find them.
-from mufasa.utils.label_io import save_labels_for_video
+# Patch 122ae-5d: continue-mode loader. load_labels_for_video
+# returns just the behaviour label collection from
+# derived/labels/ (v1) or csv/targets_inserted/ (legacy).
+from mufasa.utils.label_io import (load_labels_for_video,
+                                    save_labels_for_video)
 
 PLAY_VIDEO_SCRIPT_PATH = os.path.join(os.path.dirname(mufasa.__file__), "labelling/play_annotation_video.py")
 PADDING = 5
@@ -115,19 +119,46 @@ class LabellingInterface(ConfigReader):
         self.main_window = Toplevel()
 
         if continuing:
-            if not os.path.isfile(self.targets_inserted_file_path):
-                raise NoFilesFoundError(msg=f'When continuing annotations, SimBA expects a file at {self.targets_inserted_file_path}. SimBA could not find this file.', source=self.__class__.__name__)
-            self.data_df = read_df(self.targets_inserted_file_path, self.file_type)
-            # Patch 122ae-5: route through load_features_for_video
-            # so v1 (derived/features/) and legacy
-            # (csv/features_extracted/) projects both resolve.
+            # Patch 122ae-5d: continue mode loads just the
+            # behaviour label collection via
+            # load_labels_for_video, then combines with features
+            # from load_features_for_video. Both helpers span
+            # v1 (derived/) and legacy (csv/) layouts. The
+            # legacy missing-features-index merge logic is gone
+            # — features and labels come from the same
+            # source-of-truth via the load helpers so they're
+            # already aligned by row position.
+            try:
+                labels_df = load_labels_for_video(
+                    self.video_name, self.config_path,
+                )
+            except FileNotFoundError:
+                raise NoFilesFoundError(
+                    msg=(
+                        f'When continuing annotations, SimBA '
+                        f'could not find existing labels for '
+                        f'video {self.video_name}. Save labels '
+                        f'first or annotate from scratch.'
+                    ),
+                    source=self.__class__.__name__,
+                )
             self.data_df_features = load_features_for_video(
                 self.video_name, self.config_path,
             )
-            missing_idx = self.data_df_features.index.difference(self.data_df.index)
-            if len(missing_idx) > 0:
-                self.data_df_features = self.data_df_features.iloc[self.data_df_features.index.difference(self.data_df.index)]
-                self.data_df = pd.concat([self.data_df.astype(int), self.data_df_features], axis=0).sort_index()
+            # NA → 0, int — matches the legacy dtype that
+            # downstream UI handlers expect.
+            labels_df = labels_df.fillna(0).astype(int)
+            # Align labels to features length — features wins on
+            # row count (e.g., user re-extracted features after
+            # a longer pose-data import). reindex() with
+            # fill_value=0 pads short labels with zeros; longer
+            # labels get truncated by the same call.
+            labels_df = labels_df.reindex(
+                self.data_df_features.index, fill_value=0,
+            )
+            self.data_df = pd.concat(
+                [self.data_df_features, labels_df], axis=1,
+            )
             self.main_window.title("SIMBA ANNOTATION INTERFACE (CONTINUING ANNOTATIONS) - {}".format( self.video_name))
             self.img_idx = read_config_entry(self.config, "Last saved frames", self.video_name, data_type="int", default_value=0)
         else:

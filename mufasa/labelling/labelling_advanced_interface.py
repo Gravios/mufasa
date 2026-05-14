@@ -35,7 +35,12 @@ from mufasa.utils.read_write import (get_all_clf_names, get_fn_ext,
 from mufasa.utils.feature_io import load_features_for_video
 # Patch 122ae-5c: sidecar label writer. See labelling_interface
 # for rationale; same dual-write transition shape applies here.
-from mufasa.utils.label_io import save_labels_for_video
+# Patch 122ae-5d: continue-mode loader. load_labels_for_video
+# returns just the behaviour label collection (Int64-nullable
+# per-classifier columns), reading derived/labels/ first and
+# falling back to legacy targets_inserted automatically.
+from mufasa.utils.label_io import (load_labels_for_video,
+                                    save_labels_for_video)
 
 
 class AdvancedLabellingInterface(ConfigReader):
@@ -84,17 +89,37 @@ class AdvancedLabellingInterface(ConfigReader):
         self.max_frm_size = 1080, 650
         self.main_window = Toplevel()
         if continuing:
-            check_file_exist_and_readable(file_path=self.targets_inserted_file_path)
-            # Patch 122ae-5: pre-check via existence-on-disk
-            # removed — load_features_for_video raises
-            # FileNotFoundError with a clearer message naming all
-            # probed paths if nothing's found. Catch and wrap in
-            # the existing labeller error type below.
-            if self.file_type == Formats.CSV.value:
-                self.data_df = (pd.read_csv(self.targets_inserted_file_path).set_index("Unnamed: 0")[self.target_lst].astype(int))
-                self.data_df.index.name = None
-            if self.file_type == Formats.PARQUET.value:
-                self.data_df = pd.read_parquet(self.targets_inserted_file_path)[self.target_lst]
+            # Patch 122ae-5d: continue mode loads just the
+            # behaviour label collection via
+            # load_labels_for_video, then joins with features
+            # from load_features_for_video. Both helpers
+            # transparently span v1 (derived/labels/,
+            # derived/features/) and legacy
+            # (csv/targets_inserted/, csv/features_extracted/)
+            # layouts. The pre-122ae-5d branched-by-file_type
+            # CSV/parquet read + "Unnamed: 0" reindex dance is
+            # gone — load_labels_for_video already projects to
+            # classifier-target columns and returns a clean
+            # RangeIndex DataFrame.
+            try:
+                self.data_df = load_labels_for_video(
+                    self.video_name, self.config_path,
+                )
+            except FileNotFoundError as exc:
+                raise NoFilesFoundError(
+                    msg=(
+                        f'When continuing annotations, SimBA '
+                        f'could not find existing labels for '
+                        f'video {self.video_name}: {exc}'
+                    ),
+                    source=self.__class__.__name__,
+                )
+            # NA → 0, int — matches the legacy targets_inserted
+            # dtype the downstream UI code expects.
+            self.data_df = (
+                self.data_df.fillna(0)
+                .astype(int)[self.target_lst]
+            )
             try:
                 self.data_df_features = load_features_for_video(
                     self.video_name, self.config_path,

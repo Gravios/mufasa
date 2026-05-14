@@ -44,7 +44,9 @@ from mufasa.utils.warnings import DataHeaderWarning, FrameRangeWarning
 from mufasa.utils.feature_io import load_features_for_video
 # Patch 122ae-5c: sidecar label writer. See labelling_interface
 # for the dual-write rationale.
-from mufasa.utils.label_io import save_labels_for_video
+# Patch 122ae-5d: continue-mode loader.
+from mufasa.utils.label_io import (load_labels_for_video,
+                                    save_labels_for_video)
 
 PLAY_VIDEO_SCRIPT_PATH = os.path.join(os.path.dirname(mufasa.__file__), "labelling/play_annotation_video.py")
 PADDING = 5
@@ -112,32 +114,75 @@ class LabellingInterface(ConfigReader):
                 self.data_df.loc[self.data_df[f"Probability_{clf}"] <= self.thresholds[clf], clf] = 0
                 self.main_window.title(f"SIMBA ANNOTATION INTERFACE (PSEUDO-LABELLING) - {self.video_name}")
         elif continuing:
-            if not os.path.isfile(self.targets_inserted_file_path):
-                raise NoFilesFoundError( msg=f'When continuing annotations, SimBA expects a file at {self.targets_inserted_file_path}. SimBA could not find this file.', source=self.__class__.__name__)
-            self.data_df = read_df(self.targets_inserted_file_path, self.file_type)
+            # Patch 122ae-5d: continue mode loads just the
+            # behaviour label collection via
+            # load_labels_for_video; features come fresh from
+            # load_features_for_video. Both span v1 + legacy
+            # layouts. The pre-122ae-5d "if features file exists
+            # then augment with new feature columns" branch is
+            # gone — fresh features ARE the source of truth in
+            # the new flow, no augmentation needed.
+            try:
+                labels_df = load_labels_for_video(
+                    self.video_name, self.config_path,
+                )
+            except FileNotFoundError as exc:
+                raise NoFilesFoundError(
+                    msg=(
+                        f'When continuing annotations, SimBA '
+                        f'could not find existing labels for '
+                        f'video {self.video_name}. {exc}'
+                    ),
+                    source=self.__class__.__name__,
+                )
+            # Per-classifier missing-column handling. The helper
+            # already returns all-NA columns for classifiers not
+            # present in the legacy fallback (per its contract);
+            # those become 0 after fillna. We additionally warn
+            # so users know which classifier got reset.
             for clf in self.clf_names:
-                if not check_that_column_exist(df=self.data_df, column_name=clf, file_name=self.targets_inserted_file_path, raise_error=False):
-                    DataHeaderWarning(msg=f'No column named {clf} in file {self.targets_inserted_file_path} - setting all annotations to absent for behavior {clf}.', source=self.__class__.__name__)
-                    self.data_df[clf] = 0
-            if os.path.isfile(self.features_extracted_file_path):
-                # Patch 122ae-5: features may now also live in
-                # derived/features/ (v1 layout); load_features_for_video
-                # handles both. Keep the os.path.isfile guard on
-                # the legacy path so the optional-augmentation
-                # behaviour is preserved — the augment only fires
-                # when the legacy CSV is present (signalling that
-                # the user has rerun the bulk extractor since the
-                # last annotation save).
+                if clf not in labels_df.columns:
+                    DataHeaderWarning(
+                        msg=(
+                            f'No labels for behavior {clf} in '
+                            f'video {self.video_name} - setting '
+                            f'all annotations to absent.'
+                        ),
+                        source=self.__class__.__name__,
+                    )
+                    labels_df[clf] = 0
+                elif labels_df[clf].isna().all():
+                    DataHeaderWarning(
+                        msg=(
+                            f'No labels for behavior {clf} in '
+                            f'video {self.video_name} - setting '
+                            f'all annotations to absent.'
+                        ),
+                        source=self.__class__.__name__,
+                    )
+                    labels_df[clf] = 0
+            labels_df = labels_df.fillna(0).astype(int)
+            # Features are fresh — no augmentation branch needed.
+            try:
                 features_df = load_features_for_video(
                     self.video_name, self.config_path,
                 )
-                new_x = [x for x in features_df.columns if x not in self.data_df.columns and x not in self.bp_col_names]
-                if len(new_x) > 0:
-                    if len(features_df) == len(self.data_df):
-                        x_df = self.data_df.drop(self.clf_names, axis=1)
-                        self.data_df = pd.concat([x_df, features_df[new_x], self.data_df[self.clf_names]], axis=1).reset_index(drop=True).sort_index()
-                    else:
-                        DataHeaderWarning(msg=f'Cannot append {len(new_x)} additional feature(s) to your annotated data set. The CSV file at {self.features_extracted_file_path} and {self.targets_inserted_file_path} contain different numbers of rows ({len(features_df)} vs {len(self.data_df)}).')
+            except FileNotFoundError as exc:
+                raise NoFilesFoundError(
+                    msg=(
+                        f'Cannot load features for video '
+                        f'{self.video_name}: {exc}'
+                    ),
+                    source=self.__class__.__name__,
+                )
+            # Align labels to features length (features wins).
+            labels_df = labels_df.reindex(
+                features_df.index, fill_value=0,
+            )
+            self.data_df = pd.concat(
+                [features_df, labels_df[self.clf_names]],
+                axis=1,
+            )
             self.main_window.title(f"SIMBA ANNOTATION INTERFACE (CONTINUING ANNOTATIONS) - {self.video_name}")
             self.img_idx = max(0, read_config_entry(self.config, "Last saved frames", self.video_name, data_type="int", default_value=0))
             if self.video_meta_data['frame_count'] != len(self.data_df):
