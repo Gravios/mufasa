@@ -35,7 +35,6 @@ add_rectangle(name=..., bgr=..., thickness=...)``.
 """
 from __future__ import annotations
 
-import configparser
 import copy
 import os
 from collections import OrderedDict
@@ -119,22 +118,37 @@ class ROILogic:
         _, video_name, _ = get_fn_ext(filepath=video_path)
         self.video_name = video_name
 
-        # Read project_path from the config — same approach every
-        # other Qt form uses. Falls back to the config file's parent
-        # directory if the [General settings]/project_path key is
-        # missing (legacy projects).
-        cfg = configparser.ConfigParser()
-        cfg.read(config_path)
-        cfg_project_path = cfg.get(
-            "General settings", "project_path", fallback="",
-        ).strip()
-        if cfg_project_path and os.path.isdir(cfg_project_path):
-            self.project_path = cfg_project_path
-        else:
+        # Patch 122ai: route through project_paths_from_config so
+        # both v1 (project.toml) and legacy (project_config.ini)
+        # projects resolve cleanly. Prior to 122ai this block read
+        # '[General settings].project_path' directly via
+        # configparser, which silently parses zero sections out of
+        # a TOML file then crashes with MissingSectionHeaderError
+        # when the user clicks any video in the ROI Definitions
+        # panel. Same bug shape that 122ab fixed for frame_labeller
+        # and 122ag fixed for clip_review / roi_define_panel /
+        # VideoInfoForm — this file was outside the 122ah audit
+        # scope (mufasa/ui_qt/) and got missed. 122ai extends the
+        # audit guard to cover mufasa/roi_tools/ and adjacent
+        # backend modules so this family of bug stops surfacing.
+        from mufasa.project_layout import project_paths_from_config
+        try:
+            paths = project_paths_from_config(config_path)
+            self.project_path = paths["project_root"]
+            self.roi_h5_path = paths["roi_definitions_path"]
+            video_info_csv = paths["video_info_path"]
+        except Exception:
+            # Defensive fallback for malformed configs. Same shape
+            # as the VideoInfoForm fallback in 122ag — preserves
+            # the pre-fix behaviour rather than crashing the dialog.
             self.project_path = os.path.dirname(config_path)
-        self.roi_h5_path = os.path.join(
-            self.project_path, "logs", "measures", "ROI_definitions.h5",
-        )
+            self.roi_h5_path = os.path.join(
+                self.project_path, "logs", "measures",
+                "ROI_definitions.h5",
+            )
+            video_info_csv = os.path.join(
+                self.project_path, "logs", "video_info.csv",
+            )
 
         # Video metadata
         self.video_meta = get_video_meta_data(video_path=video_path)
@@ -147,11 +161,12 @@ class ROILogic:
         # if available so saved ROIs include cm² area). Defaults to 1.0
         # if not configured — area_cm columns will be wrong in that
         # case, but the H5 is still readable and ROIs still functional.
+        # Patch 122ai: video_info_csv path now resolved via the layout
+        # helper above (was hardcoded '<project>/logs/video_info.csv',
+        # wrong for v1 where the canonical path is
+        # '<root>/sources/video_info.csv').
         self.px_per_mm = 1.0
         try:
-            video_info_csv = os.path.join(
-                self.project_path, "logs", "video_info.csv",
-            )
             if os.path.isfile(video_info_csv):
                 vi = pd.read_csv(video_info_csv)
                 row = vi[vi["Video"] == self.video_name]
