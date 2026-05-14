@@ -4,8 +4,12 @@ mufasa.ui_qt.forms.project_setup
 
 Inline forms for project-level actions.
 
-* :class:`BatchPreProcessLauncher` — launcher for
-  :class:`BatchProcessFrame`. Replaces :class:`BatchPreProcessPopUp`.
+Patch 122al: :class:`BatchPreProcessLauncher` is now an alias
+for :class:`BatchPreProcessForm` (the Qt port of the legacy Tk
+wizard, ported in 122al). The launcher placeholder is kept as
+an import alias so any external code that referenced
+``BatchPreProcessLauncher`` keeps working; new code should
+import :class:`BatchPreProcessForm` directly.
 
 Patch 122m: removed :class:`ArchiveFilesForm` (and its backing
 ``archive_processed_files`` helper). The legacy "shuffle outputs
@@ -21,33 +25,19 @@ The About dialog isn't a form at all — it becomes a Help-menu action
 """
 from __future__ import annotations
 
-from mufasa.ui_qt.forms.annotation import _LauncherForm
+from mufasa.ui_qt.forms.batch_pre_process import BatchPreProcessForm
 
 
 # --------------------------------------------------------------------------- #
-# BatchPreProcessLauncher — Tk wizard, kept as launcher
+# BatchPreProcessLauncher — alias for back-compat (patch 122al)
 # --------------------------------------------------------------------------- #
-class BatchPreProcessLauncher(_LauncherForm):
-    """Launcher for :class:`BatchProcessFrame`. Wraps a legacy multi-step
-    video pre-processing wizard (crop → downsample → greyscale → etc.
-    across multiple videos), which is implemented as a Tk Frame with
-    custom row widgets. Porting that to Qt is a meaningful amount of
-    work (several QTableWidget columns of per-video toggles + preview);
-    scheduled as a separate item.
-    """
-    title = "Batch pre-process videos"
-    description = ("Multi-step video pre-processing wizard for whole "
-                   "directories (crop → downsample → greyscale → "
-                   "flip/rotate → clip).")
-    launch_button_text = "Open batch pre-process wizard (legacy UI)…"
-    launch_title = "Batch pre-process"
-    launch_message = (
-        "Batch pre-processing is a multi-column wizard (one row per "
-        "video, one column per transform) that hasn't been ported to "
-        "Qt yet. Use <code>mufasa-tk</code> for this step, or drive "
-        "the video-processing forms on the <i>Video Processing</i> "
-        "page one operation at a time."
-    )
+# The Tk launcher pattern (a "Launch…" button opening the legacy
+# wizard in a separate Tk window) is gone. BatchPreProcessForm
+# is a real Qt OperationForm rendered inline on the Preprocessing
+# page, and supports pop-out into a floating dockable window.
+# The alias here preserves the old import name for any external
+# consumer that might still reference it.
+BatchPreProcessLauncher = BatchPreProcessForm
 
 
 # --------------------------------------------------------------------------- #
@@ -69,6 +59,7 @@ def register_project_menu_actions(workbench) -> None:
 
 
 __all__ = [
-    "BatchPreProcessLauncher",
+    "BatchPreProcessForm",
+    "BatchPreProcessLauncher",  # legacy alias
     "register_project_menu_actions",
 ]
