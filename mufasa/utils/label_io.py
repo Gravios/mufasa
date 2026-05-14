@@ -64,7 +64,11 @@ from mufasa.project_layout import (project_metadata_from_config,
                                    project_paths_from_config)
 
 
-__all__ = ["load_labels_for_video", "save_labels_for_video"]
+__all__ = [
+    "list_video_stems_with_labels",
+    "load_labels_for_video",
+    "save_labels_for_video",
+]
 
 
 def _strip_video_ext(video_name: str) -> str:
@@ -316,3 +320,55 @@ def save_labels_for_video(
     # No existing file, or overwrite requested: write straight.
     coerced.to_parquet(out_path, index=False)
     return out_path
+
+
+def list_video_stems_with_labels(config_path: str) -> list[str]:
+    """Return the sorted union of video stems for which labels
+    exist anywhere in the project (v1 derived/labels/ + legacy
+    csv/targets_inserted/ combined).
+
+    Patch 122ae-5e: needed by the classifier-training modules
+    which previously did directory-level discovery via a glob of
+    the legacy csv/targets_inserted/ tree. For v1 projects
+    (labels under derived/labels/<video>.parquet via the
+    122ae-5c sidecar), that glob is empty.
+
+    Sibling of
+    :func:`mufasa.utils.feature_io.list_video_stems_with_features`
+    — same shape, different layout.
+
+    :param config_path: Path to ``project.toml`` (v1) or
+        ``project_config.ini`` (legacy).
+    :returns: Sorted list of video stems. Empty list if the
+        project has no labels anywhere.
+    """
+    try:
+        paths = project_paths_from_config(config_path)
+    except Exception:
+        return []
+    stems: set[str] = set()
+
+    derived_root = paths.get("derived_labels_dir")
+    if derived_root and os.path.isdir(derived_root):
+        for name in os.listdir(derived_root):
+            full = os.path.join(derived_root, name)
+            if not os.path.isfile(full):
+                continue
+            if name.startswith("."):
+                continue
+            if name.endswith(".parquet"):
+                stems.add(Path(name).stem)
+
+    legacy_dir = paths.get("targets_inserted_dir")
+    if legacy_dir and os.path.isdir(legacy_dir):
+        for name in os.listdir(legacy_dir):
+            full = os.path.join(legacy_dir, name)
+            if not os.path.isfile(full):
+                continue
+            if name.startswith("."):
+                continue
+            ext = Path(name).suffix.lower()
+            if ext in (".csv", ".parquet", ".h5", ".hdf5"):
+                stems.add(Path(name).stem)
+
+    return sorted(stems)
