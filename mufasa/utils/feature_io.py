@@ -138,19 +138,36 @@ def _legacy_csv_path(video_name: str, *, config_path: str) -> Optional[str]:
 def _read_legacy(path: str) -> pd.DataFrame:
     """Read a legacy wide features file (CSV / parquet / H5).
 
-    Mirrors :func:`mufasa.utils.read_write.read_df` for the formats
-    actually used by the legacy ``features_extracted`` tree but
-    sidesteps that helper's quirk of stripping the first CSV column
-    regardless of ``has_index``. The frame index in legacy CSVs is
-    represented as an unnamed first column; reading it as data and
-    discarding it via ``df.iloc[:, 1:]`` would lose information for
-    feature files where the first column IS a feature, so we read
-    the file straight and let the caller treat the index column the
-    same way the legacy reader did.
+    Patch 122ae-5: aligned with :func:`mufasa.utils.read_write.read_df`'s
+    default behaviour of stripping the leading pad column that
+    SimBA's ``write_df(has_index=True)`` writes. The pad column
+    is a positional index serialised as the first CSV column;
+    SimBA's own readers drop it on load (see read_write.py
+    line 146 in the post-122ae-1 tree: ``df = df.iloc[:, 1:]``).
+    Without this strip, swapping a ``read_df(...)`` call site to
+    ``load_features_for_video(...)`` would leave consumers with
+    an extra unnamed first column that breaks their column-name
+    assumptions.
+
+    The strip is CSV-only — parquet files written by 122ae-3
+    and 122ae-4 don't have a pad column (they're written with
+    ``index=False``), and H5 files come through pd.read_hdf
+    with their original index handling intact.
+
+    Mirrors read_df's default ``has_index=True`` semantic.
+    Callers that legitimately wrote a CSV without a pad column
+    would now get their first column silently dropped — but no
+    known caller does that for the features_extracted tree
+    specifically (it's exclusively written via write_df), so
+    this is safe.
     """
     ext = Path(path).suffix.lower()
     if ext == ".csv":
-        return pd.read_csv(path)
+        df = pd.read_csv(path)
+        # Strip the leading pad column. Matches read_df default.
+        if df.shape[1] > 0:
+            df = df.iloc[:, 1:]
+        return df
     if ext == ".parquet":
         return pd.read_parquet(path)
     if ext in (".h5", ".hdf5"):

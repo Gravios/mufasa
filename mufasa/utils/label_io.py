@@ -76,10 +76,17 @@ def _strip_video_ext(video_name: str) -> str:
 
 def _read_legacy(path: str) -> pd.DataFrame:
     """Read a legacy wide targets file. Same extension dispatch as
-    feature_io._read_legacy."""
+    feature_io._read_legacy, and same leading-pad-column strip
+    for CSVs to match :func:`mufasa.utils.read_write.read_df`'s
+    default behaviour (see 122ae-5 note in feature_io._read_legacy
+    for the rationale).
+    """
     ext = Path(path).suffix.lower()
     if ext == ".csv":
-        return pd.read_csv(path)
+        df = pd.read_csv(path)
+        if df.shape[1] > 0:
+            df = df.iloc[:, 1:]
+        return df
     if ext == ".parquet":
         return pd.read_parquet(path)
     if ext in (".h5", ".hdf5"):
