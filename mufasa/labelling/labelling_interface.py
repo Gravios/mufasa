@@ -38,6 +38,12 @@ from mufasa.utils.printing import log_event, stdout_success
 from mufasa.utils.read_write import (get_fn_ext, get_video_meta_data,
                                     read_config_entry, read_config_file,
                                     read_df, read_frm_of_video, write_df)
+# Patch 122ae-5: layout-aware feature reader. Replaces three
+# read_df(self.features_extracted_file_path, ...) call sites
+# below so v1 projects (which write features to derived/features/
+# parquets) and legacy projects (csv/features_extracted/) both
+# work through the same code path.
+from mufasa.utils.feature_io import load_features_for_video
 
 PLAY_VIDEO_SCRIPT_PATH = os.path.join(os.path.dirname(mufasa.__file__), "labelling/play_annotation_video.py")
 PADDING = 5
@@ -105,7 +111,12 @@ class LabellingInterface(ConfigReader):
             if not os.path.isfile(self.targets_inserted_file_path):
                 raise NoFilesFoundError(msg=f'When continuing annotations, SimBA expects a file at {self.targets_inserted_file_path}. SimBA could not find this file.', source=self.__class__.__name__)
             self.data_df = read_df(self.targets_inserted_file_path, self.file_type)
-            self.data_df_features = read_df(self.features_extracted_file_path, self.file_type)
+            # Patch 122ae-5: route through load_features_for_video
+            # so v1 (derived/features/) and legacy
+            # (csv/features_extracted/) projects both resolve.
+            self.data_df_features = load_features_for_video(
+                self.video_name, self.config_path,
+            )
             missing_idx = self.data_df_features.index.difference(self.data_df.index)
             if len(missing_idx) > 0:
                 self.data_df_features = self.data_df_features.iloc[self.data_df_features.index.difference(self.data_df.index)]
@@ -114,9 +125,29 @@ class LabellingInterface(ConfigReader):
             self.img_idx = read_config_entry(self.config, "Last saved frames", self.video_name, data_type="int", default_value=0)
         else:
             if setting == "from_scratch":
-                if not os.path.isfile(self.features_extracted_file_path):
-                    raise NoFilesFoundError(msg=f'When annotating data, SimBA expects a file at {self.features_extracted_file_path}. SimBA could not find this file. Extract features for video {self.video_name} before annotating data.', source=self.__class__.__name__)
-                self.data_df = read_df(self.features_extracted_file_path, self.file_type)
+                # Patch 122ae-5: try load_features_for_video first
+                # (handles v1 derived/features/, wide-parquet, and
+                # legacy CSV fallback). Convert FileNotFoundError
+                # to the labeller's NoFilesFoundError shape so the
+                # user-facing message stays familiar.
+                try:
+                    self.data_df = load_features_for_video(
+                        self.video_name, self.config_path,
+                    )
+                except FileNotFoundError:
+                    raise NoFilesFoundError(
+                        msg=(
+                            f'When annotating data, SimBA expects '
+                            f'features for video {self.video_name} '
+                            f'(checked v1 derived/features/, '
+                            f'wide-parquet, and legacy '
+                            f'csv/features_extracted/). None found. '
+                            f'Extract features for video '
+                            f'{self.video_name} before annotating '
+                            f'data.'
+                        ),
+                        source=self.__class__.__name__,
+                    )
                 self.main_window.title("SIMBA ANNOTATION INTERFACE (ANNOTATING FROM SCRATCH) - {}".format(self.video_name))
                 for target in self.clf_names:
                     self.data_df[target] = 0
@@ -331,7 +362,13 @@ class LabellingInterface(ConfigReader):
         self.data_df_targets[clf_name].loc[frame_idx] = int(self.clf_cbs[clf_name].get())
 
     def __save_results(self):
-        self.features_df = read_df(self.features_extracted_file_path, self.file_type)
+        # Patch 122ae-5: layout-aware feature read for the save
+        # path (writes features+labels combined to legacy
+        # targets_inserted; the per-video labels parquet write
+        # via save_labels_for_video lands in 122ae-5-followup).
+        self.features_df = load_features_for_video(
+            self.video_name, self.config_path,
+        )
         self.save_df = pd.concat([self.features_df, self.data_df_targets], axis=1)
         try:
             write_df(self.save_df, self.file_type, self.targets_inserted_file_path)

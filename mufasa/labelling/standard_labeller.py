@@ -39,6 +39,9 @@ from mufasa.utils.read_write import (find_closest_readable_frame,
                                     get_video_meta_data, read_config_entry,
                                     read_df, read_frm_of_video, write_df)
 from mufasa.utils.warnings import DataHeaderWarning, FrameRangeWarning
+# Patch 122ae-5: layout-aware feature reader for the 2
+# read_df(self.features_extracted_file_path, ...) sites below.
+from mufasa.utils.feature_io import load_features_for_video
 
 PLAY_VIDEO_SCRIPT_PATH = os.path.join(os.path.dirname(mufasa.__file__), "labelling/play_annotation_video.py")
 PADDING = 5
@@ -114,7 +117,17 @@ class LabellingInterface(ConfigReader):
                     DataHeaderWarning(msg=f'No column named {clf} in file {self.targets_inserted_file_path} - setting all annotations to absent for behavior {clf}.', source=self.__class__.__name__)
                     self.data_df[clf] = 0
             if os.path.isfile(self.features_extracted_file_path):
-                features_df = read_df(self.features_extracted_file_path, self.file_type)
+                # Patch 122ae-5: features may now also live in
+                # derived/features/ (v1 layout); load_features_for_video
+                # handles both. Keep the os.path.isfile guard on
+                # the legacy path so the optional-augmentation
+                # behaviour is preserved — the augment only fires
+                # when the legacy CSV is present (signalling that
+                # the user has rerun the bulk extractor since the
+                # last annotation save).
+                features_df = load_features_for_video(
+                    self.video_name, self.config_path,
+                )
                 new_x = [x for x in features_df.columns if x not in self.data_df.columns and x not in self.bp_col_names]
                 if len(new_x) > 0:
                     if len(features_df) == len(self.data_df):
@@ -134,9 +147,27 @@ class LabellingInterface(ConfigReader):
 
 
         else:
-            if not os.path.isfile(self.features_extracted_file_path):
-                raise NoFilesFoundError(msg=f'When annotating data from scratch, SimBA expects a data file representing video {self.video_name} at {self.features_extracted_file_path}. SimBA could not find this file. Extract features for video {self.video_name} before annotating data.', source=self.__class__.__name__)
-            self.data_df = read_df(self.features_extracted_file_path, self.file_type)
+            # Patch 122ae-5: existence check + read collapsed
+            # into a single load_features_for_video call (which
+            # probes per-family / wide-parquet / legacy paths
+            # and raises FileNotFoundError with all three names
+            # if nothing is found).
+            try:
+                self.data_df = load_features_for_video(
+                    self.video_name, self.config_path,
+                )
+            except FileNotFoundError as exc:
+                raise NoFilesFoundError(
+                    msg=(
+                        f'When annotating data from scratch, '
+                        f'SimBA expects features for video '
+                        f'{self.video_name} (checked v1 '
+                        f'derived/features/, wide-parquet, and '
+                        f'legacy csv/features_extracted/). '
+                        f'{exc}'
+                    ),
+                    source=self.__class__.__name__,
+                )
             self.main_window.title(f"SIMBA ANNOTATION INTERFACE (ANNOTATING FROM SCRATCH) - {self.video_name}")
             for clf in self.clf_names: self.data_df[clf] = 0
 

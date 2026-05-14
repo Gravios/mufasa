@@ -28,6 +28,11 @@ from mufasa.utils.printing import log_event, stdout_success
 from mufasa.utils.read_write import (get_all_clf_names, get_fn_ext,
                                     get_video_meta_data, read_config_entry,
                                     read_df)
+# Patch 122ae-5: layout-aware feature reader. Replaces three
+# read_df(self.features_extracted_file_path, ...) call sites
+# below so v1 (derived/features/) and legacy
+# (csv/features_extracted/) projects both resolve.
+from mufasa.utils.feature_io import load_features_for_video
 
 
 class AdvancedLabellingInterface(ConfigReader):
@@ -77,13 +82,28 @@ class AdvancedLabellingInterface(ConfigReader):
         self.main_window = Toplevel()
         if continuing:
             check_file_exist_and_readable(file_path=self.targets_inserted_file_path)
-            check_file_exist_and_readable(file_path=self.features_extracted_file_path)
+            # Patch 122ae-5: pre-check via existence-on-disk
+            # removed — load_features_for_video raises
+            # FileNotFoundError with a clearer message naming all
+            # probed paths if nothing's found. Catch and wrap in
+            # the existing labeller error type below.
             if self.file_type == Formats.CSV.value:
                 self.data_df = (pd.read_csv(self.targets_inserted_file_path).set_index("Unnamed: 0")[self.target_lst].astype(int))
                 self.data_df.index.name = None
             if self.file_type == Formats.PARQUET.value:
                 self.data_df = pd.read_parquet(self.targets_inserted_file_path)[self.target_lst]
-            self.data_df_features = read_df(self.features_extracted_file_path, self.file_type)
+            try:
+                self.data_df_features = load_features_for_video(
+                    self.video_name, self.config_path,
+                )
+            except FileNotFoundError as exc:
+                raise NoFilesFoundError(
+                    msg=(
+                        f'Cannot load features for video '
+                        f'{self.video_name}: {exc}'
+                    ),
+                    source=self.__class__.__name__,
+                )
             self.data_df = self.data_df_features.join(self.data_df)
             self.main_window.title("SIMBA ANNOTATION INTERFACE (CONTINUING ANNOTATIONS)")
             try:
@@ -91,8 +111,20 @@ class AdvancedLabellingInterface(ConfigReader):
             except ValueError:
                 pass
         else:
-            check_file_exist_and_readable(file_path=self.features_extracted_file_path)
-            self.data_df = read_df(self.features_extracted_file_path, self.file_type)
+            # Patch 122ae-5: same layout-aware swap as the
+            # continuing branch above.
+            try:
+                self.data_df = load_features_for_video(
+                    self.video_name, self.config_path,
+                )
+            except FileNotFoundError as exc:
+                raise NoFilesFoundError(
+                    msg=(
+                        f'Cannot load features for video '
+                        f'{self.video_name}: {exc}'
+                    ),
+                    source=self.__class__.__name__,
+                )
             for target in self.target_lst:
                 self.data_df[target] = None
         self.main_window.title("SIMBA ANNOTATION INTERFACE (ADVANCED ANNOTATION) - VIDEO {}".format(self.video_name))
@@ -455,7 +487,10 @@ class AdvancedLabellingInterface(ConfigReader):
             )
 
     def save_results(self):
-        self.save_df = read_df(self.features_extracted_file_path, self.file_type)
+        # Patch 122ae-5: layout-aware feature read.
+        self.save_df = load_features_for_video(
+            self.video_name, self.config_path,
+        )
         self.save_df = pd.concat([self.save_df, self.data_df_targets], axis=1)
         self.save_df = self.save_df.dropna(subset=self.target_lst)
         try:
