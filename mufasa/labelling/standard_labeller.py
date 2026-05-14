@@ -42,6 +42,9 @@ from mufasa.utils.warnings import DataHeaderWarning, FrameRangeWarning
 # Patch 122ae-5: layout-aware feature reader for the 2
 # read_df(self.features_extracted_file_path, ...) sites below.
 from mufasa.utils.feature_io import load_features_for_video
+# Patch 122ae-5c: sidecar label writer. See labelling_interface
+# for the dual-write rationale.
+from mufasa.utils.label_io import save_labels_for_video
 
 PLAY_VIDEO_SCRIPT_PATH = os.path.join(os.path.dirname(mufasa.__file__), "labelling/play_annotation_video.py")
 PADDING = 5
@@ -412,6 +415,23 @@ class LabellingInterface(ConfigReader):
             write_df(self.save_df, self.file_type, self.targets_inserted_file_path)
         except Exception as e:
             raise SimbaError(msg=f"Annotation file for video {self.video_name} could not be saved at {self.targets_inserted_file_path}. {e}", source=self.__class__.__name__)
+        # Patch 122ae-5c: sidecar v1-native labels write. Dual-
+        # write transition, see labelling_interface for rationale.
+        # data_df_targets is the projection of data_df to
+        # classifier-target columns (set at construction line ~181);
+        # exactly the right shape for save_labels_for_video.
+        try:
+            save_labels_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                labels=self.data_df_targets,
+            )
+        except Exception as exc:
+            print(
+                f"[122ae-5c] Sidecar labels write to "
+                f"derived/labels/ failed for {self.video_name}: "
+                f"{exc}. Legacy targets_inserted save succeeded."
+            )
         stdout_success(msg=f"SAVED: Annotation file for video {self.video_name} saved within the {self.targets_folder} directory at file path: {self.targets_inserted_file_path}.", source=self.__class__.__name__)
         if not self.config.has_section("Last saved frames"):
             self.config.add_section("Last saved frames")

@@ -33,6 +33,9 @@ from mufasa.utils.read_write import (get_all_clf_names, get_fn_ext,
 # below so v1 (derived/features/) and legacy
 # (csv/features_extracted/) projects both resolve.
 from mufasa.utils.feature_io import load_features_for_video
+# Patch 122ae-5c: sidecar label writer. See labelling_interface
+# for rationale; same dual-write transition shape applies here.
+from mufasa.utils.label_io import save_labels_for_video
 
 
 class AdvancedLabellingInterface(ConfigReader):
@@ -501,6 +504,24 @@ class AdvancedLabellingInterface(ConfigReader):
         except Exception as e:
             print(e, "SIMBA ERROR: File for video {} could not be saved.")
             raise FileExistsError
+        # Patch 122ae-5c: sidecar v1-native labels write. Same
+        # rationale as labelling_interface: dual-write transition,
+        # legacy file is the primary contract, sidecar failure
+        # doesn't abort. self.data_df_targets has classifier-target
+        # columns (set in build) — exactly the shape
+        # save_labels_for_video expects.
+        try:
+            save_labels_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                labels=self.data_df_targets,
+            )
+        except Exception as exc:
+            print(
+                f"[122ae-5c] Sidecar labels write to "
+                f"derived/labels/ failed for {self.video_name}: "
+                f"{exc}. Legacy targets_inserted save succeeded."
+            )
         stdout_success(
             msg=f"SAVED: Annotation file for video {self.video_name} saved within the project_folder/csv/targets_inserted directory.",
             source=self.__class__.__name__,

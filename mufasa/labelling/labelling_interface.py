@@ -44,6 +44,13 @@ from mufasa.utils.read_write import (get_fn_ext, get_video_meta_data,
 # parquets) and legacy projects (csv/features_extracted/) both
 # work through the same code path.
 from mufasa.utils.feature_io import load_features_for_video
+# Patch 122ae-5c: sidecar label writer. The legacy
+# write_df(...targets_inserted...) at __save_results stays in
+# place for back-compat with classifier training (which still
+# reads the legacy file); this helper also writes labels-only
+# to derived/labels/<video>.parquet so v1 consumers reading
+# via load_labels_for_video find them.
+from mufasa.utils.label_io import save_labels_for_video
 
 PLAY_VIDEO_SCRIPT_PATH = os.path.join(os.path.dirname(mufasa.__file__), "labelling/play_annotation_video.py")
 PADDING = 5
@@ -375,6 +382,26 @@ class LabellingInterface(ConfigReader):
         except Exception as e:
             print(e, f"SIMBA ERROR: File for video {get_fn_ext(self.features_extracted_file_path)[1]} could not be saved.")
             raise FileExistsError
+        # Patch 122ae-5c: sidecar v1-native labels write. The
+        # legacy combined features+labels file above stays as-is
+        # for back-compat with classifier training (which still
+        # reads from csv/targets_inserted/). Failures here don't
+        # abort the save — the labeller's primary contract is the
+        # legacy file, and the sidecar is the new layout's view of
+        # the same data. We log and continue so a sidecar failure
+        # doesn't make the user lose their annotation work.
+        try:
+            save_labels_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                labels=self.data_df_targets,
+            )
+        except Exception as exc:
+            print(
+                f"[122ae-5c] Sidecar labels write to "
+                f"derived/labels/ failed for {self.video_name}: "
+                f"{exc}. Legacy targets_inserted save succeeded."
+            )
         stdout_success(msg=f"SAVED: Annotation file for video {self.video_name} saved within the {self.targets_folder} directory.", source=self.__class__.__name__)
         if not self.config.has_section("Last saved frames"):
             self.config.add_section("Last saved frames")
