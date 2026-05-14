@@ -46,18 +46,26 @@ def main() -> int:
     init_src = ast.unparse(init)
 
     # ------------------------------------------------------------------ #
-    # Case 1: __init__ contains the strict validation block
+    # Case 1: __init__ contains the strict validation block.
+    # Patch 122an (B1) collapsed the 4-destination guard to a
+    # 2-destination guard (save_dir or derived_features_dir).
+    # The append_to_features_extracted / append_to_targets_inserted
+    # clauses are gone with the kwargs themselves.
     # ------------------------------------------------------------------ #
-    # The block should test for: save_dir is None AND not append_to_features
-    # AND not append_to_targets, then raise.
     assert "self.save_dir is None" in init_src
-    assert "not self.append_to_features_extracted" in init_src
-    assert "not self.append_to_targets_inserted" in init_src
+    assert "self.derived_features_dir is None" in init_src
+    assert "append_to_features_extracted" not in init_src or (
+        # Comment-only references about the removal are fine
+        all(
+            "append_to_features_extracted" not in line
+            or line.lstrip().startswith("#")
+            for line in init_src.splitlines()
+        )
+    )
 
     # ------------------------------------------------------------------ #
-    # Case 2: the raise is an InvalidInputError (not generic Exception
-    # or RuntimeError — InvalidInputError carries source info and is
-    # the project's convention for parameter-validation errors)
+    # Case 2: the raise is an InvalidInputError that names the two
+    # surviving destinations (save_dir and derived_features_dir).
     # ------------------------------------------------------------------ #
     raise_nodes = [
         n for n in ast.walk(init) if isinstance(n, ast.Raise)
@@ -73,19 +81,17 @@ def main() -> int:
                 else getattr(func, "attr", None)
             )
             if name == "InvalidInputError":
-                # Check the message mentions all three options
-                # so users know what to do
                 src_text = ast.unparse(raise_node)
                 if (
                     "save_dir" in src_text
-                    and "append_to_features_extracted" in src_text
-                    and "append_to_targets_inserted" in src_text
+                    and "derived_features_dir" in src_text
                     and "discarded" in src_text.lower()
                 ):
                     found_invalid_input = True
     assert found_invalid_input, (
-        "__init__ must raise InvalidInputError mentioning all three "
-        "save destinations and the word 'discarded' in the message"
+        "__init__ must raise InvalidInputError mentioning both v1 "
+        "destinations (save_dir, derived_features_dir) and the word "
+        "'discarded' in the message"
     )
 
     # ------------------------------------------------------------------ #

@@ -146,8 +146,6 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
     :param bool file_checks: If true, checks that the files which the data is appended too contains the anticipated number of rows and no duplicate columns after appending. Default False.
     :param Optional[Union[str, os.PathLike]] save_dir: Directory where to save the data. If None, then the data is only appended.
     :param Optional[Union[str, os.PathLike]] data_dir: Directory of pose-estimation data to compute feature subsets for. If None, then the `/project_folder/csv/outlier_corrected_movement_locations` directory.
-    :param bool append_to_features_extracted: If True, appends the data to the file sin the `features_extracted` directory. Default: False.
-    :param bool append_to_targets_inserted: If True, appends the data to the file sin the `targets_inserted` directory. Default: False.
 
     .. note::
        `Tutorial <https://github.com/sgoldenlab/mufasa/blob/master/docs/feature_subsets.md>_`
@@ -159,9 +157,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
     :example:
     >>> test = FeatureSubsetsCalculator(config_path=r"C:/troubleshooting/mitra/project_folder/project_config.ini",
     >>>                               feature_families=[FRAME_BP_MOVEMENT, WITHIN_ANIMAL_THREE_POINT_ANGLES],
-    >>>                               append_to_features_extracted=False,
     >>>                               file_checks=False,
-    >>>                               append_to_targets_inserted=False,
     >>>                               save_dir=r"C:/troubleshooting/mitra/project_folder/csv/new_features")
     >>> test.run()
     """
@@ -172,8 +168,6 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                  file_checks: bool = False,
                  save_dir: Optional[Union[str, os.PathLike]] = None,
                  data_dir: Optional[Union[str, os.PathLike]] = None,
-                 append_to_features_extracted: bool = False,
-                 append_to_targets_inserted: bool = False,
                  derived_features_dir: Optional[
                      Union[str, os.PathLike]
                  ] = None,
@@ -185,8 +179,13 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         ConfigReader.__init__(self, config_path=config_path)
         TrainModelMixin.__init__(self)
         check_valid_boolean(value=file_checks, source=f'{self.__class__.__name__} file_checks', raise_error=True)
-        check_valid_boolean(value=append_to_features_extracted, source=f'{self.__class__.__name__} append_to_features_extracted', raise_error=True)
-        check_valid_boolean(value=append_to_targets_inserted, source=f'{self.__class__.__name__} append_to_targets_inserted', raise_error=True)
+        # Patch 122an (B1): append_to_features_extracted +
+        # append_to_targets_inserted kwargs removed. The pre-flight
+        # checks they gated never produced an actual append write —
+        # the writer was retargeted to per-family parquet in
+        # 122ae-3 and these flags became inert. UI form fields in
+        # features.py + subset_feature_extractor_pop_up.py are
+        # dropped in the same patch.
         check_valid_boolean(value=raise_on_error, source=f'{self.__class__.__name__} raise_on_error', raise_error=True)
         check_valid_boolean(value=overwrite_existing, source=f'{self.__class__.__name__} overwrite_existing', raise_error=True)
         if not isinstance(n_workers, int) or n_workers < 1:
@@ -204,27 +203,22 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             derived_features_dir = str(derived_features_dir)
         check_valid_lst(data=feature_families, source=f'{self.__class__.__name__} feature_families', valid_dtypes=(str,), valid_values=FEATURE_FAMILIES, min_len=1, raise_error=True)
         self.file_checks, self.feature_families, self.save_dir = file_checks, feature_families, save_dir
-        self.append_to_features_extracted = append_to_features_extracted
-        self.append_to_targets_inserted = append_to_targets_inserted
         self.derived_features_dir = derived_features_dir
         self.n_workers = n_workers
         self.raise_on_error = raise_on_error
         self.overwrite_existing = overwrite_existing
         # Refuse to start without an explicit save destination. Pre-fix
-        # behavior: if save_dir was None and neither append flag was
-        # set, run() would compute features into temp_dir and then
-        # delete temp_dir at the end — silently discarding hours of
-        # compute. The Qt form's placeholder text "blank = project log
-        # dir" was misleading: blank meant `None` meant discard.
-        # This check fails fast before any work happens.
+        # behavior: if save_dir was None, run() would compute features
+        # into temp_dir and then delete temp_dir at the end —
+        # silently discarding hours of compute. The Qt form's
+        # placeholder text "blank = project log dir" was misleading:
+        # blank meant `None` meant discard. This check fails fast
+        # before any work happens.
         #
-        # Patch 122ae-3: derived_features_dir also counts as a
-        # destination. With it set, process_one_video writes per-
-        # family parquet under <derived_features_dir>/<slug>/, the
-        # new v1-native shape.
+        # Patch 122an (B1): the dead append_to_features_extracted /
+        # append_to_targets_inserted clauses are gone from this guard
+        # along with the kwargs themselves.
         if (self.save_dir is None
-                and not self.append_to_features_extracted
-                and not self.append_to_targets_inserted
                 and self.derived_features_dir is None):
             raise InvalidInputError(
                 msg=(
@@ -234,11 +228,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                     "  - derived_features_dir=<path>  (recommended, "
                     "writes per-family parquet to <path>/<family>/)\n"
                     "  - save_dir=<path>  (writes per-video wide "
-                    "files to <path>)\n"
-                    "  - append_to_features_extracted=True  (appends "
-                    f"into {self.features_dir})\n"
-                    "  - append_to_targets_inserted=True  (appends "
-                    f"into {self.targets_folder})"
+                    "files to <path>)"
                 ),
                 source=self.__class__.__name__,
             )
@@ -249,12 +239,8 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             self.data_dir = data_dir
             check_if_dir_exists(in_dir=data_dir)
             self.data_paths  = find_files_of_filetypes_in_directory(directory=data_dir, extensions=['csv'], raise_error=True)
-        if self.append_to_features_extracted:
-            if not check_same_files_exist_in_all_directories(dirs=[self.data_dir, self.features_dir], file_type=self.file_type, raise_error=False):
-                raise NoFilesFoundError(msg=f'Cannot append feature subset to files in {self.features_dir} directory: To proceed, the files in the {self.features_dir} and the {self.data_dir} directories has to contain the same number of files with the same filenames.', source=self.__class__.__name__)
-        if self.append_to_targets_inserted:
-            if not check_same_files_exist_in_all_directories(dirs=[self.data_dir, self.targets_folder], file_type=self.file_type, raise_error=False):
-                raise NoFilesFoundError(msg=f'Cannot append feature subset to files in {self.targets_folder} directory: To proceed, the files in the {self.targets_folder} and the {self.data_dir} directories has to contain the same number of files with the same filenames.', source=self.__class__.__name__)
+        # Patch 122an (B1): legacy append-checks against
+        # self.features_dir / self.targets_folder removed.
         self.video_names = [get_fn_ext(filepath=x)[1] for x in self.data_paths]
         for file_path in self.data_paths: check_file_exist_and_readable(file_path=file_path)
         # Heavy setup (temp_dir creation, ROI loading, video
@@ -289,10 +275,10 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         destinations = []
         if self.save_dir is not None:
             destinations.append(f"save_dir → {self.save_dir}")
-        if self.append_to_features_extracted:
-            destinations.append(f"append into {self.features_dir}")
-        if self.append_to_targets_inserted:
-            destinations.append(f"append into {self.targets_folder}")
+        if self.derived_features_dir is not None:
+            destinations.append(
+                f"per-family parquet → {self.derived_features_dir}/<family>/"
+            )
         print(
             f"Feature subsets will be written to:\n  - "
             + "\n  - ".join(destinations)
@@ -532,27 +518,21 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         ``destination/filename → [reason_strings]``
         for every collision. An empty dict means no conflicts.
 
-        Two collision types are detected:
+        Detects ``save_dir`` filename collisions: when ``save_dir``
+        is set and files with the same names as the videos in
+        this run already exist in that directory. Pre-fix
+        behavior: ``copy_files_in_directory`` (via
+        ``shutil.copy``) silently overwrote these. Reason
+        string is ``"file exists"``.
 
-        1. **Append-mode column collisions**: when
-           ``append_to_features_extracted`` or
-           ``append_to_targets_inserted`` is set, and an existing
-           file in the target directory already has columns this
-           run would produce. Reason strings are the offending
-           column names.
-
-        2. **save_dir filename collisions**: when ``save_dir`` is
-           set and files with the same names as the videos in
-           this run already exist in that directory. Pre-fix
-           behavior: ``copy_files_in_directory`` (via
-           ``shutil.copy``) silently overwrote these. Reason
-           string is ``"file exists"``.
-
-        The append-mode check probes column names by running the
-        full kernel pipeline on the FIRST video in a scratch
-        directory (sub-second to a few seconds; dwarfed by the
-        multi-hour full run). The save_dir check is just a stat
-        of the target directory.
+        Patch 122an (B1): the append-mode column-collision probe
+        is gone. It scanned ``features_extracted/`` and
+        ``targets_inserted/`` for column overlaps, but the
+        ``append_to_*`` kwargs that triggered it were removed
+        from the constructor — v1 writes go to per-family
+        parquet under ``derived_features_dir`` where collisions
+        are structurally impossible (each family lives in its
+        own subdir).
 
         Returns dict instead of raising so the caller can prompt
         the user before deciding whether to set
@@ -569,8 +549,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         print(
             f"[preflight] starting check: "
             f"save_dir={'set' if self.save_dir else 'unset'}, "
-            f"append_features={self.append_to_features_extracted}, "
-            f"append_targets={self.append_to_targets_inserted}"
+            f"derived_features_dir={'set' if self.derived_features_dir else 'unset'}"
         )
 
         # ------------------------------------------------------------ #
@@ -600,111 +579,14 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                 f"{self.save_dir}"
             )
 
-        # ------------------------------------------------------------ #
-        # Pre-check 2: append-mode column collisions (only when at
-        # least one append flag is set)
-        # ------------------------------------------------------------ #
-        if not self.append_to_features_extracted and not self.append_to_targets_inserted:
-            return conflicts
-
-        # Run setup if it hasn't been run yet. Idempotent.
-        if not hasattr(self, 'temp_dir') or not os.path.isdir(getattr(self, 'temp_dir', '')):
-            self._setup_run()
-
-        # Run the orchestration on the first video, but redirect its
-        # output to a separate scratch directory so we don't pollute
-        # self.temp_dir (which the real run will populate).
-        from mufasa.feature_extractors.feature_subset_orchestration import (
-            process_one_video,
-        )
-        scratch_dir = os.path.join(
-            self.data_dir, f"preflight_scratch_{self.datetime}",
-        )
-        os.makedirs(scratch_dir, exist_ok=True)
-        try:
-            config = self._build_video_processing_config()
-            from dataclasses import replace
-            scratch_config = replace(config, temp_dir=scratch_dir)
-            process_one_video(
-                file_path=self.data_paths[0],
-                config=scratch_config,
-                file_idx=0,
-                n_total_files=1,
-                print_progress=False,
-            )
-            scratch_files = find_files_of_filetypes_in_directory(
-                directory=scratch_dir,
-                extensions=[f'.{self.file_type}'],
-                as_dict=True,
-                raise_warning=False,
-            )
-            if not scratch_files:
-                # Probe didn't write a file. Most likely cause:
-                # process_one_video raised an exception (which the
-                # caller's try/except will surface) OR the kernel
-                # chain did nothing. Either way, we can't compare
-                # column names — log it and skip the column check.
-                # The save_dir check above (if any) still applies.
-                print(
-                    f"[preflight] WARNING: probe of "
-                    f"{self.data_paths[0]} produced no output file "
-                    f"in {scratch_dir}. Column-collision check "
-                    f"SKIPPED for this run. Existing append-target "
-                    f"files will not be checked for column conflicts."
-                )
-                return conflicts
-            probe_path = next(iter(scratch_files.values()))
-            probe_df = read_df(file_path=probe_path, file_type=self.file_type)
-            new_columns = set(probe_df.columns)
-            print(
-                f"[preflight] probe produced {len(new_columns)} "
-                f"column(s) from "
-                f"{os.path.basename(self.data_paths[0])}"
-            )
-        finally:
-            try:
-                remove_a_folder(folder_dir=scratch_dir, ignore_errors=True)
-            except Exception:
-                pass
-
-        # Determine which directories to check based on append flags.
-        targets: list[tuple[str, str]] = []  # (label, dir_path)
-        if self.append_to_features_extracted:
-            targets.append(('features_extracted', self.features_dir))
-        if self.append_to_targets_inserted:
-            targets.append(('targets_inserted', self.targets_folder))
-
-        # For each target file, read just the columns and intersect.
-        # NOTE: we ADD to `conflicts` here rather than rebuilding it,
-        # because save_dir collisions may already have been recorded
-        # at the top of this method.
-        # Uses _read_columns_only (header-only read) instead of
-        # read_df: ~3 orders of magnitude faster for CSV. For 67
-        # multi-MB CSVs this drops preflight from minutes to seconds.
-        for label, dir_path in targets:
-            files_checked = 0
-            files_missing = 0
-            for video_name in self.video_names:
-                file_path = os.path.join(
-                    dir_path, f'{video_name}.{self.file_type}',
-                )
-                if not os.path.isfile(file_path):
-                    files_missing += 1
-                    continue
-                files_checked += 1
-                existing_cols = _read_columns_only(
-                    file_path=file_path, file_type=self.file_type,
-                )
-                overlap = sorted(new_columns & existing_cols)
-                if overlap:
-                    conflicts[f'{label}/{video_name}'] = overlap
-            print(
-                f"[preflight] {label}: checked {files_checked} "
-                f"file(s) in {dir_path}, found "
-                f"{sum(1 for k in conflicts if k.startswith(label + '/'))} "
-                f"with column conflicts; "
-                f"{files_missing} video(s) had no corresponding file"
-            )
+        # Patch 122an (B1): the append-mode column-collision probe
+        # (which scanned features_extracted/ and targets_inserted/
+        # for column overlaps) is gone. It depended on the
+        # append_to_* kwargs which are no longer accepted; v1
+        # writes go to derived/features/<family>/<video>.parquet
+        # under the user-supplied derived_features_dir, where the
+        # per-family layout makes collisions structurally
+        # impossible (each family lives in its own subdir).
 
         return conflicts
 
@@ -915,26 +797,15 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         output_persisted = False
         save_errors: list[str] = []
 
-        if self.append_to_features_extracted:
-            print(f'Appending new feature to files in {self.features_dir}...')
-            try:
-                self.__append_to_data_in_dir(dir=self.features_dir)
-                output_persisted = True
-            except Exception as exc:
-                save_errors.append(
-                    f"append_to_features_extracted failed: "
-                    f"{type(exc).__name__}: {exc}"
-                )
-        if self.append_to_targets_inserted:
-            print(f'Appending new feature to files in {self.targets_folder}...')
-            try:
-                self.__append_to_targets_inserted(dir=self.targets_folder)
-                output_persisted = True
-            except Exception as exc:
-                save_errors.append(
-                    f"append_to_targets_inserted failed: "
-                    f"{type(exc).__name__}: {exc}"
-                )
+        # Patch 122an (B1): the two legacy append branches
+        # (self.append_to_features_extracted → __append_to_data_in_dir
+        # against features_dir, and self.append_to_targets_inserted
+        # → __append_to_targets_inserted against targets_folder)
+        # are gone. The kwargs no longer exist and the underlying
+        # private append methods are unused — they're left in
+        # place as private utilities in case future code needs
+        # them, but no public code path calls them anymore.
+
         if self.save_dir is not None:
             print(f"Storing new features in {self.save_dir}...")
             try:

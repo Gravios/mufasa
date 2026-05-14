@@ -216,61 +216,29 @@ class FeatureSubsetExtractorForm(OperationForm):
         )
         form.addRow("", self.save_dir)
 
-        # Mode 2 (legacy): append to features_extracted — merge
-        # new columns into project's per-video wide feature files
-        # under the legacy 'csv/features_extracted/' subtree.
-        # Patch 122ae-3 removed the 'deferred run-id allocation'
-        # caveat from this label: the v1 layout decision lands as
-        # per-family files via the new default mode above, so
-        # there's no run-id question to defer. The append mode
-        # stays for users who want the legacy wide-file shape.
-        self.dest_append_features = QRadioButton(
-            "Append new columns to legacy per-video feature files "
-            "(<code>csv/features_extracted/</code>)", self,
-        )
-        form.addRow("", self.dest_append_features)
-
-        # Mode 3 (legacy): append to targets_inserted — same as
-        # features mode but writes to the targets tree. Used when
-        # the project has classifier targets already inserted and
-        # you want the new features alongside them. 122ae-3 dropped
-        # the deferred-runid caveat here too for the same reason.
-        self.dest_append_targets = QRadioButton(
-            "Append new columns to legacy per-video targets files "
-            "(<code>csv/targets_inserted/</code>)", self,
-        )
-        form.addRow("", self.dest_append_targets)
+        # Patch 122an (B1): the two legacy radio modes
+        # ("Append new columns to legacy per-video feature files"
+        # and "...to legacy per-video targets files") are gone.
+        # The kwargs they passed (append_to_features_extracted /
+        # append_to_targets_inserted) were inert after 122ae-3 —
+        # they only ran pre-flight checks and never produced a
+        # real append write. v1 layout has two real destinations:
+        # derived/features/ (per-family parquet, default) or a
+        # user-picked save_dir.
 
         # Group enforces single-choice. Default to per-family
-        # parquet (v1-native, the recommended path). save_dir,
-        # append-features, append-targets remain available as
-        # explicit opt-ins during the migration window.
+        # parquet (v1-native, the recommended path).
         self._dest_group = QButtonGroup(self)
         self._dest_group.addButton(self.dest_derived_parquet, 0)
         self._dest_group.addButton(self.dest_save_dir, 1)
-        self._dest_group.addButton(self.dest_append_features, 2)
-        self._dest_group.addButton(self.dest_append_targets, 3)
         self.dest_derived_parquet.setChecked(True)
 
         # Disable the path field unless save_dir mode is selected.
-        # Visual feedback that the field is only relevant in that
-        # mode. Connect to update enabled state on toggle.
         def _update_save_dir_enabled() -> None:
             self.save_dir.setEnabled(self.dest_save_dir.isChecked())
         self.dest_derived_parquet.toggled.connect(lambda _: _update_save_dir_enabled())
         self.dest_save_dir.toggled.connect(lambda _: _update_save_dir_enabled())
-        self.dest_append_features.toggled.connect(lambda _: _update_save_dir_enabled())
-        self.dest_append_targets.toggled.connect(lambda _: _update_save_dir_enabled())
         _update_save_dir_enabled()
-
-        # Aliases for backward compat with the old attribute names.
-        # collect_args / on_run / preflight / target all still
-        # reference these. Rather than renaming everywhere, expose
-        # property-like accessors that derive from the radio state.
-        # (Plain attributes pointing at the radios; the .isChecked()
-        # API is the same as the old QCheckBox.)
-        self.append_features = self.dest_append_features
-        self.append_targets = self.dest_append_targets
 
         # Spacer after destination block before checks/workers
         form.addRow("", QLabel("", self))
@@ -378,26 +346,14 @@ class FeatureSubsetExtractorForm(OperationForm):
                 )
             derived_features_dir = paths["derived_features_dir"]
             save_dir_value = None
-            append_features = False
-            append_targets = False
         elif self.dest_save_dir.isChecked():
             save_dir_value = self.save_dir.path or None
-            append_features = False
-            append_targets = False
             if save_dir_value is None:
                 raise ValueError(
                     "Save destination is required: pick a directory "
                     "in the 'Save standalone files' field, or switch "
-                    "the destination to one of the other modes."
+                    "the destination to derived/features/."
                 )
-        elif self.dest_append_features.isChecked():
-            save_dir_value = None
-            append_features = True
-            append_targets = False
-        elif self.dest_append_targets.isChecked():
-            save_dir_value = None
-            append_features = False
-            append_targets = True
         else:
             # Shouldn't happen — QButtonGroup forces a selection
             # since one is checked by default. But defensive.
@@ -411,8 +367,6 @@ class FeatureSubsetExtractorForm(OperationForm):
             "feature_families": selected,
             "file_checks":      bool(self.file_checks.isChecked()),
             "save_dir":         save_dir_value,
-            "append_features":  append_features,
-            "append_targets":   append_targets,
             "derived_features_dir": derived_features_dir,
             "n_workers":        int(self.n_workers.value()),
             "overwrite_existing": False,  # default; on_run may flip
@@ -452,21 +406,16 @@ class FeatureSubsetExtractorForm(OperationForm):
             f"[on_run] FeatureSubsetExtractorForm dispatching: "
             f"save_dir={kwargs['save_dir']!r}, "
             f"derived_features_dir={kwargs['derived_features_dir']!r}, "
-            f"append_features={kwargs['append_features']}, "
-            f"append_targets={kwargs['append_targets']}, "
             f"families={len(kwargs['feature_families'])}"
         )
 
-        # Run preflight whenever any destination is set. The
-        # preflight checks both save_dir filename collisions AND
-        # append-mode column collisions — both are real ways to
-        # silently destroy previous run output. Pre-fix: this only
-        # ran for append flags, missing the save_dir-overwrite case
-        # where shutil.copy silently overwrote files from a prior run.
+        # Patch 122an (B1): preflight runs whenever a destination
+        # is set. The append_features / append_targets gates from
+        # the legacy modes are gone — they only fired for dead
+        # destinations anyway.
         needs_preflight = (
             kwargs["save_dir"] is not None
-            or kwargs["append_features"]
-            or kwargs["append_targets"]
+            or kwargs["derived_features_dir"] is not None
         )
 
         if needs_preflight:
@@ -584,8 +533,6 @@ class FeatureSubsetExtractorForm(OperationForm):
             file_checks=kwargs["file_checks"],
             save_dir=kwargs["save_dir"],
             data_dir=None,
-            append_to_features_extracted=kwargs["append_features"],
-            append_to_targets_inserted=kwargs["append_targets"],
             derived_features_dir=kwargs["derived_features_dir"],
             n_workers=kwargs["n_workers"],
             overwrite_existing=False,  # preflight runs in non-overwrite mode
@@ -594,7 +541,6 @@ class FeatureSubsetExtractorForm(OperationForm):
 
     def target(self, *, config_path: str, feature_families: list[str],
                file_checks: bool, save_dir: Optional[str],
-               append_features: bool, append_targets: bool,
                derived_features_dir: Optional[str],
                n_workers: int, overwrite_existing: bool = False) -> None:
         from mufasa.feature_extractors.feature_subsets import (
@@ -606,8 +552,6 @@ class FeatureSubsetExtractorForm(OperationForm):
             file_checks=file_checks,
             save_dir=save_dir,
             data_dir=None,
-            append_to_features_extracted=append_features,
-            append_to_targets_inserted=append_targets,
             derived_features_dir=derived_features_dir,
             n_workers=n_workers,
             overwrite_existing=overwrite_existing,

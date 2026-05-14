@@ -52,14 +52,16 @@ class FeatureSubsetExtractorPopUp(PopUpMixin, ConfigReader):
         self.save_frm.grid(row=0, column=0, sticky=NW)
         self.save_dir.grid(row=0, column=0, sticky=NW)
 
-        self.append_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="APPEND SETTINGS", icon_name="plus_green", icon_link=Links.FEATURE_SUBSETS.value)
-        self.append_to_features_cb, self.append_to_features_var = SimbaCheckbox(parent=self.append_settings_frm, txt="APPEND RESULTS TO FEATURES EXTRACTED FILES")
-        self.append_to_targets_cb, self.append_to_targets_var = SimbaCheckbox(parent=self.append_settings_frm, txt="APPEND RESULTS TO TARGET INSERTED FILES")
-        self.checks_cb, self.checks_var = SimbaCheckbox(parent=self.append_settings_frm, txt="INCLUDE INTEGRITY CHECKS BEFORE APPENDING NEW DATA (RECOMMENDED)", val=True)
-        self.append_settings_frm.grid(row=1, column=0, sticky=NW)
-        self.append_to_features_cb.grid(row=0, column=0, sticky=NW)
-        self.append_to_targets_cb.grid(row=1, column=0, sticky=NW)
-        self.checks_cb.grid(row=2, column=0, sticky=NW)
+        # Patch 122an (B1): "APPEND RESULTS TO FEATURES
+        # EXTRACTED FILES" / "...TARGETS INSERTED FILES"
+        # checkboxes removed — the kwargs they fed
+        # (append_to_features_extracted / append_to_targets_inserted)
+        # were dead after 122ae-3 and removed from
+        # FeatureSubsetsCalculator in 122an.
+        self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name="settings", icon_link=Links.FEATURE_SUBSETS.value)
+        self.checks_cb, self.checks_var = SimbaCheckbox(parent=self.settings_frm, txt="INCLUDE INTEGRITY CHECKS BEFORE WRITING (RECOMMENDED)", val=True)
+        self.settings_frm.grid(row=1, column=0, sticky=NW)
+        self.checks_cb.grid(row=0, column=0, sticky=NW)
         self.feature_subset_selections = self.create_cb_frame(main_frm=self.main_frm, cb_titles=FEATURE_FAMILIES, frm_title="SELECT FEATURE SUB-SETS",)
         self.create_run_frm(run_function=self.run)
         self.main_frm.mainloop()
@@ -70,19 +72,19 @@ class FeatureSubsetExtractorPopUp(PopUpMixin, ConfigReader):
             if feature_var.get(): selected_features.append(feature_name)
         if len(selected_features) == 0:
             raise InvalidInputError(msg="Please select at least ONE feature subset family.", source=self.__class__.__name__)
-        if (not self.append_to_features_var.get() and not self.append_to_targets_var.get()):
-            if not os.path.isdir(self.save_dir.folder_path):
-                raise InvalidInputError(msg="You must select a valid path where to save the results OR select to append the features to the targets_inserted and/or features_extracted files.", source=self.__class__.__name__)
+        # Patch 122an (B1): the append-to-legacy modes are gone;
+        # save_dir is now the only destination this popup can
+        # set. (The Qt FeatureSubsetExtractorForm also supports
+        # derived_features_dir for the v1 per-family parquet
+        # layout — the Tk popup is the simpler legacy entry
+        # point and stays save_dir-only.)
         if not os.path.isdir(self.save_dir.folder_path):
-            save_dir = None
-        else:
-            save_dir = self.save_dir.folder_path
+            raise InvalidInputError(msg="You must select a valid save directory.", source=self.__class__.__name__)
+        save_dir = self.save_dir.folder_path
         feature_extractor = FeatureSubsetsCalculator(config_path=self.config_path,
                                                      feature_families=selected_features,
                                                      save_dir=save_dir,
-                                                     file_checks=self.checks_var.get(),
-                                                     append_to_features_extracted=self.append_to_features_var.get(),
-                                                     append_to_targets_inserted=self.append_to_targets_var.get())
+                                                     file_checks=self.checks_var.get())
         feature_extractor.run()
 
 
