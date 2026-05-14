@@ -163,24 +163,72 @@ def main() -> int:
             "such (# Legacy INI)",
         "mufasa/ui_qt/forms/classifier.py":
             "dual-layout helper; legacy branch commented as such",
+        # Patch 122ai extensions: directories outside ui_qt/ that
+        # the user-reported roi_logic.py bug forced us to audit too.
+        "mufasa/mixins/config_reader.py":
+            "v1-aware ConfigReader adapter — wraps TOML→INI "
+            "translation internally; the configparser usage here "
+            "is post-translation and is the canonical way to "
+            "consume the synthetic INI",
+        "mufasa/mixins/train_model_mixin.py":
+            "takes an already-parsed config object as a method "
+            "argument; doesn't read from disk itself",
+        "mufasa/utils/toml_to_configparser.py":
+            "synthesises a ConfigParser FROM TOML data — writes, "
+            "not reads",
+        "mufasa/utils/project_reconfigure.py":
+            "known deferred item — INI-only project "
+            "reconfiguration; flagged in session journal",
     }
 
+    # Patch 122ai: scope expanded from mufasa/ui_qt/ only (122ah)
+    # to ALL of mufasa/ (excluding the legacy Tk popups, which are
+    # only reachable via SimBA.py and are out of scope for v1).
+    # The user-reported roi_logic.py bug was outside the 122ah
+    # scope and so wasn't caught; this widening prevents the
+    # next instance from slipping through.
+    AUDIT_ROOTS = [
+        REPO_ROOT / "mufasa" / "ui_qt",
+        REPO_ROOT / "mufasa" / "roi_tools",
+        REPO_ROOT / "mufasa" / "utils",
+        REPO_ROOT / "mufasa" / "mixins",
+        REPO_ROOT / "mufasa" / "feature_extractors",
+        REPO_ROOT / "mufasa" / "cli",
+    ]
+
     leaks: list[tuple[str, int, str]] = []
-    for p in (REPO_ROOT / "mufasa" / "ui_qt").rglob("*.py"):
-        rel = str(p.relative_to(REPO_ROOT))
-        if rel in LEGACY_BRANCH_WHITELIST:
+    # Patch 122ai: heuristic refined. Bare '"General settings"'
+    # appears legitimately in:
+    #   * docstring usage examples (mufasa/utils/read_write.py)
+    #   * the GENERAL_SETTINGS = "General settings" constant
+    #     (mufasa/utils/enums.py)
+    # Catching those as bugs would produce false positives. The
+    # real bug shape is a configparser .get() / .has_section()
+    # call that references the section by name — match that
+    # specifically.
+    import re
+    BUG_PATTERN = re.compile(
+        r"""\.(get|has_section|getint|getboolean|getfloat|"""
+        r"""items)\s*\(\s*["']General\s+settings["']""",
+    )
+    for root in AUDIT_ROOTS:
+        if not root.is_dir():
             continue
-        src = p.read_text()
-        for i, line in enumerate(src.splitlines(), start=1):
-            if line.lstrip().startswith("#"):
+        for p in root.rglob("*.py"):
+            rel = str(p.relative_to(REPO_ROOT))
+            if rel in LEGACY_BRANCH_WHITELIST:
                 continue
-            if ("'General settings'" in line
-                    or '"General settings"' in line):
-                leaks.append((rel, i, line.strip()))
+            src = p.read_text()
+            for i, line in enumerate(src.splitlines(), start=1):
+                if line.lstrip().startswith("#"):
+                    continue
+                if BUG_PATTERN.search(line):
+                    leaks.append((rel, i, line.strip()))
 
     check(
-        "No Qt-surface module reads '[General settings]' "
-        "outside the gated-legacy whitelist",
+        "No active backend module reads '[General settings]' "
+        "outside the gated-legacy whitelist (scope: ui_qt, "
+        "roi_tools, utils, mixins, feature_extractors, cli)",
         not leaks,
         detail=f"unexpected leaks: {leaks}" if leaks else "",
     )

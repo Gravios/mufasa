@@ -46,6 +46,24 @@ def _build_logic_class():
         lambda roi_path=None, **kw: (None, None, None)
     )
     sys.modules["mufasa.utils.read_write"] = read_write_mod
+
+    # Patch 122ai: roi_logic now lazy-imports
+    # mufasa.project_layout.project_paths_from_config inside
+    # __init__ to resolve project_path / roi_h5_path /
+    # video_info_path for both v1 and legacy layouts. We use
+    # the REAL project_layout module here (it has no heavy
+    # deps — pure stdlib + pathlib) so test cases that build
+    # actual INI/TOML config files at real disk paths get
+    # genuine path discovery. Cases with "/fake/" config paths
+    # hit the helper's exception branch and fall through to
+    # roi_logic's defensive fallback (os.path.dirname); that
+    # matches the test's prior behaviour.
+    import importlib
+    real_project_layout = importlib.import_module(
+        "mufasa.project_layout",
+    )
+    sys.modules["mufasa.project_layout"] = real_project_layout
+
     # Parent packages need stubs too
     sys.modules.setdefault("mufasa", ModuleType("mufasa"))
     sys.modules.setdefault("mufasa.utils", ModuleType("mufasa.utils"))
