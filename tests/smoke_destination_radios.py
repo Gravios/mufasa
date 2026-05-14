@@ -43,38 +43,34 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # Case 2: four radio buttons exist with the right attribute names
-    # (Patch 122ae-3 added dest_derived_parquet as the new default
-    # destination — write per-family parquet to derived/features/.)
+    # Case 2: two radio buttons exist with the right attribute names.
+    # Patch 122an (B1) dropped the legacy append radios — only
+    # dest_derived_parquet (default, v1 per-family) and
+    # dest_save_dir (user-picked standalone directory) remain.
     # ------------------------------------------------------------------ #
-    for attr in ("dest_derived_parquet",
-                 "dest_save_dir",
-                 "dest_append_features",
-                 "dest_append_targets"):
+    for attr in ("dest_derived_parquet", "dest_save_dir"):
         assert f"self.{attr}" in body_src, (
             f"Form should have a self.{attr} radio button"
         )
+    for removed in ("dest_append_features", "dest_append_targets"):
+        assert f"self.{removed} = QRadioButton" not in body_src, (
+            f"Legacy radio self.{removed} should have been removed "
+            f"by patch 122an"
+        )
 
     # ------------------------------------------------------------------ #
-    # Case 3: All four radios are added to the same QButtonGroup
+    # Case 3: Both surviving radios are added to the same QButtonGroup
     # (which is what enforces single-choice)
     # ------------------------------------------------------------------ #
     assert "_dest_group.addButton(self.dest_derived_parquet" in body_src
     assert "_dest_group.addButton(self.dest_save_dir" in body_src
-    assert "_dest_group.addButton(self.dest_append_features" in body_src
-    assert "_dest_group.addButton(self.dest_append_targets" in body_src
 
     # ------------------------------------------------------------------ #
-    # Case 4: A default selection is set so the group is never
-    # in "no selection" state. Patch 122ae-3 changed the default
-    # from dest_save_dir to dest_derived_parquet — accept either
-    # so this test stays useful through the migration window.
+    # Case 4: dest_derived_parquet is the default selection (v1-native)
     # ------------------------------------------------------------------ #
     assert (
         "self.dest_derived_parquet.setChecked(True)" in body_src
         or "self.dest_save_dir.setChecked(True)" in body_src
-        or "self.dest_append_features.setChecked(True)" in body_src
-        or "self.dest_append_targets.setChecked(True)" in body_src
     ), "One radio must be checked by default"
 
     # ------------------------------------------------------------------ #
@@ -93,55 +89,40 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # Case 6: collect_args derives kwargs from radio state, not
-    # from the old checkbox state. Specifically: it should NOT
-    # produce a kwargs dict where save_dir is set AND append_features
-    # is True simultaneously (the old bug).
+    # Case 6: collect_args branches on which radio is checked.
+    # Patch 122an (B1) removed the two legacy append branches —
+    # collect_args now only handles dest_derived_parquet and
+    # dest_save_dir.
     # ------------------------------------------------------------------ #
     methods = {n.name: n for n in cls.body if isinstance(n, ast.FunctionDef)}
     collect = methods["collect_args"]
     collect_src = ast.unparse(collect)
-    # New code branches on which radio is checked
     assert "self.dest_save_dir.isChecked()" in collect_src, (
         "collect_args should branch on dest_save_dir.isChecked()"
     )
-    assert "self.dest_append_features.isChecked()" in collect_src
-    assert "self.dest_append_targets.isChecked()" in collect_src
-    # In the save_dir branch, append flags should be False
-    # In the append branches, save_dir should be None
-    # We verify by structure rather than literal string: the
-    # save_dir branch should have lines setting append_features=False
-    save_dir_branch_idx = collect_src.index("self.dest_save_dir.isChecked()")
-    save_dir_branch = collect_src[save_dir_branch_idx:save_dir_branch_idx + 600]
-    assert "append_features = False" in save_dir_branch, (
-        "save_dir branch must set append_features=False (no dual "
-        "destination)"
+    assert "self.dest_derived_parquet.isChecked()" in collect_src, (
+        "collect_args should branch on dest_derived_parquet.isChecked()"
     )
-    assert "append_targets = False" in save_dir_branch, (
-        "save_dir branch must set append_targets=False"
+    # The legacy branches and the keys they returned should be gone
+    assert "self.dest_append_features.isChecked()" not in collect_src, (
+        "Legacy dest_append_features branch must be removed"
     )
+    assert "self.dest_append_targets.isChecked()" not in collect_src, (
+        "Legacy dest_append_targets branch must be removed"
+    )
+    assert '"append_features"' not in collect_src
+    assert '"append_targets"' not in collect_src
 
     # ------------------------------------------------------------------ #
     # Case 7: collect_args raises a clear error if save_dir is
-    # selected but no path is given (the form's most user-visible
-    # validation)
+    # selected but no path is given
     # ------------------------------------------------------------------ #
     assert "Save destination is required" in collect_src, (
         "collect_args should raise ValueError with a clear message "
         "when save_dir is selected but no path is provided"
     )
 
-    # ------------------------------------------------------------------ #
-    # Case 8: backward compat — append_features and append_targets
-    # attributes still exist (referenced by other tests / code)
-    # ------------------------------------------------------------------ #
-    assert "self.append_features = self.dest_append_features" in init_src, (
-        "append_features attribute should still exist as alias for "
-        "the radio (other code references it)"
-    )
-    assert "self.append_targets = self.dest_append_targets" in init_src
-
-    print("smoke_destination_radios: 8/8 cases passed")
+    print("smoke_destination_radios: 7/7 cases passed")
     return 0
 
 

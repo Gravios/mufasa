@@ -29,9 +29,11 @@ class SelectLabellingVideoPupUp():
         else: win_title = "SELECT VIDEO FILE - CONTINUING VIDEO ANNOTATION"
         config = read_config_file(config_path=config_path)
         project_path = read_config_entry(config, ConfigKey.GENERAL_SETTINGS.value, ConfigKey.PROJECT_PATH.value, data_type=Dtypes.STR.value)
+        # Patch 122an (B2): file_type lookup retained only for
+        # diagnostic messaging; no longer used to construct a
+        # legacy targets_inserted file path.
         file_type = read_config_entry(config, ConfigKey.GENERAL_SETTINGS.value, ConfigKey.FILE_TYPE.value, data_type=Dtypes.STR.value)
         video_dir = os.path.join(project_path, 'videos')
-        targets_inserted_dir = os.path.join(project_path, 'csv', 'targets_inserted')
         video_dir = None if not os.path.isdir(video_dir) else video_dir
         video_file_path = filedialog.askopenfilename(filetypes=[("VIDEO FILE", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)], initialdir=video_dir, title=win_title)
         check_file_exist_and_readable(file_path=video_file_path)
@@ -39,9 +41,30 @@ class SelectLabellingVideoPupUp():
         print(f"INITIATING ANNOTATION INTERFACE FOR {video_meta['video_name']} \n VIDEO INFO: {video_meta}")
 
         if continuing:
-            self.targets_inserted_file_path = os.path.join(targets_inserted_dir, f"{video_meta['video_name']}.{file_type}")
-            if not os.path.isfile(self.targets_inserted_file_path):
-                raise NoFilesFoundError( msg=f'When continuing annotations, SimBA expects a file at {self.targets_inserted_file_path}. SimBA could not find this file.', source=self.__class__.__name__)
+            # Patch 122an (B2): existence check for "continue
+            # mode" now probes the v1 layout
+            # (derived/labels/<video>.parquet) via
+            # load_labels_for_video. After 122ak, labels live
+            # there — the legacy os.path.isfile(targets_inserted_
+            # file_path) check returned False on v1-only
+            # projects, which incorrectly blocked continuing
+            # work on already-annotated videos.
+            from mufasa.utils.label_io import load_labels_for_video
+            try:
+                load_labels_for_video(
+                    video_meta['video_name'], config_path,
+                )
+            except FileNotFoundError:
+                raise NoFilesFoundError(
+                    msg=(
+                        f"Cannot continue annotation for "
+                        f"{video_meta['video_name']!r}: no labels "
+                        f"were found under derived/labels/. "
+                        f"Annotate this video at least once with "
+                        f"continuing=False first."
+                    ),
+                    source=self.__class__.__name__,
+                )
 
         _ = LabellingInterface(config_path=config_path,
                                file_path=video_file_path,
