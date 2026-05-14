@@ -85,49 +85,35 @@ def _make_v1_project(tmp: Path, file_type: str = "csv") -> Path:
 
 def main() -> int:
     # ==================================================================
-    # 1. _read_legacy strip-alignment: CSVs now drop the leading
-    #    pad column (matches read_df default has_index=True).
+    # 1. Legacy-only seed → FileNotFoundError (patch 122ak removed
+    #    the _read_legacy strip-alignment helpers along with the
+    #    fallback they served)
     # ==================================================================
     from mufasa.utils.feature_io import load_features_for_video
+    from mufasa.utils.label_io import load_labels_for_video
 
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
         toml = _make_v1_project(tmp, file_type="csv")
-
-        # Mimic exactly what SimBA's write_df(has_index=True)
-        # produces: a leading unnamed column carrying the
-        # positional index, then the real feature columns.
         legacy_dir = tmp / "csv" / "features_extracted"
         legacy_dir.mkdir(parents=True)
-        wide = pd.DataFrame({
-            "Unnamed: 0":  [0, 1, 2, 3],   # leading pad column
+        pd.DataFrame({
+            "Unnamed: 0":  [0, 1, 2, 3],
             "feat_a":      [10.0, 20.0, 30.0, 40.0],
             "feat_b":      [100.0, 200.0, 300.0, 400.0],
-        })
-        wide.to_csv(legacy_dir / "v_legacy.csv", index=False)
+        }).to_csv(legacy_dir / "v_legacy.csv", index=False)
 
-        result = load_features_for_video("v_legacy", str(toml))
+        raised = False
+        try:
+            load_features_for_video("v_legacy", str(toml))
+        except FileNotFoundError:
+            raised = True
         check(
-            "_read_legacy CSV strip: leading 'Unnamed: 0' column "
-            "dropped (matches read_df has_index=True default)",
-            "Unnamed: 0" not in result.columns,
-            detail=f"got {list(result.columns)}",
-        )
-        check(
-            "_read_legacy CSV strip: real feature columns preserved",
-            "feat_a" in result.columns and "feat_b" in result.columns,
-        )
-        check(
-            "_read_legacy CSV strip: values unaffected",
-            result["feat_a"].tolist() == [10.0, 20.0, 30.0, 40.0],
-        )
-        check(
-            "_read_legacy CSV strip: column count reduced by 1",
-            result.shape[1] == 2,
+            "patch 122ak: legacy-CSV-only project raises "
+            "FileNotFoundError (legacy fallback removed)",
+            raised,
         )
 
-    # Same check on label_io._read_legacy
-    from mufasa.utils.label_io import load_labels_for_video
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
         toml = tmp / "project.toml"
@@ -148,44 +134,38 @@ def main() -> int:
         """).strip() + "\n")
         legacy_dir = tmp / "csv" / "targets_inserted"
         legacy_dir.mkdir(parents=True)
-        wide = pd.DataFrame({
+        pd.DataFrame({
             "Unnamed: 0":  [0, 1, 2],
             "feat_x":      [1.0, 2.0, 3.0],
             "sniff":       [0, 1, 0],
             "rear":        [1, 1, 0],
-        })
-        wide.to_csv(legacy_dir / "v_lab.csv", index=False)
+        }).to_csv(legacy_dir / "v_lab.csv", index=False)
 
-        result = load_labels_for_video("v_lab", str(toml))
+        raised = False
+        try:
+            load_labels_for_video("v_lab", str(toml))
+        except FileNotFoundError:
+            raised = True
         check(
-            "label_io _read_legacy: strip applied (Unnamed: 0 "
-            "dropped before projection)",
-            "Unnamed: 0" not in result.columns,
-        )
-        check(
-            "label_io _read_legacy: classifier targets correctly "
-            "extracted after strip",
-            set(result.columns) == {"sniff", "rear"}
-            and result["sniff"].tolist() == [0, 1, 0],
+            "patch 122ak: legacy-targets-only project raises "
+            "FileNotFoundError (legacy fallback removed)",
+            raised,
         )
 
-    # Parquet branch: should NOT be affected by the strip
-    # (parquet files don't have a leading pad column).
+    # Parquet at the v1 location: still works (regression check).
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
         toml = _make_v1_project(tmp, file_type="parquet")
-        legacy_dir = tmp / "csv" / "features_extracted"
-        legacy_dir.mkdir(parents=True)
-        # Parquet written without index — no pad column
+        feat_dir = tmp / "derived" / "features"
+        feat_dir.mkdir(parents=True)
         pd.DataFrame({
             "feat_a": [1.0, 2.0],
             "feat_b": [3.0, 4.0],
-        }).to_parquet(legacy_dir / "v_parq.parquet", index=False)
+        }).to_parquet(feat_dir / "v_parq.parquet", index=False)
 
         result = load_features_for_video("v_parq", str(toml))
         check(
-            "_read_legacy parquet branch: strip NOT applied "
-            "(parquet files don't have pad columns)",
+            "v1 wide-parquet read still works after 122ak cleanup",
             set(result.columns) == {"feat_a", "feat_b"},
         )
 
@@ -251,9 +231,18 @@ def main() -> int:
     # ==================================================================
     # 3. The 3 labellers' specific call counts match expected
     # ==================================================================
+    # Patch 122ak: labellers' save methods no longer call
+    # load_features_for_video (labels-only save). The 3 → 2,
+    # 3 → 2, 2 → 2 drops reflect:
+    #   * labelling_interface: __save_results dropped its
+    #     load_features_for_video call.
+    #   * labelling_advanced: save_results dropped its
+    #     load_features_for_video call.
+    #   * standard_labeller: __save_results never had one;
+    #     count unchanged.
     expected_call_counts = {
-        "labelling_interface.py":          3,
-        "labelling_advanced_interface.py": 3,
+        "labelling_interface.py":          2,
+        "labelling_advanced_interface.py": 2,
         "standard_labeller.py":            2,
     }
     for name, expected in expected_call_counts.items():
@@ -278,13 +267,16 @@ def main() -> int:
                / "feature_io.py").read_text()
     lio_src = (REPO_ROOT / "mufasa" / "utils"
                / "label_io.py").read_text()
+    # Patch 122ak: _read_legacy was removed from both modules.
+    # Confirm the 122ae-5 alignment note isn't a stale leftover
+    # asserting a function that no longer exists.
     check(
-        "feature_io._read_legacy records 122ae-5 alignment",
-        "122ae-5" in fio_src and "iloc[:, 1:]" in fio_src,
+        "feature_io: _read_legacy removed (patch 122ak)",
+        "def _read_legacy" not in fio_src,
     )
     check(
-        "label_io._read_legacy records 122ae-5 alignment",
-        "122ae-5" in lio_src and "iloc[:, 1:]" in lio_src,
+        "label_io: _read_legacy removed (patch 122ak)",
+        "def _read_legacy" not in lio_src,
     )
 
     print(

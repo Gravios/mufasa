@@ -515,26 +515,9 @@ class AdvancedLabellingInterface(ConfigReader):
             )
 
     def save_results(self):
-        # Patch 122ae-5: layout-aware feature read.
-        self.save_df = load_features_for_video(
-            self.video_name, self.config_path,
-        )
-        self.save_df = pd.concat([self.save_df, self.data_df_targets], axis=1)
-        self.save_df = self.save_df.dropna(subset=self.target_lst)
-        try:
-            if self.file_type == Formats.CSV.value:
-                self.save_df.to_csv(self.targets_inserted_file_path)
-            if self.file_type == Formats.PARQUET.value:
-                self.save_df.to_parquet(self.targets_inserted_file_path)
-        except Exception as e:
-            print(e, "SIMBA ERROR: File for video {} could not be saved.")
-            raise FileExistsError
-        # Patch 122ae-5c: sidecar v1-native labels write. Same
-        # rationale as labelling_interface: dual-write transition,
-        # legacy file is the primary contract, sidecar failure
-        # doesn't abort. self.data_df_targets has classifier-target
-        # columns (set in build) — exactly the shape
-        # save_labels_for_video expects.
+        """Patch 122ak: labels-only save via save_labels_for_video.
+        See labelling_interface.__save_results for rationale.
+        """
         try:
             save_labels_for_video(
                 video_name=self.video_name,
@@ -542,13 +525,10 @@ class AdvancedLabellingInterface(ConfigReader):
                 labels=self.data_df_targets,
             )
         except Exception as exc:
-            print(
-                f"[122ae-5c] Sidecar labels write to "
-                f"derived/labels/ failed for {self.video_name}: "
-                f"{exc}. Legacy targets_inserted save succeeded."
-            )
+            print(f"SIMBA ERROR: labels save failed for {self.video_name}: {exc}")
+            raise FileExistsError
         stdout_success(
-            msg=f"SAVED: Annotation file for video {self.video_name} saved within the project_folder/csv/targets_inserted directory.",
+            msg=f"SAVED: Labels for video {self.video_name} saved.",
             source=self.__class__.__name__,
         )
         if not self.config.has_section("Last annotated frames"):

@@ -107,8 +107,17 @@ class BorisAppender(ConfigReader):
         stdout_success(msg=f"BORIS annotations appended to {len(self.feature_file_paths)} data file(s) and saved in {self.targets_folder}", elapsed_time=self.timer.elapsed_time_str)
 
     def __save_boris_annotations(self, df):
-        self.save_path = os.path.join(self.targets_folder, f"{self.file_name}.{self.file_type}")
-        write_df(df, self.file_type, self.save_path)
+        # Patch 122ak: write labels-only via save_labels_for_video
+        # to derived/labels/<video>.parquet. df is the combined
+        # features+labels DataFrame; project to classifier-target
+        # columns for the save.
+        from mufasa.utils.label_io import save_labels_for_video
+        labels_df = df[self.clf_names]
+        self.save_path = save_labels_for_video(
+            video_name=self.file_name,
+            config_path=self.config_path,
+            labels=labels_df,
+        )
         self.video_timer.stop_timer()
         print(f"Saved BORIS annotations for video {self.file_name}... (elapsed time: {self.video_timer.elapsed_time_str})")
 

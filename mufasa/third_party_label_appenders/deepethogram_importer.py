@@ -118,14 +118,21 @@ class DeepEthogramImporter(ConfigReader):
             for clf_name in self.clf_names:
                 self.out_data[clf_name] = self.annotations_df[clf_name]
 
-            save_path = os.path.join(
-                self.targets_folder, video_name + "." + self.file_type
+            # Patch 122ak: write labels-only via save_labels_for_video
+            # to derived/labels/<video>.parquet. self.out_data is
+            # the combined features+labels DataFrame; project to
+            # classifier-target columns for the save.
+            from mufasa.utils.label_io import save_labels_for_video
+            labels_df = self.out_data[list(self.clf_names)]
+            save_labels_for_video(
+                video_name=video_name,
+                config_path=self.config_path,
+                labels=labels_df,
             )
-            write_df(df=self.out_data, file_type=self.file_type, save_path=save_path)
-            print("DeepEthogram annotation for video {} saved...".format(video_name))
+            print("DeepEthogram annotation for video {} saved.".format(video_name))
 
         stdout_success(
-            msg=f"Annotations for {str(len(list(self.clf_names)))} behaviors added to {len(self.matches_dict.keys())} videos and saved in the project_folder/csv/targets_inserted directory."
+            msg=f"Annotations for {str(len(list(self.clf_names)))} behaviors added to {len(self.matches_dict.keys())} videos and saved under derived/labels/."
         )
 
 

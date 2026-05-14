@@ -129,40 +129,38 @@ class TrainModelMixin(object):
         :examples:
         >>> self.read_all_files_in_folder(file_paths=['targets_inserted/Video_1.csv', 'targets_inserted/Video_2.csv'], file_type='csv', classifier_names=['Attack'])
         """
-        # Patch 122ae-5e: v1 mode (self.config_path set) skips the
-        # on-disk existence check — file_path entries may be
-        # pseudo-paths whose data lives in derived/features/ +
-        # derived/labels/. The load helpers resolve the actual
-        # location per-stem.
+        # Patch 122ak: v1-native only. config_path is required —
+        # the legacy read_df(file_path) branch is gone. file_path
+        # entries are pseudo-paths used only for stem extraction;
+        # the actual data location is resolved per-stem by the
+        # load helpers.
         config_path = getattr(self, "config_path", None)
         if config_path is None:
-            check_filepaths_in_iterable_exist(file_paths=file_paths, name=self.__class__.__name__)
+            raise RuntimeError(
+                f"{self.__class__.__name__} requires self.config_path "
+                f"to be set. v1-native training reads via "
+                f"load_features_for_video + load_labels_for_video."
+            )
         timer = SimbaTimer(start=True)
         frm_number_lst, dfs = [], []
         if len(file_paths) == 0:
-            raise NoDataError(msg="SimBA found 0 annotated frames in the project_folder/csv/targets_inserted directory", source=self.__class__.__name__)
+            raise NoDataError(msg="No annotated videos found under derived/labels/. Annotate at least one video before training.", source=self.__class__.__name__)
+        from mufasa.utils.feature_io import load_features_for_video
+        from mufasa.utils.label_io import load_labels_for_video
         for file_cnt, file in enumerate(file_paths):
             _, vid_name, _ = get_fn_ext(file)
             stdout_information(msg=f"Reading in {vid_name} (file {str(file_cnt + 1)}/{str(len(file_paths))})...")
-            if config_path is not None:
-                # Patch 122ae-5e: read via load helpers in v1 mode.
-                from mufasa.utils.feature_io import \
-                    load_features_for_video
-                from mufasa.utils.label_io import \
-                    load_labels_for_video
-                features = load_features_for_video(vid_name, config_path)
-                labels = load_labels_for_video(vid_name, config_path)
-                labels = labels.reindex(
-                    features.index, fill_value=0,
-                ).fillna(0).astype(int)
-                df = (
-                    pd.concat([features, labels], axis=1)
-                    .dropna(axis=0, how="all")
-                    .fillna(0)
-                    .astype(np.float32)
-                )
-            else:
-                df = (read_df(file, file_type).dropna(axis=0, how="all").fillna(0).astype(np.float32))
+            features = load_features_for_video(vid_name, config_path)
+            labels = load_labels_for_video(vid_name, config_path)
+            labels = labels.reindex(
+                features.index, fill_value=0,
+            ).fillna(0).astype(int)
+            df = (
+                pd.concat([features, labels], axis=1)
+                .dropna(axis=0, how="all")
+                .fillna(0)
+                .astype(np.float32)
+            )
             frm_number_lst.extend(list(df.index))
             df.index = [vid_name] * len(df)
             if classifier_names != None:
@@ -1719,40 +1717,37 @@ class TrainModelMixin(object):
                                        clf_names: Optional[List[str]] = None,
                                        raise_bool_clf_error: bool = True,
                                        config_path: Optional[str] = None):
-        """
-        Private function called by :meth:`mufasa.train_model_functions.read_all_files_in_folder_mp_futures`
+        """Private worker for :meth:`read_all_files_in_folder_mp_futures`.
 
-        Patch 122ae-5e: takes an optional ``config_path``. When
-        provided, the per-video read goes through the v1-aware
-        load helpers (``load_features_for_video`` +
-        ``load_labels_for_video``) which span both the v1 layout
-        (derived/features/ + derived/labels/) and the legacy
-        layout (csv/features_extracted/ + csv/targets_inserted/).
-        The ``file_path`` argument is then a pseudo-path used
-        only for its stem; the actual data location is resolved
-        per-stem inside the helpers. When ``config_path`` is
-        None (legacy callers) the original ``read_df(file_path)``
-        path is preserved.
+        Patch 122ak: v1-native only. ``config_path`` is now
+        required; the legacy ``read_df(file_path)`` branch is
+        gone. ``file_path`` is used only for stem extraction via
+        ``get_fn_ext``; actual data is resolved per-stem via the
+        load helpers
+        (:func:`load_features_for_video` + :func:`load_labels_for_video`).
+        ``file_type`` is kept in the signature for API stability
+        with the caller's executor.submit but is no longer
+        consulted.
         """
+        if config_path is None:
+            raise RuntimeError(
+                "_read_data_file_helper_futures requires "
+                "config_path. v1-native training reads via "
+                "load_features_for_video + load_labels_for_video."
+            )
         timer = SimbaTimer(start=True)
         _, vid_name, _ = get_fn_ext(file_path)
-        if config_path is not None:
-            # v1-aware path — features + labels separately,
-            # combined in memory.
-            from mufasa.utils.feature_io import \
-                load_features_for_video
-            from mufasa.utils.label_io import load_labels_for_video
-            features = load_features_for_video(vid_name, config_path)
-            labels = load_labels_for_video(vid_name, config_path)
-            # Align labels to features row count (features wins).
-            labels = labels.reindex(
-                features.index, fill_value=0,
-            ).fillna(0).astype(int)
-            df = pd.concat(
-                [features, labels], axis=1,
-            ).dropna(axis=0, how="all").fillna(0)
-        else:
-            df = read_df(file_path, file_type).dropna(axis=0, how="all").fillna(0)
+        from mufasa.utils.feature_io import load_features_for_video
+        from mufasa.utils.label_io import load_labels_for_video
+        features = load_features_for_video(vid_name, config_path)
+        labels = load_labels_for_video(vid_name, config_path)
+        # Align labels to features row count (features wins).
+        labels = labels.reindex(
+            features.index, fill_value=0,
+        ).fillna(0).astype(int)
+        df = pd.concat(
+            [features, labels], axis=1,
+        ).dropna(axis=0, how="all").fillna(0)
         frm_numbers = list(df.index)
         df.index = [vid_name] * len(df)
         if clf_names != None:
@@ -1795,14 +1790,17 @@ class TrainModelMixin(object):
         """
 
         THREADSAFE_CORE_COUNT = 16
-        # Patch 122ae-5e: if v1 mode (self.config_path set), skip
-        # the on-disk existence check — file_path entries may be
-        # pseudo-paths whose data lives elsewhere
-        # (derived/features/, derived/labels/). The load helpers
-        # resolve the actual location per-stem.
+        # Patch 122ak: v1-native only. config_path is required;
+        # the legacy on-disk existence check is gone (file_paths
+        # are pseudo-paths whose data lives in derived/features/
+        # + derived/labels/, resolved per-stem inside the workers).
         config_path = getattr(self, "config_path", None)
         if config_path is None:
-            check_filepaths_in_iterable_exist(file_paths=annotations_file_paths, name=self.__class__.__name__)
+            raise RuntimeError(
+                f"{self.__class__.__name__} requires self.config_path "
+                f"to be set. v1-native training reads via "
+                f"load_features_for_video + load_labels_for_video."
+            )
         try:
             # [Linux-only] Darwin spawn guard removed.
             cpu_cnt, _ = find_core_cnt()

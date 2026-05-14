@@ -185,11 +185,20 @@ class ThirdPartyLabelAppender(ConfigReader):
                 annot_idx = [x for x in annot_idx if x not in idx_diff]
                 out_df[clf] = 0
                 out_df.loc[annot_idx, clf] = 1
-            save_path = os.path.join(self.targets_folder, f"{self.video_name}.{self.file_type}")
-            write_df(out_df, self.file_type, save_path)
+            # Patch 122ak: write labels-only via save_labels_for_video
+            # to derived/labels/<video>.parquet. out_df is the
+            # combined features+labels DataFrame; project to
+            # classifier-target columns for the save.
+            from mufasa.utils.label_io import save_labels_for_video
+            labels_df = out_df[list(self.clf_names)]
+            save_path = save_labels_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                labels=labels_df,
+            )
             print(f"Saved {self.annotation_app} annotations for video {self.video_name}...")
         self.timer.stop_timer()
-        stdout_success(msg=f"{self.annotation_app} annotations appended to dataset and saved in {self.targets_folder} directory", elapsed_time=self.timer.elapsed_time_str)
+        stdout_success(msg=f"{self.annotation_app} annotations saved to derived/labels/", elapsed_time=self.timer.elapsed_time_str)
 
 
 # log = True

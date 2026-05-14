@@ -133,12 +133,13 @@ def main() -> int:
             and {"feat_a", "feat_b"}.issubset(set(raw.columns)),
             detail=f"got columns {list(raw.columns)}",
         )
-        # Round-trip the pad strip and check values
-        from mufasa.utils.feature_io import _read_legacy
-        legacy = _read_legacy(path)
+        # Round-trip the pad strip and check values. Patch 122ak
+        # removed _read_legacy; we inline its CSV behaviour
+        # (drop the leading pad column).
+        legacy = pd.read_csv(path).iloc[:, 1:]
         check(
-            "features: round-trip through _read_legacy "
-            "(SimBA strip) recovers exact values",
+            "features: include_index=True round-trip recovers "
+            "exact values after pad-column strip",
             legacy["feat_a"].tolist() == [1.0, 2.0, 3.0]
             and legacy["feat_b"].tolist() == [10.0, 20.0, 30.0],
         )
@@ -251,9 +252,9 @@ def main() -> int:
             "combined: feature + label columns concatenated",
             "feat" in raw.columns and "sniff" in raw.columns,
         )
-        # Strip pad column for value verification
-        from mufasa.utils.feature_io import _read_legacy
-        stripped = _read_legacy(path)
+        # Strip pad column for value verification. Patch 122ak
+        # removed _read_legacy; inline its CSV behaviour.
+        stripped = pd.read_csv(path).iloc[:, 1:]
         check(
             "combined: feature values preserved",
             stripped["feat"].tolist() == [10.0, 20.0, 30.0],

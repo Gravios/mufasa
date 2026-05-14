@@ -68,12 +68,9 @@ class BentoAppender(ConfigReader):
             print(f"Appending BENTO annotation to video {self.video_name}...")
             _, _, fps = self.read_video_info(video_name=self.video_name)
             # Patch 122ae-5b: read via load_features_for_video so
-            # v1 + legacy both work. The existence check on the
-            # specific legacy path is replaced with the helper's
-            # FileNotFoundError, wrapped to preserve the
-            # NoFilesFoundError shape downstream consumers expect.
-            features_path = os.path.join(self.features_dir, self.video_name + f'.{self.file_type}')
-            self.save_path = os.path.join(self.targets_folder, self.video_name + f'.{self.file_type}')
+            # v1 layout resolves. Patch 122ak: stale legacy
+            # save_path computation removed — __save now writes
+            # to derived/labels/<video>.parquet via the helper.
             try:
                 feature_df = load_features_for_video(
                     self.video_name, self.config_path,
@@ -111,9 +108,19 @@ class BentoAppender(ConfigReader):
             stdout_success(msg=f"Annotations for {str(len(self.saved_files))} video(s) and saved in the {self.targets_folder}.")
 
     def __save(self):
-        write_df(df=self.results, file_type=self.file_type, save_path=self.save_path)
+        # Patch 122ak: write labels-only via save_labels_for_video
+        # to derived/labels/<video>.parquet. self.results is the
+        # combined features+labels DataFrame; project to
+        # classifier-target columns for the save.
+        from mufasa.utils.label_io import save_labels_for_video
+        labels_df = self.results[self.clf_names]
+        self.save_path = save_labels_for_video(
+            video_name=self.video_name,
+            config_path=self.config_path,
+            labels=labels_df,
+        )
         self.saved_files.append(self.save_path)
-        print(f"BENTO annotations appended to video {self.video_name} and saved in {self.save_path}")
+        print(f"BENTO annotations appended to video {self.video_name} and saved at {self.save_path}")
 
 
 

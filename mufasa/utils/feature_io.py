@@ -2,18 +2,14 @@
 mufasa.utils.feature_io
 ========================
 
-Single read API for per-video features. Reads from the v1 per-
-family parquet tree first; falls back to the legacy wide CSV
-under ``csv/features_extracted/`` so consumers can adopt this
-helper before writers retarget to parquet in patches 122ae-3
-and 122ae-4.
+v1-native read API for per-video features. Reads from
+``derived/features/`` only — both the per-family parquet tree
+(from FeatureSubsetsCalculator) and the wide-parquet sidecar
+(from the bulk feature extractors). The legacy
+``csv/features_extracted/`` fallback was removed in patch
+122ak; v1 layout is the only supported layout.
 
-Shipped in patch 122ae-2. Replaces ~7 call sites that each
-read ``csv/features_extracted/<video>.<ext>`` directly and
-branch on ``file_type``: classifier training, classifier
-inference, frame labeller, clip review, analysis plots,
-visualization plots, and the FeatureSubsetsCalculator's
-internal read paths.
+Shipped in patch 122ae-2. v1-only in 122ak.
 
 Public API
 ----------
@@ -24,44 +20,33 @@ Public API
 
 :func:`load_features_for_video` — read all (or selected)
     feature families for one video into one wide DataFrame.
+    Raises FileNotFoundError if no v1 features exist.
+
+:func:`write_wide_features_v1` — write a wide DataFrame as a
+    v1-native sidecar parquet.
+
+:func:`list_video_stems_with_features` — enumerate video stems
+    with features anywhere under ``derived/features/``.
 
 Per-family parquet layout
 -------------------------
 ::
 
     <project_root>/derived/features/
+    ├── <video_001>.parquet                # wide-parquet sidecar
+    │                                        from bulk extractors
     ├── two_point_body_part_distances_mm/
-    │   ├── video_001.parquet
-    │   └── video_002.parquet
+    │   ├── <video_001>.parquet
+    │   └── <video_002>.parquet
     ├── within_animal_three_point_body_part_angles_degrees/
-    │   ├── video_001.parquet
+    │   ├── <video_001>.parquet
     │   └── …
     └── …
 
-Each parquet file holds the columns for exactly one family for
-one video. Concatenating per-family files horizontally
-(``pd.concat(..., axis=1)``) yields the same wide schema the
-legacy CSV produced — by construction, since the writers will
-slice the wide DataFrame by family and write each slice
-separately.
-
-Legacy fallback
----------------
-If the per-family tree doesn't exist OR doesn't contain any
-matching files for ``video_name``, the helper falls back to
-reading the legacy wide CSV at
-``<features_extracted_dir>/<video>.<ext>`` (ext from the
-project's ``import_file_type``). This lets:
-
-* Existing projects (CSV-only on disk) keep working without
-  migration.
-* The reader land in patches 122ae-2 (this patch) before any
-  writer retargets to parquet in 122ae-3 + 122ae-4.
-
-After 122ae-4 ships, the legacy fallback stays in place
-indefinitely so that historical CSV projects remain readable.
-The fallback is read-only — this helper never writes the
-legacy format.
+Per-family files (subdirs) take precedence over the wide
+parquet for any column-name conflict — per-family files come
+from explicit user re-computations and represent the most
+recent values; the wide parquet is the baseline.
 """
 from __future__ import annotations
 
@@ -73,8 +58,7 @@ from typing import List, Optional
 
 import pandas as pd
 
-from mufasa.project_layout import (project_metadata_from_config,
-                                   project_paths_from_config)
+from mufasa.project_layout import project_paths_from_config
 
 
 __all__ = [
@@ -119,63 +103,11 @@ def _strip_video_ext(video_name: str) -> str:
     return Path(video_name).stem
 
 
-def _legacy_csv_path(video_name: str, *, config_path: str) -> Optional[str]:
-    """Resolve the legacy wide-CSV path for ``video_name`` based on
-    the project's ``import_file_type``. Returns None if the
-    project's metadata is unreadable (defensive — keeps the
-    caller's error story consistent regardless of cause)."""
-    try:
-        paths = project_paths_from_config(config_path)
-        meta = project_metadata_from_config(config_path)
-    except Exception:
-        return None
-    ext = meta.get("import_file_type", meta.get("file_type", "csv"))
-    return os.path.join(
-        paths["features_extracted_dir"],
-        f"{_strip_video_ext(video_name)}.{ext}",
-    )
-
-
-def _read_legacy(path: str) -> pd.DataFrame:
-    """Read a legacy wide features file (CSV / parquet / H5).
-
-    Patch 122ae-5: aligned with :func:`mufasa.utils.read_write.read_df`'s
-    default behaviour of stripping the leading pad column that
-    SimBA's ``write_df(has_index=True)`` writes. The pad column
-    is a positional index serialised as the first CSV column;
-    SimBA's own readers drop it on load (see read_write.py
-    line 146 in the post-122ae-1 tree: ``df = df.iloc[:, 1:]``).
-    Without this strip, swapping a ``read_df(...)`` call site to
-    ``load_features_for_video(...)`` would leave consumers with
-    an extra unnamed first column that breaks their column-name
-    assumptions.
-
-    The strip is CSV-only — parquet files written by 122ae-3
-    and 122ae-4 don't have a pad column (they're written with
-    ``index=False``), and H5 files come through pd.read_hdf
-    with their original index handling intact.
-
-    Mirrors read_df's default ``has_index=True`` semantic.
-    Callers that legitimately wrote a CSV without a pad column
-    would now get their first column silently dropped — but no
-    known caller does that for the features_extracted tree
-    specifically (it's exclusively written via write_df), so
-    this is safe.
-    """
-    ext = Path(path).suffix.lower()
-    if ext == ".csv":
-        df = pd.read_csv(path)
-        # Strip the leading pad column. Matches read_df default.
-        if df.shape[1] > 0:
-            df = df.iloc[:, 1:]
-        return df
-    if ext == ".parquet":
-        return pd.read_parquet(path)
-    if ext in (".h5", ".hdf5"):
-        return pd.read_hdf(path)
-    raise ValueError(
-        f"Unsupported legacy features extension {ext!r} at {path}",
-    )
+# Patch 122ak: _legacy_csv_path and _read_legacy removed. v1
+# projects are the only supported layout; features live under
+# derived/features/. If callers need to import legacy CSVs as
+# input, they should run feature extraction (which now writes
+# v1-native parquets) from scratch.
 
 
 def load_features_for_video(
@@ -327,21 +259,21 @@ def load_features_for_video(
         )
         return merged
 
-    # ---- Legacy fallback ----
-    legacy_path = _legacy_csv_path(stem, config_path=config_path)
-    if legacy_path and os.path.isfile(legacy_path):
-        return _read_legacy(legacy_path)
-
     # ---- Nothing found ----
+    # Patch 122ak: legacy fallback removed. v1 projects store
+    # features under derived/features/<video>.parquet (wide
+    # extractor) and/or derived/features/<slug>/<video>.parquet
+    # (per-family writer). If neither produced a file for this
+    # video, raise — features must be extracted first.
     wide_path_str = (
         os.path.join(derived_root, f"{stem}.parquet")
         if derived_root else None
     )
     raise FileNotFoundError(
         f"No features found for video {stem!r}. Looked under "
-        f"{derived_root!r} (per-family tree), "
-        f"{wide_path_str!r} (wide parquet), and "
-        f"{legacy_path!r} (legacy wide file)."
+        f"{derived_root!r} (per-family tree) and "
+        f"{wide_path_str!r} (wide parquet). Run feature "
+        f"extraction first."
     )
 
 
@@ -474,20 +406,7 @@ def list_video_stems_with_features(
                 ):
                     stems.add(Path(name).stem)
 
-    legacy_dir = paths.get("features_extracted_dir")
-    if legacy_dir and os.path.isdir(legacy_dir):
-        # Extension is whatever the project's import_file_type
-        # says — but we also accept .csv and .parquet as a
-        # safety net in case the metadata is out of sync with
-        # what's actually on disk.
-        for name in os.listdir(legacy_dir):
-            full = os.path.join(legacy_dir, name)
-            if not os.path.isfile(full):
-                continue
-            if name.startswith("."):
-                continue
-            ext = Path(name).suffix.lower()
-            if ext in (".csv", ".parquet", ".h5", ".hdf5"):
-                stems.add(Path(name).stem)
+    # Patch 122ak: legacy csv/features_extracted/ scan removed.
+    # v1 layout (derived/features/) is the only source of truth.
 
     return sorted(stems)
