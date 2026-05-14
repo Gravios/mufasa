@@ -23,6 +23,13 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_fn_ext, read_data_paths, read_df,
                                     write_df)
 from mufasa.utils.warnings import DuplicateNamesWarning, ROIWarning
+# Patch 122ae-5b: layout-aware feature reader for the append
+# branch below (the read at the os.path.join(self.features_dir,
+# ...) site). Discovery (self.feature_file_paths) still uses
+# the legacy directory scan since it's the input contract this
+# class operates on — the read swap alone is sufficient to make
+# v1 projects' append-mode work.
+from mufasa.utils.feature_io import load_features_for_video
 
 
 class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
@@ -169,8 +176,18 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
                             self.summary.loc[len(self.summary)] = [self.video_name, animal_name, shape_name, "Total direction time (s)", round((float(self.out_df[c].sum()) / self.fps), 4)]
                 video_timer.stop_timer()
                 if self.append_data:
+                    # Patch 122ae-5b: read via load_features_for_video
+                    # so v1 (derived/features/) and legacy
+                    # (csv/features_extracted/) projects both
+                    # resolve. The downstream write_df still
+                    # targets the legacy features_dir path —
+                    # consumers reading from there (and v1
+                    # consumers reading via the load helper)
+                    # both see the augmented columns.
                     feature_path = os.path.join(self.features_dir, f'{self.video_name}.{self.file_type}')
-                    features_df = read_df(file_path=feature_path, file_type=self.file_type)
+                    features_df = load_features_for_video(
+                        self.video_name, self.config_path,
+                    )
                     duplicated_columns = [x for x in features_df.columns if x in self.out_df.columns]
                     if len(duplicated_columns) > 0:
                         DuplicateNamesWarning(msg=f'Some new ROI feature column names already exist in the {feature_path} file and have been duplicated: {duplicated_columns}', source=self.__class__.__name__)

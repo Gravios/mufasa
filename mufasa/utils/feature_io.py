@@ -79,6 +79,7 @@ from mufasa.project_layout import (project_metadata_from_config,
 
 __all__ = [
     "family_slug",
+    "list_video_stems_with_features",
     "load_features_for_video",
     "write_wide_features_v1",
 ]
@@ -405,3 +406,88 @@ def write_wide_features_v1(
     out_path = os.path.join(derived_features_dir, f"{stem}.parquet")
     df.to_parquet(out_path, index=False)
     return out_path
+
+
+def list_video_stems_with_features(
+    config_path: str,
+) -> list[str]:
+    """Return the sorted union of video stems for which features
+    exist anywhere in the project (v1 layout AND legacy layout
+    combined).
+
+    Patch 122ae-5b: needed by consumers that previously did
+    directory-level discovery via
+    :func:`mufasa.utils.read_write.find_files_of_filetypes_in_directory`
+    on the legacy ``csv/features_extracted/`` tree. For v1
+    projects, features live across multiple locations
+    (per-family parquet subdirs, wide-parquet sidecar at the
+    derived/features/ root, AND the legacy tree during the
+    migration window), so a single-directory scan misses
+    videos. This helper consolidates discovery.
+
+    Lookup order:
+
+    1. Wide-parquet sidecar at
+       ``<derived_features_dir>/<stem>.parquet``.
+    2. Per-family files at
+       ``<derived_features_dir>/<family_slug>/<stem>.parquet``.
+       Multiple family-subdir occurrences of the same stem
+       count once.
+    3. Legacy wide CSV / parquet at
+       ``<features_extracted_dir>/<stem>.<ext>``.
+
+    The output is the union — a stem appears once even if it
+    has files in multiple layouts. Consumers can then call
+    :func:`load_features_for_video` per stem; that helper
+    merges the available sources.
+
+    :param config_path: Path to ``project.toml`` (v1) or
+        ``project_config.ini`` (legacy).
+    :returns: Sorted list of video stems. Empty list if the
+        project has no features anywhere.
+    """
+    try:
+        paths = project_paths_from_config(config_path)
+    except Exception:
+        return []
+    stems: set[str] = set()
+
+    derived_root = paths.get("derived_features_dir")
+    if derived_root and os.path.isdir(derived_root):
+        # Wide parquet (122ae-4 sidecar): files directly at the
+        # derived_features_dir root with .parquet extension.
+        for name in os.listdir(derived_root):
+            full = os.path.join(derived_root, name)
+            if os.path.isfile(full) and name.endswith(".parquet"):
+                stems.add(Path(name).stem)
+        # Per-family parquets (122ae-3): one subdir per family,
+        # each containing <stem>.parquet files.
+        for sub in os.listdir(derived_root):
+            sub_path = os.path.join(derived_root, sub)
+            if not os.path.isdir(sub_path):
+                continue
+            for name in os.listdir(sub_path):
+                full = os.path.join(sub_path, name)
+                if (
+                    os.path.isfile(full)
+                    and name.endswith(".parquet")
+                ):
+                    stems.add(Path(name).stem)
+
+    legacy_dir = paths.get("features_extracted_dir")
+    if legacy_dir and os.path.isdir(legacy_dir):
+        # Extension is whatever the project's import_file_type
+        # says — but we also accept .csv and .parquet as a
+        # safety net in case the metadata is out of sync with
+        # what's actually on disk.
+        for name in os.listdir(legacy_dir):
+            full = os.path.join(legacy_dir, name)
+            if not os.path.isfile(full):
+                continue
+            if name.startswith("."):
+                continue
+            ext = Path(name).suffix.lower()
+            if ext in (".csv", ".parquet", ".h5", ".hdf5"):
+                stems.add(Path(name).stem)
+
+    return sorted(stems)

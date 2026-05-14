@@ -22,6 +22,12 @@ from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_fn_ext, read_df, write_df)
 from mufasa.utils.warnings import NoFileFoundWarning
+# Patch 122ae-5b: layout-aware discovery + read so v1
+# projects (where features live under derived/features/)
+# don't get "Zero files found" when run without an explicit
+# features_dir override.
+from mufasa.utils.feature_io import (list_video_stems_with_features,
+                                      load_features_for_video)
 
 MINIMUM_BOUT_LENGTH = 'minimum_bout_length'
 THRESHOLD = 'threshold'
@@ -65,6 +71,26 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
             check_if_dir_exists(in_dir=features_dir, source=self.__class__.__name__)
             self.features_dir = deepcopy(features_dir)
             self.feature_file_paths = find_files_of_filetypes_in_directory(directory=self.features_dir, extensions=[f'.{self.file_type}'], raise_warning=False, raise_error=False)
+        else:
+            # Patch 122ae-5b: ConfigReader populates
+            # self.feature_file_paths via a glob of the legacy
+            # csv/features_extracted/ tree. For v1 projects
+            # that's empty (features live under derived/features/),
+            # which used to surface as "Zero files found" below.
+            # Re-derive the list from list_video_stems_with_features
+            # which unions both layouts. The pseudo-paths we
+            # construct are good enough for the downstream
+            # get_fn_ext stem extraction + length checks; the
+            # actual reads in run() go through load_features_for_video.
+            stems = list_video_stems_with_features(self.config_path)
+            if stems:
+                self.feature_file_paths = [
+                    os.path.join(
+                        self.features_dir,
+                        f"{stem}.{self.file_type}",
+                    )
+                    for stem in stems
+                ]
         if save_dir is not None:
             check_if_dir_exists(in_dir=save_dir, source=self.__class__.__name__)
             self.save_dir = deepcopy(save_dir)
@@ -95,7 +121,14 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
             _, file_name, _ = get_fn_ext(file_path)
             if self.verbose: stdout_information(msg=f"Analyzing video {file_name}... (Video {file_cnt+1}/{len(self.feature_file_paths)})")
             file_save_path = os.path.join(self.save_dir, f"{file_name}.{self.file_type}")
-            in_df = read_df(file_path, self.file_type)
+            # Patch 122ae-5b: read via load_features_for_video so
+            # v1 (derived/features/) and legacy
+            # (csv/features_extracted/) projects both resolve.
+            # file_path may be a pseudo-path under self.features_dir
+            # for v1 projects (constructed in __init__ from stems);
+            # the helper only needs the stem to find the actual
+            # data on disk.
+            in_df = load_features_for_video(file_name, self.config_path)
             x_df = self.drop_bp_cords(df=in_df).astype(np.float32)
             self.check_df_dataset_integrity(df=x_df, logs_path=self.logs_path, file_name=file_name)
             _, px_per_mm, fps = self.read_video_info(video_name=file_name, raise_error=False)
