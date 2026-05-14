@@ -129,7 +129,14 @@ class TrainModelMixin(object):
         :examples:
         >>> self.read_all_files_in_folder(file_paths=['targets_inserted/Video_1.csv', 'targets_inserted/Video_2.csv'], file_type='csv', classifier_names=['Attack'])
         """
-        check_filepaths_in_iterable_exist(file_paths=file_paths, name=self.__class__.__name__)
+        # Patch 122ae-5e: v1 mode (self.config_path set) skips the
+        # on-disk existence check — file_path entries may be
+        # pseudo-paths whose data lives in derived/features/ +
+        # derived/labels/. The load helpers resolve the actual
+        # location per-stem.
+        config_path = getattr(self, "config_path", None)
+        if config_path is None:
+            check_filepaths_in_iterable_exist(file_paths=file_paths, name=self.__class__.__name__)
         timer = SimbaTimer(start=True)
         frm_number_lst, dfs = [], []
         if len(file_paths) == 0:
@@ -137,7 +144,25 @@ class TrainModelMixin(object):
         for file_cnt, file in enumerate(file_paths):
             _, vid_name, _ = get_fn_ext(file)
             stdout_information(msg=f"Reading in {vid_name} (file {str(file_cnt + 1)}/{str(len(file_paths))})...")
-            df = (read_df(file, file_type).dropna(axis=0, how="all").fillna(0).astype(np.float32))
+            if config_path is not None:
+                # Patch 122ae-5e: read via load helpers in v1 mode.
+                from mufasa.utils.feature_io import \
+                    load_features_for_video
+                from mufasa.utils.label_io import \
+                    load_labels_for_video
+                features = load_features_for_video(vid_name, config_path)
+                labels = load_labels_for_video(vid_name, config_path)
+                labels = labels.reindex(
+                    features.index, fill_value=0,
+                ).fillna(0).astype(int)
+                df = (
+                    pd.concat([features, labels], axis=1)
+                    .dropna(axis=0, how="all")
+                    .fillna(0)
+                    .astype(np.float32)
+                )
+            else:
+                df = (read_df(file, file_type).dropna(axis=0, how="all").fillna(0).astype(np.float32))
             frm_number_lst.extend(list(df.index))
             df.index = [vid_name] * len(df)
             if classifier_names != None:
@@ -1692,14 +1717,42 @@ class TrainModelMixin(object):
     def _read_data_file_helper_futures(file_path: str,
                                        file_type: str,
                                        clf_names: Optional[List[str]] = None,
-                                       raise_bool_clf_error: bool = True):
+                                       raise_bool_clf_error: bool = True,
+                                       config_path: Optional[str] = None):
         """
         Private function called by :meth:`mufasa.train_model_functions.read_all_files_in_folder_mp_futures`
-        """
 
+        Patch 122ae-5e: takes an optional ``config_path``. When
+        provided, the per-video read goes through the v1-aware
+        load helpers (``load_features_for_video`` +
+        ``load_labels_for_video``) which span both the v1 layout
+        (derived/features/ + derived/labels/) and the legacy
+        layout (csv/features_extracted/ + csv/targets_inserted/).
+        The ``file_path`` argument is then a pseudo-path used
+        only for its stem; the actual data location is resolved
+        per-stem inside the helpers. When ``config_path`` is
+        None (legacy callers) the original ``read_df(file_path)``
+        path is preserved.
+        """
         timer = SimbaTimer(start=True)
         _, vid_name, _ = get_fn_ext(file_path)
-        df = read_df(file_path, file_type).dropna(axis=0, how="all").fillna(0)
+        if config_path is not None:
+            # v1-aware path — features + labels separately,
+            # combined in memory.
+            from mufasa.utils.feature_io import \
+                load_features_for_video
+            from mufasa.utils.label_io import load_labels_for_video
+            features = load_features_for_video(vid_name, config_path)
+            labels = load_labels_for_video(vid_name, config_path)
+            # Align labels to features row count (features wins).
+            labels = labels.reindex(
+                features.index, fill_value=0,
+            ).fillna(0).astype(int)
+            df = pd.concat(
+                [features, labels], axis=1,
+            ).dropna(axis=0, how="all").fillna(0)
+        else:
+            df = read_df(file_path, file_type).dropna(axis=0, how="all").fillna(0)
         frm_numbers = list(df.index)
         df.index = [vid_name] * len(df)
         if clf_names != None:
@@ -1742,7 +1795,14 @@ class TrainModelMixin(object):
         """
 
         THREADSAFE_CORE_COUNT = 16
-        check_filepaths_in_iterable_exist(file_paths=annotations_file_paths, name=self.__class__.__name__)
+        # Patch 122ae-5e: if v1 mode (self.config_path set), skip
+        # the on-disk existence check — file_path entries may be
+        # pseudo-paths whose data lives elsewhere
+        # (derived/features/, derived/labels/). The load helpers
+        # resolve the actual location per-stem.
+        config_path = getattr(self, "config_path", None)
+        if config_path is None:
+            check_filepaths_in_iterable_exist(file_paths=annotations_file_paths, name=self.__class__.__name__)
         try:
             # [Linux-only] Darwin spawn guard removed.
             cpu_cnt, _ = find_core_cnt()
@@ -1750,7 +1810,7 @@ class TrainModelMixin(object):
                 cpu_cnt = THREADSAFE_CORE_COUNT
             dfs, frm_number_list = [], []
             with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_cnt) as executor:
-                results = [executor.submit(self._read_data_file_helper_futures, data, file_type, classifier_names, raise_bool_clf_error) for data in annotations_file_paths]
+                results = [executor.submit(self._read_data_file_helper_futures, data, file_type, classifier_names, raise_bool_clf_error, config_path) for data in annotations_file_paths]
                 for result in concurrent.futures.as_completed(results):
                     dfs.append(result.result()[0])
                     frm_number_list.extend((result.result()[-1]))

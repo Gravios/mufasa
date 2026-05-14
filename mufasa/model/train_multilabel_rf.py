@@ -19,6 +19,30 @@ class TrainMultiLabelRandomForestClassifier(ConfigReader, TrainModelMixin):
     def __init__(self, config_path: Union[str, os.PathLike]):
         ConfigReader.__init__(self, config_path=config_path)
         TrainModelMixin.__init__(self)
+
+        # Patch 122ae-5e: v1-aware target_file_paths discovery.
+        # ConfigReader populates target_file_paths via a glob of
+        # the legacy csv/targets_inserted/ tree. For v1 projects
+        # (labels under derived/labels/<video>.parquet via the
+        # 122ae-5c sidecar), that glob returns empty. Re-derive
+        # via list_video_stems_with_labels which unions both
+        # layouts, constructing pseudo-paths under
+        # self.targets_folder for downstream code that uses
+        # get_fn_ext stem extraction. The actual reads in
+        # read_all_files_in_folder_mp_futures go through the
+        # load helpers via the new config_path branch.
+        if not self.target_file_paths:
+            from mufasa.utils.label_io import \
+                list_video_stems_with_labels
+            stems = list_video_stems_with_labels(self.config_path)
+            if stems:
+                self.target_file_paths = [
+                    os.path.join(
+                        self.targets_folder,
+                        f"{stem}.{self.file_type}",
+                    )
+                    for stem in stems
+                ]
         log_event(
             logger_name=str(self.__class__.__name__),
             log_type=TagNames.CLASS_INIT.value,
