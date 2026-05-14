@@ -20,6 +20,12 @@ from mufasa.utils.read_write import (bento_file_reader,
 from mufasa.utils.warnings import (
     ThirdPartyAnnotationsClfMissingWarning,
     ThirdPartyAnnotationsOutsidePoseEstimationDataWarning)
+# Patch 122ae-5b: layout-aware feature reader for the
+# per-video read inside run(). The existence check on
+# features_path is replaced with a try/except around
+# load_features_for_video so v1 projects (where features
+# live under derived/features/) resolve correctly.
+from mufasa.utils.feature_io import load_features_for_video
 
 
 class BentoAppender(ConfigReader):
@@ -61,11 +67,25 @@ class BentoAppender(ConfigReader):
             _, self.video_name, ext = get_fn_ext(filepath=bento_file_path)
             print(f"Appending BENTO annotation to video {self.video_name}...")
             _, _, fps = self.read_video_info(video_name=self.video_name)
+            # Patch 122ae-5b: read via load_features_for_video so
+            # v1 + legacy both work. The existence check on the
+            # specific legacy path is replaced with the helper's
+            # FileNotFoundError, wrapped to preserve the
+            # NoFilesFoundError shape downstream consumers expect.
             features_path = os.path.join(self.features_dir, self.video_name + f'.{self.file_type}')
-            if not os.path.isfile(features_path):
-                raise NoFilesFoundError(msg=f'No features file for annotation file {self.video_name} file in {self.features_dir}. SimBA is expecting a file at path {features_path}')
             self.save_path = os.path.join(self.targets_folder, self.video_name + f'.{self.file_type}')
-            feature_df = read_df(file_path=features_path, file_type=self.file_type)
+            try:
+                feature_df = load_features_for_video(
+                    self.video_name, self.config_path,
+                )
+            except FileNotFoundError as exc:
+                raise NoFilesFoundError(
+                    msg=(
+                        f'No features file for annotation file '
+                        f'{self.video_name}: {exc}'
+                    ),
+                    source=self.__class__.__name__,
+                )
             self.results = deepcopy(feature_df)
             bento_dict = bento_file_reader(file_path=bento_file_path, fps=fps, save_path=None, orient='index')
             for clf_name in self.clf_names:

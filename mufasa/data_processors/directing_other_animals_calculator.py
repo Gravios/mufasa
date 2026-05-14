@@ -24,6 +24,13 @@ from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
                                   stdout_success)
 from mufasa.utils.read_write import (create_directory, get_fn_ext, read_df,
                                     seconds_to_timestamp, write_df)
+# Patch 122ae-5b: layout-aware feature reader for the
+# append-bool-tables-to-features branch in run(). Only the
+# READ swaps — the write back via write_df continues to
+# target the legacy features_dir path so downstream legacy
+# consumers (and the load helper's legacy fallback) see the
+# augmented columns.
+from mufasa.utils.feature_io import load_features_for_video
 
 NOSE, EAR_LEFT, EAR_RIGHT = Keys.NOSE.value, Keys.EAR_LEFT.value, Keys.EAR_RIGHT.value
 X_BPS, Y_BPS = Keys.X_BPS.value, Keys.Y_BPS.value
@@ -197,7 +204,13 @@ class DirectingOtherAnimalsAnalyzer(ConfigReader, FeatureExtractionMixin):
                         video_df[f"{animal_permutation}_{body_part_name}"] = (body_part_data["Directing_BOOL"])
                 if self.append_bool_tables_to_features:
                     if self.verbose: print(f"Adding directionality tables to features data for video {video_name}...")
-                    df = read_df(file_path=os.path.join(self.features_dir, f"{video_name}.{self.file_type}"), file_type=self.file_type)
+                    # Patch 122ae-5b: layout-aware feature read.
+                    # The downstream write_df continues to target
+                    # the legacy features_dir for back-compat
+                    # with the legacy reader path.
+                    df = load_features_for_video(
+                        video_name, self.config_path,
+                    )
                     if len(df) != len(video_df):
                         raise CountError(msg=f"Failed to join data files as they contains different number of frames: the file representing video {video_name} in directory {self.outlier_corrected_dir} contains {len(video_df)} frames, and the file representing video {video_name} in directory {self.features_dir} contains {len(df)} frames.")
                     df = pd.concat([df.reset_index(drop=True), video_df.reset_index(drop=True)], axis=1)
