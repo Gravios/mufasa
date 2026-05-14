@@ -77,7 +77,11 @@ from mufasa.project_layout import (project_metadata_from_config,
                                    project_paths_from_config)
 
 
-__all__ = ["family_slug", "load_features_for_video"]
+__all__ = [
+    "family_slug",
+    "load_features_for_video",
+    "write_wide_features_v1",
+]
 
 
 _SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
@@ -203,6 +207,7 @@ def load_features_for_video(
         paths = {}
     derived_root = paths.get("derived_features_dir")
     parquet_frames: list[pd.DataFrame] = []
+    wide_parquet_df: Optional[pd.DataFrame] = None
 
     if derived_root and os.path.isdir(derived_root):
         # Pick the subdirs to scan. If the caller passed an explicit
@@ -232,21 +237,76 @@ def load_features_for_video(
                     stacklevel=2,
                 )
 
-    if parquet_frames:
-        # Concat horizontally, aligned by position. Duplicate
-        # column names are possible if a family was renamed in
-        # the writer between runs — flag them, keep first occurrence.
-        merged = pd.concat(parquet_frames, axis=1)
-        dupes = merged.columns[merged.columns.duplicated()].tolist()
-        if dupes:
-            warnings.warn(
-                f"Duplicate columns across feature families for "
-                f"{stem}: {dupes!r}. Keeping the first occurrence; "
-                f"check that family slug names don't collide.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            merged = merged.loc[:, ~merged.columns.duplicated()]
+        # Patch 122ae-4: also check for a wide parquet at the
+        # derived root (NOT inside a per-family subdir). This is
+        # what the full feature extractor writes — it produces one
+        # wide DataFrame per video and the per-family attribution
+        # isn't easily recoverable from column names, so it lands
+        # as a sidecar wide file rather than as per-family files.
+        # The families= filter is intentionally ignored for the
+        # wide file (since the wide file has all families merged;
+        # filtering would require column-name pattern matching
+        # which is deferred).
+        wide_path = os.path.join(derived_root, f"{stem}.parquet")
+        if os.path.isfile(wide_path):
+            try:
+                wide_parquet_df = pd.read_parquet(wide_path)
+            except Exception as exc:
+                warnings.warn(
+                    f"Failed to read wide parquet {wide_path}: "
+                    f"{exc}. Falling through to per-family / "
+                    f"legacy for {stem}.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+
+    if parquet_frames or wide_parquet_df is not None:
+        # Patch 122ae-4: merge precedence —
+        #   per-family columns OVERRIDE wide-parquet columns when
+        #   both exist with the same name. Rationale: per-family
+        #   files come from FeatureSubsetsCalculator runs that
+        #   were SPECIFICALLY re-computed by the user; the wide
+        #   parquet from the full extractor is the canonical
+        #   "all features" baseline. When the user re-runs a
+        #   family, they want the new values, not the baseline.
+        per_family = (
+            pd.concat(parquet_frames, axis=1)
+            if parquet_frames else pd.DataFrame()
+        )
+        # Drop duplicate columns WITHIN the per-family stack first
+        # (could happen if two slug dirs claim overlapping names).
+        if per_family.shape[1]:
+            dupes_pf = per_family.columns[
+                per_family.columns.duplicated()
+            ].tolist()
+            if dupes_pf:
+                warnings.warn(
+                    f"Duplicate columns across feature families "
+                    f"for {stem}: {dupes_pf!r}. Keeping the first "
+                    f"occurrence; check that family slug names "
+                    f"don't collide.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                per_family = per_family.loc[
+                    :, ~per_family.columns.duplicated()
+                ]
+        # Now merge with wide. Per-family wins for duplicates.
+        if wide_parquet_df is None:
+            return per_family
+        if per_family.empty:
+            return wide_parquet_df
+        # Both present — drop wide columns that per-family also has,
+        # then concat the rest. Aligned by row position.
+        wide_unique_cols = [
+            c for c in wide_parquet_df.columns
+            if c not in per_family.columns
+        ]
+        merged = pd.concat(
+            [per_family.reset_index(drop=True),
+             wide_parquet_df[wide_unique_cols].reset_index(drop=True)],
+            axis=1,
+        )
         return merged
 
     # ---- Legacy fallback ----
@@ -255,8 +315,76 @@ def load_features_for_video(
         return _read_legacy(legacy_path)
 
     # ---- Nothing found ----
+    wide_path_str = (
+        os.path.join(derived_root, f"{stem}.parquet")
+        if derived_root else None
+    )
     raise FileNotFoundError(
         f"No features found for video {stem!r}. Looked under "
-        f"{derived_root!r} (per-family parquet tree) and "
+        f"{derived_root!r} (per-family tree), "
+        f"{wide_path_str!r} (wide parquet), and "
         f"{legacy_path!r} (legacy wide file)."
     )
+
+
+def write_wide_features_v1(
+    df: pd.DataFrame,
+    video_name: str,
+    config_path: str,
+) -> Optional[str]:
+    """Write a wide-features DataFrame as a v1-native sidecar
+    parquet at ``<derived_features_dir>/<video>.parquet``.
+
+    Patch 122ae-4: bulk feature extractors (``feature_extractor_*bp``,
+    ``feature_extractor_user_defined``) produce a single wide
+    DataFrame per video — there's no easy per-family attribution
+    to recover from column names, so they can't write the
+    per-family layout that ``FeatureSubsetsCalculator`` writes
+    (via 122ae-3). Instead, they sidecar a wide parquet at the
+    derived-features root, picked up by
+    :func:`load_features_for_video`'s wide-parquet branch.
+
+    No-op for legacy (non-TOML) projects so projects that haven't
+    migrated don't gain a stray ``derived/`` subtree alongside
+    their ``csv/`` tree. v1 detection is by config file extension
+    — matches what
+    :class:`mufasa.mixins.config_reader.ConfigReader._is_v1` does.
+
+    :param df: The wide DataFrame to write. Written as-is; no
+        column-name suffixing or sorting (the legacy wide CSV
+        write already handled any such normalisation upstream).
+    :param video_name: Video stem; ``.mp4`` etc. tolerated and
+        stripped.
+    :param config_path: Path to ``project.toml`` (v1) or
+        ``project_config.ini`` (legacy). Used to (a) detect
+        v1-ness and (b) resolve ``derived_features_dir`` via the
+        layout helper.
+
+    :returns: The path written to, or ``None`` if no write
+        happened (legacy project, or the layout helper couldn't
+        resolve a path).
+    """
+    if not str(config_path).lower().endswith(".toml"):
+        # Legacy project — skip the v1 write so the project tree
+        # stays clean. Callers' legacy wide-CSV write was
+        # already performed upstream.
+        return None
+    try:
+        paths = project_paths_from_config(config_path)
+    except Exception as exc:
+        warnings.warn(
+            f"Cannot resolve derived_features_dir from "
+            f"{config_path!r}: {exc}. Skipping v1 wide-parquet "
+            f"sidecar write for {video_name!r}.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return None
+    derived_features_dir = paths.get("derived_features_dir")
+    if not derived_features_dir:
+        return None
+    os.makedirs(derived_features_dir, exist_ok=True)
+    stem = _strip_video_ext(video_name)
+    out_path = os.path.join(derived_features_dir, f"{stem}.parquet")
+    df.to_parquet(out_path, index=False)
+    return out_path

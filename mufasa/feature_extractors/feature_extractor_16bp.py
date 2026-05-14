@@ -1277,6 +1277,14 @@ class ExtractFeaturesFrom16bps(ConfigReader, FeatureExtractionMixin):
                 self.save_dir, self.video_name + "." + self.file_type
             )
             write_df(df=self.out_data, file_type=self.file_type, save_path=save_path)
+            # Patch 122ae-4: v1-native wide-parquet sidecar.
+            # No-op for legacy projects (the helper checks
+            # the project_config extension internally).
+            from mufasa.utils.feature_io import write_wide_features_v1
+            write_wide_features_v1(
+                df=self.out_data, video_name=self.video_name,
+                config_path=self.config_path,
+            )
             video_timer.stop_timer()
             print(
                 f"Feature extraction complete for {self.video_name} ({file_cnt + 1}/{len(self.files_found)} (elapsed time: {video_timer.elapsed_time_str}s)..."

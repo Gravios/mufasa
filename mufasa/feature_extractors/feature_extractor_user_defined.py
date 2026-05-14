@@ -181,6 +181,15 @@ class UserDefinedFeatureExtractor(ConfigReader, FeatureExtractionMixin):
             save_path = os.path.join(self.save_dir, file_name + "." + self.file_type)
             self.data_df = self.data_df.reset_index(drop=True).fillna(0)
             write_df(df=self.data_df, file_type=self.file_type, save_path=save_path)
+            # Patch 122ae-4: v1-native wide-parquet sidecar.
+            # user_defined names the video via `file_name`
+            # (local from get_fn_ext) rather than
+            # `self.video_name` like the other extractors.
+            from mufasa.utils.feature_io import write_wide_features_v1
+            write_wide_features_v1(
+                df=self.data_df, video_name=file_name,
+                config_path=self.config_path,
+            )
             video_timer.stop_timer()
             print(f"Feature extraction complete for video {file_name} (elapsed time: {video_timer.elapsed_time_str}s)")
 
