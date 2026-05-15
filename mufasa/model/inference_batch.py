@@ -91,9 +91,26 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
                     )
                     for stem in stems
                 ]
+        # Patch 122ax: the legacy csv/machine_results/ write is
+        # gone. save_dir used to redirect that write; it's now a
+        # no-op kept for back-compat with external callers. The
+        # v1 sidecar writes to a fixed location derived from
+        # config_path (derived/classifications/<video>.parquet).
+        # If the user passed an explicit save_dir that differs
+        # from the v1 location, surface a warning in verbose mode
+        # so they know their override no longer takes effect.
         if save_dir is not None:
             check_if_dir_exists(in_dir=save_dir, source=self.__class__.__name__)
             self.save_dir = deepcopy(save_dir)
+            if verbose:
+                stdout_information(
+                    msg=(
+                        f"[122ax] InferenceBatch save_dir override "
+                        f"({save_dir!r}) is ignored. v1 predictions "
+                        f"land under derived/classifications/ "
+                        f"relative to {self.config_path}."
+                    ),
+                )
         else:
             self.save_dir = self.machine_results_dir
         TrainModelMixin.__init__(self)
@@ -120,7 +137,6 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
             video_timer = SimbaTimer(start=True)
             _, file_name, _ = get_fn_ext(file_path)
             if self.verbose: stdout_information(msg=f"Analyzing video {file_name}... (Video {file_cnt+1}/{len(self.feature_file_paths)})")
-            file_save_path = os.path.join(self.save_dir, f"{file_name}.{self.file_type}")
             # Patch 122ae-5b: read via load_features_for_video so
             # v1 (derived/features/) and legacy
             # (csv/features_extracted/) projects both resolve.
@@ -163,41 +179,29 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
                             if self.verbose: stdout_information(msg=f'Correcting minimum bouts in video {file_name} and classifier {m_hyp[MODEL_NAME]} ({clf_min_bout}ms)...')
                             out_df = plug_holes_shortest_bout(data_df=out_df, clf_name=f'{m_hyp[MODEL_NAME]}_{model_subset_name}', fps=fps, shortest_bout=clf_min_bout)
                     with open(self.config_path, "w") as f: self.config.write(f)
-            write_df(df=out_df, file_type=self.file_type, save_path=file_save_path)
-            # Patch 122at: dual-write to v1 layout. Predictions-only
-            # parquet at derived/classifications/<video>.parquet,
-            # extracted from the combined out_df by classifier
-            # target names. The legacy CSV write above stays for
-            # the dual-write era so existing consumers keep working;
-            # follow-up patches migrate consumers to read v1, and a
-            # final patch drops the legacy write.
-            try:
-                from mufasa.utils.classification_io import (
-                    save_classifications_for_video,
-                    _prediction_columns,
+            # Patch 122ax: close out the dual-write era. The
+            # legacy write_df(out_df, ..., csv/machine_results/)
+            # call is removed — every in-process consumer now
+            # reads via load_machine_results_for_video, every
+            # remaining MP-worker consumer keeps working from
+            # the v1 sidecar once it's threaded with config_path
+            # (separate small lane).
+            #
+            # The v1 helper is now the primary (and only) write.
+            # Failures bubble up instead of being swallowed —
+            # this is the canonical write site now, so silent
+            # degradation would corrupt the project.
+            from mufasa.utils.classification_io import (
+                save_classifications_for_video,
+                _prediction_columns,
+            )
+            pred_cols = _prediction_columns(out_df, self.clf_names)
+            if pred_cols:
+                save_classifications_for_video(
+                    video_name=file_name,
+                    config_path=self.config_path,
+                    predictions=out_df[pred_cols],
                 )
-                pred_cols = _prediction_columns(out_df, self.clf_names)
-                if pred_cols:
-                    save_classifications_for_video(
-                        video_name=file_name,
-                        config_path=self.config_path,
-                        predictions=out_df[pred_cols],
-                    )
-            except Exception as exc:
-                # Sidecar write must never block the legacy flow.
-                # The verbose-mode print keeps this visible in logs
-                # so the migration doesn't silently degrade.
-                if self.verbose:
-                    stdout_information(
-                        msg=(
-                            f"[122at] v1 classifications sidecar "
-                            f"write for {file_name} failed: "
-                            f"{type(exc).__name__}: {exc}. The "
-                            f"legacy {file_save_path} write "
-                            f"succeeded; v1 consumers will fall "
-                            f"back to that."
-                        ),
-                    )
             video_timer.stop_timer()
             if self.verbose: stdout_information(msg=f"Predictions created for {file_name} (frame count: {len(in_df)}, elapsed time: {video_timer.elapsed_time_str}) ...")
         self.timer.stop_timer()

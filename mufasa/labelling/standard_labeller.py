@@ -105,16 +105,40 @@ class LabellingInterface(ConfigReader):
         self.video_last_played_frm_path = os.path.join(os.path.dirname(self.config_path), "labelling_info.txt")
         self.main_window = Toplevel()
         if thresholds is not None:
-            if not os.path.isfile(self.machine_results_file_path):
-                raise NoFilesFoundError(msg=f'When doing pseudo-annotations, SimBA expects a file at {self.machine_results_file_path} representing video {self.video_name}. SimBA could not find this file.', source=self.__class__.__name__)
-            # Patch 122aw: dual-read via classification_io helper.
+            # Patch 122ax: rail relaxed for v1 projects. Accept
+            # predictions from either derived/classifications/
+            # (v1) or csv/machine_results/ (legacy).
             from mufasa.utils.classification_io import (
                 load_machine_results_for_video,
+                list_video_stems_with_classifications,
             )
+            _v1_stems = list_video_stems_with_classifications(
+                self.config_path,
+            )
+            _v1_has = self.video_name in _v1_stems
+            _legacy_has = os.path.isfile(
+                self.machine_results_file_path,
+            )
+            if not _v1_has and not _legacy_has:
+                raise NoFilesFoundError(
+                    msg=(
+                        f"When doing pseudo-annotations, SimBA "
+                        f"expects predictions for video "
+                        f"{self.video_name!r} either at "
+                        f"derived/classifications/"
+                        f"{self.video_name}.parquet (v1) or at "
+                        f"{self.machine_results_file_path} "
+                        f"(legacy). Neither was found."
+                    ),
+                    source=self.__class__.__name__,
+                )
             self.data_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=self.machine_results_file_path,
+                legacy_fallback=(
+                    self.machine_results_file_path
+                    if _legacy_has else None
+                ),
             )
             check_valid_dataframe(df=self.data_df, source=self.machine_results_file_path, required_fields=self.clf_names + self.p_cols)
             for clf in self.clf_names:

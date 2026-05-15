@@ -145,7 +145,11 @@ class TargetedClipsDialog(QDialog):
         )
         os.makedirs(self.target_dir, exist_ok=True)
         self.clips_json = os.path.join(self.target_dir, "clips.json")
-        self.machine_results_dir = paths["machine_results_dir"]
+        # Patch 122ax: machine_results_dir is now legacy-only.
+        # v1 projects don't define this key; consumers must handle
+        # None. Used as a legacy_fallback path builder when
+        # available; otherwise the helper handles v1 directly.
+        self.machine_results_dir = paths.get("machine_results_dir")
 
     def _load_existing_clips(self) -> None:
         if not os.path.isfile(self.clips_json):
@@ -462,14 +466,17 @@ class TargetedClipsDialog(QDialog):
             include_clip_time_in_filename=True,
         )
         # Data slicing — read machine_results and slice by frame
-        # range. Patch 122aw: dual-read via classification_io
-        # helper. v1 path: derived/features + derived/classifications
-        # joined. Legacy fallback: the legacy CSV (kept as the
-        # secondary path so projects that haven't run inference
-        # under 122at still work).
-        mr_path = os.path.join(
-            self.machine_results_dir,
-            f"{self.video_name}.{self.file_type}",
+        # range. v1 path (post-122ax): derived/features +
+        # derived/classifications joined. Legacy fallback: only
+        # built when self.machine_results_dir is not None (v1
+        # projects post-122ax don't set this key, so the
+        # fallback is None and the helper goes v1-only).
+        mr_path = (
+            os.path.join(
+                self.machine_results_dir,
+                f"{self.video_name}.{self.file_type}",
+            )
+            if self.machine_results_dir is not None else None
         )
         try:
             from mufasa.utils.classification_io import (
@@ -479,7 +486,9 @@ class TargetedClipsDialog(QDialog):
                 video_name=self.video_name,
                 config_path=self.config_path,
                 legacy_fallback=(
-                    mr_path if os.path.isfile(mr_path) else None
+                    mr_path
+                    if mr_path is not None and os.path.isfile(mr_path)
+                    else None
                 ),
             )
         except FileNotFoundError:

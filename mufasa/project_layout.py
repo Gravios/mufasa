@@ -796,7 +796,11 @@ def project_paths_from_config(
     ``derived/labels/``. The remaining two stay until classifier
     inference output migrates to v1:
 
-    * ``machine_results_dir`` — ``<root>/csv/machine_results/``
+    * ``machine_results_dir`` — ``<project_path>/csv/machine_results/``
+      (**legacy only**, post-122ax). v1 projects no longer have
+      this key — predictions live under
+      ``derived_classifications_dir``. Consumers reading this key
+      should use ``.get("machine_results_dir")`` and handle None.
       (both layouts).
     * ``roi_definitions_path`` — ``<root>/logs/measures/ROI_definitions.h5``
       (both layouts).
@@ -864,24 +868,22 @@ def project_paths_from_config(
             "logs_dir":               str(root / "logs"),
             "video_info_path":        str(root / "sources" / "video_info.csv"),
             "models_dir":             str(root / "models"),
-            # Patch 122ao: features_extracted_dir +
-            # targets_inserted_dir keys removed. v1 layout uses
-            # derived_features_dir + derived_labels_dir
-            # exclusively for features/labels storage. The
-            # remaining csv/<kind>/ key (machine_results_dir)
-            # stays until classifier inference output migrates
-            # to v1.
-            "machine_results_dir":    str(root / "csv" / "machine_results"),
+            # Patch 122ax: machine_results_dir is gone from v1
+            # projects. The csv/ subtree no longer exists at all
+            # under a v1 layout — predictions live exclusively
+            # under derived/classifications/<video>.parquet.
+            # This is the last csv/<kind>/ key that was carried
+            # through; with it dropped, the v1 layout is fully
+            # the new shape (logs/, models/, sources/, derived/).
             "roi_definitions_path":   str(root / "logs" / "measures"
                                           / "ROI_definitions.h5"),
             # Patch 122ae-1: per-family parquet trees for derived data.
             "derived_features_dir":   str(root / "derived" / "features"),
             "derived_labels_dir":     str(root / "derived" / "labels"),
-            # Patch 122at: per-video classifier predictions land here
-            # (parquet, predictions-only — features stay in
-            # derived/features/). Dual-write era: InferenceBatch
-            # writes here AND to the legacy machine_results_dir
-            # until the consumer migration is complete.
+            # Patch 122at: per-video classifier predictions land
+            # here (parquet, predictions-only — features stay in
+            # derived/features/). Now the sole write location
+            # post-122ax (was dual-write until then).
             "derived_classifications_dir":
                 str(root / "derived" / "classifications"),
         }
