@@ -173,9 +173,17 @@ class ClassifierValidationClipsMultiprocess(ConfigReader):
     def run(self):
         for file_cnt, file_path in enumerate(self.data_paths):
             video_timer = SimbaTimer(start=True)
-            self.data_df = read_df(file_path, self.file_type)
-            check_that_column_exist(df=self.data_df, column_name=self.p_col, file_name=file_path)
             _, file_name, _ = get_fn_ext(file_path)
+            # Patch 122ay: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.data_df = load_machine_results_for_video(
+                video_name=file_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
+            check_that_column_exist(df=self.data_df, column_name=self.p_col, file_name=file_path)
             self.video_path = self.find_video_of_file(video_dir=self.video_dir, filename=file_name, raise_error=True)
             self.video_info = get_video_meta_data(video_path=self.video_path)
             self.fps = int(self.video_info["fps"])

@@ -234,7 +234,15 @@ class HeatMapperClfMultiprocess(ConfigReader, PlottingMixin):
                 video_bg_img = read_frm_of_video(video_path=video_path, frame_index=video_bg_index, greyscale=False)
             else:
                 video_bg_img = None
-            self.data_df = read_df(file_path=file_path, file_type=self.file_type)
+            # Patch 122ay: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.data_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             check_valid_dataframe(df=self.data_df, required_fields=[self.clf_name] + self.bp_lst, valid_dtypes=Formats.NUMERIC_DTYPES.value)
             if self.time_slice is not None:
                 frm_numbers = find_frame_numbers_from_time_stamp(start_time=self.time_slice[START_TIME], end_time=self.time_slice[END_TIME], fps=self.fps)
