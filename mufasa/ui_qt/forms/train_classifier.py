@@ -28,15 +28,14 @@ workbench main window — same pattern as 122aj, 122al, 122ap.
 
 What's persisted
 ----------------
-All fields write to the ``[create_ensemble_settings]`` section
-of ``project_config.ini`` using the same keys
-:data:`MLParamKeys.*` the Tk popup did, so
-:class:`TrainRandomForestClassifier`'s settings reader picks
-them up unchanged.
-
-For v1 TOML-only projects (no backing INI), Save / Train both
-raise a clear error pointing to the future
-``[classifier_training]`` TOML section — same deferral as 122ap.
+All fields write to whichever config format the project uses.
+Legacy ``.ini`` projects write to ``[create_ensemble_settings]``
+using the same keys :class:`TrainRandomForestClassifier`'s
+settings reader expects. v1 ``.toml`` projects write to the
+``[classifier_training]`` table with the same key names
+(proper-typed values though — bools as bools, ints as ints).
+The TOML→CP translator in 122as injects the values into the
+legacy CP section name the trainer reads from.
 
 What's deferred from Tk parity
 ------------------------------
@@ -398,24 +397,39 @@ class TrainClassifierForm(OperationForm):
             return []
 
     def _load_from_ini(self) -> None:
-        """Hydrate field values from existing
-        ``[create_ensemble_settings]`` section if available."""
-        if (not self.config_path
-                or not str(self.config_path).lower().endswith(".ini")):
+        """Hydrate field values from whichever config format the
+        project uses (v1 ``[classifier_training]`` table or legacy
+        ``[create_ensemble_settings]`` section).
+
+        Patch 122as: this now delegates to
+        :func:`mufasa.project_layout.read_classifier_training_settings`,
+        which transparently handles both formats. Pre-122as this
+        method was INI-only and the form showed defaults on TOML
+        projects.
+        """
+        if not self.config_path:
             return
-        parser = configparser.ConfigParser()
         try:
-            parser.read(self.config_path)
-        except configparser.Error:
+            from mufasa.project_layout import (
+                read_classifier_training_settings,
+            )
+            cfg = read_classifier_training_settings(self.config_path)
+        except Exception:
             return
-        sec = "create_ensemble_settings"
-        if not parser.has_section(sec):
+        if not cfg:
             return
-        # Helpers
+
+        # Helpers — cfg values can be native types (TOML) or str (INI)
         def s(key: str, default: str = "") -> str:
-            return parser.get(sec, key, fallback=default).strip()
+            v = cfg.get(key, default)
+            return str(v).strip() if v is not None else default
         def b(key: str) -> bool:
-            return parser.get(sec, key, fallback="False").strip().lower() in ("true", "yes", "1")
+            v = cfg.get(key)
+            if isinstance(v, bool):
+                return v
+            return str(v or "False").strip().lower() in (
+                "true", "yes", "1",
+            )
 
         # Hydrate behavior
         clf = s("classifier")
@@ -499,80 +513,76 @@ class TrainClassifierForm(OperationForm):
                 self.eval_shap_mp.setCurrentIndex(idx)
 
     def _write_to_ini(self) -> None:
-        """Persist settings to ``[create_ensemble_settings]``. Same
-        key shape :class:`TrainRandomForestClassifier` reads."""
-        if not str(self.config_path).lower().endswith(".ini"):
-            raise RuntimeError(
-                "Training settings currently persist to "
-                "project_config.ini (legacy layout). v1-native "
-                "projects (project.toml) need a "
-                "[classifier_training] TOML section — deferred "
-                "until that's designed. For now, point this form "
-                "at a project with an .ini config."
-            )
-        parser = configparser.ConfigParser()
-        parser.read(self.config_path)
-        sec = "create_ensemble_settings"
-        if not parser.has_section(sec):
-            parser.add_section(sec)
-        # Algorithm fixed to RF (Tk dropdown was cosmetic)
-        parser.set(sec, "model_to_run", "RF")
-        parser.set(sec, "classifier", self.behavior_combo.currentText())
-        parser.set(sec, "rf_n_estimators", self.estimators.text().strip())
-        parser.set(sec, "rf_max_features",
-                   self.max_features.currentText())
-        parser.set(sec, "rf_criterion", self.criterion.currentText())
-        parser.set(sec, "train_test_size", self.test_size.currentText())
-        parser.set(sec, "train_test_split_type",
-                   self.tt_split.currentText())
-        parser.set(sec, "rf_min_sample_leaf", self.min_leaf.text().strip())
-        parser.set(sec, "under_sample_setting",
-                   self.undersample_setting.currentText())
-        parser.set(sec, "under_sample_ratio",
-                   self.undersample_ratio.text().strip())
-        parser.set(sec, "over_sample_setting",
-                   self.oversample_setting.currentText())
-        parser.set(sec, "over_sample_ratio",
-                   self.oversample_ratio.text().strip())
-        parser.set(sec, "class_weights",
-                   self.class_weight.currentText())
-        # Evaluations
-        parser.set(sec, "rf_metadata",
-                   str(self.eval_meta_data.isChecked()))
-        parser.set(sec, "generate_example_decision_tree",
-                   str(self.eval_dtree_gviz.isChecked()))
-        parser.set(sec, "generate_example_decision_tree_fancy",
-                   str(self.eval_dtree_dtviz.isChecked()))
-        parser.set(sec, "generate_classification_report",
-                   str(self.eval_clf_report.isChecked()))
-        parser.set(sec, "generate_features_importance_bar_graph",
-                   str(self.eval_bar_graph.isChecked()))
-        parser.set(sec, "n_feature_importance_bars",
-                   self.eval_bar_graph_n.text().strip())
-        parser.set(sec, "compute_feature_permutation_importance",
-                   str(self.eval_permutation.isChecked()))
-        parser.set(sec, "generate_learning_curve",
-                   str(self.eval_learning.isChecked()))
-        parser.set(sec, "learning_curve_k_splits",
-                   self.eval_learning_k.text().strip())
-        parser.set(sec, "learning_curve_data_splits",
-                   self.eval_learning_d.text().strip())
-        parser.set(sec, "generate_precision_recall_curve",
-                   str(self.eval_pr_curve.isChecked()))
-        parser.set(sec, "partial_dependency",
-                   str(self.eval_partial_dep.isChecked()))
-        parser.set(sec, "calculate_shap_scores",
-                   str(self.eval_shap.isChecked()))
-        parser.set(sec, "shap_target_present_no",
-                   self.eval_shap_present.text().strip())
-        parser.set(sec, "shap_target_absent_no",
-                   self.eval_shap_absent.text().strip())
-        parser.set(sec, "shap_save_iteration",
-                   self.eval_shap_cadence.currentText())
-        parser.set(sec, "shap_multiprocess",
-                   self.eval_shap_mp.currentText())
-        with open(self.config_path, "w") as fp:
-            parser.write(fp)
+        """Persist settings to whichever config format the project
+        uses (v1 ``[classifier_training]`` table or legacy
+        ``[create_ensemble_settings]`` section).
+
+        Patch 122as: previously raised RuntimeError on TOML
+        projects. Now delegates to
+        :func:`mufasa.project_layout.write_classifier_training_settings`
+        which handles both formats. v1 TOML projects get proper
+        typed values (bool / int / float); legacy INI projects get
+        the stringified shape the trainer's reader expects.
+        """
+        from mufasa.project_layout import (
+            write_classifier_training_settings,
+        )
+        settings: dict = {
+            # Algorithm fixed to RF (Tk dropdown was cosmetic)
+            "model_to_run":           "RF",
+            "classifier":             self.behavior_combo.currentText(),
+            "rf_n_estimators":        int(self.estimators.text().strip()),
+            "rf_max_features":        self.max_features.currentText(),
+            "rf_criterion":           self.criterion.currentText(),
+            "train_test_size":        self.test_size.currentText(),
+            "train_test_split_type":  self.tt_split.currentText(),
+            "rf_min_sample_leaf":     int(self.min_leaf.text().strip()),
+            "under_sample_setting":   self.undersample_setting.currentText(),
+            "under_sample_ratio":     self.undersample_ratio.text().strip(),
+            "over_sample_setting":    self.oversample_setting.currentText(),
+            "over_sample_ratio":      self.oversample_ratio.text().strip(),
+            "class_weights":          self.class_weight.currentText(),
+            # Evaluations — bool checkboxes
+            "rf_metadata":            bool(self.eval_meta_data.isChecked()),
+            "generate_example_decision_tree":
+                bool(self.eval_dtree_gviz.isChecked()),
+            "generate_example_decision_tree_fancy":
+                bool(self.eval_dtree_dtviz.isChecked()),
+            "generate_classification_report":
+                bool(self.eval_clf_report.isChecked()),
+            "generate_features_importance_bar_graph":
+                bool(self.eval_bar_graph.isChecked()),
+            "n_feature_importance_bars":
+                int(self.eval_bar_graph_n.text().strip()
+                    or "15"),
+            "compute_feature_permutation_importance":
+                bool(self.eval_permutation.isChecked()),
+            "generate_learning_curve":
+                bool(self.eval_learning.isChecked()),
+            "learning_curve_k_splits":
+                int(self.eval_learning_k.text().strip() or "5"),
+            "learning_curve_data_splits":
+                int(self.eval_learning_d.text().strip() or "10"),
+            "generate_precision_recall_curve":
+                bool(self.eval_pr_curve.isChecked()),
+            "partial_dependency":
+                bool(self.eval_partial_dep.isChecked()),
+            "calculate_shap_scores":
+                bool(self.eval_shap.isChecked()),
+            "shap_target_present_no":
+                int(self.eval_shap_present.text().strip()
+                    or "100"),
+            "shap_target_absent_no":
+                int(self.eval_shap_absent.text().strip()
+                    or "100"),
+            "shap_save_iteration":
+                self.eval_shap_cadence.currentText(),
+            "shap_multiprocess":
+                self.eval_shap_mp.currentText(),
+        }
+        write_classifier_training_settings(
+            self.config_path, settings,
+        )
 
     def _validate(self) -> None:
         if (self.behavior_combo.currentText()
