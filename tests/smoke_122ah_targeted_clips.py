@@ -113,9 +113,13 @@ def main() -> int:
         or "paths['project_root']" in tc_src,
     )
     check(
-        "targeted_clips reads paths['machine_results_dir'] directly",
+        "targeted_clips reads machine_results_dir from layout "
+        "(via subscript or .get — post-122ax the key is "
+        "absent on v1 projects so .get is the safe form)",
         'paths["machine_results_dir"]' in tc_src
-        or "paths['machine_results_dir']" in tc_src,
+        or "paths['machine_results_dir']" in tc_src
+        or 'paths.get("machine_results_dir")' in tc_src
+        or "paths.get('machine_results_dir')" in tc_src,
     )
 
     # ----- 5. file_type from metadata -----

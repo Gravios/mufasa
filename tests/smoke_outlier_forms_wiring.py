@@ -244,7 +244,13 @@ def check_page_order(page_tree: ast.AST) -> None:
                             forms_in_section.append(first.id)
             section_forms.append(forms_in_section)
 
+    # Patch 122bf: 122x moved "Preprocess Videos" and "Video
+    # Calibration" from data_import_page to this page. The 6
+    # original sections are still present in the same relative
+    # order, with the two new ones prepended.
     expected_order = [
+        "Preprocess Videos",
+        "Video Calibration",
         "Interpolate missing frames",
         "Kalman v2 smoothing",
         "Run outlier correction",

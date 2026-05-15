@@ -95,9 +95,12 @@ def main() -> int:
             f"{path.name}: imports load_machine_results_for_video",
             "load_machine_results_for_video" in src,
         )
+        # Patch 122bf: 122ax close-out renumbered some of
+        # 122aw's comments. Accept either patch ID — the
+        # important thing is the migration is recorded.
         check(
-            f"{path.name}: records 122aw",
-            "122aw" in src,
+            f"{path.name}: records 122aw or 122ax (close-out renumber)",
+            "122aw" in src or "122ax" in src,
         )
 
     # ==================================================================

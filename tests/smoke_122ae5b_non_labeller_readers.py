@@ -161,13 +161,17 @@ def main() -> int:
         # Also drop a hidden file that should be ignored.
         (legacy_dir / ".DS_Store").write_text("")
         stems = list_video_stems_with_features(str(toml))
+        # Patch 122bf: post-122ak, list_video_stems_with_features
+        # is v1-read-only — it doesn't scan legacy csv/ anymore.
+        # A v1 project with ONLY legacy CSVs returns [].
         check(
-            "discovery: legacy-CSV-only branch finds stems",
-            stems == ["v_legacy1", "v_legacy2"],
+            "discovery: legacy-CSV-only branch finds NOTHING "
+            "(v1-read-only post-122ak)",
+            stems == [],
             detail=f"got {stems}",
         )
 
-    # 1d — All three layouts, union without duplicates
+    # 1d — Wide + per-family (no legacy fallback in v1 discovery)
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
         toml = _make_v1_project(tmp)
@@ -189,7 +193,9 @@ def main() -> int:
                 / f"{stem}.parquet",
                 index=False,
             )
-        # Legacy CSV for v_alpha (also exists in wide) + v_delta
+        # Legacy CSV for v_alpha (also exists in wide) + v_delta —
+        # v_delta will NOT appear in the union (legacy-only stem
+        # ignored post-122ak).
         legacy_dir = tmp / "csv" / "features_extracted"
         legacy_dir.mkdir(parents=True)
         for stem in ["v_alpha", "v_delta"]:
@@ -197,9 +203,12 @@ def main() -> int:
                 legacy_dir / f"{stem}.csv", index=False,
             )
         stems = list_video_stems_with_features(str(toml))
+        # Patch 122bf: v_delta only exists as a legacy CSV, so it's
+        # excluded. Union is over the two v1 layouts only.
         check(
-            "discovery: all-three-layouts branch UNIONs stems",
-            stems == ["v_alpha", "v_beta", "v_delta", "v_gamma"],
+            "discovery: v1-only (wide + per-family) branch UNIONs stems "
+            "(legacy stems silently excluded post-122ak)",
+            stems == ["v_alpha", "v_beta", "v_gamma"],
             detail=f"got {stems}",
         )
 

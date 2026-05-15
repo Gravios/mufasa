@@ -154,9 +154,11 @@ def main() -> int:
     )
     pcp_src = pcp_path.read_text()
     check(
-        "Preprocessing page imports BatchPreProcessLauncher "
-        "(post-122x home)",
-        "BatchPreProcessLauncher" in pcp_src,
+        "Preprocessing page imports BatchPreProcessForm "
+        "(post-122x home; class renamed from "
+        "BatchPreProcessLauncher → BatchPreProcessForm during "
+        "the Qt port)",
+        "BatchPreProcessForm" in pcp_src,
     )
     check(
         "Preprocessing page registers 'Preprocess Videos' section "

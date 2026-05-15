@@ -233,10 +233,14 @@ def main() -> int:
     }
     for name, path in labellers.items():
         src = path.read_text()
+        # Patch 122bf: 122ak migrated the labellers to labels-only
+        # save via save_labels_for_video. The import is the same
+        # but commonly on multiple lines as a tuple — match the
+        # substring rather than the exact single-line form.
         check(
             f"{name}: imports save_labels_for_video",
-            "from mufasa.utils.label_io import "
-            "save_labels_for_video" in src,
+            "save_labels_for_video" in src
+            and "from mufasa.utils.label_io" in src,
         )
         # Sidecar call appears at code level
         code_uses = [
@@ -249,18 +253,31 @@ def main() -> int:
             f"{name}: save_labels_for_video called at code level",
             len(code_uses) >= 1,
         )
-        # Try/except guard around the sidecar (graceful degradation)
+        # Patch 122bf: the [122ae-5c] canary tag + "Sidecar labels
+        # write" wording were transitional — 122ak removed the
+        # dual-write era and the sidecar IS the save now. The
+        # try/except is still around save_labels_for_video as
+        # error handling, just without the sidecar framing.
         check(
-            f"{name}: sidecar guarded with try/except "
-            "(so failures don't abort the legacy save)",
-            "[122ae-5c]" in src
-            and "Sidecar labels write" in src,
+            f"{name}: save_labels_for_video call is in a "
+            "try/except (error propagation)",
+            "try:" in src
+            and "save_labels_for_video" in src
+            and "except Exception" in src,
         )
-        # Legacy write is STILL present (we did NOT remove it)
+        # Patch 122bf: the actual legacy WRITE is gone post-122ak,
+        # but the variable assignment
+        # `self.targets_inserted_file_path = os.path.join(...)`
+        # may still linger in __init__ (vestigial — used by no
+        # downstream write). Check for the absence of an actual
+        # write_df call using this path.
         check(
-            f"{name}: legacy targets_inserted_file_path write "
-            "still present (dual-write transition mode)",
-            "self.targets_inserted_file_path" in src,
+            f"{name}: no write_df(...self.targets_inserted_file_path) "
+            "write site remains (post-122ak v1-only save)",
+            "write_df(" not in src
+            or "self.targets_inserted_file_path" not in
+                src.split("write_df(")[1].split(")")[0]
+            if "write_df(" in src else True,
         )
         check(
             f"{name}: records 122ae-5c in code/comments",

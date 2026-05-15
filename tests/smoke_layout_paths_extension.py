@@ -76,30 +76,28 @@ def main() -> int:
             version = "0.0.1"
         """).strip() + "\n")
         v1 = project_paths_from_config(toml)
-        for key in ("features_extracted_dir", "targets_inserted_dir",
-                    "machine_results_dir", "roi_definitions_path"):
+        # Patch 122bf: 122ao removed features_extracted_dir +
+        # targets_inserted_dir from v1 (csv-subtree audit B3),
+        # and 122ax removed machine_results_dir (close-out).
+        # Only roi_definitions_path remains of the 122ab 4-key
+        # set on v1. Negative guards on the removed keys lock
+        # in the cleanup.
+        check(
+            "v1 layout returns key 'roi_definitions_path'",
+            "roi_definitions_path" in v1,
+        )
+        for removed_key in ("features_extracted_dir",
+                            "targets_inserted_dir",
+                            "machine_results_dir"):
             check(
-                f"v1 layout returns key {key!r}",
-                key in v1,
+                f"v1 layout: key {removed_key!r} is REMOVED "
+                f"(was 122ab; removed in 122ao/122ax)",
+                removed_key not in v1,
             )
-        check(
-            "v1 features_extracted_dir is <root>/csv/features_extracted",
-            v1.get("features_extracted_dir", "").replace("\\", "/").endswith(
-                "/csv/features_extracted"
-            ),
-        )
-        check(
-            "v1 targets_inserted_dir is <root>/csv/targets_inserted",
-            v1.get("targets_inserted_dir", "").replace("\\", "/").endswith(
-                "/csv/targets_inserted"
-            ),
-        )
-        check(
-            "v1 machine_results_dir is <root>/csv/machine_results",
-            v1.get("machine_results_dir", "").replace("\\", "/").endswith(
-                "/csv/machine_results"
-            ),
-        )
+        # Patch 122bf: only the surviving v1 key shape is checked.
+        # The previous v1 csv/features_extracted, csv/targets_inserted,
+        # csv/machine_results path-shape assertions are removed since
+        # the keys are gone.
         check(
             "v1 roi_definitions_path is "
             "<root>/logs/measures/ROI_definitions.h5",
@@ -107,10 +105,12 @@ def main() -> int:
                 "/logs/measures/ROI_definitions.h5"
             ),
         )
-        # Anchored under the project root
+        # Anchored under the project root — switched from
+        # features_extracted_dir to roi_definitions_path since
+        # the former is gone on v1.
         check(
-            "v1 features_extracted_dir is under project_root",
-            v1.get("features_extracted_dir", "")
+            "v1 roi_definitions_path is under project_root",
+            v1.get("roi_definitions_path", "")
               .startswith(v1.get("project_root", "x")),
         )
 
@@ -125,19 +125,32 @@ def main() -> int:
             workflow_file_type = csv
         """).strip() + "\n")
         legacy = project_paths_from_config(ini)
-        for key in ("features_extracted_dir", "targets_inserted_dir",
-                    "machine_results_dir", "roi_definitions_path"):
+        # Patch 122bf: 122ao removed features_extracted_dir +
+        # targets_inserted_dir from legacy too. Only the
+        # machine_results_dir + roi_definitions_path pair
+        # remains of the 122ab 4-key set on legacy. Negative
+        # guards lock in the cleanup.
+        for key in ("machine_results_dir", "roi_definitions_path"):
             check(
                 f"legacy layout returns key {key!r}",
                 key in legacy,
             )
+        for removed_key in ("features_extracted_dir",
+                            "targets_inserted_dir"):
+            check(
+                f"legacy layout: key {removed_key!r} is REMOVED "
+                f"(was 122ab; removed in 122ao)",
+                removed_key not in legacy,
+            )
+        # Patch 122bf: legacy-features-extracted path-shape
+        # assertion removed since the key is gone.
         check(
-            "legacy features_extracted_dir is "
-            "<project>/csv/features_extracted",
-            legacy.get("features_extracted_dir", "")
-                  .endswith(f"{proj_dir.name}/csv/features_extracted")
-            or legacy.get("features_extracted_dir", "")
-                  .endswith(f"{proj_dir.name}\\csv\\features_extracted"),
+            "legacy machine_results_dir is "
+            "<project>/csv/machine_results",
+            legacy.get("machine_results_dir", "")
+                  .endswith(f"{proj_dir.name}/csv/machine_results")
+            or legacy.get("machine_results_dir", "")
+                  .endswith(f"{proj_dir.name}\\csv\\machine_results"),
         )
         check(
             "legacy roi_definitions_path is "

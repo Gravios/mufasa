@@ -278,15 +278,23 @@ def main() -> int:
         "_prediction_columns helper",
         "_prediction_columns" in ib_src,
     )
+    # Patch 122bf: the original 122at assertion required the
+    # sidecar to be try/except-wrapped so failures didn't abort
+    # the legacy CSV write. Post-122ax the legacy CSV write is
+    # gone — the v1 helper IS the canonical (and only) write
+    # site, so failures should bubble up not be swallowed. The
+    # wrap is correctly absent.
     check(
-        "InferenceBatch sidecar wrapped in try/except — never "
-        "blocks legacy CSV write",
-        "save_classifications_for_video" in ib_src
-        and "except Exception" in ib_src,
+        "InferenceBatch save_classifications_for_video called "
+        "(canonical write site post-122ax)",
+        "save_classifications_for_video" in ib_src,
     )
+    # Patch 122bf: 122at comment block was rewritten in 122ax
+    # close-out — now records 122ax instead.
     check(
-        "InferenceBatch records 122at patch number",
-        "122at" in ib_src,
+        "InferenceBatch records 122ax (was 122at; renumbered in "
+        "the close-out)",
+        "122ax" in ib_src,
     )
 
     print(
