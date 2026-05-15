@@ -10,7 +10,7 @@ from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df, write_df
+from mufasa.utils.read_write import get_fn_ext, read_df
 
 
 class InferenceMulticlassBatch(TrainModelMixin, ConfigReader):
@@ -73,17 +73,39 @@ class InferenceMulticlassBatch(TrainModelMixin, ConfigReader):
                     columns=self.p_col_headers,
                 )
                 out_df = pd.concat([out_df, probability_df], axis=1)
-            file_save_path = os.path.join(
-                self.machine_results_dir, f"{file_name}.{self.file_type}"
+            # Patch 122bc: dropped the legacy
+            # csv/machine_results/ write — same close-out as
+            # 122ax did for InferenceBatch. The multi-class
+            # variant was missed by 122ax and surfaced by the
+            # 122bc csv-subtree audit. v1 helper handles both
+            # project formats; predictions land at
+            # derived/classifications/<video>.parquet.
+            from mufasa.utils.classification_io import (
+                save_classifications_for_video,
+                _prediction_columns,
             )
-            write_df(out_df, self.file_type, file_save_path)
+            clf_names = []
+            for m_hyp in self.model_dict.values():
+                # Multi-class produces one prediction column per
+                # classifier (the winning class label per frame
+                # isn't materialised here, but the probability
+                # columns ARE — _prediction_columns picks up
+                # any non-probability classifier columns).
+                clf_names.append(m_hyp["model_name"])
+            pred_cols = _prediction_columns(out_df, clf_names)
+            if pred_cols:
+                save_classifications_for_video(
+                    video_name=file_name,
+                    config_path=self.config_path,
+                    predictions=out_df[pred_cols],
+                )
             video_timer.stop_timer()
             print(
                 f"Predictions created for {file_name} (elapsed time: {video_timer.elapsed_time_str}) ..."
             )
         self.timer.stop_timer()
         stdout_success(
-            msg=f"Multi-class machine predictions complete. {len(self.feature_file_paths)} file(s) saved in project_folder/csv/machine_results directory",
+            msg=f"Multi-class machine predictions complete. {len(self.feature_file_paths)} file(s) saved in project_folder/derived/classifications/ directory",
             elapsed_time=self.timer.elapsed_time_str,
             source=self.__class__.__name__,
         )

@@ -98,8 +98,8 @@ class FrameLabellingLauncher(OperationForm):
     previously the labeller would crash on the missing INI
     section. For both layouts, labels save under
     ``<root>/csv/targets_inserted/`` and pseudo-labels seed
-    from ``<root>/csv/machine_results/`` (paths returned by the
-    layout helper).
+    from ``<root>/derived/classifications/`` post-122ax (paths
+    returned by the layout helper).
     """
 
     title = "Frame labelling"
@@ -111,10 +111,10 @@ class FrameLabellingLauncher(OperationForm):
         "classifier inference file. "
         "<br><br>"
         "<b>Path note:</b> features come from "
-        "<code>csv/features_extracted/</code>, labels save to "
+        "<code>derived/features/</code>, labels save to "
         "<code>csv/targets_inserted/</code>, pseudo-labels seed "
-        "from <code>csv/machine_results/</code>, all under the "
-        "active project root. Works for both v1 "
+        "from <code>derived/classifications/</code>, all under "
+        "the active project root. Works for both v1 "
         "(<code>project.toml</code>) and legacy "
         "(<code>project_config.ini</code>) layouts."
     )
@@ -474,8 +474,8 @@ class ClipReviewLauncher(OperationForm):
 
     def build(self) -> None:
         hint = QLabel(
-            "<i>Select a video + its machine_results CSV "
-            "(from <code>csv/machine_results/</code>). The "
+            "<i>Select a video + its classifications file "
+            "(from <code>derived/classifications/</code>). The "
             "dialog shows each bout on a timeline, with a "
             "scrubber to verify each detection.</i>", self,
         )
