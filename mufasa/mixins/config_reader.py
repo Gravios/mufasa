@@ -392,7 +392,15 @@ class ConfigReader(object):
         self.targets_folder = _latest_run_or_parent(
             root / "derived" / "classifications",
         )
-        self.machine_results_dir = self.targets_folder
+        # Patch 122ax: classifier predictions now live exclusively
+        # at derived/classifications/<video>.parquet (no run-id
+        # subdir — the v1 helper writes flat). machine_results_dir
+        # is kept as a ConfigReader attribute for backward-compat
+        # with consumers that still build path strings off it,
+        # but it now points at the v1 location, not csv/.
+        self.machine_results_dir = str(
+            root / "derived" / "classifications"
+        )
 
         # ----- Frames -------------------------------------------------- #
         self.input_frames_dir = str(
@@ -469,9 +477,28 @@ class ConfigReader(object):
         self.outlier_corrected_movement_paths = glob.glob(
             self.outlier_corrected_movement_dir + f"/*.{ft}"
         )
-        self.machine_results_paths = glob.glob(
-            self.machine_results_dir + f"/*.{ft}"
+        # Patch 122ax: v1 predictions live at
+        # derived/classifications/<stem>.parquet (no run-id subdir;
+        # the helper writes flat). Enumerate via the helper so the
+        # ordering is stable across runs. The returned paths use
+        # .parquet extension regardless of `ft` (the project's
+        # legacy file_type) — consumers that pass these paths back
+        # through load_machine_results_for_video as legacy_fallback
+        # don't care about extension since the helper inspects the
+        # suffix itself.
+        from mufasa.utils.classification_io import (
+            list_video_stems_with_classifications,
         )
+        clf_stems = list_video_stems_with_classifications(
+            self.config_path,
+        )
+        self.machine_results_paths = [
+            os.path.join(
+                self.machine_results_dir,
+                f"{stem}.parquet",
+            )
+            for stem in clf_stems
+        ]
         self.body_part_directionality_paths = glob.glob(
             self.body_part_directionality_df_dir + f"/*.{ft}"
         )

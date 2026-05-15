@@ -188,7 +188,12 @@ class FrameLabellerWidget(QWidget):
         # anyway — _save uses save_labels_for_video which writes
         # to derived/labels/<video>.parquet via the layout
         # helper's derived_labels_dir.
-        self.machine_results_dir = paths["machine_results_dir"]
+        # Patch 122ax: machine_results_dir is legacy-only post-122ax.
+        # v1 projects don't define this key; consumers must handle
+        # None. The frame labeller uses it only to build the
+        # legacy_fallback path for pseudo-label seeding —
+        # _load_pseudo_labels handles the None case.
+        self.machine_results_dir = paths.get("machine_results_dir")
         # derived/labels/ is auto-created by save_labels_for_video
         # on first write.
 
@@ -334,9 +339,12 @@ class FrameLabellerWidget(QWidget):
         docstring's old caveat 'machine_results doesn't have a v1
         derived/ location yet' is no longer true post-122at.
         """
-        src = os.path.join(
-            self.machine_results_dir,
-            f"{self.video_name}.{self.file_type}",
+        src = (
+            os.path.join(
+                self.machine_results_dir,
+                f"{self.video_name}.{self.file_type}",
+            )
+            if self.machine_results_dir is not None else None
         )
         try:
             from mufasa.utils.classification_io import (
@@ -345,7 +353,11 @@ class FrameLabellerWidget(QWidget):
             df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=src if os.path.isfile(src) else None,
+                legacy_fallback=(
+                    src
+                    if src is not None and os.path.isfile(src)
+                    else None
+                ),
             )
         except FileNotFoundError:
             self.status.setText(

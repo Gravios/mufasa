@@ -190,22 +190,42 @@ class LabellingInterface(ConfigReader):
                 for target in self.clf_names:
                     self.data_df[target] = 0
             elif setting == "pseudo":
-                if not os.path.isfile(self.machine_results_file_path):
-                    raise NoFilesFoundError(msg=f'When doing pseudo-annotations, SimBA expects a file at {self.machine_results_file_path}. SimBA could not find this file.', source=self.__class__.__name__)
-                # Patch 122aw: dual-read via classification_io
-                # helper. The legacy NoFilesFoundError check above
-                # is preserved — it asserts the legacy CSV exists
-                # before we attempt the read, matching the
-                # pre-122aw behaviour exactly. v1-only projects
-                # post-122ax will need that check relaxed; for now
-                # it acts as a safety rail during the migration.
+                # Patch 122ax: rail relaxed for v1 projects. Pre-122ax
+                # this required the legacy CSV to exist; post-122ax
+                # v1-only projects don't have a legacy CSV at all and
+                # the predictions live at derived/classifications/
+                # <video>.parquet. Accept either source.
                 from mufasa.utils.classification_io import (
                     load_machine_results_for_video,
+                    list_video_stems_with_classifications,
                 )
+                _v1_stems = list_video_stems_with_classifications(
+                    self.config_path,
+                )
+                _v1_has = self.video_name in _v1_stems
+                _legacy_has = os.path.isfile(
+                    self.machine_results_file_path,
+                )
+                if not _v1_has and not _legacy_has:
+                    raise NoFilesFoundError(
+                        msg=(
+                            f"When doing pseudo-annotations, SimBA "
+                            f"expects predictions for {self.video_name!r} "
+                            f"either at derived/classifications/"
+                            f"{self.video_name}.parquet (v1) or at "
+                            f"{self.machine_results_file_path} "
+                            f"(legacy). Neither was found. Run "
+                            f"InferenceBatch on this video first."
+                        ),
+                        source=self.__class__.__name__,
+                    )
                 self.data_df = load_machine_results_for_video(
                     video_name=self.video_name,
                     config_path=self.config_path,
-                    legacy_fallback=self.machine_results_file_path,
+                    legacy_fallback=(
+                        self.machine_results_file_path
+                        if _legacy_has else None
+                    ),
                 )
                 check_valid_dataframe(df=self.data_df, source=self.__class__.__name__, required_fields=self.clf_names)
                 for target in self.clf_names:

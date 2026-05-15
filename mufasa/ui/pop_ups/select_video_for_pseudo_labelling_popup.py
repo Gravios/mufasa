@@ -59,16 +59,37 @@ class SelectPseudoLabellingVideoPupUp(ConfigReader, PopUpMixin):
             check_float(name=clf, value=threshold_ebs.entry_get, min_value=0.0, max_value=1.0, raise_error=True)
             thresholds[clf] = float(threshold_ebs.entry_get)
         self.machine_results_file_path = os.path.join(self.machine_results_dir, f"{video_meta_data['video_name']}.{self.file_type}")
-        if not os.path.isfile(self.machine_results_file_path):
-            raise NoFilesFoundError(msg=f'When doing pseudo-annotations, SimBA expects a file at {self.machine_results_file_path} representing video {video_meta_data["video_name"]}. SimBA could not find this file.', source=self.__class__.__name__)
-        # Patch 122aw: dual-read via classification_io helper.
+        # Patch 122ax: rail relaxed for v1 projects. Pre-122ax
+        # this required the legacy CSV to exist; post-122ax v1
+        # predictions live under derived/classifications/ instead.
         from mufasa.utils.classification_io import (
             load_machine_results_for_video,
+            list_video_stems_with_classifications,
         )
+        _video_name = video_meta_data["video_name"]
+        _v1_stems = list_video_stems_with_classifications(
+            self.config_path,
+        )
+        _v1_has = _video_name in _v1_stems
+        _legacy_has = os.path.isfile(self.machine_results_file_path)
+        if not _v1_has and not _legacy_has:
+            raise NoFilesFoundError(
+                msg=(
+                    f"When doing pseudo-annotations, SimBA expects "
+                    f"predictions for video {_video_name!r} either "
+                    f"at derived/classifications/{_video_name}.parquet "
+                    f"(v1) or at {self.machine_results_file_path} "
+                    f"(legacy). Neither was found."
+                ),
+                source=self.__class__.__name__,
+            )
         self.data_df = load_machine_results_for_video(
-            video_name=video_meta_data["video_name"],
+            video_name=_video_name,
             config_path=self.config_path,
-            legacy_fallback=self.machine_results_file_path,
+            legacy_fallback=(
+                self.machine_results_file_path
+                if _legacy_has else None
+            ),
         )
         check_valid_dataframe(df=self.data_df, source=self.__class__.__name__, required_fields=self.clf_names + self.p_cols)
         _ = LabellingInterface(config_path=self.config_path,
