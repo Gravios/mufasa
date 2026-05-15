@@ -10,7 +10,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (check_if_filepath_list_is_empty,
                                 check_that_column_exist)
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df, write_df
+from mufasa.utils.read_write import get_fn_ext, read_df
 from mufasa.utils.warnings import IdenticalInputWarning
 
 SUBORDINATES = "subordinates"
@@ -104,10 +104,36 @@ class MutualExclusivityCorrector(ConfigReader):
 
             if not os.path.isdir(self.save_dir):
                 os.makedirs(self.save_dir)
+            # Patch 122bc: dropped the legacy
+            # csv/machine_results/ write — same close-out as
+            # 122ax did for InferenceBatch and 122bc just did
+            # for InferenceMulticlassBatch. The read-side was
+            # migrated in 122au; the write-side was missed and
+            # surfaced by the 122bc csv-subtree audit.
+            #
+            # Semantically the corrector backs up the original
+            # before writing the corrected version back in
+            # place. On v1, "in place" = the same
+            # derived/classifications/<video>.parquet that the
+            # helper writes to; shutil.move on the original
+            # works regardless of format. v1 helper writes
+            # only the prediction columns
+            # (Probability_<clf> + <clf>), which matches the
+            # contract for derived/classifications/.
             shutil.move(
                 file_path, os.path.join(self.save_dir, os.path.basename(file_path))
             )
-            write_df(df=self.data_df, file_type=self.file_type, save_path=file_path)
+            from mufasa.utils.classification_io import (
+                save_classifications_for_video,
+                _prediction_columns,
+            )
+            pred_cols = _prediction_columns(self.data_df, self.clf_names)
+            if pred_cols:
+                save_classifications_for_video(
+                    video_name=self.video_name,
+                    config_path=self.config_path,
+                    predictions=self.data_df[pred_cols],
+                )
             video_timer.stop_timer()
             stdout_success(
                 msg=f"Mutual exclusivity complete video {self.video_name}. ({file_cnt+1}/{len(self.machine_results_paths)})",
@@ -116,7 +142,7 @@ class MutualExclusivityCorrector(ConfigReader):
 
         self.timer.stop_timer()
         stdout_success(
-            msg=f"Mutual exclusivity performed on {len(self.machine_results_paths)} file(s). Results are saved in the project_folder/csv/machine_results directory. Copies of files PRIOR to applying mutual exclusivity rules are saved in {self.save_dir}",
+            msg=f"Mutual exclusivity performed on {len(self.machine_results_paths)} file(s). Results are saved in the project_folder/derived/classifications/ directory. Copies of files PRIOR to applying mutual exclusivity rules are saved in {self.save_dir}",
             elapsed_time=self.timer.elapsed_time_str,
         )
 

@@ -43,8 +43,9 @@ On Run:
    back in the same way.
 3. Invokes :class:`InferenceBatch`'s run() with the current
    config, which iterates over ``self.feature_file_paths`` and
-   writes per-video classification CSVs to
-   ``csv/machine_results/`` (still legacy — separate migration).
+   writes per-video classification parquet files to
+   ``derived/classifications/<video>.parquet`` (post-122ax;
+   the legacy ``csv/machine_results/`` write was dropped).
 
 v1 + legacy config persistence
 ------------------------------
@@ -92,8 +93,9 @@ class RunInferenceForm(OperationForm):
         "Configure per-classifier model paths, probability thresholds, "
         "and minimum bout lengths, then run the inference batch over "
         "all videos with features. Writes per-video predictions to "
-        "<code>csv/machine_results/</code>. Settings persist to "
-        "<code>project_config.ini</code>."
+        "<code>derived/classifications/</code>. Settings persist to "
+        "<code>project.toml</code> (v1) or <code>project_config.ini</code> "
+        "(legacy)."
     )
 
     # ----------------------------------------------------------- State
@@ -183,7 +185,7 @@ class RunInferenceForm(OperationForm):
                 f"Running inference for <b>{len(targets)} classifier(s)</b>. "
                 f"Fill in a model path, threshold (0.0–1.0), and minimum "
                 f"bout length (ms) per row. Predictions write to "
-                f"<code>csv/machine_results/</code>."
+                f"<code>derived/classifications/</code>."
             )
 
         # Seed each row from INI (if present) or from snapshot above
