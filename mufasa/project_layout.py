@@ -877,6 +877,13 @@ def project_paths_from_config(
             # Patch 122ae-1: per-family parquet trees for derived data.
             "derived_features_dir":   str(root / "derived" / "features"),
             "derived_labels_dir":     str(root / "derived" / "labels"),
+            # Patch 122at: per-video classifier predictions land here
+            # (parquet, predictions-only — features stay in
+            # derived/features/). Dual-write era: InferenceBatch
+            # writes here AND to the legacy machine_results_dir
+            # until the consumer migration is complete.
+            "derived_classifications_dir":
+                str(root / "derived" / "classifications"),
         }
     # Legacy: parse the [General settings] project_path.
     import configparser as _cp
@@ -912,6 +919,11 @@ def project_paths_from_config(
         # Patch 122ae-1: per-family parquet trees for derived data.
         "derived_features_dir":   str(proj / "derived" / "features"),
         "derived_labels_dir":     str(proj / "derived" / "labels"),
+        # Patch 122at: per-video classifier predictions (see v1
+        # branch above for rationale). Legacy projects still also
+        # write to machine_results_dir during the dual-write era.
+        "derived_classifications_dir":
+            str(proj / "derived" / "classifications"),
     }
 
 

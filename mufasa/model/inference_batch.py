@@ -164,6 +164,40 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
                             out_df = plug_holes_shortest_bout(data_df=out_df, clf_name=f'{m_hyp[MODEL_NAME]}_{model_subset_name}', fps=fps, shortest_bout=clf_min_bout)
                     with open(self.config_path, "w") as f: self.config.write(f)
             write_df(df=out_df, file_type=self.file_type, save_path=file_save_path)
+            # Patch 122at: dual-write to v1 layout. Predictions-only
+            # parquet at derived/classifications/<video>.parquet,
+            # extracted from the combined out_df by classifier
+            # target names. The legacy CSV write above stays for
+            # the dual-write era so existing consumers keep working;
+            # follow-up patches migrate consumers to read v1, and a
+            # final patch drops the legacy write.
+            try:
+                from mufasa.utils.classification_io import (
+                    save_classifications_for_video,
+                    _prediction_columns,
+                )
+                pred_cols = _prediction_columns(out_df, self.clf_names)
+                if pred_cols:
+                    save_classifications_for_video(
+                        video_name=file_name,
+                        config_path=self.config_path,
+                        predictions=out_df[pred_cols],
+                    )
+            except Exception as exc:
+                # Sidecar write must never block the legacy flow.
+                # The verbose-mode print keeps this visible in logs
+                # so the migration doesn't silently degrade.
+                if self.verbose:
+                    stdout_information(
+                        msg=(
+                            f"[122at] v1 classifications sidecar "
+                            f"write for {file_name} failed: "
+                            f"{type(exc).__name__}: {exc}. The "
+                            f"legacy {file_save_path} write "
+                            f"succeeded; v1 consumers will fall "
+                            f"back to that."
+                        ),
+                    )
             video_timer.stop_timer()
             if self.verbose: stdout_information(msg=f"Predictions created for {file_name} (frame count: {len(in_df)}, elapsed time: {video_timer.elapsed_time_str}) ...")
         self.timer.stop_timer()
