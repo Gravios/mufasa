@@ -244,6 +244,14 @@ class _VizRoute:
     data_path_source : str | None
         Singular variant — passes one file as ``data_path`` (probability
         plotter, directing-to-bodypart).
+    kwargs_transform : Callable[[dict], dict] | None
+        Patch 122az hook for routes whose backend signature can't
+        be expressed as plain rename/default. Called after
+        ``default_kwargs`` + extras merge and before
+        ``filter_kwargs``. Use for type coercions like
+        ``body_part: str -> body_parts: [body_part]`` that backends
+        need but the form only collects as scalars (no list-type
+        extras builder yet).
     """
     label: str
     scope_kind: str = "project"
@@ -257,6 +265,7 @@ class _VizRoute:
     default_kwargs: dict = field(default_factory=dict)
     data_paths_source: Optional[str] = None
     data_path_source: Optional[str] = None
+    kwargs_transform: Optional[Callable[[dict], dict]] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -576,6 +585,78 @@ ROUTES: list[_VizRoute] = [
         data_path_source="directing_data",
         default_kwargs={"style_attr": {}},
     ),
+    # -------- Patch 122az: ROI / skeleton fill-ins ---------- #
+    # Three routes that closed gaps in the viz form: ROI overlay,
+    # ROI feature overlay, and pose-skeleton video. The first two
+    # take body_parts as a list[str] which the declarative form
+    # can't natively express (no "list" kind); a kwargs_transform
+    # wraps the singular body_part string into [body_part].
+    _VizRoute(
+        label="ROI overlay (per video)",
+        scope_kind="file",
+        backend_sp=_lazy_factory("mufasa.plotting.roi_plotter",
+                                 "ROIPlotter"),
+        needs_video=True,
+        extras=[
+            ("body_part",         "str",   "Nose",
+             "Body-part name to overlay"),
+            ("outside_roi",       "bool",  False),
+            ("threshold",         "float", 0.0, 0.0, 1.0, 0.05),
+            ("show_animal_name",  "bool",  True),
+            ("show_body_part",    "bool",  True),
+            ("show_bbox",         "bool",  False),
+        ],
+        kwargs_map={"video_path": "video_path"},
+        kwargs_transform=lambda kw: (
+            {**{k: v for k, v in kw.items()
+                if k != "body_part"},
+             "body_parts": [kw["body_part"]]}
+            if "body_part" in kw else kw
+        ),
+    ),
+    _VizRoute(
+        label="ROI feature overlay (per video)",
+        scope_kind="file",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.ROI_feature_visualizer",
+            "ROIfeatureVisualizer",
+        ),
+        needs_video=True,
+        extras=[
+            ("body_part", "str", "Nose",
+             "Body-part name to overlay"),
+        ],
+        kwargs_map={"video_path": "video_path"},
+        # Same body_part → [body_part] wrap as ROI overlay.
+        kwargs_transform=lambda kw: (
+            {**{k: v for k, v in kw.items()
+                if k != "body_part"},
+             "body_parts": [kw["body_part"]]}
+            if "body_part" in kw else kw
+        ),
+        # Backend takes style_attr dict; empty dict triggers
+        # backend's defaults.
+        default_kwargs={"style_attr": {}},
+    ),
+    _VizRoute(
+        label="Skeleton video (project pose)",
+        scope_kind="project",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.skeleton_video_creator",
+            "SkeletonVideoCreator",
+        ),
+        extras=[
+            ("circle_size",     "int",   5, 1, 50),
+            ("line_thickness",  "int",   2, 1, 20),
+            ("bp_threshold",    "float", 0.0, 0.0, 1.0, 0.05),
+            ("ego_direction",   "bool",  False),
+        ],
+        # SkeletonVideoCreator iterates over project pose data
+        # at outlier_corrected_movement; uses save_dir for output.
+        data_paths_source="outlier_corrected_movement_location",
+        needs_save_dir=True,
+        kwargs_map={"data_paths": "data_path", "save_path": "save_dir"},
+    ),
 ]
 
 
@@ -846,6 +927,14 @@ class VisualizationForm(OperationForm):
             raise NotImplementedError(
                 f"No backend defined for {route.label!r}."
             )
+
+        # Patch 122az: route-level kwargs_transform — runs after
+        # merge/rename, before the defensive signature filter.
+        # Used for type coercions the declarative form can't
+        # express (e.g. wrapping a single body_part into a list
+        # for backends that take body_parts: list[str]).
+        if route.kwargs_transform is not None:
+            kwargs = route.kwargs_transform(kwargs)
 
         # Defensive signature filter — delegated to the shared helper
         # so data_import and analysis forms all get the same behaviour.
