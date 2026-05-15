@@ -10,12 +10,12 @@ Replaces:
   :class:`PrintModelInfoPopUp` → :class:`ClassifierManageForm`
   (3 popups collapsed into one form with an "action" selector).
 
+Patch 122ap moved :class:`RunMachineModelsPopUp` to its own
+in-frame form, :class:`mufasa.ui_qt.forms.run_inference.RunInferenceForm`.
+
 Left as dedicated dialogs for now (interactive / long-running):
 
 * ``KleinbergPopUp`` — burst-smoothing parameter sweep, live preview
-* ``RunMachineModelsPopUp`` — inference runner with per-classifier
-  threshold / min-bout configuration (enough fields to warrant its own
-  panel)
 """
 from __future__ import annotations
 
