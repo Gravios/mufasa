@@ -46,8 +46,8 @@ class KleinbergCalculator(ConfigReader):
     :param float gamma: State transition cost for moving to lower burst levels. Higher values (e.g., 0.5-1.0) reduce total burst count by making downward transitions costly; lower values (e.g., 0.1-0.3) allow more flexible state changes. Must be >= 0. Default: 0.3.
     :param int hierarchy: Hierarchy level to extract bursts from (0=lowest, higher=more selective). Level 0 captures all bursts; level 1-2 typically filters noise; level 3+ selects only the most prominent, sustained bursts. Higher levels yield fewer but more confident detections. Must be >= 0. Default: 1.
     :param bool hierarchical_search: If True, searches for target hierarchy level within detected burst periods, falling back to lower levels if target not found. If False, extracts only bursts at the exact specified hierarchy level. Recommended when target hierarchy may be sparse. Default: False.
-    :param Optional[Union[str, os.PathLike]] input_dir: The directory with files to perform kleinberg smoothing on. If None, defaults to `project_folder/csv/machine_results`
-    :param Optional[Union[str, os.PathLike]] output_dir: Location to save smoothened data in. If None, defaults to `project_folder/csv/machine_results`
+    :param Optional[Union[str, os.PathLike]] input_dir: The directory with files to perform kleinberg smoothing on. If None, defaults to the project's ``derived/classifications/`` (v1) or ``csv/machine_results/`` (legacy) directory.
+    :param Optional[Union[str, os.PathLike]] output_dir: Location to save smoothened data in. If None, defaults to the project's ``derived/classifications/`` (v1) or ``csv/machine_results/`` (legacy) directory.
     :param Optional[bool] save_originals: If True, saves the original data in sub-directory of the ouput directory.`
 
     :example I:

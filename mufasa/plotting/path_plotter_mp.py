@@ -129,7 +129,7 @@ class PathPlotterMulticore(ConfigReader, PlottingMixin):
     :param bool frame_setting: If True, individual frames will be created.
     :param bool video_setting: If True, compressed videos will be created.
     :param bool last_frame: If True, png of the last frame will be created.
-    :param List[str] files_found: Data paths to create path plots for (e.g., ['project_folder/csv/machine_results/MyVideo.csv'])
+    :param List[str] files_found: Data paths to create path plots for (e.g., ['project_folder/derived/classifications/MyVideo.parquet'])
     :param dict animal_attr: Animal body-parts to use when creating paths and their colors.
     :param Optional[dict] input_style_attr: Plot sttributes (line thickness, color, etc..). If None, then autocomputed. Max lines will be set to 2s.
     :param Optional[dict] input_clf_attr: Dict reprenting classified behavior locations, their color and size. If None, then no classified behavior locations are shown.
@@ -156,7 +156,7 @@ class PathPlotterMulticore(ConfigReader, PlottingMixin):
     >>> input_style_attr = {'width': 'As input', 'height': 'As input', 'line width': 5, 'font size': 5, 'font thickness': 2, 'circle size': 5, 'bg color': 'White', 'max lines': 100}
     >>> animal_attr = {0: ['Ear_right_1', 'Red']}
     >>> input_clf_attr = {0: ['Attack', 'Black', 'Size: 30'], 1: ['Sniffing', 'Red', 'Size: 30']}
-    >>> path_plotter = PathPlotterMulticore(config_path=r'MyConfigPath', frame_setting=False, video_setting=True, style_attr=style_attr, animal_attr=animal_attr, files_found=['project_folder/csv/machine_results/MyVideo.csv'], cores=5, clf_attr=clf_attr, print_animal_names=True)
+    >>> path_plotter = PathPlotterMulticore(config_path=r'MyConfigPath', frame_setting=False, video_setting=True, style_attr=style_attr, animal_attr=animal_attr, files_found=['project_folder/derived/classifications/MyVideo.parquet'], cores=5, clf_attr=clf_attr, print_animal_names=True)
     >>> path_plotter.run()
 
     References

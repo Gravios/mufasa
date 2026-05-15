@@ -141,7 +141,7 @@ class HeatMapperClfMultiprocess(ConfigReader, PlottingMixin):
 
     :example:
     >>> style_attr = {'palette': 'jet', 'shading': 'gouraud', 'bin_size': 50, 'max_scale': 'auto'}
-    >>> heatmapper = HeatMapperClfMultiprocess(config_path='project_config.ini', bodypart='Nose_1', clf_name='Attack', data_paths=['csv/machine_results/Video1.csv'], style_attr=style_attr, final_img_setting=True, video_setting=False, frame_setting=False, core_cnt=-1)
+    >>> heatmapper = HeatMapperClfMultiprocess(config_path='project_config.ini', bodypart='Nose_1', clf_name='Attack', data_paths=['derived/classifications/Video1.parquet'], style_attr=style_attr, final_img_setting=True, video_setting=False, frame_setting=False, core_cnt=-1)
     >>> heatmapper.run()
     """
 

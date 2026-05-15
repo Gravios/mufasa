@@ -14,6 +14,24 @@ from mufasa.utils.read_write import get_fn_ext, read_df
 
 
 class InferenceMulticlassBatch(TrainModelMixin, ConfigReader):
+    """
+    Run multi-class classifier inference on all videos with
+    extracted features. Multi-class variant of
+    :class:`InferenceBatch` — same I/O contract:
+
+    * Reads features from ``derived/features/`` (v1) or
+      ``csv/features_extracted/`` (legacy).
+    * Writes per-video predictions to
+      ``derived/classifications/<video>.parquet`` for both
+      project formats (post-122bc).
+
+    Each model in the project config can produce multiple
+    output classes; one probability column per class is written
+    alongside the boolean prediction.
+
+    :param str config_path: Path to SimBA project config
+        (TOML for v1, INI for legacy).
+    """
 
     def __init__(self, config_path: str):
 
@@ -27,7 +45,10 @@ class InferenceMulticlassBatch(TrainModelMixin, ConfigReader):
 
         if len(self.feature_file_paths) == 0:
             raise NoFilesFoundError(
-                "Zero files found in the project_folder/csv/features_extracted directory. Create features before running classifier.",
+                "Zero feature files found. Create features before "
+                "running the multi-class classifier — feature files "
+                "live at derived/features/<video>.parquet (v1) or "
+                "csv/features_extracted/<video>.<ext> (legacy).",
                 source=self.__class__.__name__,
             )
         print(

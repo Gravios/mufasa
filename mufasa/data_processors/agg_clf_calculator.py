@@ -56,7 +56,7 @@ class AggregateClfCalculator(ConfigReader):
 
     :param Union[str, os.PathLike] config_path: Path to SimBA project config file in Configparser format.
     :param List[str] classifiers: List of classifier names to calculate aggregate statistics for. Must be valid classifier names from the project.
-    :param Optional[Union[str, os.PathLike]] data_dir: Directory containing the machine results CSV files. If None, uses ``project_folder/csv/machine_results``.
+    :param Optional[Union[str, os.PathLike]] data_dir: Directory containing the classifier prediction files. If None, defaults to the project's ``derived/classifications/`` (v1) or ``csv/machine_results/`` (legacy) directory, resolved via :attr:`ConfigReader.machine_results_dir`.
     :param bool detailed_bout_data: If True, saves detailed bout data (start frame, end frame, bout time, etc.) for each bout in each video. Default: False.
     :param bool transpose: If True, creates output with one video per row. If False, one measurement per row. Default: False.
     :param bool first_occurrence: If True, calculates first occurrence time for each classifier. Default: True.
