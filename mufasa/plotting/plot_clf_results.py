@@ -154,7 +154,18 @@ class PlotSklearnResultsSingleCore(ConfigReader, TrainModelMixin, PlottingMixin)
         for video_cnt, video_path in enumerate(self.video_paths):
             _, self.video_name, _ = get_fn_ext(video_path)
             self.data_path = os.path.join(self.machine_results_dir, f'{self.video_name}.{self.file_type}')
-            self.data_df = read_df(self.data_path, self.file_type).reset_index(drop=True).fillna(0)
+            # Patch 122av: dual-read via classification_io helper.
+            # .reset_index(drop=True).fillna(0) chain preserved —
+            # downstream rendering loop relies on contiguous
+            # integer index and NaN-free predictions.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.data_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=self.data_path,
+            ).reset_index(drop=True).fillna(0)
             if self.show_pose: check_that_column_exist(df=self.data_df, column_name=self.bp_col_names, file_name=self.data_path)
             if self.show_confidence: check_that_column_exist(df=self.data_df, column_name=self.conf_cols, file_name=self.data_path)
             self.video_meta_data = get_video_meta_data(video_path=video_path)

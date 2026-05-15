@@ -199,7 +199,15 @@ class PathPlotterSingleCore(ConfigReader, PlottingMixin):
             video_timer = SimbaTimer(start=True)
             _, self.video_name, _ = get_fn_ext(file_path)
             self.video_info, _, self.fps = self.read_video_info(video_name=self.video_name)
-            self.in_df = read_df(file_path, self.file_type)
+            # Patch 122av: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.in_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             check_valid_dataframe(df=self.in_df, source=file_path, valid_dtypes=Formats.NUMERIC_DTYPES.value, required_fields=self.data_cols)
             if self.clf_attr is not None:
                 check_valid_dataframe(df=self.in_df, source=file_path, valid_dtypes=Formats.NUMERIC_DTYPES.value, required_fields=self.clf_names)

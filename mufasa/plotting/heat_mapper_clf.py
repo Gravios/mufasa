@@ -100,7 +100,15 @@ class HeatMapperClfSingleCore(ConfigReader, PlottingMixin):
                 self.save_video_folder = os.path.join(self.heatmap_clf_location_dir, self.video_name)
                 if not os.path.exists(self.save_video_folder):
                     os.makedirs(self.save_video_folder)
-            self.data_df = read_df(file_path=file_path, file_type=self.file_type)
+            # Patch 122av: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.data_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             check_valid_dataframe(df=self.data_df, required_fields=[self.clf_name] + self.bp_lst, valid_dtypes=Formats.NUMERIC_DTYPES.value)
             bp_data = self.data_df[self.bp_lst].values.astype(np.int32)
             clf_data = self.data_df[self.clf_name].values.astype(np.int32)
