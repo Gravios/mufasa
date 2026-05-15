@@ -325,25 +325,33 @@ class FrameLabellerWidget(QWidget):
         )
 
     def _load_pseudo_labels(self) -> None:
-        """Pseudo-labelling: seed labels from machine_results CSV
-        outputs. Stays on the legacy path because machine_results
-        doesn't have a v1 derived/ location yet."""
+        """Pseudo-labelling: seed labels from machine_results
+        predictions.
+
+        Patch 122aw: dual-read via classification_io helper.
+        Tries v1 (derived/classifications/<video>.parquet) first,
+        falls back to the legacy machine_results CSV. The
+        docstring's old caveat 'machine_results doesn't have a v1
+        derived/ location yet' is no longer true post-122at.
+        """
         src = os.path.join(
             self.machine_results_dir,
             f"{self.video_name}.{self.file_type}",
         )
-        if not os.path.isfile(src):
+        try:
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=src if os.path.isfile(src) else None,
+            )
+        except FileNotFoundError:
             self.status.setText(
                 "Pseudo source not found; starting from zeros."
             )
             return
-        try:
-            import pandas as pd
-            if self.file_type.lower() == "csv":
-                df = pd.read_csv(src)
-            else:
-                from mufasa.utils.read_write import read_df
-                df = read_df(src, self.file_type)
         except Exception as exc:
             self.status.setText(f"Could not read {src}: {exc}")
             return

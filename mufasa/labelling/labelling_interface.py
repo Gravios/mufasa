@@ -192,7 +192,21 @@ class LabellingInterface(ConfigReader):
             elif setting == "pseudo":
                 if not os.path.isfile(self.machine_results_file_path):
                     raise NoFilesFoundError(msg=f'When doing pseudo-annotations, SimBA expects a file at {self.machine_results_file_path}. SimBA could not find this file.', source=self.__class__.__name__)
-                self.data_df = read_df(self.machine_results_file_path, self.file_type)
+                # Patch 122aw: dual-read via classification_io
+                # helper. The legacy NoFilesFoundError check above
+                # is preserved — it asserts the legacy CSV exists
+                # before we attempt the read, matching the
+                # pre-122aw behaviour exactly. v1-only projects
+                # post-122ax will need that check relaxed; for now
+                # it acts as a safety rail during the migration.
+                from mufasa.utils.classification_io import (
+                    load_machine_results_for_video,
+                )
+                self.data_df = load_machine_results_for_video(
+                    video_name=self.video_name,
+                    config_path=self.config_path,
+                    legacy_fallback=self.machine_results_file_path,
+                )
                 check_valid_dataframe(df=self.data_df, source=self.__class__.__name__, required_fields=self.clf_names)
                 for target in self.clf_names:
                     self.data_df.loc[self.data_df[f"Probability_{target}"] > self.threshold_dict[target], target] = 1
