@@ -71,7 +71,15 @@ class SeverityFrameCalculator(ConfigReader, FeatureExtractionMixin):
                 f"Analyzing movements in {video_name} ({file_cnt+1}/{len(self.machine_results_paths)})..."
             )
             _, px_per_mm, fps = self.read_video_info(video_name=video_name)
-            df = read_df(file_path=file_path, file_type=self.file_type)
+            # Patch 122au: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            df = load_machine_results_for_video(
+                video_name=video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             if self.settings["clf"] not in df.columns:
                 NoDataFoundWarning(
                     msg=f'Skipping file {video_name} - {self.settings["clf"]} data not present in file'
@@ -112,7 +120,17 @@ class SeverityFrameCalculator(ConfigReader, FeatureExtractionMixin):
             )
             self.results[video_name] = {}
             _, px_per_mm, fps = self.read_video_info(video_name=video_name)
-            df = read_df(file_path=file_path, file_type=self.file_type).astype(int)
+            # Patch 122au: dual-read via classification_io helper.
+            # .astype(int) preserved — frame-based scorer needs int
+            # dtype for the bracket-bin math downstream.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            df = load_machine_results_for_video(
+                video_name=video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            ).astype(int)
             check_that_column_exist(
                 df=df, column_name=self.settings["clf"], file_name=file_path
             )
