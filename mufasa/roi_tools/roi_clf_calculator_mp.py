@@ -59,7 +59,12 @@ def _clf_by_roi_helper(data: tuple,
                        end_bout_cnt: bool,
                        clf_names: list,
                        roi_names: list,
-                       video_info_df: pd.DataFrame):
+                       video_info_df: pd.DataFrame,
+                       config_path: str = None):
+    """Worker entry point. Patch 122ay threaded ``config_path``
+    in so the worker reads via the v1-aware helper. None default
+    for back-compat — falls back to the raw read_df from the
+    legacy path when not provided (pre-122ay behaviour)."""
 
     batch_id, data_paths = data
     batch_results, batch_bouts_results = {}, []
@@ -80,7 +85,20 @@ def _clf_by_roi_helper(data: tuple,
         if len(list(video_rois.keys())) == 0:
             ROIWarning(msg=f'Skipping video {video_name}: No ROIs found for video {video_name}. The video has the ROIs {list(input_video_rois.keys())} but analysis is to be performed on ROIs {video_roi_names}', source=self.__class__.__name__)
             continue
-        data_df = read_df(file_path=data_path)
+        # Patch 122ay: dual-read via classification_io helper.
+        if config_path is not None:
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            data_df = load_machine_results_for_video(
+                video_name=video_name,
+                config_path=config_path,
+                legacy_fallback=(
+                    data_path if os.path.isfile(data_path) else None
+                ),
+            )
+        else:
+            data_df = read_df(file_path=data_path)
         check_valid_dataframe(df=data_df, source=f'{data_path}', required_fields=required_fields)
         data_df = data_df[required_fields]
         for (bp_x, bp_y, bp_p) in bp_cols:
@@ -232,7 +250,12 @@ class ROIClfCalculatorMultiprocess(ConfigReader):
                                           end_bout_cnt=self.ended_bout_cnt,
                                           clf_names=self.clf_names,
                                           video_info_df=self.video_info_df,
-                                          roi_names=self.roi_names)
+                                          roi_names=self.roi_names,
+                                          # Patch 122ay: thread
+                                          # config_path so the
+                                          # pickled worker can do
+                                          # v1-aware reads.
+                                          config_path=self.config_path)
             for cnt, (batch_id, batch_results_df, batch_bout_results) in enumerate(pool.map(constants, chunked_data_paths, chunksize=self.multiprocess_chunksize)):
                 self.results_df = pd.concat([self.results_df, batch_results_df], axis=0).reset_index(drop=True)
                 self.bouts_results.append(batch_bout_results)

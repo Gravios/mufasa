@@ -52,7 +52,15 @@ def _agg_clf_helper(data: tuple,
                     verbose: bool,
                     video_info_df: pd.DataFrame,
                     clfs: list,
-                    detailed_bout_data: bool):
+                    detailed_bout_data: bool,
+                    config_path: str = None):
+    """Worker entry point. Patch 122ay threaded ``config_path``
+    in so the worker can do v1-aware reads via
+    :func:`load_machine_results_for_video`. ``config_path`` is
+    keyword-only with a None default for back-compat with
+    external callers that pickle their own ``partial`` without
+    setting it — in that case the worker falls back to a raw
+    read_df from the legacy CSV (pre-122ay behaviour)."""
 
     batch_id, data_paths = data
     batch_bouts_df_lst, batch_results_df = [], pd.DataFrame()
@@ -60,8 +68,26 @@ def _agg_clf_helper(data: tuple,
         _, file_name, _ = get_fn_ext(file_path)
         if verbose: stdout_information(msg=f"Analyzing classifier descriptive statistics for video {file_name} ({file_cnt + 1}/{len(data_paths)}, cpu core: {batch_id})...")
         _, _, fps = read_video_info(video_name=file_name, video_info_df=video_info_df)
-        check_file_exist_and_readable(file_path)
-        data_df = read_df(file_path, 'csv')
+        # Patch 122ay: dual-read via classification_io helper.
+        # check_file_exist_and_readable is intentionally dropped
+        # — for v1 projects file_path may be a pseudo-path under
+        # derived/classifications/<stem>.parquet that the helper
+        # resolves itself, so the legacy isfile check would
+        # spuriously fire.
+        if config_path is not None:
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            data_df = load_machine_results_for_video(
+                video_name=file_name,
+                config_path=config_path,
+                legacy_fallback=(
+                    file_path if os.path.isfile(file_path) else None
+                ),
+            )
+        else:
+            check_file_exist_and_readable(file_path)
+            data_df = read_df(file_path, 'csv')
         check_valid_dataframe(df=data_df, required_fields=clfs, source=file_path)
         bouts_df = detect_bouts(data_df=data_df, target_lst=clfs, fps=fps)
         if detailed_bout_data and (len(bouts_df) > 0):
@@ -211,7 +237,11 @@ class AggregateClfCalculatorMultiprocess(ConfigReader):
                                       verbose=self.verbose,
                                       video_info_df=self.video_info_df,
                                       clfs=self.classifiers,
-                                      detailed_bout_data=self.detailed_bout_data)
+                                      detailed_bout_data=self.detailed_bout_data,
+                                      # Patch 122ay: thread config_path
+                                      # so the pickled worker can do
+                                      # v1-aware reads.
+                                      config_path=self.config_path)
         for cnt, (batch_id, batch_results_df, batch_bouts_df_lst) in enumerate(pool.map(constants, chunked_data_paths, chunksize=self.multiprocess_chunksize)):
             self.results_df = pd.concat([self.results_df, batch_results_df], axis=0)
             self.bouts_df_lst.append(batch_bouts_df_lst)

@@ -186,7 +186,15 @@ class TresholdPlotCreatorMultiprocess(ConfigReader, PlottingMixin):
             video_timer = SimbaTimer(start=True)
             _, self.video_name, _ = get_fn_ext(file_path)
             video_info, self.px_per_mm, self.fps = self.read_video_info(video_name=self.video_name)
-            data_df = read_df(file_path, self.file_type)
+            # Patch 122ay: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            data_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             check_that_column_exist(df=data_df, column_name=[self.clf_name, self.probability_col], file_name=file_path)
             self.save_frame_folder_dir = os.path.join(self.probability_plot_dir, self.video_name + f"_{self.clf_name}")
             self.video_folder = os.path.join(self.probability_plot_dir, self.video_name + f"_{self.clf_name}")

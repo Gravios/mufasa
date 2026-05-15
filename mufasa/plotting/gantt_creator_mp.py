@@ -226,7 +226,15 @@ class GanttCreatorMultiprocess(ConfigReader, PlottingMixin):
         for file_cnt, file_path in enumerate(self.data_paths):
             video_timer = SimbaTimer(start=True)
             _, self.video_name, _ = get_fn_ext(file_path)
-            self.data_df = read_df(file_path, self.file_type)
+            # Patch 122ay: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.data_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             check_that_column_exist(df=self.data_df, column_name=self.clf_names, file_name=file_path)
             stdout_information(msg=f"Processing video {self.video_name}, Frame count: {len(self.data_df)} (Video {(file_cnt + 1)}/{len(self.data_paths)})...")
             self.video_info_settings, _, self.fps = self.read_video_info(video_name=self.video_name)
