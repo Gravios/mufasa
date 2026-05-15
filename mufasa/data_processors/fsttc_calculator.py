@@ -156,7 +156,15 @@ class FSTTCCalculator(ConfigReader, PlottingMixin):
             _, _, self.fps = self.read_video_info(video_name=self.video_name)
             self.video_sequences[self.video_name]["fps"] = self.fps
             self.frames_in_window = int((self.fps / 1000) * self.time_delta)
-            self.data_df = read_df(file_path, self.file_type)  # [self.behavior_lst]
+            # Patch 122au: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.data_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             self.video_sequences[self.video_name]["session_length_frames"] = len(
                 self.data_df
             )

@@ -140,7 +140,15 @@ class TimeBinsClfCalculator(ConfigReader):
             _, file_name, _ = get_fn_ext(file_path)
             self.video_dict[file_name] = {}
             stdout_information(msg=f'Analyzing classification in time-bins ({self.bin_length}s) for video {file_name} ({file_cnt+1}/{len(self.data_paths)}')
-            data_df = read_df(file_path, self.file_type)
+            # Patch 122au: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            data_df = load_machine_results_for_video(
+                video_name=file_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             check_that_column_exist(df=data_df, column_name=self.clfs, file_name=file_path)
             video_settings, px_per_mm, fps = self.read_video_info(video_name=file_name)
             bin_frame_length = max(1, int(self.bin_length * fps))

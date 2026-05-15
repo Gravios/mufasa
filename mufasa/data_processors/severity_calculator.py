@@ -58,7 +58,15 @@ class SeverityCalculator(ConfigReader):
         for file_path in self.machine_results_paths:
             _, video_name, _ = get_fn_ext(file_path)
             self.results[video_name] = {}
-            df = read_df(file_path=file_path, file_type=self.file_type)
+            # Patch 122au: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            df = load_machine_results_for_video(
+                video_name=video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             if self.settings["clf"] not in df.columns:
                 NoDataFoundWarning(
                     msg=f'Skipping file {video_name} - {self.settings["clf"]} data not present in file'

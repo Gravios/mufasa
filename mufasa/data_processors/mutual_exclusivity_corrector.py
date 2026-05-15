@@ -59,7 +59,15 @@ class MutualExclusivityCorrector(ConfigReader):
             self.video_name = get_fn_ext(filepath=file_path)[1]
             video_timer = SimbaTimer(start=True)
             print(f"Analysing mutual exclusivity in {self.video_name}..")
-            self.input_df = read_df(file_path=file_path, file_type=self.file_type)
+            # Patch 122au: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.input_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             self.data_df = deepcopy(self.input_df)
             for rule_cnt, rule_data in self.rules.items():
                 self.rule_cnt, self.rule_data = rule_cnt, rule_data

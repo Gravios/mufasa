@@ -141,7 +141,17 @@ class AggregateClfCalculator(ConfigReader):
             stdout_information(msg=f"Analyzing classifier descriptive statistics for video {file_name} ({file_cnt+1}/{len(self.machine_results_paths)})...")
             _, _, fps = self.read_video_info(video_name=file_name)
             check_file_exist_and_readable(file_path)
-            data_df = read_df(file_path, self.file_type)
+            # Patch 122au: dual-read via classification_io helper.
+            # v1 path: derived/features + derived/classifications;
+            # legacy fallback: the combined csv/machine_results CSV.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            data_df = load_machine_results_for_video(
+                video_name=file_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            )
             check_valid_dataframe(df=data_df, required_fields=self.classifiers, source=file_path)
             bouts_df = detect_bouts(data_df=data_df, target_lst=self.classifiers, fps=fps)
             if self.detailed_bout_data and (len(bouts_df) > 0):

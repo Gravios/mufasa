@@ -147,7 +147,15 @@ class ROIClfCalculator(ConfigReader):
             if len(list(video_rois.keys())) == 0:
                 ROIWarning(msg=f'Skipping video {video_name}: No ROIs found for video {video_name}. The video has the ROIs {list(input_video_rois.keys())} but analysis is to be performed on ROIs {video_roi_names}', source=self.__class__.__name__)
                 continue
-            data_df = read_df(file_path=data_path, file_type=self.file_type)
+            # Patch 122au: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            data_df = load_machine_results_for_video(
+                video_name=video_name,
+                config_path=self.config_path,
+                legacy_fallback=data_path,
+            )
             check_valid_dataframe(df=data_df, source=f'{data_path}', required_fields=self.required_fields)
             data_df = data_df[self.required_fields]
             for (bp_x, bp_y, bp_p) in self.bp_cols:
