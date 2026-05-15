@@ -461,24 +461,32 @@ class TargetedClipsDialog(QDialog):
             out_dir=self.target_dir,
             include_clip_time_in_filename=True,
         )
-        # Data slicing — read machine_results CSV and slice by frame range
+        # Data slicing — read machine_results and slice by frame
+        # range. Patch 122aw: dual-read via classification_io
+        # helper. v1 path: derived/features + derived/classifications
+        # joined. Legacy fallback: the legacy CSV (kept as the
+        # secondary path so projects that haven't run inference
+        # under 122at still work).
         mr_path = os.path.join(
             self.machine_results_dir,
             f"{self.video_name}.{self.file_type}",
         )
-        if not os.path.isfile(mr_path):
-            # Non-fatal: a user may want video-only clips
-            return
         try:
-            import pandas as pd
-            try:
-                from mufasa.utils.read_write import read_df
-                df = read_df(mr_path, self.file_type)
-            except Exception:
-                if self.file_type.lower() == "csv":
-                    df = pd.read_csv(mr_path)
-                else:
-                    raise
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=(
+                    mr_path if os.path.isfile(mr_path) else None
+                ),
+            )
+        except FileNotFoundError:
+            # Non-fatal: a user may want video-only clips (no
+            # data slicing) — matches the pre-122aw behaviour
+            # where missing machine_results just skipped slicing.
+            return
         except Exception:
             return
         for i, c in enumerate(clips):

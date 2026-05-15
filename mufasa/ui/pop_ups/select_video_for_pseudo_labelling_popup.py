@@ -61,7 +61,15 @@ class SelectPseudoLabellingVideoPupUp(ConfigReader, PopUpMixin):
         self.machine_results_file_path = os.path.join(self.machine_results_dir, f"{video_meta_data['video_name']}.{self.file_type}")
         if not os.path.isfile(self.machine_results_file_path):
             raise NoFilesFoundError(msg=f'When doing pseudo-annotations, SimBA expects a file at {self.machine_results_file_path} representing video {video_meta_data["video_name"]}. SimBA could not find this file.', source=self.__class__.__name__)
-        self.data_df = read_df(self.machine_results_file_path, self.file_type)
+        # Patch 122aw: dual-read via classification_io helper.
+        from mufasa.utils.classification_io import (
+            load_machine_results_for_video,
+        )
+        self.data_df = load_machine_results_for_video(
+            video_name=video_meta_data["video_name"],
+            config_path=self.config_path,
+            legacy_fallback=self.machine_results_file_path,
+        )
         check_valid_dataframe(df=self.data_df, source=self.__class__.__name__, required_fields=self.clf_names + self.p_cols)
         _ = LabellingInterface(config_path=self.config_path,
                                file_path=video_path,

@@ -107,7 +107,15 @@ class LabellingInterface(ConfigReader):
         if thresholds is not None:
             if not os.path.isfile(self.machine_results_file_path):
                 raise NoFilesFoundError(msg=f'When doing pseudo-annotations, SimBA expects a file at {self.machine_results_file_path} representing video {self.video_name}. SimBA could not find this file.', source=self.__class__.__name__)
-            self.data_df = read_df(self.machine_results_file_path, self.file_type)
+            # Patch 122aw: dual-read via classification_io helper.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.data_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=self.machine_results_file_path,
+            )
             check_valid_dataframe(df=self.data_df, source=self.machine_results_file_path, required_fields=self.clf_names + self.p_cols)
             for clf in self.clf_names:
                 self.data_df.loc[self.data_df[f"Probability_{clf}"] > self.thresholds[clf], clf] = 1

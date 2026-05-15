@@ -319,22 +319,28 @@ class ClipReviewDialog(QDialog):
         )
 
     def _load_machine_results(self) -> None:
-        """Load the machine_results CSV into ``self._mr_df``.
+        """Load the machine_results into ``self._mr_df``.
 
-        Uses pandas directly for CSV to dodge an upstream quirk in
-        ``mufasa.utils.read_write.read_df`` which unconditionally
-        strips the first column of CSV input regardless of
-        ``has_index``. For .parquet / .pickle the project reader is
-        used since those formats handle index correctly.
+        Patch 122aw: dual-read via classification_io helper.
+        v1 path: derived/features + derived/classifications joined
+        positionally → combined-shape DataFrame. Legacy fallback:
+        the machine_results_path passed by the caller.
+
+        The pre-122aw special-case for CSV (using pd.read_csv to
+        dodge a read_df quirk that strips the first column) is now
+        handled inside the helper's legacy-fallback branch — it
+        does pd.read_csv directly for .csv suffixes, so the
+        previous workaround is no longer needed.
         """
         try:
-            import pandas as pd
-            if self.file_type.lower() == "csv":
-                self._mr_df = pd.read_csv(self.machine_results_path)
-            else:
-                from mufasa.utils.read_write import read_df
-                self._mr_df = read_df(self.machine_results_path,
-                                      self.file_type)
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self._mr_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=self.machine_results_path,
+            )
         except Exception as exc:
             raise RuntimeError(
                 f"Could not read machine_results at "
