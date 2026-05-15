@@ -788,15 +788,14 @@ def project_paths_from_config(
     * ``models_dir`` — ``<root>/models/`` (v1) or
       ``<project_path>/../models/`` (legacy).
 
-    Patch 122ab adds four keys consumed by the frame-labeller and
-    ROI dialogs. For v1 these intentionally mirror the legacy
-    layout under the v1 project root rather than under v1's
-    ``derived/<stage>/<run_id>/`` provenance tree:
+    Patch 122ab originally added four keys consumed by the
+    frame-labeller and ROI dialogs. Patch 122ao removed two of
+    them (``features_extracted_dir`` + ``targets_inserted_dir``)
+    after the v1 migration completed in 122ak — features and
+    labels now live exclusively under ``derived/features/`` and
+    ``derived/labels/``. The remaining two stay until classifier
+    inference output migrates to v1:
 
-    * ``features_extracted_dir`` — ``<root>/csv/features_extracted/``
-      (both layouts).
-    * ``targets_inserted_dir`` — ``<root>/csv/targets_inserted/``
-      (both layouts).
     * ``machine_results_dir`` — ``<root>/csv/machine_results/``
       (both layouts).
     * ``roi_definitions_path`` — ``<root>/logs/measures/ROI_definitions.h5``
@@ -865,9 +864,13 @@ def project_paths_from_config(
             "logs_dir":               str(root / "logs"),
             "video_info_path":        str(root / "sources" / "video_info.csv"),
             "models_dir":             str(root / "models"),
-            # Patch 122ab: labeller / ROI paths under the v1 root.
-            "features_extracted_dir": str(root / "csv" / "features_extracted"),
-            "targets_inserted_dir":   str(root / "csv" / "targets_inserted"),
+            # Patch 122ao: features_extracted_dir +
+            # targets_inserted_dir keys removed. v1 layout uses
+            # derived_features_dir + derived_labels_dir
+            # exclusively for features/labels storage. The
+            # remaining csv/<kind>/ key (machine_results_dir)
+            # stays until classifier inference output migrates
+            # to v1.
             "machine_results_dir":    str(root / "csv" / "machine_results"),
             "roi_definitions_path":   str(root / "logs" / "measures"
                                           / "ROI_definitions.h5"),
@@ -900,9 +903,9 @@ def project_paths_from_config(
         "logs_dir":               str(proj / "logs"),
         "video_info_path":        str(proj / "logs" / "video_info.csv"),
         "models_dir":             str(proj.parent / "models"),
-        # Patch 122ab: labeller / ROI paths under the legacy root.
-        "features_extracted_dir": str(proj / "csv" / "features_extracted"),
-        "targets_inserted_dir":   str(proj / "csv" / "targets_inserted"),
+        # Patch 122ao: features_extracted_dir +
+        # targets_inserted_dir keys removed; see v1 branch above
+        # for rationale.
         "machine_results_dir":    str(proj / "csv" / "machine_results"),
         "roi_definitions_path":   str(proj / "logs" / "measures"
                                       / "ROI_definitions.h5"),

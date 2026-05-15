@@ -155,8 +155,40 @@ class ConfigReader(object):
         self.gpu_available = check_nvidea_gpu_available()
         self.clf_cnt = self.read_config_entry(self.config, ConfigKey.SML_SETTINGS.value, ConfigKey.TARGET_CNT.value, Dtypes.INT.value)
         self.clf_names = get_all_clf_names(config=self.config, target_cnt=self.clf_cnt)
-        self.feature_file_paths = glob.glob(self.features_dir + f"/*.{self.file_type}")
-        self.target_file_paths = glob.glob(self.targets_folder + f"/*.{self.file_type}")
+        # Patch 122ao (B3): v1-aware enumeration. The legacy
+        # glob.glob(self.features_dir + ...) / glob.glob(self.
+        # targets_folder + ...) returned empty for v1-only
+        # projects after 122ak — features and labels live under
+        # derived/features/ + derived/labels/, not the legacy
+        # tree. list_video_stems_with_* unions both layouts so
+        # consumers see correct counts.
+        #
+        # Paths returned are pseudo-paths under the legacy
+        # location (self.features_dir / self.targets_folder).
+        # Consumers that:
+        #   * count entries: get correct count (UI displays).
+        #   * iterate for stem extraction: get_fn_ext works on
+        #     pseudo-paths just fine.
+        #   * actually open the file: go through
+        #     load_features_for_video / load_labels_for_video
+        #     in v1-migrated training code (122ae-5b/5e).
+        try:
+            from mufasa.utils.feature_io import list_video_stems_with_features
+            from mufasa.utils.label_io import list_video_stems_with_labels
+            self.feature_file_paths = [
+                os.path.join(self.features_dir, f"{stem}.{self.file_type}")
+                for stem in list_video_stems_with_features(self.config_path)
+            ]
+            self.target_file_paths = [
+                os.path.join(self.targets_folder, f"{stem}.{self.file_type}")
+                for stem in list_video_stems_with_labels(self.config_path)
+            ]
+        except Exception:
+            # Defensive: any failure (malformed config, missing
+            # v1 layout, etc.) falls back to an empty list — same
+            # as the legacy glob returned on a fresh project.
+            self.feature_file_paths = []
+            self.target_file_paths = []
         self.input_csv_paths = glob.glob(self.input_csv_dir + f"/*.{self.file_type}")
         self.body_part_directionality_paths = glob.glob(
             self.body_part_directionality_df_dir + f"/*.{self.file_type}"
@@ -411,12 +443,26 @@ class ConfigReader(object):
         self.input_csv_paths = glob.glob(
             self.input_csv_dir + f"/*.{ft}"
         )
-        self.feature_file_paths = glob.glob(
-            self.features_dir + f"/*.{ft}"
-        )
-        self.target_file_paths = glob.glob(
-            self.targets_folder + f"/*.{ft}"
-        )
+        # Patch 122ao (B3): same v1-aware enumeration as in the
+        # legacy __init__ branch. v1 override may have repointed
+        # self.features_dir / self.targets_folder at a run-id
+        # subdir; the helpers still scan the project's
+        # derived/features/ + derived/labels/ via config_path
+        # regardless.
+        try:
+            from mufasa.utils.feature_io import list_video_stems_with_features
+            from mufasa.utils.label_io import list_video_stems_with_labels
+            self.feature_file_paths = [
+                os.path.join(self.features_dir, f"{stem}.{ft}")
+                for stem in list_video_stems_with_features(self.config_path)
+            ]
+            self.target_file_paths = [
+                os.path.join(self.targets_folder, f"{stem}.{ft}")
+                for stem in list_video_stems_with_labels(self.config_path)
+            ]
+        except Exception:
+            self.feature_file_paths = []
+            self.target_file_paths = []
         self.outlier_corrected_paths = glob.glob(
             self.outlier_corrected_dir + f"/*.{ft}"
         )

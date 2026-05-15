@@ -182,12 +182,15 @@ class FrameLabellerWidget(QWidget):
         paths = project_paths_from_config(self.config_path)
         meta = project_metadata_from_config(self.config_path)
         self.file_type = meta.get("file_type", "csv")
-        self.features_dir = paths["features_extracted_dir"]
-        self.targets_dir = paths["targets_inserted_dir"]
+        # Patch 122ao: features_extracted_dir and targets_inserted_dir
+        # keys were dropped from project_paths_from_config. After
+        # 122ak the labeller doesn't write to those locations
+        # anyway — _save uses save_labels_for_video which writes
+        # to derived/labels/<video>.parquet via the layout
+        # helper's derived_labels_dir.
         self.machine_results_dir = paths["machine_results_dir"]
-        # Patch 122ak: no longer write to targets_dir, so don't
-        # auto-create it. derived/labels/ is auto-created by
-        # save_labels_for_video on first write.
+        # derived/labels/ is auto-created by save_labels_for_video
+        # on first write.
 
     # ------------------------------------------------------------------ #
     # UI construction
