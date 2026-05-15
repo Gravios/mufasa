@@ -122,7 +122,16 @@ class GanttCreatorSingleProcess(ConfigReader, PlottingMixin):
         check_all_file_names_are_represented_in_video_log(video_info_df=self.video_info_df, data_paths=self.data_paths)
         for file_cnt, file_path in enumerate(self.data_paths):
             _, self.video_name, _ = get_fn_ext(file_path)
-            self.data_df = read_df(file_path, self.file_type).reset_index(drop=True)
+            # Patch 122av: dual-read via classification_io helper.
+            # .reset_index(drop=True) chain preserved.
+            from mufasa.utils.classification_io import (
+                load_machine_results_for_video,
+            )
+            self.data_df = load_machine_results_for_video(
+                video_name=self.video_name,
+                config_path=self.config_path,
+                legacy_fallback=file_path,
+            ).reset_index(drop=True)
             check_valid_dataframe(df=self.data_df, source=file_path, required_fields=self.clf_names)
             self.video_info_settings, _, self.fps = self.read_video_info(video_name=self.video_name)
             self.bouts_df = detect_bouts(data_df=self.data_df, target_lst=self.clf_names, fps=self.fps)
