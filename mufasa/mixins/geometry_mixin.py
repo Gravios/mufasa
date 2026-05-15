@@ -2151,8 +2151,8 @@ class GeometryMixin(object):
         :rtype: List[List[Polygon]]
 
         :example:
-        >>> data_path = '/Users/simon/Desktop/envs/troubleshooting/Rat_NOR/project_folder/csv/machine_results/08102021_DOT_Rat7_8(2).csv'
-        >>> data = pd.read_csv(data_path, index_col=0).head(1000).iloc[:, 0:21]
+        >>> data_path = '/Users/simon/Desktop/envs/troubleshooting/Rat_NOR/project_folder/derived/classifications/08102021_DOT_Rat7_8(2).parquet'
+        >>> data = pd.read_parquet(data_path).head(1000).iloc[:, 0:21]
         >>> data = data[data.columns.drop(list(data.filter(regex='_p')))]
         >>> animal_data = data.values.reshape(len(data), -1, 2).astype(int)
         >>> tri = GeometryMixin().multiframe_delaunay_triangulate_keypoints(data=animal_data)
@@ -2355,7 +2355,7 @@ class GeometryMixin(object):
         :rtype: List[Union[LineString, MultiLineString]]
 
         :example:
-        >>> df = pd.read_csv('/Users/simon/Desktop/envs/troubleshooting/Rat_NOR/project_folder/csv/machine_results/08102021_DOT_Rat7_8(2).csv', nrows=500).fillna(0).astype(int)
+        >>> df = pd.read_parquet('/Users/simon/Desktop/envs/troubleshooting/Rat_NOR/project_folder/derived/classifications/08102021_DOT_Rat7_8(2).parquet').head(500).fillna(0).astype(int)
         >>> skeleton = [['Center', 'Lat_left'], ['Center', 'Lat_right'], ['Center', 'Nose'], ['Center', 'Tail_base'], ['Lat_left', 'Tail_base'], ['Lat_right', 'Tail_base'], ['Nose', 'Ear_left'], ['Nose', 'Ear_right'], ['Ear_left', 'Lat_left'], ['Ear_right', 'Lat_right']]
         >>> geometries = GeometryMixin().multiframe_bodyparts_to_multistring_skeleton(data_df=df, skeleton=skeleton, core_cnt=2, verbose=True)
         """

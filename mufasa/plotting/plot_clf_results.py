@@ -55,7 +55,7 @@ class PlotSklearnResultsSingleCore(ConfigReader, TrainModelMixin, PlottingMixin)
     :param Union[str, os.PathLike] config_path: path to SimBA project config file in Configparser format
     :param Optional[bool] video_setting: If True, SimBA will create compressed videos. Default True.
     :param Optional[bool] frame_setting: If True, SimBA will create individual frames. Default True.
-    :param Optional[str] video_file_path: Path to video file to create classification visualizations for. If None, then all the videos in the csv/machine_results will be used. Default None.
+    :param Optional[str] video_file_path: Path to video file to create classification visualizations for. If None, then all videos with classifications under ``derived/classifications/`` (v1) or ``csv/machine_results/`` (legacy) are used. Default None.
     :param Optional[Union[Dict[str, float], bool]] text_settings: Dictionary holding the circle size, font size, spacing size, and text thickness of the printed text. If None, then these are autocomputed.
     :param Optional[bool] rotate: If True, the output video will be rotated 90 degrees from the input. Default False.
     :param Optional[str] palette: The name of the palette used for the pose-estimation key-points. Default ``Set1``.

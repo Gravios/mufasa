@@ -36,15 +36,19 @@ MODEL_PATH = 'model_path'
 
 class InferenceBatch(TrainModelMixin, ConfigReader):
     """
-    Run classifier inference on all files with the ``project_folder/csv/features_extracted`` directory.
-    Results are stored in the ``project_folder/csv/machine_results`` directory of the SimBA project.
+    Run classifier inference on all videos with extracted features.
+    Reads features from ``derived/features/`` (v1) or
+    ``csv/features_extracted/`` (legacy). Predictions are written
+    to ``derived/classifications/<video>.parquet`` for both project
+    formats (post-122ax). Failed-load videos are skipped with a
+    warning rather than aborting the batch.
 
     .. note::
        To compute aggregate statistics from the output of this class, see :func:`mufasa.data_processors.agg_clf_calculator.AggregateClfCalculator`
 
     :param Union[str, os.PathLike] config_path: path to SimBA project config file in Configparser format.
-    :param Optional[Union[str, os.PathLike]] features_dir: Optional directory containing featurized files in CSV or parquet format. If None, then the `project_folder/csv/features_extracted` directory of the project will be used.
-    :param Optional[Union[str, os.PathLike]] save_dir: Optional directory to save the data for the analyzed videos. If None, then the `project_folder/csv/machine_results` directory of the project will be used.
+    :param Optional[Union[str, os.PathLike]] features_dir: Optional directory containing featurized files in CSV or parquet format. If None, defaults to the project's ``derived/features/`` (v1) or ``csv/features_extracted/`` (legacy) directory.
+    :param Optional[Union[str, os.PathLike]] save_dir: **Deprecated post-122ax.** The save location is now derived from ``config_path`` (predictions land at ``derived/classifications/<video>.parquet``). If passed, a warning is logged and the value is ignored; kept in the signature for back-compat with external callers.
     :param Optional[int] minimum_bout_length: Optional minimum bout length (milliseconds) override. If None, classifier-specific minimum bout settings from project configuration are used.
     :param Optional[Dict[str, Dict[str, List[str]]]] feature_subsets_by_clf: Optional per-classifier feature subsets to use during inference. Format: ``{classifier_name: {subset_name: [feature_col_1, feature_col_2, ...]}}``. If provided, each classifier is applied once per subset and outputs are suffixed with the subset name.
     :param bool verbose: If True, print progress and status messages during inference. Default: True.
