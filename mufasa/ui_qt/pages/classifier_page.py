@@ -11,21 +11,23 @@ Sections
 * **Run inference** — :class:`RunInferenceForm`: per-classifier
   model-path / threshold / min-bout configurator that drives
   :class:`InferenceBatch`. Patch 122ap port of
-  :class:`RunMachineModelsPopUp`. In-frame with pop-out-to-dock
-  support, same pattern as 122aj's frame labeller and 122al's
-  batch pre-processor.
+  :class:`RunMachineModelsPopUp`.
 * **Train classifier** — :class:`TrainClassifierForm`: hyperparams
   + evaluation toggles + Train button that invokes
   :class:`TrainRandomForestClassifier`. Patch 122aq port of
   :class:`MachineModelSettingsPopUp` plus a Train invocation
-  the Tk popup didn't have (Tk persisted settings only; users
-  had to click a separate SimBA.py menu entry to actually
-  train).
+  the Tk popup didn't have.
+* **Validate classifier** — :class:`ValidateClassifierForm`:
+  out-of-sample validation video runner. Picks a model + feature
+  file, runs inference and renders an annotated video with pose
+  tracks + classifier predictions + optional Gantt overlay.
+  Patch 122ar port of :class:`ValidationVideoPopUp`.
 
-Validate section is still on the Tk side (driven by the legacy
-SimBA.py root window's menus). ``inference_validation.py`` has
-its own input/output dir conventions and earns its own port
-separately.
+All sections follow the 122aj+ in-frame + pop-out-to-dock pattern.
+:class:`ClassifierValidationPopUp` (per-bout clip generator) is
+post-inference visualization rather than validation per se — it
+belongs on the Visualizations page when that gets its own ports,
+not the Classifier page.
 """
 from __future__ import annotations
 
@@ -34,6 +36,7 @@ from typing import Optional
 from mufasa.ui_qt.forms.classifier import ClassifierManageForm
 from mufasa.ui_qt.forms.run_inference import RunInferenceForm
 from mufasa.ui_qt.forms.train_classifier import TrainClassifierForm
+from mufasa.ui_qt.forms.validate_classifier import ValidateClassifierForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
@@ -48,6 +51,10 @@ def build_classifier_page(workbench,
     # Patch 122aq: Train classifier — port of
     # MachineModelSettingsPopUp plus a Train invocation.
     page.add_section("Train classifier", [(TrainClassifierForm, {})])
+    # Patch 122ar: Validate classifier — port of
+    # ValidationVideoPopUp.
+    page.add_section("Validate classifier",
+                     [(ValidateClassifierForm, {})])
     return page
 
 
