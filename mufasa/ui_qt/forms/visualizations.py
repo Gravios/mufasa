@@ -108,6 +108,13 @@ class _ExtrasFormBuilder:
     * ``"choice"`` — QComboBox; extras: list-of-options
     * ``"color"`` — _ColorButton
     * ``"str"`` — QLineEdit; extras: (placeholder,)
+    * ``"list"`` — QLineEdit collecting a comma-separated list of
+      strings; produces ``list[str]`` at ``to_kwargs`` time.
+      Default may be a list (rendered as comma-joined text) or
+      a pre-joined string. Empty/whitespace tokens are dropped.
+      Patch 122be: lets list-typed backend kwargs (body_parts,
+      cue_light_names, arm_names, …) be declared natively
+      instead of via a ``kwargs_transform`` lambda.
     * ``"file"`` — _PathField (file picker); extras: (file_filter, placeholder)
 
     Label text is derived from the backend kwarg name by replacing
@@ -158,6 +165,21 @@ class _ExtrasFormBuilder:
             if default:
                 w.setText(str(default))
             self._form.addRow(self._label(name), w)
+        elif kind == "list":
+            # Patch 122be: comma-separated list. Default may be a
+            # list (rendered as comma-joined text) or a pre-joined
+            # string. Placeholder defaults to a hint about the
+            # comma format if not provided.
+            placeholder = extra[0] if extra else (
+                "comma-separated, e.g. Item_1,Item_2"
+            )
+            w = QLineEdit(); w.setPlaceholderText(placeholder)
+            if isinstance(default, (list, tuple)):
+                if default:
+                    w.setText(",".join(str(x) for x in default))
+            elif default:
+                w.setText(str(default))
+            self._form.addRow(self._label(name), w)
         elif kind == "file":
             file_filter = extra[0] if extra else ""
             placeholder  = extra[1] if len(extra) > 1 else ""
@@ -187,6 +209,12 @@ class _ExtrasFormBuilder:
                 out[name] = w.color
             elif kind == "str":
                 out[name] = w.text().strip()
+            elif kind == "list":
+                # Patch 122be: comma-split, strip, drop empties.
+                raw = w.text() or ""
+                out[name] = [
+                    s.strip() for s in raw.split(",") if s.strip()
+                ]
             elif kind == "file":
                 out[name] = w.path
         return out
@@ -587,10 +615,11 @@ ROUTES: list[_VizRoute] = [
     ),
     # -------- Patch 122az: ROI / skeleton fill-ins ---------- #
     # Three routes that closed gaps in the viz form: ROI overlay,
-    # ROI feature overlay, and pose-skeleton video. The first two
-    # take body_parts as a list[str] which the declarative form
-    # can't natively express (no "list" kind); a kwargs_transform
-    # wraps the singular body_part string into [body_part].
+    # ROI feature overlay, and pose-skeleton video. The ROI ones
+    # take body_parts as a list[str]; originally that was
+    # expressed as singular body_part + a kwargs_transform
+    # lambda wrapping it into [body_part]. Patch 122be moved to
+    # the native "list" extras kind, dropping the transforms.
     _VizRoute(
         label="ROI overlay (per video)",
         scope_kind="file",
@@ -598,8 +627,12 @@ ROUTES: list[_VizRoute] = [
                                  "ROIPlotter"),
         needs_video=True,
         extras=[
-            ("body_part",         "str",   "Nose",
-             "Body-part name to overlay"),
+            # Patch 122be: native "list" kind — was a singular
+            # body_part: str + kwargs_transform wrap. The user
+            # can now type "Nose" or "Nose,Tail" and the backend
+            # receives a list directly.
+            ("body_parts",        "list",  ["Nose"],
+             "Body-part name(s) to overlay (comma-separated)"),
             ("outside_roi",       "bool",  False),
             ("threshold",         "float", 0.0, 0.0, 1.0, 0.05),
             ("show_animal_name",  "bool",  True),
@@ -607,12 +640,6 @@ ROUTES: list[_VizRoute] = [
             ("show_bbox",         "bool",  False),
         ],
         kwargs_map={"video_path": "video_path"},
-        kwargs_transform=lambda kw: (
-            {**{k: v for k, v in kw.items()
-                if k != "body_part"},
-             "body_parts": [kw["body_part"]]}
-            if "body_part" in kw else kw
-        ),
     ),
     _VizRoute(
         label="ROI feature overlay (per video)",
@@ -623,17 +650,12 @@ ROUTES: list[_VizRoute] = [
         ),
         needs_video=True,
         extras=[
-            ("body_part", "str", "Nose",
-             "Body-part name to overlay"),
+            # Patch 122be: native "list" kind — same migration
+            # as ROIPlotter above.
+            ("body_parts", "list", ["Nose"],
+             "Body-part name(s) to overlay (comma-separated)"),
         ],
         kwargs_map={"video_path": "video_path"},
-        # Same body_part → [body_part] wrap as ROI overlay.
-        kwargs_transform=lambda kw: (
-            {**{k: v for k, v in kw.items()
-                if k != "body_part"},
-             "body_parts": [kw["body_part"]]}
-            if "body_part" in kw else kw
-        ),
         # Backend takes style_attr dict; empty dict triggers
         # backend's defaults.
         default_kwargs={"style_attr": {}},
