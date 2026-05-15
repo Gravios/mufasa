@@ -145,31 +145,58 @@ def project_toml_to_configparser(
     # until classifier training runs; reads through ConfigReader's
     # `model_path_N` attribute should be treated as "the path where the
     # model is expected to land".
+    #
+    # Patch 122as: per-classifier inference settings from the v1
+    # [classifier_inference.<name>] sub-tables override these defaults
+    # so the InferenceBatch reader sees real model paths / thresholds
+    # / min bouts (not NaN placeholders) when the user has run the
+    # RunInferenceForm against a TOML project.
     models_dir = str(Path(project_root) / "models")
+    inference_settings = toml_data.get("classifier_inference", {})
+    if not isinstance(inference_settings, dict):
+        inference_settings = {}
     cp.add_section("SML settings")
     cp.set("SML settings", "model_dir", models_dir)
     cp.set("SML settings", "no_targets", str(len(targets)))
     for i, target in enumerate(targets, start=1):
         cp.set("SML settings", f"target_name_{i}", target)
-        cp.set(
-            "SML settings", f"model_path_{i}",
+        entry = inference_settings.get(target, {})
+        if not isinstance(entry, dict):
+            entry = {}
+        model_path = entry.get(
+            "model_path",
             str(Path(models_dir) / f"{target}.sav"),
         )
+        cp.set("SML settings", f"model_path_{i}", str(model_path))
 
     # ------------------------------------------------------------------
     # [threshold_settings]
     # ------------------------------------------------------------------
     cp.add_section("threshold_settings")
-    for i in range(1, len(targets) + 1):
-        cp.set("threshold_settings", f"threshold_{i}", "NaN")
+    for i, target in enumerate(targets, start=1):
+        entry = inference_settings.get(target, {})
+        if not isinstance(entry, dict):
+            entry = {}
+        thr = entry.get("threshold")
+        cp.set(
+            "threshold_settings", f"threshold_{i}",
+            _stringify(thr) if thr is not None else "NaN",
+        )
     cp.set("threshold_settings", "sklearn_bp_prob_thresh", "0.0")
 
     # ------------------------------------------------------------------
     # [Minimum_bout_lengths]
     # ------------------------------------------------------------------
     cp.add_section("Minimum_bout_lengths")
-    for i in range(1, len(targets) + 1):
-        cp.set("Minimum_bout_lengths", f"min_bout_{i}", "NaN")
+    for i, target in enumerate(targets, start=1):
+        entry = inference_settings.get(target, {})
+        if not isinstance(entry, dict):
+            entry = {}
+        mb = entry.get("min_bout_ms")
+        cp.set(
+            "Minimum_bout_lengths", f"min_bout_{i}",
+            _stringify(mb) if mb is not None else "NaN",
+        )
 
     # ------------------------------------------------------------------
     # Plot / ROI / directionality / movement sections — empty by
@@ -195,33 +222,49 @@ def project_toml_to_configparser(
     # ~25 keys here, mostly with "NaN" placeholders. Match exactly so
     # downstream `read_config_entry(...)` calls return the same
     # values they always have.
+    #
+    # Patch 122as: training settings from the v1 [classifier_training]
+    # table override these defaults so TrainRandomForestClassifier
+    # sees the user's saved hyperparameters / evaluation toggles on
+    # TOML projects.
+    training_settings = toml_data.get("classifier_training", {})
+    if not isinstance(training_settings, dict):
+        training_settings = {}
     cp.add_section("create ensemble settings")
-    cp.set(
-        "create ensemble settings", "pose_estimation_body_parts",
-        _stringify(pose.get("pose_config_code", "user_defined")),
-    )
-    cp.set("create ensemble settings", "classifier", "NaN")
-    cp.set("create ensemble settings", "train_test_size", "0.2")
-    cp.set("create ensemble settings", "under_sample_setting", "NaN")
-    cp.set("create ensemble settings", "under_sample_ratio", "NaN")
-    cp.set("create ensemble settings", "over_sample_setting", "NaN")
-    cp.set("create ensemble settings", "over_sample_ratio", "NaN")
-    cp.set("create ensemble settings", "rf_n_estimators", "2000")
-    cp.set("create ensemble settings", "rf_min_sample_leaf", "1")
-    cp.set("create ensemble settings", "rf_max_features", "sqrt")
-    cp.set("create ensemble settings", "rf_n_jobs", "-1")
-    cp.set("create ensemble settings", "rf_criterion", "entropy")
-    cp.set("create ensemble settings", "rf_metadata", "NaN")
-    cp.set("create ensemble settings", "ex_decision_tree", "NaN")
-    cp.set("create ensemble settings", "ex_decision_tree_fancy", "NaN")
-    cp.set("create ensemble settings", "rf_feature_importance_log", "NaN")
-    cp.set("create ensemble settings", "feature_importance_bar_chart", "NaN")
-    cp.set("create ensemble settings", "permutation_feature_importance", "NaN")
-    cp.set("create ensemble settings", "learning_curve", "NaN")
-    cp.set("create ensemble settings", "precision_recall", "NaN")
-    cp.set("create ensemble settings", "n_feature_importance_bars", "NaN")
-    cp.set("create ensemble settings", "learning_curve_k_splits", "NaN")
-    cp.set("create ensemble settings", "learningcurve_data_splits", "NaN")
+    _ce_defaults = {
+        "pose_estimation_body_parts":
+            _stringify(pose.get("pose_config_code", "user_defined")),
+        "classifier":                 "NaN",
+        "train_test_size":            "0.2",
+        "under_sample_setting":       "NaN",
+        "under_sample_ratio":         "NaN",
+        "over_sample_setting":        "NaN",
+        "over_sample_ratio":          "NaN",
+        "rf_n_estimators":            "2000",
+        "rf_min_sample_leaf":         "1",
+        "rf_max_features":            "sqrt",
+        "rf_n_jobs":                  "-1",
+        "rf_criterion":               "entropy",
+        "rf_metadata":                "NaN",
+        "ex_decision_tree":           "NaN",
+        "ex_decision_tree_fancy":     "NaN",
+        "rf_feature_importance_log":  "NaN",
+        "feature_importance_bar_chart": "NaN",
+        "permutation_feature_importance": "NaN",
+        "learning_curve":             "NaN",
+        "precision_recall":           "NaN",
+        "n_feature_importance_bars":  "NaN",
+        "learning_curve_k_splits":    "NaN",
+        "learningcurve_data_splits":  "NaN",
+    }
+    # Defaults first, then overlay the user's [classifier_training]
+    # values. Stringify since ConfigParser is string-only on the wire.
+    for key, default in _ce_defaults.items():
+        cp.set("create ensemble settings", key, default)
+    for key, value in training_settings.items():
+        cp.set(
+            "create ensemble settings", key, _stringify(value),
+        )
 
     # ------------------------------------------------------------------
     # [Multi animal IDs]

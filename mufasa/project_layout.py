@@ -1050,3 +1050,321 @@ def project_metadata_from_config(
         "classifier_targets": classifier_targets,
         "pose_config_code":   pose_config_code,
     }
+
+
+# ---------------------------------------------------------------------------
+# Patch 122as: classifier-inference + classifier-training settings I/O
+# ---------------------------------------------------------------------------
+#
+# Bridges the gap between the per-form settings the Qt forms collect
+# (RunInferenceForm in 122ap, TrainClassifierForm in 122aq) and the
+# storage they land in: ``[classifier_inference]`` / ``[classifier_training]``
+# sub-tables in ``project.toml`` for v1 projects, and the canonical
+# ``[SML settings]`` / ``[threshold_settings]`` / ``[Minimum_bout_lengths]``
+# / ``[create_ensemble_settings]`` sections in ``project_config.ini``
+# for legacy projects.
+#
+# Forms call these helpers without branching on file extension. The
+# helpers detect the format and dispatch internally.
+#
+# v1 TOML schemas
+# ---------------
+# Inference settings live as per-classifier sub-tables:
+#
+#     [classifier_inference.attack]
+#     model_path = "/abs/path/to/attack.sav"
+#     threshold = 0.5
+#     min_bout_ms = 200
+#
+#     [classifier_inference.grooming]
+#     model_path = "/abs/path/to/grooming.sav"
+#     threshold = 0.4
+#     min_bout_ms = 100
+#
+# Training settings live as a flat table with the same key names the
+# trainer's legacy reader expects (so the TOML→CP translator can dump
+# them verbatim):
+#
+#     [classifier_training]
+#     model_to_run = "RF"
+#     classifier = "attack"
+#     rf_n_estimators = 2000
+#     rf_max_features = "sqrt"
+#     ...
+#     calculate_shap_scores = false
+#     shap_target_present_no = 100
+#     ...
+
+import configparser as _cp_mod
+
+
+def _is_toml_config(config_path) -> bool:
+    return str(config_path).lower().endswith(".toml")
+
+
+# Mapping from form-friendly TOML key → INI section + key shape for
+# inference. The INI section/key shape was set in stone by the legacy
+# Tk popup and the backend that reads it back.
+_INFERENCE_INI_MAP = {
+    "model_path":  ("SML settings",         "model_path_{idx}"),
+    "threshold":   ("threshold_settings",   "threshold_{idx}"),
+    "min_bout_ms": ("Minimum_bout_lengths", "min_bout_{idx}"),
+}
+
+
+def read_classifier_inference_settings(
+    config_path,
+) -> Dict[str, Dict[str, Any]]:
+    """Return per-classifier inference settings (model path,
+    discrimination threshold, minimum bout length in ms).
+
+    Keys of the outer dict are classifier names. Missing classifiers
+    are simply absent from the result; the form will leave their
+    fields blank. Empty / NaN values from legacy INI projects are
+    also skipped so the form starts blank when the user hasn't run
+    inference before.
+
+    Patch 122as. Replaces the form-internal
+    ``_read_existing_ini_settings`` shim from 122ap with a
+    layout-aware helper that handles both v1 TOML and legacy INI
+    projects.
+    """
+    cp = Path(config_path)
+    out: Dict[str, Dict[str, Any]] = {}
+    if _is_toml_config(cp):
+        try:
+            data = read_project_toml(cp)
+        except Exception:
+            return out
+        section = data.get("classifier_inference", {})
+        if not isinstance(section, dict):
+            return out
+        for clf_name, settings in section.items():
+            if not isinstance(settings, dict):
+                continue
+            row: Dict[str, Any] = {}
+            mp = settings.get("model_path")
+            if isinstance(mp, str) and mp:
+                row["model_path"] = mp
+            thr = settings.get("threshold")
+            if isinstance(thr, (int, float)):
+                row["threshold"] = float(thr)
+            mb = settings.get("min_bout_ms")
+            if isinstance(mb, int):
+                row["min_bout_ms"] = int(mb)
+            if row:
+                out[str(clf_name)] = row
+        return out
+    # Legacy INI
+    parser = _cp_mod.ConfigParser()
+    try:
+        parser.read(config_path)
+    except _cp_mod.Error:
+        return out
+    n_targets = parser.getint(
+        "SML settings", "no_targets", fallback=0,
+    )
+    for idx in range(1, n_targets + 1):
+        name = parser.get(
+            "SML settings", f"target_name_{idx}", fallback="",
+        ).strip()
+        if not name:
+            continue
+        row: Dict[str, Any] = {}
+        mp = parser.get(
+            "SML settings", f"model_path_{idx}", fallback="",
+        ).strip()
+        if mp and mp.lower() not in ("nan", "none", "select model (.sav) file"):
+            row["model_path"] = mp
+        thr_text = parser.get(
+            "threshold_settings", f"threshold_{idx}", fallback="",
+        ).strip()
+        if thr_text and thr_text.lower() not in ("nan", "none", ""):
+            try:
+                row["threshold"] = float(thr_text)
+            except ValueError:
+                pass
+        mb_text = parser.get(
+            "Minimum_bout_lengths", f"min_bout_{idx}", fallback="",
+        ).strip()
+        if mb_text and mb_text.lower() not in ("nan", "none", ""):
+            try:
+                row["min_bout_ms"] = int(mb_text)
+            except ValueError:
+                pass
+        if row:
+            out[name] = row
+    return out
+
+
+def write_classifier_inference_settings(
+    config_path,
+    settings: Dict[str, Dict[str, Any]],
+) -> None:
+    """Persist per-classifier inference settings.
+
+    For v1 ``.toml`` projects, writes ``[classifier_inference.<name>]``
+    sub-tables. For legacy ``.ini`` projects, writes into the
+    canonical sections using the classifier ordinal.
+
+    Each entry's dict may have any subset of ``model_path``,
+    ``threshold``, and ``min_bout_ms``. Missing keys are not
+    written (preserving any earlier values).
+
+    Patch 122as. Replaces the form-internal ``_write_settings_to_ini``
+    shim from 122ap, which raised RuntimeError on TOML projects.
+    """
+    cp = Path(config_path)
+    if _is_toml_config(cp):
+        try:
+            data = read_project_toml(cp)
+        except FileNotFoundError:
+            data = {"project_layout_version": PROJECT_LAYOUT_VERSION}
+        section = dict(data.get("classifier_inference", {}))
+        for clf_name, row in settings.items():
+            entry = dict(section.get(clf_name, {}))
+            if "model_path" in row:
+                entry["model_path"] = str(row["model_path"])
+            if "threshold" in row:
+                entry["threshold"] = float(row["threshold"])
+            if "min_bout_ms" in row:
+                entry["min_bout_ms"] = int(row["min_bout_ms"])
+            section[clf_name] = entry
+        data["classifier_inference"] = section
+        write_project_toml(cp, data)
+        return
+    # Legacy INI
+    parser = _cp_mod.ConfigParser()
+    parser.read(config_path)
+    n_targets = parser.getint(
+        "SML settings", "no_targets", fallback=0,
+    )
+    # Build name → ordinal map from the existing INI
+    name_to_idx: Dict[str, int] = {}
+    for idx in range(1, n_targets + 1):
+        name = parser.get(
+            "SML settings", f"target_name_{idx}", fallback="",
+        ).strip()
+        if name:
+            name_to_idx[name] = idx
+    for sec in ("SML settings", "threshold_settings",
+                "Minimum_bout_lengths"):
+        if not parser.has_section(sec):
+            parser.add_section(sec)
+    for clf_name, row in settings.items():
+        idx = name_to_idx.get(clf_name)
+        if idx is None:
+            # Classifier not registered in [SML settings] —
+            # skip rather than corrupt the ordinal sequence.
+            # Callers should use ClassifierManageForm to add it
+            # before persisting inference settings.
+            continue
+        if "model_path" in row:
+            parser.set(
+                "SML settings", f"model_path_{idx}",
+                str(row["model_path"]),
+            )
+        if "threshold" in row:
+            parser.set(
+                "threshold_settings", f"threshold_{idx}",
+                str(row["threshold"]),
+            )
+        if "min_bout_ms" in row:
+            parser.set(
+                "Minimum_bout_lengths", f"min_bout_{idx}",
+                str(row["min_bout_ms"]),
+            )
+    with open(config_path, "w") as fp:
+        parser.write(fp)
+
+
+def read_classifier_training_settings(
+    config_path,
+) -> Dict[str, Any]:
+    """Return classifier-training hyperparameters + evaluation
+    toggles as a flat dict. Keys match the canonical names the
+    trainer's legacy reader expects (``rf_n_estimators``,
+    ``rf_max_features``, etc.). Missing keys are absent from the
+    result so callers can distinguish 'never set' from a stored
+    default.
+
+    Bool-typed values from TOML are returned as bool. Int / float
+    values from TOML are returned as those types. Legacy INI
+    projects return everything as str (the form casts to the
+    appropriate type on its end, same as it did before 122as).
+
+    Patch 122as. Replaces the form-internal ``_load_from_ini`` shim
+    from 122aq for the TOML case.
+    """
+    cp = Path(config_path)
+    out: Dict[str, Any] = {}
+    if _is_toml_config(cp):
+        try:
+            data = read_project_toml(cp)
+        except Exception:
+            return out
+        section = data.get("classifier_training", {})
+        if not isinstance(section, dict):
+            return out
+        # Only copy scalar values; nested tables aren't part of
+        # the schema for training settings.
+        for key, value in section.items():
+            if isinstance(value, (str, int, float, bool)):
+                out[key] = value
+        return out
+    # Legacy INI — return string values, caller casts.
+    parser = _cp_mod.ConfigParser()
+    try:
+        parser.read(config_path)
+    except _cp_mod.Error:
+        return out
+    sec = "create_ensemble_settings"
+    if not parser.has_section(sec):
+        # Old projects spelled it 'create ensemble settings' with
+        # spaces; the toml_to_configparser translator also uses that
+        # form. Fall back to the spaced section name.
+        sec = "create ensemble settings"
+    if parser.has_section(sec):
+        for key, value in parser.items(sec):
+            out[key] = value
+    return out
+
+
+def write_classifier_training_settings(
+    config_path,
+    settings: Dict[str, Any],
+) -> None:
+    """Persist classifier-training settings.
+
+    For v1 ``.toml`` projects, writes the flat
+    ``[classifier_training]`` section. For legacy ``.ini`` projects,
+    writes into ``[create_ensemble_settings]``.
+
+    Pass values in their natural types (bool / int / float / str).
+    The legacy INI writer stringifies everything; the TOML writer
+    preserves types.
+
+    Patch 122as. Replaces the form-internal ``_write_to_ini``
+    shim from 122aq, which raised RuntimeError on TOML projects.
+    """
+    cp = Path(config_path)
+    if _is_toml_config(cp):
+        try:
+            data = read_project_toml(cp)
+        except FileNotFoundError:
+            data = {"project_layout_version": PROJECT_LAYOUT_VERSION}
+        existing = dict(data.get("classifier_training", {}))
+        existing.update(settings)
+        data["classifier_training"] = existing
+        write_project_toml(cp, data)
+        return
+    # Legacy INI
+    parser = _cp_mod.ConfigParser()
+    parser.read(config_path)
+    sec = "create_ensemble_settings"
+    if not parser.has_section(sec):
+        parser.add_section(sec)
+    for key, value in settings.items():
+        parser.set(sec, key, str(value))
+    with open(config_path, "w") as fp:
+        parser.write(fp)

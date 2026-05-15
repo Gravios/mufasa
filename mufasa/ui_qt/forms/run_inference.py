@@ -46,15 +46,17 @@ On Run:
    writes per-video classification CSVs to
    ``csv/machine_results/`` (still legacy — separate migration).
 
-v1 config persistence
----------------------
-The settings persistence here writes the INI sections directly via
-``configparser``, matching the Tk popup. For pure-TOML v1 projects
-that don't have a backing INI file, the form raises a clear error
-on Run rather than silently dropping the settings. v1-native
-inference-settings storage is deferred — needs a TOML section
-design pass (where ``[classifier_inference]`` would naturally live)
-and isn't blocking the UI port.
+v1 + legacy config persistence
+------------------------------
+Patch 122as: settings now persist to whichever format the project
+uses. Legacy ``.ini`` projects write to ``[SML settings]`` /
+``[threshold_settings]`` / ``[Minimum_bout_lengths]`` (same shape
+the Tk popup did). v1 ``.toml`` projects write to per-classifier
+sub-tables ``[classifier_inference.<name>]`` with keys
+``model_path``, ``threshold``, ``min_bout_ms``. The TOML→CP
+translator in 122as injects those values into the legacy CP
+section names ``InferenceBatch`` already reads from, so the
+backend doesn't need to change.
 """
 from __future__ import annotations
 
@@ -258,63 +260,66 @@ class RunInferenceForm(OperationForm):
             return []
 
     def _read_existing_ini_settings(self) -> dict:
-        """Pre-fill the table from project_config.ini if present.
-        Returns three parallel lists (paths, thresholds, min_bouts)
-        indexed by classifier position."""
+        """Pre-fill the table from prior runs. Returns three parallel
+        lists indexed by classifier position so the build path can
+        seed each row.
+
+        Patch 122as: this now delegates to
+        :func:`mufasa.project_layout.read_classifier_inference_settings`,
+        which transparently handles both v1 TOML and legacy INI
+        projects. Pre-122as this method was INI-only and the form
+        showed empty fields on TOML projects.
+        """
         empty = {"paths": [], "thresholds": [], "min_bouts": []}
-        if not self.config_path or not str(self.config_path).lower().endswith(".ini"):
+        if not self.config_path:
             return empty
-        parser = configparser.ConfigParser()
         try:
-            parser.read(self.config_path)
-        except configparser.Error:
+            from mufasa.project_layout import (
+                read_classifier_inference_settings,
+            )
+            settings = read_classifier_inference_settings(self.config_path)
+        except Exception:
             return empty
         paths, thresholds, min_bouts = [], [], []
-        for idx in range(1, len(self._classifier_targets) + 1):
-            paths.append(
-                parser.get("SML settings", f"model_path_{idx}",
-                           fallback="").strip()
-            )
+        for clf_name in self._classifier_targets:
+            row = settings.get(clf_name, {})
+            paths.append(str(row.get("model_path", "")))
+            thr = row.get("threshold")
             thresholds.append(
-                parser.get("threshold_settings",
-                           f"threshold_{idx}", fallback="").strip()
+                "" if thr is None else str(thr),
             )
+            mb = row.get("min_bout_ms")
             min_bouts.append(
-                parser.get("Minimum_bout_lengths",
-                           f"min_bout_{idx}", fallback="").strip()
+                "" if mb is None else str(mb),
             )
         return {"paths": paths, "thresholds": thresholds,
                 "min_bouts": min_bouts}
 
     def _write_settings_to_ini(self,
                                filtered: list[dict]) -> None:
-        """Persist per-classifier settings to project_config.ini in
-        the same shape the Tk popup did (so InferenceBatch reads
-        them back unchanged)."""
-        if not str(self.config_path).lower().endswith(".ini"):
-            raise RuntimeError(
-                "Per-classifier inference settings currently persist "
-                "to project_config.ini (legacy layout). v1-native "
-                "projects (project.toml) need a [classifier_inference] "
-                "TOML section — deferred until that's designed. "
-                "For now, point this form at a project that has an .ini "
-                "config, or set the per-classifier settings manually."
-            )
-        parser = configparser.ConfigParser()
-        parser.read(self.config_path)
-        for section in ("SML settings", "threshold_settings",
-                        "Minimum_bout_lengths"):
-            if not parser.has_section(section):
-                parser.add_section(section)
-        for idx, row in enumerate(filtered, start=1):
-            parser.set("SML settings", f"model_path_{idx}",
-                       str(row["path"]))
-            parser.set("threshold_settings", f"threshold_{idx}",
-                       str(row["threshold"]))
-            parser.set("Minimum_bout_lengths", f"min_bout_{idx}",
-                       str(row["min_bout"]))
-        with open(self.config_path, "w") as fp:
-            parser.write(fp)
+        """Persist per-classifier settings to whichever config format
+        the project uses (v1 TOML → ``[classifier_inference.<name>]``
+        sub-tables; legacy INI → canonical sections).
+
+        Patch 122as: previously raised RuntimeError on TOML projects.
+        Now delegates to
+        :func:`mufasa.project_layout.write_classifier_inference_settings`
+        which handles both formats.
+        """
+        from mufasa.project_layout import (
+            write_classifier_inference_settings,
+        )
+        settings = {
+            row["name"]: {
+                "model_path":  row["path"],
+                "threshold":   float(row["threshold"]),
+                "min_bout_ms": int(row["min_bout"]),
+            }
+            for row in filtered
+        }
+        write_classifier_inference_settings(
+            self.config_path, settings,
+        )
 
     # ----------------------------------------------------------- Pop-out
     def _toggle_pop_out(self) -> None:
