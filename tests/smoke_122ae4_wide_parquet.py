@@ -318,11 +318,10 @@ def main() -> int:
             "wide" in msg,
             detail=f"got {msg!r}",
         )
-        check(
-            "nothing-found: message mentions legacy",
-            "legacy" in msg,
-            detail=f"got {msg!r}",
-        )
+        # Patch 122bf: post-122ak, load_features_for_video is
+        # v1-read-only — there's no legacy CSV fallback in the
+        # error path. The "legacy" wording was dropped from the
+        # message. Assertion removed (was: "message mentions legacy").
 
     # ==================================================================
     # 3. AST — all 8 standard extractors call write_wide_features_v1

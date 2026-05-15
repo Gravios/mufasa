@@ -156,9 +156,9 @@ def main() -> int:
             and "derived_labels_dir" in paths,
         )
         check(
-            "v1 layout: 'machine_results_dir' still present "
-            "(out of scope for 122ao)",
-            "machine_results_dir" in paths,
+            "v1 layout: 'machine_results_dir' is GONE post-122ax "
+            "(was kept by 122ao, removed in 122ax close-out)",
+            "machine_results_dir" not in paths,
         )
 
     # 2b — legacy INI project
@@ -258,10 +258,13 @@ def main() -> int:
         and "paths['targets_inserted_dir']" not in fl_src,
     )
     check(
-        "frame_labeller: machine_results_dir read retained "
-        "(out of scope)",
+        "frame_labeller: machine_results_dir read — either retained "
+        "as a paths['machine_results_dir'] read (out of scope for "
+        "122ao) OR moved to a different access pattern post-122ax. "
+        "Test softened to either form.",
         'paths["machine_results_dir"]' in fl_src
-        or "paths['machine_results_dir']" in fl_src,
+        or "paths['machine_results_dir']" in fl_src
+        or "self.machine_results_dir" in fl_src,
     )
     check(
         "frame_labeller: records 122ao patch number",

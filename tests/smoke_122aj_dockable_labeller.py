@@ -302,15 +302,19 @@ def main() -> int:
         and "video_name=self.video_name" in src
         and "config_path=self.config_path" in src,
     )
+    # Patch 122bf: 122ak closed out the dual-write era — the
+    # [122aj] sidecar canary tag and the legacy combined-file
+    # write are gone. The v1 helper IS the save now. Inverted
+    # assertions to lock in the close-out.
     check(
-        "_save guards sidecar with try/except so failure doesn't "
-        "abort the legacy write (matches 122ae-5c canary tag)",
-        "[122aj] Sidecar labels write" in src,
+        "_save sidecar canary tag is GONE (post-122ak v1-only save)",
+        "[122aj] Sidecar labels write" not in src,
     )
     check(
-        "_save still writes the legacy combined features+labels "
-        "file (dual-write transition)",
-        "self._write_df_best_effort(df, target_path)" in src,
+        "_save legacy combined features+labels write is GONE "
+        "(post-122ak — labels saved via helper, features stay where "
+        "extractor wrote them)",
+        "self._write_df_best_effort(df, target_path)" not in src,
     )
 
     # ==================================================================

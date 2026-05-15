@@ -126,13 +126,17 @@ def main() -> int:
         # Hidden file should be ignored
         (legacy_dir / ".DS_Store").write_text("")
         stems = list_video_stems_with_labels(str(toml))
+        # Patch 122bf: 122ak made list_video_stems_with_labels
+        # v1-read-only — legacy csv/targets_inserted/ is not
+        # scanned. A v1 project with legacy-only labels returns [].
         check(
-            "discovery: legacy-only branch finds stems",
-            stems == ["v_legacy1", "v_legacy2"],
+            "discovery: legacy-only branch finds NOTHING "
+            "(v1-read-only post-122ak)",
+            stems == [],
             detail=f"got {stems}",
         )
 
-    # 1c — both layouts, union without dupes
+    # 1c — both layouts, union — but legacy stems are excluded
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
         toml = _make_v1_project(tmp, ["sniff"])
@@ -149,9 +153,12 @@ def main() -> int:
                 legacy_dir / f"{stem}.csv", index=False,
             )
         stems = list_video_stems_with_labels(str(toml))
+        # Patch 122bf: v_c only exists as legacy CSV — excluded
+        # post-122ak. Only the v1 stems (v_a, v_b) are returned.
         check(
-            "discovery: both-layouts UNION with dedupe",
-            stems == ["v_a", "v_b", "v_c"],
+            "discovery: v1-only branch returns derived/labels stems "
+            "(legacy-only stems silently excluded post-122ak)",
+            stems == ["v_a", "v_b"],
             detail=f"got {stems}",
         )
 
@@ -226,10 +233,13 @@ def main() -> int:
             f"load_labels_for_video"
         ),
     )
-    # Patch number recorded
+    # Patch 122bf: 122ak rewrote the dual-write era's
+    # 122ae-5e comments — the v1-only train flow records
+    # 122ak now. Update expected patch number.
     check(
-        "train_model_mixin records 122ae-5e",
-        "122ae-5e" in mixin_src,
+        "train_model_mixin records 122ak (was 122ae-5e, "
+        "rewritten in the v1-only close-out)",
+        "122ak" in mixin_src,
     )
 
     # ==================================================================

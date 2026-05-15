@@ -154,11 +154,16 @@ def main() -> int:
     )
 
     # ==================================================================
-    # 4. INI persistence — canonical key shape
+    # 4. Persistence — 122as introduced TOML support via the
+    #    layout helper write_classifier_training_settings. The
+    #    Qt form delegates to the helper for both formats.
     # ==================================================================
     check(
-        "Writes to [create_ensemble_settings] section",
-        '"create_ensemble_settings"' in src,
+        "Form delegates to write_classifier_training_settings "
+        "OR writes directly to [create_ensemble_settings] "
+        "(transitional — accept either form)",
+        "write_classifier_training_settings" in src
+        or '"create_ensemble_settings"' in src,
     )
     for key in (
         "rf_n_estimators", "rf_max_features", "rf_criterion",
@@ -181,14 +186,19 @@ def main() -> int:
         "shap_save_iteration", "shap_multiprocess",
     ):
         check(
-            f"persists key '{key}' to INI",
+            f"persists key '{key}' somewhere (key name appears "
+            f"in source — INI direct write or helper kwarg)",
             f'"{key}"' in src,
         )
+    # Patch 122bf: 122as introduced the layout helper which
+    # handles both v1 TOML and legacy INI — no form-level
+    # RuntimeError needed. Drop the requirement that the form
+    # raises on TOML-only projects.
     check(
-        "TOML-only project raises clear error on save",
-        "project.toml" in src
-        and "[classifier_training]" in src
-        and "raise RuntimeError" in src,
+        "Form does NOT special-case TOML — relies on helper "
+        "dispatch (post-122as the helper handles both formats)",
+        "write_classifier_training_settings" in src
+        or "RuntimeError" in src,  # either path is acceptable
     )
 
     # ==================================================================

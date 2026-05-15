@@ -82,21 +82,20 @@ def main() -> int:
             not in class_src,
         )
 
-        # Description carries path note
-        for path in ("csv/features_extracted/",
+        # Patch 122bf: 122bd updated the description to use v1
+        # paths (derived/features/, derived/classifications/).
+        # targets_inserted is the one path that stays under csv/.
+        for path in ("derived/features/",
                      "csv/targets_inserted/",
-                     "csv/machine_results/"):
+                     "derived/classifications/"):
             check(
                 f"FrameLabellingLauncher description mentions "
                 f"{path!r}",
                 path in class_src,
             )
-        check(
-            "FrameLabellingLauncher description acknowledges the "
-            "v1 layout-awareness gap (deferred run-id allocation)",
-            "deferred" in class_src.lower()
-            and ("v1" in class_src or "layout" in class_src),
-        )
+        # Patch 122bf: the v1-layout-awareness-gap assertion was
+        # transitional. Post-122ag/122aj the labeller works on
+        # v1 directly; gap is closed. Assertion removed.
 
         # Project-load warning mentions both project file kinds
         check(

@@ -137,15 +137,22 @@ def main() -> int:
                  .replace("\\", "/")
                  .endswith(f"{proj_dir.name}/derived/labels"),
         )
-        # The previous 122ab keys must still be present — no
-        # regression.
-        for key in ("features_extracted_dir",
-                    "targets_inserted_dir",
-                    "machine_results_dir",
+        # Patch 122bf: features_extracted_dir and targets_inserted_dir
+        # were removed in 122ao (csv-subtree audit B3). Only
+        # machine_results_dir and roi_definitions_path remain in the
+        # legacy 122ab key set. A negative guard is added for the
+        # removed keys to lock in the cleanup.
+        for key in ("machine_results_dir",
                     "roi_definitions_path"):
             check(
                 f"legacy layout still returns 122ab key {key!r}",
                 key in paths,
+            )
+        for key in ("features_extracted_dir",
+                    "targets_inserted_dir"):
+            check(
+                f"layout key {key!r} stays REMOVED post-122ao",
+                key not in paths,
             )
 
     # ==================================================================

@@ -156,25 +156,15 @@ def main() -> int:
                 "self.roi_families.selectedItems" in ca_src,
             )
 
-        # ---------- 5. Destination labels mention both schemas ----------
+        # ---------- 5. Destination labels mention v1 schema ----------
+        # Patch 122bf: post-122bd visible labels in the form
+        # describe the v1 path only (derived/features/). The
+        # legacy and classifications paths were transitional —
+        # 122bd dropped them from user-visible text. Assertions
+        # for those paths are removed.
         check(
             "Destination labels mention v1 'derived/features/' path",
             "derived/features/" in class_src,
-        )
-        check(
-            "Destination labels mention v1 'derived/classifications/' "
-            "path",
-            "derived/classifications/" in class_src,
-        )
-        check(
-            "Destination labels mention legacy 'csv/features_extracted/' "
-            "path",
-            "csv/features_extracted/" in class_src,
-        )
-        check(
-            "Destination labels mention legacy 'csv/targets_inserted/' "
-            "path",
-            "csv/targets_inserted/" in class_src,
         )
 
     # ---------- 7. 122z patch note in module docstring ----------

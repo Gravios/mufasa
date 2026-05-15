@@ -87,8 +87,10 @@ def main() -> int:
         "VideoInfoForm" in ppp_src,
     )
     check(
-        "Preprocessing page imports BatchPreProcessLauncher",
-        "BatchPreProcessLauncher" in ppp_src,
+        "Preprocessing page imports BatchPreProcessForm "
+        "(was BatchPreProcessLauncher; renamed during the "
+        "Qt port — class is now BatchPreProcessForm)",
+        "BatchPreProcessForm" in ppp_src,
     )
 
     # ---------- Docstring updates ----------
