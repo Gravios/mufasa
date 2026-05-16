@@ -657,6 +657,174 @@ ROUTES: list[_VizRoute] = [
         needs_save_dir=True,
         kwargs_map={"data_paths": "data_path", "save_path": "save_dir"},
     ),
+    # -------- Patch 122ba: niche viz plotter fill-ins ---------- #
+    # 7 backends that exist in mufasa/plotting/ but weren't yet
+    # surfaced through the form. Single str → list[str] coercions
+    # use the 122az kwargs_transform hook.
+    _VizRoute(
+        label="Cue light visualizer",
+        scope_kind="project",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.cue_light_visualizer",
+            "CueLightVisualizer",
+        ),
+        needs_video=True,
+        common_toggles={"frame", "video"},
+        extras=[
+            ("data_path",       "file", "",
+             "CSV files (*.csv);;Parquet files (*.parquet);;"
+             "All files (*)",
+             "Cue light data file (CSV / parquet)"),
+            ("cue_light_names", "str",  "",
+             "Comma-separated cue light names "
+             "(e.g. CueLight_1,CueLight_2)"),
+            ("show_pose",       "bool", True),
+            ("core_cnt",        "int",  1, 1, 64),
+            ("verbose",         "bool", True),
+        ],
+        kwargs_transform=lambda kw: (
+            {**{k: v for k, v in kw.items()
+                if k != "cue_light_names"},
+             "cue_light_names": [
+                 s.strip() for s in
+                 str(kw["cue_light_names"]).split(",")
+                 if s.strip()
+             ]}
+            if kw.get("cue_light_names") else kw
+        ),
+    ),
+    _VizRoute(
+        label="Interactive probability inspector",
+        scope_kind="project",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.interactive_probability_grapher",
+            "InteractiveProbabilityGrapher",
+        ),
+        extras=[
+            ("file_path",   "file", "",
+             "CSV files (*.csv);;Parquet files (*.parquet);;"
+             "All files (*)",
+             "machine_results file to inspect"),
+            ("model_path",  "file", "",
+             "Model files (*.sav);;All files (*)",
+             "Classifier .sav to load thresholds from"),
+            ("lbl_font_size",          "int",  10, 1, 60),
+            ("show_thresholds",        "bool", True),
+            ("show_statistics_legend", "bool", True),
+        ],
+    ),
+    _VizRoute(
+        label="Spontaneous alternation plot",
+        scope_kind="project",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.spontaneous_alternation_plotter",
+            "SpontaneousAlternationsPlotter",
+        ),
+        extras=[
+            ("arm_names",   "str",   "",
+             "Comma-separated arm ROI names "
+             "(e.g. Arm_1,Arm_2,Arm_3)"),
+            ("center_name", "str",   "Center",
+             "Center ROI name"),
+            ("animal_area", "float", 100.0, 1.0, 100000.0, 1.0),
+            ("threshold",   "float", 0.0, 0.0, 1.0, 0.05),
+            ("buffer",      "int",   0, 0, 1000),
+            ("core_cnt",    "int",   1, 1, 64),
+            ("verbose",     "bool",  True),
+        ],
+        kwargs_transform=lambda kw: (
+            {**{k: v for k, v in kw.items()
+                if k != "arm_names"},
+             "arm_names": [
+                 s.strip() for s in
+                 str(kw["arm_names"]).split(",")
+                 if s.strip()
+             ]}
+            if kw.get("arm_names") else kw
+        ),
+    ),
+    _VizRoute(
+        label="YOLO pose+track predictions (external)",
+        scope_kind="file",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.yolo_pose_track_visualizer",
+            "YOLOPoseTrackVisualizer",
+        ),
+        needs_video=True,
+        needs_save_dir=True,
+        extras=[
+            ("threshold",   "float", 0.5, 0.0, 1.0, 0.01),
+            ("thickness",   "int",   2, 1, 20),
+            ("circle_size", "int",   5, 1, 50),
+            ("bbox",        "bool",  True),
+            ("overwrite",   "bool",  False),
+            ("core_cnt",    "int",   1, 1, 64),
+        ],
+        kwargs_map={"source_path": "data_path",
+                    "video_path": "video_path",
+                    "save_path": "save_dir"},
+    ),
+    _VizRoute(
+        label="YOLO segmentation predictions (external)",
+        scope_kind="file",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.yolo_seg_visualizer",
+            "YOLOSegmentationVisualizer",
+        ),
+        needs_video=True,
+        needs_save_dir=True,
+        extras=[
+            ("threshold",     "float", 0.5, 0.0, 1.0, 0.01),
+            ("shape_opacity", "float", 0.5, 0.0, 1.0, 0.05),
+            ("core_cnt",      "int",   1, 1, 64),
+        ],
+        kwargs_map={"source_path": "data_path",
+                    "video_path": "video_path",
+                    "save_path": "save_dir"},
+    ),
+    _VizRoute(
+        label="YOLO annotation visualizer (training data)",
+        scope_kind="file",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.yolo_annotation_visualizer",
+            "YOLOAnnotationVisualizer",
+        ),
+        needs_save_dir=True,
+        extras=[
+            ("split",        "choice", "train",
+             ["train", "val", "test"]),
+            ("n",            "int",    10, 1, 100000),
+            ("circle_size",  "int",    5, 1, 50),
+            ("thickness",    "int",    2, 1, 20),
+            ("seg_opacity",  "float",  0.5, 0.0, 1.0, 0.05),
+            ("img_format",   "choice", "png",
+             ["png", "jpg", "jpeg", "webp"]),
+            ("show_names",   "bool",   True),
+            ("show_outline", "bool",   True),
+            ("verbose",      "bool",   True),
+        ],
+        kwargs_map={"source_path": "map_yaml_path",
+                    "save_path": "save_dir"},
+    ),
+    _VizRoute(
+        label="Blob plotter (simple)",
+        scope_kind="file",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.blob_plotter",
+            "BlobPlotter",
+        ),
+        needs_save_dir=True,
+        common_toggles={"gpu"},
+        extras=[
+            ("circle_size", "int", 5, 1, 50),
+            ("smoothing",   "int", 0, 0, 100),
+            ("batch_size",  "int", 100, 1, 100000),
+            ("core_cnt",    "int", 1, 1, 64),
+            ("verbose",     "bool", True),
+        ],
+        kwargs_map={"source_path": "data_path",
+                    "save_path": "save_dir"},
+    ),
 ]
 
 
