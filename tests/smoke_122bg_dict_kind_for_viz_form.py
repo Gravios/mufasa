@@ -252,12 +252,23 @@ def main() -> int:
     )
 
     # ==================================================================
-    # 6. GeometryPlotter NOT in routes (explicitly skipped)
+    # 6. GeometryPlotter — not surfaced via the dict kind
+    #    introduced by THIS patch. 122bh later surfaces it via
+    #    the "pickle" kind, so a `GeometryPlotter` route may
+    #    exist in the routes table — but it must NOT use the
+    #    "dict" kind (which can't represent Shapely geometries).
     # ==================================================================
+    geometry_route_dict_extras = [
+        kwargs for label, kwargs in routes_with_dict_extras.items()
+        if route_backends.get(label) == "GeometryPlotter"
+    ]
     check(
-        "GeometryPlotter is NOT surfaced as a route "
-        "(Shapely-object kwargs aren't JSON-serializable)",
-        "GeometryPlotter" not in route_backends.values(),
+        "GeometryPlotter is NOT routed via the dict kind "
+        "(its Shapely-object kwargs aren't JSON-serializable). "
+        "Later patches may surface GeometryPlotter via OTHER "
+        "kinds (e.g. 122bh's pickle kind) — that's fine.",
+        geometry_route_dict_extras == [],
+        detail=f"got dict-kind extras {geometry_route_dict_extras!r}",
     )
 
     # ==================================================================
