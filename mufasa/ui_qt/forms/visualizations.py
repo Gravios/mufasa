@@ -775,8 +775,9 @@ ROUTES: list[_VizRoute] = [
     ),
     # -------- Patch 122ba: niche viz plotter fill-ins ---------- #
     # 7 backends that exist in mufasa/plotting/ but weren't yet
-    # surfaced through the form. Single str → list[str] coercions
-    # use the 122az kwargs_transform hook.
+    # surfaced through the form. Patch 122bi migrated the two
+    # str → list[str] coercions (cue_light_names, arm_names)
+    # from kwargs_transform lambdas to the native "list" kind.
     _VizRoute(
         label="Cue light visualizer",
         scope_kind="project",
@@ -791,23 +792,15 @@ ROUTES: list[_VizRoute] = [
              "CSV files (*.csv);;Parquet files (*.parquet);;"
              "All files (*)",
              "Cue light data file (CSV / parquet)"),
-            ("cue_light_names", "str",  "",
-             "Comma-separated cue light names "
-             "(e.g. CueLight_1,CueLight_2)"),
+            # Patch 122bi: native "list" kind — was str +
+            # kwargs_transform comma-split.
+            ("cue_light_names", "list", [],
+             "Cue light names (comma-separated, "
+             "e.g. CueLight_1,CueLight_2)"),
             ("show_pose",       "bool", True),
             ("core_cnt",        "int",  1, 1, 64),
             ("verbose",         "bool", True),
         ],
-        kwargs_transform=lambda kw: (
-            {**{k: v for k, v in kw.items()
-                if k != "cue_light_names"},
-             "cue_light_names": [
-                 s.strip() for s in
-                 str(kw["cue_light_names"]).split(",")
-                 if s.strip()
-             ]}
-            if kw.get("cue_light_names") else kw
-        ),
     ),
     _VizRoute(
         label="Interactive probability inspector",
@@ -837,9 +830,11 @@ ROUTES: list[_VizRoute] = [
             "SpontaneousAlternationsPlotter",
         ),
         extras=[
-            ("arm_names",   "str",   "",
-             "Comma-separated arm ROI names "
-             "(e.g. Arm_1,Arm_2,Arm_3)"),
+            # Patch 122bi: native "list" kind — was str +
+            # kwargs_transform comma-split.
+            ("arm_names",   "list",  [],
+             "Arm ROI names (comma-separated, "
+             "e.g. Arm_1,Arm_2,Arm_3)"),
             ("center_name", "str",   "Center",
              "Center ROI name"),
             ("animal_area", "float", 100.0, 1.0, 100000.0, 1.0),
@@ -848,16 +843,6 @@ ROUTES: list[_VizRoute] = [
             ("core_cnt",    "int",   1, 1, 64),
             ("verbose",     "bool",  True),
         ],
-        kwargs_transform=lambda kw: (
-            {**{k: v for k, v in kw.items()
-                if k != "arm_names"},
-             "arm_names": [
-                 s.strip() for s in
-                 str(kw["arm_names"]).split(",")
-                 if s.strip()
-             ]}
-            if kw.get("arm_names") else kw
-        ),
     ),
     _VizRoute(
         label="YOLO pose+track predictions (external)",
