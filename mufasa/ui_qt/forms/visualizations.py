@@ -115,6 +115,14 @@ class _ExtrasFormBuilder:
       Patch 122be: lets list-typed backend kwargs (body_parts,
       cue_light_names, arm_names, …) be declared natively
       instead of via a ``kwargs_transform`` lambda.
+    * ``"dict"`` — QLineEdit collecting a JSON object as text;
+      produces ``dict`` at ``to_kwargs`` time. Default may be
+      a dict (rendered as compact JSON) or a pre-formatted JSON
+      string. Empty input yields ``{}``. Malformed JSON also
+      yields ``{}`` (silent fallback — backends typically have
+      their own defaults for missing keys).
+      Patch 122bg: unlocks routes whose backend needs a config
+      dict (e.g. CircularFeaturePlotter's ``settings``).
     * ``"file"`` — _PathField (file picker); extras: (file_filter, placeholder)
 
     Label text is derived from the backend kwarg name by replacing
@@ -180,6 +188,21 @@ class _ExtrasFormBuilder:
             elif default:
                 w.setText(str(default))
             self._form.addRow(self._label(name), w)
+        elif kind == "dict":
+            # Patch 122bg: JSON-as-text input for dict-typed
+            # backend kwargs. Default may be a dict (rendered as
+            # compact JSON) or a pre-formatted JSON string.
+            placeholder = extra[0] if extra else (
+                'JSON object, e.g. {"key": "value"}'
+            )
+            w = QLineEdit(); w.setPlaceholderText(placeholder)
+            if isinstance(default, dict):
+                if default:
+                    import json
+                    w.setText(json.dumps(default, separators=(",", ":")))
+            elif default:
+                w.setText(str(default))
+            self._form.addRow(self._label(name), w)
         elif kind == "file":
             file_filter = extra[0] if extra else ""
             placeholder  = extra[1] if len(extra) > 1 else ""
@@ -215,6 +238,23 @@ class _ExtrasFormBuilder:
                 out[name] = [
                     s.strip() for s in raw.split(",") if s.strip()
                 ]
+            elif kind == "dict":
+                # Patch 122bg: parse JSON object; empty input or
+                # malformed JSON yields {} (backends have their
+                # own defaults for missing keys).
+                raw = (w.text() or "").strip()
+                if not raw:
+                    out[name] = {}
+                else:
+                    import json
+                    try:
+                        parsed = json.loads(raw)
+                        out[name] = (
+                            parsed if isinstance(parsed, dict)
+                            else {}
+                        )
+                    except (json.JSONDecodeError, ValueError):
+                        out[name] = {}
             elif kind == "file":
                 out[name] = w.path
         return out
@@ -846,6 +886,34 @@ ROUTES: list[_VizRoute] = [
         ],
         kwargs_map={"source_path": "data_path",
                     "save_path": "save_dir"},
+    ),
+    # -------- Patch 122bg: dict-kind route fill-in ---------- #
+    # CircularFeaturePlotter takes a settings dict whose values
+    # are JSON-serializable (e.g. {'center': {'Animal_1':
+    # 'SwimBladder'}, 'text_settings': False, 'palette': 'bwr'}).
+    # The new "dict" extras kind lets users paste a JSON object
+    # directly. GeometryPlotter is NOT surfaced — its
+    # `geometries` arg is List[List[Shapely-objects]] which
+    # isn't JSON-serializable; that backend stays callable
+    # programmatically only.
+    _VizRoute(
+        label="Circular feature overlay (per video)",
+        scope_kind="file",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.circular_feature_overlay_plotter",
+            "CircularFeaturePlotter",
+        ),
+        extras=[
+            # settings: JSON dict. Default is a minimal example
+            # the user can edit; backends typically inspect
+            # specific keys, so empty {} works too.
+            ("settings", "dict",
+             {"text_settings": False, "palette": "bwr"},
+             'JSON, e.g. {"center": {"Animal_1": "SwimBladder"}, '
+             '"text_settings": false, "palette": "bwr"}'),
+        ],
+        # File scope: user picks the circular-features data CSV.
+        kwargs_map={"source_path": "data_path"},
     ),
 ]
 
