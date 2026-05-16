@@ -402,7 +402,7 @@ class VideoImportForm(OperationForm):
         )
         if mode_single:
             copy_single_video_to_project(
-                simba_ini_path=config_path,
+                mufasa_ini_path=config_path,
                 source_path=source,
                 symlink=symlink,
                 allowed_video_formats=_VIDEO_FORMATS,

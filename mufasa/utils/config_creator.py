@@ -67,8 +67,8 @@ def _read_preset_body_parts(
     dropdown displays the human-readable name from
     ``pose_config_names.csv`` at the same row index.
     """
-    simba_dir = Path(mufasa.__file__).parent
-    bp_dir_path = simba_dir / Paths.SIMBA_BP_CONFIG_PATH.value
+    mufasa_dir = Path(mufasa.__file__).parent
+    bp_dir_path = mufasa_dir / Paths.SIMBA_BP_CONFIG_PATH.value
     with open(bp_dir_path, "r", encoding="utf8") as f:
         rows = list(csv.reader(f, delimiter=","))
     if body_part_config_idx < 0 or body_part_config_idx >= len(rows):

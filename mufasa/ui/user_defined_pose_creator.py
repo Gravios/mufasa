@@ -114,12 +114,12 @@ class PoseConfigCreator(PlottingMixin):
 
     def save(self):
         overlay = cv2.resize(self.overlay, (250, 300))
-        simba_cw = os.path.dirname(mufasa.__file__)
-        img_dir = os.path.join(simba_cw, Paths.SCHEMATICS.value)
+        mufasa_cw = os.path.dirname(mufasa.__file__)
+        img_dir = os.path.join(mufasa_cw, Paths.SCHEMATICS.value)
         check_if_dir_exists(in_dir=img_dir, source=self.__class__.__name__, create_if_not_exist=True)
-        pose_name_path = os.path.join(simba_cw, Paths.PROJECT_POSE_CONFIG_NAMES.value)
-        bp_path = os.path.join(simba_cw, Paths.SIMBA_BP_CONFIG_PATH.value)
-        no_animals_path = os.path.join(simba_cw, Paths.SIMBA_NO_ANIMALS_PATH.value)
+        pose_name_path = os.path.join(mufasa_cw, Paths.PROJECT_POSE_CONFIG_NAMES.value)
+        bp_path = os.path.join(mufasa_cw, Paths.SIMBA_BP_CONFIG_PATH.value)
+        no_animals_path = os.path.join(mufasa_cw, Paths.SIMBA_NO_ANIMALS_PATH.value)
         for path in [pose_name_path, bp_path, no_animals_path]:
             check_file_exist_and_readable(file_path=path)
         prior_img_cnt = len(find_files_of_filetypes_in_directory(directory=img_dir, extensions=['.png'], raise_warning=False, raise_error=False))

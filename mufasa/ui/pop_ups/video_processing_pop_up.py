@@ -911,8 +911,8 @@ class ConcatenatorPopUp(PopUpMixin, ConfigReader):
         self.join_type_frm.grid(row=2, sticky=NW)
         self.join_type_var = StringVar()
         self.icons_dict = {}
-        simba_dir = os.path.dirname(mufasa.__file__)
-        icon_assets_dir = os.path.join(simba_dir, Paths.ICON_ASSETS.value)
+        mufasa_dir = os.path.dirname(mufasa.__file__)
+        icon_assets_dir = os.path.join(mufasa_dir, Paths.ICON_ASSETS.value)
         concat_icon_dir = os.path.join(icon_assets_dir, "concat_icons")
         for file_cnt, file_path in enumerate(glob.glob(concat_icon_dir + "/*.png")):
             _, file_name, _ = get_fn_ext(file_path)
