@@ -29,7 +29,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_int,
                                 check_video_and_data_frm_count_align)
 from mufasa.utils.enums import Formats, TagNames
 from mufasa.utils.errors import (FrameRangeError, NoDataError,
-                                NoFilesFoundError, SimbaError)
+                                NoFilesFoundError, MufasaError)
 from mufasa.utils.lookups import (get_current_time, get_display_resolution,
                                  get_img_resize_info,
                                  get_labelling_img_kbd_bindings,
@@ -497,7 +497,7 @@ class LabellingInterface(ConfigReader):
                 labels=self.data_df_targets,
             )
         except Exception as exc:
-            raise SimbaError(msg=f"Labels for video {self.video_name} could not be saved: {exc}", source=self.__class__.__name__)
+            raise MufasaError(msg=f"Labels for video {self.video_name} could not be saved: {exc}", source=self.__class__.__name__)
         stdout_success(msg=f"SAVED: Labels for video {self.video_name} saved.", source=self.__class__.__name__)
         if not self.config.has_section("Last saved frames"):
             self.config.add_section("Last saved frames")

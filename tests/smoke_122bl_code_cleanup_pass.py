@@ -77,51 +77,85 @@ def main() -> int:
     errors_src = errors_path.read_text()
 
     # ==================================================================
-    # 1. SimBAPackageVersionError is defined
+    # 1. The misspelled 'SimBAPAckageVersionError' is NOT defined
+    #    as a class — only as an alias.
     # ==================================================================
     check(
-        "SimBAPackageVersionError class is defined in errors.py",
-        "class SimBAPackageVersionError(" in errors_src,
+        "SimBAPAckageVersionError (typo) is NOT defined as a class "
+        "(canonical name is correctly spelled)",
+        "class SimBAPAckageVersionError(" not in errors_src,
+    )
+    # The correctly-spelled class exists somewhere in errors.py —
+    # either as the original 122bl canonical 'SimBAPackageVersionError'
+    # OR as 'MufasaPackageVersionError' after a later rename.
+    canonical_exists = (
+        "class SimBAPackageVersionError(" in errors_src
+        or "class MufasaPackageVersionError(" in errors_src
+    )
+    check(
+        "A correctly-spelled PackageVersionError class is defined "
+        "(SimBAPackageVersionError OR MufasaPackageVersionError, "
+        "depending on whether 122bo rename has been applied)",
+        canonical_exists,
     )
 
     # ==================================================================
     # 2-3. SimBAPAckageVersionError (old name) is still importable as
-    #      a backward-compat alias
+    #      a backward-compat alias. The RHS may be either name (122bl
+    #      or post-122bo state).
     # ==================================================================
-    check(
-        "Backward-compat alias 'SimBAPAckageVersionError = "
-        "SimBAPackageVersionError' is present in errors.py",
+    has_either_alias = (
         "SimBAPAckageVersionError = SimBAPackageVersionError"
-        in errors_src,
+        in errors_src
+        or "SimBAPAckageVersionError = MufasaPackageVersionError"
+        in errors_src
+    )
+    check(
+        "Backward-compat alias 'SimBAPAckageVersionError = …' is "
+        "present (RHS may be SimBAPackageVersionError or "
+        "MufasaPackageVersionError)",
+        has_either_alias,
     )
     # The alias should be at the bottom (so it sees the class).
-    alias_pos = errors_src.find(
-        "SimBAPAckageVersionError = SimBAPackageVersionError"
+    alias_pos = max(
+        errors_src.find(
+            "SimBAPAckageVersionError = SimBAPackageVersionError"),
+        errors_src.find(
+            "SimBAPAckageVersionError = MufasaPackageVersionError"),
     )
-    class_pos = errors_src.find("class SimBAPackageVersionError(")
+    class_pos = max(
+        errors_src.find("class SimBAPackageVersionError("),
+        errors_src.find("class MufasaPackageVersionError("),
+    )
     check(
         "Alias appears AFTER the class definition (so the alias "
         "binds to a defined name)",
         0 < class_pos < alias_pos,
     )
 
-    # Behavioural: import + check identity
+    # Behavioural: import + check identity. Old name should resolve
+    # to whichever class is canonical now.
     try:
         from mufasa.utils import errors as err_mod
+        # The canonical class is whichever name appears in `class X(`
+        # in errors_src. Prefer the Mufasa-prefixed name if both exist.
+        if hasattr(err_mod, "MufasaPackageVersionError"):
+            canonical = err_mod.MufasaPackageVersionError
+        else:
+            canonical = err_mod.SimBAPackageVersionError
         same_class = (
-            err_mod.SimBAPAckageVersionError
-            is err_mod.SimBAPackageVersionError
+            err_mod.SimBAPAckageVersionError is canonical
         )
         check(
-            "Old + new names refer to the same class object "
+            "Old typo name resolves to whichever class is canonical "
             "(identity check after import)",
             same_class,
         )
-    except ImportError as e:
-        # mufasa.utils.errors imports may pull in heavy deps
-        # unavailable in the sandbox; if so, fall back to AST.
+    except (ImportError, ModuleNotFoundError) as e:
+        # mufasa.utils.errors imports tkinter which may be missing
+        # in the sandbox; fall back to AST.
         check(
-            f"Behavioural identity check skipped (ImportError: {e})",
+            f"Behavioural identity check skipped (import err: {e})",
             True,
         )
 
@@ -136,12 +170,14 @@ def main() -> int:
         if "SimBAPAckage" not in src:
             continue
         if f == errors_path:
-            # Allow alias declaration + the explanatory comment
+            # Allow alias declaration (either RHS form) + comment
             non_alias = [
                 line for line in src.splitlines()
                 if "SimBAPAckage" in line
                 and "SimBAPAckageVersionError = "
                     "SimBAPackageVersionError" not in line
+                and "SimBAPAckageVersionError = "
+                    "MufasaPackageVersionError" not in line
                 and not line.lstrip().startswith("#")
             ]
             if non_alias:
@@ -156,15 +192,19 @@ def main() -> int:
     )
 
     # ==================================================================
-    # 5. SimBAPackageVersionError (canonical) is referenced from at
-    #    least the 13 files originally using the typo
+    # 5. The correctly-spelled PackageVersionError name appears in
+    #    at least 13 files (the originally affected ones). Whether
+    #    that name is 'SimBAPackageVersionError' (post-122bl) or
+    #    'MufasaPackageVersionError' (post-122bo) depends on which
+    #    rename patches have been applied.
     # ==================================================================
     canonical_users = sum(
         1 for f in pkg_root.rglob("*.py")
-        if "SimBAPackageVersionError" in f.read_text()
+        if ("SimBAPackageVersionError" in f.read_text()
+            or "MufasaPackageVersionError" in f.read_text())
     )
     check(
-        f"SimBAPackageVersionError canonical name appears in "
+        f"Correctly-spelled PackageVersionError name appears in "
         f">= 13 files. Found {canonical_users}",
         canonical_users >= 13,
     )

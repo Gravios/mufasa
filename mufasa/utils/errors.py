@@ -9,7 +9,7 @@ from mufasa.utils.printing import log_event
 WINDOW_TITLE = "SIMBA ERROR"
 
 
-class SimbaError(Exception):
+class MufasaError(Exception):
     def __init__(self, msg: str, source: str = " ", show_window: bool = False):
         self.msg, self.source, self.show_window = msg, source, show_window
         self.print_and_log_error()
@@ -24,120 +24,120 @@ class SimbaError(Exception):
             mb.showerror(title=WINDOW_TITLE, message=self.msg)
 
 
-class NoSpecifiedOutputError(SimbaError):
+class NoSpecifiedOutputError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = True):
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ROICoordinatesNotFoundError(SimbaError):
+class ROICoordinatesNotFoundError(MufasaError):
     def __init__(self, expected_file_path: str, source: str = "", show_window: bool = False):
         msg = f"[{datetime.now().strftime('%H:%M:%S')}] SIMBA ROI COORDINATES ERROR: No ROI coordinates found. Please use the [ROI] tab to define ROIs. Expected at location {expected_file_path}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class NoChoosenClassifierError(SimbaError):
+class NoChoosenClassifierError(MufasaError):
     def __init__(self, source: str = "", show_window: bool = False):
         msg = f"Select at least one classifier"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class NoChoosenROIError(SimbaError):
+class NoChoosenROIError(MufasaError):
     def __init__(self, source: str = "", show_window: bool = False):
         msg = f"Please select at least one ROI."
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class NoChoosenMeasurementError(SimbaError):
+class NoChoosenMeasurementError(MufasaError):
     def __init__(self, source: str = "", show_window: bool = False):
         msg = "SIMBA NoChoosenMeasurementError ERROR: Please select at least one measurement to calculate descriptive statistics for."
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class NoDataError(SimbaError):
+class NoDataError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA NO DATA ERROR: {msg}"
+        msg = f"NO DATA ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class SamplingError(SimbaError):
+class SamplingError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA SAMPLING ERROR: {msg}"
+        msg = f"SAMPLING ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class PermissionError(SimbaError):
+class PermissionError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA PERMISSION ERROR: {msg}"
+        msg = f"PERMISSION ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class NoROIDataError(SimbaError):
+class NoROIDataError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA NO ROI DATA ERROR: {msg}"
+        msg = f"NO ROI DATA ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class MixedMosaicError(SimbaError):
+class MixedMosaicError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA MixedMosaicError ERROR: {msg}"
+        msg = f"MixedMosaicError ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ClassifierInferenceError(SimbaError):
+class ClassifierInferenceError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA CLASSIFIER INFERENCE ERROR: {msg}"
+        msg = f"CLASSIFIER INFERENCE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class AnimalNumberError(SimbaError):
+class AnimalNumberError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA ANIMAL NUMBER ERROR: {msg}"
+        msg = f"ANIMAL NUMBER ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class InvalidFilepathError(SimbaError):
+class InvalidFilepathError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA INVALID FILE PATH ERROR: {msg}"
+        msg = f"INVALID FILE PATH ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class NoFilesFoundError(SimbaError):
+class NoFilesFoundError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA NO FILES FOUND ERROR: {msg}"
+        msg = f"NO FILES FOUND ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class DataHeaderError(SimbaError):
+class DataHeaderError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA DATA HEADER ERROR: {msg}"
+        msg = f"DATA HEADER ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class NotDirectoryError(SimbaError):
+class NotDirectoryError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA NOT A DIRECTORY ERROR: {msg}"
+        msg = f"NOT A DIRECTORY ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class DirectoryExistError(SimbaError):
+class DirectoryExistError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA DIRECTORY ALREADY EXIST ERROR: {msg}"
+        msg = f"DIRECTORY ALREADY EXIST ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class FileExistError(SimbaError):
+class FileExistError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA FILE EXIST ERROR: {msg}"
+        msg = f"FILE EXIST ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class FrameRangeError(SimbaError):
+class FrameRangeError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA FRAME RANGE ERROR: {msg}"
+        msg = f"FRAME RANGE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class AdvancedLabellingError(SimbaError):
+class AdvancedLabellingError(MufasaError):
     def __init__(
         self,
         frame: str,
@@ -155,97 +155,97 @@ class AdvancedLabellingError(SimbaError):
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class InvalidHyperparametersFileError(SimbaError):
+class InvalidHyperparametersFileError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA HYPERPARAMETER FILE ERROR: {msg}"
+        msg = f"HYPERPARAMETER FILE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class InvalidVideoFileError(SimbaError):
+class InvalidVideoFileError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA VIDEO FILE ERROR: {msg}"
+        msg = f"VIDEO FILE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class InvalidFileTypeError(SimbaError):
+class InvalidFileTypeError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA INVALID FILE TYPE ERROR: {msg}"
+        msg = f"INVALID FILE TYPE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class FaultyTrainingSetError(SimbaError):
+class FaultyTrainingSetError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA INVALID ML TRAINING SET ERROR: {msg}"
+        msg = f"INVALID ML TRAINING SET ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class CountError(SimbaError):
+class CountError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA COUNT ERROR: {msg}"
+        msg = f"COUNT ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class FeatureNumberMismatchError(SimbaError):
+class FeatureNumberMismatchError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA FEATURE NUMBER MISMATCH ERROR: {msg}"
+        msg = f"FEATURE NUMBER MISMATCH ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class DuplicationError(SimbaError):
+class DuplicationError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA DUPLICATION ERROR: {msg}"
+        msg = f"DUPLICATION ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class InvalidInputError(SimbaError):
+class InvalidInputError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA VALUE ERROR: {msg}"
+        msg = f"VALUE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class IntegerError(SimbaError):
+class IntegerError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA INTEGER ERROR: {msg}"
+        msg = f"INTEGER ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class StringError(SimbaError):
+class StringError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA STRING ERROR: {msg}"
+        msg = f"STRING ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class FloatError(SimbaError):
+class FloatError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA FLOAT ERROR: {msg}"
+        msg = f"FLOAT ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class MissingProjectConfigEntryError(SimbaError):
+class MissingProjectConfigEntryError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA MISSING PROJECT CONFIG ENTRY ERROR: {msg}"
+        msg = f"MISSING PROJECT CONFIG ENTRY ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class MissingColumnsError(SimbaError):
+class MissingColumnsError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA MISSING COLUMN ERROR: {msg}"
+        msg = f"MISSING COLUMN ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class CorruptedFileError(SimbaError):
+class CorruptedFileError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA READ FILE ERROR: {msg}"
+        msg = f"READ FILE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ParametersFileError(SimbaError):
+class ParametersFileError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA VIDEO PARAMETERS FILE ERROR: {msg}"
+        msg = f"VIDEO PARAMETERS FILE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ColumnNotFoundError(SimbaError):
+class ColumnNotFoundError(MufasaError):
     def __init__(
         self,
         column_name: str,
@@ -257,34 +257,34 @@ class ColumnNotFoundError(SimbaError):
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class BodypartColumnNotFoundError(SimbaError):
+class BodypartColumnNotFoundError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA BODY_PART COLUMN NOT FOUND ERROR: {msg}"
+        msg = f"BODY_PART COLUMN NOT FOUND ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class AnnotationFileNotFoundError(SimbaError):
+class AnnotationFileNotFoundError(MufasaError):
     def __init__(self, video_name: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA THIRD-PARTY ANNOTATION ERROR: NO ANNOTATION DATA FOR VIDEO {video_name} FOUND"
+        msg = f"THIRD-PARTY ANNOTATION ERROR: NO ANNOTATION DATA FOR VIDEO {video_name} FOUND"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class DirectoryNotEmptyError(SimbaError):
+class DirectoryNotEmptyError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA DIRECTORY NOT EMPTY ERROR: {msg}"
+        msg = f"DIRECTORY NOT EMPTY ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
 #####
 
 
-class ThirdPartyAnnotationFileNotFoundError(SimbaError):
+class ThirdPartyAnnotationFileNotFoundError(MufasaError):
     def __init__(self, video_name: str, source: str = "", show_window: bool = False):
         msg = f"Could not find file in project_folder/csv/features_extracted directory representing annotations for video {video_name}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ThirdPartyAnnotationsFpsConflictError(SimbaError):
+class ThirdPartyAnnotationsFpsConflictError(MufasaError):
     def __init__(
         self,
         video_name: str,
@@ -293,11 +293,11 @@ class ThirdPartyAnnotationsFpsConflictError(SimbaError):
         source: str = "",
         show_window: bool = False,
     ):
-        msg = f"SIMBA THIRD-PARTY ANNOTATION ERROR: The FPS for video {video_name} is set to {str(video_fps)} in SimBA and {str(annotation_fps)} in the annotation file"
+        msg = f"THIRD-PARTY ANNOTATION ERROR: The FPS for video {video_name} is set to {str(video_fps)} in SimBA and {str(annotation_fps)} in the annotation file"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ThirdPartyAnnotationsMissingAnnotationsError(SimbaError):
+class ThirdPartyAnnotationsMissingAnnotationsError(MufasaError):
     def __init__(
         self,
         video_name: str,
@@ -305,11 +305,11 @@ class ThirdPartyAnnotationsMissingAnnotationsError(SimbaError):
         source: str = "",
         show_window: bool = False,
     ):
-        msg = f"SIMBA THIRD-PARTY ANNOTATION ERROR: No annotations detected for SimBA classifier(s) named {clf_names} for video {video_name}"
+        msg = f"THIRD-PARTY ANNOTATION ERROR: No annotations detected for SimBA classifier(s) named {clf_names} for video {video_name}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ThirdPartyAnnotationOverlapError(SimbaError):
+class ThirdPartyAnnotationOverlapError(MufasaError):
     def __init__(
         self,
         video_name: str,
@@ -317,11 +317,11 @@ class ThirdPartyAnnotationOverlapError(SimbaError):
         source: str = "",
         show_window: bool = False,
     ):
-        msg = f"SIMBA THIRD-PARTY ANNOTATION ERROR: The annotations for behavior {clf_name} in video {video_name} contains behavior start events that are initiated PRIOR to the PRECEDING behavior event ending. SimBA requires a specific behavior event to end before another behavior event can start."
+        msg = f"THIRD-PARTY ANNOTATION ERROR: The annotations for behavior {clf_name} in video {video_name} contains behavior start events that are initiated PRIOR to the PRECEDING behavior event ending. SimBA requires a specific behavior event to end before another behavior event can start."
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ThirdPartyAnnotationsAdditionalClfError(SimbaError):
+class ThirdPartyAnnotationsAdditionalClfError(MufasaError):
     def __init__(
         self,
         video_name: str,
@@ -329,11 +329,11 @@ class ThirdPartyAnnotationsAdditionalClfError(SimbaError):
         source: str = "",
         show_window: bool = False,
     ):
-        msg = f"SIMBA THIRD-PARTY ANNOTATION ERROR: Annotations file for video {video_name} has annotations for the following behaviors {clf_names} that are NOT classifiers named in the Mufasa project."
+        msg = f"THIRD-PARTY ANNOTATION ERROR: Annotations file for video {video_name} has annotations for the following behaviors {clf_names} that are NOT classifiers named in the Mufasa project."
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ThirdPartyAnnotationEventCountError(SimbaError):
+class ThirdPartyAnnotationEventCountError(MufasaError):
     def __init__(
         self,
         video_name: str,
@@ -343,11 +343,11 @@ class ThirdPartyAnnotationEventCountError(SimbaError):
         source: str = "",
         show_window: bool = False,
     ):
-        msg = f"SIMBA THIRD-PARTY ANNOTATION ERROR: The annotations for behavior {clf_name} in video {video_name} contains {str(start_event_cnt)} start events and {str(stop_event_cnt)} stop events. SimBA requires the number of stop and start event counts to be equal."
+        msg = f"THIRD-PARTY ANNOTATION ERROR: The annotations for behavior {clf_name} in video {video_name} contains {str(start_event_cnt)} start events and {str(stop_event_cnt)} stop events. SimBA requires the number of stop and start event counts to be equal."
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ThirdPartyAnnotationsClfMissingError(SimbaError):
+class ThirdPartyAnnotationsClfMissingError(MufasaError):
     def __init__(
         self,
         video_name: str,
@@ -355,11 +355,11 @@ class ThirdPartyAnnotationsClfMissingError(SimbaError):
         source: str = "",
         show_window: bool = False,
     ):
-        msg = f"SIMBA THIRD-PARTY ANNOTATION WARNING: No annotations detected for video {video_name} and behavior {clf_name}."
+        msg = f"THIRD-PARTY ANNOTATION WARNING: No annotations detected for video {video_name} and behavior {clf_name}."
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ThirdPartyAnnotationsOutsidePoseEstimationDataError(SimbaError):
+class ThirdPartyAnnotationsOutsidePoseEstimationDataError(MufasaError):
     def __init__(
         self,
         video_name: str,
@@ -382,59 +382,69 @@ class ThirdPartyAnnotationsOutsidePoseEstimationDataError(SimbaError):
                 f"Please make sure you imported the same video as you annotated in BORIS into SimBA and the video is registered with the correct frame rate."
             )
         else:
-            msg = f"SIMBA THIRD-PARTY ANNOTATION WARNING: The annotations for video {video_name} contain data for {str(annotation_frms)} frames. The pose-estimation features for the same video contain data for {str(frm_cnt)} frames."
+            msg = f"THIRD-PARTY ANNOTATION WARNING: The annotations for video {video_name} contain data for {str(annotation_frms)} frames. The pose-estimation features for the same video contain data for {str(frm_cnt)} frames."
 
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class FFMPEGCodecGPUError(SimbaError):
+class FFMPEGCodecGPUError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA FFMPEG CODEC ERROR: {msg}"
+        msg = f"FFMPEG CODEC ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class FFMPEGNotFoundError(SimbaError):
+class FFMPEGNotFoundError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA FFMPEG NOT FOUND ERROR: {msg}"
+        msg = f"FFMPEG NOT FOUND ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class ArrayError(SimbaError):
+class ArrayError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA ARRAY SIZE ERROR: {msg}"
+        msg = f"ARRAY SIZE ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
-class ResolutionError(SimbaError):
+class ResolutionError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA RESOLUTION ERROR: {msg}"
-        super().__init__(msg=msg, source=source, show_window=show_window)
-
-
-class SimBAModuleNotFoundError(SimbaError):
-    def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA MODULE NOT FOUND ERROR: {msg}"
+        msg = f"RESOLUTION ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class SimBAGPUError(SimbaError):
+class MufasaModuleNotFoundError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA GPU ERROR: {msg}"
+        msg = f"MODULE NOT FOUND ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class SimBAPackageVersionError(SimbaError):
+class MufasaGPUError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA PACKAGE VERSION ERROR: {msg}"
+        msg = f"GPU ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class CropError(SimbaError):
+class MufasaPackageVersionError(MufasaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA CROP ERROR: {msg}"
+        msg = f"PACKAGE VERSION ERROR: {msg}"
+        super().__init__(msg=msg, source=source, show_window=show_window)
+
+
+class CropError(MufasaError):
+    def __init__(self, msg: str, source: str = "", show_window: bool = False):
+        msg = f"CROP ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 # Patch 122bl: backward-compat alias for the
 # misspelled exception class name (SimBAPAckage… →
 # SimBAPackage…). External callers importing the old
 # name keep working; the canonical name is preferred.
-SimBAPAckageVersionError = SimBAPackageVersionError
+SimBAPAckageVersionError = MufasaPackageVersionError
+
+# Patch 122bo: backward-compat aliases for the renamed exception
+# classes. The canonical names are MufasaError (base class) and
+# MufasaGPUError / MufasaModuleNotFoundError /
+# MufasaPackageVersionError (subclasses). External callers
+# importing the old SimBA-prefixed names continue to work.
+SimbaError = MufasaError
+SimBAGPUError = MufasaGPUError
+SimBAModuleNotFoundError = MufasaModuleNotFoundError
+SimBAPackageVersionError = MufasaPackageVersionError

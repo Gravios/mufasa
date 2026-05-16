@@ -31,8 +31,8 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_valid_tuple, get_fn_ext)
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import (CountError, InvalidFilepathError,
-                                InvalidFileTypeError, SimBAGPUError,
-                                SimBAPackageVersionError)
+                                InvalidFileTypeError, MufasaGPUError,
+                                MufasaPackageVersionError)
 from mufasa.utils.lookups import get_current_time
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
@@ -119,11 +119,11 @@ class YOLOPoseInference():
 
         gpu_available, gpus = _is_cuda_available()
         if not gpu_available:
-            raise SimBAGPUError(msg='No GPU detected.', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='No GPU detected.', source=self.__class__.__name__)
         else:
             print(f'GPUS AVAILABLE: {gpus}')
         if YOLO is None:
-            raise SimBAPackageVersionError(msg='ultralytics.YOLO package not detected.', source=self.__class__.__name__)
+            raise MufasaPackageVersionError(msg='ultralytics.YOLO package not detected.', source=self.__class__.__name__)
         check_valid_boolean(value=raise_error, source=f'{self.__class__.__name__} raise_error')
         check_valid_boolean(value=recursive, source=f'{self.__class__.__name__} recursive')
         if isinstance(video_path, list):

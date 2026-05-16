@@ -48,7 +48,7 @@ from mufasa.utils.enums import (OS, ConfigKey, Defaults, Dtypes, Formats, Keys,
 from mufasa.utils.errors import (BodypartColumnNotFoundError, CountError,
                                 InvalidFileTypeError, InvalidInputError,
                                 NoFilesFoundError, NoROIDataError,
-                                SimBAModuleNotFoundError)
+                                MufasaModuleNotFoundError)
 from mufasa.utils.printing import stdout_success, stdout_warning
 from mufasa.utils.read_write import (find_core_cnt, find_video_of_file,
                                     get_current_time, get_fn_ext,
@@ -1476,7 +1476,7 @@ def get_library_version(library_name: str,
         if not raise_error:
             return False
         else:
-            raise SimBAModuleNotFoundError(msg=f'The library {library_name} could not be found', source=get_library_version.__name__)
+            raise MufasaModuleNotFoundError(msg=f'The library {library_name} could not be found', source=get_library_version.__name__)
 
 
 

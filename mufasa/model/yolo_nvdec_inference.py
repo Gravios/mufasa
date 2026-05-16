@@ -38,7 +38,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
 from mufasa.utils.data import (df_smoother, resample_geometry_vertices,
                               savgol_smoother)
 from mufasa.utils.errors import (InvalidInputError, NoFilesFoundError,
-                                SimBAGPUError)
+                                MufasaGPUError)
 from mufasa.utils.lookups import get_nvdec_count
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (find_all_videos_in_directory,
@@ -650,7 +650,7 @@ class YoloNVDECInference(object):
                 if self.verbose: stdout_information(msg=f'{tag} failed to initialize.', source=self.__class__.__name__)
 
         if alive_count == 0:
-            raise SimBAGPUError(msg='All NVDEC workers failed to initialize. Check GPU memory and TensorRT engine compatibility.', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='All NVDEC workers failed to initialize. Check GPU memory and TensorRT engine compatibility.', source=self.__class__.__name__)
 
         timer = SimbaTimer(start=True)
         for video_idx, video_path in enumerate(self.video_paths.values(), 1):

@@ -26,7 +26,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_valid_tuple, get_fn_ext)
 from mufasa.utils.enums import Options
 from mufasa.utils.errors import (CountError, InvalidFilepathError,
-                                InvalidFileTypeError, SimBAGPUError)
+                                InvalidFileTypeError, MufasaGPUError)
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_pkg_version, get_video_meta_data,
@@ -139,7 +139,7 @@ class YOLOPoseTrackInference():
         _ = get_pkg_version(pkg='torch', raise_error=True)
         gpu_available, gpus = _is_cuda_available()
         if not gpu_available:
-            raise SimBAGPUError(msg='No GPU detected.', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='No GPU detected.', source=self.__class__.__name__)
         else:
             print(f'GPUS AVAILABLE: {gpus}')
         check_valid_boolean(value=raise_error, source=f'{self.__class__.__name__} raise_error')

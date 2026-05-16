@@ -84,7 +84,7 @@ from mufasa.utils.errors import (ClassifierInferenceError, CorruptedFileError,
                                 DataHeaderError, FaultyTrainingSetError,
                                 FeatureNumberMismatchError, InvalidInputError,
                                 MissingColumnsError, NoDataError,
-                                SamplingError, SimBAModuleNotFoundError)
+                                SamplingError, MufasaModuleNotFoundError)
 from mufasa.utils.lookups import get_meta_data_file_headers, get_table
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (find_core_cnt, get_current_time,
@@ -1565,7 +1565,7 @@ class TrainModelMixin(object):
                             min_samples_leaf=min_samples_leaf,
                             verbose=6)
             else:
-                raise SimBAModuleNotFoundError(msg='Mufasa could not find the cuml library for GPU machine learning algorithms. Set CUML to False in the SimBA model parameters, or import CUML environment variable using `export CUML=True`', source=self.__class__.__name__)
+                raise MufasaModuleNotFoundError(msg='Mufasa could not find the cuml library for GPU machine learning algorithms. Set CUML to False in the SimBA model parameters, or import CUML environment variable using `export CUML=True`', source=self.__class__.__name__)
 
     def clf_fit(self,
                 clf: Union[RandomForestClassifier, cuRF],

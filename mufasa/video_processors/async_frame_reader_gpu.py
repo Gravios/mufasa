@@ -18,7 +18,7 @@ except ImportError:
 from mufasa.data_processors.cuda.utils import get_nvc_decoder
 from mufasa.utils.checks import (check_int, check_nvidea_gpu_available,
                                 check_valid_boolean)
-from mufasa.utils.errors import SimBAGPUError, SimBAModuleNotFoundError
+from mufasa.utils.errors import MufasaGPUError, MufasaModuleNotFoundError
 
 
 class NvDecReader:
@@ -64,11 +64,11 @@ class NvDecReader:
                  bgr: bool = True):
 
         if nvc is None:
-            raise SimBAModuleNotFoundError(msg='PyNvVideoCodec is required but not installed. Install via: pip install pynvvideocodec', source=self.__class__.__name__)
+            raise MufasaModuleNotFoundError(msg='PyNvVideoCodec is required but not installed. Install via: pip install pynvvideocodec', source=self.__class__.__name__)
         if torch is None:
-            raise SimBAModuleNotFoundError(msg='PyTorch is required but not installed.', source=self.__class__.__name__)
+            raise MufasaModuleNotFoundError(msg='PyTorch is required but not installed.', source=self.__class__.__name__)
         if not check_nvidea_gpu_available():
-            raise SimBAGPUError(msg='No NVIDIA GPU detected.', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='No NVIDIA GPU detected.', source=self.__class__.__name__)
         check_int(name=f'{self.__class__.__name__} batch_size', value=batch_size, min_value=1)
         check_int(name=f'{self.__class__.__name__} max_batches_pending', value=max_batches_pending, min_value=1)
         check_int(name=f'{self.__class__.__name__} n_decoders', value=n_decoders, min_value=-1)
@@ -83,7 +83,7 @@ class NvDecReader:
         if n_decoders == -1:
             n_decoders = max_nvdec
         elif n_decoders > max_nvdec:
-            raise SimBAGPUError(msg=f'{self.__class__.__name__} n_decoders={n_decoders} exceeds the max NVDEC engines ({max_nvdec}) on {gpu_name}.', source=self.__class__.__name__)
+            raise MufasaGPUError(msg=f'{self.__class__.__name__} n_decoders={n_decoders} exceeds the max NVDEC engines ({max_nvdec}) on {gpu_name}.', source=self.__class__.__name__)
         self.video_path, self.gpu_id, self.batch_size = video_path, gpu_id, batch_size
         self.max_batches_pending, self.n_decoders = max_batches_pending, n_decoders
         self.use_device_memory, self.output_color_type, self.bgr = use_device_memory, output_color_type, bgr

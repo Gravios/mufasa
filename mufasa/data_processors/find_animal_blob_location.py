@@ -23,7 +23,7 @@ from mufasa.utils.checks import (check_float, check_instance, check_int,
                                 is_img_bw)
 from mufasa.utils.data import resample_geometry_vertices, terminate_cpu_pool
 from mufasa.utils.enums import OS, Defaults
-from mufasa.utils.errors import FFMPEGCodecGPUError, SimBAGPUError
+from mufasa.utils.errors import FFMPEGCodecGPUError, MufasaGPUError
 from mufasa.utils.lookups import get_available_ram
 from mufasa.utils.read_write import (find_core_cnt, get_fn_ext,
                                     get_memory_usage_array,
@@ -389,7 +389,7 @@ def get_blob_vertices_from_video(video_path: Union[str, os.PathLike],
     if window_size is not None:
         check_float(name='window_size', value=window_size, min_value=1.0, raise_error=True)
     if gpu and not check_nvidea_gpu_available():
-        raise SimBAGPUError(msg='GPU is set to True, but Mufasa could not find a GPU on the machine', source=get_blob_vertices_from_video.__name__)
+        raise MufasaGPUError(msg='GPU is set to True, but Mufasa could not find a GPU on the machine', source=get_blob_vertices_from_video.__name__)
     frame_ids = list(range(0, video_meta['frame_count']))
     frame_ids = [frame_ids[i:i + batch_size] for i in range(0, len(frame_ids), batch_size)]
     results = {}
