@@ -39,7 +39,7 @@ class AnnotationMetaDataExtractor(ConfigReader):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=True)
         if len(self.clf_names) == 0:
-            raise CountError(msg=f'No classifier names associated with SimBA project {config_path}', source=self.__class__.__name__)
+            raise CountError(msg=f'No classifier names associated with Mufasa project {config_path}', source=self.__class__.__name__)
         if len(self.target_file_paths) == 0:
             raise CountError(msg=f'No data files found inside the {self.targets_folder} directory', source=self.__class__.__name__)
         self.save_path = os.path.join(self.logs_path, f'ANNOTATION_STATISTICS_{self.datetime}.xlsx')

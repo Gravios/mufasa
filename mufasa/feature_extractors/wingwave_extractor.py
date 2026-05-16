@@ -170,7 +170,7 @@ class WingWaveFeatureExtractor(ConfigReader, FeatureExtractionMixin, AbstractFea
 
 if __name__ == "__main__" and not hasattr(sys, 'ps1'):
     parser = argparse.ArgumentParser(description="Extract features for aggression classification in resident intruder setups.")
-    parser.add_argument('--config_path', type=str, required=True, help='Path to SimBA Project config.')
+    parser.add_argument('--config_path', type=str, required=True, help='Path to project config (Mufasa TOML or SimBA INI)')
     args = parser.parse_args()
     runner = WingWaveFeatureExtractor(config_path=args.config_path)
     runner.run()
@@ -184,6 +184,5 @@ if __name__ == "__main__" and not hasattr(sys, 'ps1'):
 # r.run()
 #
 #
-
 
 

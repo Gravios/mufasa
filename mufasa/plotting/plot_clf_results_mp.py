@@ -284,7 +284,7 @@ class PlotSklearnResultsMultiProcess(ConfigReader, TrainModelMixin, PlottingMixi
         for i in [video_setting, frame_setting, rotate, animal_names, show_pose, gpu, show_confidence]:
             check_valid_boolean(value=i, source=self.__class__.__name__, raise_error=True)
         if (not video_setting) and (not frame_setting):
-            raise NoSpecifiedOutputError(msg="Please choose to create a video and/or frames. SimBA found that you ticked neither video and/or frames", source=self.__class__.__name__)
+            raise NoSpecifiedOutputError(msg="Please choose to create a video and/or frames. Mufasa found that you ticked neither video and/or frames", source=self.__class__.__name__)
         if font_size is not None: check_float(name=f'{self.__class__.__name__} font_size', value=font_size, min_value=0.1)
         if space_size is not None: check_float(name=f'{self.__class__.__name__} space_size', value=space_size, min_value=0.1)
         if text_thickness is not None: check_float(name=f'{self.__class__.__name__} text_thickness', value=text_thickness, min_value=0.1)

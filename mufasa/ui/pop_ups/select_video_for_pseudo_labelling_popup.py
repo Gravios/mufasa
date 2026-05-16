@@ -29,7 +29,7 @@ class SelectPseudoLabellingVideoPupUp(ConfigReader, PopUpMixin):
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False, create_logger=False)
         PopUpMixin.__init__(self, title="SETTINGS - PSEUDO LABELLING")
         if len(self.clf_names) == 0:
-            raise NoDataError(msg='To pseudo-label behaviors, your SimBA project needs at least one defined classifier. Found 0 classifiers defined in SimBA project', source=self.__class__.__name__)
+            raise NoDataError(msg='To pseudo-label behaviors, your Mufasa project needs at least one defined classifier. Found 0 classifiers defined in Mufasa project', source=self.__class__.__name__)
 
         instructions_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header='INSTRUCTIONS', icon_name='documentation', relief='solid', padx=5, pady=5)
         pseudo_intructions_lbl_1 = SimBALabel(parent=instructions_frm, txt="Note: SimBA pseudo-labelling require initial machine predictions", font=Formats.FONT_REGULAR.value)
@@ -75,7 +75,7 @@ class SelectPseudoLabellingVideoPupUp(ConfigReader, PopUpMixin):
         if not _v1_has and not _legacy_has:
             raise NoFilesFoundError(
                 msg=(
-                    f"When doing pseudo-annotations, SimBA expects "
+                    f"When doing pseudo-annotations, Mufasa expects "
                     f"predictions for video {_video_name!r} either "
                     f"at derived/classifications/{_video_name}.parquet "
                     f"(v1) or at {self.machine_results_file_path} "

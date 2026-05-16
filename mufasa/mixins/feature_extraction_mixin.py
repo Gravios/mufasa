@@ -1264,9 +1264,9 @@ class FeatureExtractionMixin(object):
         """
         if len(headers) != len(df.columns):
             raise CountError(
-                f"Your SimBA project is set to using the default {pose_config} pose-configuration. "
+                f"Your Mufasa project is set to using the default {pose_config} pose-configuration. "
                 f"SimBA therefore expects {str(len(headers))} columns of data inside the files within the project_folder. However, "
-                f"within file {filename} file, SimBA found {str(len(df.columns))} columns.",
+                f"within file {filename} file, Mufasa found {str(len(df.columns))} columns.",
                 source=self.__class__.__name__,
             )
         else:

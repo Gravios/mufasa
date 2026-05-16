@@ -78,7 +78,7 @@ class SolomonImporter(ConfigReader):
                 target_col = list(solomon_df.columns[solomon_df.isin([clf_name]).any()])
                 if len(target_col) == 0:
                     print(
-                        "No SOLOMON frames annotated as containing behavior {} in video {}. SimBA will set all frames in video {} as behavior-absent for behavior {}".format(
+                        "No SOLOMON frames annotated as containing behavior {} in video {}. Mufasa will set all frames in video {} as behavior-absent for behavior {}".format(
                             clf_name, file_name, file_name, clf_name
                         )
                     )
@@ -90,7 +90,7 @@ class SolomonImporter(ConfigReader):
                 if len(idx_difference) > 0:
                     if len(idx_difference) > 0:
                         print(
-                            f"SIMBA SOLOMON WARNING: SimBA found SOLOMON annotations for behavior {clf_name} in video "
+                            f"SIMBA SOLOMON WARNING: Mufasa found SOLOMON annotations for behavior {clf_name} in video "
                             f"{file_name} that are annotated to occur at times which is not present in the "
                             f"video data you imported into SIMBA. The video you imported to SimBA has {str(features_frames[-1])} frames. "
                             f"However, in SOLOMON, you have annotated {clf_name} to happen at frame number {str(idx_difference[0])}. "
@@ -106,5 +106,5 @@ class SolomonImporter(ConfigReader):
             write_df(out_df, self.file_type, save_path)
             print("Solomon annotations appended for video {}...".format(file_name))
         stdout_success(
-            msg="All SOLOMON annotations imported. Data saved in the project_folder/csv/targets_inserted directory of the SimBA project"
+            msg="All SOLOMON annotations imported. Data saved in the project_folder/csv/targets_inserted directory of the Mufasa project"
         )

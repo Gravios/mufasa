@@ -80,7 +80,7 @@ class FaceMapImporter(ConfigReader):
             file_timer.stop_timer()
             print(f'Imported data for video {video_name} (elapsed time: {file_timer.elapsed_time}s)')
         self.timer.stop_timer()
-        stdout_success(msg=f"{len(self.data_paths)} SimBA FaceMap tracking files file(s) imported to the SimBA project {self.save_dir}", source=self.__class__.__name__, elapsed_time=self.timer.elapsed_time)
+        stdout_success(msg=f"{len(self.data_paths)} SimBA FaceMap tracking files file(s) imported to the Mufasa project {self.save_dir}", source=self.__class__.__name__, elapsed_time=self.timer.elapsed_time)
 
 
 

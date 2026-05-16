@@ -213,7 +213,7 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
 
 if __name__ == "__main__" and not hasattr(sys, 'ps1'):
     parser = argparse.ArgumentParser(description="Perform classifications according to rules defined in SimBA project_config.ini.")
-    parser.add_argument('--config_path', type=str, required=True, help='Path to SimBA Project config.')
+    parser.add_argument('--config_path', type=str, required=True, help='Path to project config (Mufasa TOML or SimBA INI)')
     args = parser.parse_args()
     runner = InferenceBatch(config_path=args.config_path)
     runner.run()

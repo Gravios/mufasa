@@ -509,7 +509,7 @@ class ConfigReader(object):
         """
 
         if not os.path.isfile(self.roi_coordinates_path):
-            raise NoROIDataError(msg="No ROI definitions were found in your SimBA project. Please draw some ROIs before analyzing your ROI data", source=self.__class__.__name__)
+            raise NoROIDataError(msg="No ROI definitions were found in your Mufasa project. Please draw some ROIs before analyzing your ROI data", source=self.__class__.__name__)
         else:
             try:
                 self.rectangles_df = pd.read_hdf(self.roi_coordinates_path, key=Keys.ROI_RECTANGLES.value)
@@ -595,12 +595,12 @@ class ConfigReader(object):
             bp_missing = int(abs(difference) / 3)
             if difference < 0:
                 raise DataHeaderError(
-                    msg=f"SimBA expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, SimBA found {len(data_df.columns)} columns. Thus, there is {abs(difference)} missing data columns in the imported data, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the SimBA project pose-configuration with {bp_missing} less body-part, or include {bp_missing} more body-part in the imported data",
+                    msg=f"Mufasa expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, Mufasa found {len(data_df.columns)} columns. Thus, there is {abs(difference)} missing data columns in the imported data, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the Mufasa project pose-configuration with {bp_missing} less body-part, or include {bp_missing} more body-part in the imported data",
                     source=self.__class__.__name__,
                 )
             else:
                 raise DataHeaderError(
-                    msg=f"SimBA expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, SimBA found {len(data_df.columns)} columns. Thus, there is {abs(difference)} more data columns in the imported data than anticipated, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the SimBA project pose-configuration with {bp_missing} more body-part, or include {bp_missing} less body-part in the imported data",
+                    msg=f"Mufasa expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, Mufasa found {len(data_df.columns)} columns. Thus, there is {abs(difference)} more data columns in the imported data than anticipated, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the Mufasa project pose-configuration with {bp_missing} more body-part, or include {bp_missing} less body-part in the imported data",
                     source=self.__class__.__name__,
                 )
         else:
@@ -675,12 +675,12 @@ class ConfigReader(object):
 
         if return_path is None and not raise_error:
             NoFileFoundWarning(
-                msg=f"SimBA could not find a video file representing {filename} in the project video directory",
+                msg=f"Mufasa could not find a video file representing {filename} in the project video directory",
                 source=self.__class__.__name__,
             )
         if return_path is None and raise_error:
             raise NoFilesFoundError(
-                msg=f"SimBA could not find a video file representing {filename} in the project video directory",
+                msg=f"Mufasa could not find a video file representing {filename} in the project video directory",
                 source=self.__class__.__name__,
             )
         return return_path
@@ -878,11 +878,11 @@ class ConfigReader(object):
         """
         missing_body_part_fields = list(set(self.bp_col_names) - set(list(df.columns)))
         if len(missing_body_part_fields) > 0 and not raise_error:
-            BodypartColumnNotFoundWarning(msg=f"SimBA could not drop body-part coordinates, some body-part names are missing in dataframe. SimBA expected the following body-parts, that could not be found inside the file: {missing_body_part_fields}", source=self.__class__.__name__)
+            BodypartColumnNotFoundWarning(msg=f"Mufasa could not drop body-part coordinates, some body-part names are missing in dataframe. SimBA expected the following body-parts, that could not be found inside the file: {missing_body_part_fields}", source=self.__class__.__name__)
             return df.drop(self.bp_col_names, axis=1, errors="ignore")
         elif len(missing_body_part_fields) > 0 and raise_error:
             raise BodypartColumnNotFoundError(
-                msg=f"SimBA could not drop body-part coordinates, some body-part names are missing in dataframe. SimBA expected the following body-parts, that could not be found inside the file: {missing_body_part_fields}",
+                msg=f"Mufasa could not drop body-part coordinates, some body-part names are missing in dataframe. SimBA expected the following body-parts, that could not be found inside the file: {missing_body_part_fields}",
                 source=self.__class__.__name__,
             )
         else:
@@ -961,7 +961,7 @@ class ConfigReader(object):
                 return default_value
             else:
                 raise MissingProjectConfigEntryError(
-                    msg=f"SimBA could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
+                    msg=f"Mufasa could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
                     source=self.__class__.__name__,
                 )
         except ValueError as e:
@@ -969,7 +969,7 @@ class ConfigReader(object):
                 return default_value
             else:
                 raise MissingProjectConfigEntryError(
-                    msg=f"SimBA could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
+                    msg=f"Mufasa could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
                     source=self.__class__.__name__,
                 )
 
@@ -987,7 +987,7 @@ class ConfigReader(object):
         EXPECTED_FLOAT_COLS = ["fps", "Resolution_width", "Resolution_height", "Distance_in_mm", "pixels/mm"]
 
         if not os.path.isfile(file_path):
-            raise NoFilesFoundError(msg=f"Could not find the video_info.csv table in your SimBA project. Create it using the [Video parameters] tab. SimBA expects the file at location {file_path}. See SimBA documentation for more info: https://t.ly/OtY79", source=ConfigReader.read_video_info_csv.__name__)
+            raise NoFilesFoundError(msg=f"Could not find the video_info.csv table in your Mufasa project. Create it using the [Video parameters] tab. Mufasa expects the file at location {file_path}. See SimBA documentation for more info: https://t.ly/OtY79", source=ConfigReader.read_video_info_csv.__name__)
         info_df = pd.read_csv(file_path)
         for c in EXPECTED_COLS:
             if c not in info_df.columns:
@@ -1002,10 +1002,10 @@ class ConfigReader(object):
                 pass
         if info_df["fps"].min() <= 1:
             videos_w_low_fps = ', '.join(list(info_df[info_df['fps'] <= 1]['Video']))
-            InvalidValueWarning(msg=f"Video(s) in your SimBA project have an FPS of 1 or less. This includes video(s) {videos_w_low_fps}. It is recommended to use videos with more than one frame per second. If inaccurate, correct the FPS values inside the {file_path} file", source=ConfigReader.read_video_info_csv.__name__)
+            InvalidValueWarning(msg=f"Video(s) in your Mufasa project have an FPS of 1 or less. This includes video(s) {videos_w_low_fps}. It is recommended to use videos with more than one frame per second. If inaccurate, correct the FPS values inside the {file_path} file", source=ConfigReader.read_video_info_csv.__name__)
         if info_df["pixels/mm"].min() == 0:
             videos_w_low_conversion_factor = ', '.join(list(info_df[info_df['pixels/mm'] == 0]['Video']))
-            InvalidValueWarning(msg=f"Video(s) in your SimBA project have an pixel/mm conversion factor of 0. This includes video(s) {videos_w_low_conversion_factor}. Correct the pixel/mm conversion factor values inside the {file_path} file", source=ConfigReader.read_video_info_csv.__name__)
+            InvalidValueWarning(msg=f"Video(s) in your Mufasa project have an pixel/mm conversion factor of 0. This includes video(s) {videos_w_low_conversion_factor}. Correct the pixel/mm conversion factor values inside the {file_path} file", source=ConfigReader.read_video_info_csv.__name__)
 
         return info_df
 
@@ -1036,10 +1036,10 @@ class ConfigReader(object):
         check_valid_dataframe(df=video_info_df, source='', required_fields=["Video", "pixels/mm", "fps"])
         video_settings = video_info_df.loc[video_info_df["Video"] == video_name]
         if len(video_settings) > 1:
-            raise DuplicationError(msg=f"SimBA found multiple rows in the {video_info_df_path} named {video_name}. Please make sure that each video name is represented ONCE in the {video_info_df_path} file", source=ConfigReader.read_video_info.__name__)
+            raise DuplicationError(msg=f"Mufasa found multiple rows in the {video_info_df_path} named {video_name}. Please make sure that each video name is represented ONCE in the {video_info_df_path} file", source=ConfigReader.read_video_info.__name__)
         elif len(video_settings) < 1:
             if raise_error:
-                raise ParametersFileError(msg=f"SimBA could not find {video_name} in the video_info.csv file. Make sure all videos analyzed are represented in the {video_info_df_path} file.", source=ConfigReader.read_video_info.__name__)
+                raise ParametersFileError(msg=f"Mufasa could not find {video_name} in the video_info.csv file. Make sure all videos analyzed are represented in the {video_info_df_path} file.", source=ConfigReader.read_video_info.__name__)
             else:
                 return (None, None, None)
         else:

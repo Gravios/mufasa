@@ -119,12 +119,12 @@ class Smoothing(ConfigReader):
             video_path = find_video_of_file(video_dir=self.video_dir, filename=video_name, raise_error=False, warning=False)
             if video_path is None:
                 if not os.path.isfile(self.video_info_path):
-                    raise NoFilesFoundError(msg=f"To perform smoothing, SimBA needs to read the video FPS. SimBA could not find the video {video_name} in represented in the {self.video_dir} directory or in {self.video_info_path} file. Please import the video and/or include it in the video_logs.csv file so SimBA can know the video FPS", source=self.__class__.__name__)
+                    raise NoFilesFoundError(msg=f"To perform smoothing, SimBA needs to read the video FPS. Mufasa could not find the video {video_name} in represented in the {self.video_dir} directory or in {self.video_info_path} file. Please import the video and/or include it in the video_logs.csv file so SimBA can know the video FPS", source=self.__class__.__name__)
                 else:
                     self.video_info_df = self.read_video_info_csv(file_path=self.video_info_path)
                     video_info = read_video_info(vid_info_df=self.video_info_df,video_name=video_name, raise_error=False)
                     if video_info[2] is None:
-                        raise NoFilesFoundError(msg=f"To perform smoothing, SimBA needs to read the video FPS. SimBA could not find the video {video_name} represented in the {self.video_dir} directory or in {self.video_info_path} file. Please import the video and/or include it in the video_logs.csv file so SimBA can know the video FPS", source=self.__class__.__name__)
+                        raise NoFilesFoundError(msg=f"To perform smoothing, SimBA needs to read the video FPS. Mufasa could not find the video {video_name} represented in the {self.video_dir} directory or in {self.video_info_path} file. Please import the video and/or include it in the video_logs.csv file so SimBA can know the video FPS", source=self.__class__.__name__)
                     else:
                         fps = video_info[2]
             else:

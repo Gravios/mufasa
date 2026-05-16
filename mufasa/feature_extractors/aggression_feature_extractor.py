@@ -169,7 +169,7 @@ class AgressionFeatureExtractor(ConfigReader, AbstractFeatureExtraction):
 
 if __name__ == "__main__" and not hasattr(sys, 'ps1'):
     parser = argparse.ArgumentParser(description="Extract features for aggression classification in resident intruder setups.")
-    parser.add_argument('--config_path', type=str, required=True, help='Path to SimBA Project config.')
+    parser.add_argument('--config_path', type=str, required=True, help='Path to project config (Mufasa TOML or SimBA INI)')
     args = parser.parse_args()
     runner = AgressionFeatureExtractor(config_path=args.config_path)
     runner.run()
@@ -180,7 +180,6 @@ if __name__ == "__main__" and not hasattr(sys, 'ps1'):
 
 # f = AgressionFeatureExtractor(config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini")
 # f.run()
-
 
 
 

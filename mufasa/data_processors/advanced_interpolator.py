@@ -179,7 +179,7 @@ class AdvancedInterpolator(ConfigReader):
             if self.config_path is not None:
                 df = read_df(file_path=file_path, file_type=self.file_type, check_multiindex=self.multi_index_data).fillna(0).reset_index(drop=True)
                 if len(df.columns) != len(self.bp_col_names):
-                    raise DataHeaderError(msg=f"The SimBA project suggest the data should have {len(self.bp_col_names)} columns, but the input data has {len(df.columns)} columns", source=self.__class__.__name__)
+                    raise DataHeaderError(msg=f"The Mufasa project suggest the data should have {len(self.bp_col_names)} columns, but the input data has {len(df.columns)} columns", source=self.__class__.__name__)
                 df.columns = self.bp_headers
                 df[df < 0] = 0
             else:

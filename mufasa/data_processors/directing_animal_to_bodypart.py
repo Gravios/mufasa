@@ -245,6 +245,6 @@ class DirectingAnimalsToBodyPartAnalyzer(ConfigReader, FeatureExtractionMixin):
             msg=f"Summary body part directional statistics saved at {self.save_path}"
         )
         stdout_success(
-            msg="All directional data saved in SimBA project",
+            msg="All directional data saved in Mufasa project",
             elapsed_time=self.timer.elapsed_time_str,
         )

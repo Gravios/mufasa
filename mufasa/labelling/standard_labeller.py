@@ -100,7 +100,7 @@ class LabellingInterface(ConfigReader):
         self.max_frm_id = self.video_meta_data["frame_count"] - 1
         self.temp_file_path = os.path.join(os.path.dirname(self.config_path), "subprocess.txt")
         if len(self.clf_names) == 0:
-            raise NoDataError(msg='To annotate behaviors, your SimBA project needs at least one defined classifier. Found 0 classifiers defined in SimBA project', source=self.__class__.__name__)
+            raise NoDataError(msg='To annotate behaviors, your Mufasa project needs at least one defined classifier. Found 0 classifiers defined in Mufasa project', source=self.__class__.__name__)
         self.p_cols = [f"Probability_{x}" for x in self.clf_names]
         self.video_last_played_frm_path = os.path.join(os.path.dirname(self.config_path), "labelling_info.txt")
         self.main_window = Toplevel()
@@ -240,7 +240,7 @@ class LabellingInterface(ConfigReader):
                 raise NoFilesFoundError(
                     msg=(
                         f'When annotating data from scratch, '
-                        f'SimBA expects features for video '
+                        f'Mufasa expects features for video '
                         f'{self.video_name} (checked v1 '
                         f'derived/features/, wide-parquet, and '
                         f'legacy csv/features_extracted/). '

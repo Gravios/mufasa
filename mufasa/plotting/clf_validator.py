@@ -160,4 +160,4 @@ class ClassifierValidationClips(ConfigReader):
             if self.concat_video:
                 self.concat_writer.release()
         self.timer.stop_timer()
-        stdout_success(msg=f"All validation clips complete. Files are saved in the {self.clf_validation_dir} directory of the SimBA project", elapsed_time=self.timer.elapsed_time_str)
+        stdout_success(msg=f"All validation clips complete. Files are saved in the {self.clf_validation_dir} directory of the Mufasa project", elapsed_time=self.timer.elapsed_time_str)

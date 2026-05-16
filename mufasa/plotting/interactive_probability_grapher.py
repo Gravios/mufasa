@@ -71,7 +71,7 @@ class InteractiveProbabilityGrapher(ConfigReader):
         self.click_counter, self.is_playing = 0, False
         _, self.clf_name, _ = get_fn_ext(filepath=self.model_path)
         if self.clf_name not in self.clf_names:
-            raise InvalidInputError(msg=f"The classifier name {self.clf_name} is not a classifier in the SimBA project. Accepted model names: {self.clf_names}. Try re-naming the classifier name or add the classifier name to the SImBA project", source=self.__class__.__name__)
+            raise InvalidInputError(msg=f"The classifier name {self.clf_name} is not a classifier in the Mufasa project. Accepted model names: {self.clf_names}. Try re-naming the classifier name or add the classifier name to the SImBA project", source=self.__class__.__name__)
         self.data_path = os.path.join(self.project_path, Paths.CLF_DATA_VALIDATION_DIR.value, os.path.basename(self.file_path))
         check_file_exist_and_readable(self.data_path)
         _, video_name, _ = get_fn_ext(filepath=file_path)

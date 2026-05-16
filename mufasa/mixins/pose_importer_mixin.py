@@ -109,7 +109,7 @@ class PoseImporterMixin(object):
             video_idx = [i for i, x in enumerate(video_names) if x in data_file_names]
             if len(video_idx) == 0:
                 if raise_error:
-                    raise NoFilesFoundError(msg=f"SimBA could not locate a video file in your SimBA project for data file {data_file_name}", source=self.__class__.__name__)
+                    raise NoFilesFoundError(msg=f"Mufasa could not locate a video file in your Mufasa project for data file {data_file_name}", source=self.__class__.__name__)
                 else:
                     results[data_file_names[0]] = {"DATA": data_path, "VIDEO": None}
             else:
@@ -381,7 +381,7 @@ class PoseImporterMixin(object):
 
         if track_cnt != self.animal_cnt:
             raise CountError(
-                msg=f"There are {str(track_cnt)} tracks in the .trk file {file_path}. But your SimBA project expects {str(self.animal_cnt)} tracks.",
+                msg=f"There are {str(track_cnt)} tracks in the .trk file {file_path}. But your Mufasa project expects {str(self.animal_cnt)} tracks.",
                 source=self.__class__.__name__,
             )
 

@@ -389,7 +389,7 @@ def get_blob_vertices_from_video(video_path: Union[str, os.PathLike],
     if window_size is not None:
         check_float(name='window_size', value=window_size, min_value=1.0, raise_error=True)
     if gpu and not check_nvidea_gpu_available():
-        raise SimBAGPUError(msg='GPU is set to True, but SimBA could not find a GPU on the machine', source=get_blob_vertices_from_video.__name__)
+        raise SimBAGPUError(msg='GPU is set to True, but Mufasa could not find a GPU on the machine', source=get_blob_vertices_from_video.__name__)
     frame_ids = list(range(0, video_meta['frame_count']))
     frame_ids = [frame_ids[i:i + batch_size] for i in range(0, len(frame_ids), batch_size)]
     results = {}

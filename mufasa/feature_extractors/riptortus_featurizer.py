@@ -731,7 +731,7 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
 
 if __name__ == "__main__" and not hasattr(sys, 'ps1'):
     parser = argparse.ArgumentParser(description="Extract Riptortus features.")
-    parser.add_argument('--config_path', type=str, required=True, help='Path to SimBA Project config.')
+    parser.add_argument('--config_path', type=str, required=True, help='Path to project config (Mufasa TOML or SimBA INI)')
     args = parser.parse_args()
     runner = RiptortusFeaturizer(config_path=args.config_path)
     runner.run()

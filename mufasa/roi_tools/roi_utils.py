@@ -466,9 +466,9 @@ def multiply_ROIs(filename: Union[str, os.PathLike],
     _, video_name, video_ext = get_fn_ext(filename)
 
     if not os.path.isdir(videos_dir):
-        raise NotDirectoryError(msg=f'Could not find the videos directory in the SimBA project. SimBA expected a directory at location: {videos_dir}')
+        raise NotDirectoryError(msg=f'Could not find the videos directory in the Mufasa project. SimBA expected a directory at location: {videos_dir}')
     if not os.path.isfile(roi_coordinates_path):
-        raise NoROIDataError(msg=f"Cannot multiply ROI definitions: no ROI definitions exist in SimBA project. Could find find a file at expected location {roi_coordinates_path}", source=multiply_ROIs.__name__)
+        raise NoROIDataError(msg=f"Cannot multiply ROI definitions: no ROI definitions exist in Mufasa project. Could find find a file at expected location {roi_coordinates_path}", source=multiply_ROIs.__name__)
 
     with pd.HDFStore(roi_coordinates_path) as hdf: roi_data_keys = [x[1:] for x in hdf.keys()]
     missing_keys = [x for x in roi_data_keys if x not in [Keys.ROI_RECTANGLES.value, Keys.ROI_CIRCLES.value, Keys.ROI_POLYGONS.value]]
@@ -545,7 +545,7 @@ def reset_video_ROIs(config_path: Union[str, os.PathLike],
     project_path = config.get(ConfigKey.GENERAL_SETTINGS.value, ConfigKey.PROJECT_PATH.value)
     roi_coordinates_path = os.path.join(project_path, "logs", Paths.ROI_DEFINITIONS.value)
     if not os.path.isfile(roi_coordinates_path):
-        raise NoROIDataError(msg=f"Cannot reset/delete ROI definitions: no ROI definitions exist in SimBA project. Could find find a file at expected location {roi_coordinates_path}. Create ROIs before deleting ROIs.", source=reset_video_ROIs.__name__)
+        raise NoROIDataError(msg=f"Cannot reset/delete ROI definitions: no ROI definitions exist in Mufasa project. Could find find a file at expected location {roi_coordinates_path}. Create ROIs before deleting ROIs.", source=reset_video_ROIs.__name__)
     with pd.HDFStore(roi_coordinates_path) as hdf: roi_data_keys = [x[1:] for x in hdf.keys()]
     missing_keys = [x for x in roi_data_keys if x not in [Keys.ROI_RECTANGLES.value, Keys.ROI_CIRCLES.value, Keys.ROI_POLYGONS.value]]
     if len(missing_keys) > 0:

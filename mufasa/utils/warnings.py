@@ -31,7 +31,7 @@ def ThirdPartyAnnotationsOutsidePoseEstimationDataWarning(
 ):
     if clf_name:
         msg = (
-            f"SIMBA THIRD-PARTY ANNOTATION WARNING: SimBA found THIRD-PARTY annotations for behavior {clf_name} in video "
+            f"SIMBA THIRD-PARTY ANNOTATION WARNING: Mufasa found THIRD-PARTY annotations for behavior {clf_name} in video "
             f"{video_name} that are annotated to occur at times which is not present in the "
             f"video data you imported into SIMBA. The video you imported to SimBA has {str(frm_cnt)} frames. "
             f"However, you have annotated {clf_name} to happen at frame number {str(first_error_frm)}. "
@@ -49,7 +49,7 @@ def ThirdPartyAnnotationsOutsidePoseEstimationDataWarning(
 def ThirdPartyAnnotationsClfMissingWarning(video_name: str, clf_name: str):
     msg = (
         f"SIMBA THIRD-PARTY ANNOTATION WARNING: No annotations detected for video {video_name} and behavior {clf_name}. "
-        f"SimBA will set all frame annotations as absent."
+        f"Mufasa will set all frame annotations as absent."
     )
     stdout_warning(msg=msg)
 
@@ -57,7 +57,7 @@ def ThirdPartyAnnotationsClfMissingWarning(video_name: str, clf_name: str):
 def ThirdPartyAnnotationsAdditionalClfWarning(
     video_name: str, clf_names: list, source: str = "", log_status: bool = False
 ):
-    msg = f"SIMBA THIRD-PARTY ANNOTATION WARNING: Annotations file for video {video_name} has annotations for the following behaviors {clf_names} that are NOT classifiers named in the SimBA project. SimBA will OMIT appending the data for these {str(len(clf_names))} classifiers."
+    msg = f"SIMBA THIRD-PARTY ANNOTATION WARNING: Annotations file for video {video_name} has annotations for the following behaviors {clf_names} that are NOT classifiers named in the Mufasa project. SimBA will OMIT appending the data for these {str(len(clf_names))} classifiers."
     if log_status:
         logging.warning(msg=msg)
     stdout_warning(msg=msg)

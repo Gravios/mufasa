@@ -256,7 +256,7 @@ class ROIPlotMultiprocess(ConfigReader):
         if len(set(body_parts)) != len(body_parts):
             raise DuplicationError(msg=f'All body-part entries have to be unique. Got {body_parts}', source=self.__class__.__name__)
         for bp in body_parts:
-            if bp not in self.body_parts_lst: raise BodypartColumnNotFoundError(msg=f'The body-part {bp} is not a valid body-part in the SimBA project. Options: {self.body_parts_lst}', source=self.__class__.__name__)
+            if bp not in self.body_parts_lst: raise BodypartColumnNotFoundError(msg=f'The body-part {bp} is not a valid body-part in the Mufasa project. Options: {self.body_parts_lst}', source=self.__class__.__name__)
         self.roi_analyzer = ROIAggregateStatisticsAnalyzer(config_path=self.config_path, data_path=self.data_path,  detailed_bout_data=True, threshold=threshold, body_parts=body_parts, outside_rois=outside_roi, verbose=verbose)
         self.roi_analyzer.run()
         if bp_colors is not None:

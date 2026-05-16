@@ -24,7 +24,7 @@ class ROIAnalysisTimeBinsPopUp(ConfigReader, PopUpMixin):
     def __init__(self, config_path: Union[str, os.PathLike]):
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         if not os.path.isfile(self.roi_coordinates_path):
-            raise NoROIDataError(msg='No ROI data detected in SimBA project. Draw ROIs before doing ROI time analysis', source=self.__class__.__name__)
+            raise NoROIDataError(msg='No ROI data detected in Mufasa project. Draw ROIs before doing ROI time analysis', source=self.__class__.__name__)
         if len(self.outlier_corrected_paths) == 0:
             raise NoROIDataError(msg=f'No data found in {self.outlier_corrected_dir} directory. Create data before analyzing ROI time data', source=self.__class__.__name__)
 

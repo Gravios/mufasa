@@ -218,7 +218,7 @@ class BoundaryMenus(ConfigReader, PopUpMixin):
         videos_in_project = find_all_videos_in_project(videos_dir=self.video_dir)
         videos_with_data = list(self.roi_data.keys())
         if len(videos_in_project) == 0:
-            raise NoFilesFoundError(msg="Zero video files found in SimBA project")
+            raise NoFilesFoundError(msg="Zero video files found in Mufasa project")
         video_names = []
         for file_path in videos_in_project:
             _, name, _ = get_fn_ext(filepath=file_path)
@@ -226,7 +226,7 @@ class BoundaryMenus(ConfigReader, PopUpMixin):
         sets_w_data_and_video = list(set(videos_with_data).intersection(video_names))
         if len(sets_w_data_and_video) == 0:
             raise NoFilesFoundError(
-                msg="Zero video files found with calculated anchored ROIs in SimBA project"
+                msg="Zero video files found with calculated anchored ROIs in Mufasa project"
             )
         self.viz_boundaries_frm = Toplevel()
         self.viz_boundaries_frm.minsize(600, 150)

@@ -26,7 +26,7 @@ class AnimalDirectingAnimalPopUp(ConfigReader, PopUpMixin):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         if self.animal_cnt < 2:
-            raise AnimalNumberError(msg=f"Directionality between animals require at least two animals. The SimBA project is set to use {self.animal_cnt} animal.", source=self.__class__.__name__,)
+            raise AnimalNumberError(msg=f"Directionality between animals require at least two animals. The Mufasa project is set to use {self.animal_cnt} animal.", source=self.__class__.__name__,)
         if len(self.outlier_corrected_paths) == 0:
             raise NoFilesFoundError(msg=f"No data files found in {self.outlier_corrected_dir}.", source=self.__class__.__name__)
         PopUpMixin.__init__(self, title="ANALYZE DIRECTIONALITY BETWEEN ANIMALS", size=(600, 500), icon='direction')

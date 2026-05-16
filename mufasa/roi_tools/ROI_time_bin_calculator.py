@@ -68,7 +68,7 @@ class ROITimebinCalculator(ConfigReader):
         self.save_path_entries = os.path.join(self.logs_path, f"ROI_time_bins_{bin_length}s_entry_data_{self.datetime}.csv")
         for bp in body_parts:
             if bp not in self.body_parts_lst:
-                raise BodypartColumnNotFoundError(msg=f'The body-part {bp} is not a valid body-part in the SimBA project. Options: {self.body_parts_lst}', source=self.__class__.__name__)
+                raise BodypartColumnNotFoundError(msg=f'The body-part {bp} is not a valid body-part in the Mufasa project. Options: {self.body_parts_lst}', source=self.__class__.__name__)
         if len(set(body_parts)) != len(body_parts):
             raise DuplicationError(msg=f'All body-part entries have to be unique. Got {body_parts}', source=self.__class__.__name__)
         self.roi_analyzer = ROIAnalyzer(config_path=self.config_path, data_path=self.outlier_corrected_dir, calculate_distances=False, threshold=threshold, body_parts=body_parts, detailed_bout_data=True)

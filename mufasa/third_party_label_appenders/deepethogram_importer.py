@@ -89,7 +89,7 @@ class DeepEthogramImporter(ConfigReader):
                 if clf_name not in self.annotations_df.columns:
                     print(
                         "No annotations for behavior {} found in DeepEthogram annotation file for video {}"
-                        "Exclude {} from your SimBA project or add DeepEthogram annotations for {} for video {}.".format(
+                        "Exclude {} from your Mufasa project or add DeepEthogram annotations for {} for video {}.".format(
                             clf_name, video_name, clf_name, clf_name, video_name
                         )
                     )
@@ -103,7 +103,7 @@ class DeepEthogramImporter(ConfigReader):
             if len(self.annotations_df) < len(self.features_df):
                 print(
                     f"The DEEPETHOGRAM annotations for video {video_name} contain data for {str(len(self.annotations_df))} frames. The pose-estimation features for the same video contain data for {str(len(self.features_df))} frames. "
-                    "SimBA expects the annotations and pose-estimation data to contain an equal number of frames. SimBA will assume that "
+                    "Mufasa expects the annotations and pose-estimation data to contain an equal number of frames. SimBA will assume that "
                     "the un-annotated frames have no behaviors present."
                 )
                 padding = pd.DataFrame(

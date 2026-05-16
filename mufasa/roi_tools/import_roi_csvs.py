@@ -127,7 +127,7 @@ class ROIDefinitionsCSVImporter(ConfigReader):
         if len(missing_videos) > 0:
             MissingFileWarning(msg=f'Imported ROIs for {len(missing_videos)} videos which do not exist in the {self.video_dir} directory: {missing_videos}.', source=self.__class__.__name__)
         self.timer.stop_timer()
-        stdout_success(msg=f'{new_roi_cnt} new ROIs for {len(new_video_names)} videos imported to SimBA project.', source=self.__class__.__name__, elapsed_time=self.timer.elapsed_time_str)
+        stdout_success(msg=f'{new_roi_cnt} new ROIs for {len(new_video_names)} videos imported to Mufasa project.', source=self.__class__.__name__, elapsed_time=self.timer.elapsed_time_str)
 
 
 

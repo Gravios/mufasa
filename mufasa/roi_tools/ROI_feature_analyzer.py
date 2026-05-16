@@ -93,7 +93,7 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
         self.roi_directing_viable = self.check_directionality_viable()[0]
         for bp in body_parts:
             if bp not in self.body_parts_lst:
-                raise BodypartColumnNotFoundError(msg=f"The body-part {bp} is not a valid body-part in the SimBA project. Options: {self.body_parts_lst}", source=self.__class__.__name__)
+                raise BodypartColumnNotFoundError(msg=f"The body-part {bp} is not a valid body-part in the Mufasa project. Options: {self.body_parts_lst}", source=self.__class__.__name__)
         self.bp_lk = {}
         for cnt, bp in enumerate(body_parts):
             animal = self.find_animal_name_from_body_part_name(bp_name=bp, bp_dict=self.animal_bp_dict)

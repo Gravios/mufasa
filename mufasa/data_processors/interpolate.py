@@ -105,7 +105,7 @@ class Interpolate(ConfigReader):
             df = read_df(file_path=file_path, file_type=self.file_type, check_multiindex=self.multi_index_df_headers)
             if self.multi_index_df_headers:
                 if len(df.columns) != len(self.bp_headers):
-                    raise DataHeaderError( msg=f"The file {file_path} contains {len(df.columns)} columns, but your SimBA project expects {len(self.bp_headers)} columns representing {int(len(self.bp_headers) / 3)} body-parts (x, y, p). Check that the {self.body_parts_path} lists the correct body-parts associated with the project", source=self.__class__.__name__)
+                    raise DataHeaderError( msg=f"The file {file_path} contains {len(df.columns)} columns, but your Mufasa project expects {len(self.bp_headers)} columns representing {int(len(self.bp_headers) / 3)} body-parts (x, y, p). Check that the {self.body_parts_path} lists the correct body-parts associated with the project", source=self.__class__.__name__)
                 df.columns = self.bp_headers
             df = df.apply(pd.to_numeric, errors="coerce").fillna(0.0)
             df[df < 0] = 0.0

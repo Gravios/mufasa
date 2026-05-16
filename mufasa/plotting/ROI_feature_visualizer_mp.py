@@ -250,7 +250,7 @@ class ROIfeatureVisualizerMultiprocess(ConfigReader):
         check_valid_lst(data=body_parts, source=f"{self.__class__.__name__} body-parts", valid_dtypes=(str,), min_len=1,)
         for bp in body_parts:
             if bp not in self.body_parts_lst:
-                raise BodypartColumnNotFoundError(msg=f"The body-part {bp} is not a valid body-part in the SimBA project. Options: {self.body_parts_lst}",source=self.__class__.__name__,)
+                raise BodypartColumnNotFoundError(msg=f"The body-part {bp} is not a valid body-part in the Mufasa project. Options: {self.body_parts_lst}",source=self.__class__.__name__,)
         self.roi_feature_creator = ROIFeatureCreator(config_path=config_path, body_parts=body_parts, append_data=False, data_path=self.data_path)
         self.roi_feature_creator.run()
         self.bp_lk = self.roi_feature_creator.bp_lk

@@ -61,7 +61,7 @@ def import_dlc_csv(config_path: Union[str, os.PathLike], source: str) -> List[st
             new_file_name = video_name.split(".")[0] + ".csv"
         new_file_name_wo_ext = new_file_name.split(".")[0]
         video_basename = os.path.basename(file_path)
-        print(f"Importing {video_name} to SimBA project...")
+        print(f"Importing {video_name} to Mufasa project...")
         if new_file_name_wo_ext in prev_imported_file_names:
             raise FileExistError(f"SIMBA IMPORT ERROR: {new_file_name} already exist in project in the directory {conf.input_csv_dir}. Remove file from project or rename imported video file name before importing.")
         shutil.copy(file_path, conf.input_csv_dir)
@@ -80,7 +80,7 @@ def import_dlc_csv(config_path: Union[str, os.PathLike], source: str) -> List[st
             df.to_csv(os.path.join(conf.input_csv_dir, new_file_name), index=False)
         imported_file_paths.append(os.path.join(conf.input_csv_dir, new_file_name))
         video_timer.stop_timer()
-        print(f"Pose-estimation data for video {video_name} imported to SimBA project (elapsed time: {video_timer.elapsed_time_str}s)...")
+        print(f"Pose-estimation data for video {video_name} imported to Mufasa project (elapsed time: {video_timer.elapsed_time_str}s)...")
     return imported_file_paths
 
 def import_dlc_csv_data(config_path: Union[str, os.PathLike],

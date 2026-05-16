@@ -31,7 +31,7 @@ class CueLightClfAnalyzerPopUp(ConfigReader, PopUpMixin):
         self.read_roi_data()
         self.cue_light_names = cue_light_names
         missing_cue_lights = [x for x in cue_light_names if x not in self.roi_names]
-        if len(missing_cue_lights) > 0: raise NoROIDataError(msg=f'{len(missing_cue_lights)} cue-lights are not drawn in the SimBA project: cannot be found in the {self.roi_coordinates_path} file', source=self.__class__.__name__)
+        if len(missing_cue_lights) > 0: raise NoROIDataError(msg=f'{len(missing_cue_lights)} cue-lights are not drawn in the Mufasa project: cannot be found in the {self.roi_coordinates_path} file', source=self.__class__.__name__)
 
         if data_dir is None:
             self.data_dir = self.cue_lights_data_dir
