@@ -1037,10 +1037,10 @@ class App(object):
 
 
 
-        simba_pip_data = fetch_pip_data(pip_url=Links.MUFASA_PIP_URL.value)
-        if (simba_pip_data[1] is not None) and OS.MUFASA_VERSION.value is not None:
-            if simba_pip_data[1] != OS.MUFASA_VERSION.value:
-                msg = f"A new version of Mufasa is available: {simba_pip_data[1]} (you have version {OS.MUFASA_VERSION.value}). Consider upgrading using: pip install mufasa-uw-tf-dev --upgrade"
+        mufasa_pip_data = fetch_pip_data(pip_url=Links.MUFASA_PIP_URL.value)
+        if (mufasa_pip_data[1] is not None) and OS.MUFASA_VERSION.value is not None:
+            if mufasa_pip_data[1] != OS.MUFASA_VERSION.value:
+                msg = f"A new version of Mufasa is available: {mufasa_pip_data[1]} (you have version {OS.MUFASA_VERSION.value}). Consider upgrading using: pip install mufasa-uw-tf-dev --upgrade"
                 VersionWarning(msg=msg)
 
     def clear_recent_projects(self):

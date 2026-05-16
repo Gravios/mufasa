@@ -32,9 +32,9 @@ YOLO_FORMATS = Options.VALID_YOLO_FORMATS.value + ['None']
 devices = ['CPU']
 THRESHOLD_OPTIONS = list(np.arange(0.05, 1.05, 0.05).astype(np.float32))
 
-simba_dir = os.path.dirname(mufasa.__file__)
-YOLO_SCHEMATICS_DIR = os.path.join(simba_dir, Paths.YOLO_SCHEMATICS_DIR.value)
-ASSETS_DIR = os.path.join(simba_dir, 'assets')
+mufasa_dir = os.path.dirname(mufasa.__file__)
+YOLO_SCHEMATICS_DIR = os.path.join(mufasa_dir, Paths.YOLO_SCHEMATICS_DIR.value)
+ASSETS_DIR = os.path.join(mufasa_dir, 'assets')
 
 
 
@@ -207,5 +207,4 @@ class YOLOPoseInferencePopUP(PopUpMixin):
 
 
 #YOLOPoseInferencePopUP()
-
 

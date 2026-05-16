@@ -732,9 +732,9 @@ class FeatureExtractionMixin(object):
         :parameter str pose: Pose-estimation setting, e.g., ``16``.
         :return List[str]: The names and order of the pose-estimation columns.
         """
-        simba_dir = os.path.dirname(mufasa.__file__)
+        mufasa_dir = os.path.dirname(mufasa.__file__)
         feature_categories_csv_path = os.path.join(
-            simba_dir, Paths.SIMBA_FEATURE_EXTRACTION_COL_NAMES_PATH.value
+            mufasa_dir, Paths.SIMBA_FEATURE_EXTRACTION_COL_NAMES_PATH.value
         )
         check_file_exist_and_readable(file_path=feature_categories_csv_path)
         bps = list(pd.read_csv(feature_categories_csv_path)[pose])

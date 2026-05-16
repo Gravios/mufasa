@@ -81,9 +81,9 @@ class ProjectCreateForm(QWidget):
         # ----- Source of truth for presets ------------------------- #
         # Same lookup files the legacy Tk UI uses; if they ever move
         # to project.toml, only this block changes.
-        simba_dir = Path(mufasa.__file__).parent
-        names_path = simba_dir / Paths.PROJECT_POSE_CONFIG_NAMES.value
-        animals_path = simba_dir / Paths.SIMBA_NO_ANIMALS_PATH.value
+        mufasa_dir = Path(mufasa.__file__).parent
+        names_path = mufasa_dir / Paths.PROJECT_POSE_CONFIG_NAMES.value
+        animals_path = mufasa_dir / Paths.SIMBA_NO_ANIMALS_PATH.value
         self._preset_names: List[str] = list(
             pd.read_csv(names_path, header=None)[0],
         )

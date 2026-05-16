@@ -1488,20 +1488,20 @@ def get_memory_usage_of_df(df: pd.DataFrame) -> Dict[str, float]:
 
 
 def copy_single_video_to_project(
-    simba_ini_path: Union[str, os.PathLike],
+    mufasa_ini_path: Union[str, os.PathLike],
     source_path: Union[str, os.PathLike],
     symlink: bool = False,
     allowed_video_formats: Optional[Tuple[str]] = ("avi", "mp4"),
     overwrite: Optional[bool] = False,
 ) -> None:
     """
-    Import single video file to SimBA project
+    Import single video file to a Mufasa project (legacy INI format).
 
-    :param Union[str, os.PathLike] simba_ini_path: path to SimBA project config file in Configparser format
-    :param Union[str, os.PathLike] source_path: Path to video file outside SimBA project.
+    :param Union[str, os.PathLike] mufasa_ini_path: path to project config file in Configparser (INI) format
+    :param Union[str, os.PathLike] source_path: Path to video file outside the project.
     :param Optional[bool] symlink: If True, creates soft copy rather than hard copy. Default: False.
     :param Optional[Tuple[str]] allowed_video_formats: Allowed video formats. DEFAULT: avi or mp4
-    :param Optional[bool] overwrite: If True, overwrites existing video if it exists in SimBA project. Else, raise FileExistError.
+    :param Optional[bool] overwrite: If True, overwrites existing video if it exists in the project. Else, raise FileExistError.
     """
 
     timer = SimbaTimer(start=True)
@@ -1515,13 +1515,13 @@ def copy_single_video_to_project(
         )
     new_filename = os.path.join(file_name + file_ext)
     # Patch 122o: layout-aware destination resolution. Legacy code
-    # hardcoded ``os.path.dirname(simba_ini_path)/videos`` which is
+    # hardcoded ``os.path.dirname(mufasa_ini_path)/videos`` which is
     # the right path for SimBA INI projects but wrong for v1, where
     # videos live under ``<root>/sources/videos/``. The helper now
     # delegates to ``project_paths_from_config`` so the same call
     # works for both layouts.
     from mufasa.project_layout import project_paths_from_config
-    video_dir = project_paths_from_config(simba_ini_path)["video_dir"]
+    video_dir = project_paths_from_config(mufasa_ini_path)["video_dir"]
     os.makedirs(video_dir, exist_ok=True)
     destination = os.path.join(video_dir, new_filename)
     if os.path.isfile(destination) and not overwrite:

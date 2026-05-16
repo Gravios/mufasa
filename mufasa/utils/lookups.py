@@ -82,9 +82,9 @@ def get_body_part_configurations() -> Dict[str, Union[str, os.PathLike]]:
     """
 
     lookup = {}
-    simba_dir = os.path.dirname(mufasa.__file__)
-    img_dir = os.path.join(simba_dir, Paths.SCHEMATICS.value)
-    names_path = os.path.join(simba_dir, Paths.PROJECT_POSE_CONFIG_NAMES.value)
+    mufasa_dir = os.path.dirname(mufasa.__file__)
+    img_dir = os.path.join(mufasa_dir, Paths.SCHEMATICS.value)
+    names_path = os.path.join(mufasa_dir, Paths.PROJECT_POSE_CONFIG_NAMES.value)
     check_file_exist_and_readable(file_path=names_path)
     check_if_dir_exists(in_dir=img_dir)
     names_lst = list(pd.read_csv(names_path, header=None)[0])
@@ -174,8 +174,8 @@ def get_icons_paths() -> Dict[str, Union[str, os.PathLike]]:
     file paths as values.
     """
 
-    simba_dir = os.path.dirname(mufasa.__file__)
-    icons_dir = os.path.join(simba_dir, Paths.ICON_ASSETS.value)
+    mufasa_dir = os.path.dirname(mufasa.__file__)
+    icons_dir = os.path.join(mufasa_dir, Paths.ICON_ASSETS.value)
     icon_paths = glob.glob(icons_dir + "/*.png")
     icons = {}
     for icon_path in icon_paths:
@@ -1183,8 +1183,8 @@ def create_directionality_cords(bp_dict: dict,
     return results
 
 def get_tooltips() -> Dict[str, str]:
-    simba_dir = os.path.dirname(mufasa.__file__)
-    tool_tips_path = os.path.join(simba_dir, Paths.TOOLTIPS.value)
+    mufasa_dir = os.path.dirname(mufasa.__file__)
+    tool_tips_path = os.path.join(mufasa_dir, Paths.TOOLTIPS.value)
     if not os.path.isfile(tool_tips_path):
         return {}
     else:
