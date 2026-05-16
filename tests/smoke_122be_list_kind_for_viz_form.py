@@ -190,7 +190,14 @@ def main() -> int:
         )
 
     # ==================================================================
-    # 8. Zero remaining kwargs_transform lambdas in ROUTES
+    # 8. ROI-route migration: both ROIPlotter + ROIfeatureVisualizer
+    #    are converted to kind="list". 122bg-era HEAD: later patches
+    #    (e.g. 122ba's niche viz fill-ins) may re-introduce
+    #    kwargs_transform lambdas for OTHER routes that haven't
+    #    been migrated yet (cue_light_names, arm_names). Verify
+    #    that whatever transforms exist do NOT touch body_part —
+    #    locking in 122be's specific migration without forbidding
+    #    later transforms.
     # ==================================================================
     transform_lambdas: list[ast.Lambda] = []
     for node in ast.walk(tree):
@@ -201,11 +208,18 @@ def main() -> int:
                 if (kw.arg == "kwargs_transform"
                         and isinstance(kw.value, ast.Lambda)):
                     transform_lambdas.append(kw.value)
+    # Body-part transforms specifically must be gone (the 122be
+    # migration). Other transforms may exist post-122ba.
+    body_part_lambdas = [
+        lam for lam in transform_lambdas
+        if "body_part" in ast.dump(lam)
+    ]
     check(
-        "Zero kwargs_transform lambdas in ROUTES "
+        "Zero body_part kwargs_transform lambdas in ROUTES "
         "(both ROI routes converted to native 'list' kind)",
-        len(transform_lambdas) == 0,
-        detail=f"got {len(transform_lambdas)}",
+        len(body_part_lambdas) == 0,
+        detail=f"got {len(body_part_lambdas)} body_part lambdas; "
+               f"total transforms in ROUTES = {len(transform_lambdas)}",
     )
 
     # ==================================================================
@@ -223,13 +237,16 @@ def main() -> int:
     )
 
     # ==================================================================
-    # 10. Route count unchanged (this patch is a refactor, not a
-    #     route add/remove)
+    # 10. Route count — 122be is a refactor-not-add, so its
+    #     floor is 20 (from 122az). Later patches (122ba, 122bg)
+    #     add routes. Check the floor instead of equality so
+    #     this test stays green through future additions.
     # ==================================================================
     label_count = src.count('label="')
     check(
-        f"ROUTES count unchanged at 20. Found {label_count}",
-        label_count == 20,
+        f"ROUTES has at least 20 entries (122az's floor; this "
+        f"patch is a refactor). Found {label_count}",
+        label_count >= 20,
     )
 
     # ==================================================================
