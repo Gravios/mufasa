@@ -6,6 +6,21 @@ broken, what the Qt port covers vs. misses. It's a reverse-
 engineered guide to a codebase that grew organically over many
 years.
 
+## Companion documents (added 2026-05-16, post-patch 122bj)
+
+This file is the **developer-facing technical audit** — one entry
+per workflow, status-tagged, salvage notes, branch-by-branch trace.
+Three lighter-weight companion docs serve user-facing needs:
+
+- **`docs/workflow_audit.md`** — topological view: pages → forms →
+  backend classes. Use to find which class implements what.
+- **`docs/data_source_guides.md`** — per-data-source import guide
+  (DLC / SLEAP / YOLO / etc.). Use when bringing data IN.
+- **`docs/workflow_recipes.md`** — 11 end-to-end recipes for
+  common experimental setups. Use as a starting checklist.
+
+See `docs/README.md` for the full doc index.
+
 ## Audit status legend
 
 Each workflow entry is tagged:
