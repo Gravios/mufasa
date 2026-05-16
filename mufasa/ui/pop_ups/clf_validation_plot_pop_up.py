@@ -10,7 +10,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.plotting.clf_validator import ClassifierValidationClips
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, DropDownMenu,
                                         Entry_Box, SimbaButton, SimbaCheckbox,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_int
 from mufasa.utils.enums import Formats, Keys, Links, Options
 from mufasa.utils.errors import NoDataError
@@ -38,10 +38,10 @@ class ClassifierValidationPopUp(PopUpMixin, ConfigReader):
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings',  icon_link=Links.CLF_VALIDATION.value, padx=5, pady=5, relief='solid')
         self.seconds_entry = Entry_Box(self.settings_frm, "SECONDS PADDING: ", 40, validation="numeric", value=2, entry_box_width=30, justify='center', img='timer_2')
 
-        self.clf_dropdown = SimBADropDown(parent=self.settings_frm, label='CLASSIFIER: ', label_width=40, dropdown_width=30, dropdown_options=self.clf_names, value=self.clf_names[0], img='forest')
-        self.clr_dropdown = SimBADropDown(parent=self.settings_frm, label="TEXT COLOR: ", label_width=40, dropdown_width=30, dropdown_options=color_names, value="Cyan", img='text_color_2')
-        self.highlight_clr_dropdown = SimBADropDown(parent=self.settings_frm, label="HIGHLIGHT TEXT COLOR: ", label_width=40, dropdown_width=30, dropdown_options=["None"] + color_names, value="None", img='text_color')
-        self.video_speed_dropdown = SimBADropDown(parent=self.settings_frm, label="VIDEO SPEED: ", label_width=40, dropdown_width=30, dropdown_options=Options.SPEED_OPTIONS.value, value=1.0, img='rocket')
+        self.clf_dropdown = MufasaDropDown(parent=self.settings_frm, label='CLASSIFIER: ', label_width=40, dropdown_width=30, dropdown_options=self.clf_names, value=self.clf_names[0], img='forest')
+        self.clr_dropdown = MufasaDropDown(parent=self.settings_frm, label="TEXT COLOR: ", label_width=40, dropdown_width=30, dropdown_options=color_names, value="Cyan", img='text_color_2')
+        self.highlight_clr_dropdown = MufasaDropDown(parent=self.settings_frm, label="HIGHLIGHT TEXT COLOR: ", label_width=40, dropdown_width=30, dropdown_options=["None"] + color_names, value="None", img='text_color')
+        self.video_speed_dropdown = MufasaDropDown(parent=self.settings_frm, label="VIDEO SPEED: ", label_width=40, dropdown_width=30, dropdown_options=Options.SPEED_OPTIONS.value, value=1.0, img='rocket')
 
         self.individual_bout_clips_cb, self.one_vid_per_bout_var = SimbaCheckbox(parent=self.settings_frm, txt="CREATE ONE CLIP PER BOUT", txt_img='segment', val=False)
         self.individual_clip_per_video_cb, self.one_vid_per_video_var = SimbaCheckbox(parent=self.settings_frm, txt="CREATE ONE CLIP PER BOUT", txt_img='video', val=True)
@@ -57,7 +57,7 @@ class ClassifierValidationPopUp(PopUpMixin, ConfigReader):
 
         self.run_single_video_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SINGLE VIDEO", icon_name='run',  icon_link='video', padx=5, pady=5, relief='solid')
         self.run_single_video_btn = SimbaButton(parent=self.run_single_video_frm, txt="CREATE SINGLE VIDEO", img='rocket', txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=self.run, cmd_kwargs={'multiple': False})
-        self.single_video_dropdown = SimBADropDown(parent=self.run_single_video_frm, label="VIDEO: ", label_width=15, dropdown_width=30, dropdown_options=list(self.machine_results_dict.keys()), value=list(self.machine_results_dict.keys())[0])
+        self.single_video_dropdown = MufasaDropDown(parent=self.run_single_video_frm, label="VIDEO: ", label_width=15, dropdown_width=30, dropdown_options=list(self.machine_results_dict.keys()), value=list(self.machine_results_dict.keys())[0])
         self.run_single_video_frm.grid(row=1, column=0, sticky=NW, padx=10, pady=10)
         self.run_single_video_btn.grid(row=0, column=1, sticky=NW)
         self.single_video_dropdown.grid(row=0, column=2, sticky=NW)

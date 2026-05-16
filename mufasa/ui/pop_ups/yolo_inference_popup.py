@@ -11,7 +11,7 @@ from mufasa.model.yolo_pose_inference import YOLOPoseInference
 from mufasa.model.yolo_pose_track_inference import YOLOPoseTrackInference
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
                                         FolderSelect, SimbaButton,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.enums import Options, PackageNames, Paths
@@ -63,20 +63,20 @@ class YOLOPoseInferencePopUP(PopUpMixin):
         self.tracker_path = FileSelect(parent=paths_frm, fileDescription='TRACKER CONFIG (OPTIONAL, .YML):', lblwidth=32,  entry_width=65, file_types=[("YAML FILE", ".yml"), ("YAML FILE", ".yaml")], initialdir=ASSETS_DIR, tooltip_key='bp_config_csv_path')
 
 
-        self.batch_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=BATCH_SIZE_OPTIONS, label="BATCH SIZE: ", label_width=35, dropdown_width=40, value=250, tooltip_key='batch_dropdown', img='batch')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:", label_width=35, dropdown_width=40, value='TRUE', tooltip_key='verbose_dropdown', img='text')
-        self.workers_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=CORE_CNT_OPTIONS, label="CPU WORKERS:", label_width=35, dropdown_width=40, value=int(math.ceil((max(CORE_CNT_OPTIONS)/2))), tooltip_key='workers_dropdown', img='cpu_small')
-        self.format_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=YOLO_FORMATS, label="FORMAT:", label_width=35, dropdown_width=40, value='None', tooltip_key='format_dropdown', img='system')
-        self.img_size_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=IMG_SIZE_OPTIONS, label="IMAGE SIZE:", label_width=35, dropdown_width=40, value=256, tooltip_key='img_size_dropdown', img='monitor')
-        self.devices_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=devices, label="DEVICE:", label_width=35, dropdown_width=40, value=devices[1], tooltip_key='devices_dropdown', img='gpu_3')
-        self.interpolate_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="INTERPOLATE:",  label_width=35, dropdown_width=40, value='TRUE', tooltip_key='interpolate_dropdown', img='line_chart_blue')
-        self.stream_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="STREAM:", label_width=35, dropdown_width=40, value='TRUE', tooltip_key='stream_dropdown', img='stream')
-        self.threshold_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=THRESHOLD_OPTIONS, label="THRESHOLD:", label_width=35, dropdown_width=40, value=0.1, tooltip_key='threshold_dropdown', img='threshold')
-        self.iou_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=THRESHOLD_OPTIONS,  label="IOU:", label_width=35, dropdown_width=40, value=0.8, tooltip_key='iou_dropdown', img='overlap_iou')
-        self.max_tracks_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=MAX_TRACKS_OPTIONS, label="MAX TRACKS:", label_width=35, dropdown_width=40, value=MAX_TRACKS_OPTIONS[0], tooltip_key='max_tracks_dropdown', img='abacus')
-        self.max_track_per_id_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=MAX_TRACKS_OPTIONS, label="MAX TRACKS PER ID:", label_width=35, dropdown_width=40, value=1, tooltip_key='max_track_per_id_dropdown', img='abacus_2')
-        self.smoothing_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=SMOOTHING_OPTIONS, label="SMOOTHING (MS):", label_width=35, dropdown_width=40, value=SMOOTHING_OPTIONS[2], tooltip_key='smoothing_dropdown', img='smooth')
-        self.recursive_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="RECURSIVE VIDEO SEARCH:", label_width=35, dropdown_width=40, value='FALSE', tooltip_key='recursive_dropdown', img='hierarchy')
+        self.batch_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=BATCH_SIZE_OPTIONS, label="BATCH SIZE: ", label_width=35, dropdown_width=40, value=250, tooltip_key='batch_dropdown', img='batch')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:", label_width=35, dropdown_width=40, value='TRUE', tooltip_key='verbose_dropdown', img='text')
+        self.workers_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=CORE_CNT_OPTIONS, label="CPU WORKERS:", label_width=35, dropdown_width=40, value=int(math.ceil((max(CORE_CNT_OPTIONS)/2))), tooltip_key='workers_dropdown', img='cpu_small')
+        self.format_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=YOLO_FORMATS, label="FORMAT:", label_width=35, dropdown_width=40, value='None', tooltip_key='format_dropdown', img='system')
+        self.img_size_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=IMG_SIZE_OPTIONS, label="IMAGE SIZE:", label_width=35, dropdown_width=40, value=256, tooltip_key='img_size_dropdown', img='monitor')
+        self.devices_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=devices, label="DEVICE:", label_width=35, dropdown_width=40, value=devices[1], tooltip_key='devices_dropdown', img='gpu_3')
+        self.interpolate_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="INTERPOLATE:",  label_width=35, dropdown_width=40, value='TRUE', tooltip_key='interpolate_dropdown', img='line_chart_blue')
+        self.stream_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="STREAM:", label_width=35, dropdown_width=40, value='TRUE', tooltip_key='stream_dropdown', img='stream')
+        self.threshold_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=THRESHOLD_OPTIONS, label="THRESHOLD:", label_width=35, dropdown_width=40, value=0.1, tooltip_key='threshold_dropdown', img='threshold')
+        self.iou_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=THRESHOLD_OPTIONS,  label="IOU:", label_width=35, dropdown_width=40, value=0.8, tooltip_key='iou_dropdown', img='overlap_iou')
+        self.max_tracks_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=MAX_TRACKS_OPTIONS, label="MAX TRACKS:", label_width=35, dropdown_width=40, value=MAX_TRACKS_OPTIONS[0], tooltip_key='max_tracks_dropdown', img='abacus')
+        self.max_track_per_id_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=MAX_TRACKS_OPTIONS, label="MAX TRACKS PER ID:", label_width=35, dropdown_width=40, value=1, tooltip_key='max_track_per_id_dropdown', img='abacus_2')
+        self.smoothing_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=SMOOTHING_OPTIONS, label="SMOOTHING (MS):", label_width=35, dropdown_width=40, value=SMOOTHING_OPTIONS[2], tooltip_key='smoothing_dropdown', img='smooth')
+        self.recursive_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="RECURSIVE VIDEO SEARCH:", label_width=35, dropdown_width=40, value='FALSE', tooltip_key='recursive_dropdown', img='hierarchy')
 
 
 

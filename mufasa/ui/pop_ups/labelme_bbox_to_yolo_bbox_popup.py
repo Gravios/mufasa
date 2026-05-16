@@ -6,7 +6,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.third_party_label_appenders.transform.labelme_to_yolo import \
     LabelmeBoundingBoxes2YoloBoundingBoxes
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     str_2_bool)
@@ -26,11 +26,11 @@ class LabelmeBbox2YoloBboxPopUp(PopUpMixin):
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings')
         self.labelme_dir = FolderSelect(settings_frm, folderDescription="LABELME DIRECTORY:", lblwidth=35, lbl_icon='folder')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, lbl_icon='folder')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
-        self.obb_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="OBB:", label_width=35, dropdown_width=40, value='TRUE', img='obb')
-        self.clahe_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE:", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
-        self.greyscale_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE:", label_width=35, dropdown_width=40, value='FALSE', img='grey')
-        self.train_size_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=TRAIN_SIZE_OPTIONS, label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
+        self.obb_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="OBB:", label_width=35, dropdown_width=40, value='TRUE', img='obb')
+        self.clahe_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE:", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
+        self.greyscale_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE:", label_width=35, dropdown_width=40, value='FALSE', img='grey')
+        self.train_size_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=TRAIN_SIZE_OPTIONS, label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2')
 
 
         settings_frm.grid(row=0, column=0, sticky=NW)

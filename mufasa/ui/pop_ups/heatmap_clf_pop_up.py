@@ -13,7 +13,7 @@ from mufasa.plotting.heat_mapper_clf import HeatMapperClfSingleCore
 from mufasa.plotting.heat_mapper_clf_mp import HeatMapperClfMultiprocess
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         SimbaButton, SimbaCheckbox,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import (check_if_filepath_list_is_empty,
                                 check_if_string_value_is_valid_video_timestamp,
                                 check_int,
@@ -50,17 +50,17 @@ class HeatmapClfPopUp(PopUpMixin, ConfigReader):
 
         self.style_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="STYLE SETTINGS", icon_name='style', icon_link=Links.HEATMAP_CLF.value)
 
-        self.palette_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.palette_options, label='PALETTE: ', label_width=30, dropdown_width=35, value='jet', img='palette_small', tooltip_key='HEATMAP_CLF_PALETTE')
-        self.shading_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.shading_options, label='SHADING: ', label_width=30, dropdown_width=35, value='flat', img='shade', tooltip_key='HEATMAP_CLF_SHADING')
-        self.clf_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.clf_names, label='CLASSIFIER: ', label_width=30, dropdown_width=35, value=self.clf_names[0], img='forest', tooltip_key='HEATMAP_CLF_CLASSIFIER')
-        self.bp_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.body_parts_lst, label='BODY-PART: ', label_width=30, dropdown_width=35, value=self.body_parts_lst[0], img='pose', tooltip_key='HEATMAP_CLF_BODY_PART')
-        self.max_time_scale_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=max_scales_option, label='MAX TIME SCALE (S): ', label_width=30, dropdown_width=35, value=AUTO, img='timer', tooltip_key='HEATMAP_CLF_MAX_TIME_SCALE')
-        self.bin_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.heatmap_bin_size_options, label='BIN SIZE (MM): ', label_width=30, dropdown_width=35, value="20×20", img='size_black', tooltip_key='HEATMAP_CLF_BIN_SIZE')
-        self.min_timescale_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=min_scales_option, label='MINIMUM SECONDS: ', label_width=30, dropdown_width=35, value="NONE", img='timer_2', tooltip_key='HEATMAP_CLF_MIN_SECONDS')
-        self.legend_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=['TRUE', 'FALSE'], label='SHOW TIME COLOR LEGEND: ', label_width=30, dropdown_width=35, value='TRUE', img='palette_small', tooltip_key='HEATMAP_CLF_SHOW_LEGEND')
+        self.palette_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.palette_options, label='PALETTE: ', label_width=30, dropdown_width=35, value='jet', img='palette_small', tooltip_key='HEATMAP_CLF_PALETTE')
+        self.shading_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.shading_options, label='SHADING: ', label_width=30, dropdown_width=35, value='flat', img='shade', tooltip_key='HEATMAP_CLF_SHADING')
+        self.clf_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.clf_names, label='CLASSIFIER: ', label_width=30, dropdown_width=35, value=self.clf_names[0], img='forest', tooltip_key='HEATMAP_CLF_CLASSIFIER')
+        self.bp_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.body_parts_lst, label='BODY-PART: ', label_width=30, dropdown_width=35, value=self.body_parts_lst[0], img='pose', tooltip_key='HEATMAP_CLF_BODY_PART')
+        self.max_time_scale_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=max_scales_option, label='MAX TIME SCALE (S): ', label_width=30, dropdown_width=35, value=AUTO, img='timer', tooltip_key='HEATMAP_CLF_MAX_TIME_SCALE')
+        self.bin_size_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.heatmap_bin_size_options, label='BIN SIZE (MM): ', label_width=30, dropdown_width=35, value="20×20", img='size_black', tooltip_key='HEATMAP_CLF_BIN_SIZE')
+        self.min_timescale_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=min_scales_option, label='MINIMUM SECONDS: ', label_width=30, dropdown_width=35, value="NONE", img='timer_2', tooltip_key='HEATMAP_CLF_MIN_SECONDS')
+        self.legend_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=['TRUE', 'FALSE'], label='SHOW TIME COLOR LEGEND: ', label_width=30, dropdown_width=35, value='TRUE', img='palette_small', tooltip_key='HEATMAP_CLF_SHOW_LEGEND')
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="VISUALIZATION SETTINGS", icon_name='eye', icon_link=Links.HEATMAP_CLF.value)
-        self.core_cnt_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(2, self.cpu_cnt)), label='CPU CORE COUNT: ', label_width=30, dropdown_width=35, value=int(self.cpu_cnt/3), img='cpu_small', tooltip_key='HEATMAP_CLF_CPU_CORES')
-        self.line_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=line_color_options, label='LINE COLOR: ', label_width=30, dropdown_width=35, value='NONE', img='line', tooltip_key='HEATMAP_LOCATION_LINE_COLOR')
+        self.core_cnt_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(2, self.cpu_cnt)), label='CPU CORE COUNT: ', label_width=30, dropdown_width=35, value=int(self.cpu_cnt/3), img='cpu_small', tooltip_key='HEATMAP_CLF_CPU_CORES')
+        self.line_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=line_color_options, label='LINE COLOR: ', label_width=30, dropdown_width=35, value='NONE', img='line', tooltip_key='HEATMAP_LOCATION_LINE_COLOR')
 
 
 
@@ -69,7 +69,7 @@ class HeatmapClfPopUp(PopUpMixin, ConfigReader):
         heatmap_last_frm_cb, self.heatmap_last_frm_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE LAST FRAME', txt_img='finish', val=True, tooltip_key='HEATMAP_CLF_CREATE_LAST_FRAME')
 
         self.bg_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="HEATMAP BACKGROUND SETTINGS", icon_name='background', icon_link=Links.HEATMAP_CLF.value)
-        self.bg_dropdown = SimBADropDown(parent=self.bg_frm, dropdown_options=HEATMAP_BG_OPTIONS, label='HEATMAP BACKGROUND: ', label_width=30, dropdown_width=35, value='NONE', img='background', command=self._set_select_bg_frm, tooltip_key='HEATMAP_CLF_BACKGROUND')
+        self.bg_dropdown = MufasaDropDown(parent=self.bg_frm, dropdown_options=HEATMAP_BG_OPTIONS, label='HEATMAP BACKGROUND: ', label_width=30, dropdown_width=35, value='NONE', img='background', command=self._set_select_bg_frm, tooltip_key='HEATMAP_CLF_BACKGROUND')
 
         self.time_slice_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="TIME PERIOD", icon_name='timer_2', icon_link=Links.HEATMAP_LOCATION.value)
         self.plot_time_period_cb, self.time_period_val = SimbaCheckbox(parent=self.time_slice_frm, txt='PLOT SELECT TIME-PERIOD', val=FALSE, txt_img='timer_2', cmd=self._set_timeslice_state, tooltip_key='HEATMAP_LOCATION_PLOT_TIME_PERIOD')
@@ -81,7 +81,7 @@ class HeatmapClfPopUp(PopUpMixin, ConfigReader):
         self.run_single_video_frm = LabelFrame(self.run_frm, text="SINGLE VIDEO", font=Formats.FONT_HEADER.value, pady=5, padx=5, fg="black",)
 
         self.run_single_video_btn = SimbaButton(parent=self.run_single_video_frm, txt="CREATE SINGLE HEATMAP", txt_clr="blue", img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.__create_heatmap_plots, cmd_kwargs={'multiple_videos': False})
-        self.single_video_dropdown = SimBADropDown(parent=self.run_single_video_frm, label='VIDEO:', dropdown_options=list(self.files_found_dict.keys()), label_width=20, dropdown_width=35, value=list(self.files_found_dict.keys())[0], tooltip_key='HEATMAP_CLF_SINGLE_VIDEO')
+        self.single_video_dropdown = MufasaDropDown(parent=self.run_single_video_frm, label='VIDEO:', dropdown_options=list(self.files_found_dict.keys()), label_width=20, dropdown_width=35, value=list(self.files_found_dict.keys())[0], tooltip_key='HEATMAP_CLF_SINGLE_VIDEO')
         self.run_multiple_videos = LabelFrame(self.run_frm, text="MULTIPLE VIDEO", font=Formats.FONT_HEADER.value, pady=5, padx=5, fg="black",)
 
         self.run_multiple_video_btn = SimbaButton(parent=self.run_multiple_videos, txt=f"CREATE MULTIPLE HEATMAPS ({len(list(self.files_found_dict.keys()))} files found)", img='rocket', txt_clr="blue", font=Formats.FONT_REGULAR.value, cmd=self.__create_heatmap_plots, cmd_kwargs={'multiple_videos': True})
@@ -131,12 +131,12 @@ class HeatmapClfPopUp(PopUpMixin, ConfigReader):
             if hasattr(self, widget_name):
                 getattr(self, widget_name).destroy()
         if selection == VIDEO:
-            self.opacity_dropdown = SimBADropDown(parent=self.bg_frm, dropdown_options=list(np.arange(5, 105, 5)), label='HEATMAP OPACITY (%): ', label_width=30, dropdown_width=35, value=50, img='opacity', tooltip_key='HEATMAP_CLF_OPACITY')
-            self.keypoint_dropdown = SimBADropDown(parent=self.bg_frm, dropdown_options=['TRUE', 'FALSE'], label='SHOW KEYPOINT: ', label_width=30, dropdown_width=35, value='TRUE', img='pose', tooltip_key='HEATMAP_CLF_SHOW_KEYPOINT')
+            self.opacity_dropdown = MufasaDropDown(parent=self.bg_frm, dropdown_options=list(np.arange(5, 105, 5)), label='HEATMAP OPACITY (%): ', label_width=30, dropdown_width=35, value=50, img='opacity', tooltip_key='HEATMAP_CLF_OPACITY')
+            self.keypoint_dropdown = MufasaDropDown(parent=self.bg_frm, dropdown_options=['TRUE', 'FALSE'], label='SHOW KEYPOINT: ', label_width=30, dropdown_width=35, value='TRUE', img='pose', tooltip_key='HEATMAP_CLF_SHOW_KEYPOINT')
             self.opacity_dropdown.grid(row=1, sticky=NW)
             self.keypoint_dropdown.grid(row=2, sticky=NW)
         elif selection == VIDEO_FRM:
-            self.opacity_dropdown = SimBADropDown(parent=self.bg_frm, dropdown_options=list(np.arange(5, 105, 5)), label='HEATMAP OPACITY (%): ', label_width=30, dropdown_width=35, value=50, img='opacity', tooltip_key='HEATMAP_CLF_OPACITY')
+            self.opacity_dropdown = MufasaDropDown(parent=self.bg_frm, dropdown_options=list(np.arange(5, 105, 5)), label='HEATMAP OPACITY (%): ', label_width=30, dropdown_width=35, value=50, img='opacity', tooltip_key='HEATMAP_CLF_OPACITY')
             self.frm_id_eb = Entry_Box(parent=self.bg_frm, fileDescription='FRAME NUMBER:', labelwidth=30, entry_box_width=35, justify='center', validation='numeric', img='abacus_2', tooltip_key='HEATMAP_CLF_FRAME_NUMBER', value=0)
             self.opacity_dropdown.grid(row=1, sticky=NW)
             self.frm_id_eb.grid(row=2, sticky=NW)

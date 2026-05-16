@@ -8,7 +8,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.third_party_label_appenders.transform.dlc_to_labelme import \
     DLC2Labelme
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.read_write import str_2_bool
 
@@ -27,9 +27,9 @@ class DLC2LabelmePopUp(PopUpMixin):
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings')
         self.dlc_dir = FolderSelect(settings_frm, folderDescription="DLC ANNOTATION DIRECTORY:", lblwidth=35, entry_width=40, initialdir=r'D:\troubleshooting\dlc_h5_multianimal_to_yolo\data', lbl_icon='folder')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, entry_width=40, initialdir=r'D:\troubleshooting\dlc_h5_multianimal_to_yolo\yolo', lbl_icon='folder')
-        self.grey_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
-        self.clahe_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
+        self.grey_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
+        self.clahe_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
 
 
         settings_frm.grid(row=0, column=0, sticky=NW)

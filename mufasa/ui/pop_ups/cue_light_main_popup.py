@@ -22,7 +22,7 @@ from mufasa.ui.pop_ups.cue_light_movement_analyzer_popup import \
     CueLightMovementAnalyzerPopUp
 from mufasa.ui.pop_ups.cue_light_visualizer_popup import CueLightVisulizerPopUp
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, SimbaButton,
-                                        SimBADropDown, SimBALabel)
+                                        MufasaDropDown, SimBALabel)
 from mufasa.utils.checks import check_float, check_int
 from mufasa.utils.enums import Keys, Links
 from mufasa.utils.errors import (CountError, NoChoosenClassifierError,
@@ -64,12 +64,12 @@ class CueLightMainPopUp(ConfigReader, PopUpMixin):
                 i.destroy()
             self.cue_light_dropdowns = []
             for j in range(cue_light_cnt):
-                cue_light_dropdown = SimBADropDown(parent=self.cue_light_settings_frm, dropdown_options=self.roi_names, label=f'CUE LIGHT {j+1}', label_width=20, dropdown_width=self.max_len + 2, value=self.roi_names[j])
+                cue_light_dropdown = MufasaDropDown(parent=self.cue_light_settings_frm, dropdown_options=self.roi_names, label=f'CUE LIGHT {j+1}', label_width=20, dropdown_width=self.max_len + 2, value=self.roi_names[j])
                 self.cue_light_dropdowns.append(cue_light_dropdown)
                 cue_light_dropdown.grid(row=j+1, column=0, sticky=NW)
 
         self.cue_light_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="DEFINE CUE LIGHTS", icon_name='light_bulb', icon_link=Links.CUE_LIGHTS.value)
-        self.cue_light_cnt_dropdown = SimBADropDown(parent=self.cue_light_settings_frm, dropdown_options=list(range(1, len(self.roi_names)+1)), label='# CUE LIGHTS', label_width=20, dropdown_width=self.max_len+2, value=1, command= lambda x: _get_cue_light_names(int(x)))
+        self.cue_light_cnt_dropdown = MufasaDropDown(parent=self.cue_light_settings_frm, dropdown_options=list(range(1, len(self.roi_names)+1)), label='# CUE LIGHTS', label_width=20, dropdown_width=self.max_len+2, value=1, command= lambda x: _get_cue_light_names(int(x)))
         self.cue_light_settings_frm.grid(row=0, column=0, sticky=NW, padx=(0, 10))
         self.cue_light_cnt_dropdown.grid(row=0, column=0, sticky=NW)
         _get_cue_light_names()

@@ -13,8 +13,8 @@ from PIL import ImageTk
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         SimbaButton, SimbaCheckbox,
-                                        SimBADropDown, SimBALabel,
-                                        SimBASeperator)
+                                        MufasaDropDown, SimBALabel,
+                                        MufasaSeparator)
 from mufasa.utils.checks import (check_ffmpeg_available,
                                 check_file_exist_and_readable, check_float,
                                 check_if_string_value_is_valid_video_timestamp,
@@ -170,8 +170,8 @@ class BatchProcessFrame(PopUpMixin):
 
 
         self.quick_set_quality = CreateLabelFrameWithIcon(parent=self.quick_settings_frm, header="OUTPUT VIDEO QUALITY", icon_name='star', padx=5, pady=12)
-        self.use_gpu_dropdown = SimBADropDown(parent=self.quick_set_quality, label="USE GPU", label_width=20, dropdown_options=['TRUE', 'FALSE'], value='FALSE', img='gpu_3', state=self.gpu_available_state, dropdown_width=15, tooltip_key='USE_GPU')
-        self.quick_set_quality_dropdown = SimBADropDown(parent=self.quick_set_quality, label='VIDEO QUALITY %', label_width=20, dropdown_options=self.cpu_video_quality, value=60, img='star', dropdown_width=15, tooltip_key='OUTPUT_VIDEO_QUALITY')
+        self.use_gpu_dropdown = MufasaDropDown(parent=self.quick_set_quality, label="USE GPU", label_width=20, dropdown_options=['TRUE', 'FALSE'], value='FALSE', img='gpu_3', state=self.gpu_available_state, dropdown_width=15, tooltip_key='USE_GPU')
+        self.quick_set_quality_dropdown = MufasaDropDown(parent=self.quick_set_quality, label='VIDEO QUALITY %', label_width=20, dropdown_options=self.cpu_video_quality, value=60, img='star', dropdown_width=15, tooltip_key='OUTPUT_VIDEO_QUALITY')
         self.quick_set_quality_apply = SimbaButton(parent=self.quick_set_quality, txt='APPLY', img='arrow_down_green_2', cmd=self.apply_quality_to_all)
 
         self.quick_settings_frm.grid(row=0, column=0, sticky=W, padx=10)
@@ -293,10 +293,10 @@ class BatchProcessFrame(PopUpMixin):
         self.headings["apply_clahe_cbox"].grid(row=0, column=13, sticky=W, padx=5)
         self.headings["video_quality_head"].grid(row=0, column=14, sticky=NW)
 
-        seperator = SimBASeperator(parent=self.videos_frm, color=None, orient='horizontal', borderwidth=1)
+        seperator = MufasaSeparator(parent=self.videos_frm, color=None, orient='horizontal', borderwidth=1)
         seperator.grid(row=1, column=0, columnspan=15, rowspan=1, sticky="ew")
 
-        seperator = SimBASeperator(parent=self.videos_frm, orient='vertical', borderwidth=1)
+        seperator = MufasaSeparator(parent=self.videos_frm, orient='vertical', borderwidth=1)
         seperator.grid(row=0, column=1, rowspan=len(self.videos_in_dir_dict.keys()) + 400, sticky="ns")
 
 
@@ -339,7 +339,7 @@ class BatchProcessFrame(PopUpMixin):
             self.videos[name]["grayscale_cbox"], self.videos[name]["grayscale_cb_var"] = SimbaCheckbox(parent=self.videos_frm, txt='', cmd=lambda _name=name: self._set_entry_boxes_bg_clr(state=self.videos[_name]["grayscale_cb_var"].get(), cboxes=[self.videos[_name]["grayscale_cbox"]]))
             self.videos[name]["frame_cnt_cbox"], self.videos[name]["frame_cnt_cb_var"] = SimbaCheckbox(parent=self.videos_frm, txt='', cmd=lambda _name=name: self._set_entry_boxes_bg_clr(state=self.videos[_name]["frame_cnt_cb_var"].get(), cboxes=[self.videos[_name]["frame_cnt_cbox"]]))
             self.videos[name]["apply_clahe_cbox"], self.videos[name]["apply_clahe_cb_var"] = SimbaCheckbox(parent=self.videos_frm, txt='', cmd=lambda _name=name: self._set_entry_boxes_bg_clr(state=self.videos[_name]["apply_clahe_cb_var"].get(), cboxes=[self.videos[_name]["apply_clahe_cbox"]]))
-            self.videos[name]["video_quality_dropdown"] = SimBADropDown(parent=self.videos_frm, label="", dropdown_options=self.cpu_video_quality, value=60, dropdown_width=10)
+            self.videos[name]["video_quality_dropdown"] = MufasaDropDown(parent=self.videos_frm, label="", dropdown_options=self.cpu_video_quality, value=60, dropdown_width=10)
 
             self.videos[name]["video_name_lbl"].grid(row=row, column=0, sticky=W, pady=(3, 3))
             self.videos[name]["crop_btn"].grid(row=row, column=2, pady=(3, 3))
@@ -360,7 +360,7 @@ class BatchProcessFrame(PopUpMixin):
                 pass
             self.videos[name]["video_quality_dropdown"].grid(row=row, column=14, sticky=W)
             if video_cnt != len(self.videos_in_dir_dict.keys()) -1:
-                sep = SimBASeperator(parent=self.videos_frm, orient='horizontal', height=1, color="#ccc")
+                sep = MufasaSeparator(parent=self.videos_frm, orient='horizontal', height=1, color="#ccc")
                 sep.grid(row=row + 1, column=0, columnspan=15, sticky="ew")
 
 
@@ -411,14 +411,14 @@ class BatchProcessFrame(PopUpMixin):
         codecs = get_ffmpeg_encoders(alphabetically_sorted=True)
         fonts = list(get_fonts().keys())
         pref_frm = CreateLabelFrameWithIcon(parent=self.preferences_frm, header='SETTINGS', icon_name='settings')
-        self.codec_dropdown = SimBADropDown(parent=pref_frm, dropdown_options=codecs, label='CODEC:', label_width=25, value=self.settings['codec'], dropdown_width=30, searchable=True)
-        self.font_dropdown = SimBADropDown(parent=pref_frm, dropdown_options=fonts, label='FONT:', label_width=25, value=self.settings['font'], dropdown_width=30)
-        self.font_size_dropdown = SimBADropDown(parent=pref_frm, dropdown_options=list(range(1, 61)), label='FONT SIZE:', label_width=25, value=self.settings['font_size'], dropdown_width=30)
-        self.text_loc_dropdown = SimBADropDown(parent=pref_frm, dropdown_options=Formats.TXT_LOCATIONS.value, label='TEXT LOCATION:', label_width=25, value=self.settings['txt_loc'], dropdown_width=30)
-        self.crop_thickness_dropdown = SimBADropDown(parent=pref_frm, dropdown_options=list(range(1, 31)), label='CROP THICKNESS:', label_width=25, value=self.settings['crop_thickness'], dropdown_width=30)
-        self.crop_color_dropdown = SimBADropDown(parent=pref_frm, dropdown_options=list(self.clrs.keys()), label='CROP COLOR:', label_width=25, value=self.settings['crop_color'], dropdown_width=30)
-        self.clahe_clip_limit_dropdown = SimBADropDown(parent=pref_frm, dropdown_options=list(range(1, 31)), label='CLAHE CLIP LIMIT:', label_width=25, value=self.settings['clahe_clip_limit'], dropdown_width=30)
-        self.clahe_tile_size_dropdown = SimBADropDown(parent=pref_frm, dropdown_options=list(range(1, 31)), label='CLAHE TILE SIZE:', label_width=25, value=self.settings['clahe_tile_size'], dropdown_width=30)
+        self.codec_dropdown = MufasaDropDown(parent=pref_frm, dropdown_options=codecs, label='CODEC:', label_width=25, value=self.settings['codec'], dropdown_width=30, searchable=True)
+        self.font_dropdown = MufasaDropDown(parent=pref_frm, dropdown_options=fonts, label='FONT:', label_width=25, value=self.settings['font'], dropdown_width=30)
+        self.font_size_dropdown = MufasaDropDown(parent=pref_frm, dropdown_options=list(range(1, 61)), label='FONT SIZE:', label_width=25, value=self.settings['font_size'], dropdown_width=30)
+        self.text_loc_dropdown = MufasaDropDown(parent=pref_frm, dropdown_options=Formats.TXT_LOCATIONS.value, label='TEXT LOCATION:', label_width=25, value=self.settings['txt_loc'], dropdown_width=30)
+        self.crop_thickness_dropdown = MufasaDropDown(parent=pref_frm, dropdown_options=list(range(1, 31)), label='CROP THICKNESS:', label_width=25, value=self.settings['crop_thickness'], dropdown_width=30)
+        self.crop_color_dropdown = MufasaDropDown(parent=pref_frm, dropdown_options=list(self.clrs.keys()), label='CROP COLOR:', label_width=25, value=self.settings['crop_color'], dropdown_width=30)
+        self.clahe_clip_limit_dropdown = MufasaDropDown(parent=pref_frm, dropdown_options=list(range(1, 31)), label='CLAHE CLIP LIMIT:', label_width=25, value=self.settings['clahe_clip_limit'], dropdown_width=30)
+        self.clahe_tile_size_dropdown = MufasaDropDown(parent=pref_frm, dropdown_options=list(range(1, 31)), label='CLAHE TILE SIZE:', label_width=25, value=self.settings['clahe_tile_size'], dropdown_width=30)
         self.save_pref_btn = SimbaButton(parent=pref_frm, txt='SAVE', img='rocket', cmd=lambda: self._save_preferences())
 
         pref_frm.grid(row=0, column=0, sticky=NW)

@@ -200,7 +200,7 @@ from mufasa.ui.pop_ups.yolo_plot_results import YoloPoseVisualizerPopUp
 from mufasa.ui.pop_ups.yolo_pose_train_popup import YOLOPoseTrainPopUP
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         FileSelect, SimbaButton, SimbaCheckbox,
-                                        SimBADropDown, SimBALabel,
+                                        MufasaDropDown, SimBALabel,
                                         hxtScrollbar)
 from mufasa.ui.utils import position_window
 from mufasa.utils.checks import (check_ffmpeg_available,
@@ -255,7 +255,7 @@ class LoadProjectPopUp(object):
         if len(recent_project_paths) > 0:
             max_len = max(len(s) for s in recent_project_paths)
             self.load_recent_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="LOAD RECENT PROJECT", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.LOAD_PROJECT.value)
-            self.recent_project_dropdown = SimBADropDown(parent=self.load_recent_frm, dropdown_options=recent_project_paths, label='RECENT CONFIG FILE PATH:', label_width=30, value=recent_project_paths[0], dropdown_width=max_len, tooltip_key='LOAD_PROJECT_RECENT_CONFIG')
+            self.recent_project_dropdown = MufasaDropDown(parent=self.load_recent_frm, dropdown_options=recent_project_paths, label='RECENT CONFIG FILE PATH:', label_width=30, value=recent_project_paths[0], dropdown_width=max_len, tooltip_key='LOAD_PROJECT_RECENT_CONFIG')
             self.load_recent_project_btn = SimbaButton(parent=self.load_recent_frm, txt="LOAD RECENT PROJECT", txt_clr='darkgreen', img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.launch_project, cmd_kwargs={'project_path': lambda: self.recent_project_dropdown.get_value()})
             self.load_recent_frm.grid(row=1, sticky=NW)
             self.recent_project_dropdown.grid(row=0, sticky=NW)

@@ -11,7 +11,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.plotting.annotation_videos import PlotAnnotatedBouts
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         SimbaButton, SimbaCheckbox,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_int, check_nvidea_gpu_available)
 from mufasa.utils.enums import Formats, Options
@@ -57,7 +57,7 @@ class AnnotatedBoutsVideoPopUp(PopUpMixin, ConfigReader):
         self.clf_frm.grid(row=0, column=0, sticky=NW)
 
         self.video_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CHOOSE VIDEOS", icon_name="video")
-        self.video_dropdown = SimBADropDown(parent=self.video_frm, dropdown_options=self.video_options, label="VIDEO:", label_width=35, dropdown_width=30, value=ALL_VIDEOS, img="video_2", tooltip_key="ANNOTATION_BOUTS_VIDEO")
+        self.video_dropdown = MufasaDropDown(parent=self.video_frm, dropdown_options=self.video_options, label="VIDEO:", label_width=35, dropdown_width=30, value=ALL_VIDEOS, img="video_2", tooltip_key="ANNOTATION_BOUTS_VIDEO")
         self.video_frm.grid(row=1, column=0, sticky=NW)
         self.video_dropdown.grid(row=0, column=0, sticky=NW)
 
@@ -69,14 +69,14 @@ class AnnotatedBoutsVideoPopUp(PopUpMixin, ConfigReader):
         self.post_window_entry.grid(row=1, column=0, sticky=NW)
 
         self.style_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="STYLE SETTINGS", icon_name="style")
-        self.text_size_dropdown = SimBADropDown(parent=self.style_frm, dropdown_options=TEXT_SIZE_OPTIONS, label="TEXT SIZE:", label_width=35, dropdown_width=15, value=AUTO, img="text", tooltip_key="ANNOTATION_BOUTS_TEXT_SIZE")
-        self.text_spacing_dropdown = SimBADropDown(parent=self.style_frm, dropdown_options=TEXT_SIZE_OPTIONS, label="TEXT SPACING:", label_width=35, dropdown_width=15, value=AUTO, img="text_spacing", tooltip_key="ANNOTATION_BOUTS_TEXT_SPACING")
-        self.text_thickness_dropdown = SimBADropDown(parent=self.style_frm, dropdown_options=TEXT_SIZE_OPTIONS, label="TEXT THICKNESS:", label_width=35, dropdown_width=15, value=AUTO, img="bold", tooltip_key="ANNOTATION_BOUTS_TEXT_THICKNESS")
-        self.circle_size_dropdown = SimBADropDown(parent=self.style_frm, dropdown_options=TEXT_SIZE_OPTIONS, label="CIRCLE SIZE:", label_width=35, dropdown_width=15, value=AUTO, img="circle_small", tooltip_key="ANNOTATION_BOUTS_CIRCLE_SIZE")
-        self.text_opacity_dropdown = SimBADropDown(parent=self.style_frm, dropdown_options=OPACITY_OPTIONS, label="TEXT OPACITY:", label_width=35, dropdown_width=15, value=0.8, img="opacity", tooltip_key="ANNOTATION_BOUTS_TEXT_OPACITY")
-        self.text_clr_dropdown = SimBADropDown(parent=self.style_frm, dropdown_options=list(self.clr_dict.keys()), label="TEXT COLOR:", label_width=35, dropdown_width=15, value="White", img="text_color", tooltip_key="ANNOTATION_BOUTS_TEXT_COLOR")
-        self.text_bg_clr_dropdown = SimBADropDown(parent=self.style_frm, dropdown_options=list(self.clr_dict.keys()), label="TEXT BG COLOR:", label_width=35, dropdown_width=15, value="Black", img="fill", tooltip_key="ANNOTATION_BOUTS_TEXT_BG_COLOR")
-        self.tracking_clr_palette_dropdown = SimBADropDown(parent=self.style_frm, dropdown_options=self.pose_palettes, label="TRACKING COLOR PALETTE:", label_width=35, dropdown_width=15, value="Set1", img="color_wheel", tooltip_key="ANNOTATION_BOUTS_TRACKING_PALETTE")
+        self.text_size_dropdown = MufasaDropDown(parent=self.style_frm, dropdown_options=TEXT_SIZE_OPTIONS, label="TEXT SIZE:", label_width=35, dropdown_width=15, value=AUTO, img="text", tooltip_key="ANNOTATION_BOUTS_TEXT_SIZE")
+        self.text_spacing_dropdown = MufasaDropDown(parent=self.style_frm, dropdown_options=TEXT_SIZE_OPTIONS, label="TEXT SPACING:", label_width=35, dropdown_width=15, value=AUTO, img="text_spacing", tooltip_key="ANNOTATION_BOUTS_TEXT_SPACING")
+        self.text_thickness_dropdown = MufasaDropDown(parent=self.style_frm, dropdown_options=TEXT_SIZE_OPTIONS, label="TEXT THICKNESS:", label_width=35, dropdown_width=15, value=AUTO, img="bold", tooltip_key="ANNOTATION_BOUTS_TEXT_THICKNESS")
+        self.circle_size_dropdown = MufasaDropDown(parent=self.style_frm, dropdown_options=TEXT_SIZE_OPTIONS, label="CIRCLE SIZE:", label_width=35, dropdown_width=15, value=AUTO, img="circle_small", tooltip_key="ANNOTATION_BOUTS_CIRCLE_SIZE")
+        self.text_opacity_dropdown = MufasaDropDown(parent=self.style_frm, dropdown_options=OPACITY_OPTIONS, label="TEXT OPACITY:", label_width=35, dropdown_width=15, value=0.8, img="opacity", tooltip_key="ANNOTATION_BOUTS_TEXT_OPACITY")
+        self.text_clr_dropdown = MufasaDropDown(parent=self.style_frm, dropdown_options=list(self.clr_dict.keys()), label="TEXT COLOR:", label_width=35, dropdown_width=15, value="White", img="text_color", tooltip_key="ANNOTATION_BOUTS_TEXT_COLOR")
+        self.text_bg_clr_dropdown = MufasaDropDown(parent=self.style_frm, dropdown_options=list(self.clr_dict.keys()), label="TEXT BG COLOR:", label_width=35, dropdown_width=15, value="Black", img="fill", tooltip_key="ANNOTATION_BOUTS_TEXT_BG_COLOR")
+        self.tracking_clr_palette_dropdown = MufasaDropDown(parent=self.style_frm, dropdown_options=self.pose_palettes, label="TRACKING COLOR PALETTE:", label_width=35, dropdown_width=15, value="Set1", img="color_wheel", tooltip_key="ANNOTATION_BOUTS_TRACKING_PALETTE")
         self.style_frm.grid(row=3, column=0, sticky=NW)
         self.text_size_dropdown.grid(row=0, column=0, sticky=NW)
         self.text_spacing_dropdown.grid(row=1, column=0, sticky=NW)
@@ -88,10 +88,10 @@ class AnnotatedBoutsVideoPopUp(PopUpMixin, ConfigReader):
         self.tracking_clr_palette_dropdown.grid(row=7, column=0, sticky=NW)
 
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="VISUALIZATION SETTINGS", icon_name="eye")
-        self.multiprocess_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(2, self.cpu_cnt + 1)), label="CPU CORES:", label_width=35, dropdown_width=15, value=int(max(2, self.cpu_cnt / 3)), img="cpu_small", tooltip_key="ANNOTATION_BOUTS_CPU_CORES")
-        self.gpu_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=["TRUE", FALSE], label="USE GPU:", label_width=35, dropdown_width=15, value=FALSE, state=DISABLED if not gpu_available else NORMAL, img="gpu_3", tooltip_key="ANNOTATION_BOUTS_USE_GPU")
-        self.bbox_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=[FALSE, Options.AXIS_ALIGNED.value, Options.ANIMAL_ALIGNED.value], label="SHOW ANIMAL BBOX:", label_width=35, dropdown_width=15, value=FALSE, img="rectangle", tooltip_key="ANNOTATION_BOUTS_SHOW_BBOX")
-        self.timer_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=[FALSE, Options.SECONDS.value, Options.HHMMSSSSSS.value], label="SHOW VIDEO TIMER:", label_width=35, dropdown_width=15, value=Options.HHMMSSSSSS.value, img="timer", tooltip_key="ANNOTATION_BOUTS_TIMER")
+        self.multiprocess_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(2, self.cpu_cnt + 1)), label="CPU CORES:", label_width=35, dropdown_width=15, value=int(max(2, self.cpu_cnt / 3)), img="cpu_small", tooltip_key="ANNOTATION_BOUTS_CPU_CORES")
+        self.gpu_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=["TRUE", FALSE], label="USE GPU:", label_width=35, dropdown_width=15, value=FALSE, state=DISABLED if not gpu_available else NORMAL, img="gpu_3", tooltip_key="ANNOTATION_BOUTS_USE_GPU")
+        self.bbox_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=[FALSE, Options.AXIS_ALIGNED.value, Options.ANIMAL_ALIGNED.value], label="SHOW ANIMAL BBOX:", label_width=35, dropdown_width=15, value=FALSE, img="rectangle", tooltip_key="ANNOTATION_BOUTS_SHOW_BBOX")
+        self.timer_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=[FALSE, Options.SECONDS.value, Options.HHMMSSSSSS.value], label="SHOW VIDEO TIMER:", label_width=35, dropdown_width=15, value=Options.HHMMSSSSSS.value, img="timer", tooltip_key="ANNOTATION_BOUTS_TIMER")
         self.show_pose_cb, self.show_pose_var = SimbaCheckbox(parent=self.settings_frm, txt="SHOW TRACKING (POSE)", font=Formats.FONT_REGULAR.value, txt_img="pose", val=True)
         self.show_animal_names_cb, self.show_animal_names_var = SimbaCheckbox(parent=self.settings_frm, txt="SHOW ANIMAL NAME(S)", font=Formats.FONT_REGULAR.value, txt_img="label", val=False)
         self.verbose_cb, self.verbose_var = SimbaCheckbox(parent=self.settings_frm, txt="VERBOSE OUTPUT", font=Formats.FONT_REGULAR.value, txt_img="details", val=True)

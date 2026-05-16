@@ -10,7 +10,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.third_party_label_appenders.transform.utils import \
     check_valid_yolo_map
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
-                                        FolderSelect, SimBADropDown)
+                                        FolderSelect, MufasaDropDown)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.enums import Options, PackageNames
@@ -43,15 +43,15 @@ class YOLOPoseTrainPopUP(PopUpMixin):
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, entry_width=45, lbl_icon='save', tooltip_key='SAVE_DIR')
         self.weights_path = FileSelect(parent=settings_frm, fileDescription='INITIAL WEIGHT FILE (E.G., .PT):', lblwidth=35, entry_width=45, lbl_icon='file', tooltip_key='yolo_initial_weights_path')
 
-        self.epochs_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=EPOCH_OPTIONS, label="EPOCHS: ", label_width=35, dropdown_width=40, value=500, img='rotate', tooltip_key='epochs_dropdown')
-        self.batch_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=BATCH_SIZE_OPTIONS, label="BATCH SIZE: ", label_width=35, dropdown_width=40, value=16, img='weight', tooltip_key='batch_dropdown')
-        self.plots_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="PLOTS:", label_width=35, dropdown_width=40, value='TRUE', img='plot', tooltip_key='plots_dropdown')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:", label_width=35, dropdown_width=40, value='TRUE', img='verbose', tooltip_key='verbose_dropdown')
-        self.workers_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=CORE_CNT_OPTIONS, label="CPU WORKERS:", label_width=35, dropdown_width=40, value=int(max(CORE_CNT_OPTIONS)/2), img='cpu_small', tooltip_key='workers_dropdown')
-        self.format_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=FORMAT_OPTIONS, label="FORMAT:", label_width=35, dropdown_width=40, value='None', img='file_type', tooltip_key='format_dropdown')
-        self.img_size_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=IMG_SIZE_OPTIONS, label="IMAGE SIZE:", label_width=35, dropdown_width=40, value=640, img='resize', tooltip_key='img_size_dropdown')
-        self.patience_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=PATIENCE_OPTIONS, label="PATIENCE:", label_width=35, dropdown_width=40, value=100, img='timer', tooltip_key='patience_dropdown')
-        self.devices_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=devices, label="DEVICE:", label_width=35, dropdown_width=40, value=devices[1], img='gpu_3', tooltip_key='devices_dropdown')
+        self.epochs_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=EPOCH_OPTIONS, label="EPOCHS: ", label_width=35, dropdown_width=40, value=500, img='rotate', tooltip_key='epochs_dropdown')
+        self.batch_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=BATCH_SIZE_OPTIONS, label="BATCH SIZE: ", label_width=35, dropdown_width=40, value=16, img='weight', tooltip_key='batch_dropdown')
+        self.plots_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="PLOTS:", label_width=35, dropdown_width=40, value='TRUE', img='plot', tooltip_key='plots_dropdown')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:", label_width=35, dropdown_width=40, value='TRUE', img='verbose', tooltip_key='verbose_dropdown')
+        self.workers_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=CORE_CNT_OPTIONS, label="CPU WORKERS:", label_width=35, dropdown_width=40, value=int(max(CORE_CNT_OPTIONS)/2), img='cpu_small', tooltip_key='workers_dropdown')
+        self.format_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=FORMAT_OPTIONS, label="FORMAT:", label_width=35, dropdown_width=40, value='None', img='file_type', tooltip_key='format_dropdown')
+        self.img_size_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=IMG_SIZE_OPTIONS, label="IMAGE SIZE:", label_width=35, dropdown_width=40, value=640, img='resize', tooltip_key='img_size_dropdown')
+        self.patience_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=PATIENCE_OPTIONS, label="PATIENCE:", label_width=35, dropdown_width=40, value=100, img='timer', tooltip_key='patience_dropdown')
+        self.devices_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=devices, label="DEVICE:", label_width=35, dropdown_width=40, value=devices[1], img='gpu_3', tooltip_key='devices_dropdown')
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.yolo_map_path.grid(row=0, column=0, sticky=NW)

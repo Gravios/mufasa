@@ -120,7 +120,7 @@ def form_validator_is_numeric(inStr, acttyp):
 
 class DropDownMenu(Frame):
     """
-    Legacy, use :func:`mufasa.ui.tkinter_functions.SimBADropDown`.
+    Legacy, use :func:`mufasa.ui.tkinter_functions.MufasaDropDown`.
     """
     def __init__(self,
                  parent=None,
@@ -157,7 +157,7 @@ class DropDownMenu(Frame):
         self.popupMenu.configure(state="disable")
 
 
-class SimBAScaleBar(Frame):
+class MufasaScaleBar(Frame):
     def __init__(self,
                  parent: Union[Frame, Canvas, LabelFrame, Toplevel, Tk],
                  label: Optional[str] = None,
@@ -756,7 +756,7 @@ def get_menu_icons():
 
 
 
-class SimBASeperator(Frame):
+class MufasaSeparator(Frame):
 
     def __init__(self,
                  parent: Union[Frame, Canvas, LabelFrame, Toplevel, Tk],
@@ -787,7 +787,7 @@ class SimBASeperator(Frame):
             seperator.pack(fill="y", expand=True)
 
 
-class SimBADropDown(Frame):
+class MufasaDropDown(Frame):
     """
     Create a dropdown menu widget with optional searchable functionality.
 
@@ -811,7 +811,7 @@ class SimBADropDown(Frame):
     :param tooltip_key (str, optional): Key for tooltip lookup in TOOLTIPS dictionary. For dictionary, see `mufasa.assets.lookups.tooptips.json`. Default: None.
 
     :example:
-    >>> dropdown = SimBADropDown(parent=parent_frm, dropdown_options=['Option 1', 'Option 2', 'Option 3'], label='Select option:', searchable=True)
+    >>> dropdown = MufasaDropDown(parent=parent_frm, dropdown_options=['Option 1', 'Option 2', 'Option 3'], label='Select option:', searchable=True)
     >>> selected = dropdown.get_value()
     """
     def __init__(self,
@@ -945,7 +945,7 @@ class SimBADropDown(Frame):
 class DropDownMenu(Frame):
 
     """
-    Legacy, use :func:`mufasa.ui.tkinter_functions.SimBADropDown`.
+    Legacy, use :func:`mufasa.ui.tkinter_functions.MufasaDropDown`.
     """
     def __init__(self,
                  parent=None,
@@ -984,7 +984,7 @@ class FileSelect(Frame):
                  lblwidth: Optional[int] = None,
                  file_types=None,
                  bg_clr: Optional[str] = 'white',
-                 dropdown: Union[DropDownMenu, SimBADropDown] = None,
+                 dropdown: Union[DropDownMenu, MufasaDropDown] = None,
                  entry_width: Optional[int] = 20,
                  status: Optional[str] = None,
                  lbl_icon: Optional[str] = None,
@@ -1110,3 +1110,11 @@ def SimBARadioButton(parent: Union[Frame, Canvas, LabelFrame, Toplevel],
         CreateToolTip(widget=btn, text=tooltip_txt)
 
     return btn
+
+# Patch 122bn: backward-compat aliases for the renamed UI widget
+# classes. The canonical names are MufasaDropDown / MufasaScaleBar /
+# MufasaSeparator. External callers importing the old SimBA-prefixed
+# names — or the misspelled SimBASeperator — continue to work.
+SimBADropDown = MufasaDropDown
+SimBAScaleBar = MufasaScaleBar
+SimBASeperator = MufasaSeparator  # preserve old typo for back-compat

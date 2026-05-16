@@ -9,7 +9,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.roi_tools.ROI_feature_analyzer import ROIFeatureCreator
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, DropDownMenu,
-                                        SimbaButton, SimBADropDown)
+                                        SimbaButton, MufasaDropDown)
 from mufasa.utils.enums import Formats, Keys, Links
 from mufasa.utils.warnings import ROIWarning
 
@@ -22,7 +22,7 @@ class AppendROIFeaturesByAnimalPopUp(ConfigReader, PopUpMixin):
         PopUpMixin.__init__(self, title="APPEND ROI FEATURES: BY ANIMALS", size=(400, 600), icon='shapes_small')
         self.animal_cnt_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT NUMBER OF ANIMALS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.ROI_FEATURES.value)
 
-        self.animal_cnt_dropdown = SimBADropDown(parent=self.animal_cnt_frm, label="# of animals", dropdown_options=list(range(1, self.animal_cnt + 1)), label_width=30, dropdown_width=30, value=1, img='mouse_head')
+        self.animal_cnt_dropdown = MufasaDropDown(parent=self.animal_cnt_frm, label="# of animals", dropdown_options=list(range(1, self.animal_cnt + 1)), label_width=30, dropdown_width=30, value=1, img='mouse_head')
         self.animal_cnt_confirm_btn = SimbaButton(parent=self.animal_cnt_frm, txt='Confirm', img='tick', cmd=self.create_settings_frm)
 
         self.animal_cnt_frm.grid(row=0, column=0, sticky=NW)

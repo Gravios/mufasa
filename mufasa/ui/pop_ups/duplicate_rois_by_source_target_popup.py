@@ -12,7 +12,7 @@ from mufasa.roi_tools.roi_utils import (change_roi_dict_video_name,
                                        get_roi_df_from_dict)
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         SimbaButton, SimbaCheckbox,
-                                        SimBADropDown, SimBALabel,
+                                        MufasaDropDown, SimBALabel,
                                         TwoOptionQuestionPopUp)
 from mufasa.utils.checks import check_file_exist_and_readable
 from mufasa.utils.enums import Formats, Keys, Links, TkBinds
@@ -54,7 +54,7 @@ class DuplicateROIsBySourceTarget(ConfigReader, PopUpMixin):
 
     def _create_source_frm(self):
         self.source_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header=f"SELECT ROI SOURCE VIDEO", icon_name='video', icon_link=Links.ROI.value, pady=10)
-        self.source_dropdown = SimBADropDown(parent=self.source_frm, dropdown_options=list(self.video_names_w_rois), label='ROI SOURCE VIDEO: ', label_width=35, dropdown_width=30, value=list(self.video_names_w_rois)[0], searchable=True, command= lambda x: self._get_targets(source_value=x))
+        self.source_dropdown = MufasaDropDown(parent=self.source_frm, dropdown_options=list(self.video_names_w_rois), label='ROI SOURCE VIDEO: ', label_width=35, dropdown_width=30, value=list(self.video_names_w_rois)[0], searchable=True, command= lambda x: self._get_targets(source_value=x))
         self.run_btn = SimbaButton(parent=self.source_frm, txt='RUN', img='rocket', txt_clr='blue', font=Formats.FONT_LARGE.value, hover_font=Formats.FONT_LARGE_BOLD.value, cmd=self._run)
         self.source_frm.grid(row=0, column=0, sticky='NW')
         self.source_dropdown.grid(row=0, column=0, sticky='NW')

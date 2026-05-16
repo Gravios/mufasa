@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image, ImageTk
 
 from mufasa.mixins.image_mixin import ImageMixin
-from mufasa.ui.tkinter_functions import SimbaButton, SimBALabel, SimBAScaleBar
+from mufasa.ui.tkinter_functions import SimbaButton, SimBALabel, MufasaScaleBar
 from mufasa.utils.checks import (check_file_exist_and_readable, check_int,
                                 check_valid_boolean)
 from mufasa.utils.enums import Formats, TkBinds
@@ -345,7 +345,7 @@ class TimelapseSlider():
         self.slider_frame.columnconfigure(index=4, weight=0)
         self.slider_frame.columnconfigure(index=5, weight=1)
     
-        self.start_scale = SimBAScaleBar(parent=self.slider_frame, label="START TIME:", from_=0, to=self.video_meta['video_length_s'], orient=HORIZONTAL, length=400, resolution=1, value=0, showvalue=False, label_width=15, sliderrelief='raised', troughcolor='white', activebackground='green', lbl_font=Formats.FONT_LARGE_BOLD.value)
+        self.start_scale = MufasaScaleBar(parent=self.slider_frame, label="START TIME:", from_=0, to=self.video_meta['video_length_s'], orient=HORIZONTAL, length=400, resolution=1, value=0, showvalue=False, label_width=15, sliderrelief='raised', troughcolor='white', activebackground='green', lbl_font=Formats.FONT_LARGE_BOLD.value)
         self.start_scale.grid(row=0, column=1, padx=5)
         self.start_scale.scale.config(command=lambda x: self._update_selection(slider_type='start'))
     
@@ -362,7 +362,7 @@ class TimelapseSlider():
         self.start_frame_right_btn = SimbaButton(parent=self.slider_frame, txt=start_btn_txt_right, tooltip_txt=start_btn_tooltip_right, cmd=self._move_start_frame, cmd_kwargs={'direction': 1}, font=Formats.FONT_REGULAR_BOLD.value, img='right_arrow_green')
         self.start_frame_right_btn.grid(row=0, column=4, padx=2)
 
-        self.end_scale = SimBAScaleBar(parent=self.slider_frame, label="END TIME:", from_=0, to=int(self.video_meta['video_length_s']), orient=HORIZONTAL, length=400, resolution=1, value=int(self.video_meta['video_length_s']), showvalue=False, label_width=15, sliderrelief='raised', troughcolor='white', activebackground='red',  lbl_font=Formats.FONT_LARGE_BOLD.value)
+        self.end_scale = MufasaScaleBar(parent=self.slider_frame, label="END TIME:", from_=0, to=int(self.video_meta['video_length_s']), orient=HORIZONTAL, length=400, resolution=1, value=int(self.video_meta['video_length_s']), showvalue=False, label_width=15, sliderrelief='raised', troughcolor='white', activebackground='red',  lbl_font=Formats.FONT_LARGE_BOLD.value)
         self.end_scale.grid(row=1, column=1, padx=5)
         self.end_scale.scale.config(command=lambda x: self._update_selection(slider_type='end'))
 

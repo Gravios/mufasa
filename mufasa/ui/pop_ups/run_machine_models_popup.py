@@ -9,7 +9,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.model.inference_batch import InferenceBatch
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         FileSelect, SimbaButton, SimBALabel,
-                                        SimBASeperator)
+                                        MufasaSeparator)
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_int)
 from mufasa.utils.enums import ConfigKey, Dtypes, Formats, Keys, Links
@@ -42,7 +42,7 @@ class RunMachineModelsPopUp(PopUpMixin, ConfigReader):
         threshold_header.grid(row=0, column=2, sticky=NW, padx=padx)
         min_bout_header.grid(row=0, column=3, sticky=NW, padx=padx)
 
-        seperator = SimBASeperator(parent=self.clf_table_frm, color='grey', orient='horizontal', borderwidth=1)
+        seperator = MufasaSeparator(parent=self.clf_table_frm, color='grey', orient='horizontal', borderwidth=1)
         seperator.grid(row=1, column=0, columnspan=4, rowspan=1, sticky="ew", pady=(0, 10))
 
         self.clf_data = {}

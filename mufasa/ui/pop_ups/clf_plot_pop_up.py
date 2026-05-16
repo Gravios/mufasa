@@ -12,7 +12,7 @@ from mufasa.plotting.plot_clf_results import PlotSklearnResultsSingleCore
 from mufasa.plotting.plot_clf_results_mp import PlotSklearnResultsMultiProcess
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         FileSelect, SimbaButton, SimbaCheckbox,
-                                        SimBADropDown, SimBALabel)
+                                        MufasaDropDown, SimBALabel)
 from mufasa.utils.checks import (check_float,
                                 check_if_string_value_is_valid_video_timestamp,
                                 check_nvidea_gpu_available,
@@ -63,14 +63,14 @@ class SklearnVisualizationPopUp(PopUpMixin, ConfigReader):
         self.bp_threshold_entry.grid(row=1, column=0, sticky=NW)
 
         self.style_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="TEXT SETTINGS", icon_name='style', icon_link=Links.SKLEARN_PLOTS.value, padx=5, pady=5, relief='solid')
-        self.text_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=TEXT_SIZE_OPTIONS, label='TEXT SIZE: ', label_width=40, dropdown_width=15, value='AUTO', img='text', tooltip_key='CLF_PLOT_TEXT_SIZE')
-        self.text_spacing_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=TEXT_SIZE_OPTIONS, label='TEXT SPACING: ', label_width=40, dropdown_width=15, value='AUTO', img='text_spacing', tooltip_key='CLF_PLOT_TEXT_SPACING')
-        self.text_thickness_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=TEXT_SIZE_OPTIONS, label='TEXT THICKNESS: ', label_width=40, dropdown_width=15, value='AUTO', img='bold', tooltip_key='CLF_PLOT_TEXT_THICKNESS')
-        self.circle_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=TEXT_SIZE_OPTIONS, label='CIRCLE SIZE: ', label_width=40, dropdown_width=15, value='AUTO', img='circle_small', tooltip_key='CLF_PLOT_CIRCLE_SIZE')
-        self.text_opacity_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=OPACITY_OPTIONS, label='TEXT OPACITY: ', label_width=40, dropdown_width=15, value=0.8, img='opacity', tooltip_key='CLF_PLOT_TEXT_OPACITY')
-        self.text_clr_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(self.clr_dict.keys()), label='TEXT COLOR: ', label_width=40, dropdown_width=15, value='White', img='text_color', tooltip_key='CLF_PLOT_TEXT_COLOR')
-        self.bg_clr_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(self.clr_dict.keys()), label='TEXT BACKGROUND COLOR: ', label_width=40, dropdown_width=15, value='Black', img='fill', tooltip_key='CLF_PLOT_BG_COLOR')
-        self.tracking_clr_palette_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=pose_palettes, label='TRACKING COLOR PALETTE: ', label_width=40, dropdown_width=15, value='Set1', img='color_wheel', tooltip_key='CLF_PLOT_TRACKING_PALETTE')
+        self.text_size_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=TEXT_SIZE_OPTIONS, label='TEXT SIZE: ', label_width=40, dropdown_width=15, value='AUTO', img='text', tooltip_key='CLF_PLOT_TEXT_SIZE')
+        self.text_spacing_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=TEXT_SIZE_OPTIONS, label='TEXT SPACING: ', label_width=40, dropdown_width=15, value='AUTO', img='text_spacing', tooltip_key='CLF_PLOT_TEXT_SPACING')
+        self.text_thickness_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=TEXT_SIZE_OPTIONS, label='TEXT THICKNESS: ', label_width=40, dropdown_width=15, value='AUTO', img='bold', tooltip_key='CLF_PLOT_TEXT_THICKNESS')
+        self.circle_size_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=TEXT_SIZE_OPTIONS, label='CIRCLE SIZE: ', label_width=40, dropdown_width=15, value='AUTO', img='circle_small', tooltip_key='CLF_PLOT_CIRCLE_SIZE')
+        self.text_opacity_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=OPACITY_OPTIONS, label='TEXT OPACITY: ', label_width=40, dropdown_width=15, value=0.8, img='opacity', tooltip_key='CLF_PLOT_TEXT_OPACITY')
+        self.text_clr_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=list(self.clr_dict.keys()), label='TEXT COLOR: ', label_width=40, dropdown_width=15, value='White', img='text_color', tooltip_key='CLF_PLOT_TEXT_COLOR')
+        self.bg_clr_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=list(self.clr_dict.keys()), label='TEXT BACKGROUND COLOR: ', label_width=40, dropdown_width=15, value='Black', img='fill', tooltip_key='CLF_PLOT_BG_COLOR')
+        self.tracking_clr_palette_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=pose_palettes, label='TRACKING COLOR PALETTE: ', label_width=40, dropdown_width=15, value='Set1', img='color_wheel', tooltip_key='CLF_PLOT_TRACKING_PALETTE')
 
         self.style_settings_frm.grid(row=1, column=0, sticky=NW)
         self.text_size_dropdown.grid(row=0, column=0, sticky=NW)
@@ -93,11 +93,11 @@ class SklearnVisualizationPopUp(PopUpMixin, ConfigReader):
         self.end_eb.grid(row=1, column=1, sticky=NW)
 
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="VISUALIZATION SETTINGS",  icon_name='eye', icon_link=Links.SKLEARN_PLOTS.value, padx=5,  pady=5, relief='solid')
-        self.multiprocess_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(2, self.cpu_cnt+1)), label='CPU CORES: ', label_width=40, dropdown_width=30, value=int(self.cpu_cnt/2), img='cpu_small', tooltip_key='CLF_PLOT_CPU_CORES')
-        self.gpu_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label='USE GPU: ', label_width=40, dropdown_width=30, value='FALSE', state=DISABLED if not gpu_available else NORMAL, img='gpu_3', tooltip_key='CLF_PLOT_USE_GPU')
-        self.gantt_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(GANTT_OPTIONS.keys()), label='SHOW GANTT PLOT:', label_width=40, dropdown_width=30, value=list(GANTT_OPTIONS.keys())[0], img='gantt_small', tooltip_key='CLF_PLOT_GANTT')
-        self.bbox_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['FALSE', Options.AXIS_ALIGNED.value, Options.ANIMAL_ALIGNED.value], label='SHOW ANIMAL BOUNDING BOXES:', label_width=40, dropdown_width=30, value='FALSE', img='rectangle', tooltip_key='CLF_PLOT_SHOW_BBOX')
-        self.timer_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['FALSE', Options.SECONDS.value, Options.HHMMSSSSSS.value], label='SHOW CLASSIFICATION TIMERS:', label_width=40, dropdown_width=30, value=Options.SECONDS.value, img='timer', tooltip_key='CLF_PLOT_INCLUDE_TIMERS')
+        self.multiprocess_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(2, self.cpu_cnt+1)), label='CPU CORES: ', label_width=40, dropdown_width=30, value=int(self.cpu_cnt/2), img='cpu_small', tooltip_key='CLF_PLOT_CPU_CORES')
+        self.gpu_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label='USE GPU: ', label_width=40, dropdown_width=30, value='FALSE', state=DISABLED if not gpu_available else NORMAL, img='gpu_3', tooltip_key='CLF_PLOT_USE_GPU')
+        self.gantt_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(GANTT_OPTIONS.keys()), label='SHOW GANTT PLOT:', label_width=40, dropdown_width=30, value=list(GANTT_OPTIONS.keys())[0], img='gantt_small', tooltip_key='CLF_PLOT_GANTT')
+        self.bbox_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['FALSE', Options.AXIS_ALIGNED.value, Options.ANIMAL_ALIGNED.value], label='SHOW ANIMAL BOUNDING BOXES:', label_width=40, dropdown_width=30, value='FALSE', img='rectangle', tooltip_key='CLF_PLOT_SHOW_BBOX')
+        self.timer_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['FALSE', Options.SECONDS.value, Options.HHMMSSSSSS.value], label='SHOW CLASSIFICATION TIMERS:', label_width=40, dropdown_width=30, value=Options.SECONDS.value, img='timer', tooltip_key='CLF_PLOT_INCLUDE_TIMERS')
 
         self.create_videos_cb, self.create_videos_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE VIDEO', font=Formats.FONT_REGULAR.value, txt_img='video', val=True, tooltip_key='CLF_PLOT_CREATE_VIDEO')
         self.create_frames_cb, self.create_frames_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE FRAMES', font=Formats.FONT_REGULAR.value, txt_img='frames', val=False, tooltip_key='CLF_PLOT_CREATE_FRAMES')
@@ -122,7 +122,7 @@ class SklearnVisualizationPopUp(PopUpMixin, ConfigReader):
         self.run_single_video_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SINGLE VIDEO",  icon_name='video', icon_link=Links.SKLEARN_PLOTS.value, padx=5,  pady=5, relief='solid')
         self.run_single_video_btn = SimbaButton(parent=self.run_single_video_frm, txt="CREATE SINGLE VIDEO", img='rocket', txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=self.__run, cmd_kwargs={'multiple': lambda: False})
 
-        self.single_video_dropdown = SimBADropDown(parent=self.run_single_video_frm, dropdown_options=self.video_lst, label='VIDEO: ', label_width=12, value=self.video_lst[0], dropdown_width=self.max_len, tooltip_key='CLF_PLOT_SINGLE_VIDEO')
+        self.single_video_dropdown = MufasaDropDown(parent=self.run_single_video_frm, dropdown_options=self.video_lst, label='VIDEO: ', label_width=12, value=self.video_lst[0], dropdown_width=self.max_len, tooltip_key='CLF_PLOT_SINGLE_VIDEO')
         self.select_video_file_select = FileSelect(self.run_single_video_frm, "", lblwidth="1", file_types=[("VIDEO FILE", Options.ALL_VIDEO_FORMAT_STR_OPTIONS.value)], dropdown=self.single_video_dropdown, initialdir=self.video_dir, initial_path=self.video_lst[0], tooltip_key='CLF_PLOT_VIDEO_PATH')
 
         self.run_multiple_videos = CreateLabelFrameWithIcon(parent=self.main_frm, header="MULTIPLE VIDEOS", icon_name='stack', icon_link=Links.SKLEARN_PLOTS.value, padx=5, pady=5, relief='solid')

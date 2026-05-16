@@ -14,7 +14,7 @@ from mufasa.plotting.distance_plotter import DistancePlotterSingleCore
 from mufasa.plotting.distance_plotter_mp import DistancePlotterMultiCore
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, DropDownMenu,
                                         Entry_Box, SimbaButton, SimbaCheckbox,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_filepath_list_is_empty, check_int
 from mufasa.utils.enums import Formats, Keys, Links
 from mufasa.utils.errors import DuplicationError
@@ -43,14 +43,14 @@ class DistancePlotterPopUp(PopUpMixin, ConfigReader):
         PopUpMixin.__init__(self, title="CREATE DISTANCE PLOTS", icon='distance')
 
         self.style_settings_frm = CreateLabelFrameWithIcon( parent=self.main_frm, header="STYLE SETTINGS", icon_name='style', icon_link=Links.DISTANCE_PLOTS.value,)
-        self.resolution_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='RESOLUTION: ', label_width=25, dropdown_width=20, value=self.resolutions[1], img='monitor')
-        self.font_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=font_size_options, label='FONT SIZE: ', label_width=25, dropdown_width=20, value=8, img='font_size')
-        self.line_width_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=font_size_options, label='LINE WIDTH: ', label_width=25, dropdown_width=20, value=6, img='line')
-        self.opacity_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=opacity_options, label='LINE OPACITY: ', label_width=25, dropdown_width=20, value=0.5, img='opacity')
-        self.max_y_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.max_y_lst, label='MAX Y-AXIS: ', label_width=25, dropdown_width=20, value=AUTO, img='y')
+        self.resolution_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='RESOLUTION: ', label_width=25, dropdown_width=20, value=self.resolutions[1], img='monitor')
+        self.font_size_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=font_size_options, label='FONT SIZE: ', label_width=25, dropdown_width=20, value=8, img='font_size')
+        self.line_width_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=font_size_options, label='LINE WIDTH: ', label_width=25, dropdown_width=20, value=6, img='line')
+        self.opacity_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=opacity_options, label='LINE OPACITY: ', label_width=25, dropdown_width=20, value=0.5, img='opacity')
+        self.max_y_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.max_y_lst, label='MAX Y-AXIS: ', label_width=25, dropdown_width=20, value=AUTO, img='y')
 
         self.distances_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CHOOSE DISTANCES", icon_name='distance', icon_link=Links.DISTANCE_PLOTS.value)
-        self.number_of_distances_dropdown = SimBADropDown(parent=self.distances_frm, dropdown_options=self.number_of_distances_options, label='# DISTANCES: ', label_width=25, dropdown_width=20, value=1, command=self.__populate_distances_menu, img='abacus')
+        self.number_of_distances_dropdown = MufasaDropDown(parent=self.distances_frm, dropdown_options=self.number_of_distances_options, label='# DISTANCES: ', label_width=25, dropdown_width=20, value=1, command=self.__populate_distances_menu, img='abacus')
         self.__populate_distances_menu(1)
 
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="VISUALIZATION SETTING", icon_name='eye', icon_link=Links.DISTANCE_PLOTS.value)
@@ -60,7 +60,7 @@ class DistancePlotterPopUp(PopUpMixin, ConfigReader):
         distance_final_img_cb, self.distance_final_img_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE LAST FRAME', txt_img='finish', val=True)
         last_frame_as_svg_cb, self.last_frame_as_svg_var = SimbaCheckbox(parent=self.settings_frm, txt='LAST FRAME AS SVG', txt_img='svg', val=False, tooltip_key='LAST_FRAME_AS_SVG')
 
-        self.multiprocess_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(1, self.cpu_cnt)), label='CPU CORE COUNT: ', label_width=25, dropdown_width=20, value=int(self.cpu_cnt/2), img='cpu_small')
+        self.multiprocess_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(1, self.cpu_cnt)), label='CPU CORE COUNT: ', label_width=25, dropdown_width=20, value=int(self.cpu_cnt/2), img='cpu_small')
 
         self.run_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="RUN", icon_name='run', icon_link=Links.DISTANCE_PLOTS.value)
         self.run_single_video_frm = LabelFrame(self.run_frm, text="SINGLE VIDEO", font=Formats.FONT_HEADER.value, pady=5, padx=5, fg="black")
@@ -108,11 +108,11 @@ class DistancePlotterPopUp(PopUpMixin, ConfigReader):
 
         self.bp_1, self.bp_2, self.distance_clrs = {}, {}, {}
         for distance_cnt in range(int(self.number_of_distances_dropdown.getChoices())):
-            self.bp_1[distance_cnt] = SimBADropDown(parent=self.distances_frm, dropdown_options=self.body_parts_lst, label=f'DISTANCE {distance_cnt + 1}: ', label_width=25, dropdown_width=20, value=self.body_parts_lst[distance_cnt], img='circle_black')
+            self.bp_1[distance_cnt] = MufasaDropDown(parent=self.distances_frm, dropdown_options=self.body_parts_lst, label=f'DISTANCE {distance_cnt + 1}: ', label_width=25, dropdown_width=20, value=self.body_parts_lst[distance_cnt], img='circle_black')
             self.bp_1[distance_cnt].grid(row=distance_cnt + 1, column=0, sticky=NW)
-            self.bp_2[distance_cnt] = SimBADropDown(parent=self.distances_frm, dropdown_options=self.body_parts_lst, label='', label_width=0, dropdown_width=20, value=self.body_parts_lst[distance_cnt])
+            self.bp_2[distance_cnt] = MufasaDropDown(parent=self.distances_frm, dropdown_options=self.body_parts_lst, label='', label_width=0, dropdown_width=20, value=self.body_parts_lst[distance_cnt])
             self.bp_2[distance_cnt].grid(row=distance_cnt + 1, column=1, sticky=NW)
-            self.distance_clrs[distance_cnt] = SimBADropDown(parent=self.distances_frm, dropdown_options=list(self.colors_dict.keys()), label='', label_width=0, dropdown_width=20, value=list(self.colors_dict.keys())[distance_cnt])
+            self.distance_clrs[distance_cnt] = MufasaDropDown(parent=self.distances_frm, dropdown_options=list(self.colors_dict.keys()), label='', label_width=0, dropdown_width=20, value=list(self.colors_dict.keys())[distance_cnt])
             self.distance_clrs[distance_cnt].grid(row=distance_cnt + 1, column=3, sticky=NW)
 
     def __create_distance_plots(self, multiple_videos: bool):

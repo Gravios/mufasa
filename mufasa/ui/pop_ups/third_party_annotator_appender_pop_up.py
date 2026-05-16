@@ -10,7 +10,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.third_party_label_appenders.third_party_appender import \
     ThirdPartyLabelAppender
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.enums import Defaults, Links, Methods, Options
 from mufasa.utils.errors import NoDataError
@@ -26,7 +26,7 @@ class ThirdPartyAnnotatorAppenderPopUp(PopUpMixin, ConfigReader):
         PopUpMixin.__init__(self, title="APPEND THIRD-PARTY ANNOTATIONS", icon='draw')
         warnings_lst = Options.THIRD_PARTY_ANNOTATION_ERROR_OPTIONS.value
         app_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="THIRD-PARTY APPLICATION", icon_name='application', icon_link=Links.THIRD_PARTY_ANNOTATION_NEW.value, pady=5, padx=5, relief='solid')
-        self.app_dropdown = SimBADropDown(parent=app_frm, dropdown_options=Options.THIRD_PARTY_ANNOTATION_APPS_OPTIONS.value, label="THIRD-PARTY APPLICATION:", label_width=50, dropdown_width=30, value='BORIS')
+        self.app_dropdown = MufasaDropDown(parent=app_frm, dropdown_options=Options.THIRD_PARTY_ANNOTATION_APPS_OPTIONS.value, label="THIRD-PARTY APPLICATION:", label_width=50, dropdown_width=30, value='BORIS')
         app_frm.grid(row=0, column=0, sticky=NW, padx=10, pady=10)
         self.app_dropdown.grid(row=0, column=0, sticky=NW)
 
@@ -37,13 +37,13 @@ class ThirdPartyAnnotatorAppenderPopUp(PopUpMixin, ConfigReader):
 
         warnings_and_errors_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="WARNINGS & ERRORS", icon_name='warning', icon_link=Links.THIRD_PARTY_ANNOTATION_NEW.value, pady=5, padx=5, relief='solid')
 
-        self.invalid_data_file_format_dropdown = SimBADropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="INVALID annotations file data format", label_width=50, dropdown_width=30, value='WARNING')
-        self.additional_third_party_behavior_dropdown = SimBADropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="ADDITIONAL third-party behavior detected", label_width=50, dropdown_width=30, value='WARNING')
-        self.annot_overlap_conflict_dropdown = SimBADropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="Annotations OVERLAP conflict", label_width=50, dropdown_width=30, value='WARNING')
-        self.zero_third_party_behavior_detected_dropdown = SimBADropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="ZERO third-party video behavior annotations found", label_width=50, dropdown_width=30, value='WARNING')
-        self.annotation_pose_conflict_frm_cnt_dropdown = SimBADropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="Annotations and pose FRAME COUNT conflict", label_width=50, dropdown_width=30, value='WARNING')
-        self.annotation_event_cnt_conflict = SimBADropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="Annotations EVENT COUNT conflict", label_width=50, dropdown_width=30, value='WARNING')
-        self.data_file_not_found = SimBADropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="Annotations data file NOT FOUND", label_width=50, dropdown_width=30, value='WARNING')
+        self.invalid_data_file_format_dropdown = MufasaDropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="INVALID annotations file data format", label_width=50, dropdown_width=30, value='WARNING')
+        self.additional_third_party_behavior_dropdown = MufasaDropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="ADDITIONAL third-party behavior detected", label_width=50, dropdown_width=30, value='WARNING')
+        self.annot_overlap_conflict_dropdown = MufasaDropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="Annotations OVERLAP conflict", label_width=50, dropdown_width=30, value='WARNING')
+        self.zero_third_party_behavior_detected_dropdown = MufasaDropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="ZERO third-party video behavior annotations found", label_width=50, dropdown_width=30, value='WARNING')
+        self.annotation_pose_conflict_frm_cnt_dropdown = MufasaDropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="Annotations and pose FRAME COUNT conflict", label_width=50, dropdown_width=30, value='WARNING')
+        self.annotation_event_cnt_conflict = MufasaDropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="Annotations EVENT COUNT conflict", label_width=50, dropdown_width=30, value='WARNING')
+        self.data_file_not_found = MufasaDropDown(parent=warnings_and_errors_frm, dropdown_options=["WARNING", "ERROR"], label="Annotations data file NOT FOUND", label_width=50, dropdown_width=30, value='WARNING')
 
         warnings_and_errors_frm.grid(row=2, column=0, sticky=NW, padx=10, pady=10)
         self.invalid_data_file_format_dropdown.grid(row=0, column=0, sticky=NW)

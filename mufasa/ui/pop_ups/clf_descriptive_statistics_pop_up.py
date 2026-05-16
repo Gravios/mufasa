@@ -8,7 +8,7 @@ from mufasa.data_processors.agg_clf_counter_mp import \
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, SimbaButton,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.enums import Formats, Links
 from mufasa.utils.errors import (NoChoosenClassifierError,
                                 NoChoosenMeasurementError, NoDataError)
@@ -68,7 +68,7 @@ class ClfDescriptiveStatsPopUp(PopUpMixin, ConfigReader):
         transpose_output_cb.grid(row=0, column=0, sticky=NW)
 
         core_cnt_option_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CHOOSE CPU CORE COUNT", icon_name='cpu_small', icon_link=Links.ANALYZE_ML_RESULTS.value, relief='solid', tooltip_key='CPU_ROI_DESCRIPTIVE_ANALYSIS')
-        self.core_cnt_dropdown = SimBADropDown(parent=core_cnt_option_frm, dropdown_options=list(range(1, find_core_cnt()[0]+1)), label='CPU CORE COUNT', label_width=30, dropdown_width=10, value=1, tooltip_key='CPU_ROI_DESCRIPTIVE_ANALYSIS')
+        self.core_cnt_dropdown = MufasaDropDown(parent=core_cnt_option_frm, dropdown_options=list(range(1, find_core_cnt()[0]+1)), label='CPU CORE COUNT', label_width=30, dropdown_width=10, value=1, tooltip_key='CPU_ROI_DESCRIPTIVE_ANALYSIS')
 
         core_cnt_option_frm.grid(row=5, column=0, sticky=NW, padx=5, pady=5)
         self.core_cnt_dropdown.grid(row=0, column=0, sticky=NW)

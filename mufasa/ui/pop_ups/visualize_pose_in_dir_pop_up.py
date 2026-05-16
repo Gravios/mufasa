@@ -8,7 +8,7 @@ from mufasa.plotting.pose_plotter import PosePlotter
 from mufasa.plotting.pose_plotter_mp import PosePlotterMultiProcess
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
                                         FolderSelect, SimbaButton,
-                                        SimBADropDown, SimBALabel)
+                                        MufasaDropDown, SimBALabel)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists, check_int)
 from mufasa.utils.enums import Formats, Keys, Links, Options
@@ -42,14 +42,14 @@ class VisualizePoseInFolderPopUp(PopUpMixin):
         self.center_mass_options = list(self.color_dict.keys())
         self.center_mass_options.insert(0, 'FALSE')
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
-        self.keypoint_size_dropdown = SimBADropDown(parent=self.settings_frm, label='KEY-POINT SIZES', label_width=40, dropdown_width=20, value=AUTO, command=None, dropdown_options=KEYPOINT_SIZES, img='circle_small', tooltip_key='POSE_VIZ_KEYPOINT_SIZE')
-        self.video_slice_dropdown = SimBADropDown(parent=self.settings_frm, label="VIDEO SECTION (SECONDS):", label_width=40, dropdown_width=20, value=ENTIRE_VIDEOS, command=None, dropdown_options=VIDEO_LENGTHS, img='timer', tooltip_key='POSE_VIZ_VIDEO_SECTION')
-        self.cpu_cnt_dropdown = SimBADropDown(parent=self.settings_frm, label="CPU COUNT:", label_width=40, dropdown_width=20, value=find_core_cnt()[1], command=None, dropdown_options=list(range(2, find_core_cnt()[0])), img='cpu_small', tooltip_key='CORE_COUNT')
-        self.gpu_dropdown = SimBADropDown(parent=self.settings_frm, label="USE GPU:", label_width=40, dropdown_width=20, value='FALSE', command=None, dropdown_options=['TRUE', 'FALSE'], img='gpu_3', tooltip_key='USE_GPU')
-        self.include_bbox_dropdown = SimBADropDown(parent=self.settings_frm, label="INCLUDE BOUNDING BOX:", label_width=40, dropdown_width=20, value='FALSE', command=None, dropdown_options=['FALSE', 'AXIS-ALIGNED', 'ANIMAL-ALIGNED'], img='rectangle_small', tooltip_key='SHOW_ANIMAL_BBOX')
-        self.center_mass_dropdown = SimBADropDown(parent=self.settings_frm, label="SHOW CENTER OF MASS:", label_width=40, dropdown_width=20, value='FALSE', command=None, dropdown_options=self.center_mass_options, img='bullseye', tooltip_key='POSE_VIZ_CENTER_OF_MASS')
+        self.keypoint_size_dropdown = MufasaDropDown(parent=self.settings_frm, label='KEY-POINT SIZES', label_width=40, dropdown_width=20, value=AUTO, command=None, dropdown_options=KEYPOINT_SIZES, img='circle_small', tooltip_key='POSE_VIZ_KEYPOINT_SIZE')
+        self.video_slice_dropdown = MufasaDropDown(parent=self.settings_frm, label="VIDEO SECTION (SECONDS):", label_width=40, dropdown_width=20, value=ENTIRE_VIDEOS, command=None, dropdown_options=VIDEO_LENGTHS, img='timer', tooltip_key='POSE_VIZ_VIDEO_SECTION')
+        self.cpu_cnt_dropdown = MufasaDropDown(parent=self.settings_frm, label="CPU COUNT:", label_width=40, dropdown_width=20, value=find_core_cnt()[1], command=None, dropdown_options=list(range(2, find_core_cnt()[0])), img='cpu_small', tooltip_key='CORE_COUNT')
+        self.gpu_dropdown = MufasaDropDown(parent=self.settings_frm, label="USE GPU:", label_width=40, dropdown_width=20, value='FALSE', command=None, dropdown_options=['TRUE', 'FALSE'], img='gpu_3', tooltip_key='USE_GPU')
+        self.include_bbox_dropdown = MufasaDropDown(parent=self.settings_frm, label="INCLUDE BOUNDING BOX:", label_width=40, dropdown_width=20, value='FALSE', command=None, dropdown_options=['FALSE', 'AXIS-ALIGNED', 'ANIMAL-ALIGNED'], img='rectangle_small', tooltip_key='SHOW_ANIMAL_BBOX')
+        self.center_mass_dropdown = MufasaDropDown(parent=self.settings_frm, label="SHOW CENTER OF MASS:", label_width=40, dropdown_width=20, value='FALSE', command=None, dropdown_options=self.center_mass_options, img='bullseye', tooltip_key='POSE_VIZ_CENTER_OF_MASS')
         self.save_dir = FolderSelect(self.settings_frm, "SAVE DIRECTORY: ", title="Select a data folder", lblwidth=40, initialdir=get_desktop_path(), lbl_icon='folder', tooltip_key='SAVE_DIR')
-        self.number_of_animals_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(1, 17)), label="NUMBER OF ANIMALS:", label_width=40, dropdown_width=20, command=self.__create_table, value=1, img='abacus_2', tooltip_key='POSE_VIZ_NUMBER_OF_ANIMALS')
+        self.number_of_animals_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(1, 17)), label="NUMBER OF ANIMALS:", label_width=40, dropdown_width=20, command=self.__create_table, value=1, img='abacus_2', tooltip_key='POSE_VIZ_NUMBER_OF_ANIMALS')
         self.__create_table(animal_cnt=1)
         self.settings_frm.grid(row=0, column=0, sticky=NW)
         self.keypoint_size_dropdown.grid(row=0, column=0, sticky=NW)
@@ -71,7 +71,7 @@ class VisualizePoseInFolderPopUp(PopUpMixin):
         self.animal_clr_dropdowns = {}
         self.color_keypoint_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="ANIMAL COLORS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.VIDEO_TOOLS.value)
         for cnt, title in enumerate(dropdown_color_titles):
-            self.animal_clr_dropdowns[title] = SimBADropDown(parent=self.color_keypoint_frm, dropdown_options=COLOR_OPTIONS, label=title, label_width=40, dropdown_width=20, value=COLOR_OPTIONS[0], img='color_wheel', tooltip_key='POSE_VIZ_ANIMAL_COLOR')
+            self.animal_clr_dropdowns[title] = MufasaDropDown(parent=self.color_keypoint_frm, dropdown_options=COLOR_OPTIONS, label=title, label_width=40, dropdown_width=20, value=COLOR_OPTIONS[0], img='color_wheel', tooltip_key='POSE_VIZ_ANIMAL_COLOR')
             self.animal_clr_dropdowns[title].grid(row=cnt, column=0, sticky=NW)
         self.color_keypoint_frm.grid(row=1, column=0, sticky=NW)
 

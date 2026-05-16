@@ -8,7 +8,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.third_party_label_appenders.transform.labelme_to_df import \
     LabelMe2DataFrame
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     str_2_bool)
@@ -26,12 +26,12 @@ class Labelme2DataFramePopUp(PopUpMixin):
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings')
         self.labelme_dir = FolderSelect(settings_frm, folderDescription="LABELME DIRECTORY (JSONS):", lblwidth=35, entry_width=40, initialdir=r"C:\troubleshooting\coco_data\labels\test_2", lbl_icon='json')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY :", lblwidth=35, entry_width=40, initialdir=r"C:\troubleshooting\RAT_NOR", lbl_icon='folder')
-        self.grey_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
-        self.clahe_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
-        self.pad_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="PAD: ", label_width=35, dropdown_width=40, value='FALSE', img='size_black')
-        self.normalize_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="NORMALIZE: ", label_width=35, dropdown_width=40, value='FALSE', img='equation_small')
-        self.size_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['MIN', 'MAX', 'NONE'], label="SIZE: ", label_width=35, dropdown_width=40, value='MAX', img='resize')
+        self.grey_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
+        self.clahe_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
+        self.pad_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="PAD: ", label_width=35, dropdown_width=40, value='FALSE', img='size_black')
+        self.normalize_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="NORMALIZE: ", label_width=35, dropdown_width=40, value='FALSE', img='equation_small')
+        self.size_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['MIN', 'MAX', 'NONE'], label="SIZE: ", label_width=35, dropdown_width=40, value='MAX', img='resize')
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.labelme_dir .grid(row=0, column=0, sticky=NW)

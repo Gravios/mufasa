@@ -7,7 +7,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.roi_tools.roi_time_bins_analyzer import ROITimebinAnalyzer
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         SimbaButton, SimbaCheckbox,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_float
 from mufasa.utils.enums import Formats, Keys, Links
 from mufasa.utils.errors import InvalidInputError, NoROIDataError
@@ -31,7 +31,7 @@ class ROIAnalysisTimeBinsPopUp(ConfigReader, PopUpMixin):
         PopUpMixin.__init__(self, title="ROI AGGREGATE STATISTICS ANALYSIS BY TIME-BIN", icon='shapes_small')
         self.config_path = config_path
         self.animal_cnt_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT NUMBER OF ANIMAL(S)", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.ROI_DATA_ANALYSIS.value)
-        self.animal_cnt_dropdown = SimBADropDown(parent=self.animal_cnt_frm, dropdown_options=list(range(1, self.animal_cnt + 1)), label="# OF ANIMALS", label_width=30, dropdown_width=10, value=1, img='abacus', tooltip_key='ROI_TRACKING_NUMBER_OF_ANIMALS')
+        self.animal_cnt_dropdown = MufasaDropDown(parent=self.animal_cnt_frm, dropdown_options=list(range(1, self.animal_cnt + 1)), label="# OF ANIMALS", label_width=30, dropdown_width=10, value=1, img='abacus', tooltip_key='ROI_TRACKING_NUMBER_OF_ANIMALS')
         self.animal_cnt_confirm_btn = SimbaButton(parent=self.animal_cnt_frm, txt="CONFIRM", img='tick', txt_clr="blue", font=Formats.FONT_REGULAR.value, cmd=self._get_settings_frm)
         self.animal_cnt_frm.grid(row=0, column=0, sticky=NW)
         self.animal_cnt_dropdown.grid(row=0, column=0, sticky=NW)
@@ -62,7 +62,7 @@ class ROIAnalysisTimeBinsPopUp(ConfigReader, PopUpMixin):
         self.body_part_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT BODY-PART(S)", icon_name='pose')
         self.body_part_frm.grid(row=self.frame_children(frame=self.main_frm), sticky=NW)
         for bp_cnt in range(int(self.animal_cnt_dropdown.getChoices())):
-            self.body_parts_dropdowns[bp_cnt] = SimBADropDown(parent=self.body_part_frm, dropdown_options=self.body_parts_lst, label=f"BODY-PART {bp_cnt + 1}:", label_width=30, dropdown_width=self.max_bp_len+5, value=self.body_parts_lst[bp_cnt],img='circle_black', tooltip_key='ROI_TRACKING_BODY_PART')
+            self.body_parts_dropdowns[bp_cnt] = MufasaDropDown(parent=self.body_part_frm, dropdown_options=self.body_parts_lst, label=f"BODY-PART {bp_cnt + 1}:", label_width=30, dropdown_width=self.max_bp_len+5, value=self.body_parts_lst[bp_cnt],img='circle_black', tooltip_key='ROI_TRACKING_BODY_PART')
 
             self.body_parts_dropdowns[bp_cnt].grid(row=bp_cnt, column=0, sticky=NW)
 

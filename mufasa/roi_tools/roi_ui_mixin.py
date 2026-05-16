@@ -43,7 +43,7 @@ from mufasa.roi_tools.roi_utils import (change_roi_dict_video_name,
                                        get_vertices_hexagon,
                                        insert_gridlines_on_roi_img)
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, DropDownMenu,
-                                        Entry_Box, SimbaButton, SimBADropDown,
+                                        Entry_Box, SimbaButton, MufasaDropDown,
                                         SimBALabel, get_menu_icons)
 from mufasa.ui.utils import position_window
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
@@ -379,9 +379,9 @@ class ROI_mixin(ConfigReader):
                              row_idx: int):
 
         self.shape_attr_panel = CreateLabelFrameWithIcon(parent=parent_frame, header="SHAPE ATTRIBUTES", font=Formats.FONT_HEADER.value, padx=5, pady=5, icon_name='attributes_large', relief='solid')
-        self.thickness_dropdown = SimBADropDown(parent=self.shape_attr_panel, dropdown_options=ROI_SETTINGS.SHAPE_THICKNESS_OPTIONS.value, label="SHAPE THICKNESS: ", label_width=17, value=5, dropdown_width=5, img='width')
-        self.color_dropdown = SimBADropDown(parent=self.shape_attr_panel, dropdown_options=list(self.color_option_dict.keys()), label="SHAPE COLOR: ", label_width=17, value='Red', dropdown_width=20, img='palette_small')
-        self.ear_tag_size_dropdown = SimBADropDown(parent=self.shape_attr_panel, dropdown_options=ROI_SETTINGS.EAR_TAG_SIZE_OPTIONS.value, label="EAR TAG SIZE: ", label_width=17, value=15, dropdown_width=5, img='circle_small')
+        self.thickness_dropdown = MufasaDropDown(parent=self.shape_attr_panel, dropdown_options=ROI_SETTINGS.SHAPE_THICKNESS_OPTIONS.value, label="SHAPE THICKNESS: ", label_width=17, value=5, dropdown_width=5, img='width')
+        self.color_dropdown = MufasaDropDown(parent=self.shape_attr_panel, dropdown_options=list(self.color_option_dict.keys()), label="SHAPE COLOR: ", label_width=17, value='Red', dropdown_width=20, img='palette_small')
+        self.ear_tag_size_dropdown = MufasaDropDown(parent=self.shape_attr_panel, dropdown_options=ROI_SETTINGS.EAR_TAG_SIZE_OPTIONS.value, label="EAR TAG SIZE: ", label_width=17, value=15, dropdown_width=5, img='circle_small')
 
 
         self.shape_attr_panel.grid(row=row_idx, sticky=W, pady=10)
@@ -445,7 +445,7 @@ class ROI_mixin(ConfigReader):
         self.draw_btn = SimbaButton(parent=self.draw_panel, txt='DRAW', img='brush_large', txt_clr='black', cmd=self.draw, cmd_kwargs={'parent_frame': top_level})
         self.delete_all_btn = SimbaButton(parent=self.draw_panel, txt='DELETE ALL', img='delete_large_red', txt_clr='black', cmd=self.delete_all)
 
-        self.roi_dropdown = SimBADropDown(parent=self.draw_panel, dropdown_options=self.roi_names, label="ROI: ", label_width=5, value=self.roi_names[0], dropdown_width=max(5, max(len(s) for s in self.roi_names)))
+        self.roi_dropdown = MufasaDropDown(parent=self.draw_panel, dropdown_options=self.roi_names, label="ROI: ", label_width=5, value=self.roi_names[0], dropdown_width=max(5, max(len(s) for s in self.roi_names)))
         if self.roi_names == ['']: self.roi_dropdown.disable()
 
 
@@ -470,7 +470,7 @@ class ROI_mixin(ConfigReader):
 
         self.shapes_from_other_video_panel = CreateLabelFrameWithIcon(parent=parent_frame, header="APPLY SHAPES FROM DIFFERENT VIDEO", font=Formats.FONT_HEADER.value, padx=5, pady=5, icon_name='duplicate_2_large', relief='solid')
         dropdown_width = max(len(s) for s in self.other_video_names_w_rois)
-        self.other_videos_dropdown = SimBADropDown(parent=self.shapes_from_other_video_panel, dropdown_options=self.other_video_names_w_rois, label="FROM VIDEO: ", label_width=15, dropdown_width=dropdown_width, value=self.other_video_names_w_rois[0])
+        self.other_videos_dropdown = MufasaDropDown(parent=self.shapes_from_other_video_panel, dropdown_options=self.other_video_names_w_rois, label="FROM VIDEO: ", label_width=15, dropdown_width=dropdown_width, value=self.other_video_names_w_rois[0])
         self.apply_other_video_btn = SimbaButton(parent=self.shapes_from_other_video_panel, txt="APPLY", img='tick_large', txt_clr='black', enabled=True, cmd=self.apply_different_video, cmd_kwargs={'video_name': lambda: self.other_videos_dropdown.getChoices()})
         if self.other_video_names_w_rois == ['']:
             self.other_videos_dropdown.disable()
@@ -668,7 +668,7 @@ class ROI_mixin(ConfigReader):
         self.update_dropdown_menu(dropdown=self.roi_dropdown, new_options=self.roi_names, set_index=0)
 
     def update_dropdown_menu(self,
-                             dropdown: SimBADropDown,
+                             dropdown: MufasaDropDown,
                              new_options: list,
                              set_index: Optional[int] = 0,
                              set_str: Optional[str] = None):
@@ -751,12 +751,12 @@ class ROI_mixin(ConfigReader):
         self.change_attr_frm.iconphoto(False, self.menu_icons['edit_roi_large']["img"])
 
         self.change_attr_panel = LabelFrame(self.change_attr_frm, text="SHAPE ATTRIBUTES", font=Formats.FONT_HEADER.value, padx=5, pady=5)
-        self.change_attr_input_dropdown = SimBADropDown(parent=self.change_attr_panel, dropdown_options=self.roi_names, label="CHANGE SHAPE: ", label_width=25, command=lambda x: self._set_shape_attributes_from_selection(x), value=selected_roi_name)
+        self.change_attr_input_dropdown = MufasaDropDown(parent=self.change_attr_panel, dropdown_options=self.roi_names, label="CHANGE SHAPE: ", label_width=25, command=lambda x: self._set_shape_attributes_from_selection(x), value=selected_roi_name)
         self.new_shape_name_eb = Entry_Box(parent=self.change_attr_panel, fileDescription="NEW SHAPE NAME: ", labelwidth=25, entry_box_width=40, value=selected_roi_name)
 
-        self.new_thickness_dropdown = SimBADropDown(parent=self.change_attr_panel, dropdown_options=ROI_SETTINGS.SHAPE_THICKNESS_OPTIONS.value, label="NEW SHAPE THICKNESS: ", label_width=25, value=self.roi_dict[selected_roi_name]['Thickness'])
-        self.new_color_dropdown = SimBADropDown(parent=self.change_attr_panel, dropdown_options=list(self.color_option_dict.keys()), label="NEW SHAPE COLOR: ", label_width=25, value=self.roi_dict[selected_roi_name]['Color name'])
-        self.new_ear_tag_size_dropdown = SimBADropDown(parent=self.change_attr_panel, dropdown_options=ROI_SETTINGS.EAR_TAG_SIZE_OPTIONS.value, label="NEW EAR TAG SIZE: ", label_width=25, value=self.roi_dict[selected_roi_name]['Ear_tag_size'])
+        self.new_thickness_dropdown = MufasaDropDown(parent=self.change_attr_panel, dropdown_options=ROI_SETTINGS.SHAPE_THICKNESS_OPTIONS.value, label="NEW SHAPE THICKNESS: ", label_width=25, value=self.roi_dict[selected_roi_name]['Thickness'])
+        self.new_color_dropdown = MufasaDropDown(parent=self.change_attr_panel, dropdown_options=list(self.color_option_dict.keys()), label="NEW SHAPE COLOR: ", label_width=25, value=self.roi_dict[selected_roi_name]['Color name'])
+        self.new_ear_tag_size_dropdown = MufasaDropDown(parent=self.change_attr_panel, dropdown_options=ROI_SETTINGS.EAR_TAG_SIZE_OPTIONS.value, label="NEW EAR TAG SIZE: ", label_width=25, value=self.roi_dict[selected_roi_name]['Ear_tag_size'])
         self.change_attr_save_btn = SimbaButton(parent=self.change_attr_panel, txt='SAVE ATTRIBUTES', txt_clr='black', img='save_large', cmd=self.save_attr_changes)
         self.change_attr_panel.grid(row=0, sticky=NW)
         self.change_attr_input_dropdown.grid(row=0, column=0, sticky=NW)
@@ -854,15 +854,15 @@ class ROI_mixin(ConfigReader):
         self.preferences_frm.iconphoto(False, self.menu_icons['settings']["img"])
 
         pref_frm_panel = CreateLabelFrameWithIcon(parent=self.preferences_frm, header="PREFERENCES", icon_name='settings', padx=5, pady=5)
-        self.line_type_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=ROI_SETTINGS.LINE_TYPE_OPTIONS.value, label="LINE TYPE: ", label_width=35, dropdown_width=35, value=self.settings['LINE_TYPE'], img='line', tooltip_key='ROI_LINE_TYPE')
-        self.roi_select_clr_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=list(self.color_option_dict.keys()), label="ROI SELECT COLOR: ", label_width=35, dropdown_width=35, value=next(key for key, val in self.color_option_dict.items() if val == self.settings['ROI_SELECT_CLR']), img='fill', tooltip_key='ROI_SELECT_COLOR')
-        self.duplication_jump_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=list(range(1, 100, 5)), label="DUPLICATION JUMP SIZE: ", label_width=35, dropdown_width=35, value=self.settings['DUPLICATION_JUMP_SIZE'], img='jump', tooltip_key='ROI_DUPLICATION_JUMP_SIZE')
-        self.show_tracking_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=['FALSE', 'KEYPOINTS', 'BBOX', 'KEYPOINTS & BBOX'], label="SHOW TRACKING DATA: ", label_width=35, dropdown_width=35, value=self.settings[ROI_TRACKING_STYLE].upper(), img='pose', tooltip_key='ROI_SHOW_TRACKING_DATA')
-        self.overlay_color_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=list(self.color_option_dict.keys()), label="OVERLAY GRID COLOR: ", label_width=35, dropdown_width=35, value=next(key for key, val in self.color_option_dict.items() if val == self.settings[OVERLAY_GRID_COLOR]), img='paint', tooltip_key='ROI_OVERLAY_GRID_COLOR')
-        self.show_grid_overlay_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=['FALSE', '10MM', '20MM', '40MM', '80MM', '160MM'], label="SHOW GRID OVERLAY: ", label_width=35, dropdown_width=35, value=self.settings[SHOW_GRID_OVERLAY], img='table_2', tooltip_key='ROI_SHOW_GRID_OVERLAY')
-        self.show_hexagon_overlay_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=['FALSE', '10MM', '20MM', '40MM', '80MM', '160MM'], label="SHOW HEXAGON OVERLAY: ", label_width=35, dropdown_width=35, value=self.settings[SHOW_GRID_OVERLAY], img='hexagon', tooltip_key='ROI_SHOW_HEXAGON_OVERLAY')
-        self.polygon_tolerance_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=list(range(2, 22, 2)), label="POLYGON TOLERANCE: ", label_width=35, dropdown_width=35, value=self.settings[POLYGON_TOLERANCE], tooltip_key='ROI_POLYGON_TOLERANCE', img='polygon_2')
-        self.keyboard_sensitivity_dropdown = SimBADropDown(parent=pref_frm_panel, dropdown_options=list(range(1, 52, 1)), label="KEYBOARD MOVEMENT SENSITIVITY: ", label_width=35, dropdown_width=35, value=self.settings[KEYBOARD_SENSITIVITY], tooltip_key='ROI_KEYBOARD_SENSITIVITY', img='keyboard')
+        self.line_type_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=ROI_SETTINGS.LINE_TYPE_OPTIONS.value, label="LINE TYPE: ", label_width=35, dropdown_width=35, value=self.settings['LINE_TYPE'], img='line', tooltip_key='ROI_LINE_TYPE')
+        self.roi_select_clr_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=list(self.color_option_dict.keys()), label="ROI SELECT COLOR: ", label_width=35, dropdown_width=35, value=next(key for key, val in self.color_option_dict.items() if val == self.settings['ROI_SELECT_CLR']), img='fill', tooltip_key='ROI_SELECT_COLOR')
+        self.duplication_jump_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=list(range(1, 100, 5)), label="DUPLICATION JUMP SIZE: ", label_width=35, dropdown_width=35, value=self.settings['DUPLICATION_JUMP_SIZE'], img='jump', tooltip_key='ROI_DUPLICATION_JUMP_SIZE')
+        self.show_tracking_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=['FALSE', 'KEYPOINTS', 'BBOX', 'KEYPOINTS & BBOX'], label="SHOW TRACKING DATA: ", label_width=35, dropdown_width=35, value=self.settings[ROI_TRACKING_STYLE].upper(), img='pose', tooltip_key='ROI_SHOW_TRACKING_DATA')
+        self.overlay_color_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=list(self.color_option_dict.keys()), label="OVERLAY GRID COLOR: ", label_width=35, dropdown_width=35, value=next(key for key, val in self.color_option_dict.items() if val == self.settings[OVERLAY_GRID_COLOR]), img='paint', tooltip_key='ROI_OVERLAY_GRID_COLOR')
+        self.show_grid_overlay_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=['FALSE', '10MM', '20MM', '40MM', '80MM', '160MM'], label="SHOW GRID OVERLAY: ", label_width=35, dropdown_width=35, value=self.settings[SHOW_GRID_OVERLAY], img='table_2', tooltip_key='ROI_SHOW_GRID_OVERLAY')
+        self.show_hexagon_overlay_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=['FALSE', '10MM', '20MM', '40MM', '80MM', '160MM'], label="SHOW HEXAGON OVERLAY: ", label_width=35, dropdown_width=35, value=self.settings[SHOW_GRID_OVERLAY], img='hexagon', tooltip_key='ROI_SHOW_HEXAGON_OVERLAY')
+        self.polygon_tolerance_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=list(range(2, 22, 2)), label="POLYGON TOLERANCE: ", label_width=35, dropdown_width=35, value=self.settings[POLYGON_TOLERANCE], tooltip_key='ROI_POLYGON_TOLERANCE', img='polygon_2')
+        self.keyboard_sensitivity_dropdown = MufasaDropDown(parent=pref_frm_panel, dropdown_options=list(range(1, 52, 1)), label="KEYBOARD MOVEMENT SENSITIVITY: ", label_width=35, dropdown_width=35, value=self.settings[KEYBOARD_SENSITIVITY], tooltip_key='ROI_KEYBOARD_SENSITIVITY', img='keyboard')
 
         pref_save_btn = SimbaButton(parent=pref_frm_panel, txt="SAVE", img='save_large', font=Formats.FONT_REGULAR.value, cmd=self.set_settings)
         pref_frm_panel.grid(row=0, column=0, sticky=NW)
@@ -925,9 +925,9 @@ class ROI_mixin(ConfigReader):
 
         settings = CreateLabelFrameWithIcon(parent=self.fixed_roi_frm, header="SETTINGS", icon_name='settings', padx=5, pady=5)
         self.fixed_roi_name_eb = Entry_Box(parent=settings, fileDescription='ROI NAME: ', labelwidth=15, entry_box_width=25, img='label_yellow')
-        self.fixed_roi_clr_drpdwn = SimBADropDown(parent=settings, dropdown_options=list(self.color_option_dict.keys()), label='COLOR:', label_width=15, value='Red', img='palette_small')
-        self.fixed_roi_thickness_drpdwn = SimBADropDown(parent=settings, dropdown_options=self.settings['SHAPE_THICKNESS_OPTIONS'], label='THICKNESS:', label_width=15, value=10, img='line')
-        self.fixed_roi_eartag_size_drpdwn = SimBADropDown(parent=settings, dropdown_options=self.settings['EAR_TAG_SIZE_OPTIONS'], label='EAR TAG SIZE:', label_width=15, value=15, img='ear_small')
+        self.fixed_roi_clr_drpdwn = MufasaDropDown(parent=settings, dropdown_options=list(self.color_option_dict.keys()), label='COLOR:', label_width=15, value='Red', img='palette_small')
+        self.fixed_roi_thickness_drpdwn = MufasaDropDown(parent=settings, dropdown_options=self.settings['SHAPE_THICKNESS_OPTIONS'], label='THICKNESS:', label_width=15, value=10, img='line')
+        self.fixed_roi_eartag_size_drpdwn = MufasaDropDown(parent=settings, dropdown_options=self.settings['EAR_TAG_SIZE_OPTIONS'], label='EAR TAG SIZE:', label_width=15, value=15, img='ear_small')
         settings.grid(row=0, column=0, sticky=NW)
         self.fixed_roi_name_eb.grid(row=0, column=0, sticky=NW)
         self.fixed_roi_clr_drpdwn.grid(row=1, column=0, sticky=NW)
@@ -962,7 +962,7 @@ class ROI_mixin(ConfigReader):
         self.half_circle_frm = CreateLabelFrameWithIcon(parent=self.fixed_roi_frm, header="ADD HALF CIRCLE", icon_name='half_circle_small', pady=10)
         self.half_circle_radius_eb = Entry_Box(self.half_circle_frm, '', 0, None, validation='numeric', entry_box_width='11', value='RADIUS (MM)', entry_font=Formats.FONT_REGULAR_ITALICS.value)
 
-        self.half_circle_direction_drpdwn = SimBADropDown(parent=self.half_circle_frm, label='DIRECTION:', dropdown_options=['NORTH', 'SOUTH', 'WEST', 'EAST', 'NORTH-EAST', 'NORTH-WEST', 'SOUTH-EAST', 'SOUTH-WEST'], value='NORTH')
+        self.half_circle_direction_drpdwn = MufasaDropDown(parent=self.half_circle_frm, label='DIRECTION:', dropdown_options=['NORTH', 'SOUTH', 'WEST', 'EAST', 'NORTH-EAST', 'NORTH-WEST', 'SOUTH-EAST', 'SOUTH-WEST'], value='NORTH')
         add_half_circle_btn = SimbaButton(parent=self.half_circle_frm, txt='ADD HALF CIRCLE', img='half_circle_small', txt_clr='black', cmd= lambda: self.fixed_roi_half_circle())
         self.half_circle_frm.grid(row=4, column=0, sticky=NW)
         self.half_circle_radius_eb.grid(row=0, column=0, sticky=NW)
@@ -972,7 +972,7 @@ class ROI_mixin(ConfigReader):
 
         self.triangle_frm = CreateLabelFrameWithIcon(parent=self.fixed_roi_frm, header="ADD EQUILATERAL TRIANGLE", icon_name='triangle_small', pady=10)
         self.triangle_side_length_eb = Entry_Box(self.triangle_frm, '', 0, None, validation='numeric', entry_box_width='15', value='SIDE LENGTH (MM)', entry_font=Formats.FONT_REGULAR_ITALICS.value)
-        self.triangle_direction_drpdwn = SimBADropDown(parent=self.triangle_frm, dropdown_options=list(range(1, 361)), label='DIRECTION DEGREES:', value='90')
+        self.triangle_direction_drpdwn = MufasaDropDown(parent=self.triangle_frm, dropdown_options=list(range(1, 361)), label='DIRECTION DEGREES:', value='90')
 
         add_triangle_btn = SimbaButton(parent=self.triangle_frm, txt='ADD TRIANGLE', img='triangle_small', txt_clr='black', cmd= lambda: self.fixed_roi_triangle())
 
