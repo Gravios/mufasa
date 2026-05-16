@@ -44,7 +44,7 @@ class ImportEthovision(ConfigReader):
         self.files_found = [x for x in self.files_found if "~$" not in x]
         check_if_filepath_list_is_empty(
             filepaths=self.files_found,
-            error_msg="SIMBA ERROR: No ETHOVISION xlsx or xls files found in {}".format(
+            error_msg="No ETHOVISION xlsx or xls files found in {}".format(
                 str(data_dir)
             ),
         )
@@ -63,22 +63,22 @@ class ImportEthovision(ConfigReader):
                 video_path = ethovision_df.loc["Video file"].values[0]
             except KeyError:
                 print(
-                    'SIMBA ERROR: "Video file" row does not exist in the sheet named {} in file {}'.format(
+                    '"Video file" row does not exist in the sheet named {} in file {}'.format(
                         manual_scoring_sheet_name, file_path
                     )
                 )
                 raise ValueError(
-                    f'SIMBA ERROR: "Video file" does not exist in the sheet named {manual_scoring_sheet_name} in file {file_path}'
+                    f'"Video file" does not exist in the sheet named {manual_scoring_sheet_name} in file {file_path}'
                 )
             try:
                 if np.isnan(video_path):
                     print(
-                        'SIMBA ERROR: "Video file" row does not have a value in the sheet named {} in file {}'.format(
+                        '"Video file" row does not have a value in the sheet named {} in file {}'.format(
                             manual_scoring_sheet_name, file_path
                         )
                     )
                     raise ValueError(
-                        f'SIMBA ERROR: "Video file" row does not have a value in the sheet named {manual_scoring_sheet_name} in file {file_path}'
+                        f'"Video file" row does not have a value in the sheet named {manual_scoring_sheet_name} in file {file_path}'
                     )
             except:
                 pass
@@ -111,7 +111,7 @@ class ImportEthovision(ConfigReader):
             non_clf_behaviors = [x for x in non_clf_behaviors if x.lower() != "start"]
             if len(non_clf_behaviors) > 0:
                 print(
-                    f"SIMBA WARNING: The ETHOVISION annotation file for video {self.video_name} contains annotations for {str(len(non_clf_behaviors))} behaviors"
+                    f"The ETHOVISION annotation file for video {self.video_name} contains annotations for {str(len(non_clf_behaviors))} behaviors"
                     f" which is NOT defined in the SimBA project: {non_clf_behaviors} and will be SKIPPED."
                 )
             for clf in self.clf_names:
@@ -119,7 +119,7 @@ class ImportEthovision(ConfigReader):
                 clf_data = ethovision_df[ethovision_df["Behavior"] == clf]
                 if len(clf_data) == 0:
                     print(
-                        f"SIMBA WARNING: ZERO ETHOVISION annotations detected for SimBA classifier named {clf} for video {self.video_name}. "
+                        f"ZERO ETHOVISION annotations detected for SimBA classifier named {clf} for video {self.video_name}. "
                         f"SimBA will label that the behavior as ABSENT in the entire {self.video_name} video."
                     )
                 starts = list(

@@ -43,7 +43,7 @@ class KeypointReorganizer(object):
         self.files_found = glob.glob(self.data_folder + "/*." + file_format)
         check_if_filepath_list_is_empty(
             self.files_found,
-            error_msg=f"SIMBA ERROR: {self.data_folder} directory contains no {file_format} files.",
+            error_msg=f"{self.data_folder} directory contains no {file_format} files.",
         )
         self.datetime = str(datetime.now().strftime("%Y%m%d%H%M%S"))
 

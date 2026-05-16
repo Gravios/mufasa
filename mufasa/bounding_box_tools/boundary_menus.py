@@ -226,7 +226,7 @@ class BoundaryMenus(ConfigReader, PopUpMixin):
         sets_w_data_and_video = list(set(videos_with_data).intersection(video_names))
         if len(sets_w_data_and_video) == 0:
             raise NoFilesFoundError(
-                msg="SIMBA ERROR: Zero video files found with calculated anchored ROIs in SimBA project"
+                msg="Zero video files found with calculated anchored ROIs in SimBA project"
             )
         self.viz_boundaries_frm = Toplevel()
         self.viz_boundaries_frm.minsize(600, 150)
@@ -448,7 +448,7 @@ class BoundaryMenus(ConfigReader, PopUpMixin):
         )
         if not os.path.isfile(self.anchored_roi_path):
             raise NoFilesFoundError(
-                msg="SIMBA ERROR: No anchored ROI found in {}.".format(
+                msg="No anchored ROI found in {}.".format(
                     self.anchored_roi_path
                 )
             )
@@ -529,7 +529,7 @@ class BoundaryMenus(ConfigReader, PopUpMixin):
         self.data_path = os.path.join(self.project_path, "csv", "anchored_roi_data")
         if not os.path.isdir(self.data_path):
             raise NoFilesFoundError(
-                msg="SIMBA ERROR: No anchored ROI statistics found in {}.".format(
+                msg="No anchored ROI statistics found in {}.".format(
                     self.anchored_roi_path
                 )
             )

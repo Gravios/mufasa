@@ -203,7 +203,12 @@ TAB_SPEC: list[dict] = [
             ("Add classifier", "mufasa.ui_qt.popups.clf_add_remove_print:AddClfPopUp"),
             ("Remove classifier", "mufasa.ui_qt.popups.clf_add_remove_print:RemoveAClassifierPopUp"),
             ("Smooth pose", "mufasa.ui_qt.popups.smoothing:SmoothingPopUp"),
-            # TODO: Interpolate, Egocentric Align, Archive, Reverse identities
+            # TODO: wire up Interpolate, Egocentric Align, Archive,
+            # Reverse identities — these are surfaced in the Qt
+            # workbench (mufasa / mufasa-workbench entry points)
+            # but not in this legacy Qt chooser. Low priority since
+            # the workbench is the recommended entry point; this
+            # chooser remains for users running standalone popups.
         ],
     },
     {"label": "Video parameters",   "icon": "calipher", "actions": []},

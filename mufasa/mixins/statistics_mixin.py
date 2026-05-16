@@ -1598,7 +1598,7 @@ class Statistics(FeatureExtractionMixin):
 
         .. warning:
            Non-overlapping values (i.e., categories exist in sample_1 that does not exist in sample2) or small values may cause inflated chi square values.
-           If small contingency table small values, consider TODO Fisher's exact test
+           If small contingency table small values, consider Fisher's exact test (not currently implemented in this mixin).
 
         :param ndarray sample_1: First 1d array representing feature values.
         :param ndarray sample_2: Second 1d array representing feature values.

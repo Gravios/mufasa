@@ -15,7 +15,7 @@ from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.enums import Options, PackageNames, Paths
-from mufasa.utils.errors import SimBAGPUError, SimBAPAckageVersionError
+from mufasa.utils.errors import SimBAGPUError, SimBAPackageVersionError
 from mufasa.utils.read_write import (find_core_cnt,
                                     find_files_of_filetypes_in_directory,
                                     get_pkg_version, get_video_meta_data,
@@ -47,7 +47,7 @@ class YOLOPoseInferencePopUP(PopUpMixin):
                                source=self.__class__.__name__)
         ultralytics_version = get_pkg_version(pkg=PackageNames.ULTRALYTICS.value)
         if ultralytics_version is None:
-           raise SimBAPAckageVersionError(msg=f'Cannot train YOLO pose-estimation model: Could not find ultralytics package in python environment',  source=self.__class__.__name__)
+           raise SimBAPackageVersionError(msg=f'Cannot train YOLO pose-estimation model: Could not find ultralytics package in python environment',  source=self.__class__.__name__)
 
         seven_bp_path = os.path.join(YOLO_SCHEMATICS_DIR, 'yolo_7bps.csv')
         PopUpMixin.__init__(self, title="PREDICT USING YOLO POSE ESTIMATION MODEL", icon='ultralytics_2', size=(1100, 700))

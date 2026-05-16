@@ -85,7 +85,7 @@ class PupRetrieverCalculator(ConfigReader):
         self.data_files = glob.glob(machine_results_path + "/*." + self.file_type)
         check_if_filepath_list_is_empty(
             filepaths=self.data_files,
-            error_msg="SIMBA ERROR: NO FILES FOUND IN {}".format(machine_results_path),
+            error_msg="NO FILES FOUND IN {}".format(machine_results_path),
         )
         self.vid_info_df = read_video_info_csv(
             os.path.join(self.project_path, Paths.VIDEO_INFO.value)
@@ -105,7 +105,7 @@ class PupRetrieverCalculator(ConfigReader):
         ]:
             if c not in self.data_df.columns:
                 print(
-                    f"SIMBA ERROR: Could not find anticipated column named {c} in {self.file_path}"
+                    f"Could not find anticipated column named {c} in {self.file_path}"
                 )
                 raise ValueError()
 

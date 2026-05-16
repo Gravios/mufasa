@@ -43,11 +43,11 @@ class DeepEthogramImporter(ConfigReader):
         check_if_dir_exists(in_dir=self.data_dir)
         self.deepethogram_files_found = glob.glob(self.data_dir + "/*.csv")
         check_if_filepath_list_is_empty(filepaths=self.deepethogram_files_found,
-            error_msg=f"SIMBA ERROR: ZERO DeepEthogram CSV files found in {self.data_dir} directory",
+            error_msg=f"ZERO DeepEthogram CSV files found in {self.data_dir} directory",
         )
         check_if_filepath_list_is_empty(
             filepaths=self.feature_file_paths,
-            error_msg="SIMBA ERROR: ZERO files found in the project_folder/csv/features_extracted directory",
+            error_msg="ZERO files found in the project_folder/csv/features_extracted directory",
         )
         feature_file_names, self.matches_dict = [], {}
         for feature_file_path in self.feature_file_paths:
@@ -69,7 +69,7 @@ class DeepEthogramImporter(ConfigReader):
                     pass
             else:
                 print(
-                    "SIMBA ERROR: Could not find file in project_folder/csv/features_extracted directory representing {}".format(
+                    "Could not find file in project_folder/csv/features_extracted directory representing {}".format(
                         file_name
                     )
                 )
@@ -88,7 +88,7 @@ class DeepEthogramImporter(ConfigReader):
             for clf_name in self.clf_names:
                 if clf_name not in self.annotations_df.columns:
                     print(
-                        "SIMBA ERROR: No annotations for behavior {} found in DeepEthogram annotation file for video {}"
+                        "No annotations for behavior {} found in DeepEthogram annotation file for video {}"
                         "Exclude {} from your SimBA project or add DeepEthogram annotations for {} for video {}.".format(
                             clf_name, video_name, clf_name, clf_name, video_name
                         )
@@ -96,13 +96,13 @@ class DeepEthogramImporter(ConfigReader):
                     raise ValueError()
             if len(self.annotations_df) > len(self.features_df):
                 print(
-                    f"SIMBA WARNING: The DEEPETHOGRAM annotations for video {video_name} contain data for {str(len(self.annotations_df))} frames. The pose-estimation features for the same video contain data for {str(len(self.features_df))} frames. "
+                    f"The DEEPETHOGRAM annotations for video {video_name} contain data for {str(len(self.annotations_df))} frames. The pose-estimation features for the same video contain data for {str(len(self.features_df))} frames. "
                     "SimBA will use the annotations for the frames present in the pose-estimation data and discard the rest."
                 )
                 self.annotations_df = self.annotations_df.head(len(self.features_df))
             if len(self.annotations_df) < len(self.features_df):
                 print(
-                    f"SIMBA WARNING: The DEEPETHOGRAM annotations for video {video_name} contain data for {str(len(self.annotations_df))} frames. The pose-estimation features for the same video contain data for {str(len(self.features_df))} frames. "
+                    f"The DEEPETHOGRAM annotations for video {video_name} contain data for {str(len(self.annotations_df))} frames. The pose-estimation features for the same video contain data for {str(len(self.features_df))} frames. "
                     "SimBA expects the annotations and pose-estimation data to contain an equal number of frames. SimBA will assume that "
                     "the un-annotated frames have no behaviors present."
                 )

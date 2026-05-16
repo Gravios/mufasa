@@ -77,7 +77,7 @@ class Interpolate(ConfigReader):
             self.input_dir = input_path
             check_if_filepath_list_is_empty(
                 filepaths=self.files_found,
-                error_msg=f"SIMBA ERROR: {self.input_dir} does not contain any {self.file_type} files.",
+                error_msg=f"{self.input_dir} does not contain any {self.file_type} files.",
             )
         else:
             self.files_found = [input_path]
@@ -275,7 +275,7 @@ class Smooth(ConfigReader):
             self.input_dir = input_path
             check_if_filepath_list_is_empty(
                 filepaths=self.files_found,
-                error_msg=f"SIMBA ERROR: {self.input_dir} does not contain any {self.file_type} files.",
+                error_msg=f"{self.input_dir} does not contain any {self.file_type} files.",
             )
         else:
             self.files_found = [input_path]

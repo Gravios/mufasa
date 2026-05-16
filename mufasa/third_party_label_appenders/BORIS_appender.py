@@ -90,7 +90,7 @@ class BorisAppender(ConfigReader):
                 self.clf_name = clf_name
                 data_df[clf_name] = 0
                 if clf_name not in video_annot[BEHAVIOR].unique():
-                    print(f"SIMBA WARNING: No BORIS annotation detected for video {self.file_name} and behavior {clf_name}. SimBA will set all frame annotations as absent.")
+                    print(f"No BORIS annotation detected for video {self.file_name} and behavior {clf_name}. SimBA will set all frame annotations as absent.")
                     continue
                 video_clf_annot = video_annot[video_annot[BEHAVIOR] == clf_name].reset_index(drop=True)
                 self.__check_non_overlapping_annotations(video_clf_annot)

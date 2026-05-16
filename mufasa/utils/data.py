@@ -421,7 +421,7 @@ def smooth_data_savitzky_golay(
     video_file_path = find_video_of_file(video_dir, filename)
     if not video_file_path:
         raise NoFilesFoundError(
-            msg=f"SIMBA ERROR: Import video for {filename} to perform Savitzky-Golay smoothing",
+            msg=f"Import video for {filename} to perform Savitzky-Golay smoothing",
             source=smooth_data_savitzky_golay.__name__,
         )
     video_meta_data = get_video_meta_data(video_path=video_file_path)

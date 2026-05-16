@@ -446,7 +446,7 @@ class ImageMixin(object):
         if mode in [0, 1]:
             return cv2.findContours(img, mode, method)[1]
         else:
-            cnts, hierarchy = cv2.findContours(img, mode, method)[-2:]  # TODO
+            cnts, hierarchy = cv2.findContours(img, mode, method)[-2:]
             interior_contours = []
             for i in range(len(cnts)):
                 if (hierarchy[0][i][3] == -1):  # Contour with no parent (interior contour)
@@ -579,7 +579,11 @@ class ImageMixin(object):
         return max_frm, results, found_img
 
     def template_matching_gpu(self):
-        # TODO
+        # TODO: not implemented. Intended to mirror the CPU
+        # template_matching above using cv2.cuda.matchTemplate
+        # on a GpuMat. Stub kept as a placeholder so callers
+        # checking `hasattr(self, 'template_matching_gpu')`
+        # don't get an AttributeError.
         pass
 
     @staticmethod

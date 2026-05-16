@@ -402,8 +402,6 @@ def merge_coco_keypoints_files(data_dir: Union[str, os.PathLike],
     if len(duplicates) > 0:
         DuplicateNamesWarning(msg=f'{len(duplicates)} annotated file names have the same name: {duplicates}', source=merge_coco_keypoints_files.__name__)
 
-    #PRINT THE NUMBER OF TOTAL ANNOTATIONS TODO
-
     timer.stop_timer()
     save_json(data=results, filepath=save_path)
     stdout_success(msg=f'Merged COCO key-points file (from {data_file_cnt} input files) saved at {save_path}', source=merge_coco_keypoints_files.__name__, elapsed_time=timer.elapsed_time_str)

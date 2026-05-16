@@ -18,7 +18,7 @@ class AppendROIFeaturesByAnimalPopUp(ConfigReader, PopUpMixin):
     def __init__(self, config_path: Union[str, os.PathLike]):
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         if not os.path.isfile(self.roi_coordinates_path):
-            ROIWarning(msg=f"SIMBA ERROR: No ROIs have been defined. Please define ROIs before appending ROI-based features (no data file found at path {self.roi_coordinates_path})", source=self.__class__.__name__,)
+            ROIWarning(msg=f"No ROIs have been defined. Please define ROIs before appending ROI-based features (no data file found at path {self.roi_coordinates_path})", source=self.__class__.__name__,)
         PopUpMixin.__init__(self, title="APPEND ROI FEATURES: BY ANIMALS", size=(400, 600), icon='shapes_small')
         self.animal_cnt_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT NUMBER OF ANIMALS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.ROI_FEATURES.value)
 

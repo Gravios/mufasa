@@ -102,7 +102,7 @@ class ThirdPartyLabelAppender(ConfigReader):
         check_if_dir_exists(in_dir=data_dir)
         self.data_file_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=[file_format], raise_error=True)
         self.data_file_paths = [x for x in self.data_file_paths if "~$" not in x]
-        check_if_filepath_list_is_empty(filepaths=self.feature_file_paths, error_msg=f"SIMBA ERROR: ZERO files found in {self.features_dir} directory")
+        check_if_filepath_list_is_empty(filepaths=self.feature_file_paths, error_msg=f"ZERO files found in {self.features_dir} directory")
         self.annotation_app, self.error_settings, self.log = app, error_settings, log
         print(f"Processing {len(self.feature_file_paths)} {app} file(s)...")
     #

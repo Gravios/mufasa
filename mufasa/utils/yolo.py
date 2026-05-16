@@ -30,7 +30,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_valid_tuple)
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import (InvalidFileTypeError, InvalidInputError,
-                                SimBAGPUError, SimBAPAckageVersionError)
+                                SimBAGPUError, SimBAPackageVersionError)
 from mufasa.utils.printing import stdout_information
 from mufasa.utils.read_write import (create_directory, find_core_cnt,
                                     get_fn_ext, get_video_meta_data)
@@ -523,7 +523,7 @@ def export_yolo_model(model_path: Union[str, os.PathLike],
     :param bool half: If True, request FP16 export where supported.
     :return: Path-like export artifact returned by Ultralytics.
     :rtype: Union[str, os.PathLike]
-    :raises SimBAPAckageVersionError: If Ultralytics is unavailable.
+    :raises SimBAPackageVersionError: If Ultralytics is unavailable.
     :raises InvalidInputError: On unsupported format or invalid precision combination.
 
     :example:
@@ -542,7 +542,7 @@ def export_yolo_model(model_path: Union[str, os.PathLike],
     """
 
     if YOLO is None:
-        raise SimBAPAckageVersionError(msg='YOLO/Ultralytics not detected in SimBA environment', source=export_yolo_model.__name__)
+        raise SimBAPackageVersionError(msg='YOLO/Ultralytics not detected in SimBA environment', source=export_yolo_model.__name__)
     check_file_exist_and_readable(file_path=model_path)
     check_int(name=f"{export_yolo_model.__name__} imgsz", value=imgsz, min_value=1)
     check_int(name=f"{export_yolo_model.__name__} batch", value=batch, min_value=1)

@@ -89,7 +89,7 @@ class ROIfeatureVisualizer(ConfigReader):
         self.roi_dict, shape_names = slice_roi_dict_for_video(data=self.roi_dict, video_name=self.video_name)
         self.data_path = os.path.join(self.outlier_corrected_dir, f"{self.video_name}.{self.file_type}")
         if not os.path.isfile(self.data_path):
-            raise NoFilesFoundError(msg=f"SIMBA ERROR: Could not find the file at path {self.data_path}. Make sure the data file exist to create ROI visualizations", source=self.__class__.__name__)
+            raise NoFilesFoundError(msg=f"Could not find the file at path {self.data_path}. Make sure the data file exist to create ROI visualizations", source=self.__class__.__name__)
         if not os.path.exists(self.roi_features_save_dir):
             os.makedirs(self.roi_features_save_dir)
         self.save_path = os.path.join(self.roi_features_save_dir, f"{self.video_name}.mp4")

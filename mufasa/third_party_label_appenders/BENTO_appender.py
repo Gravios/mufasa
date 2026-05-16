@@ -57,8 +57,8 @@ class BentoAppender(ConfigReader):
         ConfigReader.__init__(self, config_path=config_path)
         check_if_dir_exists(in_dir=data_dir)
         self.bento_files = find_files_of_filetypes_in_directory(directory=data_dir, extensions=['.annot'], raise_error=False, raise_warning=True)
-        check_if_filepath_list_is_empty(filepaths=self.feature_file_paths, error_msg="SIMBA ERROR: No feature files found in project_folder/csv/features_extracted. Extract Features BEFORE appending BENTO annotations")
-        check_if_filepath_list_is_empty(filepaths=self.bento_files, error_msg=f"SIMBA ERROR: No BENTO files with .annot extension found in {data_dir}.")
+        check_if_filepath_list_is_empty(filepaths=self.feature_file_paths, error_msg="No feature files found in project_folder/csv/features_extracted. Extract Features BEFORE appending BENTO annotations")
+        check_if_filepath_list_is_empty(filepaths=self.bento_files, error_msg=f"No BENTO files with .annot extension found in {data_dir}.")
         self.saved_files = []
 
     def run(self):

@@ -40,11 +40,11 @@ class SolomonImporter(ConfigReader):
         self.solomon_paths = glob.glob(data_dir + "/*.csv")
         check_if_filepath_list_is_empty(
             filepaths=self.solomon_paths,
-            error_msg=f"SIMBA ERROR: No CSV files detected in SOLOMON directory {data_dir}",
+            error_msg=f"No CSV files detected in SOLOMON directory {data_dir}",
         )
         check_if_filepath_list_is_empty(
             filepaths=self.feature_file_paths,
-            error_msg=f"SIMBA ERROR: No CSV files detected in feature directory {self.features_dir}",
+            error_msg=f"No CSV files detected in feature directory {self.features_dir}",
         )
         if not os.path.exists(self.targets_folder):
             os.mkdir(self.targets_folder)
@@ -58,7 +58,7 @@ class SolomonImporter(ConfigReader):
             _, _, fps = self.read_video_info(video_name=file_name)
             if not os.path.isfile(feature_file_path):
                 print(
-                    "SIMBA WARNING: Data for video {} does not exist in the features directory. SimBA will SKIP appending annotations for video {}".format(
+                    "Data for video {} does not exist in the features directory. SimBA will SKIP appending annotations for video {}".format(
                         file_name, file_name
                     )
                 )
@@ -78,7 +78,7 @@ class SolomonImporter(ConfigReader):
                 target_col = list(solomon_df.columns[solomon_df.isin([clf_name]).any()])
                 if len(target_col) == 0:
                     print(
-                        "SIMBA WARNING: No SOLOMON frames annotated as containing behavior {} in video {}. SimBA will set all frames in video {} as behavior-absent for behavior {}".format(
+                        "No SOLOMON frames annotated as containing behavior {} in video {}. SimBA will set all frames in video {} as behavior-absent for behavior {}".format(
                             clf_name, file_name, file_name, clf_name
                         )
                     )

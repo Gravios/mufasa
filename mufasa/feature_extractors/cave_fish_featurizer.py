@@ -99,7 +99,7 @@ class CaveFishFeaturizer(ConfigReader, FeatureExtractionMixin):
         )
         check_if_filepath_list_is_empty(
             filepaths=self.files_found,
-            error_msg="SIMBA ERROR: No file in {} directory".format(
+            error_msg="No file in {} directory".format(
                 self.input_file_dir
             ),
         )

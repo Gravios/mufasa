@@ -180,7 +180,7 @@ class DirectingOtherAnimalsVisualizerMultiprocess(ConfigReader, PlottingMixin):
         _, self.video_name, _ = get_fn_ext(video_path)
         self.data_path = os.path.join(self.outlier_corrected_dir, f"{self.video_name}.{self.file_type}")
         if not os.path.isfile(self.data_path):
-            raise NoFilesFoundError(msg=f"SIMBA ERROR: Could not find the file at path {self.data_path}. Make sure the data file exist to create directionality visualizations", source=self.__class__.__name__)
+            raise NoFilesFoundError(msg=f"Could not find the file at path {self.data_path}. Make sure the data file exist to create directionality visualizations", source=self.__class__.__name__)
         self.direction_analyzer = DirectingOtherAnimalsAnalyzer(config_path=config_path, bool_tables=False, summary_tables=False, aggregate_statistics_tables=False, data_paths=[self.data_path], left_ear_name=left_ear_name, right_ear_name=right_ear_name, nose_name=nose_name, verbose=False)
         self.direction_analyzer.run()
         self.direction_analyzer.transpose_results()

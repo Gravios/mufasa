@@ -69,7 +69,7 @@ class HDBSCANClusterer(UMLMixin):
             check_if_dir_exists(in_dir=data_path)
             check_if_filepath_list_is_empty(
                 filepaths=glob.glob(data_path + "/*.pickle"),
-                error_msg=f"SIMBA ERROR: No pickle files in {data_path}",
+                error_msg=f"No pickle files in {data_path}",
             )
         else:
             check_file_exist_and_readable(file_path=data_path)

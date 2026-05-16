@@ -246,7 +246,7 @@ class ROIfeatureVisualizerMultiprocess(ConfigReader):
         os.makedirs(self.save_temp_dir)
         self.data_path = os.path.join(self.outlier_corrected_dir, f"{self.video_name}.{self.file_type}")
         if not os.path.isfile(self.data_path):
-            raise NoFilesFoundError(msg=f"SIMBA ERROR: Could not find the file at path {self.data_path}. Make sure the data file exist to create ROI visualizations", source=self.__class__.__name__,)
+            raise NoFilesFoundError(msg=f"Could not find the file at path {self.data_path}. Make sure the data file exist to create ROI visualizations", source=self.__class__.__name__,)
         check_valid_lst(data=body_parts, source=f"{self.__class__.__name__} body-parts", valid_dtypes=(str,), min_len=1,)
         for bp in body_parts:
             if bp not in self.body_parts_lst:

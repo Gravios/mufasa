@@ -185,7 +185,7 @@ class AnalyzeSeverityPopUp(PopUpMixin, ConfigReader):
             settings["time"] = self.seconds_cnt_var.get()
             if (not self.seconds_cnt_var.get()) and (not self.frame_cnt_var.get()):
                 raise NoSpecifiedOutputError(
-                    msg="SIMBA ERROR: Please select frames and/or time output metrics",
+                    msg="Please select frames and/or time output metrics",
                     source=self.__class__.__name__,
                 )
 
