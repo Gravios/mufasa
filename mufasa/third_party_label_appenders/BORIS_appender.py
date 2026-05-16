@@ -120,19 +120,3 @@ class BorisAppender(ConfigReader):
         )
         self.video_timer.stop_timer()
         print(f"Saved BORIS annotations for video {self.file_name}... (elapsed time: {self.video_timer.elapsed_time_str})")
-
-
-
-# test = BorisAppender(config_path=r"C:\troubleshooting\boris_test_2\project_folder\project_config.ini",
-#                      data_dir=r"C:\troubleshooting\boris_test_2\project_folder\boris_files")
-# test.run()
-#
-#
-# test = BorisAppender(config_path=r"C:\troubleshooting\snake\project_folder\project_config.ini",
-#                      data_dir=r"C:\troubleshooting\snake\project_folder\boris")
-# test.run()
-
-#
-# test = BorisAppender(config_path=r"C:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini",
-#                      data_dir=r"C:\troubleshooting\two_black_animals_14bp\BORIS")
-# test.run()

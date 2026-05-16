@@ -107,28 +107,3 @@ class CueLightMovementAnalyzer(ConfigReader):
         self.results.to_csv(self.save_path)
         self.timer.stop_timer()
         stdout_success(msg=f'Cue light movement data saved at {self.save_path}', elapsed_time=self.timer.elapsed_time_str)
-
-
-
-
-# test = CueLightMovementAnalyzer(config_path=r"C:\troubleshooting\cue_light\t1\project_folder\project_config.ini",
-#                                 pre_window=0,
-#                                 post_window=0,
-#                                 cue_light_names=['cl'],
-#                                 data_dir=r"C:\troubleshooting\cue_light\t1\project_folder\csv\cue_lights",
-#                                 bp_name='Nose')
-#
-# test.run()
-# test.save()
-
-# test = CueLightMovementAnalyzer(config_path=r'/Users/simon/Desktop/envs/troubleshooting/naresh/project_folder/project_config.ini',
-#                                 pre_window=100, post_window=100, cue_light_names=['Rectangl_1'], threshold=0.0, roi_setting=True)
-#
-#
-# def __init__(self,
-#              config_path: str,
-#              pre_window: int,
-#              post_window: int,
-#              cue_light_names: list,
-#              threshold: float,
-#              roi_setting: bool):

@@ -796,7 +796,3 @@ class ExtractFeaturesFrom8bps2Animals(ConfigReader, FeatureExtractionMixin):
             msg="All features extracted. Results stored in project_folder/csv/features_extracted directory.",
             elapsed_time=self.timer.elapsed_time_str,
         )
-
-
-# test = ExtractFeaturesFrom8bps2Animals(config_path='/Users/simon/Desktop/envs/troubleshooting/8Bp_2_animals/project_folder/project_config.ini')
-# test.run()

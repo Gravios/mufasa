@@ -148,27 +148,3 @@ class TRKImporter(ConfigReader):
     #                 y_cord = int(self.animal_df.loc[self.frm_number, animal_name + '_' + animal_bps['Y_bps'][bp_cnt]])
     #                 self.img_bp_cords_dict[animal_name].append((x_cord, y_cord))
     #         self.__insert_all_animal_bps(frame=self.overlay)
-
-
-# test = TRKImporter(config_path='/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project_folder/project_config.ini',
-#                    data_path='/Users/simon/Desktop/envs/simba_dev/tests/test_data/import_tests/trk_data',
-#                    animal_id_lst=['Animal_1', 'Animal_2'],
-#                    interpolation_method="Body-parts: Nearest",
-#                    smoothing_settings = {'Method': 'Savitzky Golay', 'Parameters': {'Time_window': '200'}})
-#
-
-
-# test = SLEAPImporterCSV(config_path=r'/Users/simon/Desktop/envs/troubleshooting/Hornet/project_folder/project_config.ini',
-#                  data_folder=r'/Users/simon/Desktop/envs/troubleshooting/Hornet_single_slp/import',
-#                  actor_IDs=['Hornet'],
-#                  interpolation_settings="Body-parts: Nearest",
-#                  smoothing_settings = {'Method': 'Savitzky Golay', 'Parameters': {'Time_window': '200'}})
-# test.run()
-
-
-# def __init__(self,
-#              config_path: str,
-#              data_folder: str,
-#              animal_id_lst: list,
-#              interpolation_method: str,
-#              smooth_settings: dict):

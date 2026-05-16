@@ -179,12 +179,3 @@ class GerbilFeaturizer(object):
             save_path = os.path.join(self.out_path, f'features_{video_name.split(".")[0]}.parquet')
             out_df.fillna(0).to_parquet(save_path)
             print(f'Featurized data saved @ {save_path} (Video {video_cnt+1} / {len(self.data_results.keys())})')
-
-
-# test = GerbilFeaturizer(in_path='gerbil_data/input',
-#                                      out_path='gerbil_data/featurized_data_092223')
-# start = time.time()
-# test.extract_features()
-# end = time.time()
-# test.save()
-

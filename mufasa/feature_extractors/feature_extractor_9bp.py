@@ -803,5 +803,3 @@ class ExtractFeaturesFrom9bps(ConfigReader, FeatureExtractionMixin):
 
 
 #
-# test = ExtractFeaturesFrom9bps(config_path='/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/project_config.ini')
-# test.run()

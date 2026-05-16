@@ -1212,7 +1212,3 @@ class ExtractFeaturesFrom14bps(ConfigReader, FeatureExtractionMixin):
             msg="All features extracted. Results stored in project_folder/csv/features_extracted directory",
             elapsed_time=self.timer.elapsed_time_str,
         )
-
-
-# test = ExtractFeaturesFrom14bps(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
-# test.run()

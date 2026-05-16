@@ -52,6 +52,3 @@ def select_labelling_video_targeted_clips(config_path: Union[str, os.PathLike]):
     _, video_name, _ = get_fn_ext(video_file_path)
     print(f"ANNOTATING VIDEO {video_name} \n  VIDEO INFO: {video_meta}")
     _ = TargetedAnnotatorWithClips(config_path=config_path, video_path=video_file_path)
-
-
-# test = TargetedAnnotatorWithClips(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini', video_name='Together_1')

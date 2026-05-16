@@ -626,5 +626,3 @@ def select_labelling_video_advanced(
     )
 #
 #
-# test = select_labelling_video_advanced(config_path=r"C:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini",
-#                                       continuing=False)

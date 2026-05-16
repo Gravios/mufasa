@@ -234,14 +234,3 @@ class FFMPEGCommandCreator(object):
             shutil.rmtree(self.temp_dir)
         if os.path.exists(self.process_dir):
             shutil.rmtree(self.process_dir)
-
-
-# test = FFMPEGCommandCreator(json_path='/Users/simon/Desktop/train_model_project/project_folder/videos_2/batch_process.json_log')
-# test.crop_videos()
-# test.clip_videos()
-# test.downsample_videos()
-# test.apply_fps()
-# test.apply_grayscale()
-# test.apply_frame_count()
-# test.apply_clahe()
-# test.move_all_processed_files_to_output_folder()

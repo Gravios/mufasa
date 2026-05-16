@@ -212,16 +212,3 @@ class ShapAggregateStatisticsCalculator():
 
 
 # shap_df = pd.read_csv('/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0)
-# test = ShapAggregateStatisticsCalculator(classifier_name='target',
-#                                          shap_df=shap_df,
-#                                          shap_baseline_value=40,
-#                                          save_dir=None) #'/Users/simon/Desktop/feltz'
-# dfs, img = test.run()
-
-# shap_df = pd.read_csv('/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0)
-# test = ShapAggregateStatisticsVisualizer(config_path='/Users/simon/Desktop/envs/NG_Unsupervised/project_folder/project_config.ini',
-#                                          classifier_name='target',
-#                                          shap_df=shap_df,
-#                                          shap_baseline_value=40,
-#                                          save_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/logs/shap')
-#

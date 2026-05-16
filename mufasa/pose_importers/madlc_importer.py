@@ -121,12 +121,3 @@ class MADLCImporterH5(ConfigReader, PoseImporterMixin):
             stdout_success(msg=f"Video {video_name} data imported...", elapsed_time=video_timer.elapsed_time_str)
         self.timer.stop_timer()
         stdout_success(msg=f"All maDLC H5 data files imported to {self.input_csv_dir} directory", elapsed_time=self.timer.elapsed_time_str)
-
-
-# test = MADLCImporterH5(config_path=r'/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                    data_folder=r'/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/h5',
-#                    file_type='ellipse',
-#                    id_lst=['Simon', 'JJ'],
-#                    interpolation_settings= {'type': 'animals', 'method': 'linear'},
-#                    smoothing_settings = {'time_window': 500, 'method': 'gaussian'})
-# test.run()

@@ -425,33 +425,3 @@ class FSTTCCalculator(ConfigReader, PlottingMixin):
 
 #
 #
-# test = FSTTCCalculator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                        time_window=10000,
-#                         behavior_lst=['Attack', 'Sniffing'],
-#                         create_graphs=True)
-# test.run()
-#
-
-
-# test = FSTTCCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                        time_window=60000,
-#                        join_bouts_within_delta=True,
-#                        time_delta_at_onset=True,
-#                        behavior_lst=['licking_grooming', 'active_nursing', 'nest_attendance'], #'passive_nursing', 'nest_attendance'
-#                        create_graphs=True)
-# test.run()
-
-
-# test = FSTTCCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                      time_window=10000,
-#                      behavior_lst=['Attack', 'Sniffing'],
-#                     create_graphs=False)
-# test.run()
-
-
-#
-# test = FSTTCCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/naresh/project_folder/project_config.ini',
-#                      time_window=2000,
-#                      behavior_lst=['Erratic Turning', 'Bottom', 'Normal Swimming', 'Freezing', 'Wall Bumping'],
-#                     create_graphs=True)
-# test.run()

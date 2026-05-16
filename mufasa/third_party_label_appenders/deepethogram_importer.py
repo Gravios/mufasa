@@ -134,8 +134,3 @@ class DeepEthogramImporter(ConfigReader):
         stdout_success(
             msg=f"Annotations for {str(len(list(self.clf_names)))} behaviors added to {len(self.matches_dict.keys())} videos and saved under derived/labels/."
         )
-
-
-# test = DeepEthogramImporter(deep_ethogram_dir='/Users/simon/Desktop/troubleshooting/deepethnogram/deepethnogram',
-#                             config_path='/Users/simon/Desktop/troubleshooting/deepethnogram/project_folder/project_config.ini')
-# test.run()

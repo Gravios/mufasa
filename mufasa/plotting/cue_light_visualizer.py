@@ -207,14 +207,3 @@ class CueLightVisualizer(ConfigReader):
             stdout_success(msg=f"Cue light video visualization for video {self.video_name} saved at {self.save_video_path}", elapsed_time=self.timer.elapsed_time_str)
         if self.frame_setting:
             stdout_success(msg=f"Cue light frame visualization for video {self.video_name} saved at {frames_dir}", elapsed_time=self.timer.elapsed_time_str)
-
-# if __name__ == "__main__":
-#     test = CueLightVisualizer(config_path=r"C:\troubleshooting\cue_light\t1\project_folder\project_config.ini",
-#                               cue_light_names=['cl'],
-#                               video_path=r"C:\troubleshooting\cue_light\t1\project_folder\videos\2025-05-21 16-10-06_cropped.mp4",
-#                               data_path=r"C:\troubleshooting\cue_light\t1\project_folder\csv\cue_lights\2025-05-21 16-10-06_cropped.csv",
-#                               video_setting=True,
-#                               frame_setting=False,
-#                               core_cnt=23)
-#
-#     test.run()

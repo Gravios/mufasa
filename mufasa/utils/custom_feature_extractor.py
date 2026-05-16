@@ -203,12 +203,3 @@ class CustomFeatureExtractor(ConfigReader):
 
             else:
                 user_class(self.config_path)
-
-# test = CustomFeatureExtractor(extractor_file_path=r"C:\Users\sroni\Downloads\CustomSimbaWithNotes.py",
-#                               config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")
-# test.run()
-
-
-# test = CustomFeatureExtractor(extractor_file_path='/Users/simon/Desktop/envs/mufasa/mufasa/mufasa/feature_extractors/amber_feature_extractor.py',
-#                               config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/Amber_test/project_folder/project_config.ini')
-# test.run()

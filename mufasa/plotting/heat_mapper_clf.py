@@ -152,28 +152,3 @@ class HeatMapperClfSingleCore(ConfigReader, PlottingMixin):
 
         self.timer.stop_timer()
         stdout_success(msg=f"All heatmap visualizations created in {self.heatmap_clf_location_dir} directory", elapsed_time=self.timer.elapsed_time_str)
-
-
-# test = HeatMapperClfSingleCore(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini",
-#                      style_attr = {'palette': 'jet', 'shading': 'gouraud', 'bin_size': 50, 'max_scale': 'auto'},
-#                      final_img_setting=True,
-#                      video_setting=True,
-#                      frame_setting=False,
-#                      bodypart='Ear_left',
-#                      clf_name='straub_tail',
-#                      data_paths=[r"C:\troubleshooting\RAT_NOR\project_folder\csv\test\2022-06-20_NOB_DOT_4.csv"])
-# test.run()
-
-
-
-
-
-# test = HeatMapperClfSingleCore(config_path='/Users/simon/Desktop/envs/troubleshooting/Two_animals_16bps/project_folder/project_config.ini',
-#                      style_attr = {'palette': 'jet', 'shading': 'gouraud', 'bin_size': 75, 'max_scale': 'auto'},
-#                      final_img_setting=False,
-#                      video_setting=True,
-#                      frame_setting=False,
-#                      bodypart='Nose_1',
-#                      clf_name='Attack',
-#                      files_found=['/Users/simon/Desktop/envs/troubleshooting/Two_animals_16bps/project_folder/csv/machine_results/Together_3.csv'])
-# test.run()

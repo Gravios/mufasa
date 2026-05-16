@@ -735,7 +735,3 @@ if __name__ == "__main__" and not hasattr(sys, 'ps1'):
     args = parser.parse_args()
     runner = RiptortusFeaturizer(config_path=args.config_path)
     runner.run()
-
-
-# test = RiptortusFeaturizer(config_path=r"D:\troubleshooting\riptortus\project_folder\project_config.ini")
-# test.run()

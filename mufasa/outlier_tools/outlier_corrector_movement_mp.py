@@ -176,6 +176,3 @@ class OutlierCorrecterMovementMultiProcess(ConfigReader, FeatureExtractionMixin)
 #
 # if __name__ == "__main__":
 #     #test = OutlierCorrecterMovementMultiProcess(config_path=r"C:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini")
-#     test = OutlierCorrecterMovementMultiProcess(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")
-#     test.run()
-#

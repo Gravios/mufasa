@@ -463,7 +463,3 @@ class ExtractFeaturesFrom4bps(ConfigReader, FeatureExtractionMixin):
             msg="All features extracted. Results are stored in the project_folder/csv/features_extracted directory",
             elapsed_time=self.timer.elapsed_time_str,
         )
-
-
-# test = ExtractFeaturesFrom4bps(config_path='/Users/simon/Desktop/envs/simba_dev/tests/test_data/mouse_open_field/project_folder/project_config.ini')
-# test.run()

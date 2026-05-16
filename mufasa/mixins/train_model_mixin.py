@@ -2870,15 +2870,3 @@ class TrainModelMixin(object):
 # trainer.clf_define(cuda=True)
 
 # from mufasa.utils.read_write import read_simba_meta_files
-# test = TrainModelMixin()
-# data_df, _ = test.read_all_files_in_folder(file_paths=[r"C:\troubleshooting\two_black_animals_14bp\project_folder\csv\targets_inserted\Together_1.csv"], file_type='csv', classifier_names=['Attack'])
-# meta_file_lst = read_simba_meta_files(folder_path=r"C:\troubleshooting\two_black_animals_14bp\project_folder\configs")
-#
-# meta_dicts = test.check_validity_of_meta_files(data_df=data_df, meta_file_paths=meta_file_lst)
-#
-
-
-# test = TrainModelMixin()
-# test.read_all_files_in_folder_mp(file_paths=['/Users/simon/Desktop/envs/troubleshooting/jake/project_folder/csv/targets_inserted/22-437C_c3_2022-11-01_13-16-23_color.csv', '/Users/simon/Desktop/envs/troubleshooting/jake/project_folder/csv/targets_inserted/22-437D_c4_2022-11-01_13-16-39_color.csv'],
-#                               file_type='csv', classifier_names=['attack', 'non-agresive parallel swimming'])
-#

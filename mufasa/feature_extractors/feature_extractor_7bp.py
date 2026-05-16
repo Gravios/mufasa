@@ -609,7 +609,3 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
             msg="All features extracted. Results are stored in the project_folder/csv/features_extracted directory",
             elapsed_time=self.timer.elapsed_time_str,
         )
-
-
-# test = ExtractFeaturesFrom7bps(config_path='/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/project_config.ini')
-# test.run()

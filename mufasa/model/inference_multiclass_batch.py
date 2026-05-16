@@ -130,11 +130,3 @@ class InferenceMulticlassBatch(TrainModelMixin, ConfigReader):
             elapsed_time=self.timer.elapsed_time_str,
             source=self.__class__.__name__,
         )
-
-
-# test = InferenceMulticlassBatch(config_path='/Users/simon/Desktop/envs/troubleshooting/multilabel/project_folder/project_config.ini')
-# test.run()
-
-
-# test.clf.n_classes_
-# test.model_dict

@@ -231,20 +231,3 @@ class CueLightAnalyzer(ConfigReader):
             print(f'Detailed cue light data saved at {details_save_path}...')
         self.timer.stop_timer()
         stdout_success(msg=f"Analysed {self.video_cnt} files. Data stored in {self.save_dir}", elapsed_time=self.timer.elapsed_time)
-
-# if __name__ == "__main__":
-#     test = CueLightAnalyzer(config_path=r"C:\troubleshooting\cue_light\t1\project_folder\project_config.ini",
-#                             data_dir=r'C:\troubleshooting\cue_light\t1\project_folder\csv\outlier_corrected_movement_location',
-#                             cue_light_names=['cl', 'cl2'],
-#                             save_dir=r'C:\troubleshooting\cue_light\t1\project_folder\csv\cue_lights',
-#                             core_cnt=18,
-#                             detailed_data=True)
-#     test.run()
-
-
-
-
-# test = CueLightAnalyzer(config_path='/Users/simon/Desktop/troubleshooting/light_analyzer/project_folder/project_config.ini',
-#                         in_dir='/Users/simon/Desktop/troubleshooting/light_analyzer/project_folder/csv/outlier_corrected_movement_location',
-#                         cue_light_names=['Cue_light'])
-# test.run()

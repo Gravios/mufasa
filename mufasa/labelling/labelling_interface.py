@@ -511,25 +511,3 @@ def select_labelling_video(config_path: Union[str, os.PathLike],
                            threshold_dict=threshold_dict,
                            setting=setting,
                            continuing=continuing)
-
-
-# test = select_labelling_video(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini",
-#                               threshold_dict=None, #threshold_dict={'Attack': 0.4}
-#                               setting='from_scratch',
-#                               continuing=False)
-
-# _ = LabellingInterface(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini",
-#                        file_path=r"C:\troubleshooting\mitra\project_folder\videos\501_MA142_Gi_CNO_0521.mp4",
-#                        threshold_dict=None,
-#                        setting='from_scratch',
-#                        continuing=False)
-
-
-
-
-
-# #
-# test = select_labelling_video(config_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/project_config.ini",
-#                               threshold_dict={'Attack': 0.4},
-#                               setting='from_scratch',
-#                               continuing=False)

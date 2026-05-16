@@ -182,30 +182,3 @@ class TresholdPlotCreatorSingleProcess(ConfigReader, PlottingMixin):
                 stdout_information(msg=f"Probability plot for video {self.video_name} saved (elapsed time: {video_timer.elapsed_time_str}s)...")
         self.timer.stop_timer()
         stdout_success(msg=f"All probability visualizations created in {self.probability_plot_dir} directory", elapsed_time=self.timer.elapsed_time_str)
-
-
-# test = TresholdPlotCreatorSingleProcess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                                         frame_setting=False,
-#                                         video_setting=True,
-#                                         last_image=True,
-#                                         clf_name='Attack',
-#                                         files_found=['/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/machine_results/Together_1.csv'],
-#                                         style_attr={'width': 640, 'height': 480, 'font size': 10, 'line width': 10, 'color': 'Orange', 'circle size': 20, 'y_max': 'auto'})
-# test.run()
-
-# test = TresholdPlotCreatorSingleProcess(config_path=r"C:\troubleshooting\sleap_two_animals\project_folder\project_config.ini",
-#                                         frame_setting=False,
-#                                         video_setting=True,
-#                                         last_frame=True,
-#                                         clf_name='Attack',
-#                                         data_path=[r"C:\troubleshooting\sleap_two_animals\project_folder\csv\machine_results\Together_1.csv"],
-#                                         size = (640, 480),
-#                                         font_size=10,
-#                                         line_width=6,
-#                                         line_color='Orange',
-#                                         y_max=None,
-#                                         line_opacity=0.8)
-# test.run()
-#
-
-#

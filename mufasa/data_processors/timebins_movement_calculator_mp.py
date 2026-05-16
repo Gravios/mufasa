@@ -253,26 +253,3 @@ class TimeBinsMovementCalculatorMultiprocess(ConfigReader, FeatureExtractionMixi
         self.results.set_index("VIDEO").to_csv(self.save_path)
         self.timer.stop_timer()
         stdout_success(msg=f"Movement time-bins results for {len(self.file_paths)} videos ({self.bin_length}s bin size) saved at {self.save_path}", elapsed_time=self.timer.elapsed_time_str, source=self.__class__.__name__)
-
-
-
-# if __name__ == "__main__":
-#     test = TimeBinsMovementCalculatorMultiprocess(config_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/project_config.ini",
-#                                                   body_parts=['Nose'], #['Simon CENTER OF GRAVITY', 'JJ CENTER OF GRAVITY', 'Animal_1 CENTER OF GRAVITY']
-#                                                   bin_length=0.5,
-#                                                   plots=True)
-#     test.run()
-#     test.save()
-
-#
-# if __name__ == "__main__":
-#     test = TimeBinsMovementCalculatorMultiprocess(config_path=r"E:\troubleshooting\mitra_pbn\mitra_pbn\project_folder\project_config.ini",
-#                                                   bin_length=60,
-#                                                   plots=False,
-#                                                   core_cnt=10,
-#                                                   velocity=False,
-#                                                   transpose=True,
-#                                                   threshold=0.784,
-#                                                   body_parts=['center'])
-#     test.run()
-#     test.save()

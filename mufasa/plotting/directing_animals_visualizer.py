@@ -245,16 +245,3 @@ class DirectingOtherAnimalsVisualizer(ConfigReader, PlottingMixin):
 #               DIRECTION_THICKNESS: 10,
 #               HIGHLIGHT_ENDPOINTS: True}
 #
-# test = DirectingOtherAnimalsVisualizer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                                        video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.avi',
-#                                        style_attr=style_attr)
-# #
-# test.run()
-
-
-# style_attr = {'Show_pose': True, 'Pose_circle_size': 3, "Direction_color": 'Random', 'Direction_thickness': 4, 'Highlight_endpoints': True, 'Polyfill': True}
-# test = DirectingOtherAnimalsVisualizer(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                                        data_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location/Together_1.csv',
-#                                        style_attr=style_attr)
-#
-# test.run()

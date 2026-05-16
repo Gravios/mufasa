@@ -214,6 +214,3 @@ class BentoAppender(ConfigReader):
 #     #     )
 #     #
 #
-# test = BentoAppender(config_path=r"C:\troubleshooting\bento_test\project_folder\project_config.ini",
-#                      data_dir=r"C:\troubleshooting\bento_test\bento_files")
-# test.run()
