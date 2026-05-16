@@ -253,7 +253,7 @@ class ColumnNotFoundError(SimbaError):
         source: str = "",
         show_window: bool = False,
     ):
-        msg = f"SIMBA ERROR: Field name {column_name} could not be found in file {file_name}"
+        msg = f"Field name {column_name} could not be found in file {file_name}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
@@ -280,7 +280,7 @@ class DirectoryNotEmptyError(SimbaError):
 
 class ThirdPartyAnnotationFileNotFoundError(SimbaError):
     def __init__(self, video_name: str, source: str = "", show_window: bool = False):
-        msg = f"SIMBA ERROR: Could not find file in project_folder/csv/features_extracted directory representing annotations for video {video_name}"
+        msg = f"Could not find file in project_folder/csv/features_extracted directory representing annotations for video {video_name}"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
@@ -422,7 +422,7 @@ class SimBAGPUError(SimbaError):
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
-class SimBAPAckageVersionError(SimbaError):
+class SimBAPackageVersionError(SimbaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
         msg = f"SIMBA PACKAGE VERSION ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
@@ -432,3 +432,9 @@ class CropError(SimbaError):
     def __init__(self, msg: str, source: str = "", show_window: bool = False):
         msg = f"SIMBA CROP ERROR: {msg}"
         super().__init__(msg=msg, source=source, show_window=show_window)
+
+# Patch 122bl: backward-compat alias for the
+# misspelled exception class name (SimBAPAckage… →
+# SimBAPackage…). External callers importing the old
+# name keep working; the canonical name is preferred.
+SimBAPAckageVersionError = SimBAPackageVersionError

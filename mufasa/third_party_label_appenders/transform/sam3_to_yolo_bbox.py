@@ -36,7 +36,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_nvidea_gpu_available, check_str,
                                 check_valid_boolean, check_valid_lst,
                                 check_valid_tuple)
-from mufasa.utils.errors import NoFilesFoundError, SimBAPAckageVersionError
+from mufasa.utils.errors import NoFilesFoundError, SimBAPackageVersionError
 from mufasa.utils.printing import (SimbaTimer, stdout_information,
                                   stdout_success, stdout_warning)
 from mufasa.utils.read_write import (create_directory,
@@ -81,7 +81,7 @@ class SAM3ToYoloBBox:
     :param bool verbose: If True, print progress updates. Default True.
 
     :raises SimBAGPUError: If no NVIDIA GPU is detected (via ``nvidia-smi``).
-    :raises SimBAPAckageVersionError: If ``ultralytics`` is not installed, or ``SAM3SemanticPredictor`` cannot be imported.
+    :raises SimBAPackageVersionError: If ``ultralytics`` is not installed, or ``SAM3SemanticPredictor`` cannot be imported.
 
     :example:
     >>> runner = SAM3ToYoloBBox(video_data=r'/path/to/videos', sam_path=r'/path/to/sam3.pt', save_dir=r'/path/to/yolo_project', txt_prompt='mouse', n_frames=50)
@@ -114,7 +114,7 @@ class SAM3ToYoloBBox:
         check_nvidea_gpu_available(raise_error=True)
         _ = get_pkg_version(pkg='ultralytics', raise_error=True)
         if SAM3SemanticPredictor is None:
-            raise SimBAPAckageVersionError(msg='Could not import SAM3SemanticPredictor from ultralytics.models.sam. Install a compatible ultralytics build with SAM3 support.', source=self.__class__.__name__)
+            raise SimBAPackageVersionError(msg='Could not import SAM3SemanticPredictor from ultralytics.models.sam. Install a compatible ultralytics build with SAM3 support.', source=self.__class__.__name__)
 
         check_instance(source=f'{self.__class__.__name__} video_data', instance=video_data, accepted_types=(str, os.PathLike, list))
         if isinstance(video_data, list):

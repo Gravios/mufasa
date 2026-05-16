@@ -42,7 +42,7 @@ class HeatmapLocationPopup(PopUpMixin, ConfigReader):
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         self.data_path = os.path.join(self.project_path, Paths.OUTLIER_CORRECTED.value)
         self.files_found_dict = get_file_name_info_in_directory(directory=self.data_path, file_type=self.file_type)
-        check_if_filepath_list_is_empty(filepaths=list(self.files_found_dict.keys()),error_msg="SIMBA ERROR: Zero files found in the project_folder/csv/outlier_corrected_movement_location directory. ",)
+        check_if_filepath_list_is_empty(filepaths=list(self.files_found_dict.keys()),error_msg="Zero files found in the project_folder/csv/outlier_corrected_movement_location directory. ",)
         PopUpMixin.__init__(self, title="HEATMAPS: LOCATION", icon='heatmap')
         max_scales = list(np.arange(5, 105, 5))
         max_scales.insert(0, AUTO)

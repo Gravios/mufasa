@@ -23,7 +23,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_valid_boolean, check_valid_device,
                                 check_valid_url)
 from mufasa.utils.enums import Options
-from mufasa.utils.errors import SimBAGPUError, SimBAPAckageVersionError
+from mufasa.utils.errors import SimBAGPUError, SimBAPackageVersionError
 from mufasa.utils.printing import stdout_information
 from mufasa.utils.read_write import find_core_cnt, get_current_time
 from mufasa.utils.yolo import load_yolo_model
@@ -68,7 +68,7 @@ class FitYolo():
     :param int workers: Data-loader worker processes. Use ``-1`` for all cores. Default ``8``.
     :param int patience: Early-stopping patience (epochs without improvement). Default ``100``.
     :raises SimBAGPUError: If no CUDA-capable GPU is detected.
-    :raises SimBAPAckageVersionError: If ``ultralytics`` is unavailable in the environment.
+    :raises SimBAPackageVersionError: If ``ultralytics`` is unavailable in the environment.
     :raises FileNotFoundError: If ``weights_path`` or ``model_yaml`` do not exist.
     :raises ValueError: If provided arguments fail SimBA validation checks.
 
@@ -104,7 +104,7 @@ class FitYolo():
         if not _is_cuda_available()[0]:
             raise SimBAGPUError(msg='No GPU detected.', source=self.__class__.__name__)
         if YOLO is None:
-            raise SimBAPAckageVersionError(msg='Ultralytics package not detected.', source=self.__class__.__name__)
+            raise SimBAPackageVersionError(msg='Ultralytics package not detected.', source=self.__class__.__name__)
         if weights_path is not None:
             check_file_exist_and_readable(file_path=weights_path)
             self.weights_path = weights_path

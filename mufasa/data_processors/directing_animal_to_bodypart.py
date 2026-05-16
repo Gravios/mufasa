@@ -46,7 +46,7 @@ class DirectingAnimalsToBodyPartAnalyzer(ConfigReader, FeatureExtractionMixin):
             os.makedirs(self.directionality_df_dir)
         check_if_filepath_list_is_empty(
             filepaths=self.outlier_corrected_paths,
-            error_msg=f"SIMBA ERROR: No data found in the {self.outlier_corrected_dir} directory",
+            error_msg=f"No data found in the {self.outlier_corrected_dir} directory",
         )
 
         print(f"Processing {str(len(self.outlier_corrected_paths))} video(s)...")

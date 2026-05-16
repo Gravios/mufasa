@@ -98,7 +98,7 @@ def change_img_format(directory: Union[str, os.PathLike],
     check_if_dir_exists(in_dir=directory, source=change_img_format.__name__)
     files_found = glob.glob(directory + f"/*.{file_type_in}")
     if len(files_found) == 0:
-        raise NoFilesFoundError(f"SIMBA ERROR: No {file_type_in} files (with .{file_type_in} file extension) found in the {directory} directory", source=change_img_format.__name__,
+        raise NoFilesFoundError(f"No {file_type_in} files (with .{file_type_in} file extension) found in the {directory} directory", source=change_img_format.__name__,
         )
     print(f"{len(files_found)} image files found in {directory}...")
     for file_cnt, file_path in enumerate(files_found):
@@ -845,7 +845,7 @@ def convert_video_powerpoint_compatible_format(file_path: Union[str, os.PathLike
     save_name = os.path.join(dir, file_name + "_powerpointready.mp4")
     if os.path.isfile(save_name):
         raise FileExistError(
-            msg="SIMBA ERROR: The outfile file already exist: {}.".format(save_name),
+            msg="The outfile file already exist: {}.".format(save_name),
             source=convert_video_powerpoint_compatible_format.__name__,
         )
     if gpu:
@@ -906,7 +906,7 @@ def video_to_greyscale(file_path: Union[str, os.PathLike],
     if save_path is None:
         save_name = os.path.join(dir, file_name + "_grayscale.mp4")
         if os.path.isfile(save_name):
-            raise FileExistError(msg="SIMBA ERROR: The outfile file already exist: {}.".format(save_name), source=video_to_greyscale.__name__)
+            raise FileExistError(msg="The outfile file already exist: {}.".format(save_name), source=video_to_greyscale.__name__)
     else:
         check_if_dir_exists(in_dir=os.path.dirname(save_path))
         save_name = deepcopy(save_path)
@@ -1284,7 +1284,7 @@ def clip_video_in_range(file_path: Union[str, os.PathLike],
         check_if_dir_exists(in_dir=os.path.dirname(save_path), raise_error=True)
         save_name = deepcopy(save_path)
     if os.path.isfile(save_name) and (not overwrite):
-        raise FileExistError(msg=f"SIMBA ERROR: The outfile file already exist: {save_name}.", source=clip_video_in_range.__name__)
+        raise FileExistError(msg=f"The outfile file already exist: {save_name}.", source=clip_video_in_range.__name__)
     if gpu:
         cmd = f'ffmpeg -hwaccel auto -i "{file_path}" -ss {start_time} -to {end_time} -async 1 -c:v h264_nvenc -rc vbr -cq {quality_crf} "{save_name}" -loglevel error -stats -hide_banner -y'
     else:
@@ -1337,7 +1337,7 @@ def downsample_video(file_path: Union[str, os.PathLike],
         check_if_dir_exists(in_dir=os.path.dirname(save_path), raise_error=True)
         save_name = deepcopy(save_path)
     if os.path.isfile(save_name):
-        raise FileExistError("SIMBA ERROR: The outfile file already exist: {}.".format(save_name), source=downsample_video.__name__)
+        raise FileExistError("The outfile file already exist: {}.".format(save_name), source=downsample_video.__name__)
     quality = 23 if not check_int(name=f'{downsample_video.__name__} quality', value=quality, min_value=0, max_value=52, raise_error=False)[0] else int(quality)
     if codec is None:
         codec = get_ffmpeg_codec(file_name=file_path)
@@ -1456,7 +1456,7 @@ def batch_convert_video_format(directory: Union[str, os.PathLike],
         )
     if not os.path.isdir(directory):
         raise NotDirectoryError(
-            msg="SIMBA ERROR: {} is not a valid directory".format(directory),
+            msg="{} is not a valid directory".format(directory),
             source=batch_convert_video_format.__name__,
         )
     video_paths = []
@@ -1467,7 +1467,7 @@ def batch_convert_video_format(directory: Union[str, os.PathLike],
             video_paths.append(file_path)
     if len(video_paths) < 1:
         raise NoFilesFoundError(
-            msg="SIMBA ERROR: No files with .{} file extension found in the {} directory".format(
+            msg="No files with .{} file extension found in the {} directory".format(
                 input_format, directory
             ),
             source=batch_convert_video_format.__name__,
@@ -1481,7 +1481,7 @@ def batch_convert_video_format(directory: Union[str, os.PathLike],
         )
         if os.path.isfile(save_path):
             raise FileExistError(
-                msg="SIMBA ERROR: The outfile file already exist: {}.".format(
+                msg="The outfile file already exist: {}.".format(
                     save_path
                 ),
                 source=batch_convert_video_format.__name__,
@@ -1519,7 +1519,7 @@ def batch_create_frames(directory: Union[str, os.PathLike]) -> None:
 
     if not os.path.isdir(directory):
         raise NotDirectoryError(
-            msg="SIMBA ERROR: {} is not a valid directory".format(directory),
+            msg="{} is not a valid directory".format(directory),
             source=batch_create_frames.__name__,
         )
     video_paths = []
@@ -1530,7 +1530,7 @@ def batch_create_frames(directory: Union[str, os.PathLike]) -> None:
             video_paths.append(file_path)
     if len(video_paths) < 1:
         raise NoFilesFoundError(
-            msg="SIMBA ERROR: No files with .mp4, .avi, .mov, .flv file ending found in the {} directory".format(
+            msg="No files with .mp4, .avi, .mov, .flv file ending found in the {} directory".format(
                 directory
             ),
             source=batch_create_frames.__name__,
@@ -1718,7 +1718,7 @@ def crop_single_video(file_path: Union[str, os.PathLike],
         raise CountError( msg="CROP FAILED: Cannot use negative crop coordinates.", source=crop_multiple_videos.__name__)
     save_path = os.path.join(dir_name, f"{file_name}_cropped.mp4")
     if os.path.isfile(save_path):
-        raise FileExistError(msg=f"SIMBA ERROR: The out file  already exist: {save_path}.", source=crop_single_video.__name__)
+        raise FileExistError(msg=f"The out file  already exist: {save_path}.", source=crop_single_video.__name__)
     timer = SimbaTimer(start=True)
     crop_video(video_path=file_path, save_path=save_path, size=(roi_selector.width, roi_selector.height), top_left=(roi_selector.top_left[0], roi_selector.top_left[1]), gpu=gpu, verbose=False, quality=quality)
     timer.stop_timer()
@@ -2219,12 +2219,12 @@ def copy_img_folder(
     timer = SimbaTimer(start=True)
     if not os.path.isdir(source):
         raise NotDirectoryError(
-            msg=f"SIMBA ERROR: source {source} is not a directory.",
+            msg=f"source {source} is not a directory.",
             source=copy_img_folder.__name__,
         )
     if len(glob.glob(source + "/*.png")) == 0:
         raise NoFilesFoundError(
-            msg=f"SIMBA ERROR: source {source} does not contain any .png files.",
+            msg=f"source {source} does not contain any .png files.",
             source=copy_img_folder.__name__,
         )
     input_basename = os.path.basename(source)
@@ -2239,7 +2239,7 @@ def copy_img_folder(
     destination = os.path.join(input_frames_dir, input_basename)
     if os.path.isdir(destination):
         raise DirectoryExistError(
-            msg=f"SIMBA ERROR: {destination} already exist in SimBA project.",
+            msg=f"{destination} already exist in SimBA project.",
             source=copy_img_folder.__name__,
         )
     print(f"Importing image files for {input_basename}...")

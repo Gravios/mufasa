@@ -55,7 +55,7 @@ from mufasa.utils.read_write import (concatenate_videos_in_folder, get_fn_ext,
 #             img_lst.append(frame)
 #             current_frame += 1
 #         else:
-#             print('SIMBA WARNING: SimBA tried to grab frame number {} from video {}, but could not find it. The video has {} frames.'.format(str(current_frame), video_path, str(cap.get(cv2.CAP_PROP_FRAME_COUNT))))
+#             print('SimBA tried to grab frame number {} from video {}, but could not find it. The video has {} frames.'.format(str(current_frame), video_path, str(cap.get(cv2.CAP_PROP_FRAME_COUNT))))
 #     return img_lst
 
 
@@ -134,7 +134,7 @@ class BoundaryVisualizer(ConfigReader, PlottingMixin):
                 self.intersection_path = p
         if self.intersection_path is None:
             print(
-                "SIMBA WARNING: No ROI intersection data found for video {} in directory {}. Skipping intersection visualizations".format(
+                "No ROI intersection data found for video {} in directory {}. Skipping intersection visualizations".format(
                     self.video_name, self.intersection_data_folder
                 )
             )
@@ -153,7 +153,7 @@ class BoundaryVisualizer(ConfigReader, PlottingMixin):
             )
             if not os.path.isfile(self.data_df_path):
                 raise NoFilesFoundError(
-                    msg=f"SIMBA ERROR: No keypoint data found in {self.data_df_path}. Untick key-point checkbox or import pose-estimation data."
+                    msg=f"No keypoint data found in {self.data_df_path}. Untick key-point checkbox or import pose-estimation data."
                 )
             self.data_df = (
                 read_df(file_path=self.data_df_path, file_type=self.file_type)

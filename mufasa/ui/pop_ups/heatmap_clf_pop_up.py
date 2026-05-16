@@ -38,7 +38,7 @@ class HeatmapClfPopUp(PopUpMixin, ConfigReader):
         self.data_path = os.path.join(self.project_path, Paths.MACHINE_RESULTS_DIR.value)
 
         self.files_found_dict = get_file_name_info_in_directory(directory=self.data_path, file_type=self.file_type)
-        check_if_filepath_list_is_empty( filepaths=list(self.files_found_dict.keys()), error_msg="SIMBA ERROR: Zero files found in the project_folder/csv/machine_results directory. ",)
+        check_if_filepath_list_is_empty( filepaths=list(self.files_found_dict.keys()), error_msg="Zero files found in the project_folder/csv/machine_results directory. ",)
         PopUpMixin.__init__(self, title="CREATE CLASSIFICATION HEATMAP PLOTS", icon='heatmap')
         max_scales_option = list(np.arange(5, 105, 5))
         max_scales_option.insert(0, AUTO)

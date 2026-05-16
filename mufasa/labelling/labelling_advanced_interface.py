@@ -525,7 +525,7 @@ class AdvancedLabellingInterface(ConfigReader):
                 labels=self.data_df_targets,
             )
         except Exception as exc:
-            print(f"SIMBA ERROR: labels save failed for {self.video_name}: {exc}")
+            print(f"labels save failed for {self.video_name}: {exc}")
             raise FileExistsError
         stdout_success(
             msg=f"SAVED: Labels for video {self.video_name} saved.",

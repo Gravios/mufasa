@@ -33,7 +33,7 @@ from mufasa.utils.errors import (BodypartColumnNotFoundError, DataHeaderError,
                                 MissingProjectConfigEntryError,
                                 NoFilesFoundError, NoROIDataError,
                                 NotDirectoryError, ParametersFileError,
-                                PermissionError, SimBAPAckageVersionError)
+                                PermissionError, SimBAPackageVersionError)
 from mufasa.utils.lookups import (create_color_palettes, get_color_dict,
                                  get_emojis, get_log_config)
 from mufasa.utils.printing import SimbaTimer, stdout_success
@@ -509,12 +509,12 @@ class ConfigReader(object):
         """
 
         if not os.path.isfile(self.roi_coordinates_path):
-            raise NoROIDataError(msg="SIMBA ERROR: No ROI definitions were found in your SimBA project. Please draw some ROIs before analyzing your ROI data", source=self.__class__.__name__)
+            raise NoROIDataError(msg="No ROI definitions were found in your SimBA project. Please draw some ROIs before analyzing your ROI data", source=self.__class__.__name__)
         else:
             try:
                 self.rectangles_df = pd.read_hdf(self.roi_coordinates_path, key=Keys.ROI_RECTANGLES.value)
             except ValueError:
-                raise SimBAPAckageVersionError(msg=f'Could not read {self.roi_coordinates_path}. Did you create the file in a different version of Python? For example, was the file created in a SimBA python 3.6 version while you currently are in Python 3.10 or vice versa?', source=self.__class__.__name__)
+                raise SimBAPackageVersionError(msg=f'Could not read {self.roi_coordinates_path}. Did you create the file in a different version of Python? For example, was the file created in a SimBA python 3.6 version while you currently are in Python 3.10 or vice versa?', source=self.__class__.__name__)
             if ("Center_X" in self.rectangles_df.columns) and (self.rectangles_df["Center_X"].isnull().values.any()):
                 for idx, row in self.rectangles_df.iterrows():
                     self.rectangles_df.loc[idx]["Center_X"] = row["Tags"]["Center tag"][0]
@@ -595,12 +595,12 @@ class ConfigReader(object):
             bp_missing = int(abs(difference) / 3)
             if difference < 0:
                 raise DataHeaderError(
-                    msg=f"SIMBA ERROR: SimBA expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, SimBA found {len(data_df.columns)} columns. Thus, there is {abs(difference)} missing data columns in the imported data, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the SimBA project pose-configuration with {bp_missing} less body-part, or include {bp_missing} more body-part in the imported data",
+                    msg=f"SimBA expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, SimBA found {len(data_df.columns)} columns. Thus, there is {abs(difference)} missing data columns in the imported data, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the SimBA project pose-configuration with {bp_missing} less body-part, or include {bp_missing} more body-part in the imported data",
                     source=self.__class__.__name__,
                 )
             else:
                 raise DataHeaderError(
-                    msg=f"SIMBA ERROR: SimBA expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, SimBA found {len(data_df.columns)} columns. Thus, there is {abs(difference)} more data columns in the imported data than anticipated, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the SimBA project pose-configuration with {bp_missing} more body-part, or include {bp_missing} less body-part in the imported data",
+                    msg=f"SimBA expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, SimBA found {len(data_df.columns)} columns. Thus, there is {abs(difference)} more data columns in the imported data than anticipated, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the SimBA project pose-configuration with {bp_missing} more body-part, or include {bp_missing} less body-part in the imported data",
                     source=self.__class__.__name__,
                 )
         else:

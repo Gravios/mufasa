@@ -29,7 +29,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
 from mufasa.utils.data import df_smoother, savgol_smoother
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import (InvalidVideoFileError, SimBAGPUError,
-                                SimBAPAckageVersionError)
+                                SimBAPackageVersionError)
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_video_meta_data)
@@ -130,7 +130,7 @@ class YoloInference():
         if not _is_cuda_available()[0]:
             raise SimBAGPUError(msg='No GPU detected.', source=self.__class__.__name__)
         if YOLO is None:
-            raise SimBAPAckageVersionError(msg='ultralytics.YOLO package not detected.', source=self.__class__.__name__)
+            raise SimBAPackageVersionError(msg='ultralytics.YOLO package not detected.', source=self.__class__.__name__)
         if isinstance(video_path, list):
             check_valid_lst(data=video_path, source=f'{self.__class__.__name__} video_path', valid_dtypes=(str, np.str_,), min_len=1)
         elif os.path.isfile(video_path):

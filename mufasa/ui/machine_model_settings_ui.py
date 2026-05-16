@@ -403,7 +403,7 @@ class MachineModelSettingsPopUp(PopUpMixin, ConfigReader):
         try:
             meta_df = pd.read_csv(config_file_path, index_col=False)
         except pd.errors.ParserError:
-            raise InvalidHyperparametersFileError(msg=f"SIMBA ERROR: {config_name} is not a valid SimBA meta hyper-parameters file.")
+            raise InvalidHyperparametersFileError(msg=f"{config_name} is not a valid SimBA meta hyper-parameters file.")
         self.meta = {}
         for m in meta_df.columns:
             self.meta[m] = meta_df[m][0]

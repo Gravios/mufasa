@@ -58,7 +58,7 @@ class GridSearchVisualizer(UMLMixin):
         )
         check_if_filepath_list_is_empty(
             filepaths=self.data_paths,
-            error_msg=f"SIMBA ERROR: No pickle files found in {model_dir}",
+            error_msg=f"No pickle files found in {model_dir}",
         )
         check_int(
             name=f"{self.__class__.__name__} scatter size",

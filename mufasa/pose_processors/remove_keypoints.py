@@ -41,7 +41,7 @@ class KeypointRemover(object):
         self.files_found = glob.glob(data_folder + "/*." + file_format)
         check_if_filepath_list_is_empty(
             filepaths=self.files_found,
-            error_msg="SIMBA ERROR: Zero files found of type {} in the {} directory".format(
+            error_msg="Zero files found of type {} in the {} directory".format(
                 file_format, data_folder
             ),
         )

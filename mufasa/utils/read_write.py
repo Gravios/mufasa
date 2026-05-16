@@ -71,7 +71,7 @@ from mufasa.utils.errors import (CorruptedFileError, DataHeaderError,
                                 MissingProjectConfigEntryError, NoDataError,
                                 NoFilesFoundError, NotDirectoryError,
                                 ParametersFileError, PermissionError,
-                                SimBAPAckageVersionError)
+                                SimBAPackageVersionError)
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.warnings import (
     FileExistWarning, FrameRangeWarning, GPUToolsWarning, InvalidValueWarning,
@@ -670,13 +670,13 @@ def concatenate_videos_in_folder(in_folder: Union[str, os.PathLike, bytes],
         for file_path in file_paths:
             check_file_exist_and_readable(file_path=file_path)
         files = file_paths
-    check_if_filepath_list_is_empty(filepaths=files, error_msg=f"SIMBA ERROR: Cannot join videos in directory {in_folder}. The directory contain ZERO files in format {video_format}")
+    check_if_filepath_list_is_empty(filepaths=files, error_msg=f"Cannot join videos in directory {in_folder}. The directory contain ZERO files in format {video_format}")
     if substring is not None:
         sliced_paths = []
         for file_path in files:
             if substring in get_fn_ext(filepath=file_path)[1]:
                 sliced_paths.append(file_path)
-        check_if_filepath_list_is_empty(filepaths=sliced_paths, error_msg=f"SIMBA ERROR: Cannot join videos in directory {in_folder}. The directory contain ZERO files in format {video_format} with substring {substring}")
+        check_if_filepath_list_is_empty(filepaths=sliced_paths, error_msg=f"Cannot join videos in directory {in_folder}. The directory contain ZERO files in format {video_format} with substring {substring}")
         files = sliced_paths
     files.sort(key=lambda f: int(re.sub(r"\D", "", f)))
     temp_txt_path = Path(in_folder, "files.txt")
@@ -1185,13 +1185,13 @@ def convert_parquet_to_csv(directory: str) -> None:
 
     if not os.path.isdir(directory):
         raise NotDirectoryError(
-            msg="SIMBA ERROR: {} is not a valid directory".format(directory),
+            msg="{} is not a valid directory".format(directory),
             source=convert_parquet_to_csv.__name__,
         )
     files_found = glob.glob(directory + "/*.parquet")
     if len(files_found) < 1:
         raise NoFilesFoundError(
-            "SIMBA ERROR: No parquet files (with .parquet file ending) found in the {} directory".format(
+            "No parquet files (with .parquet file ending) found in the {} directory".format(
                 directory
             ),
             source=convert_parquet_to_csv.__name__,
@@ -1219,13 +1219,13 @@ def convert_csv_to_parquet(directory: Union[str, os.PathLike]) -> None:
     """
     if not os.path.isdir(directory):
         raise NotDirectoryError(
-            msg="SIMBA ERROR: {} is not a valid directory".format(directory),
+            msg="{} is not a valid directory".format(directory),
             source=convert_csv_to_parquet.__name__,
         )
     files_found = glob.glob(directory + "/*.csv")
     if len(files_found) < 1:
         raise NoFilesFoundError(
-            msg="SIMBA ERROR: No parquet files (with .csv file ending) found in the {} directory".format(
+            msg="No parquet files (with .csv file ending) found in the {} directory".format(
                 directory
             ),
             source=convert_csv_to_parquet.__name__,
@@ -1583,7 +1583,7 @@ def copy_multiple_videos_to_project(config_path: Union[str, os.PathLike],
         video_path_lst = recursive_file_search(directory=source, extensions=list(allowed_video_formats), as_dict=True, raise_error=True)
         video_path_lst = list(video_path_lst.values())
     if len(video_path_lst) == 0:
-        raise NoFilesFoundError(msg=f"SIMBA ERROR: No videos found in {source} directory of file-type {file_type}", source=copy_multiple_videos_to_project.__name__,)
+        raise NoFilesFoundError(msg=f"No videos found in {source} directory of file-type {file_type}", source=copy_multiple_videos_to_project.__name__,)
     # Patch 122o: layout-aware destination — see notes on
     # copy_single_video_to_project for the rationale.
     from mufasa.project_layout import project_paths_from_config
@@ -1764,7 +1764,7 @@ def read_roi_data(roi_path: Union[str, os.PathLike]) -> Tuple[pd.DataFrame, pd.D
     except (pickle.UnpicklingError, ValueError) as e:
         if "unsupported pickle protocol" in str(e).lower():
             print(e.args)
-            raise SimBAPAckageVersionError(msg=f'Pickle VERSION ERROR. The ROIs where likely drawn using a SimBA installation that was built in a **Python** version different from the current Python version (e.g., 3.10 vs 3.6). You currently have Python version {OS.PYTHON_VER.value}. You may have drawn the ROIs in SimBA using Python version >3.8 and now you have Python version <3.8. To fix, use the same Python version as you used when drawing the ROIs')
+            raise SimBAPackageVersionError(msg=f'Pickle VERSION ERROR. The ROIs where likely drawn using a SimBA installation that was built in a **Python** version different from the current Python version (e.g., 3.10 vs 3.6). You currently have Python version {OS.PYTHON_VER.value}. You may have drawn the ROIs in SimBA using Python version >3.8 and now you have Python version <3.8. To fix, use the same Python version as you used when drawing the ROIs')
         else:
             print(e.args)
             raise InvalidFileTypeError(msg=f"{roi_path} is not a valid SimBA ROI definitions file. See above for more detailed error cause.", source=read_roi_data.__name__)
@@ -2132,7 +2132,7 @@ def get_pkg_version(pkg: str, raise_error: Optional[bool] = False):
         return _metadata.version(pkg)
     except _metadata.PackageNotFoundError:
         if raise_error:
-            raise SimBAPAckageVersionError(msg=f'Package not found: {pkg}', source=get_pkg_version.__name__)
+            raise SimBAPackageVersionError(msg=f'Package not found: {pkg}', source=get_pkg_version.__name__)
         else:
             return None
 
@@ -2215,7 +2215,7 @@ def read_pickle(data_path: Union[str, os.PathLike], verbose: Optional[bool] = Fa
         files_found = glob.glob(data_path + f"/*.{Formats.PICKLE.value}")
         if len(files_found) == 0:
             raise NoFilesFoundError(
-                msg=f"SIMBA ERROR: Zero pickle files found in {data_path}.",
+                msg=f"Zero pickle files found in {data_path}.",
                 source=read_pickle.__name__,
             )
         for file_cnt, file_path in enumerate(files_found):
@@ -3657,7 +3657,7 @@ def get_site_packages_path(raise_error: Optional[bool] = True) -> Union[None, os
         return dir_path
     except Exception as e:
         if raise_error:
-            raise SimBAPAckageVersionError(msg=f'site-package directory could not be found: {e.args}', source=get_site_packages_path.__name__)
+            raise SimBAPackageVersionError(msg=f'site-package directory could not be found: {e.args}', source=get_site_packages_path.__name__)
         else:
             return None
 
@@ -3675,14 +3675,14 @@ def get_env_pose_config_dir(raise_error: Optional[bool] = True):
         subdirs = [d for d in os.listdir(pose_config_dir) if os.path.isdir(os.path.join(pose_config_dir, d))]
         missing_subdirs = [x for x in EXPECTED_SUBDIRS if x not in subdirs]
         if len(missing_subdirs) > 0 and raise_error:
-            raise SimBAPAckageVersionError(msg=f'pose_configurations directory did not contain the expected sub-directories: {missing_subdirs}', source=get_env_pose_config_dir.__name__)
+            raise SimBAPackageVersionError(msg=f'pose_configurations directory did not contain the expected sub-directories: {missing_subdirs}', source=get_env_pose_config_dir.__name__)
         elif len(missing_subdirs) > 0 and not raise_error:
             return None
         else:
             return pose_config_dir
     else:
         if raise_error:
-            raise SimBAPAckageVersionError(msg=f'pose_configurations directory could not be found. Expected directory: {pose_config_dir}', source=get_pose_config_dir.__name__)
+            raise SimBAPackageVersionError(msg=f'pose_configurations directory could not be found. Expected directory: {pose_config_dir}', source=get_pose_config_dir.__name__)
         return None
 
 

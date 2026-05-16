@@ -14,7 +14,7 @@ from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.enums import Options, PackageNames
-from mufasa.utils.errors import SimBAGPUError, SimBAPAckageVersionError
+from mufasa.utils.errors import SimBAGPUError, SimBAPackageVersionError
 from mufasa.utils.read_write import find_core_cnt, get_pkg_version, str_2_bool
 
 EPOCH_OPTIONS = list(range(100, 5750, 250))
@@ -34,7 +34,7 @@ class YOLOPoseTrainPopUP(PopUpMixin):
             raise SimBAGPUError(msg=f'Cannot train YOLO pose-estimation model. No NVIDA GPUs detected on machine', source=self.__class__.__name__)
         ultralytics_version = get_pkg_version(pkg=PackageNames.ULTRALYTICS.value)
         if ultralytics_version is None:
-            raise SimBAPAckageVersionError(msg=f'Cannot train YOLO pose-estimation model: Could not find ultralytics package in python environment',  source=self.__class__.__name__)
+            raise SimBAPackageVersionError(msg=f'Cannot train YOLO pose-estimation model: Could not find ultralytics package in python environment',  source=self.__class__.__name__)
 
         PopUpMixin.__init__(self, title="TRAIN YOLO POSE ESTIMATION MODEL", icon='ultralytics_2')
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings')

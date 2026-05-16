@@ -56,11 +56,11 @@ class NoldusObserverImporter(ConfigReader):
         ]
         check_if_filepath_list_is_empty(
             filepaths=self.observer_files_found,
-            error_msg=f"SIMBA ERROR: The {data_dir} directory contains ZERO xlsx/xls files",
+            error_msg=f"The {data_dir} directory contains ZERO xlsx/xls files",
         )
         check_if_filepath_list_is_empty(
             filepaths=self.feature_file_paths,
-            error_msg=f"SIMBA ERROR: The {self.features_dir} directory contains ZERO files",
+            error_msg=f"The {self.features_dir} directory contains ZERO files",
         )
         self.__read_data()
 

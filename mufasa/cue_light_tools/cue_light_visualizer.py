@@ -145,7 +145,7 @@ class CueLightVisualizer(ConfigReader):
         self.video_meta_data = get_video_meta_data(video_path)
         _, self.video_name, _ = get_fn_ext(filepath=data_path)
         if (not frame_setting) and (not video_setting):
-            raise NoSpecifiedOutputError(msg="SIMBA ERROR: Please choose to select either videos, frames, or both frames and videos.")
+            raise NoSpecifiedOutputError(msg="Please choose to select either videos, frames, or both frames and videos.")
         self.cue_light_names, self.video_path, self.data_path = cue_light_names, video_path, data_path
         self.data_df = read_df(self.data_path, self.file_type)
         self.core_cnt = find_core_cnt()[0] if core_cnt == -1 or core_cnt > find_core_cnt()[0] else core_cnt

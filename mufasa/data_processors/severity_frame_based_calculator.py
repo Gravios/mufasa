@@ -44,7 +44,7 @@ class SeverityFrameCalculator(ConfigReader, FeatureExtractionMixin):
         self.settings = settings
         check_if_filepath_list_is_empty(
             filepaths=self.machine_results_paths,
-            error_msg=f"SIMBA ERROR: Cannot process severity. {self.machine_results_dir} directory is empty",
+            error_msg=f"Cannot process severity. {self.machine_results_dir} directory is empty",
         )
         save_name = os.path.join(
             f'severity_{datetime.now().strftime("%Y%m%d%H%M%S")}.csv'

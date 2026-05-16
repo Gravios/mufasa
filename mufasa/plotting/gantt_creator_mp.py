@@ -181,7 +181,7 @@ class GanttCreatorMultiprocess(ConfigReader, PlottingMixin):
 
         check_file_exist_and_readable(file_path=config_path)
         if (not frame_setting) and (not video_setting) and (not last_frm_setting):
-            raise NoSpecifiedOutputError(msg="SIMBA ERROR: Please select gantt videos, frames, and/or last frame.", source=self.__class__.__name__)
+            raise NoSpecifiedOutputError(msg="Please select gantt videos, frames, and/or last frame.", source=self.__class__.__name__)
         check_file_exist_and_readable(file_path=config_path)
         check_int(value=width, min_value=1, name=f'{self.__class__.__name__} width')
         check_int(value=height, min_value=1, name=f'{self.__class__.__name__} height')

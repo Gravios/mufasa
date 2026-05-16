@@ -810,7 +810,7 @@ class PlottingMixin(object):
                 current_frame += 1
             else:
                 print(
-                    "SIMBA WARNING: SimBA tried to grab frame number {} from video {}, but could not find it. The video has {} frames.".format(
+                    "SimBA tried to grab frame number {} from video {}, but could not find it. The video has {} frames.".format(
                         str(current_frame),
                         video_path,
                         str(cap.get(cv2.CAP_PROP_FRAME_COUNT)),

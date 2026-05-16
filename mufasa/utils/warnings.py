@@ -66,7 +66,7 @@ def ThirdPartyAnnotationsAdditionalClfWarning(
 def ThirdPartyAnnotationsInvalidFileFormatWarning(
     annotation_app: str, file_path: str, source: str = "", log_status: bool = False
 ):
-    msg = f"SIMBA WARNING: {file_path} is not a valid {annotation_app} file and is skipped. See the SimBA GitHub repository for expected file format"
+    msg = f"{file_path} is not a valid {annotation_app} file and is skipped. See the SimBA GitHub repository for expected file format"
     if log_status:
         logging.warning(msg=msg)
     stdout_warning(msg=msg)

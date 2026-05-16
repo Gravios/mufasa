@@ -118,7 +118,7 @@ class PathPlotterSingleCore(ConfigReader, PlottingMixin):
 
         log_event(logger_name=str(__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=self.create_log_msg_from_init_args(locals=locals()))
         if (not frame_setting) and (not video_setting) and (not last_frame):
-            raise NoSpecifiedOutputError(msg="SIMBA ERROR: Please choice to create path frames and/or video path plots", source=self.__class__.__name__)
+            raise NoSpecifiedOutputError(msg="Please choice to create path frames and/or video path plots", source=self.__class__.__name__)
         check_valid_lst(data=data_paths, source=self.__class__.__name__, valid_dtypes=(str,), min_len=1)
         _ = [check_file_exist_and_readable(x) for x in data_paths]
         check_file_exist_and_readable(file_path=config_path)

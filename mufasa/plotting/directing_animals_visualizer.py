@@ -97,7 +97,7 @@ class DirectingOtherAnimalsVisualizer(ConfigReader, PlottingMixin):
         if sum(p is None for p in passed_bps) not in (0, len(passed_bps)):
             raise InvalidInputError(msg="left_ear_name, right_ear_name, and nose_name must either all be None or all be provided as strings", source=self.__class__.__name__)
         if not os.path.isfile(self.data_path):
-            raise NoFilesFoundError(msg=f"SIMBA ERROR: Could not find the file at path {self.data_path}. Make sure the data file exist to create directionality visualizations", source=self.__class__.__name__)
+            raise NoFilesFoundError(msg=f"Could not find the file at path {self.data_path}. Make sure the data file exist to create directionality visualizations", source=self.__class__.__name__)
         self.direction_analyzer = DirectingOtherAnimalsAnalyzer(config_path=config_path,
                                                                 bool_tables=False,
                                                                 summary_tables=False,

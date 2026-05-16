@@ -60,7 +60,7 @@ class AggBoundaryStatisticsCalculator(ConfigReader):
         self.data_path = os.path.join(self.project_path, "csv", "anchored_roi_data")
         if not os.path.isdir(self.data_path):
             raise NotDirectoryError(
-                msg=f"SIMBA ERROR: No anchored roi statistics found in {self.data_path}. Create data before analyzing aggregate statistics"
+                msg=f"No anchored roi statistics found in {self.data_path}. Create data before analyzing aggregate statistics"
             )
         self.files_found = (
             glob.glob(self.data_path + "/*.pickle")

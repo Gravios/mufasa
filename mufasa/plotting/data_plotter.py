@@ -68,7 +68,7 @@ class DataPlotter(ConfigReader):
                  verbose: bool = True):
 
         if (not video_setting) and (not frame_setting):
-            raise NoSpecifiedOutputError(msg="SIMBA ERROR: Please choose to create video and/or frames data plots. SimBA found that you ticked neither video and/or frames", source=self.__class__.__name__)
+            raise NoSpecifiedOutputError(msg="Please choose to create video and/or frames data plots. SimBA found that you ticked neither video and/or frames", source=self.__class__.__name__)
         check_valid_lst(data=data_paths, source=self.__class__.__name__, valid_dtypes=(str,), min_len=1)
         for data_path in data_paths: check_file_exist_and_readable(file_path=data_path)
         check_valid_lst(data=body_parts, source=self.__class__.__name__, valid_dtypes=(tuple,))

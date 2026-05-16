@@ -28,7 +28,7 @@ class GanttPlotPopUp(PopUpMixin, ConfigReader):
                  config_path: Union[str, os.PathLike]):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
-        check_if_filepath_list_is_empty(filepaths=self.machine_results_paths,error_msg=f"SIMBA ERROR: Zero files found in the {self.machine_results_dir} directory. Create classification results before visualizing gantt charts",)
+        check_if_filepath_list_is_empty(filepaths=self.machine_results_paths,error_msg=f"Zero files found in the {self.machine_results_dir} directory. Create classification results before visualizing gantt charts",)
         palettes = Options.PALETTE_OPTIONS_CATEGORICAL.value + Options.PALETTE_OPTIONS.value
         self.data_paths = find_files_of_filetypes_in_directory(directory=self.machine_results_dir, extensions=[f'.{self.file_type}'], as_dict=True)
         max_file_name_len, fonts = max(len(k) for k in self.data_paths) + 5, list(get_fonts(sort_alphabetically=True).keys())
@@ -115,7 +115,7 @@ class GanttPlotPopUp(PopUpMixin, ConfigReader):
         if len(clf_names) < 1:
             raise NoSpecifiedOutputError(msg="Select AT LEAST one behavior name.")
         if not frame_setting and not video_setting and not last_frm_setting:
-            raise NoSpecifiedOutputError(msg="SIMBA ERROR: Please select gantt videos, frames, and/or last frame.")
+            raise NoSpecifiedOutputError(msg="Please select gantt videos, frames, and/or last frame.")
 
         if multiple:
             data_paths = list(self.data_paths.values())

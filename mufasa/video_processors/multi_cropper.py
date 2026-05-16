@@ -78,7 +78,7 @@ class MultiCropper(object):
             lst = [row["height"], row["width"], row["top_left_x"], row["top_left_y"]]
             video_name = row["video"]
             if all(v == 0 for v in lst):
-                raise CountError(msg=f"SIMBA ERROR: A crop for video {video_name} has all crop coordinates set to zero. Did you click ESC, space or enter before defining the rectangle crop coordinates?!", source=self.__class__.__name__)
+                raise CountError(msg=f"A crop for video {video_name} has all crop coordinates set to zero. Did you click ESC, space or enter before defining the rectangle crop coordinates?!", source=self.__class__.__name__)
             else:
                 pass
 
