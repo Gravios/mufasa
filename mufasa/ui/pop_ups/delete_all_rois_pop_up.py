@@ -30,10 +30,10 @@ def delete_all_rois_pop_up(config_path: Union[str, os.PathLike], roi_table_frm: 
         project_path = config.get(ConfigKey.GENERAL_SETTINGS.value, ConfigKey.PROJECT_PATH.value)
         roi_coordinates_path = os.path.join(project_path, "logs", Paths.ROI_DEFINITIONS.value)
         if not os.path.isfile(roi_coordinates_path):
-            raise NoROIDataError(msg=f"Cannot delete ROI definitions: no ROI definitions exist in SimBA project. Could find find a file at expected location {roi_coordinates_path}. Create ROIs before deleting ROIs.", source=delete_all_rois_pop_up.__name__)
+            raise NoROIDataError(msg=f"Cannot delete ROI definitions: no ROI definitions exist in Mufasa project. Could find find a file at expected location {roi_coordinates_path}. Create ROIs before deleting ROIs.", source=delete_all_rois_pop_up.__name__)
         else:
             remove_files(file_paths=[roi_coordinates_path], raise_error=True)
-            stdout_trash(msg=f"Deleted all ROI records for video for the SimBA project (Deleted file {roi_coordinates_path}). USe the Define ROIs menu to create new ROIs.")
+            stdout_trash(msg=f"Deleted all ROI records for video for the Mufasa project (Deleted file {roi_coordinates_path}). USe the Define ROIs menu to create new ROIs.")
             if roi_table_frm is not None: roi_table_frm.refresh_window()
     else:
         pass

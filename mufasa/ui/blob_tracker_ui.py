@@ -437,7 +437,7 @@ class BlobTrackingUI(PopUpMixin):
         self.set_status_bar_panel(text=f'Starting blob detection, follow progress in OS terminal...({datetime.now().strftime("%H:%M:%S")})', fg='blue')
 
         sp = False if platform.system() != "Darwin" else True
-        print(f'SimBA blob tracking subprocess: {sp} (platform: {platform.system()}).')
+        print(f'Mufasa blob tracking subprocess: {sp} (platform: {platform.system()}).')
         if sp:
             cmd = f'python "{BLOB_EXECUTOR_PATH}" --data "{self.out_path}"'
             subprocess.run(cmd, check=True, shell=True)

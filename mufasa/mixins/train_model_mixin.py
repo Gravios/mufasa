@@ -166,7 +166,7 @@ class TrainModelMixin(object):
             if classifier_names != None:
                 for clf_name in classifier_names:
                     if not clf_name in df.columns:
-                        raise MissingColumnsError(msg=f"Data for video {vid_name} does not contain any annotations for behavior {clf_name}. Delete classifier {clf_name} from the SimBA project, or add annotations for behavior {clf_name} to the video {vid_name}", source=self.__class__.__name__,)
+                        raise MissingColumnsError(msg=f"Data for video {vid_name} does not contain any annotations for behavior {clf_name}. Delete classifier {clf_name} from the Mufasa project, or add annotations for behavior {clf_name} to the video {vid_name}", source=self.__class__.__name__,)
                     elif (len(set(df[clf_name].unique()) - {0, 1}) > 0 and raise_bool_clf_error):
                         raise InvalidInputError(msg=f"The annotation column for a classifier should contain only 0 or 1 values. However, in file {file} the {clf_name} field contains additional value(s): {list(set(df[clf_name].unique()) - {0, 1})}.", source=self.__class__.__name__)
             dfs.append(df)
@@ -1130,7 +1130,7 @@ class TrainModelMixin(object):
                     )
                     if type(model_dict[n]["classifier_map"]) != dict:
                         raise InvalidInputError(
-                            msg=f"SimBA found a classifier map for classifier {n + 1} that could not be interpreted as a dictionary",
+                            msg=f"Mufasa found a classifier map for classifier {n + 1} that could not be interpreted as a dictionary",
                             source=self.__class__.__name__,
                         )
 
@@ -1184,12 +1184,12 @@ class TrainModelMixin(object):
             bp_missing = int(abs(difference) / 3)
             if difference < 0:
                 raise DataHeaderError(
-                    msg=f"SimBA expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, SimBA found {len(data_df.columns)} columns. Thus, there is {abs(difference)} missing data columns in the imported data, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the SimBA project pose-configuration with {str(bp_missing)} less body-part, or include {bp_missing} more body-part in the imported data",
+                    msg=f"Mufasa expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, Mufasa found {len(data_df.columns)} columns. Thus, there is {abs(difference)} missing data columns in the imported data, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the Mufasa project pose-configuration with {str(bp_missing)} less body-part, or include {bp_missing} more body-part in the imported data",
                     source=self.__class__.__name__,
                 )
             else:
                 raise DataHeaderError(
-                    msg=f"SimBA expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, SimBA found {len(data_df.columns)} columns. Thus, there is {abs(difference)} more data columns in the imported data than anticipated, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the SimBA project pose-configuration with {str(bp_missing)} more body-part, or include {bp_missing} less body-part in the imported data",
+                    msg=f"Mufasa expects {len(new_headers)} columns of data inside the files within project_folder/csv/input_csv directory. However, within file {filepath} file, Mufasa found {len(data_df.columns)} columns. Thus, there is {abs(difference)} more data columns in the imported data than anticipated, which may represent {int(bp_missing)} bodyparts if each body-part has an x, y and p value. Either revise the Mufasa project pose-configuration with {str(bp_missing)} more body-part, or include {bp_missing} less body-part in the imported data",
                     source=self.__class__.__name__,
                 )
         else:
@@ -1370,14 +1370,14 @@ class TrainModelMixin(object):
             if len(x_nan_cnt) < 10:
                 raise FaultyTrainingSetError(
                     msg=f"{str(len(x_nan_cnt))} feature column(s) exist in some files within the project_folder/csv/targets_inserted directory, but missing in others. "
-                        f"SimBA expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the "
+                        f"Mufasa expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the "
                         f"column names with mismatches are: {list(x_nan_cnt.index)}",
                     source=self.__class__.__name__,
                 )
             else:
                 raise FaultyTrainingSetError(
                     msg=f"{str(len(x_nan_cnt))} feature columns exist in some files, but missing in others. The feature files are found in the project_folder/csv/targets_inserted directory. "
-                        f"SimBA expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the first 10 "
+                        f"Mufasa expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the first 10 "
                         f"column names with mismatches are: {list(x_nan_cnt.index)[0:9]}",
                     source=self.__class__.__name__,
                 )
@@ -1565,7 +1565,7 @@ class TrainModelMixin(object):
                             min_samples_leaf=min_samples_leaf,
                             verbose=6)
             else:
-                raise SimBAModuleNotFoundError(msg='SimBA could not find the cuml library for GPU machine learning algorithms. Set CUML to False in the SimBA model parameters, or import CUML environment variable using `export CUML=True`', source=self.__class__.__name__)
+                raise SimBAModuleNotFoundError(msg='Mufasa could not find the cuml library for GPU machine learning algorithms. Set CUML to False in the SimBA model parameters, or import CUML environment variable using `export CUML=True`', source=self.__class__.__name__)
 
     def clf_fit(self,
                 clf: Union[RandomForestClassifier, cuRF],
@@ -1639,7 +1639,7 @@ class TrainModelMixin(object):
                     if clf_name.lower() == Dtypes.NONE.value.lower():
                         raise InvalidInputError(msg=f'The classifier {clf_cnt+1} name is set to {clf_name}. Make sure you have correctly set the model hyperparameters as documented at {Links.TRAIN_ML_MODEL.value}', source=TrainModelMixin._read_data_file_helper.__name__)
                     else:
-                        raise MissingColumnsError(msg=f'The SimBA project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project_config.ini is created correctly as documented here: {Links.TRAIN_ML_MODEL.value}.', source=TrainModelMixin._read_data_file_helper.__name__)
+                        raise MissingColumnsError(msg=f'The Mufasa project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project_config.ini is created correctly as documented here: {Links.TRAIN_ML_MODEL.value}.', source=TrainModelMixin._read_data_file_helper.__name__)
                 elif (len(set(df[clf_name].unique()) - {0, 1}) > 0 and raise_bool_clf_error):
                     raise InvalidInputError(msg=f"The annotation column for a classifier should contain only 0 or 1 values. However, in file {file_path} the {clf_name} field column contains additional value(s): {list(set(df[clf_name].unique()) - {0, 1})}.", source=TrainModelMixin._read_data_file_helper.__name__)
         timer.stop_timer()
@@ -1691,7 +1691,7 @@ class TrainModelMixin(object):
                 df_concat = df_concat.drop(["scorer"], axis=1)
             if len(df_concat) == 0:
                 raise NoDataError(
-                    msg="SimBA found 0 observations (frames) in the project_folder/csv/targets_inserted directory",
+                    msg="Mufasa found 0 observations (frames) in the project_folder/csv/targets_inserted directory",
                     source=TrainModelMixin.read_all_files_in_folder_mp.__name__,
                 )
             df_concat = df_concat.loc[
@@ -1753,7 +1753,7 @@ class TrainModelMixin(object):
         if clf_names != None:
             for clf_name in clf_names:
                 if not clf_name in df.columns:
-                    raise MissingColumnsError(msg=f'The SimBA project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project_config.ini is created correctly.')
+                    raise MissingColumnsError(msg=f'The Mufasa project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project_config.ini is created correctly.')
                 elif (len(set(df[clf_name].unique()) - {0, 1}) > 0 and raise_bool_clf_error):
                     raise InvalidInputError(msg=f"The annotation column for a classifier should contain only 0 or 1 values. However, in file {file_path} the {clf_name} field contains additional value(s): {list(set(df[clf_name].unique()) - {0, 1})}.")
         timer.stop_timer()
@@ -1868,7 +1868,7 @@ class TrainModelMixin(object):
             results.to_csv(save_log_path)
             raise FaultyTrainingSetError(
                 msg=f"{len(nan_cols)} feature columns exist in some files, but missing in others. The feature files are found in the project_folder/csv/targets_inserted directory. "
-                    f"SimBA expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the first 10 "
+                    f"Mufasa expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the first 10 "
                     f"column names with mismatches are: {nan_cols[0:9]}. For a log of the files that contain, and not contain, the mis-matched columns, see {save_log_path}",
                 source=self.__class__.__name__,
             )

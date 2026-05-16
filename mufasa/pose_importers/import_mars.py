@@ -206,5 +206,5 @@ class MarsImporter(object):
                 self.__run_smoothing()
             print("Video imported {}.".format(self.file_name))
         stdout_success(
-            msg=f"{str(len(self.files_found))} data files imported to SimBA project"
+            msg=f"{str(len(self.files_found))} data files imported to Mufasa project"
         )

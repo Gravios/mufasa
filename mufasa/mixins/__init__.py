@@ -13,7 +13,7 @@ if use_cuml:
     if cuml_version:
         try:
             from cuml.ensemble import RandomForestClassifier as cuRF
-            print('SimBA CUML enabled.')
+            print('Mufasa CUML enabled.')
         except ImportError:
             VersionWarning(msg="cuML is set but not installed. Falling back to scikit-learn.")
             from sklearn.ensemble import RandomForestClassifier as cuRF

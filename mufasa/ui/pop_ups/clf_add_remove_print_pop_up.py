@@ -30,7 +30,7 @@ class AddClfPopUp(PopUpMixin, ConfigReader):
         clf_name = self.clf_eb.entry_get.strip()
         check_str(name="CLASSIFIER NAME", value=clf_name)
         if clf_name in self.clf_names:
-            raise DuplicationError(msg=f'The classifier name {clf_name} already exist in the SimBA project.', source=self.__class__.__name__)
+            raise DuplicationError(msg=f'The classifier name {clf_name} already exist in the Mufasa project.', source=self.__class__.__name__)
         self.config.set( ConfigKey.SML_SETTINGS.value, ConfigKey.TARGET_CNT.value, str(self.clf_cnt + 1))
         self.config.set(ConfigKey.SML_SETTINGS.value, f"model_path_{str(self.clf_cnt + 1)}", "")
         self.config.set(ConfigKey.SML_SETTINGS.value, f"target_name_{str(self.clf_cnt + 1)}", clf_name)
@@ -38,7 +38,7 @@ class AddClfPopUp(PopUpMixin, ConfigReader):
         self.config.set(ConfigKey.MIN_BOUT_LENGTH.value, f"min_bout_{str(self.clf_cnt + 1)}", "None")
         with open(self.config_path, "w") as f:
             self.config.write(f)
-        stdout_success(msg=f"{clf_name} classifier added to SimBA project", source=self.__class__.__name__)
+        stdout_success(msg=f"{clf_name} classifier added to Mufasa project", source=self.__class__.__name__)
 
 
 class RemoveAClassifierPopUp(PopUpMixin, ConfigReader):
@@ -46,7 +46,7 @@ class RemoveAClassifierPopUp(PopUpMixin, ConfigReader):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         if not isinstance(self.clf_names, (list, tuple)) or len(self.clf_names) < 1:
-            raise NoDataError(msg='The SimBA project has no classifiers: Cannot remove a classifier.', source=self.__class__.__name__)
+            raise NoDataError(msg='The Mufasa project has no classifiers: Cannot remove a classifier.', source=self.__class__.__name__)
         PopUpMixin.__init__(self, title="WARNING: REMOVE CLASSIFIER", icon='trash_red')
         self.remove_clf_frm = CreateLabelFrameWithIcon( parent=self.main_frm, header="SELECT A CLASSIFIER TO REMOVE", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.REMOVE_CLF.value)
         self.clf_dropdown = SimBADropDown(parent=self.remove_clf_frm, dropdown_options=self.clf_names, label_width=20, dropdown_width=40, label='CLASSIFIER:', value=self.clf_names[0])
@@ -57,7 +57,7 @@ class RemoveAClassifierPopUp(PopUpMixin, ConfigReader):
 
     def run(self):
         clf_to_remove = self.clf_dropdown.get_value()
-        question = TwoOptionQuestionPopUp(title="WARNING!", question=f"Do you want to remove the {clf_to_remove} \nclassifier from the SimBA project?", option_one="YES", option_two="NO")
+        question = TwoOptionQuestionPopUp(title="WARNING!", question=f"Do you want to remove the {clf_to_remove} \nclassifier from the Mufasa project?", option_one="YES", option_two="NO")
         if question.selected_option == "YES":
             for i in range(len(self.clf_names)):
                 self.config.remove_option("SML settings", f"model_path_{i+1}")
@@ -76,7 +76,7 @@ class RemoveAClassifierPopUp(PopUpMixin, ConfigReader):
             with open(self.config_path, "w") as f:
                 self.config.write(f)
 
-            stdout_trash(msg=f"{self.clf_dropdown.getChoices()} classifier removed from SimBA project.", source=self.__class__.__name__)
+            stdout_trash(msg=f"{self.clf_dropdown.getChoices()} classifier removed from Mufasa project.", source=self.__class__.__name__)
         else:
             pass
 

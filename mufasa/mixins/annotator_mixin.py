@@ -713,7 +713,7 @@ class AnnotatorMixin(ConfigReader):
         )
         timer.stop_timer()
         stdout_success(
-            msg=f"Annotated clip {df_filename} saved into SimBA project",
+            msg=f"Annotated clip {df_filename} saved into Mufasa project",
             elapsed_time=timer.elapsed_time_str,
         )
 
@@ -871,7 +871,7 @@ class AnnotatorMixin(ConfigReader):
         )
         save_timer.stop_timer()
         stdout_success(
-            msg=f"Annotated clip {save_path} saved into SimBA project",
+            msg=f"Annotated clip {save_path} saved into Mufasa project",
             elapsed_time=save_timer.elapsed_time_str,
         )
         self.session_annotated_frames.extend(annotated_frms)

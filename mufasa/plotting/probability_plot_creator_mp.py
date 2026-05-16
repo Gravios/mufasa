@@ -148,7 +148,7 @@ class TresholdPlotCreatorMultiprocess(ConfigReader, PlottingMixin):
 
         # [Linux-only] Darwin spawn-force removed.
         if (not video_setting) and (not frame_setting) and (not last_frame):
-            raise NoSpecifiedOutputError(msg="Please choose to create video and/or frames data plots. SimBA found that you ticked neither video and/or frames")
+            raise NoSpecifiedOutputError(msg="Please choose to create video and/or frames data plots. Mufasa found that you ticked neither video and/or frames")
         check_int(name=f"{self.__class__.__name__} core_cnt", value=cores, min_value=-1, max_value=find_core_cnt()[0], unaccepted_vals=[0])
         if cores == -1: cores = find_core_cnt()[0]
         check_valid_tuple(x=size, source=f'{self.__class__.__name__} size', accepted_lengths=(2,), valid_dtypes=Formats.INTEGER_DTYPES.value, min_integer=100)

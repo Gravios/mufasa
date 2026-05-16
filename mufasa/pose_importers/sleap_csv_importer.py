@@ -102,7 +102,7 @@ class SLEAPImporterCSV(ConfigReader, PoseImporterMixin):
             check_that_column_exist(df=idx, column_name=TRACK, file_name=video_name)
             data_unique_tracks = list(idx[TRACK].unique())
             if len(data_unique_tracks) != self.animal_cnt:
-                raise AnimalNumberError(msg=f'The SLEAP CSV file {video_data["DATA"]} contains data for {len(data_unique_tracks)} tracks (found tracks: {data_unique_tracks}). The SimBA project config says the SimBA project expects data for {self.animal_cnt} animals.')
+                raise AnimalNumberError(msg=f'The SLEAP CSV file {video_data["DATA"]} contains data for {len(data_unique_tracks)} tracks (found tracks: {data_unique_tracks}). The SimBA project config says the Mufasa project expects data for {self.animal_cnt} animals.')
             if len(data_unique_tracks) == 1:
                 idx[TRACK] = 'track_0'; data_unique_tracks = ['track_0']
             idx[TRACK] = idx[TRACK].fillna(data_unique_tracks[0])
@@ -116,7 +116,7 @@ class SLEAPImporterCSV(ConfigReader, PoseImporterMixin):
                 self.data_df.columns = np.arange(len(self.data_df.columns))
                 self.data_df = self.data_df.reindex(range(0, self.data_df.index[-1] + 1), fill_value=0)
             if len(self.bp_headers) != len(self.data_df.columns):
-                raise CountError(msg=f"The SimBA project expects {len(self.bp_headers)} data columns, but your SLEAP data file at {video_data['DATA']} contains {len(self.data_df.columns)} columns.", source=self.__class__.__name__)
+                raise CountError(msg=f"The Mufasa project expects {len(self.bp_headers)} data columns, but your SLEAP data file at {video_data['DATA']} contains {len(self.data_df.columns)} columns.", source=self.__class__.__name__)
             self.data_df.columns = self.bp_headers
             self.out_df = deepcopy(self.data_df)
             if self.animal_cnt > 1:
@@ -135,4 +135,4 @@ class SLEAPImporterCSV(ConfigReader, PoseImporterMixin):
             video_timer.stop_timer()
             stdout_success(msg=f"Video {video_name} data imported...", elapsed_time=video_timer.elapsed_time_str, source=self.__class__.__name__)
         self.timer.stop_timer()
-        stdout_success(msg=f"{len(list(self.data_and_videos_lk.keys()))} file(s) imported to the SimBA project {self.input_csv_dir}", source=self.__class__.__name__)
+        stdout_success(msg=f"{len(list(self.data_and_videos_lk.keys()))} file(s) imported to the Mufasa project {self.input_csv_dir}", source=self.__class__.__name__)

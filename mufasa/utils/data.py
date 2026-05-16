@@ -1066,8 +1066,8 @@ def slp_to_df_convert(
     ).fillna(0)
     if len(data_df.columns) != len(sleap_header):
         raise BodypartColumnNotFoundError(
-            msg=f"The number of body-parts in data file {file_path} do not match the number of body-parts in your SimBA project. "
-            f"The number of of body-parts expected by your SimBA project is {int(len(sleap_header) / 3)}. "
+            msg=f"The number of body-parts in data file {file_path} do not match the number of body-parts in your Mufasa project. "
+            f"The number of of body-parts expected by your Mufasa project is {int(len(sleap_header) / 3)}. "
             f"The number of of body-parts contained in data file {file_path} is {int(len(sleap_header) / 3)}. "
             f"Make sure you have specified the correct number of animals and body-parts in your project.",
             source=slp_to_df_convert.__name__,

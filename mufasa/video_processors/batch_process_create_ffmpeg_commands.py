@@ -93,7 +93,7 @@ class FFMPEGCommandCreator(object):
                 shutil.rmtree(self.process_dir)
             except Exception as e:
                 print(e.args)
-                raise PermissionError(msg=f'SimBA is not allowed to delete/manipulate {self.process_dir}. Are you doing batch processing on a VirtualDrive or Cloud storage? Try performing the batch processing on a local drive.', source=self.__class__.__name__)
+                raise PermissionError(msg=f'Mufasa is not allowed to delete/manipulate {self.process_dir}. Are you doing batch processing on a VirtualDrive or Cloud storage? Try performing the batch processing on a local drive.', source=self.__class__.__name__)
         os.makedirs(self.process_dir)
 
     def find_relevant_videos(self, variable=None):

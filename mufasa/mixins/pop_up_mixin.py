@@ -321,7 +321,7 @@ class PopUpMixin(object):
     ):
         if not os.path.isfile(video_path):
             raise NoFilesFoundError(
-                msg=f"Selected video {os.path.basename(video_path)} is not a video file in the SimBA project video directory."
+                msg=f"Selected video {os.path.basename(video_path)} is not a video file in the Mufasa project video directory."
             )
 
     def create_choose_bp_frm(self, bp_list: List[str], run_function: Any):

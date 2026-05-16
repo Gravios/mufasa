@@ -20,7 +20,7 @@ class ROISizeStandardizerPopUp(PopUpMixin, ConfigReader):
         PopUpMixin.__init__(self, title="ROI SIZE NORMALIZER PY PIXELS PER MILLIMETER", icon='size_black')
         self.read_roi_data()
         if len(self.video_names_w_rois) <= 1:
-            raise NoROIDataError(f"SimBA could only find {len(self.video_names_w_rois)} videos with ROIs in your project. You need at least 2 videos with ROIs to standardize ROI sizes")
+            raise NoROIDataError(f"Mufasa could only find {len(self.video_names_w_rois)} videos with ROIs in your project. You need at least 2 videos with ROIs to standardize ROI sizes")
         self.video_names = list(self.video_names_w_rois)
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.ROI_FEATURES_PLOT.value)
         self.baseline_video_dropdown = DropDownMenu(self.settings_frm, "Baseline video:", self.video_names, "12")

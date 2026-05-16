@@ -32,9 +32,9 @@ class VisualizeROIFeaturesPopUp(PopUpMixin, ConfigReader, FeatureExtractionMixin
         self.video_file_paths = find_all_videos_in_directory(directory=self.video_dir, as_dict=True)
         self.video_list = [k for k in self.video_file_paths.keys()]
         if len(self.video_list) == 0:
-            raise NoFilesFoundError(msg=f"No videos in SimBA project {self.video_dir} directory. Import videos into you SimBA project to visualize ROI features.",source=self.__class__.__name__,)
+            raise NoFilesFoundError(msg=f"No videos in Mufasa project {self.video_dir} directory. Import videos into you Mufasa project to visualize ROI features.",source=self.__class__.__name__,)
         if not os.path.isfile(self.roi_coordinates_path):
-            raise NoFilesFoundError(msg=f"No ROI data found in SimBA project (expected at path {self.roi_coordinates_path}). Draw ROIs before visualize ROI features.", source=self.__class__.__name__, )
+            raise NoFilesFoundError(msg=f"No ROI data found in Mufasa project (expected at path {self.roi_coordinates_path}). Draw ROIs before visualize ROI features.", source=self.__class__.__name__, )
         self.read_roi_data()
         self.video_names_w_rois = list(self.video_names_w_rois)
         self.video_file_paths = {k:v for k, v in self.video_file_paths.items() if k in self.video_names_w_rois}

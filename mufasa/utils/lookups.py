@@ -1176,10 +1176,10 @@ def create_directionality_cords(bp_dict: dict,
     for animal_name, animal_bps in results.items():
         for bp_name, bp_values in animal_bps.items():
            if len(bp_values.keys()) == 0:
-               raise InvalidInputError(msg=f'Could not detect a body-part for animal {animal_name}, body-part {bp_name} in SimBA project. Make sure the body-part configuration file at {Paths.BP_NAMES.value} lists the appropriate body-parts', source=create_directionality_cords.__name__)
+               raise InvalidInputError(msg=f'Could not detect a body-part for animal {animal_name}, body-part {bp_name} in Mufasa project. Make sure the body-part configuration file at {Paths.BP_NAMES.value} lists the appropriate body-parts', source=create_directionality_cords.__name__)
            for cord_key, cord_value in bp_values.items():
                 if cord_value == '':
-                    raise InvalidInputError(msg=f'Could not detect a body-part for animal {animal_name}, body-part {bp_name} and coordinate {cord_key} in SimBA project. Make sure the body-part configuration file at {Paths.BP_NAMES.value} lists the appropriate body-parts. Passed values: {left_ear_name, nose_name, right_ear_name}', source=create_directionality_cords.__name__)
+                    raise InvalidInputError(msg=f'Could not detect a body-part for animal {animal_name}, body-part {bp_name} and coordinate {cord_key} in Mufasa project. Make sure the body-part configuration file at {Paths.BP_NAMES.value} lists the appropriate body-parts. Passed values: {left_ear_name, nose_name, right_ear_name}', source=create_directionality_cords.__name__)
     return results
 
 def get_tooltips() -> Dict[str, str]:

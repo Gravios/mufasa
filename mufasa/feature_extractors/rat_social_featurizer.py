@@ -101,8 +101,8 @@ class RatSocialFeaturizer(ConfigReader,
         write_df(df=data, file_type=self.file_type, save_path=save_path)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='SimBA Custom Feature Extractor')
-    parser.add_argument('--config_path', type=str, help='SimBA project config path')
+    parser = argparse.ArgumentParser(description='Mufasa Custom Feature Extractor')
+    parser.add_argument('--config_path', type=str, help='project config path (Mufasa TOML or SimBA INI)')
     args = parser.parse_args()
     feature_extractor = RatSocialFeaturizer(config_path=args.config_path)
     feature_extractor.run()

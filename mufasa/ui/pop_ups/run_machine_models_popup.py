@@ -77,7 +77,7 @@ class RunMachineModelsPopUp(PopUpMixin, ConfigReader):
     def run(self):
         filtered_clf_data = {}
         for model_name, model_settings in self.clf_data.items():
-            print('Updating settings in SimBA project config...')
+            print('Updating settings in project config...')
             valid_path = check_file_exist_and_readable(model_settings[PATH].file_path, raise_error=False)
             valid_threshold, _ = check_float(name=f"Classifier {model_name} threshold", value=model_settings[THRESHOLD].entry_get, max_value=1.0, min_value=0.0, raise_error=False)
             valid_min_bout, _ = check_int(name=f"Classifier {model_name} minimum bout", value=model_settings[MIN_BOUT].entry_get, min_value=0, raise_error=False)

@@ -126,7 +126,7 @@ class YOLOPoseTrainPopUP(PopUpMixin):
         msg = (
             'YOLO training has been started in a separate process to avoid memory issues.\n\n'
             'On Windows a new console window will show training progress. '
-            'On other platforms, check the terminal from which SimBA was launched.\n\n'
+            'On other platforms, check the terminal from which Mufasa was launched.\n\n'
             f'Results will be saved to:\n{save_dir}'
         )
         messagebox.showinfo('YOLO training started', msg)

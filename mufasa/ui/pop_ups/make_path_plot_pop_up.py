@@ -58,7 +58,7 @@ class MakePathPlotPopUp(PopUpMixin):
         self.line_thickness.grid(row=5, sticky=W)
         self.circle_size.grid(row=6, sticky=W)
         self.last_frm_only_dropdown.grid(row=7, sticky=W)
-        SimBALabel(parent=settings_frm, font=Formats.FONT_REGULAR_ITALICS.value, txt=" NOTE: For more complex path plots, faster, \n see 'CREATE PATH PLOTS' under the [VISUALIZATIONS] tab after loading your SimBA project", txt_clr="green").grid(row=8, sticky=W)
+        SimBALabel(parent=settings_frm, font=Formats.FONT_REGULAR_ITALICS.value, txt=" NOTE: For more complex path plots, faster, \n see 'CREATE PATH PLOTS' under the [VISUALIZATIONS] tab after loading your Mufasa project", txt_clr="green").grid(row=8, sticky=W)
         self.create_run_frm(run_function=self.run)
         self.main_frm.mainloop()
 

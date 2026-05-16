@@ -804,7 +804,7 @@ class ROI_mixin(ConfigReader):
 
     def apply_different_video(self, video_name: str):
         if video_name == '':
-            error_txt = f'No other video in the SimBA project has ROIs. Draw ROIs on other videos in the SimBA project to transfer ROIs between videos'
+            error_txt = f'No other video in the Mufasa project has ROIs. Draw ROIs on other videos in the Mufasa project to transfer ROIs between videos'
             self.status_bar.configure(text=error_txt, fg="red")
             raise InvalidInputError(msg=error_txt, source=self.__class__.__name__)
         video_roi_dict = change_roi_dict_video_name(roi_dict=self.scaled_other_roi_dict[video_name], video_name=self.video_meta['video_name'])
@@ -1248,7 +1248,6 @@ class ROI_mixin(ConfigReader):
         self.rectangles_df, self.circles_df, self.polygon_df = get_roi_df_from_dict(roi_dict=self.roi_dict)
         del self.roi_bufferer
         self.overlay_rois_on_image(show_ear_tags=False, show_roi_info=False)
-
 
 
 

@@ -136,7 +136,7 @@ class FitYolo():
 
 
     def run(self):
-        stdout_information(msg=f'[{get_current_time()}] Please follow the YOLO pose model training in the terminal from where SimBA was launched ...', source=self.__class__.__name__)
+        stdout_information(msg=f'[{get_current_time()}] Please follow the YOLO pose model training in the terminal from where Mufasa was launched ...', source=self.__class__.__name__)
         stdout_information(msg=f'[{get_current_time()}] Results will be stored in the {self.save_path} directory ..', source=self.__class__.__name__)
         with redirect_stdout(sys.__stdout__), redirect_stderr(sys.__stderr__):
             model = load_yolo_model(weights_path=self.weights_path,

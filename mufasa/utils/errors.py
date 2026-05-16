@@ -329,7 +329,7 @@ class ThirdPartyAnnotationsAdditionalClfError(SimbaError):
         source: str = "",
         show_window: bool = False,
     ):
-        msg = f"SIMBA THIRD-PARTY ANNOTATION ERROR: Annotations file for video {video_name} has annotations for the following behaviors {clf_names} that are NOT classifiers named in the SimBA project."
+        msg = f"SIMBA THIRD-PARTY ANNOTATION ERROR: Annotations file for video {video_name} has annotations for the following behaviors {clf_names} that are NOT classifiers named in the Mufasa project."
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
@@ -374,7 +374,7 @@ class ThirdPartyAnnotationsOutsidePoseEstimationDataError(SimbaError):
 
         if clf_name:
             msg = (
-                f"SIMBA THIRD-PARTY ANNOTATION WARNING: SimBA found THIRD-PARTY annotations for behavior {clf_name} in video "
+                f"SIMBA THIRD-PARTY ANNOTATION WARNING: Mufasa found THIRD-PARTY annotations for behavior {clf_name} in video "
                 f"{video_name} that are annotated to occur at times which is not present in the "
                 f"video data you imported into SIMBA. The video you imported to SimBA has {str(frm_cnt)} frames. "
                 f"However, in BORIS, you have annotated {clf_name} to happen at frame number {str(first_error_frm)}. "

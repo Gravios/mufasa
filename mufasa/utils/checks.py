@@ -404,7 +404,7 @@ def check_all_file_names_are_represented_in_video_log(
             missing_videos.append(video_name)
     if len(missing_videos) > 0:
         raise ParametersFileError(
-            msg=f"SimBA could not find {len(missing_videos)} video(s) in the video_info.csv file. Make sure all videos analyzed are represented in the project_folder/logs/video_info.csv file. MISSING VIDEOS: {missing_videos}"
+            msg=f"Mufasa could not find {len(missing_videos)} video(s) in the video_info.csv file. Make sure all videos analyzed are represented in the project_folder/logs/video_info.csv file. MISSING VIDEOS: {missing_videos}"
         )
 
 
@@ -2470,5 +2470,4 @@ def check_valid_codec(codec: str, raise_error: bool = True, source: str = ''):
         else:
             return False
     return True
-
 

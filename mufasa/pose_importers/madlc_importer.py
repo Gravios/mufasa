@@ -98,8 +98,8 @@ class MADLCImporterH5(ConfigReader, PoseImporterMixin):
             self.data_df = pd.read_hdf(video_data["DATA"]).replace([np.inf, -np.inf], np.nan).fillna(0)
             if len(self.data_df.columns) != len(self.bp_headers):
                 raise BodypartColumnNotFoundError(
-                    msg=f'The number of body-parts in data file {video_data["DATA"]} do not match the number of body-parts in your SimBA project. '
-                    f"The number of of body-parts expected by your SimBA project is {int(len(self.bp_headers) / 3)}. "
+                    msg=f'The number of body-parts in data file {video_data["DATA"]} do not match the number of body-parts in your Mufasa project. '
+                    f"The number of of body-parts expected by your Mufasa project is {int(len(self.bp_headers) / 3)}. "
                     f'The number of of body-parts contained in data file {video_data["DATA"]} is {int(len(self.data_df.columns) / 3)}. '
                     f"Make sure you have specified the correct number of animals and body-parts in your project. NOTE: The project body-parts is stored at {self.body_parts_path}."
                 )

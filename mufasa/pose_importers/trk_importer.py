@@ -84,7 +84,7 @@ class TRKImporter(ConfigReader):
         )
         if track_cnt != self.animal_cnt:
             raise CountError(
-                msg=f"There are {str(track_cnt)} tracks in the .trk file {file_path}. But your SimBA project expects {str(self.animal_cnt)} tracks."
+                msg=f"There are {str(track_cnt)} tracks in the .trk file {file_path}. But your Mufasa project expects {str(self.animal_cnt)} tracks."
             )
         return animals_tracked_list
 

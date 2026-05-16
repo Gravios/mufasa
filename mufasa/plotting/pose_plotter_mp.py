@@ -144,7 +144,7 @@ class PosePlotterMultiProcess():
         if palettes is not None:
             check_instance(source=self.__class__.__name__, instance=palettes, accepted_types=(dict,))
             if len(list(palettes.keys())) != self.config.animal_cnt:
-                raise CountError(msg=f'The number of color palettes ({(len(list(palettes.keys())))}) spedificed is not the same as the number of animals ({(self.config.animal_cnt)}) in the SimBA project at {self.config.project_path}')
+                raise CountError(msg=f'The number of color palettes ({(len(list(palettes.keys())))}) spedificed is not the same as the number of animals ({(self.config.animal_cnt)}) in the Mufasa project at {self.config.project_path}')
             for cnt, (k, v) in enumerate(palettes.items()):
                 check_str(name='palette', value=v, options=Options.PALETTE_OPTIONS_CATEGORICAL.value)
                 self.color_dict[cnt] = create_color_palette(pallete_name=v, increments=len(self.config.body_parts_lst))

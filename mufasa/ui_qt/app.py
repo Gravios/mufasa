@@ -144,7 +144,7 @@ class LauncherWindow(QMainWindow):
             self,
             "Load project_config.ini",
             str(Path.home()),
-            "Mufasa / SimBA project (*.ini)",
+            "Mufasa / Mufasa project (*.ini)",
         )
         if path:
             self._load_project(path)

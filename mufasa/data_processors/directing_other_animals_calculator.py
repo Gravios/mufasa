@@ -250,4 +250,4 @@ class DirectingOtherAnimalsAnalyzer(ConfigReader, FeatureExtractionMixin):
                 video_data.to_csv(save_name)
             if self.verbose: stdout_success(f"All detailed directional data saved in the {save_dir} directory!", source=self.__class__.__name__)
         self.timer.stop_timer()
-        if self.verbose: stdout_success(msg="All directional data saved in SimBA project", elapsed_time=self.timer.elapsed_time_str, source=self.__class__.__name__)
+        if self.verbose: stdout_success(msg="All directional data saved in Mufasa project", elapsed_time=self.timer.elapsed_time_str, source=self.__class__.__name__)

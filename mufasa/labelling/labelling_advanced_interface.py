@@ -84,7 +84,7 @@ class AdvancedLabellingInterface(ConfigReader):
         self.max_frm_no = max(self.frame_lst)
         self.target_lst = get_all_clf_names(config=self.config, target_cnt=self.clf_cnt)
         if len(self.target_lst) == 0:
-            raise NoDataError(msg='To annotate behaviors, your SimBA project needs at least one defined classifier. Found 0', source=self.__class__.__name__)
+            raise NoDataError(msg='To annotate behaviors, your Mufasa project needs at least one defined classifier. Found 0', source=self.__class__.__name__)
 
         self.max_frm_size = 1080, 650
         self.main_window = Toplevel()

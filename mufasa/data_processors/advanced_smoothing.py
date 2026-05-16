@@ -150,7 +150,7 @@ class AdvancedSmoother(ConfigReader):
             df = read_df(file_path=file_path, file_type=self.file_type, check_multiindex=self.multi_index_data).fillna(0).reset_index(drop=True)
             if self.verbose: print(f"Smoothing data in video {video_name} ({file_cnt+1}/{len(self.file_paths)})...")
             if len(df.columns) != len(self.bp_col_names):
-                raise DataHeaderError(msg=f"The SimBA project suggest the data should have {len(self.bp_col_names)} columns, but the input data has {len(df.columns)} columns", source=self.__class__.__name__)
+                raise DataHeaderError(msg=f"The Mufasa project suggest the data should have {len(self.bp_col_names)} columns, but the input data has {len(df.columns)} columns", source=self.__class__.__name__)
             df.columns = self.bp_headers
             df[df < 0] = 0
             video_path = find_video_of_file(video_dir=self.video_dir, filename=video_name, warning=False, raise_error=False)
@@ -161,7 +161,7 @@ class AdvancedSmoother(ConfigReader):
                     _, _, fps = self.read_video_info(video_name=video_name)
                     video_meta_data["fps"] = fps
                 except:
-                    raise NoFilesFoundError(msg=f"No video for file {video_name} found in SimBA project. Import the video before doing smoothing. To perform smoothing, SimBA needs the video fps from the video itself OR the logs/video_info.csv file in order to read the video FPS.", source=self.__class__.__name__)
+                    raise NoFilesFoundError(msg=f"No video for file {video_name} found in Mufasa project. Import the video before doing smoothing. To perform smoothing, SimBA needs the video fps from the video itself OR the logs/video_info.csv file in order to read the video FPS.", source=self.__class__.__name__)
             else:
                 video_meta_data = get_video_meta_data(video_path=video_path)
             out_df = deepcopy(df)

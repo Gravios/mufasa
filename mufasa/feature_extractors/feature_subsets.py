@@ -286,7 +286,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         print(f"  (intermediate work: {self.temp_dir})")
         if (FRAME_BP_TO_ROI_CENTER in self.feature_families) or (FRAME_BP_INSIDE_ROI in self.feature_families):
             if not os.path.isfile(self.roi_coordinates_path):
-                raise NoROIDataError(msg=f'Cannot compute ROI features: The SimBA project has no ROI data defined.')
+                raise NoROIDataError(msg=f'Cannot compute ROI features: The Mufasa project has no ROI data defined.')
             self.read_roi_data()
             # Identify videos that are missing some of the ROIs the
             # feature pipeline expects. Default behavior of

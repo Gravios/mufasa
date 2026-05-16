@@ -96,8 +96,8 @@ class SLEAPImporterH5(ConfigReader, PoseImporterMixin):
             self.data_df = read_sleap_h5(file_path=video_data["DATA"])
             if len(self.data_df.columns) != len(self.bp_headers):
                 raise BodypartColumnNotFoundError(
-                    msg=f'The number of body-parts in data file {video_data["DATA"]} do not match the number of body-parts in your SimBA project. '
-                    f"The number of of body-parts expected by your SimBA project is {int(len(self.bp_headers) / 3)}. "
+                    msg=f'The number of body-parts in data file {video_data["DATA"]} do not match the number of body-parts in your Mufasa project. '
+                    f"The number of of body-parts expected by your Mufasa project is {int(len(self.bp_headers) / 3)}. "
                     f'The number of of body-parts contained in data file {video_data["DATA"]} is {int(len(self.data_df.columns) / 3)}. '
                     f"Make sure you have specified the correct number of animals and body-parts in your project.",
                     source=self.__class__.__name__)

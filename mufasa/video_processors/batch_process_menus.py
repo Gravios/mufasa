@@ -567,5 +567,5 @@ class BatchProcessFrame(PopUpMixin):
         ffmpeg_runner.apply_clahe(clip_limit=int(self.settings['clahe_clip_limit']), tile_size=(int(self.settings['clahe_tile_size']), int(self.settings['clahe_tile_size'])))
         ffmpeg_runner.move_all_processed_files_to_output_folder()
         timer.stop_timer()
-        stdout_success(msg=f"SimBA batch pre-process JSON saved at {self.save_path}", source=self.__class__.__name__)
+        stdout_success(msg=f"Mufasa batch pre-process JSON saved at {self.save_path}", source=self.__class__.__name__)
         stdout_success(msg=f"Video batch pre-processing complete, new videos stored in {self.output_dir}", elapsed_time=timer.elapsed_time_str, source=self.__class__.__name__)

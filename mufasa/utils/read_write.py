@@ -358,14 +358,14 @@ def read_config_entry(config: configparser.ConfigParser,
         elif default_value != None:
             return default_value
         else:
-            raise MissingProjectConfigEntryError(msg=f"SimBA could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu and make sure the path to your project config is correct", source=read_config_entry.__name__)
+            raise MissingProjectConfigEntryError(msg=f"Mufasa could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu and make sure the path to your project config is correct", source=read_config_entry.__name__)
     except ValueError as e:
         print(e.args)
         if default_value != None:
             return default_value
         else:
             raise MissingProjectConfigEntryError(
-                msg=f"SimBA could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
+                msg=f"Mufasa could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
                 source=read_config_entry.__name__,
             )
 
@@ -423,7 +423,7 @@ def read_video_info_csv(file_path: Union[str, os.PathLike], raise_error: bool = 
     EXPECTED_FLOAT_COLS = ["fps", "Resolution_width", "Resolution_height", "Distance_in_mm", "pixels/mm"]
 
     if not os.path.isfile(file_path):
-        raise NoFilesFoundError(msg=f"Could not find the video_info.csv table in your SimBA project. Create it using the [Video parameters] tab. SimBA expects the file at location {file_path}. See SimBA documentation for more info: https://t.ly/OtY79", source=read_video_info_csv.__name__)
+        raise NoFilesFoundError(msg=f"Could not find the video_info.csv table in your Mufasa project. Create it using the [Video parameters] tab. Mufasa expects the file at location {file_path}. See SimBA documentation for more info: https://t.ly/OtY79", source=read_video_info_csv.__name__)
     info_df = pd.read_csv(file_path)
     for c in EXPECTED_COLS:
         if c not in info_df.columns:
@@ -439,11 +439,11 @@ def read_video_info_csv(file_path: Union[str, os.PathLike], raise_error: bool = 
     if info_df["fps"].min() <= 1:
         videos_w_low_fps = ', '.join(list(info_df[info_df['fps'] <= 1]['Video']))
         InvalidValueWarning(
-            msg=f"Video(s) in your SimBA project have an FPS of 1 or less. This includes video(s) {videos_w_low_fps}. It is recommended to use videos with more than one frame per second. If inaccurate, correct the FPS values inside the {file_path} file",
+            msg=f"Video(s) in your Mufasa project have an FPS of 1 or less. This includes video(s) {videos_w_low_fps}. It is recommended to use videos with more than one frame per second. If inaccurate, correct the FPS values inside the {file_path} file",
             source=read_video_info_csv.__name__)
     if info_df["pixels/mm"].min() == 0:
         videos_w_low_conversion_factor = ', '.join(list(info_df[info_df['pixels/mm'] == 0]['Video']))
-        InvalidValueWarning(msg=f"Video(s) in your SimBA project have an pixel/mm conversion factor of 0. This includes video(s) {videos_w_low_conversion_factor}. Correct the pixel/mm conversion factor values inside the {file_path} file", source=read_video_info_csv.__name__)
+        InvalidValueWarning(msg=f"Video(s) in your Mufasa project have an pixel/mm conversion factor of 0. This includes video(s) {videos_w_low_conversion_factor}. Correct the pixel/mm conversion factor values inside the {file_path} file", source=read_video_info_csv.__name__)
 
     return info_df
 
@@ -789,10 +789,10 @@ def read_video_info(video_name: str,
     check_valid_boolean(value=[raise_error], source=f'{read_video_info.__name__} raise_error')
     video_settings = video_info_df.loc[video_info_df[VIDEO] == video_name]
     if len(video_settings) > 1:
-        raise DuplicationError(msg=f"SimBA found multiple rows in `project_folder/logs/video_info.csv` for videos named {video_name}. Please make sure that each video name is represented ONCE in the file", source='')
+        raise DuplicationError(msg=f"Mufasa found multiple rows in `project_folder/logs/video_info.csv` for videos named {video_name}. Please make sure that each video name is represented ONCE in the file", source='')
     elif len(video_settings) < 1:
         if raise_error:
-            raise ParametersFileError(msg=f"SimBA could not find {video_name} in the `project_folder/logs/video_info.csv` file. Make sure all videos analyzed are represented in the file.", source='')
+            raise ParametersFileError(msg=f"Mufasa could not find {video_name} in the `project_folder/logs/video_info.csv` file. Make sure all videos analyzed are represented in the file.", source='')
         else:
             return (None, None, None)
     else:
@@ -1044,7 +1044,7 @@ def find_video_of_file(video_dir: Union[str, os.PathLike],
         if raise_error:
             raise NoFilesFoundError(msg="video_dir must be a non-empty path", source=find_video_of_file.__name__)
         elif warning:
-            NoFileFoundWarning(msg=f"SimBA could not find a video file representing {filename}: video_dir is empty or invalid", source=find_video_of_file.__name__)
+            NoFileFoundWarning(msg=f"Mufasa could not find a video file representing {filename}: video_dir is empty or invalid", source=find_video_of_file.__name__)
         return None
 
     filename_base = os.path.basename(str(filename)).strip() if filename is not None else ""
@@ -1052,7 +1052,7 @@ def find_video_of_file(video_dir: Union[str, os.PathLike],
         if raise_error:
             raise NoFilesFoundError(msg="filename must be non-empty", source=find_video_of_file.__name__)
         elif warning:
-            NoFileFoundWarning(msg="SimBA could not find a video file: filename is empty", source=find_video_of_file.__name__)
+            NoFileFoundWarning(msg="Mufasa could not find a video file: filename is empty", source=find_video_of_file.__name__)
         return None
 
     return_path = None
@@ -1060,7 +1060,7 @@ def find_video_of_file(video_dir: Union[str, os.PathLike],
         if raise_error:
             raise NoFilesFoundError(msg=f"{video_dir} is not a valid directory", source=find_video_of_file.__name__)
         elif warning:
-            NoFileFoundWarning(msg=f"SimBA could not find a video file representing {filename_base} in the project video directory {video_dir}", source=find_video_of_file.__name__)
+            NoFileFoundWarning(msg=f"Mufasa could not find a video file representing {filename_base} in the project video directory {video_dir}", source=find_video_of_file.__name__)
         return None
 
     if recursive:
@@ -1080,7 +1080,7 @@ def find_video_of_file(video_dir: Union[str, os.PathLike],
             if raise_error:
                 raise
             elif warning:
-                NoFileFoundWarning(msg=f"SimBA could not search {video_dir} for video {filename_base}: access error or permission denied", source=find_video_of_file.__name__)
+                NoFileFoundWarning(msg=f"Mufasa could not search {video_dir} for video {filename_base}: access error or permission denied", source=find_video_of_file.__name__)
             return None
     else:
         try:
@@ -1097,9 +1097,9 @@ def find_video_of_file(video_dir: Union[str, os.PathLike],
 
     if return_path is None:
         if raise_error:
-            raise NoFilesFoundError(msg=f"SimBA could not find a video file representing {filename_base} in the project video directory {video_dir}", source=find_video_of_file.__name__)
+            raise NoFilesFoundError(msg=f"Mufasa could not find a video file representing {filename_base} in the project video directory {video_dir}", source=find_video_of_file.__name__)
         elif warning:
-            NoFileFoundWarning(msg=f"SimBA could not find a video file representing {filename_base} in the project video directory {video_dir}", source=find_video_of_file.__name__)
+            NoFileFoundWarning(msg=f"Mufasa could not find a video file representing {filename_base} in the project video directory {video_dir}", source=find_video_of_file.__name__)
     return return_path
 
 
@@ -1154,9 +1154,9 @@ def find_files_of_filetypes_in_directory(directory: Union[str, os.PathLike],
         if ext.lower() in extensions:
             accepted_file_paths.append(file_path)
     if not accepted_file_paths and raise_warning:
-        NoFileFoundWarning(msg=f"SimBA could not find any files with accepted extensions {extensions} in the {directory} directory", source=find_files_of_filetypes_in_directory.__name__)
+        NoFileFoundWarning(msg=f"Mufasa could not find any files with accepted extensions {extensions} in the {directory} directory", source=find_files_of_filetypes_in_directory.__name__)
     if not accepted_file_paths and raise_error:
-        raise NoDataError(msg=f"SimBA could not find any files with accepted extensions {extensions} in the {directory} directory", source=find_files_of_filetypes_in_directory.__name__)
+        raise NoDataError(msg=f"Mufasa could not find any files with accepted extensions {extensions} in the {directory} directory", source=find_files_of_filetypes_in_directory.__name__)
     if as_dict:
         out = {}
         for file_path in accepted_file_paths:
@@ -1524,7 +1524,7 @@ def copy_single_video_to_project(
     destination = os.path.join(video_dir, new_filename)
     if os.path.isfile(destination) and not overwrite:
         raise FileExistError(
-            msg=f"{file_name} already exist in SimBA project. To import, delete this video file before importing the new video file with the same name.",
+            msg=f"{file_name} already exist in Mufasa project. To import, delete this video file before importing the new video file with the same name.",
             source=copy_single_video_to_project.__name__,
         )
     else:
@@ -1543,13 +1543,13 @@ def copy_single_video_to_project(
         timer.stop_timer()
         if not symlink:
             stdout_success(
-                msg=f"Video {file_name} imported to SimBA project (project_folder/videos directory",
+                msg=f"Video {file_name} imported to Mufasa project (project_folder/videos directory",
                 elapsed_time=timer.elapsed_time_str,
                 source=copy_single_video_to_project.__name__,
             )
         else:
             stdout_success(
-                msg=f"Video {file_name}  SYMLINK imported to SimBA project (project_folder/videos directory",
+                msg=f"Video {file_name}  SYMLINK imported to Mufasa project (project_folder/videos directory",
                 elapsed_time=timer.elapsed_time_str,
                 source=copy_single_video_to_project.__name__,
             )
@@ -1596,7 +1596,7 @@ def copy_multiple_videos_to_project(config_path: Union[str, os.PathLike],
         newFileName = os.path.join(filebasename + file_extension)
         dest1 = os.path.join(destination_dir, newFileName)
         if os.path.isfile(dest1):
-            FileExistWarning(msg=f"{filebasename} already exist in SimBA project. Skipping video...", source=copy_multiple_videos_to_project.__name__)
+            FileExistWarning(msg=f"{filebasename} already exist in Mufasa project. Skipping video...", source=copy_multiple_videos_to_project.__name__)
         else:
             if not symlink:
                 shutil.copy(file_path, dest1)
@@ -1655,7 +1655,7 @@ def find_all_videos_in_project(videos_dir: Union[str, os.PathLike],
                 video_paths.append(file_name)
     if len(video_paths) == 0:
         if raise_error:
-            raise NoFilesFoundError(msg=f"No videos in mp4 or avi format found imported to SimBA project in the {videos_dir} directory", source=find_all_videos_in_project.__name__)
+            raise NoFilesFoundError(msg=f"No videos in mp4 or avi format found imported to Mufasa project in the {videos_dir} directory", source=find_all_videos_in_project.__name__)
         else:
             return []
     else:
@@ -1816,14 +1816,14 @@ def create_directory(paths: Union[str, os.PathLike, bytes, List[str], Tuple[str]
                 if verbose: stdout_information(msg=f'Creating directory {path}...')
                 os.makedirs(path)
             except Exception as e:
-                raise PermissionError(f'SimBA is not allowed to create the directory {path} ({e}). Is a file in this directory open in another process?')
+                raise PermissionError(f'Mufasa is not allowed to create the directory {path} ({e}). Is a file in this directory open in another process?')
         elif overwrite:
             try:
                 remove_a_folder(folder_dir=path)
                 if verbose: stdout_information(msg=f'Creating directory {path}...')
                 os.makedirs(path)
             except Exception as e:
-                raise PermissionError(f'SimBA is not allowed to overwrite the directory {path} ({e}). Is a file in this directory open in another process?')
+                raise PermissionError(f'Mufasa is not allowed to overwrite the directory {path} ({e}). Is a file in this directory open in another process?')
 
 
 def find_max_vertices_coordinates(shapes: List[Union[Polygon, LineString, MultiPolygon, Point]], buffer: Optional[int] = None) -> Tuple[int, int]:
@@ -1965,7 +1965,7 @@ def read_dlc_superanimal_h5(path: Union[str, os.PathLike], col_names: List[str])
     data = pose_data[DF_W_MISSING]['table'][...]
     data = pd.DataFrame([item[-1] for item in data])
     if len(data.columns) < len(col_names):
-        raise InvalidInputError(msg=f'The file {path} does contains {len(data.columns)} columns. With your current project, SimBA expects this file to contain at least {len(col_names)} columns', source=read_dlc_superanimal_h5.__name__)
+        raise InvalidInputError(msg=f'The file {path} does contains {len(data.columns)} columns. With your current project, Mufasa expects this file to contain at least {len(col_names)} columns', source=read_dlc_superanimal_h5.__name__)
     data = data.loc[:, :len(col_names)-1]
     data.columns = col_names
     return data
@@ -2732,14 +2732,14 @@ def bento_file_reader(file_path: Union[str, os.PathLike],
         out_clf_df = clf_df.str.split('\t', expand=True)
         if len(out_clf_df.columns) > 3:
             if raise_error:
-                raise InvalidFileTypeError(msg=f'SimBA found {len(out_clf_df.columns)} columns for file {file_path} and classifier {clf_name} when trying to split the data by tabs.')
+                raise InvalidFileTypeError(msg=f'Mufasa found {len(out_clf_df.columns)} columns for file {file_path} and classifier {clf_name} when trying to split the data by tabs.')
             else:
                 ThirdPartyAnnotationsInvalidFileFormatWarning(annotation_app="BENTO", file_path=file_path, source=bento_file_reader.__name__, log_status=log_setting)
                 return results
         numeric_check = list(out_clf_df.apply(lambda s: pd.to_numeric(s, errors='coerce').notnull().all()))
         if False in numeric_check:
             if raise_error:
-                raise InvalidInputError(msg=f'SimBA found values in the annotation data for behavior {clf_name} in file {file_path} that could not be interpreted as numeric values (seconds or frame numbers)')
+                raise InvalidInputError(msg=f'Mufasa found values in the annotation data for behavior {clf_name} in file {file_path} that could not be interpreted as numeric values (seconds or frame numbers)')
             else:
                 ThirdPartyAnnotationsInvalidFileFormatWarning(annotation_app="BENTO", file_path=file_path, source=bento_file_reader.__name__, log_status=log_setting)
                 return results
@@ -2858,7 +2858,7 @@ def read_boris_file(file_path: Union[str, os.PathLike],
     numeric_check = pd.to_numeric(df[TIME], errors='coerce').notnull().all()
     if not numeric_check:
         if raise_error:
-            raise InvalidInputError(msg=f'SimBA found TIME DATA annotation in file {file_path} that could not be interpreted as numeric values (seconds or frame numbers)')
+            raise InvalidInputError(msg=f'Mufasa found TIME DATA annotation in file {file_path} that could not be interpreted as numeric values (seconds or frame numbers)')
         else:
             ThirdPartyAnnotationsInvalidFileFormatWarning(annotation_app="BORIS", file_path=file_path, source=read_boris_file.__name__, log_status=log_setting)
             return {}

@@ -39,7 +39,7 @@ class AnnotatedBoutsVideoPopUp(PopUpMixin, ConfigReader):
         if len(self.target_file_paths) == 0:
             raise NoFilesFoundError(msg=f"Cannot create annotated bout videos: No data files found in {self.targets_folder}.", source=self.__class__.__name__)
         if len(self.clf_names) == 0:
-            raise NoFilesFoundError(msg=f"The SimBA project {config_path} does not have any defined classifier names.", source=self.__class__.__name__)
+            raise NoFilesFoundError(msg=f"The Mufasa project {config_path} does not have any defined classifier names.", source=self.__class__.__name__)
         self.video_dict = {}
         for file_path in self.target_file_paths:
             self.video_dict[get_fn_ext(filepath=file_path)[1]] = file_path

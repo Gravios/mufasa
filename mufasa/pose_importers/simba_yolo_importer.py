@@ -141,12 +141,12 @@ class SimBAYoloImporter(ConfigReader):
                 raise PermissionError(msg=f"SimBA tried to write to {self.video_info_path}, but was not allowed. If this file is open in another program, try closing it.", source=self.__class__.__name__)
         self.timer.stop_timer()
         if self.verbose:
-            stdout_success(msg=f'{len(list(self.data_paths.keys()))} data file(s) imported to SimBA project in directory {self.outlier_corrected_dir}', elapsed_time=self.timer.elapsed_time_str)
+            stdout_success(msg=f'{len(list(self.data_paths.keys()))} data file(s) imported to Mufasa project in directory {self.outlier_corrected_dir}', elapsed_time=self.timer.elapsed_time_str)
 
 if __name__ == "__main__" and not hasattr(sys, 'ps1'):
-    parser = argparse.ArgumentParser(description="Create a SimBA project from CLI.")
+    parser = argparse.ArgumentParser(description="Create a Mufasa project from CLI.")
     parser.add_argument('--data_dir', type=str, required=True, help='Path to directory with YOLO data.')
-    parser.add_argument('--config_path', type=str, required=True, help='Path to SimBA project config.')
+    parser.add_argument('--config_path', type=str, required=True, help='Path to project config (Mufasa TOML or SimBA INI)')
     parser.add_argument('--verbose', action='store_true', help='Process verbosity.')
     parser.add_argument('--px_per_mm', type=float, default=1.12, help='Pixels per millimeter for all videos imported')
     parser.add_argument('--fps', type=float, default=30.0, help='FPS of all videos imported')

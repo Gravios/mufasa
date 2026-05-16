@@ -114,7 +114,7 @@ class DistancePlotterSingleCore(ConfigReader):
                 data_df.columns = self.bp_headers
             except ValueError:
                 raise CountError(
-                    msg=f"SimBA expects {self.bp_headers} columns but found {len(data_df)} columns in {file_path}",
+                    msg=f"Mufasa expects {self.bp_headers} columns but found {len(data_df)} columns in {file_path}",
                     source=self.__class__.__name__,
                 )
             distances = []

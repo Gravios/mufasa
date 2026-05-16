@@ -199,7 +199,7 @@ class MovementCalculator(ConfigReader, FeatureExtractionMixin):
 
 if __name__ == "__main__" and not hasattr(sys, 'ps1'):
     parser = argparse.ArgumentParser(description="Compute movement statistics from pose-estimation data.")
-    parser.add_argument('--config_path', type=str, required=True, help='Path to SimBA project config.')
+    parser.add_argument('--config_path', type=str, required=True, help='Path to project config (Mufasa TOML or SimBA INI)')
     parser.add_argument('--body_parts', type=str, nargs='+', required=True, help='Body-parts to use for movement calculations.')
     parser.add_argument('--threshold', type=float, default=0.0, help='Confidence threshold for detections (0.0 - 1.0).')
     args = parser.parse_args()

@@ -79,7 +79,7 @@ class BorisAppender(ConfigReader):
             self.video_timer = SimbaTimer(start=True)
             print(f'Processing BORIS annotations for feature file {self.file_name}...')
             if self.file_name not in boris_annotation_dict.keys():
-                raise NoDataError(msg=f'Your SimBA project has a feature file named {self.file_name}, however no annotations exist for this file in the {self.boris_dir} directory.')
+                raise NoDataError(msg=f'Your Mufasa project has a feature file named {self.file_name}, however no annotations exist for this file in the {self.boris_dir} directory.')
             else:
                 video_annot = boris_annotation_dict[self.file_name]
             data_df = read_df(file_path, self.file_type)
@@ -90,7 +90,7 @@ class BorisAppender(ConfigReader):
                 self.clf_name = clf_name
                 data_df[clf_name] = 0
                 if clf_name not in video_annot[BEHAVIOR].unique():
-                    print(f"No BORIS annotation detected for video {self.file_name} and behavior {clf_name}. SimBA will set all frame annotations as absent.")
+                    print(f"No BORIS annotation detected for video {self.file_name} and behavior {clf_name}. Mufasa will set all frame annotations as absent.")
                     continue
                 video_clf_annot = video_annot[video_annot[BEHAVIOR] == clf_name].reset_index(drop=True)
                 self.__check_non_overlapping_annotations(video_clf_annot)

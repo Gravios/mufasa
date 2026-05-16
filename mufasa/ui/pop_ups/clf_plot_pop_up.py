@@ -181,7 +181,7 @@ class SklearnVisualizationPopUp(PopUpMixin, ConfigReader):
         frm_setting, video_setting = self.create_frames_var.get(), self.create_videos_var.get()
 
         if not frm_setting and not video_setting:
-            raise NoSpecifiedOutputError(msg="Please choose to create a video and/or frames. SimBA found that you ticked neither video and/or frames", source=self.__class__.__name__)
+            raise NoSpecifiedOutputError(msg="Please choose to create a video and/or frames. Mufasa found that you ticked neither video and/or frames", source=self.__class__.__name__)
 
         if not multiple:
             video_name = self.single_video_dropdown.getChoices()

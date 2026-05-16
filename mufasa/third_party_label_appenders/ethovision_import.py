@@ -112,7 +112,7 @@ class ImportEthovision(ConfigReader):
             if len(non_clf_behaviors) > 0:
                 print(
                     f"The ETHOVISION annotation file for video {self.video_name} contains annotations for {str(len(non_clf_behaviors))} behaviors"
-                    f" which is NOT defined in the SimBA project: {non_clf_behaviors} and will be SKIPPED."
+                    f" which is NOT defined in the Mufasa project: {non_clf_behaviors} and will be SKIPPED."
                 )
             for clf in self.clf_names:
                 self.clf_dict[clf] = {}
@@ -146,7 +146,7 @@ class ImportEthovision(ConfigReader):
             )
             if len(annotation_mismatch) > 0:
                 print(
-                    f"SIMBA ETHOVISION WARNING: SimBA found ETHOVISION annotations for behavior {clf} in video "
+                    f"SIMBA ETHOVISION WARNING: Mufasa found ETHOVISION annotations for behavior {clf} in video "
                     f"{self.video_name} that are annotated to occur at times which is not present in the "
                     f"video data you imported into SIMBA. The video you imported to SimBA has {str(max(self.features_df.index))} frames. "
                     f"However, in ETHOVISION, you have annotated {clf} to happen at frame number {str(annotation_mismatch[0])}. "

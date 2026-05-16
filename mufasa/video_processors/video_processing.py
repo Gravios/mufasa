@@ -2197,7 +2197,7 @@ def extract_frames_from_all_videos_in_directory(config_path: Union[str, os.PathL
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         else:
-            print(f"Frames for video {video_name} already extracted. SimBA is overwriting prior frames...")
+            print(f"Frames for video {video_name} already extracted. Mufasa is overwriting prior frames...")
         video_to_frames(video_path, save_path, overwrite=True, every=1, chunk_size=1000)
     timer.stop_timer()
     stdout_success(f"Frames created for {str(len(video_paths))} videos",elapsed_time=timer.elapsed_time_str, source=extract_frames_from_all_videos_in_directory.__name__)
@@ -2239,14 +2239,14 @@ def copy_img_folder(
     destination = os.path.join(input_frames_dir, input_basename)
     if os.path.isdir(destination):
         raise DirectoryExistError(
-            msg=f"{destination} already exist in SimBA project.",
+            msg=f"{destination} already exist in Mufasa project.",
             source=copy_img_folder.__name__,
         )
     print(f"Importing image files for {input_basename}...")
     shutil.copytree(source, destination)
     timer.stop_timer()
     stdout_success(
-        msg=f"{destination} imported to SimBA project",
+        msg=f"{destination} imported to Mufasa project",
         elapsed_time=timer.elapsed_time_str,
         source=copy_img_folder.__name__,
     )
@@ -5116,9 +5116,9 @@ def is_video_seekable(data_path: Union[str, os.PathLike],
         check_if_dir_exists(in_dir=os.path.dirname(save_path))
     check_valid_boolean(value=[verbose], source=f'{is_video_seekable.__name__} verbose')
     if not check_ffmpeg_available():
-        raise FFMPEGNotFoundError(msg='SimBA could not find FFMPEG on the computer.', source=is_video_seekable.__name__)
+        raise FFMPEGNotFoundError(msg='Mufasa could not find FFMPEG on the computer.', source=is_video_seekable.__name__)
     if gpu and not check_nvidea_gpu_available():
-        raise SimBAGPUError(msg='SimBA could not find a NVIDEA GPU on the computer and GPU is set to True.', source=is_video_seekable.__name__)
+        raise SimBAGPUError(msg='Mufasa could not find a NVIDEA GPU on the computer and GPU is set to True.', source=is_video_seekable.__name__)
     if os.path.isfile(data_path):
         data_paths = [data_path]
     elif os.path.isdir(data_path):

@@ -235,13 +235,13 @@ try:
 except (ImportError, AttributeError):
     is_worker_process = False
 if not is_worker_process:
-    print(f'SimBA environment variables: {ENV}. SimBA load time: {load_timer.elapsed_time_str}s')
+    print(f'Mufasa environment variables: {ENV}. Mufasa load time: {load_timer.elapsed_time_str}s')
 
 class LoadProjectPopUp(object):
     def __init__(self):
         self.main_frm = Toplevel()
         self.main_frm.minsize(300, 200)
-        self.main_frm.wm_title("Load SimBA project (project_config.ini file)")
+        self.main_frm.wm_title("Load Mufasa project (project_config.ini file)")
         self.btn_icons = get_icons_paths()
         for k in self.btn_icons.keys(): self.btn_icons[k]["img"] = ImageTk.PhotoImage(image=PIL.Image.open(os.path.join(os.path.dirname(__file__), self.btn_icons[k]["icon_path"])))
         self.main_frm.iconphoto(False, self.btn_icons['browse']["img"])
@@ -1029,10 +1029,10 @@ class App(object):
 
         if OS.PYTHON_VER.value != "3.6":
             self.txt['width'], self.txt['height'] = 200, 38
-            PythonVersionWarning(msg=f"SimBA is not extensively tested beyond python 3.6. You are using python {OS.PYTHON_VER.value}. If you encounter errors in python>3.6, please report them on GitHub or Gitter (links in the help toolbar) and we will work together to fix the issues!", source=self.__class__.__name__)
+            PythonVersionWarning(msg=f"Mufasa is not extensively tested beyond python 3.6. You are using python {OS.PYTHON_VER.value}. If you encounter errors in python>3.6, please report them on GitHub or Gitter (links in the help toolbar) and we will work together to fix the issues!", source=self.__class__.__name__)
 
         if not check_ffmpeg_available():
-            FFMpegNotFoundWarning(msg='SimBA could not find a FFMPEG installation on computer (as evaluated by "ffmpeg" returning None). SimBA works best with FFMPEG and it is recommended to install it on your computer', source=self.__class__.__name__)
+            FFMpegNotFoundWarning(msg='Mufasa could not find a FFMPEG installation on computer (as evaluated by "ffmpeg" returning None). SimBA works best with FFMPEG and it is recommended to install it on your computer', source=self.__class__.__name__)
 
 
 
@@ -1040,7 +1040,7 @@ class App(object):
         simba_pip_data = fetch_pip_data(pip_url=Links.SIMBA_PIP_URL.value)
         if (simba_pip_data[1] is not None) and OS.SIMBA_VERSION.value is not None:
             if simba_pip_data[1] != OS.SIMBA_VERSION.value:
-                msg = f"A new version of SimBA is available: {simba_pip_data[1]} (you have version {OS.SIMBA_VERSION.value}). Consider upgrading using: pip install mufasa-uw-tf-dev --upgrade"
+                msg = f"A new version of Mufasa is available: {simba_pip_data[1]} (you have version {OS.SIMBA_VERSION.value}). Consider upgrading using: pip install mufasa-uw-tf-dev --upgrade"
                 VersionWarning(msg=msg)
 
     def clear_recent_projects(self):

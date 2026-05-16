@@ -99,7 +99,7 @@ class LegacyProjectPaths:
                 models_folder=path.parent / "models",
             )
         raise FileNotFoundError(
-            f"{path}: not a legacy Mufasa/SimBA project — no "
+            f"{path}: not a legacy Mufasa/Mufasa project — no "
             f"project_folder/project_config.ini found at this "
             f"path or one level down"
         )
