@@ -317,12 +317,12 @@ def get_nvc_decoder(video_path: Union[str, os.PathLike],
 
     from mufasa.utils.checks import (check_file_exist_and_readable,
                                     check_instance, check_int)
-    from mufasa.utils.errors import SimBAGPUError
+    from mufasa.utils.errors import MufasaGPUError
 
     if nvc is None:
-        raise SimBAGPUError(msg='PyNvVideoCodec is not installed. Install it to use GPU accelerated video decoding.', source=get_nvc_decoder.__name__)
+        raise MufasaGPUError(msg='PyNvVideoCodec is not installed. Install it to use GPU accelerated video decoding.', source=get_nvc_decoder.__name__)
     if not _is_cuda_available()[0]:
-        raise SimBAGPUError(msg='No GPU detected.', source=get_nvc_decoder.__name__)
+        raise MufasaGPUError(msg='No GPU detected.', source=get_nvc_decoder.__name__)
     check_file_exist_and_readable(file_path=video_path)
     check_int(name=f'{get_nvc_decoder.__name__} gpu_id', value=gpu_id, min_value=0)
     check_instance(source=f'{get_nvc_decoder.__name__} use_device_memory', instance=use_device_memory, accepted_types=(bool,))

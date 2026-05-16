@@ -10,7 +10,7 @@ from mufasa.utils.checks import (check_instance, check_int,
                                 check_valid_boolean, check_valid_tuple)
 from mufasa.utils.data import get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import Formats
-from mufasa.utils.errors import SimBAGPUError
+from mufasa.utils.errors import MufasaGPUError
 from mufasa.utils.printing import SimbaTimer, stdout_information
 from mufasa.utils.read_write import (get_video_meta_data,
                                     read_img_batch_from_video,
@@ -72,7 +72,7 @@ class AsyncVideoFrameReader:
         self.batch_size, self.video_path, self.gpu, self.clahe = batch_size, video_path, gpu, clahe
         self.verbose, self.greyscale, self.black_and_white, self.img_size = verbose, greyscale, black_and_white, img_size
         if self.gpu and not check_nvidea_gpu_available():
-            raise SimBAGPUError(msg=f'GPU passed but no GPU device detected on machine', source=self.__class__.__name__)
+            raise MufasaGPUError(msg=f'GPU passed but no GPU device detected on machine', source=self.__class__.__name__)
         self.batches = [(i, min(i + batch_size, self.end_idx)) for i in range(self.start_idx, self.end_idx, batch_size)]
         self.batch_cnt = len(self.batches)
         self._stop, self._thread = False, None

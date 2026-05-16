@@ -36,7 +36,7 @@ from mufasa.utils.checks import (check_ffmpeg_available,
 from mufasa.utils.enums import (OS, UML, Defaults, FontPaths, Formats, Keys,
                                Methods, Options, Paths)
 from mufasa.utils.errors import (FFMPEGNotFoundError, InvalidInputError,
-                                NoFilesFoundError, SimBAPackageVersionError)
+                                NoFilesFoundError, MufasaPackageVersionError)
 from mufasa.utils.printing import stdout_information
 from mufasa.utils.read_write import (fetch_pip_data,
                                     find_files_of_filetypes_in_directory,
@@ -1266,7 +1266,7 @@ def check_for_updates(time_out: int = 2):
     :parameter int time_out: Timeout in seconds for the PyPI API request. Default is 2 seconds.
         Must be at least 1 second.
     :returns: None. Prints update information to stdout via stdout_information.
-    :raises SimBAPackageVersionError: If the latest version cannot be fetched from PyPI, or if
+    :raises MufasaPackageVersionError: If the latest version cannot be fetched from PyPI, or if
         the local SimBA version cannot be determined.
 
     :example:
@@ -1278,9 +1278,9 @@ def check_for_updates(time_out: int = 2):
     _, latest_simba_version = fetch_pip_data(pip_url=r'https://pypi.org/pypi/mufasa-uw-tf-dev/json', time_out=time_out)
     env_simba_version = OS.SIMBA_VERSION.value
     if latest_simba_version is None:
-        raise SimBAPackageVersionError(msg='Could not fetch latest SimBA version.', source=check_for_updates.__name__)
+        raise MufasaPackageVersionError(msg='Could not fetch latest SimBA version.', source=check_for_updates.__name__)
     elif env_simba_version is None:
-        raise SimBAPackageVersionError(msg='Could not get local SimBA version.', source=check_for_updates.__name__)
+        raise MufasaPackageVersionError(msg='Could not get local SimBA version.', source=check_for_updates.__name__)
     if latest_simba_version == env_simba_version:
         msg = f'UP-TO-DATE. \nYou have the latest SimBA version ({env_simba_version}).'
     else:

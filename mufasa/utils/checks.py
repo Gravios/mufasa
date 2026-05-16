@@ -37,7 +37,7 @@ from mufasa.utils.errors import (ArrayError, ColumnNotFoundError,
                                 MissingColumnsError, NoDataError,
                                 NoFilesFoundError, NoROIDataError,
                                 NotDirectoryError, ParametersFileError,
-                                SimBAGPUError, StringError)
+                                MufasaGPUError, StringError)
 from mufasa.utils.warnings import (CorruptedFileWarning, FrameRangeWarning,
                                   InvalidValueWarning, NoDataFoundWarning)
 
@@ -658,7 +658,7 @@ def check_nvidea_gpu_available(raise_error: bool = False) -> bool:
         return True
     except Exception:
         if raise_error:
-            raise SimBAGPUError(msg='No NVIDIA GPU detected on machine (checked by calling "nvidia-smi")', source=check_nvidea_gpu_available.__name__)
+            raise MufasaGPUError(msg='No NVIDIA GPU detected on machine (checked by calling "nvidia-smi")', source=check_nvidea_gpu_available.__name__)
         return False
 
 
@@ -2261,11 +2261,11 @@ def check_valid_device(device: Union[Literal['cpu'], int], raise_error: bool = T
     usage or a valid integer representing a CUDA device index.
 
     :param Union[Literal['cpu'], int] device: The device to validate. Should be the string 'cpu' for CPU usage, or an integer representing a CUDA device index (e.g., 0 for 'cuda:0').
-    :param bool raise_error: If True, raises InvalidInputError or SimBAGPUError when the device is invalid. If False, returns False instead of raising errors. Default: True.
+    :param bool raise_error: If True, raises InvalidInputError or MufasaGPUError when the device is invalid. If False, returns False instead of raising errors. Default: True.
     :return: True if the device is valid, False if it's invalid and raise_error=False.
     :rtype: bool
     :raises InvalidInputError: If the device format is invalid and raise_error=True.
-    :raises SimBAGPUError: If the GPU device is not available or not valid and raise_error=True.
+    :raises MufasaGPUError: If the GPU device is not available or not valid and raise_error=True.
 
     :example:
     >>> check_valid_device('cpu')
@@ -2295,12 +2295,12 @@ def check_valid_device(device: Union[Literal['cpu'], int], raise_error: bool = T
     gpu_available, gpus = _is_cuda_available()
     if not gpu_available:
         if raise_error:
-            raise SimBAGPUError(msg=f'No GPU detected but device {device} passed', source=source)
+            raise MufasaGPUError(msg=f'No GPU detected but device {device} passed', source=source)
         return False
 
     if device not in gpus:
         if raise_error:
-            raise SimBAGPUError(msg=f'Unaccepted GPU device {device} passed. Accepted: {list(gpus.keys())}', source=source)
+            raise MufasaGPUError(msg=f'Unaccepted GPU device {device} passed. Accepted: {list(gpus.keys())}', source=source)
         return False
 
 def is_lxc_container() -> bool:

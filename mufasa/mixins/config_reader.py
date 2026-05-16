@@ -33,7 +33,7 @@ from mufasa.utils.errors import (BodypartColumnNotFoundError, DataHeaderError,
                                 MissingProjectConfigEntryError,
                                 NoFilesFoundError, NoROIDataError,
                                 NotDirectoryError, ParametersFileError,
-                                PermissionError, SimBAPackageVersionError)
+                                PermissionError, MufasaPackageVersionError)
 from mufasa.utils.lookups import (create_color_palettes, get_color_dict,
                                  get_emojis, get_log_config)
 from mufasa.utils.printing import SimbaTimer, stdout_success
@@ -514,7 +514,7 @@ class ConfigReader(object):
             try:
                 self.rectangles_df = pd.read_hdf(self.roi_coordinates_path, key=Keys.ROI_RECTANGLES.value)
             except ValueError:
-                raise SimBAPackageVersionError(msg=f'Could not read {self.roi_coordinates_path}. Did you create the file in a different version of Python? For example, was the file created in a SimBA python 3.6 version while you currently are in Python 3.10 or vice versa?', source=self.__class__.__name__)
+                raise MufasaPackageVersionError(msg=f'Could not read {self.roi_coordinates_path}. Did you create the file in a different version of Python? For example, was the file created in a SimBA python 3.6 version while you currently are in Python 3.10 or vice versa?', source=self.__class__.__name__)
             if ("Center_X" in self.rectangles_df.columns) and (self.rectangles_df["Center_X"].isnull().values.any()):
                 for idx, row in self.rectangles_df.iterrows():
                     self.rectangles_df.loc[idx]["Center_X"] = row["Tags"]["Center tag"][0]

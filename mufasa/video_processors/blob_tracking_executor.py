@@ -16,7 +16,7 @@ from mufasa.utils.checks import (check_if_dir_exists, check_instance, check_int,
 from mufasa.utils.data import (resample_geometry_vertices, savgol_smoother,
                               terminate_cpu_pool)
 from mufasa.utils.enums import Defaults
-from mufasa.utils.errors import SimBAGPUError
+from mufasa.utils.errors import MufasaGPUError
 from mufasa.utils.lookups import get_current_time
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (find_core_cnt, get_video_meta_data,
@@ -114,7 +114,7 @@ class BlobTrackingExecutor():
         self.save_bg_videos, self.save_dir, self.opening_iterations = data[SAVE_BG_VIDEOS], data[OUT_DIR], data[OPENING_ITS]
         self.rostrocaudal, self.mediolateral, self.center = rostrocaudal, mediolateral, center
         if self.gpu and not check_nvidea_gpu_available():
-            raise SimBAGPUError(msg='GPU is set to True, but SImBA could not find a GPU on the machine', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='GPU is set to True, but SImBA could not find a GPU on the machine', source=self.__class__.__name__)
         self.vertice_col_names = []
         self.video_cnt = len(list(self.data[VIDEO_DATA].keys()))
         for i in range(self.vertice_cnt):

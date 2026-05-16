@@ -15,7 +15,7 @@ from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.enums import Options, PackageNames, Paths
-from mufasa.utils.errors import SimBAGPUError, SimBAPackageVersionError
+from mufasa.utils.errors import MufasaGPUError, MufasaPackageVersionError
 from mufasa.utils.read_write import (find_core_cnt,
                                     find_files_of_filetypes_in_directory,
                                     get_pkg_version, get_video_meta_data,
@@ -43,11 +43,11 @@ class YOLOPoseInferencePopUP(PopUpMixin):
     def __init__(self):
         gpu_available, gpus = _is_cuda_available()
         if not gpu_available:
-           raise SimBAGPUError(msg=f'Cannot train YOLO pose-estimation model. No NVIDA GPUs detected on machine',
+           raise MufasaGPUError(msg=f'Cannot train YOLO pose-estimation model. No NVIDA GPUs detected on machine',
                                source=self.__class__.__name__)
         ultralytics_version = get_pkg_version(pkg=PackageNames.ULTRALYTICS.value)
         if ultralytics_version is None:
-           raise SimBAPackageVersionError(msg=f'Cannot train YOLO pose-estimation model: Could not find ultralytics package in python environment',  source=self.__class__.__name__)
+           raise MufasaPackageVersionError(msg=f'Cannot train YOLO pose-estimation model: Could not find ultralytics package in python environment',  source=self.__class__.__name__)
 
         seven_bp_path = os.path.join(YOLO_SCHEMATICS_DIR, 'yolo_7bps.csv')
         PopUpMixin.__init__(self, title="PREDICT USING YOLO POSE ESTIMATION MODEL", icon='ultralytics_2', size=(1100, 700))

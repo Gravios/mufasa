@@ -9,7 +9,7 @@ from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
                                         MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists, check_nvidea_gpu_available
 from mufasa.utils.enums import Keys, Links
-from mufasa.utils.errors import InvalidInputError, NoDataError, SimBAGPUError
+from mufasa.utils.errors import InvalidInputError, NoDataError, MufasaGPUError
 from mufasa.utils.lookups import find_closest_string, get_color_dict
 from mufasa.utils.read_write import (find_all_videos_in_directory,
                                     find_files_of_filetypes_in_directory,
@@ -71,7 +71,7 @@ class EgocentricAlignPopUp(ConfigReader, PopUpMixin):
         fill_clr, core_cnt = self.fill_clr_dropdown.getChoices(), self.core_cnt_dropdown.getChoices()
         direction = int(self.direction_dropdown.getChoices())
         if gpu and not check_nvidea_gpu_available():
-            raise SimBAGPUError(msg='No NVIDEA GPU detected.', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='No NVIDEA GPU detected.', source=self.__class__.__name__)
         data_file_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=[f'.{self.file_type}'], raise_error=True)
         data_file_paths = [os.path.join(data_dir, x) for x in data_file_paths]
         data_file_names = [get_fn_ext(filepath=x)[1] for x in data_file_paths]

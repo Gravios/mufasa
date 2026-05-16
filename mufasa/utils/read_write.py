@@ -71,7 +71,7 @@ from mufasa.utils.errors import (CorruptedFileError, DataHeaderError,
                                 MissingProjectConfigEntryError, NoDataError,
                                 NoFilesFoundError, NotDirectoryError,
                                 ParametersFileError, PermissionError,
-                                SimBAPackageVersionError)
+                                MufasaPackageVersionError)
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.warnings import (
     FileExistWarning, FrameRangeWarning, GPUToolsWarning, InvalidValueWarning,
@@ -1764,7 +1764,7 @@ def read_roi_data(roi_path: Union[str, os.PathLike]) -> Tuple[pd.DataFrame, pd.D
     except (pickle.UnpicklingError, ValueError) as e:
         if "unsupported pickle protocol" in str(e).lower():
             print(e.args)
-            raise SimBAPackageVersionError(msg=f'Pickle VERSION ERROR. The ROIs where likely drawn using a SimBA installation that was built in a **Python** version different from the current Python version (e.g., 3.10 vs 3.6). You currently have Python version {OS.PYTHON_VER.value}. You may have drawn the ROIs in SimBA using Python version >3.8 and now you have Python version <3.8. To fix, use the same Python version as you used when drawing the ROIs')
+            raise MufasaPackageVersionError(msg=f'Pickle VERSION ERROR. The ROIs where likely drawn using a SimBA installation that was built in a **Python** version different from the current Python version (e.g., 3.10 vs 3.6). You currently have Python version {OS.PYTHON_VER.value}. You may have drawn the ROIs in SimBA using Python version >3.8 and now you have Python version <3.8. To fix, use the same Python version as you used when drawing the ROIs')
         else:
             print(e.args)
             raise InvalidFileTypeError(msg=f"{roi_path} is not a valid SimBA ROI definitions file. See above for more detailed error cause.", source=read_roi_data.__name__)
@@ -2132,7 +2132,7 @@ def get_pkg_version(pkg: str, raise_error: Optional[bool] = False):
         return _metadata.version(pkg)
     except _metadata.PackageNotFoundError:
         if raise_error:
-            raise SimBAPackageVersionError(msg=f'Package not found: {pkg}', source=get_pkg_version.__name__)
+            raise MufasaPackageVersionError(msg=f'Package not found: {pkg}', source=get_pkg_version.__name__)
         else:
             return None
 
@@ -3657,7 +3657,7 @@ def get_site_packages_path(raise_error: Optional[bool] = True) -> Union[None, os
         return dir_path
     except Exception as e:
         if raise_error:
-            raise SimBAPackageVersionError(msg=f'site-package directory could not be found: {e.args}', source=get_site_packages_path.__name__)
+            raise MufasaPackageVersionError(msg=f'site-package directory could not be found: {e.args}', source=get_site_packages_path.__name__)
         else:
             return None
 
@@ -3675,14 +3675,14 @@ def get_env_pose_config_dir(raise_error: Optional[bool] = True):
         subdirs = [d for d in os.listdir(pose_config_dir) if os.path.isdir(os.path.join(pose_config_dir, d))]
         missing_subdirs = [x for x in EXPECTED_SUBDIRS if x not in subdirs]
         if len(missing_subdirs) > 0 and raise_error:
-            raise SimBAPackageVersionError(msg=f'pose_configurations directory did not contain the expected sub-directories: {missing_subdirs}', source=get_env_pose_config_dir.__name__)
+            raise MufasaPackageVersionError(msg=f'pose_configurations directory did not contain the expected sub-directories: {missing_subdirs}', source=get_env_pose_config_dir.__name__)
         elif len(missing_subdirs) > 0 and not raise_error:
             return None
         else:
             return pose_config_dir
     else:
         if raise_error:
-            raise SimBAPackageVersionError(msg=f'pose_configurations directory could not be found. Expected directory: {pose_config_dir}', source=get_pose_config_dir.__name__)
+            raise MufasaPackageVersionError(msg=f'pose_configurations directory could not be found. Expected directory: {pose_config_dir}', source=get_pose_config_dir.__name__)
         return None
 
 

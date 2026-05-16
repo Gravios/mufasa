@@ -19,8 +19,8 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_valid_array, check_valid_tuple)
 from mufasa.utils.data import resample_geometry_vertices
 from mufasa.utils.enums import Formats, Options
-from mufasa.utils.errors import (InvalidInputError, SimBAGPUError,
-                                SimBAPackageVersionError)
+from mufasa.utils.errors import (InvalidInputError, MufasaGPUError,
+                                MufasaPackageVersionError)
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_fn_ext, get_video_meta_data, write_df)
 
@@ -56,9 +56,9 @@ class SamInference():
                  vertice_cnt: Optional[int] = 100):
 
         if not _is_cuda_available()[0]:
-            raise SimBAGPUError(msg='No GPU detected.', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='No GPU detected.', source=self.__class__.__name__)
         if SAM2VideoPredictor is None:
-            raise SimBAPackageVersionError(msg='ultralytics.models.sam.SAM2VideoPredictor package not detected.', source=self.__class__.__name__)
+            raise MufasaPackageVersionError(msg='ultralytics.models.sam.SAM2VideoPredictor package not detected.', source=self.__class__.__name__)
         if os.path.isdir(video_path):
             self.video_paths = find_files_of_filetypes_in_directory(directory=video_path, extensions=Options.ALL_VIDEO_FORMAT_OPTIONS.value, raise_error=True)
         elif os.path.isfile(video_path):

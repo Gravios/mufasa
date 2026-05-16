@@ -23,7 +23,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_valid_boolean, check_valid_device,
                                 check_valid_url)
 from mufasa.utils.enums import Options
-from mufasa.utils.errors import SimBAGPUError, SimBAPackageVersionError
+from mufasa.utils.errors import MufasaGPUError, MufasaPackageVersionError
 from mufasa.utils.printing import stdout_information
 from mufasa.utils.read_write import find_core_cnt, get_current_time
 from mufasa.utils.yolo import load_yolo_model
@@ -67,8 +67,8 @@ class FitYolo():
     :param bool verbose: Emit detailed progress information. Default ``True``.
     :param int workers: Data-loader worker processes. Use ``-1`` for all cores. Default ``8``.
     :param int patience: Early-stopping patience (epochs without improvement). Default ``100``.
-    :raises SimBAGPUError: If no CUDA-capable GPU is detected.
-    :raises SimBAPackageVersionError: If ``ultralytics`` is unavailable in the environment.
+    :raises MufasaGPUError: If no CUDA-capable GPU is detected.
+    :raises MufasaPackageVersionError: If ``ultralytics`` is unavailable in the environment.
     :raises FileNotFoundError: If ``weights_path`` or ``model_yaml`` do not exist.
     :raises ValueError: If provided arguments fail SimBA validation checks.
 
@@ -102,9 +102,9 @@ class FitYolo():
 
         os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
         if not _is_cuda_available()[0]:
-            raise SimBAGPUError(msg='No GPU detected.', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='No GPU detected.', source=self.__class__.__name__)
         if YOLO is None:
-            raise SimBAPackageVersionError(msg='Ultralytics package not detected.', source=self.__class__.__name__)
+            raise MufasaPackageVersionError(msg='Ultralytics package not detected.', source=self.__class__.__name__)
         if weights_path is not None:
             check_file_exist_and_readable(file_path=weights_path)
             self.weights_path = weights_path

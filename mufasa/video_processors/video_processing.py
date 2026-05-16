@@ -52,7 +52,7 @@ from mufasa.utils.errors import (CountError, DirectoryExistError,
                                 InvalidInputError, InvalidVideoFileError,
                                 NoDataError, NoFilesFoundError,
                                 NotDirectoryError, ResolutionError,
-                                SimBAGPUError)
+                                MufasaGPUError)
 from mufasa.utils.lookups import (get_current_time, get_ffmpeg_codec,
                                  get_ffmpeg_crossfade_methods,
                                  get_ffmpeg_encoders, get_fonts,
@@ -729,7 +729,7 @@ def change_single_video_fps(file_path: Union[str, os.PathLike],
             cmd = f'ffmpeg -hwaccel auto -i "{file_path}" -vf "fps={fps}" -c:v h264_nvenc -preset p4 -cq {quality} -c:a copy "{save_path}" -loglevel error -stats -hide_banner -y'
             result = subprocess.run(cmd, shell=True)
             if result.returncode != 0:
-                if verbose: SimBAGPUError(msg=f'FPS convertion ({video_meta_data["fps"]}->{fps}) GPU for video {file_name} failed, using CPU instead...')
+                if verbose: MufasaGPUError(msg=f'FPS convertion ({video_meta_data["fps"]}->{fps}) GPU for video {file_name} failed, using CPU instead...')
                 gpu = False
     if not gpu:
         cmd = f'ffmpeg -i "{file_path}" -filter:v fps=fps={fps} -c:v {codec} -crf {quality} -c:a aac "{save_path}" -loglevel error -stats -hide_banner -y'
@@ -806,7 +806,7 @@ def change_fps_of_multiple_videos(path: Union[str, os.PathLike, List[Union[str, 
                 cmd = f'ffmpeg -hwaccel auto -i "{file_path}" -vf "fps={fps}" -c:v h264_nvenc -preset p4 -cq {quality} -c:a copy "{save_path}" -loglevel error -stats -hide_banner -y'
                 result = subprocess.run(cmd, shell=True)
                 if result.returncode != 0:
-                    if verbose: SimBAGPUError(msg=f'FPS convertion ({video_meta_data["fps"]}->{fps}) GPU for video {file_name} failed, using CPU instead...')
+                    if verbose: MufasaGPUError(msg=f'FPS convertion ({video_meta_data["fps"]}->{fps}) GPU for video {file_name} failed, using CPU instead...')
                     gpu = False
         if not gpu:
             cmd = f'ffmpeg -i "{file_path}" -filter:v fps=fps={fps} -c:v {codec} -crf {quality} -c:a aac "{save_path}" -loglevel error -stats -hide_banner -y'
@@ -5118,7 +5118,7 @@ def is_video_seekable(data_path: Union[str, os.PathLike],
     if not check_ffmpeg_available():
         raise FFMPEGNotFoundError(msg='Mufasa could not find FFMPEG on the computer.', source=is_video_seekable.__name__)
     if gpu and not check_nvidea_gpu_available():
-        raise SimBAGPUError(msg='Mufasa could not find a NVIDEA GPU on the computer and GPU is set to True.', source=is_video_seekable.__name__)
+        raise MufasaGPUError(msg='Mufasa could not find a NVIDEA GPU on the computer and GPU is set to True.', source=is_video_seekable.__name__)
     if os.path.isfile(data_path):
         data_paths = [data_path]
     elif os.path.isdir(data_path):

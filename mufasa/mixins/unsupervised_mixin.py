@@ -10,7 +10,7 @@ from mufasa.utils.checks import (check_float, check_instance, check_int,
                                 check_valid_array, check_valid_boolean)
 from mufasa.utils.data import get_library_version
 from mufasa.utils.enums import Formats
-from mufasa.utils.errors import SimBAGPUError
+from mufasa.utils.errors import MufasaGPUError
 from mufasa.utils.lookups import get_model_names
 
 try:
@@ -43,9 +43,9 @@ class UMLMixin(object):
         check_valid_boolean(value=[gpu], source=f'umap_define gpu')
         check_valid_boolean(value=[verbose], source=f'{UMLMixin.umap_fit.__name__} verbose')
         if gpu and not _is_cuda_available()[0]:
-            raise SimBAGPUError(msg='No GPU detected and GPU as True passed', source=UMLMixin.umap_define.__name__)
+            raise MufasaGPUError(msg='No GPU detected and GPU as True passed', source=UMLMixin.umap_define.__name__)
         if gpu and not get_library_version(library_name='cuml'):
-            raise SimBAGPUError(msg='cuML library not detected and GPU as True passed', source=UMLMixin.umap_define.__name__)
+            raise MufasaGPUError(msg='cuML library not detected and GPU as True passed', source=UMLMixin.umap_define.__name__)
         if gpu:
             return cuml_umap.UMAP(min_dist=min_distance, n_neighbors=n_neighbors, spread=spread, metric='euclidean', verbose=verbose)
         else:
@@ -76,9 +76,9 @@ class UMLMixin(object):
         check_valid_boolean(value=[gpu], source=f'hdbscan_define gpu')
         check_valid_boolean(value=[verbose], source=f'hdbscan_define verbose')
         if gpu and not _is_cuda_available()[0]:
-            raise SimBAGPUError(msg='No GPU detected and GPU as True passed', source=UMLMixin.hdbscan_define.__name__)
+            raise MufasaGPUError(msg='No GPU detected and GPU as True passed', source=UMLMixin.hdbscan_define.__name__)
         if gpu and not get_library_version(library_name='cuml'):
-            raise SimBAGPUError(msg='cuML library not detected and GPU as True passed', source=UMLMixin.hdbscan_define.__name__)
+            raise MufasaGPUError(msg='cuML library not detected and GPU as True passed', source=UMLMixin.hdbscan_define.__name__)
         if not gpu:
             return hdbscan.HDBSCAN(algorithm="best", alpha=alpha, approx_min_span_tree=True, gen_min_span_tree=True, min_cluster_size=min_cluster_size, min_samples=min_samples, cluster_selection_epsilon=cluster_selection_epsilon, p=None, prediction_data=True)
         else:

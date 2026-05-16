@@ -44,7 +44,7 @@ from mufasa.utils.data import (create_color_palette,
                               find_frame_numbers_from_time_stamp)
 from mufasa.utils.enums import OS, Formats
 from mufasa.utils.errors import (FFMPEGCodecGPUError, FrameRangeError,
-                                InvalidInputError, SimBAGPUError)
+                                InvalidInputError, MufasaGPUError)
 from mufasa.utils.lookups import get_current_time
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (
@@ -1384,7 +1384,7 @@ def bg_subtraction_cupy(video_path: Union[str, os.PathLike],
     """
 
     if not _is_cuda_available()[0]:
-        raise SimBAGPUError('NP GPU detected using numba.cuda', source=bg_subtraction_cupy.__name__)
+        raise MufasaGPUError('NP GPU detected using numba.cuda', source=bg_subtraction_cupy.__name__)
     if isinstance(avg_frm, (str, os.PathLike)):
         check_file_exist_and_readable(file_path=avg_frm, raise_error=True)
         avg_frm = read_img(img_path=avg_frm, greyscale=False, clahe=False)

@@ -23,7 +23,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_nvidea_gpu_available, check_str,
                                 check_valid_boolean, check_valid_tuple)
 from mufasa.utils.data import resample_geometry_vertices
-from mufasa.utils.errors import NoFilesFoundError, SimBAPackageVersionError
+from mufasa.utils.errors import NoFilesFoundError, MufasaPackageVersionError
 from mufasa.utils.printing import (SimbaTimer, stdout_information,
                                   stdout_success, stdout_warning)
 from mufasa.utils.read_write import (create_directory,
@@ -45,8 +45,8 @@ class SAM3ToYoloSeg:
 
        * :class:`~mufasa.third_party_label_appenders.transform.merge_yolo_projects.MergeYoloProjects` — merge several ``map.yaml`` projects (same classes and task) into one dataset.
 
-    :raises SimBAGPUError: If no NVIDIA GPU is detected (via ``nvidia-smi``).
-    :raises SimBAPackageVersionError: If ``ultralytics`` is not installed, or ``SAM3SemanticPredictor`` cannot be imported.
+    :raises MufasaGPUError: If no NVIDIA GPU is detected (via ``nvidia-smi``).
+    :raises MufasaPackageVersionError: If ``ultralytics`` is not installed, or ``SAM3SemanticPredictor`` cannot be imported.
 
     :param Union[str, os.PathLike] video_dir: Directory containing input videos.
     :param Union[str, os.PathLike] sam_path: Path to SAM3 model weights (e.g. sam3.pt).
@@ -91,7 +91,7 @@ class SAM3ToYoloSeg:
         check_nvidea_gpu_available(raise_error=True)
         _ = get_pkg_version(pkg="ultralytics", raise_error=True)
         if SAM3SemanticPredictor is None:
-            raise SimBAPackageVersionError(msg="Could not import SAM3SemanticPredictor from ultralytics.models.sam. Install a compatible ultralytics build with SAM3 support.", source=self.__class__.__name__,)
+            raise MufasaPackageVersionError(msg="Could not import SAM3SemanticPredictor from ultralytics.models.sam. Install a compatible ultralytics build with SAM3 support.", source=self.__class__.__name__,)
         check_if_dir_exists(in_dir=video_dir, source=f'{self.__class__.__name__} video_dir')
         check_file_exist_and_readable(file_path=sam_path)
         check_if_dir_exists(in_dir=save_dir, source=f'{self.__class__.__name__} save_dir')
