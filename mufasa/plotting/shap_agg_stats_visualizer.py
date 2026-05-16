@@ -23,11 +23,13 @@ from mufasa.utils.read_write import (bgr_to_rgb_tuple,
                                     read_shap_feature_categories_csv,
                                     read_shap_img_paths)
 
-SIMBA_DIR = os.path.dirname(mufasa.__file__)
+MUFASA_DIR = os.path.dirname(mufasa.__file__)
+
+SIMBA_DIR = MUFASA_DIR  # patch 122bp: back-compat alias
 
 def _create_shap_base_plot(baseline_value: int) -> Tuple[np.ndarray, Tuple[int, int], List[Tuple[int, int]]]:
 
-    shap_img_path = os.path.join(SIMBA_DIR, Paths.SIMBA_SHAP_IMG_PATH.value)
+    shap_img_path = os.path.join(MUFASA_DIR, Paths.SIMBA_SHAP_IMG_PATH.value)
     check_if_dir_exists(in_dir=shap_img_path)
     scale_img_paths, category_img_paths = read_shap_img_paths()
     for k, v in category_img_paths.items(): check_file_exist_and_readable(file_path=v)

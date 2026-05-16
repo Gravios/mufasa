@@ -1276,7 +1276,7 @@ def check_for_updates(time_out: int = 2):
     """
     check_int(name=f'{fetch_pip_data.__name__} time_out', value=time_out, min_value=1)
     _, latest_simba_version = fetch_pip_data(pip_url=r'https://pypi.org/pypi/mufasa-uw-tf-dev/json', time_out=time_out)
-    env_simba_version = OS.SIMBA_VERSION.value
+    env_simba_version = OS.MUFASA_VERSION.value
     if latest_simba_version is None:
         raise MufasaPackageVersionError(msg='Could not fetch latest SimBA version.', source=check_for_updates.__name__)
     elif env_simba_version is None:

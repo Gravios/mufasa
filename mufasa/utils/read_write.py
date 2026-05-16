@@ -77,7 +77,9 @@ from mufasa.utils.warnings import (
     FileExistWarning, FrameRangeWarning, GPUToolsWarning, InvalidValueWarning,
     NoFileFoundWarning, ThirdPartyAnnotationsInvalidFileFormatWarning)
 
-SIMBA_DIR = os.path.dirname(mufasa.__file__)
+MUFASA_DIR = os.path.dirname(mufasa.__file__)
+
+SIMBA_DIR = MUFASA_DIR  # patch 122bp: back-compat alias
 
 PARSE_OPTIONS = csv.ParseOptions(delimiter=",")
 READ_OPTIONS = csv.ReadOptions(encoding="utf8")
@@ -2136,7 +2138,7 @@ def get_pkg_version(pkg: str, raise_error: Optional[bool] = False):
         else:
             return None
 
-def fetch_pip_data(pip_url: str = Links.SIMBA_PIP_URL.value,
+def fetch_pip_data(pip_url: str = Links.MUFASA_PIP_URL.value,
                    time_out: int = 2) -> Union[Tuple[Dict[str, Any], str], Tuple[None, None]]:
     """
     Fetch PyPI package metadata from a PyPI JSON API URL.
@@ -3066,7 +3068,7 @@ def labelme_to_dlc(labelme_dir: Union[str, os.PathLike],
 
 def read_shap_feature_categories_csv() -> Tuple[pd.DataFrame, List[str], List[str], List[str]]:
     """ Helper to read feature names and their categories used for binning and visualizing shapely values"""
-    feature_categories_csv_path = os.path.join(SIMBA_DIR, Paths.SIMBA_SHAP_CATEGORIES_PATH.value)
+    feature_categories_csv_path = os.path.join(MUFASA_DIR, Paths.SIMBA_SHAP_CATEGORIES_PATH.value)
     check_file_exist_and_readable(file_path=feature_categories_csv_path)
     feature_categories_df = pd.read_csv(feature_categories_csv_path, header=[0, 1])
     x_names = [list(x) for x in list(feature_categories_df.values)]
@@ -3078,7 +3080,7 @@ def read_shap_feature_categories_csv() -> Tuple[pd.DataFrame, List[str], List[st
 
 def read_shap_img_paths():
     """ Helper to read in the images used to create the SHAP visualization"""
-    shap_img_path = os.path.join(SIMBA_DIR, Paths.SIMBA_SHAP_IMG_PATH.value)
+    shap_img_path = os.path.join(MUFASA_DIR, Paths.SIMBA_SHAP_IMG_PATH.value)
     check_if_dir_exists(in_dir=shap_img_path)
     scale_img_paths = {"baseline_scale": os.path.join(shap_img_path, "baseline_scale.jpg"),
                        "small_arrow": os.path.join(shap_img_path, "down_arrow.jpg"),
@@ -3568,7 +3570,7 @@ def read_sys_env():
 
 
 def get_recent_projects_paths(max: int = 15, sort_alphabetically: bool = True) -> List[str]:
-    file_path = os.path.join(SIMBA_DIR, Paths.RECENT_PROJECTS_PATHS.value)
+    file_path = os.path.join(MUFASA_DIR, Paths.RECENT_PROJECTS_PATHS.value)
     if not os.path.isfile(file_path):
         Path(file_path).touch(); return []
     try:
@@ -3587,7 +3589,7 @@ def get_recent_projects_paths(max: int = 15, sort_alphabetically: bool = True) -
 
 
 def write_to_recent_project_paths(config_path: Union[str, os.PathLike]):
-    file_path = os.path.join(SIMBA_DIR, Paths.RECENT_PROJECTS_PATHS.value)
+    file_path = os.path.join(MUFASA_DIR, Paths.RECENT_PROJECTS_PATHS.value)
     existing_paths = get_recent_projects_paths()
     print(existing_paths)
     if os.path.isfile(config_path) and (config_path not in existing_paths):
