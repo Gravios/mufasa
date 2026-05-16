@@ -130,9 +130,13 @@ class OS(Enum):
     FORK = 'fork'
     PYTHON_VER = str(f"{sys.version_info.major}.{sys.version_info.minor}")
     try:
-        SIMBA_VERSION = _metadata.version("mufasa-uw-tf-dev")
+        MUFASA_VERSION = _metadata.version("mufasa-uw-tf-dev")
     except _metadata.PackageNotFoundError:
-        SIMBA_VERSION = None
+        MUFASA_VERSION = None
+    # Patch 122bp: backward-compat alias for OS.MUFASA_VERSION.
+    # External callers reading OS.MUFASA_VERSION.value continue to
+    # work — Python Enum aliases two members with the same value.
+    SIMBA_VERSION = MUFASA_VERSION
 
 class FontPaths(Enum):
     POPPINS_REGULAR = Path("assets/fonts/Poppins Regular.ttf")
@@ -700,7 +704,11 @@ class Links(Enum):
     COUNT_ANNOTATIONS_IN_PROJECT = "https://github.com/sgoldenlab/mufasa/blob/master/docs/label_behavior.md#count-annotations-in-mufasa-project"
     COUNT_ANNOTATIONS_OUTSIDE_PROJECT = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Tutorial_tools.md#extract-project-annotation-counts"
     CIRCLE_CROP = "https://github.com/sgoldenlab/mufasa/blob/master/docs/Tutorial_tools.md#circle-crop"
-    SIMBA_PIP_URL = 'https://pypi.org/pypi/mufasa-uw-tf-dev/json'
+    MUFASA_PIP_URL = 'https://pypi.org/pypi/mufasa-uw-tf-dev/json'
+    # Patch 122bp: backward-compat alias for Links.MUFASA_PIP_URL.
+    # External callers reading Links.MUFASA_PIP_URL.value continue
+    # to work — Python Enum aliases two members with the same value.
+    SIMBA_PIP_URL = MUFASA_PIP_URL
     YOLO_11_WEIGHTS = {'yolo11n-pose': "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n-pose.pt",
                        'yolo11s-pose': "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11s-pose.pt",
                        'yolo11m-pose': "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11s-pose.pt",
@@ -915,7 +923,6 @@ class ENV_VARS(Enum):
     UNSUPERVISED_INTERFACE = 'UNSUPERVISED_INTERFACE'
     NUMBA_PRECOMPILE = 'NUMBA_PRECOMPILE'
     CUML = 'CUML'
-
 
 
 

@@ -41,8 +41,10 @@ BUFFER_SIZES.insert(0, 'None')
 KERNEL_SIZES = list(np.round(np.arange(0.1, 100.1, 0.1), 2))
 KERNEL_SIZES.insert(0, 'None')
 
-SIMBA_DIR = os.path.dirname(mufasa.__file__)
-BLOB_EXECUTOR_PATH = os.path.join(SIMBA_DIR, Paths.BLOB_EXECUTOR_PATH.value)
+MUFASA_DIR = os.path.dirname(mufasa.__file__)
+
+SIMBA_DIR = MUFASA_DIR  # patch 122bp: back-compat alias
+BLOB_EXECUTOR_PATH = os.path.join(MUFASA_DIR, Paths.BLOB_EXECUTOR_PATH.value)
 
 class BlobTrackingUI(PopUpMixin):
     """

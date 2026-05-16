@@ -24,7 +24,7 @@ LINKS = [
 
 DEVELOPER_URL = Links.SIMON_WEBSITE.value
 DEVELOPER_IMG = os.path.join(os.path.dirname(mufasa.__file__), Paths.SIMON_SMALL_IMG.value)
-VERSION_TXT = f"SimBA v{OS.SIMBA_VERSION.value}" if OS.SIMBA_VERSION.value else "SimBA"
+VERSION_TXT = f"SimBA v{OS.MUFASA_VERSION.value}" if OS.MUFASA_VERSION.value else "SimBA"
 LANDING_MOVIE_PATH = os.path.join(os.path.dirname(mufasa.__file__), Paths.LANDING_MOVIE.value)
 
 # RGB color definitions
