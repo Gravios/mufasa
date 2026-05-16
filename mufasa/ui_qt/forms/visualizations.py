@@ -123,6 +123,22 @@ class _ExtrasFormBuilder:
       their own defaults for missing keys).
       Patch 122bg: unlocks routes whose backend needs a config
       dict (e.g. CircularFeaturePlotter's ``settings``).
+    * ``"pickle"`` — _PathField (file picker) collecting a
+      ``.pkl`` path; at ``to_kwargs`` time the form opens the
+      file with :func:`pickle.load` and returns the
+      deserialized object. Empty path or load error yields
+      ``None`` (backend will raise its usual missing-arg
+      error, which is clearer than the form would produce).
+      extras: (file_filter, placeholder).
+      Patch 122bh: unlocks routes whose backend takes a
+      complex Python object that can't be JSON-serialized
+      (e.g. GeometryPlotter's ``geometries`` arg, which is
+      ``List[List[Shapely-object]]``). Users construct
+      geometries in a Python script, pickle them, and feed
+      the file to the form. SECURITY: pickle.load executes
+      arbitrary code from the file — only load files you
+      created or trust. The form does no sandboxing; this
+      matches the trust model of a single-user desktop tool.
     * ``"file"`` — _PathField (file picker); extras: (file_filter, placeholder)
 
     Label text is derived from the backend kwarg name by replacing
@@ -203,6 +219,21 @@ class _ExtrasFormBuilder:
             elif default:
                 w.setText(str(default))
             self._form.addRow(self._label(name), w)
+        elif kind == "pickle":
+            # Patch 122bh: file picker for a pickle file. UI is
+            # identical to "file"; the difference is in
+            # to_kwargs, which opens and pickle.loads the
+            # selected file. Default extras: (file_filter,
+            # placeholder).
+            file_filter = (
+                extra[0] if extra else "Pickle files (*.pkl)"
+            )
+            placeholder = extra[1] if len(extra) > 1 else ""
+            w = _PathField(is_file=True, file_filter=file_filter,
+                           placeholder=placeholder)
+            if default:
+                w.path = str(default)
+            self._form.addRow(self._label(name), w)
         elif kind == "file":
             file_filter = extra[0] if extra else ""
             placeholder  = extra[1] if len(extra) > 1 else ""
@@ -255,6 +286,29 @@ class _ExtrasFormBuilder:
                         )
                     except (json.JSONDecodeError, ValueError):
                         out[name] = {}
+            elif kind == "pickle":
+                # Patch 122bh: open the picked file and
+                # pickle.load it. Empty path or load error
+                # yields None — backend will then raise its
+                # usual missing-arg error (clearer than a
+                # form-side message would be). pickle.load
+                # executes arbitrary code from the file; the
+                # user is trusted to only pick files they
+                # produced themselves (single-user desktop
+                # trust model — same as running any other
+                # Python script).
+                path = w.path or ""
+                if not path:
+                    out[name] = None
+                else:
+                    import pickle
+                    try:
+                        with open(path, "rb") as fh:
+                            out[name] = pickle.load(fh)
+                    except (OSError, pickle.UnpicklingError,
+                            EOFError, AttributeError,
+                            ImportError, ValueError):
+                        out[name] = None
             elif kind == "file":
                 out[name] = w.path
         return out
@@ -892,10 +946,10 @@ ROUTES: list[_VizRoute] = [
     # are JSON-serializable (e.g. {'center': {'Animal_1':
     # 'SwimBladder'}, 'text_settings': False, 'palette': 'bwr'}).
     # The new "dict" extras kind lets users paste a JSON object
-    # directly. GeometryPlotter is NOT surfaced — its
+    # directly. GeometryPlotter was NOT surfaced in 122bg — its
     # `geometries` arg is List[List[Shapely-objects]] which
-    # isn't JSON-serializable; that backend stays callable
-    # programmatically only.
+    # isn't JSON-serializable. Patch 122bh unlocks it via the
+    # new "pickle" extras kind (see route below).
     _VizRoute(
         label="Circular feature overlay (per video)",
         scope_kind="file",
@@ -914,6 +968,44 @@ ROUTES: list[_VizRoute] = [
         ],
         # File scope: user picks the circular-features data CSV.
         kwargs_map={"source_path": "data_path"},
+    ),
+    # -------- Patch 122bh: pickle-kind route fill-in ---------- #
+    # GeometryPlotter takes a List[List[Shapely-object]] for
+    # geometries — not JSON-serializable. The new "pickle"
+    # extras kind lets users construct geometries in a Python
+    # script, pickle them, and point the form at the .pkl file.
+    # At dispatch the form pickle.loads the file and passes the
+    # deserialized list-of-lists through to the backend.
+    # SECURITY: pickle.load runs arbitrary code from the file;
+    # the user trust model is "only load files you produced
+    # yourself" (same as running any Python script).
+    _VizRoute(
+        label="Geometry overlay (Shapely objects)",
+        scope_kind="project",
+        backend_sp=_lazy_factory(
+            "mufasa.plotting.geometry_plotter",
+            "GeometryPlotter",
+        ),
+        needs_save_dir=True,
+        extras=[
+            # geometries: pickle file with List[List[Shapely]].
+            ("geometries", "pickle", "",
+             "Pickle files (*.pkl);;All files (*)",
+             "Pickle file with List[List[Shapely]] geometries"),
+            ("video_name",       "str",   "",
+             "Video name (filename, not path)"),
+            ("thickness",        "int",   2, 1, 20),
+            ("circle_size",      "int",   5, 1, 50),
+            ("bg_opacity",       "float", 0.5, 0.0, 1.0, 0.05),
+            ("shape_opacity",    "float", 0.5, 0.0, 1.0, 0.05),
+            ("intersection_clr", "color", "(255, 255, 255)"),
+            ("outline_clr",      "color", "(0, 0, 0)"),
+            ("palette",          "str",   "Set1",
+             "Matplotlib palette name (e.g. Set1, tab10)"),
+            ("core_cnt",         "int",   1, 1, 64),
+            ("verbose",          "bool",  True),
+        ],
+        kwargs_map={"save_path": "save_dir"},
     ),
 ]
 
