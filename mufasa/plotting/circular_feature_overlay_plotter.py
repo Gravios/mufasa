@@ -147,7 +147,3 @@ class CircularFeaturePlotter(ConfigReader, PlottingMixin, FeatureExtractionMixin
 # settings = {'center': {'Animal_1': 'Zebrafish_SwimBladder'},
 #             'text_settings': False, "palette": 'bwr'}
 #
-# test = CircularFeaturePlotter(config_path=r'/Users/simon/Desktop/envs/mufasa/troubleshooting/zebrafish/project_folder/project_config.ini',
-#                               data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/zebrafish/project_folder/csv/features_extracted/test.csv',
-#                               settings=settings)
-# test.run()

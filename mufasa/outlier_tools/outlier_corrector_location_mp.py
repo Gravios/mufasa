@@ -177,15 +177,3 @@ class OutlierCorrecterLocationMultiprocess(ConfigReader, FeatureExtractionMixin)
         out_df.to_csv(self.logs_path)
         self.timer.stop_timer()
         stdout_success(msg='Log for corrected "location outliers" saved in project_folder/logs', elapsed_time=self.timer.elapsed_time_str)
-
-# if __name__ == "__main__":
-#     test = OutlierCorrecterLocationMultiprocess(config_path=r"C:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini")
-#     #test = OutlierCorrecterLocationMultiprocess(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini")
-#     test.run()
-
-
-# test = OutlierCorrecterLocation(config_path='/Users/simon/Desktop/envs/troubleshooting/naresh/project_folder/project_config.ini')
-# test.run()
-
-# test = OutlierCorrecterLocation(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
-# test.correct_location_outliers()

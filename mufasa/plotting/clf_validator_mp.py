@@ -244,23 +244,3 @@ class ClassifierValidationClipsMultiprocess(ConfigReader):
 
         self.timer.stop_timer()
         stdout_success(msg=f"All video clips complete and saved in {self.clf_validation_dir}!", elapsed_time=self.timer.elapsed_time_str)
-
-
-# test = ClassifierValidationClipsMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                                              window=1,
-#                                              clf_name='Attack',
-#                                              clips=True,
-#                                              concat_video=True,
-#                                              highlight_clr=(255, 0, 0),
-#                                              video_speed=0.5,
-#                                              text_clr=(0, 0, 255),
-#                                              data_paths=['/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/machine_results/Together_1.csv'])
-# test.run()
-
-# test = ClassifierValidationClips(config_path='/Users/simon/Desktop/envs/troubleshooting/Two_animals_16bps/project_folder/project_config.ini',
-#                                  window=1,
-#                                  clf_name='Attack',
-#                                  clips=False,
-#                                  concat_video=True,
-#                                  text_clr=(0, 0, 255))
-# test.create_clips()

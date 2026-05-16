@@ -188,31 +188,3 @@ class KleinbergCalculator(ConfigReader):
         else:
             if self.verbose: print(f"[{get_current_time()}] Kleinberg analysis complete for {len(self.data_paths)} files. Results stored in {self.output_dir} directory.")
             KleinbergWarning(msg="All behavior bouts removed following kleinberg smoothing", source=self.__class__.__name__)
-
-
-
-
-# test = KleinbergCalculator(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini",
-#                            classifier_names=['straub_tail'],
-#                            sigma=1.1,
-#                            gamma=0.1,
-#                            hierarchy=1,
-#                            save_originals=False,
-#                            hierarchical_search=False)
-#
-# test.run()
-#
-
-
-
-# test = KleinbergCalculator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/levi/project_folder/project_config.ini',
-#                            classifier_names=['No_Seizure_(0)'],
-#                            sigma=1.1,
-#                            gamma=0.1,
-#                            hierarchy=1,
-#                            hierarchical_search=False)
-#
-# test.run()
-#
-# test.perform_kleinberg()
-# #data = run_kleinberg(r'Z:\DeepLabCut\DLC_extract\Troubleshooting\DLC_two_mice\project_folder\project_config.ini', ['int'], sigma=2, gamma=0.3, hierarchy=1)

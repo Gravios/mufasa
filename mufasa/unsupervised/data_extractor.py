@@ -360,11 +360,3 @@ class DataExtractor(UMLMixin, ConfigReader):
             msg=f"Data for {len(self.data_paths)} model(s) extracted",
             elapsed_time=self.timer.elapsed_time,
         )
-
-
-# test = DataExtractor(data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/NG_Unsupervised/project_folder/cluster_mdls/hopeful_khorana.pickle',
-#                      data_types=['CLUSTERER HYPER-PARAMETERS'],
-#                      settings=None,
-#                      config_path='/Users/simon/Desktop/envs/NG_Unsupervised/project_folder/project_config.ini')
-#
-# test.run()

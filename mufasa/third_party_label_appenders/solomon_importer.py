@@ -108,11 +108,3 @@ class SolomonImporter(ConfigReader):
         stdout_success(
             msg="All SOLOMON annotations imported. Data saved in the project_folder/csv/targets_inserted directory of the SimBA project"
         )
-
-
-# test = SolomonImporter(
-#     config_path="/Users/simon/Desktop/envs/simba_dev/test/data/test_projects/two_c57/project_folder/project_config.ini",
-#     data_dir="/Users/simon/Desktop/envs/simba_dev/test/data/test_projects/two_c57/solomon_annotations",
-# )
-#
-# test.run()

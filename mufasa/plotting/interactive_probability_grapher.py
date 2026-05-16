@@ -187,17 +187,3 @@ class InteractiveProbabilityGrapher(ConfigReader):
         plt.close('all')
 
 #
-# test = InteractiveProbabilityGrapher(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini",
-#                                      file_path=r"C:\troubleshooting\mitra\project_folder\csv\features_extracted\501_MA142_Gi_CNO_0521.csv",
-#                                      model_path=r"C:\troubleshooting\mitra\models\generated_models\straub_tail.sav")
-# test.run()
-
-
-# test = InteractiveProbabilityGrapher(config_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/project_config.ini",
-#                                      file_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/csv/validation/704_MA115_Gi_CNO_0521.csv",
-#                                      model_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/models/generated_models/grooming.sav",
-#                                      show_statistics_legend=True)
-# test.run()
-#
-
-

@@ -174,8 +174,3 @@ class ImportEthovision(ConfigReader):
             msg="All Ethovision annotations added. Files with annotation are located in the project_folder/csv/targets_inserted directory",
             elapsed_time=self.timer.elapsed_time_str,
         )
-
-
-# test = ImportEthovision(config_path= r"/Users/simon/Desktop/envs/simba_dev/tests/test_data/import_tests/project_folder/project_config.ini", data_dir=r'/Users/simon/Desktop/envs/simba_dev/tests/test_data/import_tests/ethovision_data')
-# test = ImportEthovision(config_path= r"/Users/simon/Desktop/envs/simba_dev/test/data/test_projects/two_c57/project_folder/project_config.ini", data_dir='/Users/simon/Desktop/envs/simba_dev/test/data/test_projects/two_c57/ethovision_annotations')
-# test.run()

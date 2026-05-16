@@ -223,5 +223,3 @@ class MutualExclusivityCorrector(ConfigReader):
 #              'skip_files_with_identical': None}}
 
 # rules = {1: {'rule_type': 'highest_probability', 'subordinates': ['Sniffing', 'Attack'], 'tie_breaker': 'Attack', 'skip_files_with_identical': False}}
-# test = MutualExclusivityCorrector(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini', rules=rules)
-# test.run()

@@ -251,27 +251,3 @@ class DirectingOtherAnimalsAnalyzer(ConfigReader, FeatureExtractionMixin):
             if self.verbose: stdout_success(f"All detailed directional data saved in the {save_dir} directory!", source=self.__class__.__name__)
         self.timer.stop_timer()
         if self.verbose: stdout_success(msg="All directional data saved in SimBA project", elapsed_time=self.timer.elapsed_time_str, source=self.__class__.__name__)
-
-
-# test = DirectingOtherAnimalsAnalyzer(config_path=r"D:\troubleshooting\two_animals_sleap\project_folder\project_config.ini",
-#                                      bool_tables=True,
-#                                      summary_tables=True,
-#                                      aggregate_statistics_tables=True,
-#                                      append_bool_tables_to_features=False,
-#                                      data_paths=None,
-#                                      nose_name='earL1',
-#                                      left_ear_name='earR1',
-#                                      right_ear_name='nose1')
-# test.run()
-#
-
-# test = DirectingOtherAnimalsAnalyzer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                                      bool_tables=True,
-#                                      summary_tables=True,
-#                                      aggregate_statistics_tables=True,
-#                                      append_bool_tables_to_features=False,
-#                                      data_paths=None,
-#                                      nose_name=None,
-#                                      left_ear_name=None,
-#                                      right_ear_name=None)
-# test.run()

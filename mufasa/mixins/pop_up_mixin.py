@@ -508,12 +508,3 @@ class PopUpMixin(object):
     #     #print(f'+{e.x_root}x{e.y_root}')
     #     #self.main_frm.config(width=e.x_root, height=e.y_root)
     #     #self.main_frm.update()
-
-
-# test = PopUpMixin(config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project_folder/project_config.ini',
-#                   title='ss')
-# test.create_import_pose_menu(parent_frm=test.main_frm)
-
-# test = PopUpMixin(config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project_folder/project_config.ini',
-#                   title='ss')
-# test.create_import_videos_menu(parent_frm=test.main_frm)

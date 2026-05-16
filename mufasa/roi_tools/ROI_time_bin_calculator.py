@@ -128,30 +128,3 @@ class ROITimebinCalculator(ConfigReader):
         if self.movement:
             self.results_movement_velocity.sort_values(by=["VIDEO", "SHAPE", "ANIMAL", "TIME BIN #"]).set_index("VIDEO").to_csv(self.save_path_movement_velocity)
             stdout_success(msg=f"ROI time-bin movement data saved at {self.save_path_movement_velocity}", elapsed_time=self.timer.elapsed_time_str)
-
-
-
-# test = ROITimebinCalculator(config_path=r"C:\troubleshooting\spontenous_alternation\project_folder\project_config.ini",
-#                             bin_length=0.5,
-#                             body_parts=['nose'],
-#                             threshold=0.00,
-#                             movement=True)
-# test.run()
-# test.save()
-
-
-# test = ROITimebinCalculator(config_path=r"C:\troubleshooting\ROI_movement_test\project_folder\project_config.ini",
-#                             bin_length=0.5,
-#                             body_parts=['Head'],
-#                             threshold=0.00,
-#                             movement=True)
-# test.run()
-# test.save()
-
-# test = ROITimebinCalculator(config_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini",
-#                             bin_length=1,
-#                             body_parts=['Nose_1'],
-#                             threshold=0.00,
-#                             movement=True)
-# test.run()
-# test.save()

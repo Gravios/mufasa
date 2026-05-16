@@ -233,6 +233,3 @@ class MutualExclusivityPupUp(PopUpMixin, ConfigReader):
             rules=rules, config_path=self.config_path
         )
         corrector.run()
-
-
-# test = MutualExclusivityPupUp(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')

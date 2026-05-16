@@ -30,7 +30,3 @@ class RemoveROIFeaturesPopUp:
                 config.remove_roi_features(config.features_dir)
         else:
             pass
-
-
-# test = RemoveROIFeaturesPopUp(config_path='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project_folder/csv/features_extracted',
-#                          dataset='features_extracted')

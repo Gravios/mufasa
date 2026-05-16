@@ -273,27 +273,3 @@ class PlotSklearnResultsSingleCore(ConfigReader, TrainModelMixin, PlottingMixin)
 
         self.timer.stop_timer()
         stdout_success(msg=f"{len(self.video_paths)} visualization(s) created in {self.sklearn_plot_dir} directory", elapsed_time=self.timer.elapsed_time_str, source=self.__class__.__name__)
-
-# test = PlotSklearnResultsSingleCore(config_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini",
-#                                     video_setting=True,
-#                                     frame_setting=False,
-#                                     video_paths=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.mp4",
-#                                     print_timers=True,
-#                                     rotate=False,
-#                                     animal_names=True,
-#                                     show_gantt=2)
-# test.run()
-
-
-
-
-
-
-# test = PlotSklearnResultsSingleCore(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini",
-#                                     video_setting=True,
-#                                     frame_setting=False,
-#                                     video_paths=r"C:\troubleshooting\RAT_NOR\project_folder\videos\03152021_NOB_IOT_8.mp4",
-#                                     print_timers=True,
-#                                     rotate=True,
-#                                     animal_names=True)
-# test.run()

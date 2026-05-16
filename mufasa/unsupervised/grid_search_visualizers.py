@@ -191,37 +191,3 @@ class GridSearchVisualizer(UMLMixin):
 
 # #
 # settings = {'CATEGORICAL_PALETTE': 'tab20', 'CONTINUOUS_PALETTE': 'magma', 'SCATTER_SIZE': 10}
-# test = GridSearchVisualizer(model_dir='/Users/simon/Desktop/envs/NG_Unsupervised/project_folder/clusters',
-#                             save_dir='/Users/simon/Desktop/envs/NG_Unsupervised/project_folder/cluster_vis',
-#                             settings=settings)
-# test.categorical_visualizer(categorical_vars=['CLUSTER'])
-# test.continuous_visualizer(continuous_vars=['PROBABILITY'])
-
-
-# settings = {'CATEGORICAL_PALETTE': 'Pastel1', 'CONTINUOUS_PALETTE': 'magma', 'SCATTER_SIZE': 10}
-# test = GridSearchVisualizer(model_dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/NG_Unsupervised/project_folder/clustering_test_2',
-#                             save_dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/NG_Unsupervised/project_folder/cluster_viz_2',
-#                             settings=settings)
-# test.categorical_visualizer(categorical_vars=['CLASSIFIER'])
-
-
-# settings = {'CATEGORICAL_PALETTE': 'Pastel1', 'CONTINUOUS_PALETTE': 'magma', 'SCATTER_SIZE': 10}
-# test = GridSearchVisualizer(model_dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/NG_Unsupervised/project_folder/cluster_mdls',
-#                             save_dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/NG_Unsupervised/project_folder/cluster_vis',
-#                             settings=settings)
-# #test.categorical_visualizer(categorical_vars=['VIDEO', 'CLUSTER'])
-# test.continuous_visualizer(continuous_vars=['START_FRAME'])
-
-# settings = {'PALETTE': 'Pastel1'}
-# test = GridSearchVisualizer(model_dir='/Users/simon/Desktop/envs/troubleshooting/unsupervised/cluster_models',
-#                             save_dir='/Users/simon/Desktop/envs/troubleshooting/unsupervised/images',
-#                             settings=settings)
-# test.cluster_visualizer()
-
-
-# settings = {'CATEGORICAL_PALETTE': 'Pastel1', 'SCATTER_SIZE': 10}
-# test = GridSearchVisualizer(model_dir='/Users/simon/Desktop/envs/troubleshooting/unsupervised/cluster_models_042023',
-#                             save_dir='/Users/simon/Desktop/envs/troubleshooting/unsupervised/images',
-#                             settings=settings)
-# #test.continuous_visualizer(continuous_vars=['START_FRAME'])
-# test.categorical_visualizer(categoricals=['CLUSTER'])

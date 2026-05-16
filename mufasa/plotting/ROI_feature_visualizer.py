@@ -229,36 +229,3 @@ class ROIfeatureVisualizer(ConfigReader):
 
 
 # style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': True, 'directionality_style': 'lines', 'border_color': (0, 0, 0), 'pose_estimation': True, 'animal_names': True}
-# test = ROIfeatureVisualizer(config_path=r"C:\troubleshooting\roi_duplicates\project_folder\project_config.ini",
-#                             video_path=r"C:\troubleshooting\roi_duplicates\project_folder\videos\2021-12-21_15-03-57_CO_Trimmed.mp4",
-#                             style_attr=style_attr,
-#                             body_parts=['Butt/Proximal Tail']) #'Butt/Proximal Tail'
-# test.run()
-
-
-
-
-# style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': True, 'directionality_style': 'lines', 'border_color': (0, 0, 0), 'pose_estimation': True, 'animal_names': True}
-# test = ROIfeatureVisualizer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/project_config.ini',
-#                             video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/2022-06-20_NOB_DOT_4.mp4',
-#                             style_attr=style_attr,
-#                             body_parts=['Nose'])
-# test.run()
-
-
-# style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': True, 'directionality_style': 'funnel', 'border_color': (0, 128, 0), 'pose_estimation': True, 'animal_names': True}
-# test = ROIfeatureVisualizer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
-#                             video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.avi',
-#                             style_attr=style_attr,
-#                             body_parts=['Nose_1', 'Nose_2'])
-# test.run()
-
-
-# style_attr = {'ROI_centers': True, 'ROI_ear_tags': True, 'Directionality': True, 'Directionality_style': 'Line', 'Border_color': (0, 128, 0), 'Pose_estimation': True}
-# test = ROIfeatureVisualizer(config_path='/Users/simon/Desktop/envs/simba_dev/tests/test_data/mouse_open_field/project_folder/project_config.ini', video_name='Video1.mp4', style_attr=style_attr)
-# test.run()
-
-
-# test = ROIfeatureVisualizer(config_path='/Users/simon/Desktop/train_model_project/project_folder/project_config.ini', video_name='Together_1.avi')
-# test.run()
-# test.save_new_features_files()

@@ -202,16 +202,3 @@ class NoldusObserverImporter(ConfigReader):
 
     def __save(self, df: pd.DataFrame, path: str):
         write_df(df=df, file_type=self.file_type, save_path=path)
-
-
-# test = NoldusObserverImporter(config_path='/Users/simon/Desktop/envs/troubleshooting/Gosia/project_folder/project_config.ini',
-#                               data_dir='/Users/simon/Desktop/envs/troubleshooting/Gosia/source/behaviours/Exp_38')
-# test.run()
-
-
-# for k, v in test.annotation.items():
-#     print(v[BEHAVIOR_FIELD].unique())
-#
-#
-#
-# # test.run()

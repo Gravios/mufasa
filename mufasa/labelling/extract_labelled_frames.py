@@ -97,12 +97,3 @@ class AnnotationFrameExtractor(ConfigReader):
                     stdout_information(f"Saved {clf} annotated image for classifier {clf} at location {img_save_path} ({str(frm_cnt)}/{str(len(clf_annot_idx))}), video: {file_cnt+1}/{len(self.data_paths)}, ({video_name}) ...")
         self.timer.stop_timer()
         stdout_success(msg=f"Annotated frames saved in {self.annotated_frm_dir} directory", elapsed_time=self.timer.elapsed_time_str)
-
-
-
-# test = AnnotationFrameExtractor(config_path=r'E:\troubleshooting\mitra\project_folder\project_config.ini',
-#                                 clfs=['grooming'],
-#                                 img_downsample_factor=4,
-#                                 data_paths=[r"E:\troubleshooting\mitra\project_folder\csv\targets_inserted\grooming\502_MA141_Gi_Saline_0517.csv"],
-#                                 img_greyscale=True)
-# test.run()

@@ -248,10 +248,3 @@ class DirectingAnimalsToBodyPartAnalyzer(ConfigReader, FeatureExtractionMixin):
             msg="All directional data saved in SimBA project",
             elapsed_time=self.timer.elapsed_time_str,
         )
-
-
-# test = DirectingOtherAnimalsAnalyzer(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
-# test.process_directionality()
-# test.create_directionality_dfs()
-# test.save_directionality_dfs()
-# test.summary_statistics()

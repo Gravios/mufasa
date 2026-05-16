@@ -126,21 +126,3 @@ class OutlierCorrecterMovement(ConfigReader, FeatureExtractionMixin):
 
 
 #
-# test = OutlierCorrecterMovement(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini")
-# test.run()
-
-#
-# test = OutlierCorrecterMovement(config_path='/Users/simon/Desktop/envs/troubleshooting/dorian_2/project_folder/project_config.ini')
-# test.run()
-
-# test = OutlierCorrecterMovement(config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project_folder/project_config.ini')
-# test.correct_movement_outliers()
-
-# test = OutlierCorrecterMovement(config_path='/Users/simon/Desktop/envs/troubleshooting/naresh/project_folder/project_config.ini')
-# test.run()
-
-# test = OutlierCorrecterMovement(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
-# test.correct_movement_outliers()
-#
-# test = OutlierCorrecterMovement(config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project_folder/project_config.ini')
-# test.correct_movement_outliers()

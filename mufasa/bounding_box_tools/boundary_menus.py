@@ -637,7 +637,3 @@ class BoundaryMenus(ConfigReader, PopUpMixin):
         )
         agg_stats_calculator.run()
         agg_stats_calculator.save()
-
-
-# test = BoundaryMenus(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
-# test.main_frm.mainloop()

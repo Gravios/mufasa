@@ -881,6 +881,3 @@ class CaveFishFeaturizer(ConfigReader, FeatureExtractionMixin):
         write_df(
             self.csv_df_combined.astype(np.float32), self.file_type, self.save_path
         )
-
-
-# test = FishFeatureExtractor(config_path='/Users/simon/Desktop/envs/troubleshooting/naresh/project_folder/project_config.ini')

@@ -202,14 +202,3 @@ class ROISizeStandardizer(ConfigReader, FeatureExtractionMixin):
         store["polygons"] = self.polygon_df
         store.close()
         stdout_success(msg=f"ROI size definitions standardized according to pixels per millimeter in video {self.reference_video_name}", source=self.__class__.__name__)
-
-
-# test = ROISizeStandardizer(config_path='/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project_folder/project_config.ini', reference_video='Together_1')
-# test.run()
-# test.save()
-
-
-#
-# test = ROISizeStandardizer(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini', reference_video='Together_1')
-# test.run()
-# test.save()

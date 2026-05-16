@@ -87,4 +87,3 @@ class AnimalDirectingAnimalPopUp(ConfigReader, PopUpMixin):
         directing_animals_analyzer.run()
 
 #_ = AnimalDirectingAnimalPopUp(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project_config.ini")
-#test = AnimalDirectingAnimalPopUp(config_path=r"C:\troubleshooting\two_animals_16_bp_JAG\project_folder\project_config.ini")

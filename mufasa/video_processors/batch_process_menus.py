@@ -569,19 +569,3 @@ class BatchProcessFrame(PopUpMixin):
         timer.stop_timer()
         stdout_success(msg=f"SimBA batch pre-process JSON saved at {self.save_path}", source=self.__class__.__name__)
         stdout_success(msg=f"Video batch pre-processing complete, new videos stored in {self.output_dir}", elapsed_time=timer.elapsed_time_str, source=self.__class__.__name__)
-
-
-# test = BatchProcessFrame(input_dir=r'D:\troubleshooting\maplight_ri\project_folder\blob\videos', output_dir=r"D:\troubleshooting\maplight_ri\project_folder\blob\batch_out_6")
-# test.create_main_window()
-# test.create_video_table_headings()
-# test.create_video_rows()
-# test.create_execute_btn()
-# test.main_frm.mainloop()
-
-#
-# test = BatchProcessFrame(input_dir=r'D:\troubleshooting\batch_fps', output_dir=r"D:\troubleshooting\batch_fps\out")
-# test.create_main_window()
-# test.create_video_table_headings()
-# test.create_video_rows()
-# test.create_execute_btn()
-# test.main_frm.mainloop()

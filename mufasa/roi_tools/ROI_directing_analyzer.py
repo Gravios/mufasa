@@ -198,6 +198,3 @@ class DirectingROIAnalyzer(ConfigReader, FeatureExtractionMixin):
 
 
 #
-# test = DirectingROIAnalyzer(config_path=r"C:\troubleshooting\spontenous_alternation\project_folder\project_config.ini")
-# test.run()
-# test.save()

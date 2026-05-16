@@ -199,22 +199,3 @@ class DataPlotter(ConfigReader):
 # data_paths = [r"C:\troubleshooting\mitra\project_folder\csv\outlier_corrected_movement_location\501_MA142_Gi_Saline_0513.csv"]
 # #
 # #
-# test = DataPlotter(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini",
-#                    body_parts=body_part_attr,
-#                    data_paths=data_paths,
-#                    video_setting=True,
-#                    frame_setting=False)
-# test.run()
-
-# style_attr = {'bg_color': 'White', 'header_color': 'Black', 'font_thickness': 1, 'size': (640, 480), 'data_accuracy': 2}
-# body_part_attr = [['Ear_left_1', 'Grey'], ['Ear_right_2', 'Red']]
-# data_paths = ['/Users/simon/Desktop/envs/simba_dev/tests/test_data/two_C57_madlc/project_folder/csv/outlier_corrected_movement_location/Together_1.csv']
-#
-#
-# test = DataPlotter(config_path='/Users/simon/Desktop/envs/simba_dev/tests/test_data/two_C57_madlc/project_folder/project_config.ini',
-#                    style_attr=style_attr,
-#                    body_part_attr=body_part_attr,
-#                    data_paths=data_paths,
-#                    video_setting=True,
-#                    frame_setting=False)
-# test.create_data_plots()

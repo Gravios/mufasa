@@ -675,5 +675,3 @@ class ExtractFeaturesFrom8bps(ConfigReader, FeatureExtractionMixin):
 
 
 #
-# test = ExtractFeaturesFrom8bps(config_path='/Users/simon/Desktop/envs/troubleshooting/one_black_animal/project_folder/project_config.ini')
-# test.run()

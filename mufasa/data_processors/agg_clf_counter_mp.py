@@ -328,24 +328,3 @@ if __name__ == "__main__":
                                   core_cnt=12)
     test.run()
     test.save()
-
-
-# test = AggregateClfCalculator(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini",
-#                               data_measures=["Bout count", "Total event duration (s)", "Mean event bout duration (s)", "Median event bout duration (s)", "First event occurrence (s)", "Mean event bout interval duration (s)", "Median event bout interval duration (s)"],
-#                               classifiers=['straub_tail'],
-#                               video_meta_data = ['Frame count', "Video length (s)"],#
-#                               transpose=True)
-# test.run()
-# test.save()
-
-
-# test = AggregateClfCalculator(config_path=r"/Users/simon/Desktop/envs/troubleshooting/raph/project_folder/project_config.ini",
-#                               data_measures=['Total event duration (s)', 'Median event bout duration (s)'],
-#                               classifiers=['walking'],
-#                               video_meta_data =['Frame count'],
-#                               transpose=True)
-#
-#
-#
-# test.run()
-# test.save()

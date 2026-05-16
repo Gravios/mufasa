@@ -307,17 +307,3 @@ class DBCVCalculator(UMLMixin, ConfigReader):
         cluster_MST = MST[indices][:, indices]
         cluster_density_sparseness = np.max(cluster_MST)
         return cluster_density_sparseness
-
-
-# test = DBCVCalculator(data_path='/Users/simon/Desktop/envs/troubleshooting/unsupervised/cluster_models',
-#                       config_path='/Users/simon/Desktop/envs/troubleshooting/unsupervised/project_folder/project_config.ini')
-# test.run()
-
-# test = DBCVCalculator(config_path='/Users/simon/Desktop/envs/NG_Unsupervised/project_folder/project_config.ini',
-#                       data_path='/Users/simon/Desktop/envs/NG_Unsupervised/project_folder/small_clusters')
-# test.run()
-
-#
-# test = DBCVCalculator(config_path='/Users/simon/Desktop/envs/NG_Unsupervised/project_folder/project_config.ini',
-#                       data_path='/Users/simon/Desktop/envs/NG_Unsupervised/project_folder/error_mdl/ecstatic_darwin.pickle')
-# test.run()

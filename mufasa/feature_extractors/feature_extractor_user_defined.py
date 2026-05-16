@@ -195,7 +195,3 @@ class UserDefinedFeatureExtractor(ConfigReader, FeatureExtractionMixin):
 
         self.timer.stop_timer()
         stdout_success(f"Feature extraction complete for {str(len(self.files_found))} video(s). Results are saved inside the {self.features_dir} directory", elapsed_time=self.timer.elapsed_time_str,)
-
-
-# test = UserDefinedFeatureExtractor(config_path=r"C:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini")
-# test.run()

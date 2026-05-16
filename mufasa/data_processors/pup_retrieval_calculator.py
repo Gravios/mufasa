@@ -424,5 +424,3 @@ class PupRetrieverCalculator(ConfigReader):
 #      'clf_approach': 'approach', 'clf_dig': 'digging', 'distance_plots': True, 'log': True, 'swarm_plot': True}
 # config_path = '/Users/simon/Downloads/Automated PRT_test/project_folder/project_config.ini'
 #
-# test = PupRetrieverCalculator(config_path=config_path, settings=settings)
-# test.run()
