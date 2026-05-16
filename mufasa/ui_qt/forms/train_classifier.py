@@ -8,7 +8,7 @@ plus a Train button that drives :class:`TrainRandomForestClassifier`.
 Patch 122aq (this file)
 -----------------------
 The Tk popup was 556 lines of grid-laid-out :class:`Entry_Box` /
-:class:`SimBADropDown` widgets with hand-rolled enable/disable
+:class:`MufasaDropDown` widgets with hand-rolled enable/disable
 plumbing for sub-fields gated on parent checkboxes. Replaced
 here with a declarative :class:`QFormLayout` per group +
 helper functions for the enable/disable cascade.

@@ -5,7 +5,7 @@ import numpy as np
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.plotting.blob_visualizer import BlobVisualizer
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.lookups import get_color_dict
 from mufasa.utils.read_write import find_core_cnt
@@ -21,16 +21,16 @@ class BlobVisualizerPopUp(PopUpMixin):
         clr_names.insert(0, 'NONE')
         PopUpMixin.__init__(self, title="VISUALIZE BLOB TRACKING", icon='bubble_pink')
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings', icon_link=None)
-        self.core_cnt_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=list(range(1, find_core_cnt()[0] + 1)), label="CPU CORE COUNT:", label_width=30, dropdown_width=20, value=find_core_cnt()[0], img='cpu_small')
-        self.shape_opacity_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=OPACITY_OPTIONS, label="SHAPE OPACITY:", label_width=30, dropdown_width=20, value=0.7, img='opacity')
-        self.bg_opacity_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=OPACITY_OPTIONS, label="BACKGROUND OPACITY:", label_width=30, dropdown_width=20, value=1.0, img='opacity')
-        self.keypoint_sizes_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=CIRCLE_SIZES, label="KEY-POINT SIZES:", label_width=30, dropdown_width=20, value=CIRCLE_SIZES[0], img='circle_small')
-        self.hull_clr_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=clr_names, label="HULL COLOR:", label_width=30, dropdown_width=20, value='Pink', img='fill')
-        self.anterior_clr_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=clr_names, label="ANTERIOR COLOR:", label_width=30, dropdown_width=20, value='Green', img='color_wheel')
-        self.posterior_clr_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=clr_names, label="POSTERIOR COLOR:", label_width=30, dropdown_width=20, value='Orange', img='color_wheel')
-        self.center_clr_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=clr_names, label="CENTER COLOR:", label_width=30, dropdown_width=20, value='Cyan', img='color_wheel')
-        self.left_clr_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=clr_names, label="LEFT COLOR:", label_width=30, dropdown_width=20, value='NONE', img='color_wheel')
-        self.right_clr_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=clr_names, label="RIGHT COLOR:", label_width=30, dropdown_width=20, value='NONE', img='color_wheel')
+        self.core_cnt_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=list(range(1, find_core_cnt()[0] + 1)), label="CPU CORE COUNT:", label_width=30, dropdown_width=20, value=find_core_cnt()[0], img='cpu_small')
+        self.shape_opacity_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=OPACITY_OPTIONS, label="SHAPE OPACITY:", label_width=30, dropdown_width=20, value=0.7, img='opacity')
+        self.bg_opacity_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=OPACITY_OPTIONS, label="BACKGROUND OPACITY:", label_width=30, dropdown_width=20, value=1.0, img='opacity')
+        self.keypoint_sizes_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=CIRCLE_SIZES, label="KEY-POINT SIZES:", label_width=30, dropdown_width=20, value=CIRCLE_SIZES[0], img='circle_small')
+        self.hull_clr_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=clr_names, label="HULL COLOR:", label_width=30, dropdown_width=20, value='Pink', img='fill')
+        self.anterior_clr_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=clr_names, label="ANTERIOR COLOR:", label_width=30, dropdown_width=20, value='Green', img='color_wheel')
+        self.posterior_clr_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=clr_names, label="POSTERIOR COLOR:", label_width=30, dropdown_width=20, value='Orange', img='color_wheel')
+        self.center_clr_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=clr_names, label="CENTER COLOR:", label_width=30, dropdown_width=20, value='Cyan', img='color_wheel')
+        self.left_clr_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=clr_names, label="LEFT COLOR:", label_width=30, dropdown_width=20, value='NONE', img='color_wheel')
+        self.right_clr_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=clr_names, label="RIGHT COLOR:", label_width=30, dropdown_width=20, value='NONE', img='color_wheel')
 
 
         settings_frm.grid(row=0, column=0, sticky=NW)

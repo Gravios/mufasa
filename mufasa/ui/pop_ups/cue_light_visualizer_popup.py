@@ -6,7 +6,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.plotting.cue_light_visualizer import CueLightVisualizer
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists, check_valid_lst
 from mufasa.utils.enums import Links, Options
 from mufasa.utils.errors import NoFilesFoundError, NoROIDataError
@@ -54,12 +54,12 @@ class CueLightVisulizerPopUp(ConfigReader, PopUpMixin):
         max_len = max(len(s) for s in list(self.video_paths.keys()))
         PopUpMixin.__init__(self, size=(750, 300), title="CUE LIGHT VISUALIZER", icon='eye')
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings', icon_link=Links.CUE_LIGHTS.value)
-        self.pose_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'SHOW POSE:', label_width=30, dropdown_width=15, value='TRUE')
-        self.core_cnt_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(1, self.cpu_cnt + 1)), label=f'CPU CORE COUNT:', label_width=30, dropdown_width=15, value=int(self.cpu_cnt / 2))
-        self.frames_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'CREATE INDIVIDUAL FRAMES:', label_width=30, dropdown_width=15, value='FALSE')
-        self.create_video_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'CREATE VIDEO:', label_width=30, dropdown_width=15, value='TRUE')
+        self.pose_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'SHOW POSE:', label_width=30, dropdown_width=15, value='TRUE')
+        self.core_cnt_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(1, self.cpu_cnt + 1)), label=f'CPU CORE COUNT:', label_width=30, dropdown_width=15, value=int(self.cpu_cnt / 2))
+        self.frames_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'CREATE INDIVIDUAL FRAMES:', label_width=30, dropdown_width=15, value='FALSE')
+        self.create_video_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'CREATE VIDEO:', label_width=30, dropdown_width=15, value='TRUE')
 
-        self.verbose_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'VERBOSE:', label_width=30, dropdown_width=15, value='TRUE')
+        self.verbose_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'VERBOSE:', label_width=30, dropdown_width=15, value='TRUE')
 
         self.settings_frm.grid(row=0, column=0, sticky=NW)
         self.pose_dropdown.grid(row=0, column=0, sticky=NW)
@@ -69,7 +69,7 @@ class CueLightVisulizerPopUp(ConfigReader, PopUpMixin):
         self.verbose_dropdown.grid(row=4, column=0, sticky=NW)
 
         self.select_video_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT VIDEO", icon_name='video', icon_link=Links.CUE_LIGHTS.value)
-        self.select_video_dropdown = SimBADropDown(parent=self.select_video_frm, dropdown_options=list(self.video_paths.keys()), label=f'SELECT VIDEO:', label_width=30, dropdown_width=max_len+5, value=list(self.video_paths.keys())[0])
+        self.select_video_dropdown = MufasaDropDown(parent=self.select_video_frm, dropdown_options=list(self.video_paths.keys()), label=f'SELECT VIDEO:', label_width=30, dropdown_width=max_len+5, value=list(self.video_paths.keys())[0])
 
         self.select_video_frm.grid(row=1, column=0, sticky=NW)
         self.select_video_dropdown.grid(row=0, column=0, sticky=NW)

@@ -9,7 +9,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.plotting.EzPathPlot import EzPathPlot
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimBADropDown, SimBALabel)
+                                        MufasaDropDown, SimBALabel)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.errors import NoFilesFoundError
@@ -53,14 +53,14 @@ class EzPathPlotPopUp(PopUpMixin, ConfigReader):
         video_names = list(self.data_file_names.keys())
         video_name_max_len = max(len(s) for s in video_names)
 
-        self.video_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=video_names, label='VIDEO: ', label_width=25, dropdown_width=video_name_max_len, value=video_names[0], img='video_2', tooltip_key='EZ_PATH_PLOT_VIDEO')
-        self.bp_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=self.body_parts_lst, label='BODY-PART: ', label_width=25, dropdown_width=video_name_max_len, value=self.body_parts_lst[0], img='pose', tooltip_key='EZ_PATH_PLOT_BODY_PART')
-        self.background_color = SimBADropDown(parent=settings_frm, dropdown_options=bg_colors, label="BACKGROUND COLOR: ", label_width=25, dropdown_width=video_name_max_len, value="White", img='fill', tooltip_key='EZ_PATH_PLOT_BACKGROUND_COLOR')
-        self.line_color = SimBADropDown(parent=settings_frm, dropdown_options=line_colors, label="LINE COLOR: ", label_width=25, dropdown_width=video_name_max_len, value="Red", img='line', tooltip_key='EZ_PATH_PLOT_LINE_COLOR')
-        self.line_thickness = SimBADropDown(parent=settings_frm, dropdown_options=list(range(1, 11)), label="LINE THICKNESS: ", label_width=25, dropdown_width=video_name_max_len, value=1, img='bold', tooltip_key='EZ_PATH_PLOT_LINE_THICKNESS')
-        self.line_opacity = SimBADropDown(parent=settings_frm, dropdown_options=OPACITY_OPTIONS, label="LINE OPACITY: ", label_width=25, dropdown_width=video_name_max_len, value=1.0, img='opacity', tooltip_key='EZ_PATH_PLOT_LINE_OPACITY')
-        self.smoothing_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=SMOOTHING_OPTIONS, label="SMOOTHING (FRAMES): ", label_width=25, dropdown_width=video_name_max_len, value='NONE', img='opacity', tooltip_key='EZ_PATH_PLOT_SMOOTHING')
-        self.svg_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="AS SVG: ", label_width=25, dropdown_width=video_name_max_len, value='FALSE', img='svg', tooltip_key='EZ_PATH_PLOT_SVG')
+        self.video_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=video_names, label='VIDEO: ', label_width=25, dropdown_width=video_name_max_len, value=video_names[0], img='video_2', tooltip_key='EZ_PATH_PLOT_VIDEO')
+        self.bp_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=self.body_parts_lst, label='BODY-PART: ', label_width=25, dropdown_width=video_name_max_len, value=self.body_parts_lst[0], img='pose', tooltip_key='EZ_PATH_PLOT_BODY_PART')
+        self.background_color = MufasaDropDown(parent=settings_frm, dropdown_options=bg_colors, label="BACKGROUND COLOR: ", label_width=25, dropdown_width=video_name_max_len, value="White", img='fill', tooltip_key='EZ_PATH_PLOT_BACKGROUND_COLOR')
+        self.line_color = MufasaDropDown(parent=settings_frm, dropdown_options=line_colors, label="LINE COLOR: ", label_width=25, dropdown_width=video_name_max_len, value="Red", img='line', tooltip_key='EZ_PATH_PLOT_LINE_COLOR')
+        self.line_thickness = MufasaDropDown(parent=settings_frm, dropdown_options=list(range(1, 11)), label="LINE THICKNESS: ", label_width=25, dropdown_width=video_name_max_len, value=1, img='bold', tooltip_key='EZ_PATH_PLOT_LINE_THICKNESS')
+        self.line_opacity = MufasaDropDown(parent=settings_frm, dropdown_options=OPACITY_OPTIONS, label="LINE OPACITY: ", label_width=25, dropdown_width=video_name_max_len, value=1.0, img='opacity', tooltip_key='EZ_PATH_PLOT_LINE_OPACITY')
+        self.smoothing_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=SMOOTHING_OPTIONS, label="SMOOTHING (FRAMES): ", label_width=25, dropdown_width=video_name_max_len, value='NONE', img='opacity', tooltip_key='EZ_PATH_PLOT_SMOOTHING')
+        self.svg_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="AS SVG: ", label_width=25, dropdown_width=video_name_max_len, value='FALSE', img='svg', tooltip_key='EZ_PATH_PLOT_SVG')
         self.save_dir = FolderSelect(parent=settings_frm, folderDescription='SAVE DIRECTORY:', initialdir=desktop_path, lblwidth=25, tooltip_key='EZ_PATH_PLOT_SAVE_DIR', lbl_icon='folder')
         self.save_dir.set_folder_path(folder_path=desktop_path)
         self.inst_lbl = SimBALabel(parent=settings_frm, txt="NOTE: For more complex path plots, faster, \n see 'CREATE PATH PLOTS' under the [VISUALIZATIONS] tab", txt_clr='green')

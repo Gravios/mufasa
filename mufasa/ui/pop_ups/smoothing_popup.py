@@ -10,7 +10,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         FileSelect, FolderSelect, SimbaButton,
-                                        SimBADropDown, SimBALabel)
+                                        MufasaDropDown, SimBALabel)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists, check_int)
 from mufasa.utils.enums import Formats, Options
@@ -36,8 +36,8 @@ class SmoothingPopUp(PopUpMixin, ConfigReader):
         self.settings_frm= CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings')
         instruction_lbl = SimBALabel(parent=self.settings_frm, txt=INSTRUCTIONS_LBL_1, font=Formats.FONT_REGULAR_ITALICS.value)
         self.time_window = Entry_Box(self.settings_frm, "TIME WINDOW (MILLISECONDS):", "35", validation="numeric", entry_box_width=35, value=100, justify='center', img='timer', tooltip_key='SMOOTH_TIME_WINDOW')
-        self.method_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=Options.SMOOTHING_OPTIONS.value, label="SMOOTHING METHOD:", label_width=35, dropdown_width=35, value=Options.SMOOTHING_OPTIONS.value[0], img='equation_small', tooltip_key='SMOOTH_METHOD')
-        self.save_originals_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label="SAVE ORIGINALS:", label_width=35, dropdown_width=35, value='TRUE', img='save', tooltip_key='SMOOTH_SAVE_ORIGINALS')
+        self.method_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=Options.SMOOTHING_OPTIONS.value, label="SMOOTHING METHOD:", label_width=35, dropdown_width=35, value=Options.SMOOTHING_OPTIONS.value[0], img='equation_small', tooltip_key='SMOOTH_METHOD')
+        self.save_originals_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label="SAVE ORIGINALS:", label_width=35, dropdown_width=35, value='TRUE', img='save', tooltip_key='SMOOTH_SAVE_ORIGINALS')
 
         self.settings_frm.grid(row=0, column=0, sticky=NW)
         instruction_lbl.grid(row=0, column=0, sticky=NW)

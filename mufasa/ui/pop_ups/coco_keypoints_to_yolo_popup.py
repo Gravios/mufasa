@@ -9,7 +9,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.third_party_label_appenders.transform.coco_keypoints_to_yolo import \
     COCOKeypoints2Yolo
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
-                                        FolderSelect, SimBADropDown)
+                                        FolderSelect, MufasaDropDown)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.enums import Options
@@ -27,10 +27,10 @@ class COCOKeypoints2YOLOkeypointsPopUp(PopUpMixin):
         self.coco_file_path = FileSelect(parent=settings_frm, fileDescription='COCO FILE (JSON):', lblwidth=35, entry_width=40, lbl_icon='json')
         self.img_dir = FolderSelect(settings_frm, folderDescription="IMAGE DIRECTORY:", lblwidth=35, lbl_icon='folder')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, lbl_icon='folder')
-        self.train_size_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=TRAIN_SIZE_OPTIONS, label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
-        self.greyscale_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE:", label_width=35, dropdown_width=40, value='FALSE', img='grey')
-        self.clahe_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE:", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
+        self.train_size_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=TRAIN_SIZE_OPTIONS, label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
+        self.greyscale_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE:", label_width=35, dropdown_width=40, value='FALSE', img='grey')
+        self.clahe_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE:", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.coco_file_path.grid(row=0, column=0, sticky=NW)

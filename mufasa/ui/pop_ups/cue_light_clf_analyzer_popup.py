@@ -6,7 +6,7 @@ from mufasa.data_processors.cue_light_clf_statistics import CueLightClfAnalyzer
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists, check_int, check_valid_lst
 from mufasa.utils.enums import Links
 from mufasa.utils.errors import NoDataError, NoFilesFoundError, NoROIDataError

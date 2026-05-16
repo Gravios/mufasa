@@ -8,7 +8,7 @@ from mufasa.plotting.yolo_pose_track_visualizer import YOLOPoseTrackVisualizer
 from mufasa.plotting.yolo_pose_visualizer import YOLOPoseVisualizer
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
                                         FolderSelect, SimbaButton,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.data import get_cpu_pool, terminate_cpu_pool
@@ -32,13 +32,13 @@ class YoloPoseVisualizerPopUp(PopUpMixin):
         PopUpMixin.__init__(self, title="PLOT YOLO POSE ESTIMATION RESULTS", icon='ultralytics_2')
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, entry_width=45, lbl_icon='folder', tooltip_key='SAVE_DIR')
-        self.core_cnt_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=CORE_CNT_OPTIONS, label="CPU CORE COUNT:", label_width=35, dropdown_width=40, value=int(max(CORE_CNT_OPTIONS) / 3), img='cpu_small', tooltip_key='CORE_COUNT')
-        self.bbox_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="SHOW BOUNDING BOXES:",  label_width=35, dropdown_width=40, value='TRUE', img='rectangle_small', tooltip_key='SHOW_ANIMAL_BBOX')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:",  label_width=35, dropdown_width=40, value='TRUE', img='verbose', tooltip_key='verbose_dropdown')
-        self.threshold_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=THRESHOLD_OPTIONS, label="THRESHOLD:",  label_width=35, dropdown_width=40, value=0.0, img='threshold', tooltip_key='threshold_dropdown')
-        self.thickness_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=SIZE_OPTIONS, label="LINE THICKNESS:",  label_width=35, dropdown_width=40, value='AUTO', img='line', tooltip_key='yolo_plot_line_thickness')
-        self.circle_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=SIZE_OPTIONS, label="CIRCLE SIZE:", label_width=35, dropdown_width=40, value='AUTO', img='circle_small', tooltip_key='yolo_plot_circle_size')
-        self.tracks_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="PLOT TRACKS:", label_width=35, dropdown_width=40, value='FALSE', img='path_2', tooltip_key='yolo_plot_tracks')
+        self.core_cnt_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=CORE_CNT_OPTIONS, label="CPU CORE COUNT:", label_width=35, dropdown_width=40, value=int(max(CORE_CNT_OPTIONS) / 3), img='cpu_small', tooltip_key='CORE_COUNT')
+        self.bbox_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="SHOW BOUNDING BOXES:",  label_width=35, dropdown_width=40, value='TRUE', img='rectangle_small', tooltip_key='SHOW_ANIMAL_BBOX')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE:",  label_width=35, dropdown_width=40, value='TRUE', img='verbose', tooltip_key='verbose_dropdown')
+        self.threshold_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=THRESHOLD_OPTIONS, label="THRESHOLD:",  label_width=35, dropdown_width=40, value=0.0, img='threshold', tooltip_key='threshold_dropdown')
+        self.thickness_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=SIZE_OPTIONS, label="LINE THICKNESS:",  label_width=35, dropdown_width=40, value='AUTO', img='line', tooltip_key='yolo_plot_line_thickness')
+        self.circle_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=SIZE_OPTIONS, label="CIRCLE SIZE:", label_width=35, dropdown_width=40, value='AUTO', img='circle_small', tooltip_key='yolo_plot_circle_size')
+        self.tracks_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="PLOT TRACKS:", label_width=35, dropdown_width=40, value='FALSE', img='path_2', tooltip_key='yolo_plot_tracks')
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.save_dir.grid(row=0, column=0, sticky=NW)

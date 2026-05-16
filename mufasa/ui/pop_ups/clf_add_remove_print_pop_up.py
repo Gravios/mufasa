@@ -7,7 +7,7 @@ from typing import Union
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
-                                        FileSelect, SimbaButton, SimBADropDown,
+                                        FileSelect, SimbaButton, MufasaDropDown,
                                         TwoOptionQuestionPopUp)
 from mufasa.utils.checks import check_str
 from mufasa.utils.enums import ConfigKey, Keys, Links
@@ -49,7 +49,7 @@ class RemoveAClassifierPopUp(PopUpMixin, ConfigReader):
             raise NoDataError(msg='The Mufasa project has no classifiers: Cannot remove a classifier.', source=self.__class__.__name__)
         PopUpMixin.__init__(self, title="WARNING: REMOVE CLASSIFIER", icon='trash_red')
         self.remove_clf_frm = CreateLabelFrameWithIcon( parent=self.main_frm, header="SELECT A CLASSIFIER TO REMOVE", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.REMOVE_CLF.value)
-        self.clf_dropdown = SimBADropDown(parent=self.remove_clf_frm, dropdown_options=self.clf_names, label_width=20, dropdown_width=40, label='CLASSIFIER:', value=self.clf_names[0])
+        self.clf_dropdown = MufasaDropDown(parent=self.remove_clf_frm, dropdown_options=self.clf_names, label_width=20, dropdown_width=40, label='CLASSIFIER:', value=self.clf_names[0])
         run_btn = SimbaButton(parent=self.main_frm, txt="REMOVE CLASSIFIER", cmd=self.run, img='trash')
         self.remove_clf_frm.grid(row=0, column=0, sticky=W)
         self.clf_dropdown.grid(row=0, column=0, sticky=W)

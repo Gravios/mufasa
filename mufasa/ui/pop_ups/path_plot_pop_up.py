@@ -13,7 +13,7 @@ from mufasa.plotting.path_plotter_mp import PathPlotterMulticore
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon,
                                         CreateToolTip, DropDownMenu, Entry_Box,
                                         SimbaButton, SimbaCheckbox,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import (check_if_string_value_is_valid_video_timestamp,
                                 check_if_valid_rgb_str, check_int,
                                 check_that_hhmmss_start_is_before_end)
@@ -78,18 +78,18 @@ class PathPlotPopUp(PopUpMixin, ConfigReader):
         self.custom_rgb_selections = {}
 
         self.style_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="STYLE SETTINGS", icon_name='style', icon_link=Links.PATH_PLOTS.value)
-        self.max_prior_lines_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.max_prior_lines_options, label='MAX PRIOR LINES (S): ', label_width=35, dropdown_width=30, value=ENTIRE_VIDEO, img='timer_2', tooltip_key='PATH_PLOT_MAX_PRIOR_LINES')
-        self.resolution_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.resolution_options, label='RESOLUTION: ', label_width=35, dropdown_width=30, value=AUTO, img='monitor', tooltip_key='PATH_PLOT_RESOLUTION')
-        self.bg_clr_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.bg_clr_options, label='BACKGROUND: ', label_width=35, dropdown_width=30, value='White', command=self.__activate_settings, img='fill', tooltip_key='PATH_PLOT_BACKGROUND')
-        self.line_width_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.line_width_options, label='LINE WIDTH: ', label_width=35, dropdown_width=30, value=AUTO, img='line', tooltip_key='PATH_PLOT_LINE_WIDTH')
-        self.font_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.font_size_options, label='FONT SIZE: ', label_width=35, dropdown_width=30, value=AUTO, img='font_size', tooltip_key='PATH_PLOT_FONT_SIZE')
-        self.font_thickness_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.font_thickness_options, label='FONT THICKNESS: ', label_width=35, dropdown_width=30, value=AUTO, img='bold', tooltip_key='PATH_PLOT_FONT_THICKNESS')
-        self.bg_opacity_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.bg_opacity_options, label='BACKGROUND OPACITY (%): ', label_width=35, dropdown_width=30, value=100,  img='opacity', tooltip_key='PATH_PLOT_BG_OPACITY')
-        self.circle_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.circle_size_options, label='CIRCLE SIZE: ', label_width=35, dropdown_width=30, value=AUTO, img='circle_small', tooltip_key='PATH_PLOT_CIRCLE_SIZE')
-        self.show_animal_names_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=['TRUE', 'FALSE'], label='SHOW ANIMAL NAMES: ', label_width=35, dropdown_width=30, value='FALSE', img='label_yellow', tooltip_key='PATH_PLOT_SHOW_ANIMAL_NAMES')
+        self.max_prior_lines_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.max_prior_lines_options, label='MAX PRIOR LINES (S): ', label_width=35, dropdown_width=30, value=ENTIRE_VIDEO, img='timer_2', tooltip_key='PATH_PLOT_MAX_PRIOR_LINES')
+        self.resolution_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.resolution_options, label='RESOLUTION: ', label_width=35, dropdown_width=30, value=AUTO, img='monitor', tooltip_key='PATH_PLOT_RESOLUTION')
+        self.bg_clr_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.bg_clr_options, label='BACKGROUND: ', label_width=35, dropdown_width=30, value='White', command=self.__activate_settings, img='fill', tooltip_key='PATH_PLOT_BACKGROUND')
+        self.line_width_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.line_width_options, label='LINE WIDTH: ', label_width=35, dropdown_width=30, value=AUTO, img='line', tooltip_key='PATH_PLOT_LINE_WIDTH')
+        self.font_size_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.font_size_options, label='FONT SIZE: ', label_width=35, dropdown_width=30, value=AUTO, img='font_size', tooltip_key='PATH_PLOT_FONT_SIZE')
+        self.font_thickness_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.font_thickness_options, label='FONT THICKNESS: ', label_width=35, dropdown_width=30, value=AUTO, img='bold', tooltip_key='PATH_PLOT_FONT_THICKNESS')
+        self.bg_opacity_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.bg_opacity_options, label='BACKGROUND OPACITY (%): ', label_width=35, dropdown_width=30, value=100,  img='opacity', tooltip_key='PATH_PLOT_BG_OPACITY')
+        self.circle_size_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.circle_size_options, label='CIRCLE SIZE: ', label_width=35, dropdown_width=30, value=AUTO, img='circle_small', tooltip_key='PATH_PLOT_CIRCLE_SIZE')
+        self.show_animal_names_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=['TRUE', 'FALSE'], label='SHOW ANIMAL NAMES: ', label_width=35, dropdown_width=30, value='FALSE', img='label_yellow', tooltip_key='PATH_PLOT_SHOW_ANIMAL_NAMES')
 
         self.body_parts_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CHOOSE BODY-PARTS", icon_name='pose', icon_link=Links.PATH_PLOTS.value)
-        self.number_of_animals_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.animal_cnt_options, label="# ANIMALS:", label_width=35, dropdown_width=30, value=self.animal_cnt_options[0], command=self.populate_body_parts_menu, img='abacus', tooltip_key='PATH_PLOT_NUMBER_OF_ANIMALS')
+        self.number_of_animals_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.animal_cnt_options, label="# ANIMALS:", label_width=35, dropdown_width=30, value=self.animal_cnt_options[0], command=self.populate_body_parts_menu, img='abacus', tooltip_key='PATH_PLOT_NUMBER_OF_ANIMALS')
 
         self.style_settings_frm.grid(row=0, sticky=NW)
         self.resolution_dropdown.grid(row=1, sticky=NW)
@@ -136,7 +136,7 @@ class PathPlotPopUp(PopUpMixin, ConfigReader):
         path_frames_cb, self.path_frames_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE FRAMES', txt_img='frames', val=False, tooltip_key='PATH_PLOT_CREATE_FRAMES')
         path_videos_cb, self.path_videos_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE VIDEOS', txt_img='video', val=False, tooltip_key='PATH_PLOT_CREATE_VIDEOS')
         path_last_frm_cb, self.path_last_frm_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE LAST FRAME', txt_img='finish', val=True, tooltip_key='PATH_PLOT_CREATE_LAST_FRAME')
-        self.core_cnt_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(2, self.cpu_cnt+1)), label='CPU CORE COUNT: ', label_width=35, dropdown_width=30, value=int(self.cpu_cnt/3), tooltip_key='PATH_PLOT_CPU_CORE_COUNT')
+        self.core_cnt_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(2, self.cpu_cnt+1)), label='CPU CORE COUNT: ', label_width=35, dropdown_width=30, value=int(self.cpu_cnt/3), tooltip_key='PATH_PLOT_CPU_CORE_COUNT')
 
         self.run_frm = LabelFrame(self.main_frm, text="RUN", font=Formats.FONT_HEADER.value, pady=5, padx=5, fg="black")
         self.run_single_video_frm = LabelFrame(self.run_frm, text="SINGLE VIDEO", font=Formats.FONT_HEADER.value, pady=5, padx=5, fg="black")
@@ -185,9 +185,9 @@ class PathPlotPopUp(PopUpMixin, ConfigReader):
         self.bp_dropdowns, self.bp_colors = {}, {}
         self.bp_row_idx = []
         for animal_cnt in range(int(self.number_of_animals_dropdown.getChoices())):
-            self.bp_dropdowns[animal_cnt] = SimBADropDown(parent=self.body_parts_frm, dropdown_options=self.body_parts_lst, label=f"BODY-PART {animal_cnt + 1}:", label_width=20, dropdown_width=20, value=self.body_parts_lst[animal_cnt], tooltip_key='PATH_PLOT_BODY_PART')
+            self.bp_dropdowns[animal_cnt] = MufasaDropDown(parent=self.body_parts_frm, dropdown_options=self.body_parts_lst, label=f"BODY-PART {animal_cnt + 1}:", label_width=20, dropdown_width=20, value=self.body_parts_lst[animal_cnt], tooltip_key='PATH_PLOT_BODY_PART')
             self.bp_dropdowns[animal_cnt].grid(row=animal_cnt + 1, column=0, sticky=NW, padx=(0, 10))
-            self.bp_colors[animal_cnt] = SimBADropDown(parent=self.body_parts_frm, dropdown_options=self.animal_trace_clrs, label="COLOR/PALETTE:", label_width=20, dropdown_width=20, value=list(self.colors_dict.keys())[animal_cnt], command=lambda x, k=animal_cnt: self.__set_custom_clrs(choice=x, row=k), tooltip_key='PATH_PLOT_ANIMAL_COLOR')
+            self.bp_colors[animal_cnt] = MufasaDropDown(parent=self.body_parts_frm, dropdown_options=self.animal_trace_clrs, label="COLOR/PALETTE:", label_width=20, dropdown_width=20, value=list(self.colors_dict.keys())[animal_cnt], command=lambda x, k=animal_cnt: self.__set_custom_clrs(choice=x, row=k), tooltip_key='PATH_PLOT_ANIMAL_COLOR')
             self.bp_colors[animal_cnt].grid(row=animal_cnt + 1, column=1, sticky=NW)
 
     def __activate_settings(self, choice: str):

@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 from mufasa.data_processors.cue_light_analyzer import CueLightAnalyzer
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
-from mufasa.ui.tkinter_functions import CreateLabelFrameWithIcon, SimBADropDown
+from mufasa.ui.tkinter_functions import CreateLabelFrameWithIcon, MufasaDropDown
 from mufasa.utils.checks import check_if_dir_exists, check_valid_lst
 from mufasa.utils.enums import Links
 from mufasa.utils.errors import NoFilesFoundError, NoROIDataError
@@ -45,9 +45,9 @@ class CueLightDataAnalyzerPopUp(ConfigReader, PopUpMixin):
         PopUpMixin.__init__(self, size=(750, 300), title="CUE LIGHT DATA ANALYSIS", icon='data_table')
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings', icon_link=Links.CUE_LIGHTS.value)
 
-        self.details_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'COMPUTE DETAILED CUE LIGHT BOUT DATA:', label_width=40, dropdown_width=15, value='TRUE')
-        self.core_cnt_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(1, self.cpu_cnt+1)), label=f'CPU CORE COUNT:', label_width=40, dropdown_width=15, value=int(self.cpu_cnt/2))
-        self.verbose_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'VERBOSE:', label_width=40, dropdown_width=15, value='TRUE')
+        self.details_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'COMPUTE DETAILED CUE LIGHT BOUT DATA:', label_width=40, dropdown_width=15, value='TRUE')
+        self.core_cnt_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(1, self.cpu_cnt+1)), label=f'CPU CORE COUNT:', label_width=40, dropdown_width=15, value=int(self.cpu_cnt/2))
+        self.verbose_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label=f'VERBOSE:', label_width=40, dropdown_width=15, value='TRUE')
 
         self.settings_frm.grid(row=0, column=0, sticky=NW)
         self.details_dropdown.grid(row=0, column=0, sticky=NW)

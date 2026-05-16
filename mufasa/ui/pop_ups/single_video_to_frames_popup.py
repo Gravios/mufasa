@@ -3,7 +3,7 @@ from tkinter import *
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
                                         FolderSelect, SimbaButton,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.enums import Options
 from mufasa.utils.read_write import (find_core_cnt, get_video_meta_data,
@@ -21,14 +21,14 @@ class SingleVideo2FramesPopUp(PopUpMixin):
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header='SETTINGS', icon_name='settings', padx=5, pady=5, relief='solid')
         self.video_path = FileSelect(parent=settings_frm, fileDescription="VIDEO PATH:" , file_types=[("VIDEO FILE", Options.ALL_VIDEO_FORMAT_OPTIONS.value)], lblwidth=50, lbl_icon='video_2')
         self.save_dir = FolderSelect(parent=settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=50, lbl_icon='folder')
-        self.core_cnt_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=list(range(1, core_cnt+1)), label='CORE COUNT: ', label_width=50, value=int(core_cnt/2), img='cpu_small')
-        self.quality_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=list(range(1, 101)), label='IMAGE QUALITY: ', label_width=50, value=90, state='disabled', img='pct_2')
-        self.img_format = SimBADropDown(parent=settings_frm, dropdown_options=['jpeg', 'png', 'webp'], label='IMAGE FORMAT: ', label_width=50, value='png', command=self._inactivate_quality, img='file_type')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='VERBOSE: ', label_width=50, value='TRUE', img='verbose')
-        self.greyscale_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='GREYSCALE: ', label_width=50, value='FALSE', img='grey')
-        self.bw_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='BLACK & WHITE: ',label_width=50, value='FALSE', img='black_and_white')
-        self.clahe_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='CLAHE: ', label_width=50, value='FALSE', img='clahe')
-        self.include_fn_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='INCLUDE VIDEO NAME IN IMAGE NAMES: ',label_width=50, value='FALSE', img='id_card_2')
+        self.core_cnt_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=list(range(1, core_cnt+1)), label='CORE COUNT: ', label_width=50, value=int(core_cnt/2), img='cpu_small')
+        self.quality_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=list(range(1, 101)), label='IMAGE QUALITY: ', label_width=50, value=90, state='disabled', img='pct_2')
+        self.img_format = MufasaDropDown(parent=settings_frm, dropdown_options=['jpeg', 'png', 'webp'], label='IMAGE FORMAT: ', label_width=50, value='png', command=self._inactivate_quality, img='file_type')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='VERBOSE: ', label_width=50, value='TRUE', img='verbose')
+        self.greyscale_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='GREYSCALE: ', label_width=50, value='FALSE', img='grey')
+        self.bw_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='BLACK & WHITE: ',label_width=50, value='FALSE', img='black_and_white')
+        self.clahe_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='CLAHE: ', label_width=50, value='FALSE', img='clahe')
+        self.include_fn_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label='INCLUDE VIDEO NAME IN IMAGE NAMES: ',label_width=50, value='FALSE', img='id_card_2')
 
         settings_frm.grid(row=0, column=0, sticky=NW, padx=10, pady=10)
         self.video_path.grid(row=0, column=0, sticky=NW)

@@ -9,7 +9,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.plotting.gantt_creator import GanttCreatorSingleProcess
 from mufasa.plotting.gantt_creator_mp import GanttCreatorMultiprocess
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, SimbaButton,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.checks import check_if_filepath_list_is_empty
 from mufasa.utils.enums import Formats, Links, Options
 from mufasa.utils.errors import NoSpecifiedOutputError
@@ -37,14 +37,14 @@ class GanttPlotPopUp(PopUpMixin, ConfigReader):
         PopUpMixin.__init__(self, config_path=config_path, title="VISUALIZE GANTT PLOTS", icon='gantt_small')
 
         self.style_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="STYLE SETTINGS", icon_name='settings', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
-        self.resolution_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='GANTT PLOT RESOLUTION: ', label_width=30, dropdown_width=30, value='640×480', img='monitor', tooltip_key='GANTT_RESOLUTION')
-        self.font_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(range(1, 26)), label='TEXT SIZE: ', label_width=30, dropdown_width=30, value=8, img='text', tooltip_key='GANTT_TEXT_SIZE')
-        self.font_rotation_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(range(0, 182, 2)), label='TEXT ROTATION (°): ', label_width=30, dropdown_width=30, value=0, img='rotate', tooltip_key='GANTT_TEXT_ROTATION')
-        self.palette_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=palettes, label='COLOR PALETTE: ', label_width=30, dropdown_width=30, value='Set1', img='palette_small', tooltip_key='GANTT_PALETTE')
-        self.time_format_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=['SECONDS', 'HH:MM:SS'], label='X-AXIS TIME FORMAT: ', label_width=30, dropdown_width=30, value='SECONDS', img='timer_2', tooltip_key='GANTT_TIME_FORMAT')
-        self.opacity_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=OPACITY_OPTIONS, label='BAR OPACITY (%): ', label_width=30, dropdown_width=30, value=0.85, img='opacity', tooltip_key='GANTT_BAR_OPACITY')
-        self.core_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(range(2, self.cpu_cnt+1)), label='CPU CORES: ', label_width=30, dropdown_width=30, value=int(self.cpu_cnt/2), img='cpu_small', tooltip_key='GANTT_CPU_CORES')
-        self.font_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=fonts, label='FONT: ', label_width=30, dropdown_width=30, value=default_font, img='font', tooltip_key='GANTT_FONT')
+        self.resolution_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='GANTT PLOT RESOLUTION: ', label_width=30, dropdown_width=30, value='640×480', img='monitor', tooltip_key='GANTT_RESOLUTION')
+        self.font_size_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=list(range(1, 26)), label='TEXT SIZE: ', label_width=30, dropdown_width=30, value=8, img='text', tooltip_key='GANTT_TEXT_SIZE')
+        self.font_rotation_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=list(range(0, 182, 2)), label='TEXT ROTATION (°): ', label_width=30, dropdown_width=30, value=0, img='rotate', tooltip_key='GANTT_TEXT_ROTATION')
+        self.palette_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=palettes, label='COLOR PALETTE: ', label_width=30, dropdown_width=30, value='Set1', img='palette_small', tooltip_key='GANTT_PALETTE')
+        self.time_format_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=['SECONDS', 'HH:MM:SS'], label='X-AXIS TIME FORMAT: ', label_width=30, dropdown_width=30, value='SECONDS', img='timer_2', tooltip_key='GANTT_TIME_FORMAT')
+        self.opacity_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=OPACITY_OPTIONS, label='BAR OPACITY (%): ', label_width=30, dropdown_width=30, value=0.85, img='opacity', tooltip_key='GANTT_BAR_OPACITY')
+        self.core_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=list(range(2, self.cpu_cnt+1)), label='CPU CORES: ', label_width=30, dropdown_width=30, value=int(self.cpu_cnt/2), img='cpu_small', tooltip_key='GANTT_CPU_CORES')
+        self.font_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=fonts, label='FONT: ', label_width=30, dropdown_width=30, value=default_font, img='font', tooltip_key='GANTT_FONT')
 
 
         self.clf_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="BEHAVIORS", icon_name='forest', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
@@ -62,7 +62,7 @@ class GanttPlotPopUp(PopUpMixin, ConfigReader):
 
         self.run_single_video_frm= CreateLabelFrameWithIcon(parent=self.main_frm, header="SINGLE VIDEO", icon_name='video', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
         self.run_single_video_btn = SimbaButton(parent=self.run_single_video_frm, txt="VIDEO", txt_clr="blue", img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.__create_gantt_plots, cmd_kwargs={'multiple': False})
-        self.single_video_dropdown = SimBADropDown(parent=self.run_single_video_frm, dropdown_options=list(self.data_paths.keys()), label='VIDEO', label_width=20, dropdown_width=max_file_name_len, value=list(self.data_paths.keys())[0], tooltip_key='GANTT_SINGLE_VIDEO')
+        self.single_video_dropdown = MufasaDropDown(parent=self.run_single_video_frm, dropdown_options=list(self.data_paths.keys()), label='VIDEO', label_width=20, dropdown_width=max_file_name_len, value=list(self.data_paths.keys())[0], tooltip_key='GANTT_SINGLE_VIDEO')
 
         self.run_multiple_videos = CreateLabelFrameWithIcon(parent=self.main_frm, header="MULTIPLE VIDEO(S)", icon_name='stack', icon_link=Links.GANTT_PLOTS.value, relief='solid', padx=5, pady=5)
         self.run_multiple_video_btn = SimbaButton(parent=self.run_multiple_videos, txt=f"Create multiple videos ({len(list(self.data_paths.keys()))} video(s) found)", txt_clr="blue", img='rocket', font=Formats.FONT_REGULAR.value, cmd=self.__create_gantt_plots, cmd_kwargs={'multiple': True})

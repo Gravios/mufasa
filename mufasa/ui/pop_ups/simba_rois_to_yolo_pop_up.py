@@ -11,7 +11,7 @@ from mufasa.third_party_label_appenders.converters import simba_rois_to_yolo
 from mufasa.third_party_label_appenders.transform.simba_roi_to_yolo import \
     SimBAROI2Yolo
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
-                                        FolderSelect, SimBADropDown)
+                                        FolderSelect, MufasaDropDown)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists)
 from mufasa.utils.read_write import str_2_bool
@@ -31,12 +31,12 @@ class SimBAROIs2YOLOPopUp(PopUpMixin):
         self.simba_config_path = FileSelect(parent=settings_frm, fileDescription='SIMBA CONFIG PATH: ', lblwidth=35, file_types=[("SIMBA PROJECT CONFIG", (".ini",))], entry_width=40, lbl_icon='ini')
         self.video_dir = FolderSelect(settings_frm, folderDescription="VIDEO DIRECTORY:", lblwidth=35, width=40, lbl_icon='folder')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, width=40, lbl_icon='folder')
-        self.greyscale_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
-        self.clahe_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
-        self.obb_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="OBB: ", label_width=35, dropdown_width=40, value='TRUE', img='obb')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
-        self.frm_cnt_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=list(range(50, 650, 50)), label="FRAM COUNT (PER VIDEO): ", label_width=35, dropdown_width=40, value=100, img='frames')
-        self.train_size_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=list(range(10, 110, 10)), label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2')
+        self.greyscale_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
+        self.clahe_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
+        self.obb_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="OBB: ", label_width=35, dropdown_width=40, value='TRUE', img='obb')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
+        self.frm_cnt_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=list(range(50, 650, 50)), label="FRAM COUNT (PER VIDEO): ", label_width=35, dropdown_width=40, value=100, img='frames')
+        self.train_size_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=list(range(10, 110, 10)), label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2')
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.simba_config_path.grid(row=0, column=0, sticky=NW)

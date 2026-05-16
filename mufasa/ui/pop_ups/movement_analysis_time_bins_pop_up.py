@@ -11,7 +11,7 @@ from mufasa.data_processors.timebins_movement_calculator_mp import \
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.checks import check_float
 from mufasa.utils.enums import ConfigKey, Keys, Links
 from mufasa.utils.errors import NoDataError
@@ -34,7 +34,7 @@ class MovementAnalysisTimeBinsPopUp(ConfigReader, PopUpMixin):
             raise NoDataError(msg=f'No data files found in {self.outlier_corrected_dir} directory, cannot compute time-bins movement statistics.', source=self.__class__.__name__)
         PopUpMixin.__init__(self, title="TIME BINS: MOVEMENT/VELOCITY", size=(400, 600), icon='run')
         self.animal_cnt_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT NUMBER OF ANIMALS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
-        self.animal_cnt_dropdown = SimBADropDown(parent=self.animal_cnt_frm, label="# OF ANIMALS", label_width=30, dropdown_width=20, value=1, dropdown_options=list(range(1, self.animal_cnt + 1)), command=self.create_bp_frm, img='abacus', tooltip_key='TIMEBINS_MOVEMENT_NUMBER_OF_ANIMALS')
+        self.animal_cnt_dropdown = MufasaDropDown(parent=self.animal_cnt_frm, label="# OF ANIMALS", label_width=30, dropdown_width=20, value=1, dropdown_options=list(range(1, self.animal_cnt + 1)), command=self.create_bp_frm, img='abacus', tooltip_key='TIMEBINS_MOVEMENT_NUMBER_OF_ANIMALS')
         self.animal_cnt_frm.grid(row=0, column=0, sticky=NW)
         self.animal_cnt_dropdown.grid(row=0, column=0, sticky=NW)
 
@@ -49,7 +49,7 @@ class MovementAnalysisTimeBinsPopUp(ConfigReader, PopUpMixin):
         self.time_bin_entry.grid(row=0, column=0, sticky=NW)
 
         self.core_cnt_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CPU CORE COUNT", icon_name='cpu_small', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid', tooltip_key='CPU_TIMEBINS_MOVEMENT')
-        self.core_cnt_dropdown = SimBADropDown(parent=self.core_cnt_frm, label="CORE COUNT:", label_width=30, dropdown_width=20, value=1, dropdown_options=list(range(1, self.cpu_cnt+1)), tooltip_key='CPU_TIMEBINS_MOVEMENT', img='cpu_small')
+        self.core_cnt_dropdown = MufasaDropDown(parent=self.core_cnt_frm, label="CORE COUNT:", label_width=30, dropdown_width=20, value=1, dropdown_options=list(range(1, self.cpu_cnt+1)), tooltip_key='CPU_TIMEBINS_MOVEMENT', img='cpu_small')
         self.core_cnt_frm.grid(row=3, column=0, sticky=NW)
         self.core_cnt_dropdown.grid(row=0, column=0, sticky=NW)
 
@@ -83,7 +83,7 @@ class MovementAnalysisTimeBinsPopUp(ConfigReader, PopUpMixin):
         self.bp_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT BODY-PARTS", icon_name='pose', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
         self.body_parts_dropdowns = {}
         for cnt, i in enumerate(range(int(animal_cnt))):
-            self.body_parts_dropdowns[cnt] = SimBADropDown(parent=self.bp_frm, label=f"Animal {cnt+1}", label_width=30, dropdown_width=20, value=self.body_parts_lst[cnt], dropdown_options=self.body_parts_lst, img='circle_black', tooltip_key='TIMEBINS_MOVEMENT_BODY_PART')
+            self.body_parts_dropdowns[cnt] = MufasaDropDown(parent=self.bp_frm, label=f"Animal {cnt+1}", label_width=30, dropdown_width=20, value=self.body_parts_lst[cnt], dropdown_options=self.body_parts_lst, img='circle_black', tooltip_key='TIMEBINS_MOVEMENT_BODY_PART')
             self.body_parts_dropdowns[cnt].grid(row=cnt, column=0, sticky=NW)
         self.bp_frm.grid(row=4, column=0, sticky=NW)
 

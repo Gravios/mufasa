@@ -11,7 +11,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.plotting.data_plotter import DataPlotter
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, DropDownMenu,
                                         SimbaButton, SimbaCheckbox,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.enums import Formats, Keys, Links
 from mufasa.utils.errors import (DuplicationError, InvalidInputError,
                                 NoFilesFoundError)
@@ -40,11 +40,11 @@ class DataPlotterPopUp(PopUpMixin, ConfigReader):
         self.color_lst = list(self.colors_dict.keys())
 
         self.style_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="STYLE SETTINGS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.DATA_TABLES.value, pady=5, padx=5, relief='solid')
-        self.resolution_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='RESOLUTION:', label_width=30, dropdown_width=20, value=self.resolutions[1], img='monitor')
-        self.rounding_decimals_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=DECIMALS_OPTIONS, label='DECIMAL ACCURACY:', label_width=30, dropdown_width=20, value=2, img='rounding')
-        self.background_color_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.color_lst, label='BACKGROUND COLOR:', label_width=30, dropdown_width=20, value="White", img='fill')
-        self.header_color_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.color_lst, label='HEADER COLOR:', label_width=30, dropdown_width=20, value="Black", img='text_color')
-        self.font_thickness_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=THICKNESS_OPTIONS, label='FONT THICKNESS: ', label_width=30, dropdown_width=20, value=1, img='bold')
+        self.resolution_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='RESOLUTION:', label_width=30, dropdown_width=20, value=self.resolutions[1], img='monitor')
+        self.rounding_decimals_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=DECIMALS_OPTIONS, label='DECIMAL ACCURACY:', label_width=30, dropdown_width=20, value=2, img='rounding')
+        self.background_color_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.color_lst, label='BACKGROUND COLOR:', label_width=30, dropdown_width=20, value="White", img='fill')
+        self.header_color_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.color_lst, label='HEADER COLOR:', label_width=30, dropdown_width=20, value="Black", img='text_color')
+        self.font_thickness_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=THICKNESS_OPTIONS, label='FONT THICKNESS: ', label_width=30, dropdown_width=20, value=1, img='bold')
         self.style_settings_frm.grid(row=0, sticky=NW, pady=10, padx=10)
         self.resolution_dropdown.grid(row=0, sticky=NW)
         self.rounding_decimals_dropdown.grid(row=1, sticky=NW)
@@ -54,7 +54,7 @@ class DataPlotterPopUp(PopUpMixin, ConfigReader):
 
 
         self.body_parts_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="CHOOSE BODY-PARTS", icon_name='pose', pady=5, padx=5, relief='solid')
-        self.number_of_animals_dropdown = SimBADropDown(parent=self.body_parts_frm, dropdown_options=THICKNESS_OPTIONS, label='# ANIMALS: ', label_width=30, dropdown_width=20, value=1, command=self._create_bp_menu)
+        self.number_of_animals_dropdown = MufasaDropDown(parent=self.body_parts_frm, dropdown_options=THICKNESS_OPTIONS, label='# ANIMALS: ', label_width=30, dropdown_width=20, value=1, command=self._create_bp_menu)
         self.body_parts_frm.grid(row=1, column=0, sticky=NW, pady=10, padx=10)
         self.number_of_animals_dropdown.grid(row=0, column=0, sticky=NW)
         self._create_bp_menu(x=1)
@@ -69,7 +69,7 @@ class DataPlotterPopUp(PopUpMixin, ConfigReader):
 
         self.run_single_video_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SINGLE VIDEO", icon_name='video', pady=5, padx=5, relief='solid')
         self.run_single_video_btn = SimbaButton(parent=self.run_single_video_frm, img='rocket', txt="CREATE SINGLE VIDEO", font=Formats.FONT_REGULAR.value, cmd=self._run, cmd_kwargs={'multiple': False})
-        self.single_video_dropdown = SimBADropDown(parent=self.run_single_video_frm, dropdown_options=list(self.file_paths_dict.keys()), label='VIDEO: ', label_width=30, dropdown_width=self.max_len, value=list(self.file_paths_dict.keys())[0])
+        self.single_video_dropdown = MufasaDropDown(parent=self.run_single_video_frm, dropdown_options=list(self.file_paths_dict.keys()), label='VIDEO: ', label_width=30, dropdown_width=self.max_len, value=list(self.file_paths_dict.keys())[0])
 
         self.run_single_video_frm.grid(row=3, column=0, sticky=NW, pady=10, padx=10)
         self.run_single_video_btn.grid(row=0, column=0, sticky=NW)
@@ -90,8 +90,8 @@ class DataPlotterPopUp(PopUpMixin, ConfigReader):
                 self.bp_colors[k].destroy()
         self.bp_dropdowns, self.bp_colors = {}, {}
         for animal_cnt in range(int(self.number_of_animals_dropdown.getChoices())):
-            self.bp_dropdowns[animal_cnt] = SimBADropDown(parent=self.body_parts_frm, dropdown_options=self.body_parts_lst, label=f"BODY-PART {animal_cnt+1}:", label_width=30, dropdown_width=20, value=self.body_parts_lst[animal_cnt])
-            self.bp_colors[animal_cnt] = SimBADropDown(parent=self.body_parts_frm, dropdown_options=self.color_lst, label=f"", label_width=2, dropdown_width=20, value=self.color_lst[animal_cnt])
+            self.bp_dropdowns[animal_cnt] = MufasaDropDown(parent=self.body_parts_frm, dropdown_options=self.body_parts_lst, label=f"BODY-PART {animal_cnt+1}:", label_width=30, dropdown_width=20, value=self.body_parts_lst[animal_cnt])
+            self.bp_colors[animal_cnt] = MufasaDropDown(parent=self.body_parts_frm, dropdown_options=self.color_lst, label=f"", label_width=2, dropdown_width=20, value=self.color_lst[animal_cnt])
             self.bp_dropdowns[animal_cnt].grid(row=animal_cnt + 1, column=0, sticky=NW)
             self.bp_colors[animal_cnt].grid(row=animal_cnt + 1, column=1, sticky=NW)
 

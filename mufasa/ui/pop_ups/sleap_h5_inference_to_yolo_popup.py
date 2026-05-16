@@ -8,7 +8,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.third_party_label_appenders.transform.sleap_h5_to_yolo import \
     SleapH52Yolo
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.enums import Options
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
@@ -37,15 +37,15 @@ class SLEAPH5Inference2YoloPopUp(PopUpMixin):
         self.video_dir = FolderSelect(settings_frm, folderDescription="VIDEO DIRECTORY:", lblwidth=35, entry_width=40, initialdir=r"D:\ares\data\termite_2", lbl_icon='folder')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, entry_width=40, initialdir=r"D:\ares\data\termite_2\yolo", lbl_icon='folder')
 
-        self.frm_cnt_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=SAMPLE_SIZE_OPTIONS, label="FRAMES (PER VIDEO): ", label_width=35, dropdown_width=40, value=100, img='frames')
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
-        self.threshold_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=THRESHOLD_OPTION, label="THRESHOLD (%): ", label_width=35, dropdown_width=40, value=90, img='threshold')
-        self.train_size_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=TRAIN_SIZE_OPTIONS, label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2')
-        self.grey_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
-        self.clahe_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
-        self.padding_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=PADDING_OPTIONS, label="PADDING: ", label_width=35, dropdown_width=40, value='None', img='resize')
-        self.animal_cnt_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=list(range(1, 10, 1)), label="ANIMAL COUNT: ", label_width=35, dropdown_width=40, value=2, img='abacus')
-        self.single_id_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="REMOVE ANIMAL ID'S", label_width=35, dropdown_width=40, value='FALSE', img='mouse_head')
+        self.frm_cnt_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=SAMPLE_SIZE_OPTIONS, label="FRAMES (PER VIDEO): ", label_width=35, dropdown_width=40, value=100, img='frames')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose')
+        self.threshold_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=THRESHOLD_OPTION, label="THRESHOLD (%): ", label_width=35, dropdown_width=40, value=90, img='threshold')
+        self.train_size_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=TRAIN_SIZE_OPTIONS, label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2')
+        self.grey_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
+        self.clahe_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe')
+        self.padding_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=PADDING_OPTIONS, label="PADDING: ", label_width=35, dropdown_width=40, value='None', img='resize')
+        self.animal_cnt_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=list(range(1, 10, 1)), label="ANIMAL COUNT: ", label_width=35, dropdown_width=40, value=2, img='abacus')
+        self.single_id_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="REMOVE ANIMAL ID'S", label_width=35, dropdown_width=40, value='FALSE', img='mouse_head')
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.sleap_dir .grid(row=0, column=0, sticky=NW)

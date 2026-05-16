@@ -5,7 +5,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.roi_tools.import_roi_csvs import ROIDefinitionsCSVImporter
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FileSelect,
-                                        SimbaButton, SimBADropDown, SimBALabel)
+                                        SimbaButton, MufasaDropDown, SimBALabel)
 from mufasa.utils.enums import Formats, Links
 from mufasa.utils.errors import InvalidInputError
 from mufasa.utils.read_write import str_2_bool
@@ -30,7 +30,7 @@ class ROIDefinitionsCSVImporterPopUp(ConfigReader, PopUpMixin):
         self.circle_file_select = FileSelect(self.paths_frm, "CIRCLE CSV PATH", title="SELECT CSV FILE", lblwidth=35, file_types=[("CSV FILE", (".csv", ".CSV"))], lbl_icon='circle_small')
         self.polygon_file_select = FileSelect(self.paths_frm, "POLYGON CSV PATH", title="SELECT CSV FILE", lblwidth=35, file_types=[("CSV FILE", (".csv", ".CSV"))], lbl_icon='polygon_2')
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header=f"SETTINGS", icon_name='settings', icon_link=Links.ROI.value, pady=10)
-        self.append_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label='APPEND TO EXISTING ROI DATA: ', label_width=35, dropdown_width=30, value='FALSE', state=self.append_activated, img='plus_green_3')
+        self.append_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=['TRUE', 'FALSE'], label='APPEND TO EXISTING ROI DATA: ', label_width=35, dropdown_width=30, value='FALSE', state=self.append_activated, img='plus_green_3')
         self.roi_table_frm = roi_table_frm if roi_table_frm is not None and hasattr(roi_table_frm, 'refresh_window') else None
         self.run_btn = SimbaButton(parent=self.main_frm, txt='RUN', img='rocket', txt_clr='blue', font=Formats.FONT_LARGE.value, hover_font=Formats.FONT_LARGE_BOLD.value, cmd=self.run)
         self.paths_frm.grid(row=0, column=0, sticky='NW')

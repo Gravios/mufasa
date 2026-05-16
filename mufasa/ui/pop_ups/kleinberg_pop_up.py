@@ -8,7 +8,7 @@ from mufasa.data_processors.kleinberg_calculator import KleinbergCalculator
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
-                                        SimbaButton, SimBADropDown, SimBALabel)
+                                        SimbaButton, MufasaDropDown, SimBALabel)
 from mufasa.utils.checks import check_float, check_int
 from mufasa.utils.enums import Formats, Keys, Links
 from mufasa.utils.errors import NoChoosenClassifierError, NoDataError
@@ -28,8 +28,8 @@ class KleinbergPopUp(PopUpMixin, ConfigReader):
         self.k_sigma = Entry_Box(kleinberg_settings_frm, fileDescription="SIGMA", img='sigma', value='2', justify='center', labelwidth=35, entry_box_width=35, tooltip_key='KLEINBERG_SIGMA')
         self.k_gamma = Entry_Box(kleinberg_settings_frm, fileDescription="GAMMA", img='gamma', value='0.3', justify='center', labelwidth=35, entry_box_width=35, tooltip_key='KLEINBERG_GAMMA')
         self.k_hierarchy = Entry_Box(kleinberg_settings_frm, fileDescription="HIERARCHY", value=1, img='hierarchy_2', justify='center', labelwidth=35, entry_box_width=35, validation='numeric', tooltip_key='KLEINBERG_HIERARCHY')
-        self.h_search_dropdown = SimBADropDown(parent=kleinberg_settings_frm, dropdown_options=['TRUE', 'FALSE'], label="HIERARCHICAL SEARCH", value='FALSE', img='hierarchy', label_width=35, dropdown_width=35, tooltip_key='KLEINBERG_HIERARCHY_SEARCH')
-        self.save_originals_dropdown = SimBADropDown(parent=kleinberg_settings_frm, dropdown_options=['TRUE', 'FALSE'], label="SAVE ORIGINAL DATA:", value='TRUE', img='save', label_width=35, dropdown_width=35, tooltip_key='KLEINBERG_SAVE_ORIGINALS')
+        self.h_search_dropdown = MufasaDropDown(parent=kleinberg_settings_frm, dropdown_options=['TRUE', 'FALSE'], label="HIERARCHICAL SEARCH", value='FALSE', img='hierarchy', label_width=35, dropdown_width=35, tooltip_key='KLEINBERG_HIERARCHY_SEARCH')
+        self.save_originals_dropdown = MufasaDropDown(parent=kleinberg_settings_frm, dropdown_options=['TRUE', 'FALSE'], label="SAVE ORIGINAL DATA:", value='TRUE', img='save', label_width=35, dropdown_width=35, tooltip_key='KLEINBERG_SAVE_ORIGINALS')
         self.instructions_lbl = SimBALabel(parent=kleinberg_settings_frm, txt=INSTRUCTIONS_TXT, justify='center', txt_clr='blue', font=Formats.FONT_REGULAR_ITALICS.value)
 
 

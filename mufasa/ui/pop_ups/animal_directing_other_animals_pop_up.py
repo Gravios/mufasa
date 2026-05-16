@@ -6,7 +6,7 @@ from mufasa.data_processors.directing_other_animals_calculator import \
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.enums import Keys, Links
 from mufasa.utils.errors import (AnimalNumberError, CountError,
                                 InvalidInputError, NoFilesFoundError)
@@ -37,9 +37,9 @@ class AnimalDirectingAnimalPopUp(ConfigReader, PopUpMixin):
         ear_right_guess = find_closest_string(target=EAR_RIGHT, string_list=bp_names)[0]
 
         self.bp_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT BODY-PARTS", icon_name='pose', icon_link=Links.DIRECTING_ANIMALS_PLOTS.value)
-        self.ear_left_dropdown = SimBADropDown(parent=self.bp_frm, dropdown_options=bp_names, label_width=30, dropdown_width=25, value=ear_left_guess, label='LEFT EAR BODY-PART NAME:', img='left_ear')
-        self.ear_right_dropdown = SimBADropDown(parent=self.bp_frm, dropdown_options=bp_names, label_width=30, dropdown_width=25, value=ear_right_guess, label='RIGHT EAR BODY-PART NAME:', img='ear_right')
-        self.nose_dropdown = SimBADropDown(parent=self.bp_frm, dropdown_options=bp_names, label_width=30, dropdown_width=25, value=nose_guess, label='NOSE BODY-PART NAME:', img='nose')
+        self.ear_left_dropdown = MufasaDropDown(parent=self.bp_frm, dropdown_options=bp_names, label_width=30, dropdown_width=25, value=ear_left_guess, label='LEFT EAR BODY-PART NAME:', img='left_ear')
+        self.ear_right_dropdown = MufasaDropDown(parent=self.bp_frm, dropdown_options=bp_names, label_width=30, dropdown_width=25, value=ear_right_guess, label='RIGHT EAR BODY-PART NAME:', img='ear_right')
+        self.nose_dropdown = MufasaDropDown(parent=self.bp_frm, dropdown_options=bp_names, label_width=30, dropdown_width=25, value=nose_guess, label='NOSE BODY-PART NAME:', img='nose')
 
         self.settings_frm = CreateLabelFrameWithIcon( parent=self.main_frm, header="OUTPUT FORMATS", icon_name=Keys.DOCUMENTATION.value, icon_link=Links.DIRECTING_ANIMALS_PLOTS.value)
         boolean_tables_cb, self.boolean_tables_var = SimbaCheckbox(parent=self.settings_frm, txt="CREATE BOOLEAN TABLES", txt_img='table', val=False)

@@ -4,7 +4,7 @@ from tkinter import *
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.plotting.ez_path_plot import EzPathPlot
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
-                                        FileSelect, SimBADropDown, SimBALabel)
+                                        FileSelect, MufasaDropDown, SimBALabel)
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_valid_rgb_tuple, check_int, check_str)
 from mufasa.utils.enums import Formats, Keys, Links, Options
@@ -43,11 +43,11 @@ class MakePathPlotPopUp(PopUpMixin):
         self.data_path = FileSelect(settings_frm, fileDescription="DATA PATH (e.g., H5 or CSV file): ", lblwidth=30, entry_width=30, lbl_icon='file', tooltip_key='SIMPLE_PATH_PLOT_DATA_PATH')
         color_lst = list(get_color_dict().keys())
 
-        self.background_color = SimBADropDown(parent=settings_frm, label="BACKGROUND COLOR: ", dropdown_options=color_lst, label_width=30, dropdown_width=30, img='fill', value="White", tooltip_key='SIMPLE_PATH_PLOT_BACKGROUND_COLOR')
-        self.line_color = SimBADropDown(parent=settings_frm, label="LINE COLOR: ", dropdown_options=color_lst, label_width=30, dropdown_width=30, img='line', value="Red", tooltip_key='SIMPLE_PATH_PLOT_LINE_COLOR')
-        self.line_thickness = SimBADropDown(parent=settings_frm, label="LINE THICKNESS: ", dropdown_options=list(range(1, 11)), label_width=30, dropdown_width=30, img='bold', value=1, tooltip_key='SIMPLE_PATH_PLOT_LINE_THICKNESS')
-        self.circle_size = SimBADropDown(parent=settings_frm, label="CIRCLE SIZE: ", dropdown_options=list(range(1, 11)), label_width=30, dropdown_width=30, img='circle_small', value=5, tooltip_key='SIMPLE_PATH_PLOT_CIRCLE_SIZE')
-        self.last_frm_only_dropdown = SimBADropDown(parent=settings_frm, label="LAST FRAME ONLY: ", dropdown_options=["TRUE", "FALSE"], label_width=30, dropdown_width=30, img='finish', value='TRUE', tooltip_key='SIMPLE_PATH_PLOT_LAST_FRAME_ONLY')
+        self.background_color = MufasaDropDown(parent=settings_frm, label="BACKGROUND COLOR: ", dropdown_options=color_lst, label_width=30, dropdown_width=30, img='fill', value="White", tooltip_key='SIMPLE_PATH_PLOT_BACKGROUND_COLOR')
+        self.line_color = MufasaDropDown(parent=settings_frm, label="LINE COLOR: ", dropdown_options=color_lst, label_width=30, dropdown_width=30, img='line', value="Red", tooltip_key='SIMPLE_PATH_PLOT_LINE_COLOR')
+        self.line_thickness = MufasaDropDown(parent=settings_frm, label="LINE THICKNESS: ", dropdown_options=list(range(1, 11)), label_width=30, dropdown_width=30, img='bold', value=1, tooltip_key='SIMPLE_PATH_PLOT_LINE_THICKNESS')
+        self.circle_size = MufasaDropDown(parent=settings_frm, label="CIRCLE SIZE: ", dropdown_options=list(range(1, 11)), label_width=30, dropdown_width=30, img='circle_small', value=5, tooltip_key='SIMPLE_PATH_PLOT_CIRCLE_SIZE')
+        self.last_frm_only_dropdown = MufasaDropDown(parent=settings_frm, label="LAST FRAME ONLY: ", dropdown_options=["TRUE", "FALSE"], label_width=30, dropdown_width=30, img='finish', value='TRUE', tooltip_key='SIMPLE_PATH_PLOT_LAST_FRAME_ONLY')
 
         settings_frm.grid(row=0, sticky=W)
         self.video_path.grid(row=0, sticky=W)

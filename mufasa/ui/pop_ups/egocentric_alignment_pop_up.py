@@ -6,7 +6,7 @@ from mufasa.data_processors.egocentric_aligner import EgocentricalAligner
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists, check_nvidea_gpu_available
 from mufasa.utils.enums import Keys, Links
 from mufasa.utils.errors import InvalidInputError, NoDataError, SimBAGPUError
@@ -37,12 +37,12 @@ class EgocentricAlignPopUp(ConfigReader, PopUpMixin):
         default_center = find_closest_string(target='center', string_list=self.body_parts_lst)[0]
         default_direction = find_closest_string(target='nose', string_list=self.body_parts_lst)[0]
 
-        self.center_anchor_dropdown = SimBADropDown(parent=settings_frm, label="CENTER ANCHOR:", dropdown_options=self.body_parts_lst, label_width=45, dropdown_width=45, img='center', value=default_center, tooltip_key='EGOCENTRIC_ANCHOR')
-        self.direction_anchor_dropdown = SimBADropDown(parent=settings_frm, label="DIRECTION ANCHOR:", dropdown_options=self.body_parts_lst, label_width=45, dropdown_width=45, img='direction', value=default_direction, tooltip_key='EGOCENTRIC_DIRECTION_ANCHOR')
-        self.direction_dropdown = SimBADropDown(parent=settings_frm, label="DIRECTION:", dropdown_options=list(range(0, 361)), label_width=45, dropdown_width=45, img='direction_2', value=0, tooltip_key='EGOCENTRIC_DIRECTION')
-        self.fill_clr_dropdown = SimBADropDown(parent=settings_frm, label="ROTATION COLOR:", dropdown_options=list(self.clr_dict.keys()), label_width=45, dropdown_width=45, img='fill', value='Black', tooltip_key='ROTATE_FILL_COLOR')
-        self.core_cnt_dropdown = SimBADropDown(parent=settings_frm, label="CPU COUNT:", dropdown_options=list(range(1, self.cpu_cnt + 1)), label_width=45, dropdown_width=45, img='cpu_small', value=int(self.cpu_cnt/2), tooltip_key='CORE_COUNT')
-        self.gpu_dropdown = SimBADropDown(parent=settings_frm, label='USE GPU:', dropdown_options=['TRUE', 'FALSE'], label_width=45, dropdown_width=45, img='gpu_3', value='FALSE', state=gpu_status, tooltip_key='USE_GPU')
+        self.center_anchor_dropdown = MufasaDropDown(parent=settings_frm, label="CENTER ANCHOR:", dropdown_options=self.body_parts_lst, label_width=45, dropdown_width=45, img='center', value=default_center, tooltip_key='EGOCENTRIC_ANCHOR')
+        self.direction_anchor_dropdown = MufasaDropDown(parent=settings_frm, label="DIRECTION ANCHOR:", dropdown_options=self.body_parts_lst, label_width=45, dropdown_width=45, img='direction', value=default_direction, tooltip_key='EGOCENTRIC_DIRECTION_ANCHOR')
+        self.direction_dropdown = MufasaDropDown(parent=settings_frm, label="DIRECTION:", dropdown_options=list(range(0, 361)), label_width=45, dropdown_width=45, img='direction_2', value=0, tooltip_key='EGOCENTRIC_DIRECTION')
+        self.fill_clr_dropdown = MufasaDropDown(parent=settings_frm, label="ROTATION COLOR:", dropdown_options=list(self.clr_dict.keys()), label_width=45, dropdown_width=45, img='fill', value='Black', tooltip_key='ROTATE_FILL_COLOR')
+        self.core_cnt_dropdown = MufasaDropDown(parent=settings_frm, label="CPU COUNT:", dropdown_options=list(range(1, self.cpu_cnt + 1)), label_width=45, dropdown_width=45, img='cpu_small', value=int(self.cpu_cnt/2), tooltip_key='CORE_COUNT')
+        self.gpu_dropdown = MufasaDropDown(parent=settings_frm, label='USE GPU:', dropdown_options=['TRUE', 'FALSE'], label_width=45, dropdown_width=45, img='gpu_3', value='FALSE', state=gpu_status, tooltip_key='USE_GPU')
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.data_dir.grid(row=0, column=0, sticky=NW)

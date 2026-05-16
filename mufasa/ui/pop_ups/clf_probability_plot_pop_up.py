@@ -11,7 +11,7 @@ from mufasa.plotting.probability_plot_creator import \
 from mufasa.plotting.probability_plot_creator_mp import \
     TresholdPlotCreatorMultiprocess
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, SimbaButton,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.enums import Formats, Links
 from mufasa.utils.lookups import get_color_dict
 from mufasa.utils.read_write import (check_if_filepath_list_is_empty,
@@ -47,17 +47,17 @@ class VisualizeClassificationProbabilityPopUp(PopUpMixin, ConfigReader):
         PopUpMixin.__init__(self, title="CREATE CLASSIFICATION PROBABILITY PLOTS", icon='probability')
 
         self.style_settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="STYLE SETTINGS", icon_name='style', icon_link=Links.VISUALIZE_CLF_PROBABILITIES.value, pady=5, padx=5, relief='solid')
-        self.resolution_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='RESOLUTION: ', label_width=25, dropdown_width=35, value=self.resolutions[1], img='monitor')
-        self.max_y_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=MAX_Y_OPTIONS, label='MAX Y-AXIS: ', label_width=25, dropdown_width=35, value=AUTO, img='y')
-        self.line_clr_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=color_names, label='LINE COLOR: ', label_width=25, dropdown_width=35, value='Red', img='color_wheel')
-        self.font_size_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(range(1, 26)), label='TEXT SIZE: ', label_width=25, dropdown_width=35, value=10, img='font_size')
-        self.line_width_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=list(range(1, 26)), label='LINE WIDTH: ', label_width=25, dropdown_width=35, value=2, img='line')
-        self.line_opacity_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=OPACITY_OPTIONS, label='LINE OPACITY: ', label_width=25, dropdown_width=35, value=1.0, img='opacity')
-        self.threshold_dropdown = SimBADropDown(parent=self.style_settings_frm, dropdown_options=['TRUE', 'FALSE'], label='SHOW THRESHOLD LINES: ', label_width=25, dropdown_width=35, value='TRUE', img='threshold')
+        self.resolution_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=self.resolutions, label='RESOLUTION: ', label_width=25, dropdown_width=35, value=self.resolutions[1], img='monitor')
+        self.max_y_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=MAX_Y_OPTIONS, label='MAX Y-AXIS: ', label_width=25, dropdown_width=35, value=AUTO, img='y')
+        self.line_clr_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=color_names, label='LINE COLOR: ', label_width=25, dropdown_width=35, value='Red', img='color_wheel')
+        self.font_size_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=list(range(1, 26)), label='TEXT SIZE: ', label_width=25, dropdown_width=35, value=10, img='font_size')
+        self.line_width_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=list(range(1, 26)), label='LINE WIDTH: ', label_width=25, dropdown_width=35, value=2, img='line')
+        self.line_opacity_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=OPACITY_OPTIONS, label='LINE OPACITY: ', label_width=25, dropdown_width=35, value=1.0, img='opacity')
+        self.threshold_dropdown = MufasaDropDown(parent=self.style_settings_frm, dropdown_options=['TRUE', 'FALSE'], label='SHOW THRESHOLD LINES: ', label_width=25, dropdown_width=35, value='TRUE', img='threshold')
 
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="VISUALIZATION SETTINGS", icon_name='eye', icon_link=Links.VISUALIZE_CLF_PROBABILITIES.value, pady=5, padx=5, relief='solid')
-        self.clf_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=self.clf_names, label='CLASSIFIER: ', label_width=25, dropdown_width=35, value=self.clf_names[0], img='forest')
-        self.core_cnt_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=list(range(1, self.cpu_cnt+1)), label='CPU CORE COUNT: ', label_width=25, dropdown_width=35, value=int(self.cpu_cnt/3), img='cpu_small')
+        self.clf_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=self.clf_names, label='CLASSIFIER: ', label_width=25, dropdown_width=35, value=self.clf_names[0], img='forest')
+        self.core_cnt_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=list(range(1, self.cpu_cnt+1)), label='CPU CORE COUNT: ', label_width=25, dropdown_width=35, value=int(self.cpu_cnt/3), img='cpu_small')
 
         probability_frames_cb, self.probability_frames_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE FRAMES', font=Formats.FONT_REGULAR.value, txt_img='frames', val=False)
         probability_videos_cb, self.probability_videos_var = SimbaCheckbox(parent=self.settings_frm, txt='CREATE VIDEOS', font=Formats.FONT_REGULAR.value, txt_img='video', val=False)
@@ -66,7 +66,7 @@ class VisualizeClassificationProbabilityPopUp(PopUpMixin, ConfigReader):
 
         self.run_single_video_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SINGLE VIDEO", icon_name='video', icon_link=Links.VISUALIZE_CLF_PROBABILITIES.value, pady=5, padx=5, relief='solid')
         self.run_single_video_btn = SimbaButton(parent=self.run_single_video_frm, txt="CREATE SINGLE VIDEO", img='rocket', txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=self.__run, cmd_kwargs={'multiple': False})
-        self.single_video_dropdown = SimBADropDown(parent=self.run_single_video_frm, dropdown_options=list(self.files_found_dict.keys()), label='VIDEO: ', label_width=25, dropdown_width=max_file_name_len, value=list(self.files_found_dict.keys())[0], img='video')
+        self.single_video_dropdown = MufasaDropDown(parent=self.run_single_video_frm, dropdown_options=list(self.files_found_dict.keys()), label='VIDEO: ', label_width=25, dropdown_width=max_file_name_len, value=list(self.files_found_dict.keys())[0], img='video')
 
         self.run_multiple_videos = CreateLabelFrameWithIcon(parent=self.main_frm, header="MULTIPLE VIDEO", icon_name='stack', icon_link=Links.VISUALIZE_CLF_PROBABILITIES.value, pady=5, padx=5, relief='solid')
         self.run_multiple_video_btn = SimbaButton(parent=self.run_multiple_videos, txt=f"Create multiple videos ({len(list(self.files_found_dict.keys()))} video(s) found)", img='rocket', txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=self.__run, cmd_kwargs={'multiple': True})

@@ -8,7 +8,7 @@ from mufasa.data_processors.distance_timbin_calculator import \
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.checks import check_float
 from mufasa.utils.enums import Links
 from mufasa.utils.errors import DuplicationError, InvalidInputError, NoDataError
@@ -24,7 +24,7 @@ class TimBinDistanceAnalysisPopUp(ConfigReader, PopUpMixin):
         PopUpMixin.__init__(self, title="ANALYZE DISTANCES: TIME-BINS", size=(700, 500), icon='distance')
 
         self.distance_cnt_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT NUMBER OF DISTANCES", icon_name='distance', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
-        self.distance_cnt_dropdown = SimBADropDown(parent=self.distance_cnt_frm, label="# OF DISTANCES", label_width=30, dropdown_width=20, value=1, dropdown_options=list(range(1, 11)), command=self.create_settings_frm, img='abacus', tooltip_key='DISTANCE_ANALYSIS_NUMBER_OF_PAIRS')
+        self.distance_cnt_dropdown = MufasaDropDown(parent=self.distance_cnt_frm, label="# OF DISTANCES", label_width=30, dropdown_width=20, value=1, dropdown_options=list(range(1, 11)), command=self.create_settings_frm, img='abacus', tooltip_key='DISTANCE_ANALYSIS_NUMBER_OF_PAIRS')
         self.distance_cnt_frm.grid(row=0, column=0, sticky=NW)
         self.distance_cnt_dropdown.grid(row=0, column=0, sticky=NW)
 
@@ -72,8 +72,8 @@ class TimBinDistanceAnalysisPopUp(ConfigReader, PopUpMixin):
         self.bp_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SELECT BODY-PARTS", icon_name='pose', icon_link=Links.DATA_ANALYSIS.value, padx=5, pady=5, relief='solid')
         self.body_parts_dropdowns = []
         for cnt, i in enumerate(range(int(bp_pair_cnt))):
-            bp_1_dropdown = SimBADropDown(parent=self.bp_frm, label=f"BODY-PART 1:", label_width=20, dropdown_width=20, value=self.body_part_options[cnt], dropdown_options=self.body_part_options, img='circle_black', tooltip_key='DISTANCE_ANALYSIS_BODY_PART')
-            bp_2_dropdown = SimBADropDown(parent=self.bp_frm, label=f"BODY-PART 2:", label_width=20, dropdown_width=20, value=self.body_part_options[cnt], dropdown_options=self.body_part_options, img='circle_black', tooltip_key='DISTANCE_ANALYSIS_BODY_PART')
+            bp_1_dropdown = MufasaDropDown(parent=self.bp_frm, label=f"BODY-PART 1:", label_width=20, dropdown_width=20, value=self.body_part_options[cnt], dropdown_options=self.body_part_options, img='circle_black', tooltip_key='DISTANCE_ANALYSIS_BODY_PART')
+            bp_2_dropdown = MufasaDropDown(parent=self.bp_frm, label=f"BODY-PART 2:", label_width=20, dropdown_width=20, value=self.body_part_options[cnt], dropdown_options=self.body_part_options, img='circle_black', tooltip_key='DISTANCE_ANALYSIS_BODY_PART')
             bp_1_dropdown.grid(row=cnt, column=0, sticky=NW, padx=(0, 15))
             bp_2_dropdown.grid(row=cnt, column=1, sticky=NW)
             self.body_parts_dropdowns.append((bp_1_dropdown, bp_2_dropdown))

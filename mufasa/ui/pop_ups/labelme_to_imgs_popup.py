@@ -6,7 +6,7 @@ from tkinter import *
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.third_party_label_appenders.converters import labelme_to_img_dir
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.read_write import str_2_bool
 
 IMG_FORMATS = ['png', 'jpeg', 'bmp', 'webp']
@@ -22,8 +22,8 @@ class Labelme2ImgsPopUp(PopUpMixin):
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings')
         self.labelme_dir = FolderSelect(settings_frm, folderDescription="LABELME DIRECTORY:", lblwidth=35, width=40, lbl_icon='labelme_2')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, width=40, lbl_icon='folder')
-        self.img_format_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=IMG_FORMATS, label="IMAGE FORMAT: ", label_width=35, dropdown_width=40, value=IMG_FORMATS[0], img='frames')
-        self.grey_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
+        self.img_format_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=IMG_FORMATS, label="IMAGE FORMAT: ", label_width=35, dropdown_width=40, value=IMG_FORMATS[0], img='frames')
+        self.grey_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey')
 
 
         settings_frm.grid(row=0, column=0, sticky=NW)

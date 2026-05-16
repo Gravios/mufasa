@@ -9,7 +9,7 @@ from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.roi_tools.roi_clf_calculator import ROIClfCalculator
 from mufasa.roi_tools.roi_clf_calculator_mp import ROIClfCalculatorMultiprocess
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.enums import Links
 from mufasa.utils.errors import (NoDataError, NoROIDataError,
                                 ROICoordinatesNotFoundError)
@@ -75,7 +75,7 @@ class ClfByROIPopUp(PopUpMixin, ConfigReader):
         self.transpose_cb.grid(row=0, column=0, sticky=NW)
 
         runtime_option_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="RUNTIME OPTIONS", icon_name='settings', icon_link=Links.ANALYZE_ML_RESULTS.value, padx=2, pady=2, relief='solid', tooltip_key='CPU_ROI_DESCRIPTIVE_ANALYSIS')
-        self.cpu_cnt_dropdown = SimBADropDown(parent=runtime_option_frm, dropdown_options=list(range(1, find_core_cnt()[0]+1)), label='CPU CORE COUNT', value=1, tooltip_key='CPU_ROI_DESCRIPTIVE_ANALYSIS')
+        self.cpu_cnt_dropdown = MufasaDropDown(parent=runtime_option_frm, dropdown_options=list(range(1, find_core_cnt()[0]+1)), label='CPU CORE COUNT', value=1, tooltip_key='CPU_ROI_DESCRIPTIVE_ANALYSIS')
         runtime_option_frm.grid(row=5, column=0, sticky=NW)
         self.cpu_cnt_dropdown.grid(row=0, column=0, sticky=NW)
         self.create_run_frm(run_function=self.run, idx=6, title=f'RUN ({len(self.machine_results_paths)} file(s))')

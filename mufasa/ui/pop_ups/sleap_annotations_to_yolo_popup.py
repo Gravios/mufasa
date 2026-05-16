@@ -12,7 +12,7 @@ from mufasa.third_party_label_appenders.transform.sleap_to_yolo import \
 from mufasa.third_party_label_appenders.transform.utils import \
     get_yolo_keypoint_flip_idx
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, FolderSelect,
-                                        SimbaCheckbox, SimBADropDown)
+                                        SimbaCheckbox, MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     str_2_bool)
@@ -42,12 +42,12 @@ class SLEAPAnnotations2YoloPopUp(PopUpMixin):
         self.video_dir = FolderSelect(settings_frm, folderDescription="VIDEO DIRECTORY:", lblwidth=35, entry_width=40, lbl_icon='folder_video', tooltip_key='VIDEO_DIR')
         self.save_dir = FolderSelect(settings_frm, folderDescription="SAVE DIRECTORY:", lblwidth=35, entry_width=40, initialdir=r"D:\troubleshooting\two_animals_sleap\yolo_kpts_2", lbl_icon='folder', tooltip_key='SAVE_DIR')
 
-        self.verbose_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose', tooltip_key='verbose_dropdown')
-        self.train_size_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=TRAIN_SIZE_OPTIONS, label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2', tooltip_key='simba2yolo_train_size')
-        self.grey_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey', tooltip_key='simba2yolo_grey')
-        self.padding_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=PADDING_OPTIONS, label="PADDING: ", label_width=35, dropdown_width=40, value='None', img='size_black', tooltip_key='simba2yolo_padding')
-        self.clahe_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe', tooltip_key='simba2yolo_clahe')
-        self.single_id_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="REMOVE ANIMAL ID'S", label_width=35, dropdown_width=40, value='FALSE', img='mouse_head', tooltip_key='sleap_remove_animal_ids')
+        self.verbose_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="VERBOSE: ", label_width=35, dropdown_width=40, value='TRUE', img='verbose', tooltip_key='verbose_dropdown')
+        self.train_size_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=TRAIN_SIZE_OPTIONS, label="TRAIN SIZE (%): ", label_width=35, dropdown_width=40, value=70, img='pct_2', tooltip_key='simba2yolo_train_size')
+        self.grey_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="GREYSCALE: ", label_width=35, dropdown_width=40, value='FALSE', img='grey', tooltip_key='simba2yolo_grey')
+        self.padding_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=PADDING_OPTIONS, label="PADDING: ", label_width=35, dropdown_width=40, value='None', img='size_black', tooltip_key='simba2yolo_padding')
+        self.clahe_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="CLAHE: ", label_width=35, dropdown_width=40, value='FALSE', img='clahe', tooltip_key='simba2yolo_clahe')
+        self.single_id_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=['TRUE', 'FALSE'], label="REMOVE ANIMAL ID'S", label_width=35, dropdown_width=40, value='FALSE', img='mouse_head', tooltip_key='sleap_remove_animal_ids')
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.sleap_dir .grid(row=0, column=0, sticky=NW)

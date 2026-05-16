@@ -5,7 +5,7 @@ from typing import Union
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, SimbaButton,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_float
 from mufasa.utils.enums import ConfigKey, Dtypes, Formats
 from mufasa.utils.printing import stdout_success
@@ -31,10 +31,10 @@ class SetMinMaxDrawWindowSize(ConfigReader, PopUpMixin):
             check_float(name=f'{self.__class__.__name__} size', value=i, max_value=1, min_value=0, raise_error=True)
 
         settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="DISPLAY SETTINGS - ROI DRAW WINDOW", font=Formats.FONT_HEADER.value, padx=5, pady=5, icon_name='settings', relief='solid')
-        self.max_width_ratio_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=WINDOW_SIZE_OPTIONS, label="MAX DRAW DISPLAY RATIO WIDTH: ", label_width=35, dropdown_width=35, value=max_draw_display_ratio_w)
-        self.max_height_ratio_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=WINDOW_SIZE_OPTIONS, label="HEIGHT: ", label_width=10, dropdown_width=10, value=max_draw_display_ratio_h)
-        self.min_width_ratio_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=WINDOW_SIZE_OPTIONS, label="MIN DRAW DISPLAY RATIO WIDTH: ", label_width=35, dropdown_width=35, value=min_draw_display_ratio_w)
-        self.min_height_ratio_dropdown = SimBADropDown(parent=settings_frm, dropdown_options=WINDOW_SIZE_OPTIONS, label="HEIGHT: ", label_width=10, dropdown_width=10, value=min_draw_display_ratio_h)
+        self.max_width_ratio_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=WINDOW_SIZE_OPTIONS, label="MAX DRAW DISPLAY RATIO WIDTH: ", label_width=35, dropdown_width=35, value=max_draw_display_ratio_w)
+        self.max_height_ratio_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=WINDOW_SIZE_OPTIONS, label="HEIGHT: ", label_width=10, dropdown_width=10, value=max_draw_display_ratio_h)
+        self.min_width_ratio_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=WINDOW_SIZE_OPTIONS, label="MIN DRAW DISPLAY RATIO WIDTH: ", label_width=35, dropdown_width=35, value=min_draw_display_ratio_w)
+        self.min_height_ratio_dropdown = MufasaDropDown(parent=settings_frm, dropdown_options=WINDOW_SIZE_OPTIONS, label="HEIGHT: ", label_width=10, dropdown_width=10, value=min_draw_display_ratio_h)
 
         settings_frm.grid(row=0, column=0, sticky=NW)
         self.max_width_ratio_dropdown.grid(row=0, column=0, sticky=NW, pady=5)

@@ -7,7 +7,7 @@ from mufasa.data_processors.cue_light_movement_statistics import \
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pop_up_mixin import PopUpMixin
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
-                                        SimBADropDown)
+                                        MufasaDropDown)
 from mufasa.utils.checks import check_if_dir_exists, check_int, check_valid_lst
 from mufasa.utils.enums import Links
 from mufasa.utils.errors import NoFilesFoundError, NoROIDataError
@@ -48,7 +48,7 @@ class CueLightMovementAnalyzerPopUp(ConfigReader, PopUpMixin):
         PopUpMixin.__init__(self, size=(750, 300), title="CUE LIGHT MOVEMENT ANALYSIS", icon='analyze_green')
 
         self.settings_frm = CreateLabelFrameWithIcon(parent=self.main_frm, header="SETTINGS", icon_name='settings', icon_link=Links.CUE_LIGHTS.value)
-        self.bp_dropdown = SimBADropDown(parent=self.settings_frm, dropdown_options=self.body_parts_lst, label=f'SELECT BODY-PART:', label_width=40, dropdown_width=30, value=self.body_parts_lst[0])
+        self.bp_dropdown = MufasaDropDown(parent=self.settings_frm, dropdown_options=self.body_parts_lst, label=f'SELECT BODY-PART:', label_width=40, dropdown_width=30, value=self.body_parts_lst[0])
         self.pre_window_eb = Entry_Box(parent=self.settings_frm, fileDescription='PRE CUE LIGHT WINDOW (S): ', entry_box_width=30, value=0, validation='numeric', labelwidth="40", justify='center')
         self.post_window_eb = Entry_Box(parent=self.settings_frm, fileDescription='POST CUE LIGHT WINDOW (S): ', entry_box_width=30, value=0, validation='numeric', labelwidth="40", justify='center')
 
