@@ -41,6 +41,11 @@ Read this when planning the next porting patch — it tells you what's left to b
 
 Read this before launching the Qt workbench to know which buttons will surface errors. Includes recommended stop-gap (disable broken options) plus priority order for backend wiring.
 
+### `backend_audit.md`
+**Backend-side companion to `qt_form_runtime_gaps.md`** — two-part audit covering the actual availability of "missing" backends (5 of 7 turn out to be findable under different names, only 2 are genuinely missing) and the 25 backend modules that import from `tkinter_functions.py` (blocking Tier-4 cleanup). Each Tk importer is categorised: dies-with-unsupervised / needs-refactor / simple-popup-replacement / build-infrastructure.
+
+Read this when planning a fix-the-broken-form patch or planning the Tier-4 backend-decoupling work. The Quick Wins section in §4a lists ≤1-hour fixes that close 4 of the 7 runtime gaps.
+
 ---
 
 ## Kalman smoother — design track
