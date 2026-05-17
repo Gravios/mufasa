@@ -1,3 +1,39 @@
+"""
+mufasa/SimBA.py — legacy Tk launcher (deprecated)
+
+DEPRECATED. This is the legacy Tkinter-based launcher reached
+via the ``mufasa-tk`` entry point. New work should target the
+Qt workbench instead:
+
+    mufasa           → mufasa.cli.workbench_launcher:main
+    mufasa-workbench → mufasa.ui_qt.workbench_app:main
+    mufasa-chooser   → mufasa.ui_qt.app:main
+
+The Tk surface (this file + the entire ``mufasa/ui/`` tree) is
+slated for removal once the Qt port is feature-complete. See
+``docs/tk_surface_audit.md`` for the inventory and removal plan.
+
+Do not add new features here. Bug fixes should be limited to
+keeping the launcher functional for existing users. Anything
+new — including SimBA → Mufasa renames of Tk-only identifiers
+or UI labels — wastes effort on code that will be deleted.
+
+A DeprecationWarning is emitted on import so that contributors
+get a runtime signal. End-user invocation of ``mufasa-tk``
+still works.
+"""
+import warnings as _warnings
+
+_warnings.warn(
+    "mufasa.SimBA (the Tk launcher reached via `mufasa-tk`) is "
+    "deprecated. Use the Qt workbench: `mufasa`, `mufasa-workbench`, "
+    "or `mufasa-chooser`. See docs/tk_surface_audit.md for the "
+    "removal plan.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 from mufasa.utils.printing import (SimbaTimer, stdout_information,
