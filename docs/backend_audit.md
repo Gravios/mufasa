@@ -216,7 +216,7 @@ The audit underestimated complexity because it stopped at "is the backend named 
 7. **Redesign `DropBodypartsForm`** — either:
    * Add config-to-data-folder resolution + transform `(animal, bp)` tuples to backend's split lists, OR
    * Rework the form to surface `data_folder` directly (matching the Tk popup's UX).
-8. **Rewrite `AverageFrameForm`** to match `create_average_frm` signature (kwarg-shape mismatch from 122by).
+8. ~~**Rewrite `AverageFrameForm`**~~ ✓ **DONE in patch 122cc.** Form rewritten to match `create_average_frm` signature: dropped `method` (Mean/Median) and `stride` fields (backend doesn't support); added a window-mode selector (Whole video / Frame range / Time range) via QStackedWidget; added an optional save-path field that defaults to a timestamped name alongside source.
 
 ### 4c. Medium fixes — genuinely missing backends (port from SimBA or write fresh)
 
