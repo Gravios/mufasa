@@ -49,22 +49,20 @@ No `method`, no `frame_stride`. The form's UI surfaces parameters the backend do
 * Add `verbose` checkbox.
 * Update the dispatch to call `create_average_frm`.
 
-### 2b. `VideoFiltersForm` (video_filters.py) — 3 OPERATIONS FAIL (was 4)
+### 2b. `VideoFiltersForm` (video_filters.py) — 1 OPERATION FAILS (was 4)
 
 | Op | What fails | Reason |
 |---|---|---|
 | ~~Black & white (binarise)~~ | ~~Always~~ | ✓ **FIXED in patch 122ca** — rewired to existing `video_to_bw` backend (with threshold range scaling 0–255 → 0.0–1.0; `invert` checkbox dropped since backend doesn't support it) |
-| Box / Gaussian blur | Always | Backend genuinely missing — port from SimBA or write fresh OpenCV wrapper |
-| Brightness / contrast | Always | Backend genuinely missing — same |
+| ~~Box / Gaussian blur~~ | ~~Always~~ | ✓ **FIXED in patch 122cb** — new `video_blur` backend added to `video_processors/video_processing.py` (FFmpeg's `gblur` filter; method=gaussian default, `box` available) |
+| ~~Brightness / contrast~~ | ~~Always~~ | ✓ **FIXED in patch 122cb** — new `video_brightness_contrast` backend added (FFmpeg's `eq` filter; ranges map directly) |
 | CLAHE | Only with "Interactive preview" checked | Dialog not wired; non-interactive CLAHE works |
 
-**Severity (post-122ca): medium for the 2 unwired ops; low for the CLAHE preview** (the main CLAHE path works; the B&W blocker is resolved).
+**Severity (post-122cb): low — only the CLAHE interactive preview remains**. The main CLAHE path works; B&W is fixed; blur and brightness/contrast have working FFmpeg-backed implementations.
 
-The form has 5 operations in its dropdown; 2 of those 5 currently fail (was 3).
+The form has 5 operations in its dropdown; 1 of those 5 currently has a partial failure (CLAHE interactive preview only).
 
-**Fix scope (per remaining op):**
-* Box blur: small — port the backend (OpenCV `cv2.boxFilter` or `cv2.GaussianBlur` wrapper, ~30 lines).
-* Brightness/contrast: small — port the backend (`cv2.convertScaleAbs`, ~30 lines).
+**Fix scope (remaining):**
 * CLAHE interactive preview: medium — needs a Qt dialog like blob quick-check (live frame display + tunable parameters).
 
 **Stop-gap (no backend work):** disable the two remaining failing options in the dropdown until they're wired. Same posture as before; the broken-options scope just shrank by one.

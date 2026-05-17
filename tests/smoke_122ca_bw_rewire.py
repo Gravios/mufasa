@@ -160,9 +160,10 @@ def main() -> int:
     )
     check(
         "qt_form_runtime_gaps.md §2b VideoFiltersForm failing count "
-        "reduced (3 OPERATIONS FAIL, not 4)",
-        "3 OPERATIONS FAIL" in gaps_text
-        and "(was 4)" in gaps_text,
+        "is reduced (≤3, was 4 pre-122ca)",
+        # Don't pin a specific count — later patches (122cb wired blur
+        # + brightness) reduce it further. Just check it's no longer 4.
+        "4 OPERATIONS FAIL" not in gaps_text,
     )
 
     # ==================================================================

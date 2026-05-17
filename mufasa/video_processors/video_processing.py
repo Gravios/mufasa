@@ -4042,6 +4042,150 @@ def video_to_bw(video_path: Union[str, os.PathLike],
 #video_to_bw(video_path='/Users/simon/Desktop/Screen Recording 2024-05-08 at 10.57.59 AM_upsampled_time_superimposed.mov', threshold=0.5)
 
 
+def video_blur(video_path: Union[str, os.PathLike],
+               kernel_size: int = 5,
+               method: str = "gaussian",
+               save_dir: Optional[Union[str, os.PathLike]] = None,
+               gpu: Optional[bool] = False) -> None:
+    """
+    Apply a box or Gaussian blur to a video, or every video in a
+    directory. Implemented via FFmpeg's ``boxblur`` / ``gblur``
+    filters (no Python-side decode/encode round-trip).
+
+    Patch 122cb. Shape mirrors :func:`video_to_bw` for consistency.
+
+    :param Union[str, os.PathLike] video_path: Path to a video file
+        OR a directory containing videos.
+    :param int kernel_size: Radius for the blur. For Gaussian, used
+        directly as ``sigma``; for box, as the box radius. Must be
+        odd and ≥ 1 to match the Qt form's panel constraints.
+    :param str method: ``'gaussian'`` (default) or ``'box'``.
+    :param Optional[Union[str, os.PathLike]] save_dir: Output
+        directory. If None, saves alongside the source.
+    :param Optional[bool] gpu: If True, uses GPU codecs.
+
+    :example:
+    >>> video_blur(video_path='/foo/video.mp4', kernel_size=11, method='gaussian')
+    """
+    check_int(name=f'{video_blur.__name__} kernel_size',
+              value=kernel_size, min_value=1)
+    check_str(name=f'{video_blur.__name__} method',
+              value=method, options=['gaussian', 'box'],
+              raise_error=True)
+    if gpu and not check_nvidea_gpu_available():
+        raise FFMPEGCodecGPUError(
+            msg="No GPU found (as evaluated by nvidea-smi returning None).",
+            source=video_blur.__name__)
+    if os.path.isfile(video_path):
+        video_paths = [video_path]
+    elif os.path.isdir(video_path):
+        video_paths = list(find_all_videos_in_directory(
+            directory=video_path, as_dict=True, raise_error=True).values())
+    else:
+        raise InvalidInputError(
+            msg=f'{video_path} is not a valid file path or directory',
+            source=video_blur.__name__)
+    if save_dir is not None:
+        check_if_dir_exists(in_dir=save_dir)
+    else:
+        save_dir = os.path.dirname(video_paths[0])
+    check_ffmpeg_available(raise_error=True)
+    timer = SimbaTimer(start=True)
+    if method == 'gaussian':
+        # gblur=sigma=K. Higher K = stronger blur.
+        vf = f"gblur=sigma={kernel_size}"
+    else:
+        # boxblur=luma_radius=K:luma_power=1.
+        vf = f"boxblur=luma_radius={kernel_size}:luma_power=1"
+    for file_cnt, vp in enumerate(video_paths):
+        _, video_name, ext = get_fn_ext(vp)
+        print(f'Applying {method} blur to {video_name} '
+              f'(Video {file_cnt + 1}/{len(video_paths)})...')
+        _ = get_video_meta_data(video_path=vp)
+        save_path = os.path.join(save_dir, f'{video_name}_blur{ext}')
+        if not gpu:
+            cmd = (f"ffmpeg -i '{vp}' -vf \"{vf}\" -pix_fmt yuv420p "
+                   f"'{save_path}' -loglevel error -stats -hide_banner -y")
+        else:
+            cmd = (f"ffmpeg -hwaccel auto -i '{vp}' -vf \"{vf}\" "
+                   f"-c:v h264_nvenc '{save_path}' -loglevel error "
+                   f"-stats -hide_banner -y")
+        subprocess.call(cmd, shell=True, stdout=subprocess.PIPE)
+    timer.stop_timer()
+    stdout_success(msg=f'{len(video_paths)} video(s) blurred.',
+                   elapsed_time=timer.elapsed_time_str)
+
+
+def video_brightness_contrast(
+        video_path: Union[str, os.PathLike],
+        brightness: float = 0.0,
+        contrast: float = 1.0,
+        save_dir: Optional[Union[str, os.PathLike]] = None,
+        gpu: Optional[bool] = False) -> None:
+    """
+    Adjust brightness and contrast of a video, or every video in a
+    directory. Implemented via FFmpeg's ``eq`` filter.
+
+    Patch 122cb.
+
+    :param Union[str, os.PathLike] video_path: Path to a video file
+        OR a directory containing videos.
+    :param float brightness: Range −1.0 to +1.0. 0 = no change,
+        positive = brighter, negative = darker.
+    :param float contrast: Range 0.0 to 3.0. 1.0 = no change.
+    :param Optional[Union[str, os.PathLike]] save_dir: Output
+        directory. If None, saves alongside the source.
+    :param Optional[bool] gpu: If True, uses GPU codecs.
+
+    :example:
+    >>> video_brightness_contrast(video_path='/foo/video.mp4', brightness=0.2, contrast=1.3)
+    """
+    check_float(name=f'{video_brightness_contrast.__name__} brightness',
+                value=brightness, min_value=-1.0, max_value=1.0)
+    check_float(name=f'{video_brightness_contrast.__name__} contrast',
+                value=contrast, min_value=0.0, max_value=3.0)
+    if gpu and not check_nvidea_gpu_available():
+        raise FFMPEGCodecGPUError(
+            msg="No GPU found.",
+            source=video_brightness_contrast.__name__)
+    if os.path.isfile(video_path):
+        video_paths = [video_path]
+    elif os.path.isdir(video_path):
+        video_paths = list(find_all_videos_in_directory(
+            directory=video_path, as_dict=True, raise_error=True).values())
+    else:
+        raise InvalidInputError(
+            msg=f'{video_path} is not a valid file path or directory',
+            source=video_brightness_contrast.__name__)
+    if save_dir is not None:
+        check_if_dir_exists(in_dir=save_dir)
+    else:
+        save_dir = os.path.dirname(video_paths[0])
+    check_ffmpeg_available(raise_error=True)
+    timer = SimbaTimer(start=True)
+    # FFmpeg's eq filter takes brightness in −1..+1 and contrast in
+    # 0..2 (3 is the upper extreme of "still useful"). Map directly.
+    vf = f"eq=brightness={brightness}:contrast={contrast}"
+    for file_cnt, vp in enumerate(video_paths):
+        _, video_name, ext = get_fn_ext(vp)
+        print(f'Adjusting brightness/contrast for {video_name} '
+              f'(Video {file_cnt + 1}/{len(video_paths)})...')
+        _ = get_video_meta_data(video_path=vp)
+        save_path = os.path.join(save_dir, f'{video_name}_bc{ext}')
+        if not gpu:
+            cmd = (f"ffmpeg -i '{vp}' -vf \"{vf}\" -pix_fmt yuv420p "
+                   f"'{save_path}' -loglevel error -stats -hide_banner -y")
+        else:
+            cmd = (f"ffmpeg -hwaccel auto -i '{vp}' -vf \"{vf}\" "
+                   f"-c:v h264_nvenc '{save_path}' -loglevel error "
+                   f"-stats -hide_banner -y")
+        subprocess.call(cmd, shell=True, stdout=subprocess.PIPE)
+    timer.stop_timer()
+    stdout_success(
+        msg=f'{len(video_paths)} video(s) brightness/contrast-adjusted.',
+        elapsed_time=timer.elapsed_time_str)
+
+
 def create_average_frm(video_path: Union[str, os.PathLike],
                        start_frm: Optional[int] = None,
                        end_frm: Optional[int] = None,
