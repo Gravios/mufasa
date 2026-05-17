@@ -12,21 +12,29 @@ Replaces:
   :class:`Convert2jpegPopUp`, :class:`ChangeImageFormatPopUp` (6 popups)
   → :class:`ImageFormatConverterForm`
 * :class:`CreateAverageFramePopUp` (1 popup)
-  → :class:`AverageFrameForm`
+  → :class:`AverageFrameForm` (rewritten in patch 122cc to match
+    the actual ``create_average_frm`` backend signature)
 
-Read-only inspection popups (``PrintVideoMetaDataPopUp``,
-``CheckVideoSeekablePopUp``) live on the Tools menu — they take no
-parameters beyond a file picker and have no config to configure.
+Read-only ``PrintVideoMetaDataPopUp`` lives on the Tools menu —
+takes no parameters beyond a file picker. ``CheckVideoSeekablePopUp``
+is now :class:`CheckVideoSeekableForm` in
+``mufasa.ui_qt.forms.video_utilities`` under Video Processing →
+Utilities (patch 122bx).
 """
 from __future__ import annotations
 
+import os
+from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QFormLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QSpinBox,
-                               QStackedWidget, QWidget)
+                               QFormLayout, QGroupBox, QHBoxLayout,
+                               QLabel, QLineEdit, QPushButton, QSpinBox,
+                               QStackedWidget, QTimeEdit, QVBoxLayout,
+                               QWidget)
+from PySide6.QtCore import QTime
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm
@@ -295,14 +303,41 @@ class ImageFormatConverterForm(OperationForm):
 # AverageFrameForm — 1 popup
 # --------------------------------------------------------------------------- #
 class AverageFrameForm(OperationForm):
-    """Compute and save an average / median frame of a video. Used as
-    the baseline for background subtraction.
+    """Compute and save a per-pixel average frame across a video (or
+    a frame / time window within it).
+
+    Rewritten in patch 122cc to match the actual backend signature
+    :func:`mufasa.video_processors.video_processing.create_average_frm`.
+    The legacy form had two issues identified in
+    :doc:`backend_audit` §2a:
+
+    * Looked up the backend as ``create_average_frame`` (with `e`)
+      — the actual name is ``create_average_frm`` (no `e`). Always
+      returned ``AttributeError`` → ``NotImplementedError``.
+    * Surfaced ``method`` (Mean/Median) and ``stride`` parameters
+      the backend doesn't accept. The backend is mean-only over all
+      frames in the requested window; no stride / median support.
+
+    The rewrite drops the unsupported fields and adds the ones the
+    backend actually exposes: an optional frame-or-time window
+    (via a mode selector) and an optional explicit save path.
+
+    Replaces :class:`CreateAverageFramePopUp`.
     """
 
     title = "Compute average frame"
-    description = ("Save a per-pixel mean or median frame over the full "
-                   "video. Typical use: baseline for background "
-                   "subtraction.")
+    description = (
+        "Compute a per-pixel mean across the full video, or across "
+        "a frame / time window. Output is a single image (PNG / "
+        "JPG / TIFF) usable as a baseline for background "
+        "subtraction or as a reference frame."
+    )
+
+    WINDOW_MODES = [
+        ("Whole video", "whole"),
+        ("Frame range", "frames"),
+        ("Time range (HH:MM:SS)", "time"),
+    ]
 
     def build(self) -> None:
         form = QFormLayout()
@@ -311,44 +346,127 @@ class AverageFrameForm(OperationForm):
         self.scope = _ScopePicker(self, allow_multiple=False)
         form.addRow("Source video:", self.scope)
 
-        self.stat_cb = QComboBox(self)
-        self.stat_cb.addItems(["Mean", "Median"])
-        form.addRow("Statistic:", self.stat_cb)
+        # ----- Window mode + stacked panels ----- #
+        self.window_cb = QComboBox(self)
+        for label, _ in self.WINDOW_MODES:
+            self.window_cb.addItem(label)
+        self.window_cb.currentIndexChanged.connect(self._on_window_changed)
+        form.addRow("Average over:", self.window_cb)
 
-        self.stride = QSpinBox(self)
-        self.stride.setRange(1, 1000); self.stride.setValue(1)
-        self.stride.setPrefix("every ")
-        self.stride.setSuffix(" frame(s)")
-        form.addRow("Sampling:", self.stride)
+        self.window_stack = QStackedWidget(self)
+
+        # Mode 0: whole video — no extra controls
+        whole_panel = QWidget(self)
+        wp_lay = QVBoxLayout(whole_panel)
+        wp_lay.setContentsMargins(0, 0, 0, 0)
+        wp_lay.addWidget(QLabel(
+            "<i>All frames in the source video.</i>", whole_panel))
+        self.window_stack.addWidget(whole_panel)
+
+        # Mode 1: frame range
+        frames_panel = QWidget(self)
+        fp_form = QFormLayout(frames_panel)
+        fp_form.setContentsMargins(0, 0, 0, 0)
+        self.start_frm = QSpinBox(self)
+        self.start_frm.setRange(0, 10_000_000); self.start_frm.setValue(0)
+        fp_form.addRow("Start frame:", self.start_frm)
+        self.end_frm = QSpinBox(self)
+        self.end_frm.setRange(0, 10_000_000); self.end_frm.setValue(100)
+        fp_form.addRow("End frame:", self.end_frm)
+        self.window_stack.addWidget(frames_panel)
+
+        # Mode 2: time range
+        time_panel = QWidget(self)
+        tp_form = QFormLayout(time_panel)
+        tp_form.setContentsMargins(0, 0, 0, 0)
+        self.start_time = QTimeEdit(QTime(0, 0, 0), time_panel)
+        self.start_time.setDisplayFormat("HH:mm:ss")
+        tp_form.addRow("Start time:", self.start_time)
+        self.end_time = QTimeEdit(QTime(0, 0, 10), time_panel)
+        self.end_time.setDisplayFormat("HH:mm:ss")
+        tp_form.addRow("End time:", self.end_time)
+        self.window_stack.addWidget(time_panel)
+
+        form.addRow("Window:", self.window_stack)
+
+        # ----- Save path ----- #
+        self.save_path = QLineEdit(self)
+        self.save_path.setPlaceholderText(
+            "Optional — defaults to alongside source with a "
+            "timestamped name")
+        sp_browse = QPushButton("Browse…", self)
+        sp_browse.clicked.connect(self._pick_save_path)
+        sp_row = QHBoxLayout()
+        sp_row.addWidget(self.save_path, 1)
+        sp_row.addWidget(sp_browse)
+        form.addRow("Save image to:", sp_row)
 
         self.body_layout.addLayout(form)
+
+    def _on_window_changed(self, idx: int) -> None:
+        self.window_stack.setCurrentIndex(idx)
+
+    def _pick_save_path(self) -> None:
+        p, _ = QFileDialog.getSaveFileName(
+            self, "Save average frame as", "",
+            "Image files (*.png *.jpg *.jpeg *.tiff *.bmp);;"
+            "All files (*)")
+        if p:
+            self.save_path.setText(p)
 
     def collect_args(self) -> dict:
         if not self.scope.path:
             raise ValueError("No source video selected.")
-        return {
-            "path":   self.scope.path,
-            "method": self.stat_cb.currentText().lower(),
-            "stride": int(self.stride.value()),
+        mode = self.WINDOW_MODES[self.window_cb.currentIndex()][1]
+        args: dict = {
+            "video_path": self.scope.path,
+            "save_path":  self.save_path.text().strip() or None,
         }
+        if mode == "frames":
+            sf = int(self.start_frm.value())
+            ef = int(self.end_frm.value())
+            if sf > ef:
+                raise ValueError(
+                    f"Start frame ({sf}) must be ≤ end frame ({ef}).")
+            args["start_frm"] = sf
+            args["end_frm"] = ef
+        elif mode == "time":
+            st: QTime = self.start_time.time()
+            et: QTime = self.end_time.time()
+            args["start_time"] = st.toString("HH:mm:ss")
+            args["end_time"] = et.toString("HH:mm:ss")
+            if st >= et:
+                raise ValueError(
+                    f"Start time ({args['start_time']}) must be "
+                    f"before end time ({args['end_time']}).")
+        # mode == "whole" → no window kwargs; backend uses whole video
+        return args
 
-    def target(self, *, path: str, method: str, stride: int) -> None:
-        # create_average_frm / create_average_frm_cupy live in
-        # mufasa.data_processors.cuda.image; the CPU equivalent is
-        # in mufasa.video_processors.video_processing but naming
-        # diverges between branches. Raise explicitly if not found.
-        try:
-            from mufasa.video_processors import video_processing as _vp
-            fn = getattr(_vp, "create_average_frame", None)
-            if fn is None:
-                raise AttributeError("create_average_frame not found")
-            fn(video_path=path, method=method, frame_stride=stride)
-        except (AttributeError, ImportError) as exc:
-            raise NotImplementedError(
-                f"create_average_frame backend not present in this fork "
-                f"(looked for video_processing.create_average_frame). "
-                f"Underlying cause: {exc}"
-            )
+    def target(self, *, video_path: str,
+               save_path: Optional[str],
+               start_frm: Optional[int] = None,
+               end_frm: Optional[int] = None,
+               start_time: Optional[str] = None,
+               end_time: Optional[str] = None) -> None:
+        from mufasa.video_processors.video_processing import (
+            create_average_frm,
+        )
+        # If no explicit save_path, default to alongside source with
+        # a timestamped name. Backend returns the np.ndarray only when
+        # save_path is None — we always supply one so the user gets a
+        # file artifact.
+        if not save_path:
+            base = Path(video_path)
+            stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            save_path = str(
+                base.parent / f"{base.stem}_avgframe_{stamp}.png")
+        create_average_frm(
+            video_path=video_path,
+            start_frm=start_frm, end_frm=end_frm,
+            start_time=start_time, end_time=end_time,
+            save_path=save_path,
+            verbose=False,
+        )
 
 
 __all__ = ["ImageFormatConverterForm", "AverageFrameForm"]

@@ -9,16 +9,17 @@ This audit is the output of patch 122by, Path C of the post-122bw work. No fixes
 
 ## 1. Summary
 
-Seven Qt form/operation pairs raise `NotImplementedError` or equivalent at runtime when the user clicks Run. All seven are spread across four forms.
+**Status after patches 122ca / 122cb / 122cc:** of 7 originally-counted runtime gaps, 4 have been closed (B&W, blur, brightness/contrast, AverageFrameForm). 3 form-redesign cases remain (DropBodyparts constructor mismatch, ROIFeatures Remove data_dir field, CropVideos multi-crop semantics) plus the CLAHE interactive-preview Qt-dialog port.
 
-| Form | Failing operations | Failure mode |
-|---|---|---|
-| `VideoFiltersForm` (video_filters.py) | Black & white, Box blur, Brightness/contrast | Backend functions not present in this fork |
-| `VideoFiltersForm` | CLAHE with "Interactive preview" checked | Dialog not yet wired |
-| `CropVideosForm` (video_editing.py) | Multi-crop from single video | Backend wiring pending |
-| `AverageFrameForm` (image_conversion.py) | All — every Run | Calls `create_average_frame`; backend is named `create_average_frm` (missing `e`); also kwargs mismatch |
-| `DropBodypartsForm` (pose_cleanup.py) | All — every Run | `keypoint_dropper` backend not in this fork |
-| `ROIFeaturesForm` (roi.py) | Remove-ROI-features action | `remove_roi_features` not in this fork |
+| Form | Failing operations | Failure mode | Status |
+|---|---|---|---|
+| `VideoFiltersForm` (video_filters.py) | ~~Black & white~~ | ~~Backend functions not present in this fork~~ | ✓ 122ca |
+| `VideoFiltersForm` | ~~Box blur~~, ~~Brightness/contrast~~ | ~~Backend functions not present~~ | ✓ 122cb (new FFmpeg backends) |
+| `VideoFiltersForm` | CLAHE with "Interactive preview" checked | Dialog not yet wired | pending |
+| `CropVideosForm` (video_editing.py) | Multi-crop from single video | Semantics mismatch with `MultiCropper` (folder vs single) | pending (form redesign) |
+| `AverageFrameForm` (image_conversion.py) | ~~All — every Run~~ | ~~Calls `create_average_frame`; backend is `create_average_frm`; kwargs mismatch~~ | ✓ 122cc (form rewritten) |
+| `DropBodypartsForm` (pose_cleanup.py) | All — every Run | Constructor signature mismatch with `KeypointRemover` | pending (form redesign) |
+| `ROIFeaturesForm` (roi.py) | Remove-ROI-features action | Backend needs `data_dir` field not surfaced | pending (form redesign) |
 
 Plus `VisualizationForm` raises `RuntimeError` (not `NotImplementedError`) when the project context is unavailable — that's defensive guarding, not a gap. Excluded from this audit.
 
@@ -26,28 +27,18 @@ Plus `VisualizationForm` raises `RuntimeError` (not `NotImplementedError`) when 
 
 ## 2. Per-form detail
 
-### 2a. `AverageFrameForm` (image_conversion.py) — ALL OPERATIONS FAIL
+### 2a. `AverageFrameForm` (image_conversion.py) — ✓ FIXED in patch 122cc
 
-**Severity: high.** Every Run fails. The form is currently unusable.
+~~**Severity: high.** Every Run fails. The form is currently unusable.~~
 
-**Root cause:** The form's `target()` looks for `mufasa.video_processors.video_processing.create_average_frame` (with an `e`). The actual function is named `create_average_frm` (no `e`). The form's defensive `getattr` returns `None`, triggers the `AttributeError` branch, and raises `NotImplementedError`.
+~~**Root cause:**~~ ~~The form's `target()` looks for `mufasa.video_processors.video_processing.create_average_frame` (with an `e`). The actual function is named `create_average_frm` (no `e`).~~
 
-**Secondary issue:** Even if the spelling were corrected, the kwargs are incompatible. The form passes `video_path=path, method=method, frame_stride=stride`, but the backend signature is:
+**Resolved in 122cc:** Form rewritten to match the actual backend signature. Drops the unsupported `method` (Mean/Median) and `stride` fields — the backend is mean-only over all frames in the requested window. Surfaces the real backend parameters:
 
-```python
-def create_average_frm(video_path, start_frm=None, end_frm=None,
-                       start_time=None, end_time=None,
-                       save_path=None, verbose=False):
-```
+* **Window mode selector** — "Whole video" / "Frame range" / "Time range (HH:MM:SS)" via a QStackedWidget. Backend rejects mixing frame and time ranges; the mode selector makes that impossible to violate.
+* **Save path** — optional file picker. If empty, defaults to `<source>_avgframe_<timestamp>.png` alongside the source.
 
-No `method`, no `frame_stride`. The form's UI surfaces parameters the backend doesn't accept.
-
-**Fix scope:** medium. The form needs a redesign:
-* Drop `method` and `frame_stride` from the UI.
-* Add window controls (start/end frame OR start/end time).
-* Add `save_path` (optional file picker).
-* Add `verbose` checkbox.
-* Update the dispatch to call `create_average_frm`.
+The dispatch now calls `create_average_frm(video_path, start_frm, end_frm, start_time, end_time, save_path, verbose=False)` with kwargs assembled from the selected window mode.
 
 ### 2b. `VideoFiltersForm` (video_filters.py) — 1 OPERATION FAILS (was 4)
 
