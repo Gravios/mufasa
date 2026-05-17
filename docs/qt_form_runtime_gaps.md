@@ -9,7 +9,7 @@ This audit is the output of patch 122by, Path C of the post-122bw work. No fixes
 
 ## 1. Summary
 
-**Status after patches 122ca / 122cb / 122cc / 122cd:** of 7 originally-counted runtime gaps, 5 have been closed (B&W, blur, brightness/contrast, AverageFrameForm, ROIFeatures Remove). 2 form-redesign cases remain (DropBodyparts constructor mismatch, CropVideos multi-crop semantics) plus the CLAHE interactive-preview Qt-dialog port.
+**Status after patches 122ca / 122cb / 122cc / 122cd / 122ce:** of 7 originally-counted runtime gaps, 6 have been closed (B&W, blur, brightness/contrast, AverageFrameForm, ROIFeatures Remove, DropBodyparts). 1 form-redesign case remains (CropVideos multi-crop semantics) plus the CLAHE interactive-preview Qt-dialog port.
 
 | Form | Failing operations | Failure mode | Status |
 |---|---|---|---|
@@ -18,7 +18,7 @@ This audit is the output of patch 122by, Path C of the post-122bw work. No fixes
 | `VideoFiltersForm` | CLAHE with "Interactive preview" checked | Dialog not yet wired | pending |
 | `CropVideosForm` (video_editing.py) | Multi-crop from single video | Semantics mismatch with `MultiCropper` (folder vs single) | pending (form redesign) |
 | `AverageFrameForm` (image_conversion.py) | ~~All — every Run~~ | ~~Calls `create_average_frame`; backend is `create_average_frm`; kwargs mismatch~~ | ✓ 122cc (form rewritten) |
-| `DropBodypartsForm` (pose_cleanup.py) | All — every Run | Constructor signature mismatch with `KeypointRemover` | pending (form redesign) |
+| `DropBodypartsForm` (pose_cleanup.py) | ~~All — every Run~~ | ~~Constructor signature mismatch with `KeypointRemover`~~ | ✓ 122ce (form rewritten) |
 | `ROIFeaturesForm` (roi.py) | ~~Remove-ROI-features action~~ | ~~Backend needs `data_dir` field not surfaced~~ | ✓ 122cd (field added) |
 
 Plus `VisualizationForm` raises `RuntimeError` (not `NotImplementedError`) when the project context is unavailable — that's defensive guarding, not a gap. Excluded from this audit.
@@ -66,13 +66,18 @@ The form has 5 operations in its dropdown; 1 of those 5 currently has a partial 
 
 **Docstring inconsistency:** the `CropVideosForm` docstring doesn't reference its replaced Tk popups by `:class:` name like the other forms do. Should list `CropVideoPopUp`, `CropVideoCirclesPopUp`, `CropVideoPolygonsPopUp`, `MultiCropPopUp` so future readers know which Tk surface this absorbs.
 
-### 2d. `DropBodypartsForm` (pose_cleanup.py) — ALL OPERATIONS FAIL
+### 2d. `DropBodypartsForm` (pose_cleanup.py) — ✓ FIXED in patch 122ce
 
-**Severity: high.** Backend module `keypoint_dropper` is missing from this fork. Form is currently unusable; every Run raises `NotImplementedError`.
+~~**Severity: high.** Backend module `keypoint_dropper` is missing from this fork. Form is currently unusable; every Run raises `NotImplementedError`.~~
 
-**Fix scope:** medium-to-large. Port `keypoint_dropper.py` from the legacy SimBA branch (per the docstring note in the form). May need adjustments for v1 project layout.
+**Resolved in 122ce:** Form rewired to call the actual backend `mufasa.pose_processors.remove_keypoints.KeypointRemover`. The form was written against a non-existent `KeyPointRemover(config_path, body_parts, copy_originals)` API; the real class is `KeypointRemover(data_folder, pose_tool, file_format)` + `.run(animal_names, bp_to_remove_list)`.
 
-**Stop-gap:** disable the form (don't register it in the page). The current state is worse than no form — users see a UI promising functionality that doesn't exist.
+Key changes:
+
+* Added a `data_folder` QLineEdit + Browse button. Auto-populates `<project>/csv/input_csv` if that path exists.
+* Dropped the misleading `copy_originals` checkbox — the backend's `run()` always writes to a new `Reorganized_bp_<datetime>` subdirectory; originals are never overwritten regardless of any checkbox state.
+* Added a status label showing the inferred `pose_tool` (DLC for 1 animal, maDLC for >1) and `file_format` (read from project metadata).
+* `target()` reads project metadata via `project_metadata_from_config` to infer the backend's constructor parameters; transforms the form's `[(animal, bp), ...]` selection into the backend's split `animal_names` + `bp_to_remove_list` lists (the backend zips them lockstep for maDLC; uses bp_to_remove_list at multi-index level 1 for DLC).
 
 ### 2e. `ROIFeaturesForm` (roi.py) — ✓ FIXED in patch 122cd
 
