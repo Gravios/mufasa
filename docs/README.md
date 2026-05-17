@@ -46,6 +46,11 @@ Read this before launching the Qt workbench to know which buttons will surface e
 
 Read this when planning a fix-the-broken-form patch or planning the Tier-4 backend-decoupling work. The Quick Wins section in §4a lists ≤1-hour fixes that close 4 of the 7 runtime gaps.
 
+### `qt_form_registration_audit.md`
+**Registration check for OperationForm subclasses.** Confirms every form defined under `mufasa/ui_qt/forms/` is reachable from at least one page's `add_section()` call. All 60 subclasses registered (zero orphans) as of patch 122cf. Includes the reproducible AST script and a regression-guard smoke test that flags any future orphan addition.
+
+Read this when adding a new form to remember to wire it; the smoke test will fail loudly otherwise.
+
 ---
 
 ## Kalman smoother — design track

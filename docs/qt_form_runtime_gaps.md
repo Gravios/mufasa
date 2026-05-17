@@ -23,6 +23,8 @@ This audit is the output of patch 122by, Path C of the post-122bw work. No fixes
 
 Plus `VisualizationForm` raises `RuntimeError` (not `NotImplementedError`) when the project context is unavailable — that's defensive guarding, not a gap. Excluded from this audit.
 
+**Form-registration status** (per `qt_form_registration_audit.md`, patch 122cg): all 60 OperationForm subclasses are wired to at least one page. The 122cc + 122ce caveats about possibly-orphan AverageFrameForm and DropBodypartsForm were precautionary but unfounded. A regression-guard smoke test now enforces the no-orphan invariant.
+
 ---
 
 ## 2. Per-form detail
