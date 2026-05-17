@@ -220,10 +220,10 @@ The audit underestimated complexity because it stopped at "is the backend named 
 
 ### 4c. Medium fixes — genuinely missing backends (port from SimBA or write fresh)
 
-9. **Port box-blur backend** to `mufasa/video_processors/video_processing.py`. Wire into `VideoFiltersForm`.
-10. **Port brightness/contrast backend** to `mufasa/video_processors/video_processing.py`. Wire into `VideoFiltersForm`.
+9. ~~**Port box-blur backend**~~ ✓ **DONE in patch 122cb.** New `video_blur(video_path, kernel_size, method, save_dir, gpu)` in `mufasa/video_processors/video_processing.py`. Uses FFmpeg's `gblur` / `boxblur` filter. Wired into `VideoFiltersForm.target()` blur branch.
+10. ~~**Port brightness/contrast backend**~~ ✓ **DONE in patch 122cb.** New `video_brightness_contrast(video_path, brightness, contrast, save_dir, gpu)` in same module. Uses FFmpeg's `eq` filter; form's brightness (−1..+1) and contrast (0..3) ranges map directly.
 
-After 4b + 4c: all 7 form runtime gaps closed.
+After 4b + 4c: ~~all 7~~ **4 of the 7 form runtime gaps closed** (B&W, blur, brightness/contrast, plus the 3 deferred from §4b once those follow-ups land).
 
 ### 4d. Backend-Tk-coupling decoupling (per-file)
 

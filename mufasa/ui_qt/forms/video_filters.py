@@ -249,11 +249,21 @@ class VideoFiltersForm(OperationForm):
             else:
                 _vp.video_to_bw(video_path=path, threshold=threshold)
         elif op == "blur":
-            raise NotImplementedError(
-                "Box blur: backend wiring pending (convert_to_bw_blur).")
+            # Patch 122cb: rewired to new `video_blur` backend.
+            # Form's `kernel_size` is the FFmpeg sigma / box radius.
+            # `video_blur` handles file-or-dir internally; pass path
+            # through directly.
+            _vp.video_blur(video_path=path,
+                            kernel_size=params["kernel_size"],
+                            method="gaussian")
         elif op == "brightness_contrast":
-            raise NotImplementedError(
-                "Brightness/contrast: backend wiring pending.")
+            # Patch 122cb: rewired to new `video_brightness_contrast`
+            # backend. Form's brightness range (−1..+1) and contrast
+            # range (0..3) map directly to FFmpeg's `eq` filter args.
+            _vp.video_brightness_contrast(
+                video_path=path,
+                brightness=params["brightness"],
+                contrast=params["contrast"])
 
 
 __all__ = ["VideoFiltersForm"]
