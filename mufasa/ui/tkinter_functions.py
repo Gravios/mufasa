@@ -1,3 +1,38 @@
+"""
+mufasa.ui.tkinter_functions — legacy Tkinter widget factories (deprecated)
+
+Defines Tk widget classes (MufasaDropDown, MufasaScaleBar,
+MufasaSeparator) and factory functions (MufasaButton/SimbaButton,
+MufasaCheckbox/SimbaCheckbox, MufasaLabel/SimBALabel,
+MufasaRadioButton/SimBARadioButton) used by the legacy Tk
+launcher (``mufasa.SimBA``) and the popups under
+``mufasa.ui.pop_ups``.
+
+The Qt port provides equivalent widgets in ``mufasa.ui_qt.widgets``.
+This module is slated for removal. See ``docs/tk_surface_audit.md``
+for the per-importer migration plan — 25 backend modules
+currently import from here and need to migrate before this
+file can be deleted.
+
+The SimBA-prefixed names (SimbaButton, SimbaCheckbox, SimBALabel,
+SimBARadioButton, SimBADropDown, SimBAScaleBar, SimBASeperator)
+are NOT renamed here. They are kept as-is because the entire
+file is dead code waiting for removal — renaming would generate
+churn for vanishing code. The 122bn / 122bo backward-compat
+aliases for the Mufasa-prefixed names will be deleted along
+with this file.
+"""
+import warnings as _warnings
+
+_warnings.warn(
+    "mufasa.ui.tkinter_functions is deprecated. Use Qt widgets "
+    "from mufasa.ui_qt.widgets instead. See "
+    "docs/tk_surface_audit.md for the migration plan.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os.path

@@ -26,6 +26,11 @@ Read this when you have a research question and need a starting checklist.
 
 Read this when you're working on the codebase itself, planning a migration patch, or trying to figure out why a workflow misbehaves.
 
+### `tk_surface_audit.md`
+**Tk-vs-Qt surface inventory and removal plan.** Status-tagged audit of all 96 files in `mufasa/ui/` plus `mufasa/SimBA.py`: which are load-bearing for Qt, which are reachable only via the legacy Tk launcher, which are unreferenced, what migration steps are required to remove the Tk surface entirely.
+
+Read this when planning UI work or considering a SimBA → Mufasa rename in Tk-only code (short answer: don't — it's slated for removal).
+
 ---
 
 ## Kalman smoother — design track
