@@ -7,7 +7,7 @@ The Video Processing workbench page — **full consolidation**.
 The legacy code had 59 popups in a single source file
 (``video_processing_pop_up.py``). They're replaced here by:
 
-* **11 consolidated forms** across 10 accordion sections (see tables below), and
+* **12+ consolidated forms** across **15 accordion sections** (see tables below), and
 * **5 Tools-menu actions** for zero-field / read-only operations.
 
 Popup consolidation summary
@@ -36,7 +36,10 @@ Popup consolidation summary
       - 3
     * - Filters & enhancement
       - :class:`VideoFiltersForm`
-      - 7
+      - 5
+    * - Background removal
+      - :class:`BackgroundRemovalForm`
+      - 2
     * - Overlay / burn-in
       - :class:`VideoOverlayForm`
       - 7
@@ -74,6 +77,7 @@ from mufasa.ui_qt.forms.video_processing import (ClipVideosForm,
 from mufasa.ui_qt.forms.video_editing import (CropVideosForm, ResizeVideosForm,
                                               RotateFlipForm)
 from mufasa.ui_qt.forms.video_filters import VideoFiltersForm
+from mufasa.ui_qt.forms.video_bg_removal import BackgroundRemovalForm
 from mufasa.ui_qt.forms.video_frames import (ExtractFramesForm,
                                               ImportFrameDirectoryForm,
                                               MergeFramesToVideoForm)
@@ -99,6 +103,13 @@ def build_video_processing_page(workbench,
     page.add_section("Resize & rate",           [(ResizeVideosForm, {})])
     page.add_section("Rotate & flip",           [(RotateFlipForm, {})])
     page.add_section("Filters & enhancement",   [(VideoFiltersForm, {})])
+    # Patch 122bu: Background removal moves out of VideoFiltersForm
+    # (where it was a non-functional stub) into its own section with
+    # full backend parameter surface. Consolidates the two legacy
+    # popups BackgroundRemoverSingleVideoPopUp and
+    # BackgroundRemoverDirectoryPopUp via a single-vs-directory
+    # scope toggle.
+    page.add_section("Background removal",      [(BackgroundRemovalForm, {})])
     page.add_section("Overlay / burn-in",       [(VideoOverlayForm, {})])
     page.add_section("Frame extraction",        [(ExtractFramesForm, {})])
     # Patch 122s: frames ↔ video round-trip — merge frames into a

@@ -2,15 +2,19 @@
 mufasa.ui_qt.forms.video_filters
 ================================
 
-Inline form replacing the seven filter/enhancement popups:
+Inline form replacing five filter/enhancement popups:
 
 * :class:`CLAHEPopUp` and :class:`InteractiveClahePopUp`
 * :class:`BrightnessContrastPopUp`
 * :class:`BoxBlurPopUp`
 * :class:`GreyscaleSingleVideoPopUp`
 * :class:`Convert2BlackWhitePopUp`
-* :class:`BackgroundRemoverSingleVideoPopUp`
-* :class:`BackgroundRemoverDirectoryPopUp`
+
+Background removal (the two ``BackgroundRemover*PopUp`` classes)
+was previously a stub here. As of patch 122bu it lives in its
+own section :mod:`mufasa.ui_qt.forms.video_bg_removal` because
+it has 6+ parameters that don't fit the lightweight stacked-panel
+layout used for the other five filters.
 
 A single "operation" dropdown picks the filter; operation-specific
 parameters live in a :class:`QStackedWidget` that swaps contents when
@@ -139,34 +143,17 @@ class _BlackWhitePanel(QWidget):
                 "invert":    bool(self.invert.isChecked())}
 
 
-class _BgRemoverPanel(QWidget):
-    """Background subtraction — static baseline."""
-
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        form = QFormLayout(self)
-        form.setContentsMargins(0, 0, 0, 0)
-        self.method = QComboBox(self)
-        self.method.addItems(["Mean", "Median", "KNN", "MOG2"])
-        form.addRow("Baseline method:", self.method)
-        self.parallel = QCheckBox("Multi-process (parallel frames)", self)
-        self.parallel.setChecked(True)
-        form.addRow("", self.parallel)
-
-    def to_kwargs(self) -> dict:
-        return {"method":   self.method.currentText().lower(),
-                "parallel": bool(self.parallel.isChecked())}
-
-
 # --------------------------------------------------------------------------- #
 # VideoFiltersForm
 # --------------------------------------------------------------------------- #
 class VideoFiltersForm(OperationForm):
     """Apply an image filter to video(s): CLAHE, brightness/contrast,
-    blur, greyscale, black-and-white threshold, or background removal.
+    blur, greyscale, or black-and-white threshold.
 
-    Replaces 7 popups; the "operation" dropdown drives which panel of
-    parameters is shown.
+    Replaces 5 popups; the "operation" dropdown drives which panel of
+    parameters is shown. Background removal moved out to its own
+    section (:class:`mufasa.ui_qt.forms.video_bg_removal.BackgroundRemovalForm`)
+    in patch 122bu because of its larger parameter surface.
     """
 
     title = "Filter / enhance video(s)"
@@ -180,7 +167,6 @@ class VideoFiltersForm(OperationForm):
         ("Box / Gaussian blur",         2, "blur"),
         ("Greyscale (8-bit)",           3, "greyscale"),
         ("Black & white (binarise)",    4, "black_white"),
-        ("Background subtraction",      5, "bg_remove"),
     ]
 
     def build(self) -> None:
@@ -202,7 +188,6 @@ class VideoFiltersForm(OperationForm):
         self.panels.addWidget(_BoxBlurPanel(self))
         self.panels.addWidget(_GreyscalePanel(self))
         self.panels.addWidget(_BlackWhitePanel(self))
-        self.panels.addWidget(_BgRemoverPanel(self))
         form.addRow("Parameters:", self.panels)
 
         self.body_layout.addLayout(form)
@@ -243,11 +228,6 @@ class VideoFiltersForm(OperationForm):
                 _vp.batch_video_to_greyscale(path=path)
             else:
                 _vp.video_to_greyscale(file_path=path)
-        elif op == "bg_remove":
-            method = params.get("method", "mean")
-            parallel = params.get("parallel", True)
-            fn = _vp.video_bg_subtraction_mp if parallel else _vp.video_bg_subtraction
-            fn(video_path=path, bg_method=method)
         elif op == "black_white":
             # No dedicated backend fn on newer versions; treat as B&W
             # via greyscale + threshold. Keep the branch but mark for
