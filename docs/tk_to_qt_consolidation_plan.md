@@ -163,26 +163,28 @@ This form is the single canonical entry point for plotting backends. It already 
 
 ## 3. Gap summary
 
-The full list of Tk popups with **no current Qt route or section**:
+The full list of Tk popups with **no current Qt route or section**.
+
+> **Post-122bu update:** after Tier 1 verification (patch 122bt) and the Tier 2 background-removal port (patch 122bu), most of this section's gaps are resolved. Remaining gap: 2 entries (UnsupervisedGUI + BlobQuickChecker).
 
 ### High-priority gaps (substantial functionality, no Qt equivalent)
 
-| Tk popup | Backend | Proposed home | Notes |
+| Tk popup | Backend | Proposed home | Status |
 |---|---|---|---|
-| `UnsupervisedGUI` | `mufasa/unsupervised/*` | Add-ons → Unsupervised analysis (new section, large form) | The unsupervised pipeline (UMAP, HDBSCAN, cluster visualization) is entirely Tk. Substantial port. |
-| `BlobQuickChecker` | `mufasa/ui/blob_quick_check_interface.py` | Add-ons → Blob quick-check (new section) | Standalone Tk interface; backend already in place. |
-| `BackgroundRemoverSingleVideoPopUp` + `BackgroundRemoverDirectoryPopUp` | `video_bg_substraction` | Video Processing → Background removal (new section) | Two popups → one form with a single-vs-batch toggle. |
-| `ROIDefinitionsCSVImporter` | already in `roi_tools` | ROI → Import ROI CSV (new section) | Small form. |
-| `ROISizeStandardizer` | already in `roi_tools` | ROI → Size standardiser (new section) | Small form. |
-| `PlotAnnotatedBouts` | already in `plotting` | Annotation → Annotated bouts → videos (new section) | Or route through `VisualizationForm`. |
+| `UnsupervisedGUI` | `mufasa/unsupervised/*` | Add-ons → Unsupervised analysis (new section, large form) | ⚠ STILL A GAP — Tier 3b |
+| `BlobQuickChecker` | `mufasa/ui/blob_quick_check_interface.py` | Add-ons → Blob quick-check (new section) | ⚠ STILL A GAP — reclassified to Tier 3a (interactive viewer port, not a simple form) |
+| `BackgroundRemoverSingleVideoPopUp` + `BackgroundRemoverDirectoryPopUp` | `video_bg_subtraction` / `video_bg_subtraction_mp` | Video Processing → Background removal | ✓ DONE (patch 122bu) |
+| `ROIDefinitionsCSVImporter` | already in `roi_tools` | ROI → Import ROI CSV | ✓ DONE — already in `ROIManageForm` (Import action) |
+| `ROISizeStandardizer` | already in `roi_tools` | ROI → Size standardiser | ✓ DONE — already in `ROIManageForm` (Standardise action) |
+| `PlotAnnotatedBouts` | already in `plotting` | Annotation → Annotated bouts → videos | ✓ DONE — already as the "Annotated bouts overlay" route in `VisualizationForm` |
 
 ### Medium-priority gaps (admin/diagnostic popups)
 
-| Tk popup | Proposed home | Notes |
+| Tk popup | Proposed home | Status |
 |---|---|---|
-| `CheckVideoSeekablePopUp` | Video Processing → Utilities | One-button popup; folds into existing Utilities. |
-| `ClfByROI`, `ClfByTimebins` | Classifier → new section "Classifier × ROI / time bins" | Small forms; could be a single section with mode selector. |
-| Any `clf_descriptive_statistics_pop_up` not covered | Confirm `AnalysisForm` covers it | Likely already routed; verify only. |
+| `CheckVideoSeekablePopUp` | Video Processing → Utilities | ⚠ Still a gap; small one-button utility. Could be added as a fourth `Utilities` section form. |
+| `ClfByROI`, `ClfByTimebins` | Classifier → new section "Classifier × ROI / time bins" | ✓ DONE — already routed in `AnalysisForm` ("Classifier by ROI" + "Classifier by time bins"). |
+| Any `clf_descriptive_statistics_pop_up` not covered | Confirm `AnalysisForm` covers it | ✓ DONE — confirmed in `AnalysisForm` ("Classifier descriptive statistics" route). |
 
 ### Likely-already-covered gaps (need verification, not new work)
 
@@ -254,28 +256,57 @@ Tk popups that should be **deleted, not ported**:
 
 Recommended order of patches:
 
-### Tier 1 — Verification (no new code, AST audit only)
-1. **Confirm `VisualizationForm.ROUTES` covers the ~20 plot popups** in §3's "likely-already-covered" list. For each missing route, add it.
-2. **Confirm `AnalysisForm`'s dispatcher covers the ~9 analysis popups.** Add missing routes.
-3. **Confirm `ConverterForm` covers the ~15 data-conversion popups.** Add missing routes.
+### Tier 1 — Verification + dispatcher additions  ✓ DONE (patch 122bt)
 
-After Tier 1, the "unmapped" pool drops from 30 to roughly 7 genuinely missing forms.
+1. ~~**Confirm `VisualizationForm.ROUTES` covers the ~20 plot popups**~~ ✓ Verified post-122bt. Added 3 mp backends to existing routes (ROIPlot, ROIfeatureVisualizer, ClassifierValidationClips).
+2. ~~**Confirm `AnalysisForm`'s dispatcher covers the ~9 analysis popups**~~ ✓ Verified. Added 1 new route (`DirectingAnimalsToBodyPartAnalyzer`).
+3. ~~**Confirm `ConverterForm` covers the ~15 data-conversion popups**~~ ✓ Verified. Added 3 new routes (Sleap CSV, MultiDLC CSV, Labelme → DLC).
 
-### Tier 2 — Add new Qt sections (small forms, 1-3 hours each)
-4. **Video Processing → Background removal** (consolidates 2 Tk popups)
-5. **ROI → Import ROI CSV** (1 Tk popup)
-6. **ROI → Size standardiser** (1 Tk popup)
-7. **Annotation → Annotated bouts → videos** (1 Tk popup — or route through `VisualizationForm`)
-8. **Add-ons → Blob quick-check** (1 Tk popup)
-9. **Classifier → Classifier × ROI / time bins** (2 Tk popups → 1 section with mode selector)
+The "unmapped" pool dropped from ~30 to ~1 (BlobQuickChecker — see Tier 3).
 
-### Tier 3 — Substantial new Qt work
-10. **Add-ons → Unsupervised analysis** (entirely new Qt port of `UnsupervisedGUI` + cluster visualization). Large.
+### Tier 2 — New Qt sections  ✓ DONE (mostly already; verified post-122bu)
 
-### Tier 4 — Drop + cleanup
-11. **Delete Tk popups with confirmed Qt coverage** (after Tiers 1-3 finish). Mechanical bulk delete.
-12. **Migrate 25 backend importers of `mufasa.ui.tkinter_functions`** (the §3 cross-coupling problem from `tk_surface_audit.md`). Each backend module needs its embedded Tk-popup invocations replaced with Qt-form launches or refactored to be UI-free.
-13. **Drop `mufasa-tk` entry point + delete `mufasa/SimBA.py` + `mufasa/ui/` tree.**
+This tier was over-scoped in the original plan. Re-audit post-122bt shows most lanes were already covered by earlier patches:
+
+| Lane | Status | Where |
+|---|---|---|
+| **Background removal** (2 popups) | ✓ shipped patch 122bu | `forms/video_bg_removal.py` → `BackgroundRemovalForm` |
+| **ROI Import CSV** | ✓ already done | `forms/roi.py` → `ROIManageForm` (Import action) |
+| **ROI Size standardiser** | ✓ already done | `forms/roi.py` → `ROIManageForm` (Standardise action) |
+| **Annotated bouts → videos** | ✓ already done | `forms/visualizations.py` → "Annotated bouts overlay" route (`PlotAnnotatedBouts`) |
+| **Blob quick-check** | ✗ moved to Tier 3 | requires interactive viewer port — see below |
+| **Clf × ROI / time bins** | ✓ already done | `forms/analysis.py` → "Classifier by ROI" + "Classifier by time bins" routes |
+
+Net result: 1 new Qt form shipped (background removal); 4 lanes verified as already covered; 1 lane reclassified to Tier 3.
+
+### Tier 3 — Substantial new Qt work (interactive viewers)
+
+These are the **two** remaining substantive Qt ports, both involving interactive viewers rather than form-based parameter entry:
+
+#### 3a — Add-ons → Blob quick-check  ⚠ Reclassified from Tier 2
+
+`BlobQuickChecker` (mufasa/ui/blob_quick_check_interface.py, 193 lines) is **not** a simple form. It's an interactive CV2-based difference-image viewer with embedded Tk widgets (`Label` status panel, `PIL.ImageTk` for frame display, interactive frame nav). A Qt port requires:
+
+* QLabel-based frame display (replacing the PIL.ImageTk path).
+* A Qt status panel (replacing the Tk Label).
+* Slider-based frame nav (replacing the Tk Entry-Box-driven nav).
+* Threading model that keeps the CV2 image processing off the Qt GUI thread.
+
+This is **medium-sized work** (estimate: half a day to a day). Not "1-3 hours" as the original Tier 2 estimate said. Reclassified to Tier 3 alongside the Unsupervised port.
+
+Subprocess launch of the Tk tool from Qt was attempted in an earlier patch generation and reported broken on recent Tk + Wayland combinations (per the `forms/roi.py` docstring note). Don't repeat that approach.
+
+#### 3b — Add-ons → Unsupervised analysis  (unchanged from original plan)
+
+`UnsupervisedGUI` — entirely new Qt port of the unsupervised pipeline (UMAP setup, HDBSCAN setup, cluster visualization, video clip generation). Substantial; likely its own subsection within Add-ons with 4-5 sub-sections.
+
+### Tier 4 — Drop + cleanup  (unchanged)
+
+After Tier 3 completes:
+
+1. **Delete Tk popups with confirmed Qt coverage.** Mechanical bulk delete of the popups listed in §7 Appendix A.
+2. **Migrate 25 backend importers of `mufasa.ui.tkinter_functions`** (the cross-coupling problem from `tk_surface_audit.md`). Each backend module needs its embedded Tk-popup invocations replaced with Qt-form launches or refactored to be UI-free.
+3. **Drop `mufasa-tk` entry point + delete `mufasa/SimBA.py` + `mufasa/ui/` tree.**
 
 ---
 
