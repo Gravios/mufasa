@@ -201,7 +201,7 @@ Honest revised estimates:
 | Lane | Original audit said | 122ca review found | Status |
 |---|---|---|---|
 | **`VideoFiltersForm` B&W** → `video_to_bw` | 1-line rename | tiny — threshold scaling + drop `invert` field; ≈15 lines | ✓ shipped 122ca |
-| **`ROIFeaturesForm` Remove** → `ConfigReader.remove_roi_features` | ~10 lines | medium — backend's `remove_roi_features(self, data_dir)` requires a `data_dir` parameter the form doesn't currently surface | deferred |
+| **`ROIFeaturesForm` Remove** → `ConfigReader.remove_roi_features` | ~10 lines | medium — backend's `remove_roi_features(self, data_dir)` requires a `data_dir` parameter the form doesn't currently surface | ✓ shipped 122cd |
 | **`CropVideosForm` multi-crop** → `MultiCropper` | ~15 lines | medium — the form's mental model is "ONE video → MULTIPLE outputs"; `MultiCropper`'s real model is "MANY videos in folder → N crops each". Different operation; form's UX needs redesign or backend's behavior needs explaining | deferred |
 | **`DropBodypartsForm`** → `KeypointRemover` | ~10 lines | medium — constructor signature mismatch. Form expects `KeyPointRemover(config_path, body_parts, copy_originals)`. Real class is `KeypointRemover(data_folder, pose_tool, file_format)` + `.run(animal_names, bp_to_remove_list)`. Form needs config-to-data-folder resolution + selection transformation | deferred |
 
@@ -211,7 +211,7 @@ The audit underestimated complexity because it stopped at "is the backend named 
 
 ### 4b. Follow-up patches needed (medium, 1-3 hours each)
 
-5. **Redesign `ROIFeaturesForm` Remove action** to surface a `data_dir` field (or resolve a sensible default like the project's `features_extracted` directory).
+5. ~~**Redesign `ROIFeaturesForm` Remove action**~~ ✓ **DONE in patch 122cd.** Added `data_dir` QLineEdit + Browse button. Field enabled only for the Remove action; auto-populates `<project>/csv/features_extracted` as default when switching to Remove if that path exists. Dispatch rewired to instantiate `ConfigReader(read_video_info=False, create_logger=False)` and call `.remove_roi_features(data_dir=data_dir)`.
 6. **Redesign `CropVideosForm` multi-crop semantics** — either re-implement as "single video, repeated single-crop calls in a loop" to match the form's UX, or rework the form to match `MultiCropper`'s folder-mode reality.
 7. **Redesign `DropBodypartsForm`** — either:
    * Add config-to-data-folder resolution + transform `(animal, bp)` tuples to backend's split lists, OR
