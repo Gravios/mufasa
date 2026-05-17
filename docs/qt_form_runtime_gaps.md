@@ -9,7 +9,7 @@ This audit is the output of patch 122by, Path C of the post-122bw work. No fixes
 
 ## 1. Summary
 
-**Status after patches 122ca / 122cb / 122cc:** of 7 originally-counted runtime gaps, 4 have been closed (B&W, blur, brightness/contrast, AverageFrameForm). 3 form-redesign cases remain (DropBodyparts constructor mismatch, ROIFeatures Remove data_dir field, CropVideos multi-crop semantics) plus the CLAHE interactive-preview Qt-dialog port.
+**Status after patches 122ca / 122cb / 122cc / 122cd:** of 7 originally-counted runtime gaps, 5 have been closed (B&W, blur, brightness/contrast, AverageFrameForm, ROIFeatures Remove). 2 form-redesign cases remain (DropBodyparts constructor mismatch, CropVideos multi-crop semantics) plus the CLAHE interactive-preview Qt-dialog port.
 
 | Form | Failing operations | Failure mode | Status |
 |---|---|---|---|
@@ -19,7 +19,7 @@ This audit is the output of patch 122by, Path C of the post-122bw work. No fixes
 | `CropVideosForm` (video_editing.py) | Multi-crop from single video | Semantics mismatch with `MultiCropper` (folder vs single) | pending (form redesign) |
 | `AverageFrameForm` (image_conversion.py) | ~~All — every Run~~ | ~~Calls `create_average_frame`; backend is `create_average_frm`; kwargs mismatch~~ | ✓ 122cc (form rewritten) |
 | `DropBodypartsForm` (pose_cleanup.py) | All — every Run | Constructor signature mismatch with `KeypointRemover` | pending (form redesign) |
-| `ROIFeaturesForm` (roi.py) | Remove-ROI-features action | Backend needs `data_dir` field not surfaced | pending (form redesign) |
+| `ROIFeaturesForm` (roi.py) | ~~Remove-ROI-features action~~ | ~~Backend needs `data_dir` field not surfaced~~ | ✓ 122cd (field added) |
 
 Plus `VisualizationForm` raises `RuntimeError` (not `NotImplementedError`) when the project context is unavailable — that's defensive guarding, not a gap. Excluded from this audit.
 
@@ -74,15 +74,16 @@ The form has 5 operations in its dropdown; 1 of those 5 currently has a partial 
 
 **Stop-gap:** disable the form (don't register it in the page). The current state is worse than no form — users see a UI promising functionality that doesn't exist.
 
-### 2e. `ROIFeaturesForm` (roi.py) — REMOVE ACTION FAILS
+### 2e. `ROIFeaturesForm` (roi.py) — ✓ FIXED in patch 122cd
 
-The "Remove ROI features" action raises `NotImplementedError`; "Append by animal" and "Append by body-part" work.
+~~The "Remove ROI features" action raises `NotImplementedError`; "Append by animal" and "Append by body-part" work.~~
 
-**Severity: low.** The Add operations are the common use cases; Remove is rare.
+**Resolved in 122cd:** Form's Remove action rewired to call `ConfigReader.remove_roi_features(data_dir)`. The 122bz audit found the backend exists as a method on `ConfigReader` (not a free function); this patch surfaces a new `data_dir` field and dispatches correctly.
 
-**Fix scope:** medium. Port `remove_roi_features` backend from legacy branch.
-
-**Stop-gap:** remove the "Remove" option from the action dropdown until wired.
+* New `data_dir_edit` QLineEdit + Browse button. Field is enabled only when the Remove action is selected.
+* Auto-populates the default `<project>/csv/features_extracted` when switching to Remove if that directory exists.
+* `collect_args()` raises ValueError if Remove is selected but no data_dir picked, or if the path doesn't exist.
+* Dispatch instantiates `ConfigReader(config_path=config_path, read_video_info=False, create_logger=False)` to avoid the heavy startup work, then calls `.remove_roi_features(data_dir=data_dir)`.
 
 ---
 

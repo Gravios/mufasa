@@ -60,9 +60,11 @@ from typing import Any, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFormLayout, QGridLayout, QGroupBox, QLabel,
-                               QListWidget, QListWidgetItem, QSpinBox,
-                               QStackedWidget, QVBoxLayout, QWidget)
+                               QFormLayout, QGridLayout, QGroupBox,
+                               QHBoxLayout, QLabel, QLineEdit,
+                               QListWidget, QListWidgetItem,
+                               QPushButton, QSpinBox, QStackedWidget,
+                               QVBoxLayout, QWidget)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.forms.data_import import _PathField
@@ -323,8 +325,42 @@ class ROIFeaturesForm(OperationForm):
         self.append_existing.setChecked(True)
         form.addRow("", self.append_existing)
 
+        # Patch 122cd: data_dir field for the Remove action.
+        # `ConfigReader.remove_roi_features(self, data_dir)` requires
+        # an explicit directory; the default is the project's
+        # `csv/features_extracted` subdirectory if it exists.
+        self.data_dir_edit = QLineEdit(self)
+        self.data_dir_edit.setPlaceholderText(
+            "Required for Remove — defaults to "
+            "<project>/csv/features_extracted if available")
+        dd_browse = QPushButton("Browse…", self)
+        dd_browse.clicked.connect(self._browse_data_dir)
+        self._dd_row = QHBoxLayout()
+        self._dd_row.addWidget(self.data_dir_edit, 1)
+        self._dd_row.addWidget(dd_browse)
+        form.addRow("Data directory:", self._dd_row)
+
         self.body_layout.addLayout(form)
         self._on_action_changed(0)
+
+    def _browse_data_dir(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        # Start from the project's csv dir if config_path is known.
+        start = ""
+        if self.config_path:
+            import os as _os
+            cand = _os.path.join(
+                _os.path.dirname(self.config_path), "csv",
+                "features_extracted")
+            if _os.path.isdir(cand):
+                start = cand
+            else:
+                start = _os.path.dirname(self.config_path)
+        d = QFileDialog.getExistingDirectory(
+            self, "Pick the data directory for ROI feature removal",
+            start)
+        if d:
+            self.data_dir_edit.setText(d)
 
     def _on_action_changed(self, idx: int) -> None:
         action = self.ACTIONS[idx][1]
@@ -332,6 +368,17 @@ class ROIFeaturesForm(OperationForm):
         self.bp_picker.setEnabled(action == "append_bodypart")
         # "Append to existing" irrelevant for Remove
         self.append_existing.setEnabled(action != "remove")
+        # data_dir field only relevant for Remove
+        self.data_dir_edit.setEnabled(action == "remove")
+        # Auto-populate with default when switching TO remove and field
+        # is empty.
+        if action == "remove" and not self.data_dir_edit.text() and self.config_path:
+            import os as _os
+            default = _os.path.join(
+                _os.path.dirname(self.config_path), "csv",
+                "features_extracted")
+            if _os.path.isdir(default):
+                self.data_dir_edit.setText(default)
 
     def collect_args(self) -> dict:
         if not self.config_path:
@@ -346,11 +393,23 @@ class ROIFeaturesForm(OperationForm):
             args["append_existing"] = bool(self.append_existing.isChecked())
         elif action == "append_animal":
             args["append_existing"] = bool(self.append_existing.isChecked())
+        elif action == "remove":
+            dd = self.data_dir_edit.text().strip()
+            if not dd:
+                raise ValueError(
+                    "Pick a data directory to remove ROI features "
+                    "from (typically <project>/csv/features_extracted).")
+            import os as _os
+            if not _os.path.isdir(dd):
+                raise ValueError(
+                    f"Data directory not found: {dd}")
+            args["data_dir"] = dd
         return args
 
     def target(self, *, config_path: str, action: str,
                body_parts: Optional[list[str]] = None,
-               append_existing: bool = True) -> None:
+               append_existing: bool = True,
+               data_dir: Optional[str] = None) -> None:
         if action.startswith("append"):
             from mufasa.roi_tools.ROI_feature_analyzer import ROIFeatureCreator
             ROIFeatureCreator(
@@ -360,24 +419,16 @@ class ROIFeaturesForm(OperationForm):
                 append_data=append_existing,
             ).run()
         elif action == "remove":
-            # Legacy RemoveROIFeaturesPopUp had no dedicated class — it
-            # iterated the features_extracted dir and dropped ROI columns.
-            # Try a small set of known removers.
-            try:
-                from mufasa.roi_tools import remove_roi_features as _rrf
-                fn = (getattr(_rrf, "remove_roi_features", None)
-                      or getattr(_rrf, "RemoveROIFeatures", None))
-                if fn is None:
-                    raise AttributeError
-                if isinstance(fn, type):
-                    fn(config_path=config_path).run()
-                else:
-                    fn(config_path=config_path)
-            except (ImportError, AttributeError):
-                raise NotImplementedError(
-                    "Remove-ROI-features backend not found in this fork "
-                    "(looked for mufasa.roi_tools.remove_roi_features)."
-                )
+            # Patch 122cd: rewired to `ConfigReader.remove_roi_features`
+            # (per docs/backend_audit.md §2f). The method is on the
+            # ConfigReader class and requires an explicit data_dir.
+            from mufasa.mixins.config_reader import ConfigReader
+            reader = ConfigReader(
+                config_path=config_path,
+                read_video_info=False,
+                create_logger=False,
+            )
+            reader.remove_roi_features(data_dir=data_dir)
 
 
 # --------------------------------------------------------------------------- #
