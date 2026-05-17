@@ -1,0 +1,259 @@
+# Backend audit
+
+**Generated:** post-patch 122by (May 2026).
+**Purpose:** Two-part audit of backend code with two distinct cleanup interactions: (a) the "missing backends" flagged in `qt_form_runtime_gaps.md`, and (b) the backend modules that import from `mufasa.ui.tkinter_functions` and embed Tk-popup launches (blocking the Tier-4 Tk-tree deletion).
+
+**Companion docs:** `qt_form_runtime_gaps.md` (Qt form runtime gaps as observed from the form side), `tk_surface_audit.md` (per-Tk-file inventory), `tk_to_qt_consolidation_plan.md` (overall consolidation plan).
+
+---
+
+## 1. Summary
+
+| Audit topic | Items | Action class |
+|---|---:|---|
+| Unwired-backend gaps from Qt forms | 7 ops | **5 solvable by name fix / re-wiring; 2 genuinely missing** |
+| Backend modules embedding Tk UI | 25 files | Migration order: refactor / die-with-unsupervised / replace with Qt confirmation |
+
+The §1 finding is the more impactful: the 122by audit overstated the gap count by understating availability. Most "missing" backends actually exist under different names. **Five of seven failing operations are recoverable with a rewiring patch, not a backend port.**
+
+---
+
+## 2. §1 Unwired-backend gaps — revised availability
+
+For each operation that raised `NotImplementedError` in the 122by audit, look for the actual backend in `mufasa/` (excluding `ui_qt/`) by exact name, near matches, and substring scan.
+
+### 2a. `AverageFrameForm` — spelling mismatch (REVERIFIES 122by)
+
+Form calls `create_average_frame`. Real function:
+
+```
+mufasa/video_processors/video_processing.py:4045
+    def create_average_frm(video_path, start_frm=None, end_frm=None,
+                            start_time=None, end_time=None,
+                            save_path=None, verbose=False):
+```
+
+The spelling mismatch confirmed; also the kwargs mismatch (form passes `method`, `frame_stride` — backend takes window-bounds + `save_path`). **Fix scope: medium.** Rewrite form to match the actual signature. ~30 minutes plus design (decide how to surface time-window controls).
+
+### 2b. `VideoFiltersForm (Black & white)` — SOLVABLE BY RENAME
+
+Form calls `convert_to_black_and_white`. Real function:
+
+```
+mufasa/video_processors/video_processing.py
+    def video_to_bw(...)
+```
+
+Same module the form already imports. **Fix scope: tiny.** Change one identifier:
+
+```python
+# in target() branch for "black_white":
+_vp.video_to_bw(video_path=path, threshold=params["threshold"],
+                invert=params["invert"])
+```
+
+(Backend signature should be verified; the existing form params `threshold` + `invert` match a typical B&W signature.)
+
+### 2c. `VideoFiltersForm (Box / Gaussian blur)` — GENUINELY MISSING
+
+No function under any of: `convert_to_bw_blur`, `video_box_blur`, `blur_video`, `gaussian_blur_video`. **Fix scope: small-to-medium.** Either:
+
+* Port the backend from the SimBA branch (likely a small OpenCV wrapper using `cv2.boxFilter` or `cv2.GaussianBlur`), or
+* Write fresh using OpenCV: ~30 lines for a video-stream wrapper around `cv2.boxFilter` / `cv2.GaussianBlur`.
+
+### 2d. `VideoFiltersForm (Brightness/Contrast)` — GENUINELY MISSING
+
+No function under any of: `brightness_contrast_video`, `video_brightness_contrast`, `adjust_brightness_contrast`, `adjust_video`. **Fix scope: small-to-medium.** Same options as 2c: port from SimBA or write fresh (`cv2.convertScaleAbs` is the standard call).
+
+### 2e. `DropBodypartsForm` — SOLVABLE BY REWIRING TO EXISTING CLASS
+
+Form raises NotImplementedError citing missing `keypoint_dropper` module. The actual implementation:
+
+```
+mufasa/pose_processors/remove_keypoints.py
+    class KeypointRemover:
+```
+
+Already imported by the Tk side at `mufasa/ui/pop_ups/pose_bp_drop_pop_up.py`. **Fix scope: small.** Rewire the form's `target()` to instantiate `KeypointRemover` and call `.run()` (or equivalent).
+
+### 2f. `ROIFeaturesForm (Remove)` — SOLVABLE BY METHOD CALL
+
+Form raises NotImplementedError citing missing `remove_roi_features`. The function exists:
+
+```
+mufasa/mixins/config_reader.py
+    def remove_roi_features(...):  # method of ConfigReader
+```
+
+It's a method on `ConfigReader`, not a free function. The form just needs to instantiate `ConfigReader(config_path)` and call `.remove_roi_features(...)`. **Fix scope: small.**
+
+### 2g. `CropVideosForm (multi-crop)` — SOLVABLE BY REWIRING TO EXISTING CLASS
+
+Form raises NotImplementedError citing missing multi-crop backend. The actual implementation:
+
+```
+mufasa/video_processors/multi_cropper.py
+    class MultiCropper:
+```
+
+Already imported by the Tk side at `mufasa/ui/pop_ups/video_processing_pop_up.py:60`. **Fix scope: small.** Rewire the form's multi-crop branch.
+
+### 2h. Updated `qt_form_runtime_gaps.md` priorities
+
+The audit's priority recommendations stand, but the **work content differs from what was assumed**:
+
+| Op | 122by said | Reality (this audit) |
+|---|---|---|
+| AverageFrameForm | "medium rewrite" | medium rewrite (confirmed — kwarg shape changes too) |
+| VideoFiltersForm (B&W) | "medium port from SimBA" | **tiny — rename one call** |
+| VideoFiltersForm (blur) | "medium port from SimBA" | small-to-medium (genuinely missing) |
+| VideoFiltersForm (brightness/contrast) | "medium port from SimBA" | small-to-medium (genuinely missing) |
+| DropBodypartsForm | "medium-to-large port from SimBA" | **small — rewire to KeypointRemover** |
+| ROIFeaturesForm (Remove) | "medium port from SimBA" | **small — call existing ConfigReader method** |
+| CropVideosForm (multi-crop) | "small" | small (confirmed — rewire to MultiCropper) |
+
+**Five of seven failing operations are fixable in well under an hour each.** The remaining two (blur + brightness) need ~30 minutes each of new OpenCV code. This is much smaller than the 122by audit estimated.
+
+---
+
+## 3. §2 Backend modules with embedded Tk UI
+
+25 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import from `mufasa.ui.tkinter_functions`. These block Tier-4 cleanup because removing `tkinter_functions.py` would break them.
+
+### 3a. Inventory by category
+
+```
+unsupervised/  (13 files)   — the entire unsupervised module
+labelling/     (2 files)    — frame labelling + standard_labeller
+mixins/        (3 files)    — annotator_mixin, pop_up_mixin, train_model_mixin
+roi_tools/     (2 files)    — roi_ruler, roi_ui_mixin
+bounding_box_tools/ (1)     — boundary_menus
+cue_light_tools/   (1)      — cue_light_main_popup
+video_processors/  (2)      — batch_process_menus, video_processing
+```
+
+### 3b. Migration disposition
+
+#### Group A: dies with Tier 3b (Unsupervised port) — **13 files**
+
+All 13 `unsupervised/` files import Tk only to render the legacy unsupervised UI (`UnsupervisedGUI` + its sub-popups: dim-reduction, cluster fitting, validation, visualization, comparison, XAI, data extraction). When Tier 3b ships the Qt port of the unsupervised pipeline, this whole subtree gets deleted. No per-file migration work; the entire `unsupervised/pop_ups/` directory plus `unsupervised/unsupervised_main.py` go away in one delete.
+
+#### Group B: tightly-coupled UI + backend, needs refactor — **5 files**
+
+These define classes/functions where the Tk UI is mixed with backend logic — refactoring is required before the Tk import can be removed.
+
+| File | Tk symbols imported | Migration |
+|---|---|---|
+| `mixins/pop_up_mixin.py` | `DropDownMenu`, `Entry_Box`, `FileSelect`, `SimbaButton`, `hxtScrollbar` | Foundation class for ~85 Tk popups. Delete with Tier 4 once popups are gone. |
+| `mixins/annotator_mixin.py` | `Entry_Box` | Used by `mufasa/labelling/`. Replace `Entry_Box` with a Qt or backend-pure equivalent. |
+| `mixins/train_model_mixin.py` | `TwoOptionQuestionPopUp` | Single yes/no confirmation. Replace with `QMessageBox.question` or a backend-side `bool` parameter. |
+| `labelling/labelling_interface.py` | `CreateLabelFrameWithIcon`, `Entry_Box`, `SimBALabel`, `SimbaButton`, `SimbaCheckbox` | Labelling UI itself — the whole interface needs a Qt port (similar shape to `blob_quick_check`: parameter form + interactive viewer dialog). |
+| `labelling/standard_labeller.py` | Same as above | Sibling labeller — should be ported alongside. |
+
+#### Group C: backend-launches-popup, simple refactor — **5 files**
+
+These are backend modules that fire a Tk popup as part of an operation (e.g., a confirmation, an interactive parameter setter). The backend logic itself is fine; just the popup invocation needs to go.
+
+| File | Tk symbols imported | Migration |
+|---|---|---|
+| `video_processors/video_processing.py` | `TwoOptionQuestionPopUp` | Replace with `QMessageBox.question`. Or split: backend takes a `confirm_callback` parameter; Tk version supplies the popup, Qt version supplies a dialog. |
+| `cue_light_tools/cue_light_main_popup.py` | `CreateLabelFrameWithIcon`, `MufasaDropDown`, `SimBALabel`, `SimbaButton` | This is the launcher that's already replaced by the Add-ons Cue-light forms in the Qt workbench. Drop it. |
+| `roi_tools/roi_ruler.py` | `SimBALabel` | Read the code — the SimBALabel is probably a status display for the ruler. Refactor: emit a callback signal that callers can route to Qt or Tk. |
+| `roi_tools/roi_ui_mixin.py` | `CreateLabelFrameWithIcon`, `DropDownMenu`, `Entry_Box`, `MufasaDropDown`, `SimBALabel`, …5 more | Mixin used by `mufasa/ui/pop_ups/roi_*`. Replaced by the Qt ROI surface (`ROIManageForm` + `ROIDefinePanel`). Drop. |
+| `bounding_box_tools/boundary_menus.py` | `CreateLabelFrameWithIcon`, `DropDownMenu`, `Entry_Box` | Boundary box menu Tk surface. Status: not surfaced in the Qt workbench yet (no `BoundingBoxForm` exists). Either port to Qt or accept removal as a Tk-only feature loss. |
+
+#### Group D: build infrastructure, low priority — **2 files**
+
+| File | Tk symbols imported | Migration |
+|---|---|---|
+| `video_processors/batch_process_menus.py` | `CreateLabelFrameWithIcon`, `Entry_Box`, `MufasaDropDown`, `MufasaSeparator`, `SimBALabel`, …2 more | Batch processing menu surface, Tk-only. Should be ported into the Qt workbench as a "Batch processing" page or absorbed into existing Video Processing forms. Substantial work. |
+
+### 3c. Most-imported Tk symbols
+
+| Symbol | Importers | Replacement strategy |
+|---|---:|---|
+| `DropDownMenu` | 14 | `QComboBox` |
+| `Entry_Box` | 11 | `QLineEdit` / `QSpinBox` |
+| `FileSelect` | 11 | `QFileDialog.getOpenFileName` (or a small Qt wrapper widget) |
+| `FolderSelect` | 9 | `QFileDialog.getExistingDirectory` |
+| `CreateLabelFrameWithIcon` | 6 | `QGroupBox` + label |
+| `SimbaButton` | 6 | `QPushButton` |
+| `SimBALabel` | 6 | `QLabel` |
+| `MufasaDropDown` | 3 | `QComboBox` (or the Qt port at `ui_qt/widgets.py`) |
+| `SimbaCheckbox` | 3 | `QCheckBox` |
+| `TwoOptionQuestionPopUp` | 2 | `QMessageBox.question` |
+| `hxtScrollbar` | 2 | `QScrollArea` |
+
+The 1-to-1 Qt equivalents are well-known. The real friction is the backend ↔ UI coupling in Group B + C — once those refactors are done, the symbol substitution is mechanical.
+
+---
+
+## 4. §3 Combined cleanup plan
+
+Recommended order:
+
+### 4a. Quick wins (small fixes, < 1 hour each)
+
+These ship runtime improvements with minimal risk:
+
+1. **Rewire `DropBodypartsForm.target()`** → `KeypointRemover`. ~10 lines change.
+2. **Rewire `ROIFeaturesForm` Remove action** → `ConfigReader.remove_roi_features`. ~10 lines change.
+3. **Rewire `CropVideosForm` multi-crop branch** → `MultiCropper`. ~15 lines change.
+4. **Fix `VideoFiltersForm` B&W branch** → `video_to_bw`. 1-line identifier change.
+
+After these 4 patches: 4 of 7 failing ops are fixed; only the genuinely-missing 2 (blur, brightness) + the kwarg-shape AverageFrameForm remain.
+
+### 4b. Medium fixes (1-3 hours each)
+
+5. **Rewrite `AverageFrameForm`** to match `create_average_frm` signature. Drop `method`/`frame_stride`; add window controls.
+6. **Port box-blur backend** to `mufasa/video_processors/video_processing.py`. Wire into `VideoFiltersForm`.
+7. **Port brightness/contrast backend** to `mufasa/video_processors/video_processing.py`. Wire into `VideoFiltersForm`.
+
+After these: all 7 form runtime gaps closed.
+
+### 4c. Backend-Tk-coupling decoupling (per-file)
+
+Order suggested:
+
+8. **`video_processors/video_processing.py`** — replace `TwoOptionQuestionPopUp` import. This file is fundamental backend code; getting Tk out of it removes a heavy coupling.
+9. **`mixins/train_model_mixin.py`** — same `TwoOptionQuestionPopUp` replacement.
+10. **`roi_tools/roi_ruler.py`** — refactor `SimBALabel` use into a callback.
+11. **`mixins/annotator_mixin.py`** — refactor `Entry_Box` use.
+
+### 4d. Bulk-drop (after Tier 3b)
+
+12. **Drop `mufasa/unsupervised/pop_ups/`** + unsupervised_main.py (13 files) — handled by Tier 3b.
+13. **Drop `cue_light_tools/cue_light_main_popup.py`** — superseded by Qt Cue-light forms.
+14. **Drop `roi_tools/roi_ui_mixin.py`** — superseded by Qt ROI surface.
+15. **Drop `mixins/pop_up_mixin.py`** — once no Tk popups remain.
+
+### 4e. Last items (Tier 4 close-out)
+
+16. **`labelling/labelling_interface.py` + `standard_labeller.py`** — Qt port of the labelling UI. Substantial.
+17. **`video_processors/batch_process_menus.py`** — Qt port or accept removal.
+18. **`bounding_box_tools/boundary_menus.py`** — Qt port or accept removal.
+
+After 4a-4e: `mufasa/ui/tkinter_functions.py` is unreachable; can be deleted, completing the Tier 4 cleanup.
+
+---
+
+## 5. §4 Audit methodology
+
+Two AST-based passes; both reproducible.
+
+**Pass 1 (unwired backend search):** for each form's failing operation, search the codebase (excluding `ui_qt/`) for the literal name plus near-name variants. Top-level `def` and `class` matches are "exact"; substring matches in any line are "near".
+
+**Pass 2 (Tk-importer scan):** every `.py` under `mufasa/` excluding `ui/`, `ui_qt/`, and `SimBA.py` is parsed; any `from mufasa.ui.tkinter_functions import …` is collected with its imported symbols. Aggregation by directory gives the disposition categories.
+
+Both scripts are inlined in patch 122bz's commit message (and reproducible by anyone with the codebase open).
+
+---
+
+## 6. Caveats
+
+* **The "near match" search uses 4–5 candidate names per failing op.** A backend named in a completely unexpected way (e.g., `bw_video_creator` for `video_to_bw`) might be missed. The fact that 5 of 7 *did* turn up under reasonable guesses suggests the search space wasn't too narrow, but the genuinely-missing 2 (blur, brightness) might exist somewhere I didn't think to look.
+* **Method-on-class vs free function ambiguity.** `remove_roi_features` is a method of `ConfigReader`. The AST scan picks it up as a `FunctionDef` named `remove_roi_features` regardless. Callers need to instantiate the class first — not a drop-in replacement for a free function.
+* **Group C "drop" recommendations** (in §3b) assume the Qt surface is feature-complete for the corresponding Tk code path. Each one needs a runtime check on the Qt workbench before deletion — same caveat as `tk_surface_audit.md`.
+* **`video_processors/video_processing.py` imports `TwoOptionQuestionPopUp` from the Tk layer.** That's a backend file with a heavy Tk dependency. Decoupling is high priority because this file is used by 25+ other backend modules; the Tk import propagates virally.
+* **The 25 importer count is post-122br.** Future refactors that introduce or remove Tk imports will shift the number; the §2 numbers in `tk_surface_audit.md` may need refreshing periodically.
+* **No backend functional verification.** This audit confirms names exist; it doesn't confirm the existing functions are correct, complete, or even runnable. The "tiny fix — just rename the call" claim in §2b assumes `video_to_bw` actually produces a B&W video; a real test would confirm.
