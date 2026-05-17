@@ -203,7 +203,7 @@ Honest revised estimates:
 | **`VideoFiltersForm` B&W** → `video_to_bw` | 1-line rename | tiny — threshold scaling + drop `invert` field; ≈15 lines | ✓ shipped 122ca |
 | **`ROIFeaturesForm` Remove** → `ConfigReader.remove_roi_features` | ~10 lines | medium — backend's `remove_roi_features(self, data_dir)` requires a `data_dir` parameter the form doesn't currently surface | ✓ shipped 122cd |
 | **`CropVideosForm` multi-crop** → `MultiCropper` | ~15 lines | medium — the form's mental model is "ONE video → MULTIPLE outputs"; `MultiCropper`'s real model is "MANY videos in folder → N crops each". Different operation; form's UX needs redesign or backend's behavior needs explaining | deferred |
-| **`DropBodypartsForm`** → `KeypointRemover` | ~10 lines | medium — constructor signature mismatch. Form expects `KeyPointRemover(config_path, body_parts, copy_originals)`. Real class is `KeypointRemover(data_folder, pose_tool, file_format)` + `.run(animal_names, bp_to_remove_list)`. Form needs config-to-data-folder resolution + selection transformation | deferred |
+| **`DropBodypartsForm`** → `KeypointRemover` | ~10 lines | medium — constructor signature mismatch. Form expects `KeyPointRemover(config_path, body_parts, copy_originals)`. Real class is `KeypointRemover(data_folder, pose_tool, file_format)` + `.run(animal_names, bp_to_remove_list)`. Form needs config-to-data-folder resolution + selection transformation | ✓ shipped 122ce |
 
 **Net 122ca outcome:** 1 of 7 runtime gaps closed (B&W). The other 3 from this list need follow-up patches with form-side changes, not just dispatch rewires.
 
@@ -213,9 +213,7 @@ The audit underestimated complexity because it stopped at "is the backend named 
 
 5. ~~**Redesign `ROIFeaturesForm` Remove action**~~ ✓ **DONE in patch 122cd.** Added `data_dir` QLineEdit + Browse button. Field enabled only for the Remove action; auto-populates `<project>/csv/features_extracted` as default when switching to Remove if that path exists. Dispatch rewired to instantiate `ConfigReader(read_video_info=False, create_logger=False)` and call `.remove_roi_features(data_dir=data_dir)`.
 6. **Redesign `CropVideosForm` multi-crop semantics** — either re-implement as "single video, repeated single-crop calls in a loop" to match the form's UX, or rework the form to match `MultiCropper`'s folder-mode reality.
-7. **Redesign `DropBodypartsForm`** — either:
-   * Add config-to-data-folder resolution + transform `(animal, bp)` tuples to backend's split lists, OR
-   * Rework the form to surface `data_folder` directly (matching the Tk popup's UX).
+7. ~~**Redesign `DropBodypartsForm`**~~ ✓ **DONE in patch 122ce.** Took the "add resolution + transform" path (Option A): the form is project-aware so we keep that mental model. Added a `data_folder` QLineEdit (auto-defaults to `<project>/csv/input_csv`); added a status label showing inferred `pose_tool` (DLC for 1 animal, maDLC for >1) and `file_format` from project metadata; dropped the misleading `copy_originals` checkbox (the backend always writes to a new `Reorganized_bp_<datetime>` subdirectory). Dispatch transforms the form's `[(animal, bp), ...]` selection into the backend's split `animal_names` + `bp_to_remove_list` lists.
 8. ~~**Rewrite `AverageFrameForm`**~~ ✓ **DONE in patch 122cc.** Form rewritten to match `create_average_frm` signature: dropped `method` (Mean/Median) and `stride` fields (backend doesn't support); added a window-mode selector (Whole video / Frame range / Time range) via QStackedWidget; added an optional save-path field that defaults to a timestamped name alongside source.
 
 ### 4c. Medium fixes — genuinely missing backends (port from SimBA or write fresh)

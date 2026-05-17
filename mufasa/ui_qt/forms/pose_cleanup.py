@@ -512,16 +512,35 @@ class OutlierSettingsForm(OperationForm):
 # DropBodypartsForm
 # --------------------------------------------------------------------------- #
 class DropBodypartsForm(OperationForm):
-    """Remove selected body-parts from pose CSVs project-wide.
+    """Remove selected body-parts from pose CSVs / H5s project-wide.
 
     Useful when a late analytic decision rules out a tracked body-part
     (e.g. tail-tip too unreliable; drop it before feature extraction).
+
+    Patch 122ce: rewritten to call the actual backend
+    :class:`mufasa.pose_processors.remove_keypoints.KeypointRemover`.
+    The legacy form looked for a non-existent
+    ``KeyPointRemover(config_path, body_parts, copy_originals)`` in
+    ``mufasa.data_processors.keypoint_dropper``; the real class is
+    ``KeypointRemover(data_folder, pose_tool, file_format)`` plus
+    ``.run(animal_names, bp_to_remove_list)``. See
+    :doc:`backend_audit` §2e for the discovery.
+
+    The ``copy_originals`` checkbox was removed because it was
+    misleading: ``KeypointRemover.run()`` always writes to a new
+    ``Reorganized_bp_<datetime>`` subdirectory of the source folder;
+    originals are never overwritten regardless of any checkbox state.
+
+    Replaces :class:`DropTrackingDataPopUp`.
     """
 
     title = "Drop body-parts from pose data"
-    description = ("Remove selected body-parts from every CSV in the "
-                   "project's input directory. Irreversible unless you "
-                   "keep originals.")
+    description = (
+        "Remove selected body-parts from every pose-data file in a "
+        "directory. Output is written to a new "
+        "<source>/Reorganized_bp_<timestamp> subdirectory; originals "
+        "are not touched."
+    )
 
     def build(self) -> None:
         outer = QVBoxLayout()
@@ -535,9 +554,29 @@ class DropBodypartsForm(OperationForm):
         ))
         outer.addWidget(self.bp_list)
 
-        self.copy_originals = QCheckBox("Copy originals before overwriting", self)
-        self.copy_originals.setChecked(True)
-        outer.addWidget(self.copy_originals)
+        # Patch 122ce: data folder field for the backend's data_folder
+        # parameter. Auto-defaults to <project>/csv/input_csv if it
+        # exists (the canonical legacy pose-input directory).
+        self.data_folder_edit = QLineEdit(self)
+        self.data_folder_edit.setPlaceholderText(
+            "Pose-data directory — defaults to "
+            "<project>/csv/input_csv if available")
+        df_browse = QPushButton("Browse…", self)
+        df_browse.clicked.connect(self._browse_data_folder)
+        df_row = QHBoxLayout()
+        df_row.addWidget(QLabel("Data folder:", self))
+        df_row.addWidget(self.data_folder_edit, 1)
+        df_row.addWidget(df_browse)
+        outer.addLayout(df_row)
+
+        # Status: show inferred pose_tool + file_type so the user
+        # knows what the backend will see.
+        self._status_lbl = QLabel("", self)
+        self._status_lbl.setStyleSheet("color: gray; font-style: italic;")
+        outer.addWidget(self._status_lbl)
+
+        # Populate default + status on first build
+        self._refresh_defaults()
 
         self.body_layout.addLayout(outer)
 
@@ -555,38 +594,92 @@ class DropBodypartsForm(OperationForm):
                 item.setData(Qt.UserRole, (animal, bp))
                 self.bp_list.addItem(item)
 
+    def _browse_data_folder(self) -> None:
+        start = self._default_data_folder() or (
+            os.path.dirname(self.config_path) if self.config_path else "")
+        d = QFileDialog.getExistingDirectory(
+            self, "Pick the pose-data directory", start)
+        if d:
+            self.data_folder_edit.setText(d)
+
+    def _default_data_folder(self) -> Optional[str]:
+        """Return <project>/csv/input_csv if it exists, else None."""
+        if not self.config_path:
+            return None
+        cand = os.path.join(
+            os.path.dirname(self.config_path), "csv", "input_csv")
+        return cand if os.path.isdir(cand) else None
+
+    def _refresh_defaults(self) -> None:
+        """Pre-fill the data_folder field + status note based on
+        the loaded project."""
+        if not self.config_path:
+            self._status_lbl.setText("(no project loaded)")
+            return
+        default = self._default_data_folder()
+        if default and not self.data_folder_edit.text():
+            self.data_folder_edit.setText(default)
+        # Infer pose_tool + file_type for the status line.
+        try:
+            from mufasa.project_layout import (
+                project_metadata_from_config)
+            meta = project_metadata_from_config(self.config_path)
+            pose_tool = ("maDLC" if int(meta.get("animal_count", 1)) > 1
+                         else "DLC")
+            file_type = meta.get("file_type", "csv")
+            self._status_lbl.setText(
+                f"Inferred from project: pose_tool={pose_tool}, "
+                f"file_format={file_type}.")
+        except Exception as exc:
+            self._status_lbl.setText(
+                f"(could not infer project metadata: {exc})")
+
     def collect_args(self) -> dict:
         if not self.config_path:
             raise RuntimeError("No project loaded.")
-        selected = [it.data(Qt.UserRole) for it in self.bp_list.selectedItems()]
+        selected = [it.data(Qt.UserRole)
+                    for it in self.bp_list.selectedItems()]
         if not selected:
             raise ValueError("No body-parts selected.")
+        data_folder = self.data_folder_edit.text().strip()
+        if not data_folder:
+            raise ValueError(
+                "Pick a pose-data directory (typically "
+                "<project>/csv/input_csv).")
+        if not os.path.isdir(data_folder):
+            raise ValueError(
+                f"Data folder not found: {data_folder}")
         return {
-            "config_path":    self.config_path,
-            "to_drop":        selected,
-            "copy_originals": bool(self.copy_originals.isChecked()),
+            "config_path": self.config_path,
+            "data_folder": data_folder,
+            "to_drop":     selected,
         }
 
-    def target(self, *, config_path: str,
-               to_drop: list[tuple[str, str]],
-               copy_originals: bool) -> None:
-        # The legacy popup used a `KeyPointRemover` / `drop_bp_cords`
-        # helper. In this fork that helper lives in
-        # mufasa.data_processors.keypoint_dropper or
-        # mufasa.utils.read_write depending on branch; try a small set.
-        try:
-            from mufasa.data_processors import keypoint_dropper as _kd
-            _kd.KeyPointRemover(
-                config_path=config_path,
-                body_parts=to_drop,
-                copy_originals=copy_originals,
-            ).run()
-        except ImportError:
-            raise NotImplementedError(
-                "Drop-body-parts backend (keypoint_dropper) is not present "
-                "in this fork. Install from the legacy SimBA branch or "
-                "patch with the copy-out / column-drop function."
-            )
+    def target(self, *, config_path: str, data_folder: str,
+               to_drop: list[tuple[str, str]]) -> None:
+        # Patch 122ce: wires to KeypointRemover. The form's
+        # `[(animal, bp), ...]` selection maps to the backend's
+        # split `animal_names` + `bp_to_remove_list` lists.
+        # The backend zips these together for maDLC (lock-step
+        # pairs); for DLC it ignores animal_names and uses
+        # bp_to_remove_list to drop columns at multi-index level 1.
+        from mufasa.pose_processors.remove_keypoints import (
+            KeypointRemover,
+        )
+        from mufasa.project_layout import project_metadata_from_config
+
+        meta = project_metadata_from_config(config_path)
+        pose_tool = ("maDLC" if int(meta.get("animal_count", 1)) > 1
+                     else "DLC")
+        file_format = meta.get("file_type", "csv")
+        animal_names = [a for (a, _bp) in to_drop]
+        bp_to_remove_list = [bp for (_a, bp) in to_drop]
+        KeypointRemover(
+            data_folder=data_folder,
+            pose_tool=pose_tool,
+            file_format=file_format,
+        ).run(animal_names=animal_names,
+              bp_to_remove_list=bp_to_remove_list)
 
 
 # --------------------------------------------------------------------------- #

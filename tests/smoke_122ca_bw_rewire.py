@@ -149,8 +149,11 @@ def main() -> int:
              or "video_to_bw" in audit_text),
     )
     check(
-        "backend_audit.md §4a marks the other 3 quick wins as deferred",
-        audit_text.count("deferred") >= 3,
+        "backend_audit.md §4a documents 122ca's narrow scope decision",
+        # The count of 'deferred' entries shrinks as follow-up patches
+        # land. Pin only on the unchanging §4a header that records
+        # 122ca's narrow-scope revision.
+        "REVISED post-patch 122ca" in audit_text,
     )
 
     gaps_text = (REPO_ROOT / "docs" / "qt_form_runtime_gaps.md").read_text()
