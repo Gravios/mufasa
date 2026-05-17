@@ -32,6 +32,7 @@ from mufasa.ui_qt.forms.addons import (BlobTrackerInitLauncher,
                                        CueLightVisualizerForm, KleinbergForm,
                                        MutualExclusivityForm, PupRetrievalForm,
                                        SpontaneousAlternationForm)
+from mufasa.ui_qt.forms.blob_quick_check import BlobQuickCheckForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
@@ -52,6 +53,10 @@ def build_addons_page(workbench,
     page.add_section("Pup retrieval",                    [(PupRetrievalForm, {})])
     page.add_section("Spontaneous alternation",          [(SpontaneousAlternationForm, {})])
     page.add_section("Blob tracker — initialise",        [(BlobTrackerInitLauncher, {})])
+    # Patch 122bw (Tier 3a): Qt port of the legacy Tk
+    # BlobQuickChecker. Lets users preview the threshold-difference
+    # image before committing to a full blob-tracking run.
+    page.add_section("Blob quick-check",                  [(BlobQuickCheckForm, {})])
 
     # Tools-menu action: change playback speed — one-shot, file-picker-only
     _register_change_speed_action(workbench)
