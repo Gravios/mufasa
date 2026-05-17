@@ -269,6 +269,26 @@ ROUTES: list[_Route] = [
                     "video_path": "video_dir"},
         common_flags={"greyscale", "clahe", "verbose"},
     ),
+    # Patch 122bt: SLEAP CSV variant — sibling of the .slp / H5 routes.
+    _Route(
+        "SLEAP (CSV)", "YOLO keypoints",
+        source_kind="dir",
+        needs_video=True,
+        extras_key="yolo",
+        backend=_lazy("mufasa.third_party_label_appenders.transform.sleap_csv_to_yolo", "Sleap2Yolo"),
+        kwargs_map={"source_path": "data_dir", "save_path": "save_dir",
+                    "video_path": "video_dir"},
+        common_flags={"greyscale", "clahe", "verbose"},
+    ),
+    # Patch 122bt: multi-animal DLC source (CSV/folder, not H5).
+    _Route(
+        "DLC (multi-animal CSV)", "YOLO keypoints",
+        source_kind="dir",
+        extras_key="yolo",
+        backend=_lazy("mufasa.third_party_label_appenders.transform.dlc_multi_to_yolo", "MultiDLC2Yolo"),
+        kwargs_map={"source_path": "dlc_dir", "save_path": "save_dir"},
+        common_flags={"greyscale", "clahe", "verbose"},
+    ),
     # ---------------- SimBA source ---------------- #
     _Route(
         "SimBA / Mufasa project", "YOLO keypoints",
@@ -321,6 +341,17 @@ ROUTES: list[_Route] = [
         ),
         kwargs_map={"source_path": "labelme_dir", "save_path": "img_dir"},
         common_flags={"greyscale"},
+    ),
+    # Patch 122bt: Labelme → DLC (reverse of DLC → Labelme above).
+    # Only converter that goes back to DLC format; useful when
+    # iterating on annotations in Labelme and reimporting to DLC.
+    _Route(
+        "Labelme (keypoints)", "DLC",
+        source_kind="dir",
+        extras_key="none",
+        backend=_lazy("mufasa.third_party_label_appenders.transform.labelme_to_dlc", "Labelme2DLC"),
+        kwargs_map={"source_path": "labelme_dir", "save_path": "save_dir"},
+        common_flags={"greyscale", "clahe", "verbose"},
     ),
 ]
 

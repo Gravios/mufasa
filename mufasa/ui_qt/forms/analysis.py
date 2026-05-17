@@ -306,6 +306,20 @@ ROUTES: list[_AnalysisRoute] = [
             ("nose_name",                       "str",  "Nose"),
         ],
     ),
+    # Patch 122bt: companion analyzer route — directing toward a
+    # body-part (instead of toward another animal). Backend takes
+    # only config_path; the body-part configuration is read from
+    # the project's directing-settings (set via the dedicated
+    # settings popup or project config).
+    _AnalysisRoute(
+        label="Directing toward body-part — statistics",
+        backend_sp=_lazy_factory(
+            "mufasa.data_processors.directing_animal_to_bodypart",
+            "DirectingAnimalsToBodyPartAnalyzer",
+        ),
+        needs=set(),
+        extras=[],
+    ),
 ]
 
 

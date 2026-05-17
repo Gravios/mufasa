@@ -575,6 +575,10 @@ ROUTES: list[_VizRoute] = [
         scope_kind="project",
         backend_sp=_lazy_factory("mufasa.plotting.clf_validator",
                                  "ClassifierValidationClips"),
+        # Patch 122bt: mp variant exists and is interface-compatible;
+        # adding here so users with multiple cores get parallel runs.
+        backend_mp=_lazy_factory("mufasa.plotting.clf_validator_mp",
+                                 "ClassifierValidationClipsMultiprocess"),
         extras=[
             ("clf_name",      "str",   ""),
             ("window",        "int",   5, 1, 60),
@@ -719,6 +723,9 @@ ROUTES: list[_VizRoute] = [
         scope_kind="file",
         backend_sp=_lazy_factory("mufasa.plotting.roi_plotter",
                                  "ROIPlotter"),
+        # Patch 122bt: mp variant exists and is interface-compatible.
+        backend_mp=_lazy_factory("mufasa.plotting.roi_plotter_mp",
+                                 "ROIPlotMultiprocess"),
         needs_video=True,
         extras=[
             # Patch 122be: native "list" kind — was a singular
@@ -741,6 +748,11 @@ ROUTES: list[_VizRoute] = [
         backend_sp=_lazy_factory(
             "mufasa.plotting.ROI_feature_visualizer",
             "ROIfeatureVisualizer",
+        ),
+        # Patch 122bt: mp variant exists and is interface-compatible.
+        backend_mp=_lazy_factory(
+            "mufasa.plotting.ROI_feature_visualizer_mp",
+            "ROIfeatureVisualizerMultiprocess",
         ),
         needs_video=True,
         extras=[
