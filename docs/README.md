@@ -31,6 +31,11 @@ Read this when you're working on the codebase itself, planning a migration patch
 
 Read this when planning UI work or considering a SimBA → Mufasa rename in Tk-only code (short answer: don't — it's slated for removal).
 
+### `tk_to_qt_consolidation_plan.md`
+**Comprehensive redesign mapping every Tk popup to its Qt destination.** Lays out the target Qt workbench layout, maps the ~85 Tk popups to existing Qt forms or proposed new sections, identifies the ~7 genuine gaps that need new Qt work, and orders the migration into four tiers (verify → small new sections → unsupervised port → drop + cleanup).
+
+Read this when planning the next porting patch — it tells you what's left to build and what's already covered (existing Qt is further along than the AST audit alone suggests).
+
 ---
 
 ## Kalman smoother — design track
