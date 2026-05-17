@@ -9,14 +9,14 @@ This audit is the output of patch 122by, Path C of the post-122bw work. No fixes
 
 ## 1. Summary
 
-**Status after patches 122ca / 122cb / 122cc / 122cd / 122ce:** of 7 originally-counted runtime gaps, 6 have been closed (B&W, blur, brightness/contrast, AverageFrameForm, ROIFeatures Remove, DropBodyparts). 1 form-redesign case remains (CropVideos multi-crop semantics) plus the CLAHE interactive-preview Qt-dialog port.
+**Status after patches 122ca / 122cb / 122cc / 122cd / 122ce / 122cf:** all 7 originally-counted runtime gaps closed. The only remaining `NotImplementedError` raise is the CLAHE interactive-preview Qt-dialog port, which was always tracked separately as a partial-failure case (the main CLAHE op works; only the interactive preview checkbox is unwired).
 
 | Form | Failing operations | Failure mode | Status |
 |---|---|---|---|
 | `VideoFiltersForm` (video_filters.py) | ~~Black & white~~ | ~~Backend functions not present in this fork~~ | ✓ 122ca |
 | `VideoFiltersForm` | ~~Box blur~~, ~~Brightness/contrast~~ | ~~Backend functions not present~~ | ✓ 122cb (new FFmpeg backends) |
-| `VideoFiltersForm` | CLAHE with "Interactive preview" checked | Dialog not yet wired | pending |
-| `CropVideosForm` (video_editing.py) | Multi-crop from single video | Semantics mismatch with `MultiCropper` (folder vs single) | pending (form redesign) |
+| `VideoFiltersForm` | CLAHE with "Interactive preview" checked | Dialog not yet wired | pending (partial — main op works) |
+| `CropVideosForm` (video_editing.py) | ~~Multi-crop from single video~~ | ~~Semantics mismatch with `MultiCropper`~~ | ✓ 122cf (loops ROISelector + crop_video directly) |
 | `AverageFrameForm` (image_conversion.py) | ~~All — every Run~~ | ~~Calls `create_average_frame`; backend is `create_average_frm`; kwargs mismatch~~ | ✓ 122cc (form rewritten) |
 | `DropBodypartsForm` (pose_cleanup.py) | ~~All — every Run~~ | ~~Constructor signature mismatch with `KeypointRemover`~~ | ✓ 122ce (form rewritten) |
 | `ROIFeaturesForm` (roi.py) | ~~Remove-ROI-features action~~ | ~~Backend needs `data_dir` field not surfaced~~ | ✓ 122cd (field added) |
@@ -58,13 +58,17 @@ The form has 5 operations in its dropdown; 1 of those 5 currently has a partial 
 
 **Stop-gap (no backend work):** disable the two remaining failing options in the dropdown until they're wired. Same posture as before; the broken-options scope just shrank by one.
 
-### 2c. `CropVideosForm` (video_editing.py) — 1 OPERATION FAILS
+### 2c. `CropVideosForm` (video_editing.py) — ✓ FIXED in patch 122cf
 
-`Multi-crop from a single video` is the failing sub-mode. Other sub-modes (rect / circle / polygon, single + directory) work.
+~~`Multi-crop from a single video` is the failing sub-mode. Other sub-modes (rect / circle / polygon, single + directory) work.~~
 
-**Fix scope:** small. The Tk source `MultiCropPopUp` exists with the backend already wired; just needs the corresponding Qt path completed.
+**Resolved in 122cf:** Single-video multi-crop now works. The form loops the existing `ROISelector` + `crop_video` primitives directly — NOT `MultiCropper` (which is folder-mode by nature and incompatible with the form's "one video → many outputs" UX). New `crop_count` QSpinBox surfaces how many regions to capture (2–20, default 2).
 
-**Docstring inconsistency:** the `CropVideosForm` docstring doesn't reference its replaced Tk popups by `:class:` name like the other forms do. Should list `CropVideoPopUp`, `CropVideoCirclesPopUp`, `CropVideoPolygonsPopUp`, `MultiCropPopUp` so future readers know which Tk surface this absorbs.
+Output filenames: `<source_basename>_crop1.mp4`, `<source_basename>_crop2.mp4`, ..., `<source_basename>_cropN.mp4`. If files with these names already exist from a previous Run, a timestamp suffix is appended to avoid the `crop_video` backend's clobber-guard.
+
+Multi-crop is disabled (and the checkbox uncheck-forced) for the circle / polygon shapes and for directory-mode scope. Status enforced via `_refresh_multi_state` reacting to shape / scope / checkbox changes.
+
+The original `CropVideosForm` docstring also gets a docstring-side update via the unchanged Patch-122by "Known gap" pointer — replaced with a "Resolved in 122cf" pointer.
 
 ### 2d. `DropBodypartsForm` (pose_cleanup.py) — ✓ FIXED in patch 122ce
 

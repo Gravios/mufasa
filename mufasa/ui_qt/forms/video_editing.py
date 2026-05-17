@@ -62,9 +62,14 @@ class CropVideosForm(OperationForm):
     what's already wired to the crop backends, and reproducing it in
     Qt would be scope creep with no user-visible benefit.
 
-    **Known gap (patch 122by audit):** the multi-crop branch raises
-    `NotImplementedError` — backend wiring is pending. See
-    `docs/qt_form_runtime_gaps.md` §2c.
+    **Patch 122cf:** the multi-crop branch is now wired. Loops the
+    existing ``ROISelector`` + ``crop_video`` primitives directly
+    (NOT ``MultiCropper`` — that's folder-mode by nature and
+    incompatible with this form's "one video → many outputs" UX).
+    New ``crop_count`` spinbox surfaces how many regions to capture
+    per Run. Multi-crop is gated to rectangle-shape + single-file
+    scope; the checkbox auto-unchecks when shape or scope changes
+    to incompatible values.
     """
 
     title = "Crop video(s)"
@@ -83,27 +88,60 @@ class CropVideosForm(OperationForm):
 
         self.shape_cb = QComboBox(self)
         self.shape_cb.addItems(self.SHAPES)
+        self.shape_cb.currentIndexChanged.connect(self._refresh_multi_state)
         form.addRow("Crop shape:", self.shape_cb)
 
         self.multicrop = QCheckBox(
             "Multi-crop (one video → multiple outputs, one per drawn region)", self,
         )
+        self.multicrop.toggled.connect(self._refresh_multi_state)
         form.addRow("", self.multicrop)
 
+        # Patch 122cf: how many regions to capture for multi-crop. The
+        # backend loops ROISelector this many times; each iteration
+        # opens an OpenCV window where the user draws one rectangle.
+        self.crop_count = QSpinBox(self)
+        self.crop_count.setRange(2, 20)
+        self.crop_count.setValue(2)
+        self.crop_count.setSuffix(" regions")
+        form.addRow("Multi-crop count:", self.crop_count)
+
         self.body_layout.addLayout(form)
+        self._refresh_multi_state()
+
+    def _refresh_multi_state(self, *_args) -> None:
+        """Multi-crop is rectangle-only and single-file-only (the
+        directory case is handled by the existing single-region
+        ``crop_multiple_videos`` backend; folder-mode multi-crop is
+        ``MultiCropper`` which has a different mental model — see
+        docs/backend_audit.md §2g)."""
+        shape = self.shape_cb.currentText().lower()
+        is_dir = bool(self.scope.is_dir) if hasattr(self, "scope") else False
+        rect_only = shape == "rectangle"
+        # Multi-crop only makes sense for rectangle (the only shape
+        # the backend's loop supports). Disable + uncheck otherwise.
+        self.multicrop.setEnabled(rect_only and not is_dir)
+        if not rect_only or is_dir:
+            self.multicrop.setChecked(False)
+        # crop_count only meaningful when multi-crop is checked.
+        self.crop_count.setEnabled(self.multicrop.isChecked())
 
     def collect_args(self) -> dict:
         if not self.scope.path:
             raise ValueError("No source selected.")
-        return {
+        multi = bool(self.multicrop.isChecked())
+        args = {
             "path":       self.scope.path,
             "is_dir":     self.scope.is_dir,
             "shape":      self.shape_cb.currentText().lower(),
-            "multi":      bool(self.multicrop.isChecked()),
+            "multi":      multi,
         }
+        if multi:
+            args["crop_count"] = int(self.crop_count.value())
+        return args
 
     def target(self, *, path: str, is_dir: bool, shape: str,
-               multi: bool) -> None:
+               multi: bool, crop_count: int = 2) -> None:
         from pathlib import Path as _P
         from mufasa.video_processors import video_processing as _vp
 
@@ -116,8 +154,50 @@ class CropVideosForm(OperationForm):
 
         if shape == "rectangle":
             if multi and not is_dir:
-                raise NotImplementedError(
-                    "Multi-crop from a single video: backend wiring pending.")
+                # Patch 122cf: single-video multi-crop. Loops the
+                # interactive ROI selector `crop_count` times, then
+                # crops via `crop_video` to suffixed output files.
+                # Doesn't use `MultiCropper` because that's folder-
+                # mode by nature (many videos → N each); this is
+                # the form's "ONE video → MULTIPLE outputs" UX.
+                # See docs/backend_audit.md §2g.
+                import os as _os
+                from mufasa.utils.errors import CountError
+                from mufasa.utils.read_write import get_fn_ext
+                from mufasa.video_processors.roi_selector import (
+                    ROISelector)
+                _ = _vp.get_video_meta_data(video_path=path)
+                dir_name, file_name, _ext = get_fn_ext(filepath=path)
+                for i in range(crop_count):
+                    selector = ROISelector(path=path)
+                    selector.run()
+                    tl = selector.top_left
+                    br = selector.bottom_right
+                    if (tl[0] < 0 or tl[1] < 0 or br[0] < 0 or br[1] < 1):
+                        raise CountError(
+                            msg=f"Multi-crop region {i + 1}: cannot "
+                                f"use negative crop coordinates.",
+                            source="CropVideosForm.multi-crop")
+                    save_path = _os.path.join(
+                        dir_name, f"{file_name}_crop{i + 1}.mp4")
+                    if _os.path.isfile(save_path):
+                        # If a previous Run left files, append a
+                        # timestamp to avoid the backend's clobber-
+                        # guard. The Tk equivalent had the same
+                        # behaviour.
+                        from datetime import datetime as _dt
+                        stamp = _dt.now().strftime("%Y%m%d%H%M%S")
+                        save_path = _os.path.join(
+                            dir_name,
+                            f"{file_name}_crop{i + 1}_{stamp}.mp4")
+                    _vp.crop_video(
+                        video_path=path,
+                        save_path=save_path,
+                        size=(selector.width, selector.height),
+                        top_left=(tl[0], tl[1]),
+                        gpu=False, verbose=False, quality=60,
+                    )
+                return
             if is_dir:
                 # Rectangle batch uses `output_path` (not `out_dir`).
                 # Upstream naming inconsistency with the circle/polygon
