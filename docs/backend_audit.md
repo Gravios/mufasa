@@ -192,48 +192,62 @@ The 1-to-1 Qt equivalents are well-known. The real friction is the backend ↔ U
 
 Recommended order:
 
-### 4a. Quick wins (small fixes, < 1 hour each)
+### 4a. Quick wins — REVISED post-patch 122ca
 
-These ship runtime improvements with minimal risk:
+The original audit categorised 4 fixes as "small, ≤1 hour each." A pre-implementation review during patch 122ca discovered that **only 1 of the 4 is truly trivial**; the other 3 need form redesign because the Qt form was written against a different mental model than what the backend supports.
 
-1. **Rewire `DropBodypartsForm.target()`** → `KeypointRemover`. ~10 lines change.
-2. **Rewire `ROIFeaturesForm` Remove action** → `ConfigReader.remove_roi_features`. ~10 lines change.
-3. **Rewire `CropVideosForm` multi-crop branch** → `MultiCropper`. ~15 lines change.
-4. **Fix `VideoFiltersForm` B&W branch** → `video_to_bw`. 1-line identifier change.
+Honest revised estimates:
 
-After these 4 patches: 4 of 7 failing ops are fixed; only the genuinely-missing 2 (blur, brightness) + the kwarg-shape AverageFrameForm remain.
+| Lane | Original audit said | 122ca review found | Status |
+|---|---|---|---|
+| **`VideoFiltersForm` B&W** → `video_to_bw` | 1-line rename | tiny — threshold scaling + drop `invert` field; ≈15 lines | ✓ shipped 122ca |
+| **`ROIFeaturesForm` Remove** → `ConfigReader.remove_roi_features` | ~10 lines | medium — backend's `remove_roi_features(self, data_dir)` requires a `data_dir` parameter the form doesn't currently surface | deferred |
+| **`CropVideosForm` multi-crop** → `MultiCropper` | ~15 lines | medium — the form's mental model is "ONE video → MULTIPLE outputs"; `MultiCropper`'s real model is "MANY videos in folder → N crops each". Different operation; form's UX needs redesign or backend's behavior needs explaining | deferred |
+| **`DropBodypartsForm`** → `KeypointRemover` | ~10 lines | medium — constructor signature mismatch. Form expects `KeyPointRemover(config_path, body_parts, copy_originals)`. Real class is `KeypointRemover(data_folder, pose_tool, file_format)` + `.run(animal_names, bp_to_remove_list)`. Form needs config-to-data-folder resolution + selection transformation | deferred |
 
-### 4b. Medium fixes (1-3 hours each)
+**Net 122ca outcome:** 1 of 7 runtime gaps closed (B&W). The other 3 from this list need follow-up patches with form-side changes, not just dispatch rewires.
 
-5. **Rewrite `AverageFrameForm`** to match `create_average_frm` signature. Drop `method`/`frame_stride`; add window controls.
-6. **Port box-blur backend** to `mufasa/video_processors/video_processing.py`. Wire into `VideoFiltersForm`.
-7. **Port brightness/contrast backend** to `mufasa/video_processors/video_processing.py`. Wire into `VideoFiltersForm`.
+The audit underestimated complexity because it stopped at "is the backend named in the codebase?" without verifying constructor signatures and semantic models match the form's UX assumptions.
 
-After these: all 7 form runtime gaps closed.
+### 4b. Follow-up patches needed (medium, 1-3 hours each)
 
-### 4c. Backend-Tk-coupling decoupling (per-file)
+5. **Redesign `ROIFeaturesForm` Remove action** to surface a `data_dir` field (or resolve a sensible default like the project's `features_extracted` directory).
+6. **Redesign `CropVideosForm` multi-crop semantics** — either re-implement as "single video, repeated single-crop calls in a loop" to match the form's UX, or rework the form to match `MultiCropper`'s folder-mode reality.
+7. **Redesign `DropBodypartsForm`** — either:
+   * Add config-to-data-folder resolution + transform `(animal, bp)` tuples to backend's split lists, OR
+   * Rework the form to surface `data_folder` directly (matching the Tk popup's UX).
+8. **Rewrite `AverageFrameForm`** to match `create_average_frm` signature (kwarg-shape mismatch from 122by).
+
+### 4c. Medium fixes — genuinely missing backends (port from SimBA or write fresh)
+
+9. **Port box-blur backend** to `mufasa/video_processors/video_processing.py`. Wire into `VideoFiltersForm`.
+10. **Port brightness/contrast backend** to `mufasa/video_processors/video_processing.py`. Wire into `VideoFiltersForm`.
+
+After 4b + 4c: all 7 form runtime gaps closed.
+
+### 4d. Backend-Tk-coupling decoupling (per-file)
 
 Order suggested:
 
-8. **`video_processors/video_processing.py`** — replace `TwoOptionQuestionPopUp` import. This file is fundamental backend code; getting Tk out of it removes a heavy coupling.
-9. **`mixins/train_model_mixin.py`** — same `TwoOptionQuestionPopUp` replacement.
-10. **`roi_tools/roi_ruler.py`** — refactor `SimBALabel` use into a callback.
-11. **`mixins/annotator_mixin.py`** — refactor `Entry_Box` use.
+11. **`video_processors/video_processing.py`** — replace `TwoOptionQuestionPopUp` import. This file is fundamental backend code; getting Tk out of it removes a heavy coupling.
+12. **`mixins/train_model_mixin.py`** — same `TwoOptionQuestionPopUp` replacement.
+13. **`roi_tools/roi_ruler.py`** — refactor `SimBALabel` use into a callback.
+14. **`mixins/annotator_mixin.py`** — refactor `Entry_Box` use.
 
-### 4d. Bulk-drop (after Tier 3b)
+### 4e. Bulk-drop (after Tier 3b)
 
 12. **Drop `mufasa/unsupervised/pop_ups/`** + unsupervised_main.py (13 files) — handled by Tier 3b.
 13. **Drop `cue_light_tools/cue_light_main_popup.py`** — superseded by Qt Cue-light forms.
 14. **Drop `roi_tools/roi_ui_mixin.py`** — superseded by Qt ROI surface.
 15. **Drop `mixins/pop_up_mixin.py`** — once no Tk popups remain.
 
-### 4e. Last items (Tier 4 close-out)
+### 4f. Last items (Tier 4 close-out)
 
 16. **`labelling/labelling_interface.py` + `standard_labeller.py`** — Qt port of the labelling UI. Substantial.
 17. **`video_processors/batch_process_menus.py`** — Qt port or accept removal.
 18. **`bounding_box_tools/boundary_menus.py`** — Qt port or accept removal.
 
-After 4a-4e: `mufasa/ui/tkinter_functions.py` is unreachable; can be deleted, completing the Tier 4 cleanup.
+After 4a-4f: `mufasa/ui/tkinter_functions.py` is unreachable; can be deleted, completing the Tier 4 cleanup.
 
 ---
 

@@ -49,26 +49,25 @@ No `method`, no `frame_stride`. The form's UI surfaces parameters the backend do
 * Add `verbose` checkbox.
 * Update the dispatch to call `create_average_frm`.
 
-### 2b. `VideoFiltersForm` (video_filters.py) — 4 OPERATIONS FAIL
+### 2b. `VideoFiltersForm` (video_filters.py) — 3 OPERATIONS FAIL (was 4)
 
 | Op | What fails | Reason |
 |---|---|---|
-| Black & white (binarise) | Always | Backend `convert_to_black_and_white` not in this fork |
-| Box / Gaussian blur | Always | Backend `convert_to_bw_blur` not in this fork |
-| Brightness / contrast | Always | Backend not wired |
+| ~~Black & white (binarise)~~ | ~~Always~~ | ✓ **FIXED in patch 122ca** — rewired to existing `video_to_bw` backend (with threshold range scaling 0–255 → 0.0–1.0; `invert` checkbox dropped since backend doesn't support it) |
+| Box / Gaussian blur | Always | Backend genuinely missing — port from SimBA or write fresh OpenCV wrapper |
+| Brightness / contrast | Always | Backend genuinely missing — same |
 | CLAHE | Only with "Interactive preview" checked | Dialog not wired; non-interactive CLAHE works |
 
-**Severity: high for the 3 unwired ops; low for the CLAHE preview** (the main CLAHE path works).
+**Severity (post-122ca): medium for the 2 unwired ops; low for the CLAHE preview** (the main CLAHE path works; the B&W blocker is resolved).
 
-The form has 5 operations in its dropdown; 3 of those 5 currently fail. The user dropdown gives no indication that 3 options are broken.
+The form has 5 operations in its dropdown; 2 of those 5 currently fail (was 3).
 
-**Fix scope (per op):**
-* Black & white: small — single-function backend port; would slot into `mufasa.video_processors.video_processing` and wire here.
-* Box blur: small — same shape.
-* Brightness/contrast: small — same shape.
+**Fix scope (per remaining op):**
+* Box blur: small — port the backend (OpenCV `cv2.boxFilter` or `cv2.GaussianBlur` wrapper, ~30 lines).
+* Brightness/contrast: small — port the backend (`cv2.convertScaleAbs`, ~30 lines).
 * CLAHE interactive preview: medium — needs a Qt dialog like blob quick-check (live frame display + tunable parameters).
 
-**Stop-gap (no backend work):** disable the three failing options in the dropdown until they're wired. The Tk equivalents are deprecated already (per `tk_surface_audit.md`); the original code is gone, so "disable until ported" is a reasonable interim posture.
+**Stop-gap (no backend work):** disable the two remaining failing options in the dropdown until they're wired. Same posture as before; the broken-options scope just shrank by one.
 
 ### 2c. `CropVideosForm` (video_editing.py) — 1 OPERATION FAILS
 
