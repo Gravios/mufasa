@@ -122,11 +122,17 @@ def main() -> int:
                 f"CropVideosForm docstring lists Tk popup '{cls}'",
                 cls in doc,
             )
-        # References the audit doc
+        # References the audit doc OR a later resolution patch.
+        # Post-122cf the form's docstring was updated from
+        # "Known gap (patch 122by audit)" to a "Resolved in 122cf"
+        # note. The check is "documents its history" not "still
+        # marked as a known gap."
         check(
-            "CropVideosForm docstring references the runtime-gaps audit",
+            "CropVideosForm docstring references either the "
+            "runtime-gaps audit or a later resolution",
             "qt_form_runtime_gaps.md" in doc
-            or "122by audit" in doc,
+            or "122by audit" in doc
+            or "122cf" in doc,
         )
 
     # ==================================================================
