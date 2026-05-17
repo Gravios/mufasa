@@ -126,7 +126,15 @@ class _GreyscalePanel(QWidget):
 
 
 class _BlackWhitePanel(QWidget):
-    """Binary threshold (not greyscale)."""
+    """Binary threshold (not greyscale).
+
+    Patch 122ca: the legacy ``invert`` checkbox was removed because
+    the rewired backend (:func:`video_to_bw`) doesn't support
+    inversion. Keeping the checkbox while ignoring it would be a
+    silent-failure UX trap. If invert is later needed, add a small
+    OpenCV post-processing step in :meth:`target` and re-introduce
+    the field here.
+    """
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -135,12 +143,9 @@ class _BlackWhitePanel(QWidget):
         self.threshold = QSpinBox(self); self.threshold.setRange(0, 255)
         self.threshold.setValue(127)
         form.addRow("Threshold (0–255):", self.threshold)
-        self.invert = QCheckBox("Invert (dark → white)", self)
-        form.addRow("", self.invert)
 
     def to_kwargs(self) -> dict:
-        return {"threshold": int(self.threshold.value()),
-                "invert":    bool(self.invert.isChecked())}
+        return {"threshold": int(self.threshold.value())}
 
 
 # --------------------------------------------------------------------------- #
@@ -229,13 +234,20 @@ class VideoFiltersForm(OperationForm):
             else:
                 _vp.video_to_greyscale(file_path=path)
         elif op == "black_white":
-            # No dedicated backend fn on newer versions; treat as B&W
-            # via greyscale + threshold. Keep the branch but mark for
-            # backend wiring.
-            raise NotImplementedError(
-                "Black & white threshold: backend wiring pending "
-                "(convert_to_black_and_white is in an older branch)."
-            )
+            # Patch 122ca: rewired to existing `video_to_bw` backend
+            # (per docs/backend_audit.md §2b). The form's threshold
+            # is integer 0–255; the backend takes float 0.0–1.0.
+            # Scale here. No batch variant exists, so iterate for the
+            # directory case.
+            threshold = float(params["threshold"]) / 255.0
+            if is_dir:
+                from mufasa.utils.read_write import (
+                    find_all_videos_in_directory)
+                for vp in find_all_videos_in_directory(
+                        directory=path, raise_error=True):
+                    _vp.video_to_bw(video_path=vp, threshold=threshold)
+            else:
+                _vp.video_to_bw(video_path=path, threshold=threshold)
         elif op == "blur":
             raise NotImplementedError(
                 "Box blur: backend wiring pending (convert_to_bw_blur).")
