@@ -45,15 +45,26 @@ from mufasa.ui_qt.workbench import OperationForm
 class CropVideosForm(OperationForm):
     """Crop video(s) to a rectangular, circular, or polygonal region.
 
-    Combines the rect / circle / polygon / multi-crop popups. The shape
-    drop-down drives which crop backend is called; scope (single file
-    vs. directory) is separate.
+    Replaces four legacy Tk popups:
+
+    * :class:`CropVideoPopUp` — single video, rectangular crop
+    * :class:`CropVideoCirclesPopUp` — single video, circular crop
+    * :class:`CropVideoPolygonsPopUp` — single video, polygonal crop
+    * :class:`MultiCropPopUp` — one video, multiple rectangular outputs
+
+    The shape drop-down drives which crop backend is called; scope
+    (single file vs. directory) is separate. The "multi-crop"
+    checkbox absorbs the MultiCropPopUp case.
 
     **Interactive selection**: each backend opens an OpenCV window to
     capture the crop gesture on the video's first frame. Qt is
     intentionally NOT used for that — OpenCV's native video surface is
     what's already wired to the crop backends, and reproducing it in
     Qt would be scope creep with no user-visible benefit.
+
+    **Known gap (patch 122by audit):** the multi-crop branch raises
+    `NotImplementedError` — backend wiring is pending. See
+    `docs/qt_form_runtime_gaps.md` §2c.
     """
 
     title = "Crop video(s)"

@@ -36,6 +36,11 @@ Read this when planning UI work or considering a SimBA → Mufasa rename in Tk-o
 
 Read this when planning the next porting patch — it tells you what's left to build and what's already covered (existing Qt is further along than the AST audit alone suggests).
 
+### `qt_form_runtime_gaps.md`
+**Audit of Qt forms whose UI is wired but whose backend raises `NotImplementedError` at runtime.** Four forms with seven failing operations: `AverageFrameForm` (entirely broken — spelling mismatch + kwarg shape), `VideoFiltersForm` (3 of 5 ops + CLAHE interactive preview unwired), `CropVideosForm` (multi-crop sub-mode unwired), `DropBodypartsForm` (entirely broken — missing backend), `ROIFeaturesForm` (Remove action unwired).
+
+Read this before launching the Qt workbench to know which buttons will surface errors. Includes recommended stop-gap (disable broken options) plus priority order for backend wiring.
+
 ---
 
 ## Kalman smoother — design track
