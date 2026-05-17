@@ -2,7 +2,7 @@
 mufasa.ui_qt.forms.video_utilities
 ==================================
 
-Three small inline forms for single-utility video operations.
+Small inline forms for single-utility video operations.
 
 * :class:`ReverseVideoForm` — reverse playback of one or many
   videos. Replaces :class:`ReverseVideoPopUp`.
@@ -14,12 +14,12 @@ Three small inline forms for single-utility video operations.
   :class:`GetPixelsPerMillimeterInterface`, an OpenCV-window
   click-to-pick affair — this form just orchestrates the
   inputs (video path + known distance) and reports the result.
+* :class:`CheckVideoSeekableForm` — verify that frame seeks work
+  correctly on a video or directory of videos. Replaces
+  :class:`CheckVideoSeekablePopUp` (patch 122bx).
 
 Each form was previously a single Tk popup. Patch 122u
-consolidates them into a single Qt module since they share the
-same "Source + a few knobs + Run" shape; there's no benefit to a
-generic scope-driven framework for three operations of three
-different parameter sets.
+consolidates the first three; 122bx adds the fourth.
 """
 from __future__ import annotations
 
@@ -339,4 +339,112 @@ __all__ = [
     "ReverseVideoForm",
     "ChangeSpeedForm",
     "PixelsPerMMForm",
+    "CheckVideoSeekableForm",
 ]
+
+
+# =========================================================================== #
+# CheckVideoSeekableForm
+# =========================================================================== #
+class CheckVideoSeekableForm(OperationForm):
+    """Verify that frame seeks work correctly across a video or
+    directory of videos.
+
+    Replaces :class:`CheckVideoSeekablePopUp` (patch 122bx).
+    Backend:
+    :func:`mufasa.video_processors.video_processing.is_video_seekable`.
+
+    The backend writes a CSV report listing every video plus a
+    pass/fail flag and any error encountered. The report path
+    defaults to ``Desktop`` (falling back to ``Downloads`` if the
+    Desktop directory is unavailable, matching the Tk popup's
+    behaviour) with a timestamped filename. The user can override
+    by selecting a save path explicitly.
+    """
+
+    title = "Check video seekability"
+    description = (
+        "Test whether videos support reliable frame-seek "
+        "operations. Slow CFR sources or some VFR re-encodes can "
+        "silently mis-seek; this scan catches them. Output is a "
+        "CSV with one row per video flagged pass / fail."
+    )
+
+    def build(self) -> None:
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignRight)
+
+        self.scope = _ScopePicker(self)
+        form.addRow("Source:", self.scope)
+
+        self.gpu = QCheckBox("Use GPU (faster on large videos)", self)
+        form.addRow("", self.gpu)
+
+        # Batch size 0 → no batching (load all frames). >0 → process
+        # `batch_size` frames at a time. Default mirrors the Tk
+        # popup's default of 400 (a balance between RAM and IO).
+        self.batch_size = QSpinBox(self)
+        self.batch_size.setRange(0, 5000)
+        self.batch_size.setSingleStep(100)
+        self.batch_size.setValue(400)
+        self.batch_size.setSpecialValueText("Disabled — load all frames")
+        form.addRow("Frame batch size:", self.batch_size)
+
+        # Optional save path. Empty → defaults to Desktop /
+        # Downloads + timestamped filename in target().
+        self.save_path_edit = QLineEdit(self)
+        self.save_path_edit.setPlaceholderText(
+            "Optional — defaults to Desktop / Downloads with "
+            "timestamped filename")
+        sp_browse = QPushButton("Browse…", self)
+        sp_browse.clicked.connect(self._pick_save_path)
+        sp_row = QHBoxLayout()
+        sp_row.addWidget(self.save_path_edit, 1)
+        sp_row.addWidget(sp_browse)
+        form.addRow("Save CSV to:", sp_row)
+
+        self.body_layout.addLayout(form)
+
+    def _pick_save_path(self) -> None:
+        p, _ = QFileDialog.getSaveFileName(
+            self, "Save seekability report as", "",
+            "CSV files (*.csv);;All files (*)",
+        )
+        if p:
+            self.save_path_edit.setText(p)
+
+    def collect_args(self) -> dict:
+        if not self.scope.path:
+            raise ValueError("No source selected.")
+        bs = int(self.batch_size.value())
+        return {
+            "path":       self.scope.path,
+            "gpu":        bool(self.gpu.isChecked()),
+            # 0 = disabled in the UI; pass None to the backend
+            # which interprets that as "no batching".
+            "batch_size": bs if bs > 0 else None,
+            "save_path":  self.save_path_edit.text().strip() or None,
+        }
+
+    def target(self, *, path: str, gpu: bool,
+               batch_size: Optional[int],
+               save_path: Optional[str]) -> None:
+        from datetime import datetime
+
+        from mufasa.utils.read_write import (get_desktop_path,
+                                             get_downloads_path)
+        from mufasa.video_processors.video_processing import (
+            is_video_seekable,
+        )
+
+        if save_path is None:
+            save_dir = get_desktop_path()
+            if save_dir is None:
+                save_dir = get_downloads_path(raise_error=True)
+            stamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            save_path = os.path.join(
+                save_dir, f"seekability_test_{stamp}.csv")
+        is_video_seekable(
+            data_path=path, gpu=gpu, batch_size=batch_size,
+            verbose=False, save_path=save_path,
+        )

@@ -84,6 +84,7 @@ from mufasa.ui_qt.forms.video_frames import (ExtractFramesForm,
 from mufasa.ui_qt.forms.video_join import (CrossfadeVideosForm,
                                             JoinVideosForm)
 from mufasa.ui_qt.forms.video_utilities import (ChangeSpeedForm,
+                                                 CheckVideoSeekableForm,
                                                  PixelsPerMMForm,
                                                  ReverseVideoForm)
 from mufasa.ui_qt.forms.image_conversion import (AverageFrameForm,
@@ -127,9 +128,11 @@ def build_video_processing_page(workbench,
     # Patch 122u: three small single-utility ports (Reverse video,
     # Change speed, Pixels-per-mm calibration) live together in a
     # Utilities section. Each replaces exactly one legacy popup.
+    # Patch 122bx: CheckVideoSeekableForm added (4th utility).
     page.add_section("Utilities",               [(ReverseVideoForm, {}),
                                                  (ChangeSpeedForm, {}),
-                                                 (PixelsPerMMForm, {})])
+                                                 (PixelsPerMMForm, {}),
+                                                 (CheckVideoSeekableForm, {})])
     page.add_section("Metadata & audit",        [(AverageFrameForm, {})])
 
     register_video_processing_menu_actions(workbench)

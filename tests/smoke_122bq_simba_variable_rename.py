@@ -124,11 +124,15 @@ def main() -> int:
     # ==================================================================
     # 2. Renamed identifiers appear with the new mufasa_* name
     # ==================================================================
+    # Note (patch 122bx): mufasa_cw was defined only in
+    # mufasa/ui/user_defined_pose_creator.py, which was deleted as
+    # one of the two UNREFERENCED Tk files. Floor reduced to 0 —
+    # the rename itself was valid; the file just no longer exists.
     new_names = ["mufasa_dir", "mufasa_cw", "mufasa_pip_data",
                  "mufasa_ini_path"]
     expected_floors = {
         "mufasa_dir": 6,      # 6 files originally had simba_dir
-        "mufasa_cw": 1,
+        "mufasa_cw": 0,       # only host file deleted in 122bx
         "mufasa_pip_data": 1,
         "mufasa_ini_path": 2,  # function def + caller
     }
