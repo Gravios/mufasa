@@ -255,7 +255,11 @@ from mufasa.ui.pop_ups.video_processing_pop_up import (
     VideoRotatorPopUp, VideoTemporalJoinPopUp)
 from mufasa.ui.pop_ups.visualize_pose_in_dir_pop_up import \
     VisualizePoseInFolderPopUp
-from mufasa.ui.pop_ups.yolo_inference_popup import YOLOPoseInferencePopUP
+# Patch 122d2: YOLOPoseInferencePopUP removed (Tk popup). Qt
+# replacement is YOLOPoseInferenceForm in
+# `mufasa.ui_qt.forms.yolo_inference`, wired into classifier_page
+# as "YOLO pose — inference".
+# from mufasa.ui.pop_ups.yolo_inference_popup import YOLOPoseInferencePopUP
 from mufasa.ui.pop_ups.yolo_plot_results import YoloPoseVisualizerPopUp
 from mufasa.ui.pop_ups.yolo_pose_train_popup import YOLOPoseTrainPopUP
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
@@ -903,7 +907,10 @@ class App(object):
 
         yolo_tracking_menu = Menu(batch_process_menu)
         yolo_tracking_menu.add_command(label="Train YOLO model", compound="left", image=self.menu_icons["ultralytics_2"]["img"], command=YOLOPoseTrainPopUP, font=Formats.FONT_REGULAR.value, state=yolo_state)
-        yolo_tracking_menu.add_command(label="Predict with YOLO model", compound="left", image=self.menu_icons["ultralytics_2"]["img"], command=YOLOPoseInferencePopUP, font=Formats.FONT_REGULAR.value, state=yolo_state)
+        # Patch 122d2: 'Predict with YOLO model' menu entry
+        # removed — Qt YOLOPoseInferenceForm covers it on
+        # classifier_page → "YOLO pose — inference" section.
+        # yolo_tracking_menu.add_command(label="Predict with YOLO model", compound="left", image=self.menu_icons["ultralytics_2"]["img"], command=YOLOPoseInferencePopUP, font=Formats.FONT_REGULAR.value, state=yolo_state)
         yolo_tracking_menu.add_command(label="Visualize YOLO model results", compound="left", image=self.menu_icons["ultralytics_2"]["img"], command=YoloPoseVisualizerPopUp, font=Formats.FONT_REGULAR.value, state=yolo_state)
         batch_process_menu.add_cascade(label="YOLO tracking...", compound="left", image=self.menu_icons["ultralytics_2"]["img"], menu=yolo_tracking_menu, font=Formats.FONT_REGULAR.value, state=yolo_state)
 

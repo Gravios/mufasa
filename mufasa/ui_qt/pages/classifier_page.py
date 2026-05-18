@@ -37,6 +37,7 @@ from mufasa.ui_qt.forms.classifier import ClassifierManageForm
 from mufasa.ui_qt.forms.run_inference import RunInferenceForm
 from mufasa.ui_qt.forms.train_classifier import TrainClassifierForm
 from mufasa.ui_qt.forms.validate_classifier import ValidateClassifierForm
+from mufasa.ui_qt.forms.yolo_inference import YOLOPoseInferenceForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
@@ -55,6 +56,13 @@ def build_classifier_page(workbench,
     # ValidationVideoPopUp.
     page.add_section("Validate classifier",
                      [(ValidateClassifierForm, {})])
+    # Patch 122d2: YOLO pose inference — runs a trained YOLO pose
+    # model on a video or directory. Sibling to RunInferenceForm
+    # (which handles SimBA classifier inference) but for the YOLO
+    # pose-estimation lifecycle. Requires CUDA + ultralytics; form
+    # is inert without them.
+    page.add_section("YOLO pose — inference",
+                     [(YOLOPoseInferenceForm, {})])
     return page
 
 
