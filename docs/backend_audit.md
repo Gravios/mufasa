@@ -237,7 +237,9 @@ These are Tk surfaces with structural Tk coupling. The 5 `Entry_Box` constructio
 * ~~**ROI Tk cluster — almost-closed, similar to labelling**~~ ✓ **DELETED 122cr**. 6 files (2 in `roi_tools/`, 2 in `ui/`, 2 in `ui/pop_ups/`) + 5 surgical SimBA.py edits. Pattern: same as 122ck cue-light cleanup. Qt replacements verified before deletion: `ROIVideoTable` → `ROIManageForm`, `InitializeBlobTrackerPopUp` → `BlobTrackerInitLauncher`. The `blob_quick_check_interface.py` orphan-after-cascade was deleted in the same patch.
 * **pop_up_mixin** — fan-in from every Tk pop-up. Goes last; depends on every other Bucket-2 work item completing first.
 
-**Implication of the 122cw reclassification:** Tier 3b "Unsupervised Qt port" and "Labelling Qt port" are not separate work items — they're SimBA.py-finale prerequisites that have already been satisfied (Qt labelling exists; Qt unsupervised was never required). The next concrete Tier-4 milestone is the SimBA.py death cascade itself, which sweeps 14 unsupervised files + 4 labelling Tk-UI files + `annotator_mixin.py` + most of `ui/pop_ups/` (~75 files) + SimBA.py + `mufasa-tk` entry-point with it.
+**Implication of the 122cw reclassification:** Tier 3b "Unsupervised Qt port" and "Labelling Qt port" are not separate work items — they're SimBA.py-finale prerequisites that have already been satisfied (Qt labelling exists; Qt unsupervised was never required). The next concrete Tier-4 milestone is the SimBA.py death cascade itself, which sweeps 30 unsupervised files (14 UI/orchestration + 16 algorithm-backend — count corrected in 122cx) + 4 labelling Tk-UI files + `annotator_mixin.py` + all 75 files of `ui/pop_ups/` + SimBA.py + `mufasa-tk` entry-point with it.
+
+**Scoping doc:** see `docs/simba_death_cascade.md` for the exact 101-file inventory, staged deletion plan, and risk register (added in 122cx).
 
 **Bucket 3: Deferred — Qt code currently consumes it (0 files; DRAINED 122cq)**
 
