@@ -520,10 +520,15 @@ class ROIVideoTableDialog(QDialog):
         )
 
     def _action_min_max_draw_size(self) -> None:
-        self._launch_tk_popup(
-            "from mufasa.ui.pop_ups.min_max_draw_size_popup import SetMinMaxDrawWindowSize\n"
-            "SetMinMaxDrawWindowSize(config_path=sys.argv[1])\n"
-        )
+        # Patch 122ct: ported to Qt-native (was a subprocess-
+        # launched Tk popup; see docs/tk_surface_audit.md §2g).
+        from mufasa.ui_qt.dialogs.min_max_draw_size import (
+            MinMaxDrawSizeDialog)
+        dlg = MinMaxDrawSizeDialog(
+            config_path=self.config_path, parent=self)
+        if dlg.init_failed():
+            return
+        dlg.exec()
 
     def _action_delete_all(self) -> None:
         ok = QMessageBox.question(

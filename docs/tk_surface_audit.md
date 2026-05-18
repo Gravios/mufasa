@@ -146,11 +146,11 @@ Qt replacements verified before deletion:
 
 Same pattern as the 122ck cue-light cleanup (6 files + SimBA.py edits) but with the audit-corrected dependency picture from 122cq.
 
-**Caveat: subprocess-launched popups (122cr discovery; 122cs partial port).** After the 122cr cluster-deletion, the AST orphan-audit reported 4 files in `mufasa/ui/pop_ups/` as newly-orphan. 3 remain post-122cs:
+**Caveat: subprocess-launched popups (122cr discovery; 122cs/ct partial port).** After the 122cr cluster-deletion, the AST orphan-audit reported 4 files in `mufasa/ui/pop_ups/` as newly-orphan. 2 remain post-122ct:
 
 * `duplicate_rois_by_source_target_popup.py`
 * `import_roi_csv_popup.py`
-* `min_max_draw_size_popup.py`
+* ~~`min_max_draw_size_popup.py`~~ ✓ **DELETED 122ct** (Qt-native port at `ui_qt/dialogs/min_max_draw_size.py`)
 * ~~`roi_size_standardizer_popup.py`~~ ✓ **DELETED 122cs** (Qt-native port at `ui_qt/dialogs/roi_size_standardizer.py`)
 
 These are NOT real orphans. They're kept alive by the Qt dialog `ui_qt/dialogs/roi_video_table.py:491-513`, which has four file-menu actions (`_action_standardize`, `_action_duplicate`, `_action_import_csv`, `_action_min_max_draw_size`) that launch the popups via subprocess using string-literal imports:
