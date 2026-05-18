@@ -508,10 +508,22 @@ class ROIVideoTableDialog(QDialog):
             pass
 
     def _action_duplicate(self) -> None:
-        self._launch_tk_popup(
-            "from mufasa.ui.pop_ups.duplicate_rois_by_source_target_popup import DuplicateROIsBySourceTarget\n"
-            "DuplicateROIsBySourceTarget(config_path=sys.argv[1], roi_data_path=None, roi_table_popup=None)\n"
-        )
+        # Patch 122cv: ported to Qt-native (was the last
+        # subprocess-launched Tk popup; the `_launch_tk_popup`
+        # helper is now removed from this file — there are no
+        # remaining callers. See docs/tk_surface_audit.md §2g
+        # for the full subprocess-bridge history.)
+        from mufasa.ui_qt.dialogs.duplicate_rois_source_target import (
+            DuplicateRoisDialog)
+        dlg = DuplicateRoisDialog(
+            config_path=self.config_path, parent=self)
+        if dlg.init_failed():
+            return
+        if dlg.exec() == QDialog.Accepted:
+            try:
+                self.rois_modified.emit()
+            except Exception:
+                pass
 
     def _action_import_csv(self) -> None:
         # Patch 122cu: ported to Qt-native (was a subprocess-
@@ -564,22 +576,13 @@ class ROIVideoTableDialog(QDialog):
                 f"Could not delete: {type(exc).__name__}: {exc}"
             )
 
-    def _launch_tk_popup(self, body: str) -> None:
-        """Run a Tk popup in a subprocess so it doesn't deadlock Qt."""
-        import subprocess
-        launcher = "import sys\n" + body
-        try:
-            proc = subprocess.Popen(
-                [sys.executable, "-c", launcher, self.config_path],
-                stdin=subprocess.DEVNULL,
-            )
-            self._child_procs.append(proc)
-        except Exception as exc:
-            QMessageBox.critical(
-                self, "Launch failed",
-                f"Could not launch the popup: "
-                f"{type(exc).__name__}: {exc}"
-            )
+    # Patch 122cv: `_launch_tk_popup` helper removed — all 4
+    # subprocess-launched Tk popups have been ported to Qt-native
+    # dialogs (122cs ROISizeStandardizer, 122ct MinMaxDrawSize,
+    # 122cu ImportRoiCsv, 122cv DuplicateRois). The `_child_procs`
+    # list above is retained for tracking the still-active
+    # subprocess-launched ROI define panel (line 434), which is
+    # a different use case than the popup helper.
 
     # ------------------------------------------------------------------ #
     # Lifecycle
