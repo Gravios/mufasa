@@ -169,9 +169,12 @@ def main() -> int:
     # ==================================================================
     audit = (REPO_ROOT / "docs" / "backend_audit.md").read_text()
     check(
-        "backend_audit.md §3 count updated to 19 module-level importers",
-        "19 modules under" in audit
-        or "19 + 1 = 20" in audit,
+        "backend_audit.md §3 records 122cm's contribution to the "
+        "module-level importer count trajectory",
+        # 122cm dropped the count from 21 → 19. Later patches
+        # may reduce further. Pin to the trajectory entry that
+        # records 122cm's effect, not the live count.
+        "122cm" in audit and "19" in audit,
     )
     check(
         "backend_audit.md §3a category list updated post-122cm",

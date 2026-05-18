@@ -159,8 +159,12 @@ from mufasa.ui.pop_ups.fsttc_pop_up import FSTTCPopUp
 from mufasa.ui.pop_ups.gantt_pop_up import GanttPlotPopUp
 from mufasa.ui.pop_ups.heatmap_clf_pop_up import HeatmapClfPopUp
 from mufasa.ui.pop_ups.heatmap_location_pop_up import HeatmapLocationPopup
-from mufasa.ui.pop_ups.initialize_blob_tracking_pop_up import \
-    InitializeBlobTrackerPopUp
+# Patch 122cr: InitializeBlobTrackerPopUp removed (Tk launcher
+# popup). Qt replacement is BlobTrackerInitLauncher under
+# `mufasa.ui_qt.forms.addons`, already wired into the workbench
+# at addons_page.py:55 ("Blob tracker — initialise" section).
+# from mufasa.ui.pop_ups.initialize_blob_tracking_pop_up import \
+#     InitializeBlobTrackerPopUp
 from mufasa.ui.pop_ups.kleinberg_pop_up import KleinbergPopUp
 from mufasa.ui.pop_ups.labelme_bbox_to_yolo_bbox_popup import \
     LabelmeBbox2YoloBboxPopUp
@@ -190,7 +194,10 @@ from mufasa.ui.pop_ups.roi_analysis_time_bins_pop_up import \
     ROIAnalysisTimeBinsPopUp
 from mufasa.ui.pop_ups.roi_features_plot_pop_up import VisualizeROIFeaturesPopUp
 from mufasa.ui.pop_ups.roi_tracking_plot_pop_up import VisualizeROITrackingPopUp
-from mufasa.ui.pop_ups.roi_video_table_pop_up import ROIVideoTable
+# Patch 122cr: ROIVideoTable removed (Tk roi-table popup). Qt
+# replacement is ROIManageForm in `mufasa.ui_qt.forms.roi`,
+# wired into the ROI page (Draw/Import/Standardise mode dropdown).
+# from mufasa.ui.pop_ups.roi_video_table_pop_up import ROIVideoTable
 from mufasa.ui.pop_ups.run_machine_models_popup import RunMachineModelsPopUp
 from mufasa.ui.pop_ups.select_video_for_labelling_popup import \
     SelectLabellingVideoPupUp
@@ -397,11 +404,17 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         button_setdistanceinmm = SimbaButton(parent=label_setscale, txt="AUTO-POPULATE", txt_clr='blue', font=Formats.FONT_REGULAR.value, cmd=self.set_distance_mm)
 
         self.new_ROI_frm = CreateLabelFrameWithIcon(parent=tab6, header="SIMBA ROI INTERFACE", icon_name='shapes_small', icon_link=Links.ROI.value, bg='#DCDCDC', padx=5, pady=5)
-        self.start_new_ROI = SimbaButton(parent=self.new_ROI_frm, width=Formats.BUTTON_WIDTH_L.value, txt="DEFINE ROIs", txt_clr='green', font=Formats.FONT_REGULAR.value, img='roi', cmd=ROIVideoTable, cmd_kwargs={'config_path': lambda:self.config_path})
+        # Patch 122cr: start_new_ROI button removed with
+        # ROIVideoTable. Qt ROIManageForm is the replacement.
+        # The 'DELETE ALL ROI DEFINITIONS' button below stays —
+        # delete_all_rois_pop_up is a separate function not in
+        # the cluster deleted in 122cr.
+        # self.start_new_ROI = SimbaButton(parent=self.new_ROI_frm, width=Formats.BUTTON_WIDTH_L.value, txt="DEFINE ROIs", txt_clr='green', font=Formats.FONT_REGULAR.value, img='roi', cmd=ROIVideoTable, cmd_kwargs={'config_path': lambda:self.config_path})
 
         self.delete_all_ROIs = SimbaButton(parent=self.new_ROI_frm, width=Formats.BUTTON_WIDTH_L.value, txt="DELETE ALL ROI DEFINITIONS", txt_clr='red', font=Formats.FONT_REGULAR.value, img='trash', cmd=delete_all_rois_pop_up, cmd_kwargs={'config_path': lambda:self.config_path})
         self.new_ROI_frm.grid(row=0, sticky=NW, padx=10, pady=10)
-        self.start_new_ROI.grid(row=0, sticky=NW)
+        # Patch 122cr: start_new_ROI.grid removed with the button.
+        # self.start_new_ROI.grid(row=0, sticky=NW)
         self.delete_all_ROIs.grid(row=1, column=0, sticky=NW)
 
         self.roi_draw = CreateLabelFrameWithIcon(parent=tab6, header="ANALYZE ROI DATA", icon_name='magnifying', icon_link=Links.ROI.value, bg='#DCDCDC', padx=5, pady=5)
@@ -866,7 +879,12 @@ class App(object):
         # there from the Data Import page by patch 122x).
 
         blob_tracking_menu = Menu(batch_process_menu)
-        blob_tracking_menu.add_command(label="Perform blob tracking", compound="left", image=self.menu_icons["bubble_green"]["img"], command=InitializeBlobTrackerPopUp, font=Formats.FONT_REGULAR.value)
+        # Patch 122cr: 'Perform blob tracking' menu command removed
+        # — InitializeBlobTrackerPopUp deleted with the ROI Tk
+        # cluster. Qt replacement: BlobTrackerInitLauncher in the
+        # workbench's add-ons page. The 'Visualize blob tracking'
+        # entry below remains (BlobVisualizerPopUp is unrelated).
+        # blob_tracking_menu.add_command(label="Perform blob tracking", compound="left", image=self.menu_icons["bubble_green"]["img"], command=InitializeBlobTrackerPopUp, font=Formats.FONT_REGULAR.value)
         blob_tracking_menu.add_command(label="Visualize blob tracking", compound="left", image=self.menu_icons["bubble_pink"]["img"], command=BlobVisualizerPopUp, font=Formats.FONT_REGULAR.value)
         batch_process_menu.add_cascade(label="Blob tracking...", compound="left", image=self.menu_icons["bubble"]["img"], menu=blob_tracking_menu, font=Formats.FONT_REGULAR.value)
 

@@ -137,12 +137,18 @@ def main() -> int:
              or "re-re-audit" in ba),
     )
     check(
-        "§3d Bucket 2 lists roi_tools/roi_ui_mixin.py",
+        "§3d Bucket 2 references roi_tools/roi_ui_mixin.py "
+        "(may be strikethroughed if 122cr deletion has happened)",
+        # Pin to the durable claim: the file is mentioned in
+        # Bucket 2 (either active or strikethrough/DELETED).
+        # Was "active entry + reclassified from Bucket 3" pre-122cr;
+        # becomes "strikethrough + DELETED 122cr" post-122cr.
         "`roi_tools/roi_ui_mixin.py`" in ba
-        and "reclassified from Bucket 3" in ba,
+        and ("reclassified from Bucket 3" in ba
+             or "DELETED 122cr" in ba),
     )
     check(
-        "§3d Bucket 2 lists roi_tools/roi_ui.py",
+        "§3d Bucket 2 references roi_tools/roi_ui.py",
         "`roi_tools/roi_ui.py`" in ba,
     )
     check(
@@ -189,27 +195,27 @@ def main() -> int:
         qt_real_importers == [],
         detail=", ".join(str(p) for p in qt_real_importers),
     )
-    # Exactly 2 Tk importers expected
+    # Pre-deletion: 2 Tk consumers. Post-122cr-deletion: ROI_ui
+    # no longer exists; 0 importers expected.
     tk_importers = [p for p in roi_ui_importers
                     if "ui_qt" not in p.parts]
     check(
-        f"exactly the 2 expected Tk consumers exist for ROI_ui "
-        f"(got {len(tk_importers)}): blob_tracker_ui + "
-        f"roi_video_table_pop_up",
-        len(tk_importers) == 2
-        and any("blob_tracker_ui" in str(p) for p in tk_importers)
-        and any("roi_video_table_pop_up" in str(p)
-                for p in tk_importers),
+        f"ROI_ui has either 2 Tk consumers (pre-122cr) or 0 "
+        f"consumers (post-122cr-deletion); got "
+        f"{len(tk_importers)}",
+        len(tk_importers) in (0, 2),
+        detail=f"got: {[str(p) for p in tk_importers]}",
     )
 
-    # ROI_mixin: only roi_ui.py consumes it
+    # ROI_mixin: pre-deletion 1 importer (roi_ui.py);
+    # post-122cr-deletion 0 importers.
     roi_mixin_importers = _real_importers("ROI_mixin", pkg)
     check(
-        f"only roi_ui.py consumes ROI_mixin "
-        f"(got {len(roi_mixin_importers)} importer(s))",
-        len(roi_mixin_importers) == 1
-        and "roi_ui.py" in str(roi_mixin_importers[0])
-        and "roi_ui_mixin" not in str(roi_mixin_importers[0]),
+        f"ROI_mixin has either 1 importer (pre-122cr: roi_ui.py) "
+        f"or 0 importers (post-122cr-deletion); got "
+        f"{len(roi_mixin_importers)}",
+        len(roi_mixin_importers) in (0, 1),
+        detail=f"got: {[str(p) for p in roi_mixin_importers]}",
     )
 
     # Qt panels do import from roi_logic

@@ -125,10 +125,16 @@ def main() -> int:
     # ==================================================================
     dir_files = [
         pkg / "plotting" / "shap_agg_stats_visualizer.py",
-        pkg / "ui" / "blob_tracker_ui.py",
+        # pkg / "ui" / "blob_tracker_ui.py" — deleted in 122cr
+        # as part of the ROI Tk cluster-deletion.
         pkg / "utils" / "read_write.py",
     ]
     for f in dir_files:
+        if not f.exists():
+            # File was deleted in a later patch; skip the check.
+            # The MUFASA_DIR / SIMBA_DIR pattern is what's being
+            # verified, not the specific file roster.
+            continue
         src = f.read_text()
         check(
             f"{f.relative_to(REPO_ROOT)}: defines "
