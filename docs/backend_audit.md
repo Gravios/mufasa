@@ -210,26 +210,34 @@ After the decoupling-via-callback experiments in 122ch (video_processing.py + tr
 * `bounding_box_tools/boundary_menus.py` — only real consumer was `SimBA.py:62`. Deleted in 122cm with SimBA.py surgical edits (import + button + grid). No Qt replacement; "Animal-anchored ROIs" feature is absent from both surfaces now. Acceptable feature loss for v1.
 * `video_processors/batch_process_menus.py` — zero real consumers anywhere. Two docstring "see also" pointers (`ui_qt/forms/batch_pre_process.py`, `video_processors/blob_tracking_executor.py`) updated to point at the Qt replacement and git history.
 
-**Bucket 2: Dies with another Tier-4 work item — wait, don't decouple (14 files)**
+**Bucket 2: Dies with another Tier-4 work item — wait, don't decouple (19 files; reclassified in 122cw)**
 
 | File | Dies with |
 |---|---|
-| 13× `unsupervised/*` | Tier 3b Unsupervised Qt port |
-| `mixins/annotator_mixin.py` | Labelling Qt port (consumed only by `labelling/`) |
-| `labelling/labelling_interface.py` | Labelling Qt port (itself the surface to be ported) |
-| `labelling/standard_labeller.py` | Labelling Qt port (sibling) |
+| 13× `unsupervised/*` | **SimBA.py finale** (reclassified in 122cw — only reach is `SimBA.py:725` via `mufasa-tk`; no Qt port planned or needed) |
+| `unsupervised/unsupervised_main.py` | **SimBA.py finale** (same — sole importer) |
+| `labelling/labelling_interface.py` | **SimBA.py finale** (reclassified in 122cw — Qt has its own labelling at `ui_qt/frame_labeller.py`) |
+| `labelling/labelling_advanced_interface.py` | **SimBA.py finale** (same) |
+| `labelling/standard_labeller.py` | **SimBA.py finale** (same) |
+| `labelling/targeted_annotations_clips.py` | **SimBA.py finale** (same) |
+| `mixins/annotator_mixin.py` | **SimBA.py finale** (consumed only by `labelling/targeted_annotations_clips.py`, which dies with SimBA.py) |
 | ~~`roi_tools/roi_ui_mixin.py`~~ | ~~Tier-4 close-out~~ ✓ **DELETED 122cr** |
 | ~~`roi_tools/roi_ui.py`~~ | ~~Same — Tk-only~~ ✓ **DELETED 122cr** |
 | `mixins/pop_up_mixin.py` | Last — once all other Tk popups are gone |
 
 These are Tk surfaces with structural Tk coupling. The 5 `Entry_Box` constructions in `annotator_mixin.py` aren't a single intrusion the way `TwoOptionQuestionPopUp` was in `video_processing.py` — they're primary UI primitives. Decoupling them piecemeal would 5x file size and fight the file's nature. Better to wait for the parent work item and delete the file whole.
 
-**Cluster shapes (post-122cp/cq/cr audits):**
+**Cluster shapes (post-122cv close-out; reclassified in 122cw):**
 
-* **Unsupervised cluster — closed**. The 13 `unsupervised/` files (split between `unsupervised_main.py` and 13 entries in `unsupervised/pop_ups/`) form a self-contained subgraph. Each `unsupervised/pop_ups/` file's only importer is `unsupervised_main.py`; no SimBA.py wiring, no Qt-side coupling, no backend reach-in. When Tier 3b replaces `unsupervised_main.py`, the entire cluster cascade-deletes in one move — no surgical edits to external files needed. The cleanest possible delete-with-parent.
-* **Labelling cluster — almost-closed but touched by SimBA.py**. `labelling_interface.py` and `standard_labeller.py` are reached via SimBA.py menu wiring; `annotator_mixin.py` is consumed via `labelling/targeted_annotations_clips.py`. Tier-4 close-out for labelling needs both the Qt port + SimBA.py surgical edits (like the 122ck cue-light cleanup), but it's still a tight subgraph.
+* **Unsupervised cluster — closed; dies with SimBA.py.** 14 self-contained files: `unsupervised_main.py` + 13 in `unsupervised/pop_ups/`. Each `unsupervised/pop_ups/` file's only importer is `unsupervised_main.py`; `unsupervised_main.py`'s only importer outside the cluster is `SimBA.py:725` (deferred import inside a button-command lambda). **No Qt-side reach anywhere.** Earlier audit framing ("dies with Tier 3b Unsupervised Qt port") implied a separate Qt port would be the trigger; the 122cw re-audit found no evidence of such a port being planned, partially started, or required. The cluster is functionally orphan to current users of `mufasa` / `mufasa-workbench` (Qt entry points) and reachable only through the legacy `mufasa-tk` entry. It cascade-deletes when SimBA.py dies. **15 files total** (14 above + `annotator_mixin.py` if labelling cluster is treated together — see below).
+* **Labelling Tk-UI cluster — partial Qt port already exists; remaining Tk UI dies with SimBA.py.** The labelling/ package has a Tk/backend split (122cw audit):
+  - **Backend (5 files, stay):** `extract_labelled_frames.py`, `extract_labelling_meta.py`, `mitra_style_appender.py`, `play_annotation_video.py`, `single_clf_appender_excel.py`. Consumed by `ui_qt/forms/annotation.py:416,428` (and other Qt forms) — these are the active workbench consumers.
+  - **Tk UI (4 files, die with SimBA.py):** `labelling_interface.py`, `labelling_advanced_interface.py`, `standard_labeller.py`, `targeted_annotations_clips.py`. Only SimBA.py:67, 69 + two ui/pop_ups (also SimBA.py-only) import these. The Qt workbench has its own labelling surface (`ui_qt/frame_labeller.py`, `ui_qt/forms/annotation.py`, `ui_qt/pages/annotation_page.py`) that bypasses these Tk files entirely.
+  - Earlier audit framing ("dies with Labelling Qt port") was wrong — **the Qt port already exists.** What's left in `labelling/` Tk UI is dead-on-Qt and just waiting for SimBA.py death.
 * ~~**ROI Tk cluster — almost-closed, similar to labelling**~~ ✓ **DELETED 122cr**. 6 files (2 in `roi_tools/`, 2 in `ui/`, 2 in `ui/pop_ups/`) + 5 surgical SimBA.py edits. Pattern: same as 122ck cue-light cleanup. Qt replacements verified before deletion: `ROIVideoTable` → `ROIManageForm`, `InitializeBlobTrackerPopUp` → `BlobTrackerInitLauncher`. The `blob_quick_check_interface.py` orphan-after-cascade was deleted in the same patch.
 * **pop_up_mixin** — fan-in from every Tk pop-up. Goes last; depends on every other Bucket-2 work item completing first.
+
+**Implication of the 122cw reclassification:** Tier 3b "Unsupervised Qt port" and "Labelling Qt port" are not separate work items — they're SimBA.py-finale prerequisites that have already been satisfied (Qt labelling exists; Qt unsupervised was never required). The next concrete Tier-4 milestone is the SimBA.py death cascade itself, which sweeps 14 unsupervised files + 4 labelling Tk-UI files + `annotator_mixin.py` + most of `ui/pop_ups/` (~75 files) + SimBA.py + `mufasa-tk` entry-point with it.
 
 **Bucket 3: Deferred — Qt code currently consumes it (0 files; DRAINED 122cq)**
 

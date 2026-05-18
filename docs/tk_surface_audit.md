@@ -390,6 +390,13 @@ Pure AST-based; no runtime/dynamic-import detection. The two UNREFERENCED files 
 
 **String-literal subprocess imports are runtime dependencies no AST audit can catch** (lesson learned in §2g's 122cr deletion). Patterns like `subprocess.run(["python", "-c", "from foo import bar; bar()"])` look like just string `Constant` nodes to AST, but the imported file IS a real runtime consumer. The 122cr ROI Tk cluster-deletion almost-deleted 4 popup files that appeared orphan to AST but were actually kept alive by string-literal imports in `ui_qt/dialogs/roi_video_table.py`. **Before any cluster-deletion, grep the codebase for the target filename in ANY string context, not just imports.** The blind spot is unfixable in pure AST; the mitigation is awareness + a string-search pre-flight check.
 
+**Entry-point reachability matters for "needs a Qt port" determinations** (lesson learned in 122cw's unsupervised + labelling re-audit). A Tk file that an audit puts in Bucket 2 with the disposition "dies with Tier 3b X Qt port" can be a misdiagnosis if there's no such port planned and the Tk file is reachable only through the legacy `mufasa-tk` entry point. Two questions to ask alongside the import graph:
+
+1. *Does any Qt-side code (`ui_qt/**`) reach into this file or its cluster?* If no, the cluster is invisible to current Qt users.
+2. *Through which `[project.scripts]` entry points is the cluster reachable?* If only `mufasa-tk` (legacy), and that entry point is on the deletion path, the cluster's disposition is "dies with SimBA.py", not "needs its own Qt port".
+
+The 122cw audit found that both the unsupervised cluster (14 files) and the labelling Tk-UI cluster (4 files + `annotator_mixin.py`) fit this pattern. The original framing of "Tier 3b X Qt port" as a separate work item was wrong — no such ports were planned, and in labelling's case the Qt port already exists at `ui_qt/frame_labeller.py` / `ui_qt/forms/annotation.py`. Reclassified to "SimBA.py finale" in 122cw.
+
 ---
 
 ## 8. Caveats
