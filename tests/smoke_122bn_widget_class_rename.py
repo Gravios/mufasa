@@ -179,7 +179,11 @@ def main() -> int:
     floors = {
         "MufasaDropDown": 60,   # 650 refs / spread across many files
         "MufasaScaleBar": 1,
-        "MufasaSeparator": 4,
+        "MufasaSeparator": 3,   # was 4 pre-122cr; roi_ui_mixin.py
+                                # deletion dropped it by 1.
+                                # Further Tk-surface deletions may
+                                # reduce it further — pin to a low
+                                # floor for snapshot resilience.
     }
     for cname, floor in floors.items():
         n = sum(

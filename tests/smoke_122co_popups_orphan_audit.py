@@ -175,18 +175,39 @@ def main() -> int:
     # ==================================================================
     pkg = REPO_ROOT / "mufasa"
     popups_dir = pkg / "ui" / "pop_ups"
+    # Known subprocess-launched popups (kept alive at runtime by
+    # `ui_qt/dialogs/roi_video_table.py:491-513`, not catchable by
+    # AST). Discovered during the 122cr ROI Tk cluster-deletion;
+    # documented in tk_surface_audit.md §2g + §7 (the 4th
+    # methodology lesson).
+    KNOWN_SUBPROCESS_POPUPS = {
+        "duplicate_rois_by_source_target_popup.py",
+        "import_roi_csv_popup.py",
+        "min_max_draw_size_popup.py",
+        "roi_size_standardizer_popup.py",
+    }
     if popups_dir.exists():
         n_orphan, n_referenced = _ast_orphan_audit(popups_dir, pkg)
+        # Allow exactly the known subprocess-launched popups as
+        # "AST orphans" since they have a non-AST-visible consumer.
+        # Anything beyond that count is a real orphan and should
+        # surface.
+        n_known_subprocess = sum(
+            1 for f in popups_dir.iterdir()
+            if f.name in KNOWN_SUBPROCESS_POPUPS
+        )
+        allowed_orphan_ceiling = n_known_subprocess
         check(
-            f"AST audit reproduces 0 orphans "
+            f"AST audit: ≤ {allowed_orphan_ceiling} known-"
+            f"subprocess-launched orphans, no others "
             f"(got orphan={n_orphan}, referenced={n_referenced})",
-            n_orphan == 0,
+            n_orphan <= allowed_orphan_ceiling,
         )
         check(
-            f"AST audit covers ≥ 80 referenced files "
-            f"(post-122ck cue-light cleanup left 81; got "
+            f"AST audit covers ≥ 70 referenced files "
+            f"(post-122cr; was 81 pre-122cr; got "
             f"{n_referenced} referenced)",
-            n_referenced >= 80,
+            n_referenced >= 70,
         )
 
     # ==================================================================

@@ -118,27 +118,26 @@ The audit's priority recommendations stand, but the **work content differs from 
 
 ## 3. §2 Backend modules with embedded Tk UI
 
-**Post-patch 122cm:** 19 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import `mufasa.ui.tkinter_functions` at module-load time (was 25 pre-122ch). Plus 1 lazy importer — `mufasa.utils.confirm` — which imports inside a function body only when the default Tk-backed `confirm_two_option` actually fires; designed to be replaceable by a Qt override at workbench startup. 19 + 1 = 20 total importers.
+**Post-patch 122cr:** 18 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import `mufasa.ui.tkinter_functions` at module-load time (was 25 pre-122ch). Plus 1 lazy importer — `mufasa.utils.confirm` — which imports inside a function body only when the default Tk-backed `confirm_two_option` actually fires; designed to be replaceable by a Qt override at workbench startup. 18 + 1 = 19 total importers.
 
 Count trajectory:
 * 25 → 23 in 122ch (video_processing.py + train_model_mixin.py decoupled).
 * 23 → 22 in 122ck (cue_light_main_popup.py deleted — note: 122ck's commit message understated this; the deleted file had a module-level `from mufasa.ui.tkinter_functions import ...` and counted as an importer).
 * 22 → 21 in 122cl (roi_ruler.py decoupled via callback).
 * 21 → 19 in 122cm (boundary_menus.py + batch_process_menus.py deleted; both had zero real consumers).
+* 19 → 18 in 122cr (roi_ui_mixin.py deleted as part of the ROI Tk cluster — `roi_ui.py` is a Tk file but doesn't itself import `tkinter_functions`, so the count drops by 1 not 2).
 
 The module-level importers are the ones that block Tier-4 cleanup (removing `tkinter_functions.py` would break them at load). The lazy importer doesn't have that property — `confirm.py` would survive `tkinter_functions.py` deletion as long as a Qt override is installed first, or the stdin/auto-yes fallback is acceptable.
 
-### 3a. Inventory by category (post-122cm)
+### 3a. Inventory by category (post-122cr)
 
 ```
-unsupervised/  (13 files)   — the entire unsupervised module
+unsupervised/  (14 files)   — 13× pop_ups + unsupervised_main
 labelling/     (2 files)    — frame labelling + standard_labeller
 mixins/        (2 files)    — annotator_mixin, pop_up_mixin
                               (train_model_mixin decoupled in 122ch)
-roi_tools/     (1 file)     — roi_ui_mixin (kept; consumed by Qt
-                              ROI dialogs transitively per 122ck
-                              re-audit)
-                              (roi_ruler decoupled in 122cl)
+roi_tools/     (0)          — roi_ui_mixin deleted 122cr; roi_ruler
+                              decoupled in 122cl
 bounding_box_tools/ (0)     — boundary_menus deleted in 122cm
 cue_light_tools/   (0)      — cue_light_main_popup deleted in 122ck
 video_processors/  (0)      — batch_process_menus deleted in 122cm
@@ -146,7 +145,7 @@ video_processors/  (0)      — batch_process_menus deleted in 122cm
 utils/         (1, lazy)    — confirm (the abstraction; not blocking)
 ```
 
-Module-level count post-122cm: **19**. Trajectory: 25 → 23 (122ch) → 22 (122ck) → 21 (122cl) → 19 (122cm).
+Module-level count post-122cr: **18**. Trajectory: 25 → 23 (122ch) → 22 (122ck) → 21 (122cl) → 19 (122cm) → 18 (122cr).
 
 ### 3b. Migration disposition
 
@@ -211,7 +210,7 @@ After the decoupling-via-callback experiments in 122ch (video_processing.py + tr
 * `bounding_box_tools/boundary_menus.py` — only real consumer was `SimBA.py:62`. Deleted in 122cm with SimBA.py surgical edits (import + button + grid). No Qt replacement; "Animal-anchored ROIs" feature is absent from both surfaces now. Acceptable feature loss for v1.
 * `video_processors/batch_process_menus.py` — zero real consumers anywhere. Two docstring "see also" pointers (`ui_qt/forms/batch_pre_process.py`, `video_processors/blob_tracking_executor.py`) updated to point at the Qt replacement and git history.
 
-**Bucket 2: Dies with another Tier-4 work item — wait, don't decouple (19 files)**
+**Bucket 2: Dies with another Tier-4 work item — wait, don't decouple (14 files)**
 
 | File | Dies with |
 |---|---|
@@ -219,17 +218,17 @@ After the decoupling-via-callback experiments in 122ch (video_processing.py + tr
 | `mixins/annotator_mixin.py` | Labelling Qt port (consumed only by `labelling/`) |
 | `labelling/labelling_interface.py` | Labelling Qt port (itself the surface to be ported) |
 | `labelling/standard_labeller.py` | Labelling Qt port (sibling) |
-| `roi_tools/roi_ui_mixin.py` | Tier-4 close-out (Tk-only; consumed by `roi_ui.py` only — reclassified from Bucket 3 in 122cq) |
-| `roi_tools/roi_ui.py` | Same — Tk-only; consumed by `blob_tracker_ui.py` + `roi_video_table_pop_up.py` (both Tk) |
+| ~~`roi_tools/roi_ui_mixin.py`~~ | ~~Tier-4 close-out~~ ✓ **DELETED 122cr** |
+| ~~`roi_tools/roi_ui.py`~~ | ~~Same — Tk-only~~ ✓ **DELETED 122cr** |
 | `mixins/pop_up_mixin.py` | Last — once all other Tk popups are gone |
 
 These are Tk surfaces with structural Tk coupling. The 5 `Entry_Box` constructions in `annotator_mixin.py` aren't a single intrusion the way `TwoOptionQuestionPopUp` was in `video_processing.py` — they're primary UI primitives. Decoupling them piecemeal would 5x file size and fight the file's nature. Better to wait for the parent work item and delete the file whole.
 
-**Cluster shapes (post-122cp/cq audits):**
+**Cluster shapes (post-122cp/cq/cr audits):**
 
 * **Unsupervised cluster — closed**. The 13 `unsupervised/` files (split between `unsupervised_main.py` and 13 entries in `unsupervised/pop_ups/`) form a self-contained subgraph. Each `unsupervised/pop_ups/` file's only importer is `unsupervised_main.py`; no SimBA.py wiring, no Qt-side coupling, no backend reach-in. When Tier 3b replaces `unsupervised_main.py`, the entire cluster cascade-deletes in one move — no surgical edits to external files needed. The cleanest possible delete-with-parent.
 * **Labelling cluster — almost-closed but touched by SimBA.py**. `labelling_interface.py` and `standard_labeller.py` are reached via SimBA.py menu wiring; `annotator_mixin.py` is consumed via `labelling/targeted_annotations_clips.py`. Tier-4 close-out for labelling needs both the Qt port + SimBA.py surgical edits (like the 122ck cue-light cleanup), but it's still a tight subgraph.
-* **ROI Tk cluster — almost-closed, similar to labelling**. `roi_ui.py` is consumed by `blob_tracker_ui.py` (Tk) + `roi_video_table_pop_up.py` (Tk, wired to SimBA.py:193). `roi_ui_mixin.py` is consumed only by `roi_ui.py`. Cluster-deletion touches 5 files: the 2 roi_tools files + `blob_tracker_ui.py` + `roi_video_table_pop_up.py` + `initialize_blob_tracking_pop_up.py` (consumes blob_tracker_ui), with surgical SimBA.py edit at line 193. Identified in 122cq re-audit; pending future patch.
+* ~~**ROI Tk cluster — almost-closed, similar to labelling**~~ ✓ **DELETED 122cr**. 6 files (2 in `roi_tools/`, 2 in `ui/`, 2 in `ui/pop_ups/`) + 5 surgical SimBA.py edits. Pattern: same as 122ck cue-light cleanup. Qt replacements verified before deletion: `ROIVideoTable` → `ROIManageForm`, `InitializeBlobTrackerPopUp` → `BlobTrackerInitLauncher`. The `blob_quick_check_interface.py` orphan-after-cascade was deleted in the same patch.
 * **pop_up_mixin** — fan-in from every Tk pop-up. Goes last; depends on every other Bucket-2 work item completing first.
 
 **Bucket 3: Deferred — Qt code currently consumes it (0 files; DRAINED 122cq)**

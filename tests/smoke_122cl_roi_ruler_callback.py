@@ -135,24 +135,38 @@ def main() -> int:
     )
 
     # ==================================================================
-    # roi_ui_mixin.py consumer changes
+    # roi_ui_mixin.py consumer changes — only check if the file
+    # still exists. 122cr deleted the whole ROI Tk cluster
+    # (including roi_ui_mixin.py). The 122cl decoupling lessons
+    # remain valid in git history; the runtime check just stops
+    # being meaningful when the file is gone.
     # ==================================================================
-    mixin_src = (pkg / "roi_tools" / "roi_ui_mixin.py").read_text()
-    check(
-        "roi_ui_mixin.py consumer no longer passes `info_label=`",
-        "info_label=self.status_bar" not in mixin_src,
-    )
-    check(
-        "roi_ui_mixin.py consumer passes `on_info_text=` callback",
-        "on_info_text=" in mixin_src,
-    )
-    check(
-        "roi_ui_mixin.py has a local closure doing the Tk-specific "
-        "configure + update_idletasks",
-        "_set_ruler_status" in mixin_src
-        and "status_bar.configure" in mixin_src
-        and "update_idletasks" in mixin_src,
-    )
+    mixin_path = pkg / "roi_tools" / "roi_ui_mixin.py"
+    if mixin_path.exists():
+        mixin_src = mixin_path.read_text()
+        check(
+            "roi_ui_mixin.py consumer no longer passes `info_label=`",
+            "info_label=self.status_bar" not in mixin_src,
+        )
+        check(
+            "roi_ui_mixin.py consumer passes `on_info_text=` callback",
+            "on_info_text=" in mixin_src,
+        )
+        check(
+            "roi_ui_mixin.py has a local closure doing the "
+            "Tk-specific configure + update_idletasks",
+            "_set_ruler_status" in mixin_src
+            and "status_bar.configure" in mixin_src
+            and "update_idletasks" in mixin_src,
+        )
+    else:
+        # File was deleted in a later patch (122cr). The
+        # decoupling pattern is preserved in git history.
+        check(
+            "roi_ui_mixin.py was deleted in a later patch — "
+            "decoupling pattern preserved in git history",
+            True,
+        )
 
     # ==================================================================
     # Module-level Tk-importer count regression guard

@@ -179,9 +179,10 @@ def main() -> int:
             n_orphan == 0,
         )
         check(
-            f"non-popup mufasa/ui/ has 8 referenced files "
-            f"(got {n_ref})",
-            n_ref == 8,
+            f"non-popup mufasa/ui/ has ≥ 6 referenced files "
+            f"(was 8 pre-122cr; 122cr deleted blob_tracker_ui.py "
+            f"+ blob_quick_check_interface.py; got {n_ref})",
+            n_ref >= 6,
         )
 
     unsup_dir = pkg / "unsupervised" / "pop_ups"

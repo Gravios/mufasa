@@ -124,6 +124,51 @@ Meanwhile, the actual Qt ROI surface (`ui_qt/dialogs/roi_canvas.py` + `roi_defin
 
 `roi_ui_mixin.py` + `roi_ui.py` are reclassified from `backend_audit.md` §3d Bucket 3 → Bucket 2 in 122cq. Bucket 3 is now drained (originally had this one entry).
 
+**Update (122cr): cluster deleted.** Following the reclassification, 122cr executed the cluster-deletion. Six files removed:
+
+* `mufasa/roi_tools/roi_ui_mixin.py` (1263 lines)
+* `mufasa/roi_tools/roi_ui.py` (178 lines)
+* `mufasa/ui/blob_tracker_ui.py` (Tk blob tracker UI)
+* `mufasa/ui/blob_quick_check_interface.py` (orphan-after-cascade — consumed only by `blob_tracker_ui.py`)
+* `mufasa/ui/pop_ups/roi_video_table_pop_up.py` (Tk ROI table popup)
+* `mufasa/ui/pop_ups/initialize_blob_tracking_pop_up.py` (Tk blob tracker launcher)
+
+Five surgical `SimBA.py` edits:
+* Lines 162–163: import of `InitializeBlobTrackerPopUp` → breadcrumb-comment.
+* Line 193: import of `ROIVideoTable` → breadcrumb-comment.
+* Line 400: `start_new_ROI = SimbaButton(...)` → breadcrumb-comment.
+* Line 404: `start_new_ROI.grid()` → breadcrumb-comment.
+* Line 869: `blob_tracking_menu.add_command(...)` (the "Perform blob tracking" entry) → breadcrumb-comment. The sibling `BlobVisualizerPopUp` entry below stays.
+
+Qt replacements verified before deletion:
+* `ROIVideoTable` → `ROIManageForm` (in `mufasa/ui_qt/forms/roi.py`).
+* `InitializeBlobTrackerPopUp` → `BlobTrackerInitLauncher` (in `mufasa/ui_qt/forms/addons.py`, wired into `addons_page.py:55`).
+
+Same pattern as the 122ck cue-light cleanup (6 files + SimBA.py edits) but with the audit-corrected dependency picture from 122cq.
+
+**Caveat: subprocess-launched popups (122cr discovery).** After the cluster-deletion, the AST orphan-audit reports 4 files in `mufasa/ui/pop_ups/` as newly-orphan:
+
+* `duplicate_rois_by_source_target_popup.py`
+* `import_roi_csv_popup.py`
+* `min_max_draw_size_popup.py`
+* `roi_size_standardizer_popup.py`
+
+These are NOT real orphans. They're kept alive by the Qt dialog `ui_qt/dialogs/roi_video_table.py:491-513`, which has four file-menu actions (`_action_standardize`, `_action_duplicate`, `_action_import_csv`, `_action_min_max_draw_size`) that launch the popups via subprocess using string-literal imports:
+
+```python
+def _action_standardize(self) -> None:
+    self._launch_tk_popup(
+        "from mufasa.ui.pop_ups.roi_size_standardizer_popup import ROISizeStandardizerPopUp\n"
+        "ROISizeStandardizerPopUp(config_path=sys.argv[1])\n"
+    )
+```
+
+The import is a string literal passed to a subprocess Python interpreter — it's a real runtime dependency, but `ast.parse(roi_video_table.py)` reports it as just a `Constant` string, not an `ImportFrom`. The 4 popups appear orphan to the AST audit but aren't. Deleting them would break the Qt dialog at runtime.
+
+This is the fourth audit-methodology lesson (alongside 122co's AST > regex + walk-functions-too + 122cq's docstring-vs-import distinction): **string-literal subprocess imports are real runtime dependencies that no AST audit can catch**. Code like `subprocess.run(["python", "-c", "from foo import bar; bar()"])` is invisible to import analyses. The honest check before deletion is: does the file appear in *any* string anywhere in the codebase?
+
+When the four file-menu actions get ported to Qt-native implementations (out of scope per the comment at `roi_video_table.py:488-489`), the subprocess strings will disappear and the 4 popups can finally be deleted alongside.
+
 #### Methodology lesson: distinguish docstring references from code imports
 
 This is the third audit-methodology lesson in the recent run:
@@ -340,6 +385,8 @@ Pure AST-based; no runtime/dynamic-import detection. The two UNREFERENCED files 
 **Always use AST, never regex** (lesson learned in §2e's pop-ups orphan re-audit). A line-bound regex misses multi-line imports — both continuation-line (`import \`) and parenthesized (`import (\n …\n)`) forms. `SimBA.py` uses both extensively; a regex audit reported 37 false-positive orphans before the AST rerun corrected the count to 0.
 
 **Only `ast.ImportFrom` nodes count as real dependencies** (lesson learned in §2g's ROI Tk cluster re-audit). Sphinx-style `:class:`…\`` references in docstrings look like code references when grep'd but aren't actual `from … import …` statements. The 122ck audit treated a docstring `:class:\`ROI_ui\`` reference as evidence of Qt → Tk dependency; the 122cq correction showed this was wrong. The honest check: walk every file's `ast.ImportFrom` nodes and ask whether any `alias.name` matches the target symbol. Anything else (string match, comment, docstring, type-annotation-in-string) is noise.
+
+**String-literal subprocess imports are runtime dependencies no AST audit can catch** (lesson learned in §2g's 122cr deletion). Patterns like `subprocess.run(["python", "-c", "from foo import bar; bar()"])` look like just string `Constant` nodes to AST, but the imported file IS a real runtime consumer. The 122cr ROI Tk cluster-deletion almost-deleted 4 popup files that appeared orphan to AST but were actually kept alive by string-literal imports in `ui_qt/dialogs/roi_video_table.py`. **Before any cluster-deletion, grep the codebase for the target filename in ANY string context, not just imports.** The blind spot is unfixable in pure AST; the mitigation is awareness + a string-search pre-flight check.
 
 ---
 
