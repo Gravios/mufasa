@@ -9,13 +9,13 @@ This audit is the output of patch 122by, Path C of the post-122bw work. No fixes
 
 ## 1. Summary
 
-**Status after patches 122ca / 122cb / 122cc / 122cd / 122ce / 122cf:** all 7 originally-counted runtime gaps closed. The only remaining `NotImplementedError` raise is the CLAHE interactive-preview Qt-dialog port, which was always tracked separately as a partial-failure case (the main CLAHE op works; only the interactive preview checkbox is unwired).
+**Status after patches 122ca / 122cb / 122cc / 122cd / 122ce / 122cf / 122ci:** all 7 originally-counted runtime gaps closed AND the CLAHE interactive-preview Qt-dialog port has shipped (patch 122ci). No remaining `NotImplementedError` raises in the Qt form surface.
 
 | Form | Failing operations | Failure mode | Status |
 |---|---|---|---|
 | `VideoFiltersForm` (video_filters.py) | ~~Black & white~~ | ~~Backend functions not present in this fork~~ | ✓ 122ca |
 | `VideoFiltersForm` | ~~Box blur~~, ~~Brightness/contrast~~ | ~~Backend functions not present~~ | ✓ 122cb (new FFmpeg backends) |
-| `VideoFiltersForm` | CLAHE with "Interactive preview" checked | Dialog not yet wired | pending (partial — main op works) |
+| `VideoFiltersForm` | ~~CLAHE with "Interactive preview" checked~~ | ~~Dialog not yet wired~~ | ✓ 122ci (Qt preview dialog) |
 | `CropVideosForm` (video_editing.py) | ~~Multi-crop from single video~~ | ~~Semantics mismatch with `MultiCropper`~~ | ✓ 122cf (loops ROISelector + crop_video directly) |
 | `AverageFrameForm` (image_conversion.py) | ~~All — every Run~~ | ~~Calls `create_average_frame`; backend is `create_average_frm`; kwargs mismatch~~ | ✓ 122cc (form rewritten) |
 | `DropBodypartsForm` (pose_cleanup.py) | ~~All — every Run~~ | ~~Constructor signature mismatch with `KeypointRemover`~~ | ✓ 122ce (form rewritten) |
@@ -42,21 +42,16 @@ Plus `VisualizationForm` raises `RuntimeError` (not `NotImplementedError`) when 
 
 The dispatch now calls `create_average_frm(video_path, start_frm, end_frm, start_time, end_time, save_path, verbose=False)` with kwargs assembled from the selected window mode.
 
-### 2b. `VideoFiltersForm` (video_filters.py) — 1 OPERATION FAILS (was 4)
+### 2b. `VideoFiltersForm` (video_filters.py) — 0 OPERATIONS FAIL (was 4)
 
 | Op | What fails | Reason |
 |---|---|---|
 | ~~Black & white (binarise)~~ | ~~Always~~ | ✓ **FIXED in patch 122ca** — rewired to existing `video_to_bw` backend (with threshold range scaling 0–255 → 0.0–1.0; `invert` checkbox dropped since backend doesn't support it) |
 | ~~Box / Gaussian blur~~ | ~~Always~~ | ✓ **FIXED in patch 122cb** — new `video_blur` backend added to `video_processors/video_processing.py` (FFmpeg's `gblur` filter; method=gaussian default, `box` available) |
 | ~~Brightness / contrast~~ | ~~Always~~ | ✓ **FIXED in patch 122cb** — new `video_brightness_contrast` backend added (FFmpeg's `eq` filter; ranges map directly) |
-| CLAHE | Only with "Interactive preview" checked | Dialog not wired; non-interactive CLAHE works |
+| ~~CLAHE~~ | ~~Only with "Interactive preview" checked~~ | ~~Dialog not wired~~ ✓ **FIXED in patch 122ci** — new `_ClahePreviewDialog` shows live preview with adjustable clip_limit + tile_size + frame-nav slider. `on_run` override intercepts the interactive case; on Apply, mutates params with dialog's final values and proceeds to the worker-thread dispatch |
 
-**Severity (post-122cb): low — only the CLAHE interactive preview remains**. The main CLAHE path works; B&W is fixed; blur and brightness/contrast have working FFmpeg-backed implementations.
-
-The form has 5 operations in its dropdown; 1 of those 5 currently has a partial failure (CLAHE interactive preview only).
-
-**Fix scope (remaining):**
-* CLAHE interactive preview: medium — needs a Qt dialog like blob quick-check (live frame display + tunable parameters).
+**Severity (post-122ci): none.** All 5 ops in the dropdown are now wired end-to-end.
 
 **Stop-gap (no backend work):** disable the two remaining failing options in the dropdown until they're wired. Same posture as before; the broken-options scope just shrank by one.
 
