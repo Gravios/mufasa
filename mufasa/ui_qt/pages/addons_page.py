@@ -29,7 +29,9 @@ from PySide6.QtWidgets import (QDoubleSpinBox, QFileDialog, QMessageBox)
 from mufasa.ui_qt.forms.addons import (BlobTrackerInitLauncher,
                                        CueLightClfForm, CueLightDataForm,
                                        CueLightMovementForm,
-                                       CueLightVisualizerForm, KleinbergForm,
+                                       CueLightVisualizerForm,
+                                       DirectingBodyPartSettingsForm,
+                                       KleinbergForm,
                                        MutualExclusivityForm, PupRetrievalForm,
                                        SpontaneousAlternationForm)
 from mufasa.ui_qt.forms.blob_quick_check import BlobQuickCheckForm
@@ -52,6 +54,11 @@ def build_addons_page(workbench,
     page.add_section("Mutual exclusivity corrector",     [(MutualExclusivityForm, {})])
     page.add_section("Pup retrieval",                    [(PupRetrievalForm, {})])
     page.add_section("Spontaneous alternation",          [(SpontaneousAlternationForm, {})])
+    # Patch 122cz: Qt port of the directing-bodypart settings popup
+    # (resolves the blocking gap identified in 122cy). Writes the
+    # single `bodypart_direction` key the AnalysisForm's
+    # "Directing toward body-part — statistics" route depends on.
+    page.add_section("Directing — body-part settings",   [(DirectingBodyPartSettingsForm, {})])
     page.add_section("Blob tracker — initialise",        [(BlobTrackerInitLauncher, {})])
     # Patch 122bw (Tier 3a): Qt port of the legacy Tk
     # BlobQuickChecker. Lets users preview the threshold-difference

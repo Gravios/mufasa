@@ -9,11 +9,11 @@
 |---|---:|
 | Covered by Qt workbench | **69** |
 | Hard drops (admin/cosmetic) | **2** |
-| Workflow gaps requiring Qt work before Stage B | **1** |
+| Workflow gaps requiring Qt work before Stage B | ~~1~~ **0 (resolved 122cz)** |
 | Feature decisions required (YOLO/conversion) | **3** |
-| **Total** | **75** |
+| **Total** | **75 → 74 (1 ported in 122cz)** |
 
-**Verdict:** Stage B is **not yet ready** for monolithic execution. One real workflow gap (`direction_animal_to_bodypart_settings`) blocks the "Directing toward body-part — statistics" analysis route. Three additional gaps need feature-disposition decisions but don't block other workflows.
+**Verdict (post-122cz):** Stage B is **ready for monolithic execution** once the 3 feature decisions are made. The blocking workflow gap (`direction_animal_to_bodypart_settings`) was resolved by porting it to a Qt-native form in patch 122cz. The 3 remaining feature decisions don't block other workflows — they affect whether 3 specific popups get ported or dropped.
 
 ---
 
@@ -122,30 +122,27 @@ Acceptable to delete with no Qt replacement; not user-facing workflows.
 
 ---
 
-## §3. Workflow gaps (1 popup — BLOCKING)
+## §3. Workflow gaps (1 popup — ~~BLOCKING~~ ✓ RESOLVED 122cz)
 
 These popups have **no Qt counterpart**, and the workflow they support **cannot be invoked without them**.
 
-### 3.1. `direction_animal_to_bodypart_settings_pop_up.py` — BLOCKING
+### 3.1. `direction_animal_to_bodypart_settings_pop_up.py` — ✓ RESOLVED 122cz
 
 **Class:** `DirectionAnimalToBodyPartSettingsPopUp`
-**What it does:** lets the user pick, per animal, which body-part is the "direction-from" reference for the directing-to-bodypart analysis. Writes selections to project config:
+**What it did:** let the user pick, per animal, which body-part is the "direction-from" reference for the directing-to-bodypart analysis. Wrote selections to project config:
 - Section: `ConfigKey.DIRECTIONALITY_SETTINGS.value`
 - Key: `bodypart_direction`
 
-**Qt dependency:** `AnalysisForm`'s "Directing toward body-part — statistics" route (line 315 in `analysis.py`) calls `DirectingAnimalsToBodyPartAnalyzer(config_path=...)`. The backend takes only `config_path` and reads the body-part selections from the project's directing-settings — which the popup writes.
+**Qt dependency:** `AnalysisForm`'s "Directing toward body-part — statistics" route (line 315 in `analysis.py`) calls `DirectingAnimalsToBodyPartAnalyzer(config_path=...)`. The backend takes only `config_path` and reads the body-part selection from the project's directing-settings — which the popup wrote.
 
-**Comment in `analysis.py:311-313` explicitly says:**
-> "the body-part configuration is read from the project's directing-settings (set via the dedicated settings popup or project config)."
+**Resolution (122cz):** Ported to a Qt-native form — `DirectingBodyPartSettingsForm` in `mufasa/ui_qt/forms/addons.py`. Wired into `addons_page.py` as the "Directing — body-part settings" section. The Tk popup file is deleted; SimBA.py's import + button + grid wiring are commented out (same surgical pattern as 122ck/122cr).
 
-**Impact if deleted in Stage B:** users running the Qt route would hit a config-read error (missing keys). They'd have to hand-edit `project_config.ini`.
+Notable port differences:
+* **Single dropdown** instead of one-per-animal. The legacy Tk popup looped per animal but wrote the same single key (only the last animal's choice persisted), so the per-animal UI was misleading. The Qt form transparently writes the single key with a single dropdown.
+* **Body-part choices** are the union of body-part names across all animals (matches the backend's `bp_x_name = bodypart_direction + '_x'` lookup, which requires the name to exist for every animal).
+* **Settings-only** — the Tk popup also kicked off the analyzer at the end of save(). The Qt form is settings-only; users run the analysis from AnalysisForm separately (cleaner separation of concerns).
 
-**Disposition options:**
-1. **Port to Qt as a settings dialog.** Small popup (~50 lines): per-animal dropdown for body-part picks. Similar pattern to 122cs (`ROISizeStandardizerDialog`). **Recommended.**
-2. **Inline the selectors into AnalysisForm.** When the directing-to-bodypart route is selected, surface a body-part dropdown per animal. Saves a dialog but adds complexity to the universal AnalysisForm. Trade-off.
-3. **Drop the directing-to-bodypart route entirely.** Acceptable if the feature is not in v1 scope. Removes both the popup AND the AnalysisForm route. Cleanest but a feature loss.
-
-**Recommendation:** Option 1 (port to Qt). Estimated 1 patch (~80–120 lines of Qt code, similar shape to 122cs/cu).
+After this patch, the AnalysisForm's "Directing toward body-part — statistics" route has a complete Qt path. Stage B no longer has a blocking workflow gap.
 
 ---
 
