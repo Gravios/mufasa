@@ -68,11 +68,16 @@ def build_workbench(project_config_path: Optional[str] = None
     from mufasa.ui_qt.pages.features_page import build_features_page
     build_features_page(wb, config_path=project_config_path)
 
-    from mufasa.ui_qt.pages.annotation_page import build_annotation_page
-    build_annotation_page(wb, config_path=project_config_path)
-
+    # Patch 122d0 (QWI-4): Classifier moved BEFORE Annotation —
+    # the "Classifier → Manage" page is the prerequisite for the
+    # Annotation page (you can't label frames for a classifier
+    # that doesn't exist yet). Top-to-bottom sidebar order should
+    # follow the workflow dependency order.
     from mufasa.ui_qt.pages.classifier_page import build_classifier_page
     build_classifier_page(wb, config_path=project_config_path)
+
+    from mufasa.ui_qt.pages.annotation_page import build_annotation_page
+    build_annotation_page(wb, config_path=project_config_path)
 
     from mufasa.ui_qt.pages.analysis_page import build_analysis_page
     build_analysis_page(wb, config_path=project_config_path)
