@@ -67,7 +67,7 @@ except:
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.plotting.shap_agg_stats_visualizer import \
     ShapAggregateStatisticsCalculator
-from mufasa.ui.tkinter_functions import TwoOptionQuestionPopUp
+from mufasa.utils.confirm import confirm_two_option
 from mufasa.utils.checks import (check_all_dfs_in_list_has_same_cols,
                                 check_file_exist_and_readable,
                                 check_filepaths_in_iterable_exist, check_float,
@@ -2359,12 +2359,18 @@ class TrainModelMixin(object):
 
             errors = [x for x in errors if x != ""]
             if errors:
-                option = TwoOptionQuestionPopUp(question=f"{errors[0]} \n ({meta_file_name}) \n  Do you want to skip this meta file or terminate training ?",
-                                                title="META CONFIG FILE ERROR",
-                                                option_one="SKIP",
-                                                option_two="TERMINATE")
+                # Patch 122ch: was TwoOptionQuestionPopUp(...).selected_option.
+                # Now routed through the UI-agnostic confirm helper.
+                choice = confirm_two_option(
+                    question=(f"{errors[0]} \n ({meta_file_name}) \n  "
+                              "Do you want to skip this meta file or "
+                              "terminate training ?"),
+                    title="META CONFIG FILE ERROR",
+                    option_one="SKIP",
+                    option_two="TERMINATE",
+                )
 
-                if option.selected_option == "SKIP":
+                if choice == "SKIP":
                     continue
                 else:
                     raise InvalidInputError(msg=errors[0], source=self.__class__.__name__)

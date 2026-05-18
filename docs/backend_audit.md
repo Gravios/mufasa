@@ -118,18 +118,23 @@ The audit's priority recommendations stand, but the **work content differs from 
 
 ## 3. §2 Backend modules with embedded Tk UI
 
-25 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import from `mufasa.ui.tkinter_functions`. These block Tier-4 cleanup because removing `tkinter_functions.py` would break them.
+**Post-patch 122ch:** 23 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import `mufasa.ui.tkinter_functions` at module-load time (was 25 pre-122ch). Plus 1 lazy importer — `mufasa.utils.confirm` — which imports inside a function body only when the default Tk-backed `confirm_two_option` actually fires; designed to be replaceable by a Qt override at workbench startup. 23 + 1 = 24 total importers.
 
-### 3a. Inventory by category
+The module-level importers are the ones that block Tier-4 cleanup (removing `tkinter_functions.py` would break them at load). The lazy importer doesn't have that property — `confirm.py` would survive `tkinter_functions.py` deletion as long as a Qt override is installed first, or the stdin/auto-yes fallback is acceptable.
+
+### 3a. Inventory by category (post-122ch)
 
 ```
 unsupervised/  (13 files)   — the entire unsupervised module
 labelling/     (2 files)    — frame labelling + standard_labeller
-mixins/        (3 files)    — annotator_mixin, pop_up_mixin, train_model_mixin
+mixins/        (2 files)    — annotator_mixin, pop_up_mixin
+                              (train_model_mixin decoupled in 122ch)
 roi_tools/     (2 files)    — roi_ruler, roi_ui_mixin
 bounding_box_tools/ (1)     — boundary_menus
 cue_light_tools/   (1)      — cue_light_main_popup
-video_processors/  (2)      — batch_process_menus, video_processing
+video_processors/  (1)      — batch_process_menus
+                              (video_processing decoupled in 122ch)
+utils/         (1, lazy)    — confirm (the abstraction; not blocking)
 ```
 
 ### 3b. Migration disposition
@@ -146,7 +151,7 @@ These define classes/functions where the Tk UI is mixed with backend logic — r
 |---|---|---|
 | `mixins/pop_up_mixin.py` | `DropDownMenu`, `Entry_Box`, `FileSelect`, `SimbaButton`, `hxtScrollbar` | Foundation class for ~85 Tk popups. Delete with Tier 4 once popups are gone. |
 | `mixins/annotator_mixin.py` | `Entry_Box` | Used by `mufasa/labelling/`. Replace `Entry_Box` with a Qt or backend-pure equivalent. |
-| `mixins/train_model_mixin.py` | `TwoOptionQuestionPopUp` | Single yes/no confirmation. Replace with `QMessageBox.question` or a backend-side `bool` parameter. |
+| `mixins/train_model_mixin.py` | ~~`TwoOptionQuestionPopUp`~~ | ~~Single yes/no confirmation. Replace with `QMessageBox.question` or a backend-side `bool` parameter.~~ ✓ **DONE 122ch** — routed through `mufasa.utils.confirm.confirm_two_option`. |
 | `labelling/labelling_interface.py` | `CreateLabelFrameWithIcon`, `Entry_Box`, `SimBALabel`, `SimbaButton`, `SimbaCheckbox` | Labelling UI itself — the whole interface needs a Qt port (similar shape to `blob_quick_check`: parameter form + interactive viewer dialog). |
 | `labelling/standard_labeller.py` | Same as above | Sibling labeller — should be ported alongside. |
 
@@ -156,7 +161,7 @@ These are backend modules that fire a Tk popup as part of an operation (e.g., a 
 
 | File | Tk symbols imported | Migration |
 |---|---|---|
-| `video_processors/video_processing.py` | `TwoOptionQuestionPopUp` | Replace with `QMessageBox.question`. Or split: backend takes a `confirm_callback` parameter; Tk version supplies the popup, Qt version supplies a dialog. |
+| `video_processors/video_processing.py` | ~~`TwoOptionQuestionPopUp`~~ | ~~Replace with `QMessageBox.question`. Or split: backend takes a `confirm_callback` parameter; Tk version supplies the popup, Qt version supplies a dialog.~~ ✓ **DONE 122ch** — routed through `mufasa.utils.confirm.confirm_two_option` (lazy Tk import inside the helper; Qt override via module attribute reassignment). |
 | `cue_light_tools/cue_light_main_popup.py` | `CreateLabelFrameWithIcon`, `MufasaDropDown`, `SimBALabel`, `SimbaButton` | This is the launcher that's already replaced by the Add-ons Cue-light forms in the Qt workbench. Drop it. |
 | `roi_tools/roi_ruler.py` | `SimBALabel` | Read the code — the SimBALabel is probably a status display for the ruler. Refactor: emit a callback signal that callers can route to Qt or Tk. |
 | `roi_tools/roi_ui_mixin.py` | `CreateLabelFrameWithIcon`, `DropDownMenu`, `Entry_Box`, `MufasaDropDown`, `SimBALabel`, …5 more | Mixin used by `mufasa/ui/pop_ups/roi_*`. Replaced by the Qt ROI surface (`ROIManageForm` + `ROIDefinePanel`). Drop. |
@@ -227,10 +232,12 @@ After 4b + 4c: ~~all 7~~ **4 of the 7 form runtime gaps closed** (B&W, blur, bri
 
 Order suggested:
 
-11. **`video_processors/video_processing.py`** — replace `TwoOptionQuestionPopUp` import. This file is fundamental backend code; getting Tk out of it removes a heavy coupling.
-12. **`mixins/train_model_mixin.py`** — same `TwoOptionQuestionPopUp` replacement.
+11. ~~**`video_processors/video_processing.py`** — replace `TwoOptionQuestionPopUp` import.~~ ✓ **DONE in patch 122ch.** Both the module-level Tk import and the `TwoOptionQuestionPopUp(...)` call site (in `extract_frames_from_all_videos_in_directory`) replaced with a `from mufasa.utils.confirm import confirm_two_option` import + a `confirm_two_option(...)` call. The new helper lazy-imports Tk only if no Qt override is installed; backend file is now Tk-import-free at module load.
+12. ~~**`mixins/train_model_mixin.py`** — same `TwoOptionQuestionPopUp` replacement.~~ ✓ **DONE in patch 122ch.** Same pattern: Tk import dropped; `TrainModelMixin.read_meta_dicts_from_dir` (META CONFIG FILE ERROR confirmation) now routes through `confirm_two_option`.
 13. **`roi_tools/roi_ruler.py`** — refactor `SimBALabel` use into a callback.
 14. **`mixins/annotator_mixin.py`** — refactor `Entry_Box` use.
+
+**New helper:** `mufasa/utils/confirm.py` — provides `confirm_two_option(question, option_one, option_two, title)`. Default implementation lazy-imports the Tk popup; falls back to stdin prompt if Tk unavailable; falls back to `option_one` if stdin unavailable. Qt code can override by reassigning the module-level binding at workbench startup (see the module docstring for the pattern).
 
 ### 4e. Bulk-drop (after Tier 3b)
 
