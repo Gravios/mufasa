@@ -223,6 +223,12 @@ After the decoupling-via-callback experiments in 122ch (video_processing.py + tr
 
 These are Tk surfaces with structural Tk coupling. The 5 `Entry_Box` constructions in `annotator_mixin.py` aren't a single intrusion the way `TwoOptionQuestionPopUp` was in `video_processing.py` — they're primary UI primitives. Decoupling them piecemeal would 5x file size and fight the file's nature. Better to wait for the parent work item and delete the file whole.
 
+**Cluster shapes (post-122cp audit):**
+
+* **Unsupervised cluster — closed**. The 13 `unsupervised/` files (split between `unsupervised_main.py` and 13 entries in `unsupervised/pop_ups/`) form a self-contained subgraph. Each `unsupervised/pop_ups/` file's only importer is `unsupervised_main.py`; no SimBA.py wiring, no Qt-side coupling, no backend reach-in. When Tier 3b replaces `unsupervised_main.py`, the entire cluster cascade-deletes in one move — no surgical edits to external files needed. The cleanest possible delete-with-parent.
+* **Labelling cluster — almost-closed but touched by SimBA.py**. `labelling_interface.py` and `standard_labeller.py` are reached via SimBA.py menu wiring; `annotator_mixin.py` is consumed via `labelling/targeted_annotations_clips.py`. Tier-4 close-out for labelling needs both the Qt port + SimBA.py surgical edits (like the 122ck cue-light cleanup), but it's still a tight subgraph.
+* **pop_up_mixin** — fan-in from every Tk pop-up. Goes last; depends on every other Bucket-2 work item completing first.
+
 **Bucket 3: Deferred — Qt code currently consumes it (1 file)**
 
 * `roi_tools/roi_ui_mixin.py` — Qt ROI dialogs (`mufasa/ui_qt/dialogs/roi_canvas.py`, `roi_define_panel.py`) subclass through `roi_tools/roi_ui.py` which subclasses `ROI_mixin`. Resolving this needs either inlining what `ROI_ui` uses from the mixin (substantial), or a parallel Qt mixin (parallel maintenance burden). Identified in 122ck re-audit; tracked for future planning.
