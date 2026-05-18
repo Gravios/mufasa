@@ -237,7 +237,9 @@ Order suggested:
 13. **`roi_tools/roi_ruler.py`** — refactor `SimBALabel` use into a callback.
 14. **`mixins/annotator_mixin.py`** — refactor `Entry_Box` use.
 
-**New helper:** `mufasa/utils/confirm.py` — provides `confirm_two_option(question, option_one, option_two, title)`. Default implementation lazy-imports the Tk popup; falls back to stdin prompt if Tk unavailable; falls back to `option_one` if stdin unavailable. Qt code can override by reassigning the module-level binding at workbench startup (see the module docstring for the pattern).
+**New helper:** `mufasa/utils/confirm.py` — provides `confirm_two_option(question, option_one, option_two, title)`. Default implementation lazy-imports the Tk popup; falls back to stdin prompt if Tk unavailable; falls back to `option_one` if stdin unavailable. Qt code overrides by reassigning the module-level binding at workbench startup (see the module docstring for the pattern).
+
+**Qt-side override installed in patch 122cj.** `mufasa.ui_qt.qt_confirm.install_qt_confirm_override()` is called from `workbench_app.main()` immediately after the `QApplication` is constructed. After install, every backend call to `confirm_two_option(...)` routes through `QMessageBox.question`-style dialog with the caller's option labels preserved (e.g., "SKIP" / "TERMINATE" for the training-meta-config error path, not Qt's standard "Yes" / "No" constants).
 
 ### 4e. Bulk-drop (after Tier 3b)
 

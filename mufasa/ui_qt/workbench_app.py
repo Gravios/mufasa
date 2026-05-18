@@ -171,6 +171,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     app.setApplicationName("Mufasa")
     app.setOrganizationName("Mufasa")
 
+    # Patch 122cj: install the Qt-native confirm override so any
+    # subsequent backend call to mufasa.utils.confirm.confirm_two_option
+    # routes through QMessageBox.question instead of the lazy Tk
+    # fallback. Must happen after QApplication exists and before
+    # any backend code can fire a confirm — workbench startup is
+    # the natural single hook.
+    from mufasa.ui_qt.qt_confirm import install_qt_confirm_override
+    install_qt_confirm_override()
+
     project_config_path: Optional[str] = None
     if args.project:
         # User specified an explicit path — respect it. Don't auto-search.
