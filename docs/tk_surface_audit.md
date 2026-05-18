@@ -38,6 +38,43 @@ Both surfaces drive the same backend (`mufasa/data_processors/`, `mufasa/plottin
 
 **Implication:** until this is ported, deleting `mufasa/ui/` breaks the Qt workbench's video-calibration flow.
 
+### 2e. Pop-ups orphan re-audit (added 122co)
+
+A targeted re-audit of `mufasa/ui/pop_ups/` (81 files post-122ck, after the 5 cue-light deletions) for true orphans — files where no symbol they define is imported anywhere in the codebase.
+
+**Finding: zero true orphans.** Every single pop-up file is referenced by at least one importer somewhere in `mufasa/`. The bulk of those importers is `SimBA.py` (the Tk launcher), which imports ~80 pop-up classes for its menu-callback wiring.
+
+**Implication for Tier-4 strategy:** `mufasa/ui/pop_ups/` cannot be incrementally drained the same way `cue_light_tools/` was. Files in pop_ups/ get deleted in only two ways:
+
+1. **Cluster-deletion** — when a group of related pop-ups all have Qt replacements and `SimBA.py` is edited to drop the cluster (the 122ck cue-light cleanup pattern: 5 files dropped, 3 SimBA.py breadcrumb-comments left).
+2. **Cascade-deletion** — when `SimBA.py` itself is deleted in Tier-4 close-out, the ~80 transitively-imported files become orphans in a single move.
+
+There is no "delete now, no consumers" pop-up file. The "many likely orphans" hypothesis floated in earlier planning was wrong.
+
+#### Methodology note: AST traversal vs regex matching
+
+The first pass of this audit used regex (`\bimport\b.*\b{class_name}\b`) and reported 37 of 81 files as orphans — a 45% false-positive rate. The regex pattern failed on **multi-line imports**, which `SimBA.py` uses extensively:
+
+```python
+# Continuation-line style (used in SimBA.py for ~80 pop-up imports)
+from mufasa.ui.pop_ups.animal_directing_other_animals_pop_up import \
+    AnimalDirectingAnimalPopUp
+```
+
+```python
+# Parenthesized style (used in some places for grouped imports)
+from mufasa.ui.pop_ups.foo_pop_up import (
+    FooPopUp,
+    BarPopUp,
+)
+```
+
+In both cases, the class name lives on a different line from the `import` keyword. A line-bound regex with `re.compile(r"\bimport\b.*\bClass\b")` (no `DOTALL` flag) misses both forms.
+
+**Correct approach:** AST traversal. `ast.parse(src)` normalizes both single-line and multi-line imports into the same `ImportFrom` node shape; `node.names` gives the imported names regardless of source formatting. Every future cross-file import audit in this repo should use AST, not regex.
+
+The corrected AST-based audit re-ran in under a second and reported 0 orphans — a 1-line code change (regex → AST loop) that completely flipped the conclusion.
+
 ### 2b. UNREFERENCED (2 files)
 
 | File | Lines | Defines | Notes |
@@ -238,6 +275,8 @@ def get_from_imports(f):
 For each file in `mufasa/ui/`, find every file `f` such that `mod_of(target) in get_from_imports(f)`. Bucket the importers by their location (Qt / SimBA.py / backend / ui-internal). Status follows from which buckets have entries.
 
 Pure AST-based; no runtime/dynamic-import detection. The two UNREFERENCED files should be cross-checked against string-based dynamic loads before deletion.
+
+**Always use AST, never regex** (lesson learned in §2e's pop-ups orphan re-audit). A line-bound regex misses multi-line imports — both continuation-line (`import \`) and parenthesized (`import (\n …\n)`) forms. `SimBA.py` uses both extensively; a regex audit reported 37 false-positive orphans before the AST rerun corrected the count to 0.
 
 ---
 
