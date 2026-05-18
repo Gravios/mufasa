@@ -1,6 +1,6 @@
 # Mufasa documentation
 
-Index of documents in `docs/`. Two tracks: **workflow / user-facing** (top section) and **Kalman smoother design** (bottom section). Each doc states its audience and scope in its first lines.
+Index of documents in `docs/`. Three tracks: **workflow / user-facing**, **Tk → Qt migration & audits** (developer-facing), and **Kalman smoother design** (separate concern). Each doc states its audience and scope in its first lines.
 
 ---
 
@@ -26,25 +26,44 @@ Read this when you have a research question and need a starting checklist.
 
 Read this when you're working on the codebase itself, planning a migration patch, or trying to figure out why a workflow misbehaves.
 
+---
+
+## Tk → Qt migration & audits
+
+These five docs together cover the v1 migration: the Tk surface that needs to go, the Qt surface that's replacing it, the runtime gaps that block "the Qt workbench is feature-complete", and the backend coupling that blocks the final Tk deletion. They're chained: read them in roughly the order below for the full picture.
+
 ### `tk_surface_audit.md`
 **Tk-vs-Qt surface inventory and removal plan.** Status-tagged audit of all 96 files in `mufasa/ui/` plus `mufasa/SimBA.py`: which are load-bearing for Qt, which are reachable only via the legacy Tk launcher, which are unreferenced, what migration steps are required to remove the Tk surface entirely.
+
+Updated counts (post-122cm): 8 files dropped via Tier-4 work since the original audit (2 in 122bx + 6 cue-light in 122ck), plus 2 from elsewhere in `mufasa/` (`bounding_box_tools/boundary_menus.py` + `video_processors/batch_process_menus.py` in 122cm). 86 of 96 `mufasa/ui/` files remaining.
 
 Read this when planning UI work or considering a SimBA → Mufasa rename in Tk-only code (short answer: don't — it's slated for removal).
 
 ### `tk_to_qt_consolidation_plan.md`
 **Comprehensive redesign mapping every Tk popup to its Qt destination.** Lays out the target Qt workbench layout, maps the ~85 Tk popups to existing Qt forms or proposed new sections, identifies the ~7 genuine gaps that need new Qt work, and orders the migration into four tiers (verify → small new sections → unsupervised port → drop + cleanup).
 
-Read this when planning the next porting patch — it tells you what's left to build and what's already covered (existing Qt is further along than the AST audit alone suggests).
+Tier status (post-122cm):
+* Tier 1 (verify existing Qt) — ✓ done by 122bt/bu/bv.
+* Tier 2 (small new sections) — ✓ done by 122bv close-out.
+* Tier 3a (Blob quick-check) — ✓ 122bw.
+* Tier 3b (Unsupervised analysis) — pending (multi-day port).
+* Tier 4 (drop + cleanup) — in progress; module-level Tk-importer count 25 → 19; 10 file deletions so far.
+
+Read this when planning the next porting patch — it tells you what's left to build and what's already covered.
 
 ### `qt_form_runtime_gaps.md`
-**Audit of Qt forms whose UI is wired but whose backend raises `NotImplementedError` at runtime.** Four forms with seven failing operations: `AverageFrameForm` (entirely broken — spelling mismatch + kwarg shape), `VideoFiltersForm` (3 of 5 ops + CLAHE interactive preview unwired), `CropVideosForm` (multi-crop sub-mode unwired), `DropBodypartsForm` (entirely broken — missing backend), `ROIFeaturesForm` (Remove action unwired).
+**Audit of Qt forms whose UI was wired but whose backend raised `NotImplementedError` at runtime.** Originally identified 7 failing operations across 4 forms; all 7 closed in patches 122ca through 122cf. The CLAHE interactive-preview Qt-dialog port (originally tracked as a separate partial-failure case) shipped in 122ci. **No remaining `NotImplementedError` raises in the Qt form surface.**
 
-Read this before launching the Qt workbench to know which buttons will surface errors. Includes recommended stop-gap (disable broken options) plus priority order for backend wiring.
+Read this for the historical record of how each gap was closed, or to understand the per-form fix patterns (form rewrite vs backend addition vs UI redesign).
 
 ### `backend_audit.md`
-**Backend-side companion to `qt_form_runtime_gaps.md`** — two-part audit covering the actual availability of "missing" backends (5 of 7 turn out to be findable under different names, only 2 are genuinely missing) and the 25 backend modules that import from `tkinter_functions.py` (blocking Tier-4 cleanup). Each Tk importer is categorised: dies-with-unsupervised / needs-refactor / simple-popup-replacement / build-infrastructure.
+**Backend-side companion to `qt_form_runtime_gaps.md`.** Originally covered (a) the actual availability of "missing" backends (5 of 7 turn out to be findable under different names) and (b) the 25 backend modules that imported from `tkinter_functions.py` (blocking Tier-4 cleanup). Now extended with:
 
-Read this when planning a fix-the-broken-form patch or planning the Tier-4 backend-decoupling work. The Quick Wins section in §4a lists ≤1-hour fixes that close 4 of the 7 runtime gaps.
+* **§3d "Strategic disposition"** (added 122cm) — four-bucket classification of remaining Tk importers (delete-only / dies-with / deferred / lazy) plus a decision rule for future audits ("Tk use is a single intrusion in a pure-backend file → decouple; file is a Tk surface → wait for parent work item; don't decouple piecemeal"). Supersedes the earlier Group A/B/C/D classification.
+* **§4d Backend decoupling progress** — items 11, 12, 13 marked done in 122ch + 122cl; item 14 (annotator_mixin) RECLASSIFIED in 122cm (dies with labelling Qt port, not decouple-able).
+* **§4f Tier-4 close-out** — items 17, 18 done in 122cm; item 16 (labelling Qt port) pending.
+
+Read this when planning Tier-4 work or when considering whether a backend file's Tk use is a candidate for decoupling vs delete-with-parent. The decision rule in §3d is the actionable summary.
 
 ### `qt_form_registration_audit.md`
 **Registration check for OperationForm subclasses.** Confirms every form defined under `mufasa/ui_qt/forms/` is reachable from at least one page's `add_section()` call. All 60 subclasses registered (zero orphans) as of patch 122cf. Includes the reproducible AST script and a regression-guard smoke test that flags any future orphan addition.
@@ -55,7 +74,7 @@ Read this when adding a new form to remember to wire it; the smoke test will fai
 
 ## Kalman smoother — design track
 
-These three documents are a separate concern (the Kalman v2 smoother design + audit). Not workflow-related; kept in `docs/` for proximity to the rest of the technical writing.
+These four documents are a separate concern (the Kalman v2 smoother design + audit). Not workflow-related; kept in `docs/` for proximity to the rest of the technical writing.
 
 ### `kalman_smoother_design.md`
 Triplet-egocentric covariance Kalman smoother design document (1408 lines, May 2026). Mathematical formulation, state space, EM noise fitting, integration plan. No implementation yet at time of writing — design only.
@@ -90,6 +109,6 @@ The recipes are inferred from the resulting class graph + docstring text. They r
 If you're tempted to add a new doc to `docs/`:
 
 1. **Is it user-facing or developer-facing?** Match the convention: lowercase_with_underscores.md, first paragraph states audience.
-2. **Does it duplicate something here?** Better to extend an existing doc than fork. The Kalman track shows what fragmentation looks like — three docs that conceptually want to be one.
+2. **Does it duplicate something here?** Better to extend an existing doc than fork. The Kalman track shows what fragmentation looks like — four docs that conceptually want to be one.
 3. **Is it transient or stable?** Migration-arc work belongs in patch commit messages, not docs. Patch 122bf's snapshot-drift fix list isn't in any doc — it's in the commit.
 4. **Update `README.md` too** (this file). Keep the index in sync.
