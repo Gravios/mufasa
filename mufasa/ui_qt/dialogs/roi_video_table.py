@@ -489,10 +489,23 @@ class ROIVideoTableDialog(QDialog):
     # subprocess. Ports of these to Qt are out of scope for this patch.
     # ------------------------------------------------------------------ #
     def _action_standardize(self) -> None:
-        self._launch_tk_popup(
-            "from mufasa.ui.pop_ups.roi_size_standardizer_popup import ROISizeStandardizerPopUp\n"
-            "ROISizeStandardizerPopUp(config_path=sys.argv[1])\n"
-        )
+        # Patch 122cs: ported to Qt-native (was a subprocess-
+        # launched Tk popup; see docs/tk_surface_audit.md §2g
+        # for the subprocess-bridge pattern this replaces).
+        from mufasa.ui_qt.dialogs.roi_size_standardizer import (
+            ROISizeStandardizerDialog)
+        dlg = ROISizeStandardizerDialog(
+            config_path=self.config_path, parent=self)
+        if dlg.init_failed():
+            # Error already surfaced via QMessageBox in __init__.
+            return
+        dlg.exec()
+        # The standardizer writes back to the ROI definitions
+        # file on save(); refresh in case the user is still here.
+        try:
+            self.rois_modified.emit()
+        except Exception:
+            pass
 
     def _action_duplicate(self) -> None:
         self._launch_tk_popup(
