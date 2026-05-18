@@ -102,7 +102,39 @@ Implication: same as §2e for `pop_ups/`. None of these 8 files is independently
 
 This makes the unsupervised cluster the cleanest possible cascade-deletion target. When Tier 3b ships the Qt port and `unsupervised_main.py` is replaced (or deleted), all 13 files become orphans in a single move — no SimBA.py surgical edits needed (unlike the 122ck cue-light cleanup or the future ui/pop_ups bulk delete). The closed-cluster shape is what `backend_audit.md` §3d Bucket 2 was implicitly describing for the "dies with Tier 3b" line.
 
-`backend_audit.md` §3d Bucket 2 updated post-122cp with this "closed-cluster" observation.
+### 2g. ROI Tk cluster re-audit (added 122cq)
+
+A targeted re-audit of `roi_tools/roi_ui_mixin.py` (the §3d Bucket 3 deferral) found that the original 122ck audit was wrong. The four Qt-side "ROI_ui" references that motivated the deferral are **all docstrings**, not real code dependencies:
+
+| Qt file | Line | Reference |
+|---|---:|---|
+| `ui_qt/dialogs/roi_video_table.py` | 11 | docstring: ":class:`ROI_ui` canvas in a subprocess" |
+| `ui_qt/dialogs/roi_video_table.py` | 40 | docstring: "Subprocess-launched ``ROI_ui`` writes…" |
+| `ui_qt/dialogs/roi_video_table.py` | 407 | docstring: "Replaces the previous subprocess-launched ROI_ui" |
+| `ui_qt/forms/roi.py` | 37 | docstring: "is still the OpenCV-based ``ROI_ui``" |
+
+All four are historical pointers explaining what each Qt port replaces, not actual `from … import ROI_ui` statements. An AST audit of real `ImportFrom` nodes for the `ROI_ui` symbol returns just two consumers, both Tk:
+
+```
+ui/blob_tracker_ui.py:13        from mufasa.roi_tools.roi_ui import ROI_ui
+ui/pop_ups/roi_video_table_pop_up.py:8   from mufasa.roi_tools.roi_ui import ROI_ui
+```
+
+Meanwhile, the actual Qt ROI surface (`ui_qt/dialogs/roi_canvas.py` + `roi_define_panel.py`) imports from `mufasa.roi_tools.roi_logic` directly. `roi_logic.py` is the UI-framework-independent extraction (671 lines, no Tk/Qt imports) explicitly designed so Qt and Tk panels can both build on the same primitives. The Qt panels never touched `ROI_mixin` at all.
+
+`roi_ui_mixin.py` + `roi_ui.py` are reclassified from `backend_audit.md` §3d Bucket 3 → Bucket 2 in 122cq. Bucket 3 is now drained (originally had this one entry).
+
+#### Methodology lesson: distinguish docstring references from code imports
+
+This is the third audit-methodology lesson in the recent run:
+
+1. 122co: AST > regex (multi-line imports break line-bound regex).
+2. 122co (second pass): walk both `ast.ClassDef` AND `ast.FunctionDef` (some pop-ups use the function-style idiom).
+3. 122cq (this section): only `ast.ImportFrom` nodes count as real dependencies. Sphinx-style `:class:`…\`` references in docstrings look like code references at a glance but aren't.
+
+The audit anti-pattern is "grep for the symbol name." Even with AST, walking `ast.walk(tree)` and matching the symbol name in arbitrary `ast.Name` nodes would catch the same false positives — variable references, attribute access, type annotations in strings, comments parsed via something other than the `tokenize` module. The honest test is: does an `ast.ImportFrom` node have an `alias.name` matching the target? If not, it's not a real consumer.
+
+The 122ck audit looked at "grep results" rather than parsed imports. The correction here is to pin this lesson alongside the AST > regex lesson in §7.
 
 ### 2b. UNREFERENCED (2 files)
 
@@ -306,6 +338,8 @@ For each file in `mufasa/ui/`, find every file `f` such that `mod_of(target) in 
 Pure AST-based; no runtime/dynamic-import detection. The two UNREFERENCED files should be cross-checked against string-based dynamic loads before deletion.
 
 **Always use AST, never regex** (lesson learned in §2e's pop-ups orphan re-audit). A line-bound regex misses multi-line imports — both continuation-line (`import \`) and parenthesized (`import (\n …\n)`) forms. `SimBA.py` uses both extensively; a regex audit reported 37 false-positive orphans before the AST rerun corrected the count to 0.
+
+**Only `ast.ImportFrom` nodes count as real dependencies** (lesson learned in §2g's ROI Tk cluster re-audit). Sphinx-style `:class:`…\`` references in docstrings look like code references when grep'd but aren't actual `from … import …` statements. The 122ck audit treated a docstring `:class:\`ROI_ui\`` reference as evidence of Qt → Tk dependency; the 122cq correction showed this was wrong. The honest check: walk every file's `ast.ImportFrom` nodes and ask whether any `alias.name` matches the target symbol. Anything else (string match, comment, docstring, type-annotation-in-string) is noise.
 
 ---
 

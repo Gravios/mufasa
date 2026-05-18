@@ -211,7 +211,7 @@ After the decoupling-via-callback experiments in 122ch (video_processing.py + tr
 * `bounding_box_tools/boundary_menus.py` — only real consumer was `SimBA.py:62`. Deleted in 122cm with SimBA.py surgical edits (import + button + grid). No Qt replacement; "Animal-anchored ROIs" feature is absent from both surfaces now. Acceptable feature loss for v1.
 * `video_processors/batch_process_menus.py` — zero real consumers anywhere. Two docstring "see also" pointers (`ui_qt/forms/batch_pre_process.py`, `video_processors/blob_tracking_executor.py`) updated to point at the Qt replacement and git history.
 
-**Bucket 2: Dies with another Tier-4 work item — wait, don't decouple (17 files)**
+**Bucket 2: Dies with another Tier-4 work item — wait, don't decouple (19 files)**
 
 | File | Dies with |
 |---|---|
@@ -219,19 +219,26 @@ After the decoupling-via-callback experiments in 122ch (video_processing.py + tr
 | `mixins/annotator_mixin.py` | Labelling Qt port (consumed only by `labelling/`) |
 | `labelling/labelling_interface.py` | Labelling Qt port (itself the surface to be ported) |
 | `labelling/standard_labeller.py` | Labelling Qt port (sibling) |
+| `roi_tools/roi_ui_mixin.py` | Tier-4 close-out (Tk-only; consumed by `roi_ui.py` only — reclassified from Bucket 3 in 122cq) |
+| `roi_tools/roi_ui.py` | Same — Tk-only; consumed by `blob_tracker_ui.py` + `roi_video_table_pop_up.py` (both Tk) |
 | `mixins/pop_up_mixin.py` | Last — once all other Tk popups are gone |
 
 These are Tk surfaces with structural Tk coupling. The 5 `Entry_Box` constructions in `annotator_mixin.py` aren't a single intrusion the way `TwoOptionQuestionPopUp` was in `video_processing.py` — they're primary UI primitives. Decoupling them piecemeal would 5x file size and fight the file's nature. Better to wait for the parent work item and delete the file whole.
 
-**Cluster shapes (post-122cp audit):**
+**Cluster shapes (post-122cp/cq audits):**
 
 * **Unsupervised cluster — closed**. The 13 `unsupervised/` files (split between `unsupervised_main.py` and 13 entries in `unsupervised/pop_ups/`) form a self-contained subgraph. Each `unsupervised/pop_ups/` file's only importer is `unsupervised_main.py`; no SimBA.py wiring, no Qt-side coupling, no backend reach-in. When Tier 3b replaces `unsupervised_main.py`, the entire cluster cascade-deletes in one move — no surgical edits to external files needed. The cleanest possible delete-with-parent.
 * **Labelling cluster — almost-closed but touched by SimBA.py**. `labelling_interface.py` and `standard_labeller.py` are reached via SimBA.py menu wiring; `annotator_mixin.py` is consumed via `labelling/targeted_annotations_clips.py`. Tier-4 close-out for labelling needs both the Qt port + SimBA.py surgical edits (like the 122ck cue-light cleanup), but it's still a tight subgraph.
+* **ROI Tk cluster — almost-closed, similar to labelling**. `roi_ui.py` is consumed by `blob_tracker_ui.py` (Tk) + `roi_video_table_pop_up.py` (Tk, wired to SimBA.py:193). `roi_ui_mixin.py` is consumed only by `roi_ui.py`. Cluster-deletion touches 5 files: the 2 roi_tools files + `blob_tracker_ui.py` + `roi_video_table_pop_up.py` + `initialize_blob_tracking_pop_up.py` (consumes blob_tracker_ui), with surgical SimBA.py edit at line 193. Identified in 122cq re-audit; pending future patch.
 * **pop_up_mixin** — fan-in from every Tk pop-up. Goes last; depends on every other Bucket-2 work item completing first.
 
-**Bucket 3: Deferred — Qt code currently consumes it (1 file)**
+**Bucket 3: Deferred — Qt code currently consumes it (0 files; DRAINED 122cq)**
 
-* `roi_tools/roi_ui_mixin.py` — Qt ROI dialogs (`mufasa/ui_qt/dialogs/roi_canvas.py`, `roi_define_panel.py`) subclass through `roi_tools/roi_ui.py` which subclasses `ROI_mixin`. Resolving this needs either inlining what `ROI_ui` uses from the mixin (substantial), or a parallel Qt mixin (parallel maintenance burden). Identified in 122ck re-audit; tracked for future planning.
+Originally listed `roi_tools/roi_ui_mixin.py` based on the 122ck re-audit. The 122cq re-re-audit shows that audit was wrong: the four Qt-side "ROI_ui" references in `mufasa/ui_qt/dialogs/roi_video_table.py` (lines 11, 40, 407) and `mufasa/ui_qt/forms/roi.py` (line 37) are **all docstrings** — historical pointers explaining what each Qt port replaces. None is an actual `from … import ROI_ui` statement.
+
+The real Qt-side ROI surface (`ui_qt/dialogs/roi_canvas.py` + `ui_qt/dialogs/roi_define_panel.py`) imports from `mufasa.roi_tools.roi_logic` directly. `roi_logic.py` is the UI-framework-independent extraction (671 lines, no Tk/Qt imports) explicitly designed so Qt panels and Tk panels can both build on the same primitives. Qt has used `roi_logic.py` since the Qt ROI port shipped.
+
+`roi_ui_mixin.py` + `roi_ui.py` are reclassified to Bucket 2 (dies with the Tk surface). See lessons section below for the audit methodology error.
 
 **Bucket 4: Lazy importer, non-blocking (1 file)**
 
