@@ -12,9 +12,9 @@
 | Stage | Files | Notes |
 |---|---:|---|
 | Stage A (entry point) | 0 + 1 config edit | Remove `mufasa-tk` from `pyproject.toml`. SimBA.py becomes unreachable. |
-| Stage B (cascade) | 115 | SimBA.py itself + all files reachable only through it. |
+| Stage B (cascade) | 114 | SimBA.py itself + all files reachable only through it. Was 115 at 122cx scoping; 122cz ported + pre-deleted one popup (the unblock). |
 | Stage C (tail) | 2 | `tkinter_functions.py` + `pop_up_mixin.py` — orphan after Stage B. |
-| **Total** | **117 files** | |
+| **Total** | **116 files** | (was 117 at 122cx; -1 after 122cz pre-deletion) |
 
 After the cascade, **two Tk dependencies remain** in the Qt-using path:
 
@@ -69,9 +69,11 @@ mufasa-workbench = "mufasa.ui_qt.workbench_app:main"
 | `mufasa/ui/get_tree_view.py` | `ui/pop_ups/print_video_meta_popup.py:4` (also dying this stage) |
 | `mufasa/ui/video_timelaps.py` | `ui/pop_ups/video_processing_pop_up.py:28` (also dying this stage) |
 
-### B2. ui/pop_ups (75 files — entire directory)
+### B2. ui/pop_ups (74 files — was 75 pre-122cz)
 
 Every file in `mufasa/ui/pop_ups/` is imported by SimBA.py at module-load time, and ZERO of them have any other consumer. The whole directory cascade-deletes.
+
+(Was 75 files at 122cx scoping. Patch 122cz pre-deleted `direction_animal_to_bodypart_settings_pop_up.py` as part of the workflow-gap unblock — the file was both ported to Qt and removed in 122cz rather than waiting for Stage B.)
 
 Subgroups for review (just for orientation; deletion is bulk):
 
@@ -107,7 +109,7 @@ Plus `data_map.yaml` (non-py asset; dies with the directory removal).
 
 Zero Qt-side reach anywhere in the cluster. Cascade-deletes cleanly.
 
-### B5. Stage B file count: 5 + 75 + 5 + 30 = **115 files**
+### B5. Stage B file count: 5 + 74 + 5 + 30 = **114 files** (post-122cz)
 
 ---
 
@@ -170,14 +172,14 @@ Before running Stage B, verify each major feature category has either (a) a Qt c
 - [ ] Video processing: video_processing_pop_up (parts likely covered by `ui_qt/forms/video_utilities.py`)
 - [ ] About / settings: about_simba_pop_up
 
-**Sweep completed in 122cy** — see `docs/stage_b_checklist.md` for the full results. **TL;DR:**
+**Sweep completed in 122cy; blocker resolved in 122cz.** See `docs/stage_b_checklist.md` for the full results. **TL;DR:**
 
 * **69** of 75 popups have verified Qt counterparts (covered).
 * **2** are hard drops (about, splash — cosmetic/admin).
-* **1** is a **blocking workflow gap** — `direction_animal_to_bodypart_settings_pop_up.py` writes config keys the Qt AnalysisForm depends on. Must be ported to Qt before Stage B.
+* ~~**1** is a **blocking workflow gap**~~ ✓ **RESOLVED 122cz** — `direction_animal_to_bodypart_settings` ported to `DirectingBodyPartSettingsForm` on addons_page.
 * **3** are non-blocking gaps requiring feature-disposition decisions (`simba_rois_to_yolo`, `yolo_inference`, `yolo_pose_train`) — currently recommended to drop as features.
 
-Stage B execution is gated on resolving the 1 blocker and the 3 feature decisions. See checklist §5 for the recommended preparation patches.
+Stage B execution is gated only on the 3 feature decisions. See checklist §5 for the recommended preparation patches.
 
 ---
 

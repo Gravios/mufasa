@@ -140,8 +140,13 @@ from mufasa.ui.pop_ups.directing_animal_to_bodypart_plot_pop_up import \
     DirectingAnimalToBodyPartVisualizerPopUp
 from mufasa.ui.pop_ups.directing_other_animals_plot_pop_up import \
     DirectingOtherAnimalsVisualizerPopUp
-from mufasa.ui.pop_ups.direction_animal_to_bodypart_settings_pop_up import \
-    DirectionAnimalToBodyPartSettingsPopUp
+# Patch 122cz: DirectionAnimalToBodyPartSettingsPopUp removed
+# (the blocking-gap Tk popup identified in 122cy). Qt
+# replacement is DirectingBodyPartSettingsForm under
+# `mufasa.ui_qt.forms.addons`, wired into addons_page.py
+# section "Directing — body-part settings".
+# from mufasa.ui.pop_ups.direction_animal_to_bodypart_settings_pop_up import \
+#     DirectionAnimalToBodyPartSettingsPopUp
 from mufasa.ui.pop_ups.distance_analysis_pop_up import DistanceAnalysisPopUp
 from mufasa.ui.pop_ups.distance_plot_pop_up import DistancePlotterPopUp
 from mufasa.ui.pop_ups.distance_timebins_popup import \
@@ -442,7 +447,10 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
 
         button_analyzeDirection = SimbaButton(parent=processmovementdupLabel, width=Formats.BUTTON_WIDTH_XL.value, txt="ANALYZE DIRECTIONALITY BETWEEN ANIMALS", img='direction', txt_clr='deeppink', font=Formats.FONT_REGULAR.value, cmd=AnimalDirectingAnimalPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         button_visualizeDirection = SimbaButton(parent=processmovementdupLabel, width=Formats.BUTTON_WIDTH_XL.value, txt="VISUALIZE DIRECTIONALITY BETWEEN ANIMALS", img='direction', txt_clr='brown', font=Formats.FONT_REGULAR.value, cmd=DirectingOtherAnimalsVisualizerPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
-        button_analyzeDirection_bp = SimbaButton(parent=processmovementdupLabel, width=Formats.BUTTON_WIDTH_XL.value, txt="ANALYZE DIRECTIONALITY BETWEEN BODY PARTS", img='direction', txt_clr='purple', font=Formats.FONT_REGULAR.value, cmd=DirectionAnimalToBodyPartSettingsPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
+        # Patch 122cz: button_analyzeDirection_bp removed with the
+        # DirectionAnimalToBodyPartSettingsPopUp Tk popup. Qt
+        # replacement: DirectingBodyPartSettingsForm on addons_page.
+        # button_analyzeDirection_bp = SimbaButton(parent=processmovementdupLabel, width=Formats.BUTTON_WIDTH_XL.value, txt="ANALYZE DIRECTIONALITY BETWEEN BODY PARTS", img='direction', txt_clr='purple', font=Formats.FONT_REGULAR.value, cmd=DirectionAnimalToBodyPartSettingsPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
         button_visualizeDirection_bp = SimbaButton(parent=processmovementdupLabel, width=Formats.BUTTON_WIDTH_XL.value, txt="VISUALIZE DIRECTIONALITY BETWEEN BODY PARTS", img='direction', txt_clr='black', font=Formats.FONT_REGULAR.value, cmd=DirectingAnimalToBodyPartVisualizerPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
 
         btn_agg_boolean_conditional_statistics = SimbaButton(parent=processmovementdupLabel, width=Formats.BUTTON_WIDTH_XL.value, txt="AGGREGATE BOOLEAN CONDITIONAL STATISTICS", img='details', txt_clr='grey', font=Formats.FONT_REGULAR.value, cmd=BooleanConditionalSlicerPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
@@ -457,7 +465,9 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         button_lineplot.grid(row=3, sticky=NW)
         button_analyzeDirection.grid(row=4, sticky=NW)
         button_visualizeDirection.grid(row=5, sticky=NW)
-        button_analyzeDirection_bp.grid(row=6, sticky=NW)
+        # Patch 122cz: button_analyzeDirection_bp.grid removed
+        # with the button.
+        # button_analyzeDirection_bp.grid(row=6, sticky=NW)
         button_visualizeDirection_bp.grid(row=7, sticky=NW)
         btn_agg_boolean_conditional_statistics.grid(row=8, sticky=NW)
         spontaneous_alternation_pop_up_btn.grid(row=9, sticky=NW)

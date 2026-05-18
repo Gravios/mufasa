@@ -619,6 +619,154 @@ class BlobTrackerInitLauncher(_LauncherForm):
     )
 
 
+# --------------------------------------------------------------------------- #
+# Directing-toward-body-part — settings form (Patch 122cz)
+# --------------------------------------------------------------------------- #
+class DirectingBodyPartSettingsForm(OperationForm):
+    """Configure the reference body-part for the "Directing toward
+    body-part — statistics" analysis route.
+
+    The backend ``DirectingAnimalsToBodyPartAnalyzer`` (and
+    ``ConfigReader``) reads a single
+    ``[Directionality settings] / bodypart_direction`` key from the
+    project config. The form lets the user pick that body-part from
+    the project's available tracking points.
+
+    Replaces the legacy Tk popup
+    :class:`DirectionAnimalToBodyPartSettingsPopUp` identified as
+    the **blocking gap** in the 122cy pre-Stage-B checklist sweep.
+    With this form in place, Stage B can proceed without orphaning
+    the directing-to-bodypart analysis route in AnalysisForm.
+
+    Notes on behaviour parity
+    -------------------------
+
+    * **Single body-part key** — matches the backend contract. The
+      legacy Tk popup showed one dropdown per animal but wrote a
+      single key in a loop (so only the last animal's choice was
+      persisted). The Qt form has a single dropdown that
+      transparently writes the single key — no per-animal
+      illusion.
+    * **Body-part choices** — union of body-part names across all
+      animals (so the same name is present for every animal, which
+      the backend's ``bp_x_name = bodypart_direction + '_x'`` lookup
+      requires).
+    * **Pre-fill with current value** — if a previous setting exists
+      in the config, it's pre-selected.
+    """
+
+    title = "Directing settings — body-part reference"
+    description = (
+        "Pick the body-part used as the 'direction-from' reference "
+        "for the 'Directing toward body-part — statistics' analysis "
+        "route. Writes a single value to project_config.ini's "
+        "[Directionality settings] / bodypart_direction key."
+    )
+
+    _SECTION = "Directionality settings"
+    _KEY = "bodypart_direction"
+
+    def build(self) -> None:
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignRight)
+
+        self.bp_combo = QComboBox(self)
+        # Populate from project. Empty if no project loaded — the
+        # OperationForm base handles the no-project state with the
+        # disabled Run button, so we don't need to handle it here.
+        bps = self._gather_bps()
+        if bps:
+            self.bp_combo.addItems(bps)
+            cur = self._current_setting()
+            if cur and cur in bps:
+                self.bp_combo.setCurrentText(cur)
+
+        form.addRow("Reference body-part:", self.bp_combo)
+
+        # Status hint — current setting, or "(none)" if unset.
+        cur = self._current_setting()
+        if cur:
+            hint = QLineEdit(self)
+            hint.setReadOnly(True)
+            hint.setText(f"Currently saved: {cur}")
+        else:
+            hint = QLineEdit(self)
+            hint.setReadOnly(True)
+            hint.setText("Currently saved: (none — not yet set)")
+        form.addRow("", hint)
+
+        self.body_layout.addLayout(form)
+
+    # ------------------------------------------------------------------ #
+    # Helpers
+    # ------------------------------------------------------------------ #
+    def _gather_bps(self) -> list[str]:
+        """Body-parts available across the project (union, preserving
+        insertion order). Falls back to empty list on any error."""
+        if not self.config_path:
+            return []
+        try:
+            # Reuse the existing helper from pose_cleanup forms — it
+            # handles both v1 and legacy project layouts.
+            from mufasa.ui_qt.forms.pose_cleanup import _load_animal_bps
+            animal_bps = _load_animal_bps(self.config_path)
+        except Exception:
+            return []
+        seen: list[str] = []
+        seen_set: set[str] = set()
+        for _animal, bps in animal_bps.items():
+            for bp in bps:
+                if bp not in seen_set:
+                    seen_set.add(bp)
+                    seen.append(bp)
+        return seen
+
+    def _current_setting(self) -> Optional[str]:
+        """Read the current bodypart_direction from project config,
+        or None if unset / project not loaded."""
+        if not self.config_path:
+            return None
+        try:
+            cfg = configparser.ConfigParser()
+            cfg.read(self.config_path)
+            if cfg.has_section(self._SECTION):
+                v = cfg.get(self._SECTION, self._KEY, fallback="")
+                return v.strip() if v else None
+        except Exception:
+            return None
+        return None
+
+    # ------------------------------------------------------------------ #
+    # OperationForm contract
+    # ------------------------------------------------------------------ #
+    def collect_args(self) -> dict:
+        if not self.config_path:
+            raise RuntimeError("No project loaded.")
+        bp = self.bp_combo.currentText().strip()
+        if not bp:
+            raise ValueError(
+                "Pick a reference body-part. If the dropdown is "
+                "empty, the project has no body-parts configured — "
+                "set them up in Project Setup first.")
+        return {"config_path": self.config_path, "bp": bp}
+
+    def target(self, *, config_path: str, bp: str) -> None:
+        """Write the single bodypart_direction key to project config.
+
+        Mirrors the Tk popup's write logic in
+        ``DirectionAnimalToBodyPartSettingsPopUp.run()``: read
+        current config, add the section if missing, set the key,
+        write back.
+        """
+        cfg = configparser.ConfigParser()
+        cfg.read(config_path)
+        if not cfg.has_section(self._SECTION):
+            cfg.add_section(self._SECTION)
+        cfg.set(self._SECTION, self._KEY, bp)
+        with open(config_path, "w") as f:
+            cfg.write(f)
+
+
 __all__ = [
     "CueLightDataForm",
     "CueLightClfForm",
@@ -629,4 +777,5 @@ __all__ = [
     "PupRetrievalForm",
     "SpontaneousAlternationForm",
     "BlobTrackerInitLauncher",
+    "DirectingBodyPartSettingsForm",
 ]

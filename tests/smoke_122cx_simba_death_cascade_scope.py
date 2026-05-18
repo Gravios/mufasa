@@ -86,13 +86,14 @@ def main() -> int:
     # ==================================================================
     # Stage B file counts
     # ==================================================================
-    # 1. ui/pop_ups/ — exactly 75 files (B2)
+    # 1. ui/pop_ups/ — was 75 at 122cx scoping; will decrement
+    # as future patches port + delete more popups (122cz did one).
     popups = [f for f in (pkg / "ui" / "pop_ups").glob("*.py")
               if f.name != "__init__.py"]
     check(
-        f"ui/pop_ups/ has exactly 75 files (Stage B2; got "
-        f"{len(popups)})",
-        len(popups) == 75,
+        f"ui/pop_ups/ has ≤ 75 files (Stage B2 starting count; "
+        f"got {len(popups)} — decrements as ports land)",
+        len(popups) <= 75,
     )
 
     # 2. All 75 popups have zero non-SimBA consumers

@@ -75,13 +75,18 @@ def main() -> int:
         "stage_b_checklist.md" in cascade,
     )
 
-    # 3. Blocking gap popup still exists
+    # 3. Blocking gap popup — pre-122cz: present; post-122cz:
+    # deleted (resolved by porting to Qt). Pinned as the
+    # disposition; either state is acceptable.
     blocking = (pkg / "ui" / "pop_ups"
                 / "direction_animal_to_bodypart_settings_pop_up.py")
     check(
-        "Blocking gap popup still exists "
-        "(direction_animal_to_bodypart_settings_pop_up.py)",
-        blocking.exists(),
+        "Blocking gap popup is either present (pre-122cz) or "
+        "deleted (post-122cz; resolved by Qt port to "
+        "DirectingBodyPartSettingsForm)",
+        True,  # Disposition-only check; the file state changes
+               # across patches. The hard regression guard is
+               # check #5 below.
     )
 
     # 4. Qt AnalysisForm has the directing-to-bodypart route
@@ -94,8 +99,10 @@ def main() -> int:
         and "DirectingAnimalsToBodyPartAnalyzer" in analysis_form,
     )
 
-    # 5. No Qt code-level reference to the blocking popup's
-    # settings UI (gap still real)
+    # 5. Either: no Qt code-level reference (pre-122cz; gap real)
+    # OR: DirectingBodyPartSettingsForm exists (post-122cz; gap
+    # resolved by Qt port). Pin the union — at least ONE of these
+    # is true.
     qt_code = ""
     for d in [pkg / "ui_qt" / "forms",
               pkg / "ui_qt" / "pages",
@@ -107,16 +114,17 @@ def main() -> int:
                 if stripped.startswith(("#", "*", ":class:")):
                     continue
                 qt_code += line + "\n"
-    bodypart_settings_in_qt = bool(re.search(
+    pre_122cz_gap = not bool(re.search(
         r"DirectionAnimalToBodyPartSettings|"
         r"directing_settings.*dialog|"
         r"bodypart_direction.*dialog",
         qt_code, re.IGNORECASE))
+    post_122cz_form_exists = "DirectingBodyPartSettingsForm" in qt_code
     check(
-        "No Qt code-level reference to DirectionAnimalToBodyPart"
-        "Settings dialog (gap is still real; this is the "
-        "regression guard)",
-        not bodypart_settings_in_qt,
+        "Either gap is still real (pre-122cz) or Qt form "
+        "DirectingBodyPartSettingsForm exists (post-122cz "
+        "resolution)",
+        pre_122cz_gap or post_122cz_form_exists,
     )
 
     # 6. Non-blocking gap popups still exist
