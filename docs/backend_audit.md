@@ -244,8 +244,8 @@ Order suggested:
 ### 4e. Bulk-drop (after Tier 3b)
 
 12. **Drop `mufasa/unsupervised/pop_ups/`** + unsupervised_main.py (13 files) — handled by Tier 3b.
-13. **Drop `cue_light_tools/cue_light_main_popup.py`** — superseded by Qt Cue-light forms.
-14. **Drop `roi_tools/roi_ui_mixin.py`** — superseded by Qt ROI surface.
+13. ~~**Drop `cue_light_tools/cue_light_main_popup.py`**~~ ✓ **DONE in patch 122ck.** Deleted 6 files in one batch: `mufasa/cue_light_tools/cue_light_main_popup.py`, `mufasa/ui/pop_ups/cue_light_main_popup.py`, and 4 sub-popups (`cue_light_clf_analyzer_popup.py`, `cue_light_data_analyzer_popup.py`, `cue_light_movement_analyzer_popup.py`, `cue_light_visualizer_popup.py`). All 4 sub-popups were orphans after the main popup went — only consumer was the main popup itself. SimBA.py's import + button creation + grid call surgically removed; remaining reference is the breadcrumb comment at SimBA.py's import block.
+14. ~~**Drop `roi_tools/roi_ui_mixin.py`**~~ — **NOT safe to drop yet** (re-audited 122ck). `roi_tools/roi_ui.py:ROI_ui` subclasses `ROI_mixin` from this file, and `roi_ui.py` is transitively consumed by the Qt ROI surface at `mufasa/ui_qt/dialogs/roi_canvas.py` + `roi_define_panel.py`. Either port `ROI_ui` to be self-contained or accept that this file stays alongside the Qt ROI dialogs. Defer until the Qt ROI dialogs themselves are reviewed.
 15. **Drop `mixins/pop_up_mixin.py`** — once no Tk popups remain.
 
 ### 4f. Last items (Tier 4 close-out)

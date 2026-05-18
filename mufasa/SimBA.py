@@ -124,7 +124,12 @@ from mufasa.ui.pop_ups.coco_keypoints_to_yolo_popup import \
     COCOKeypoints2YOLOkeypointsPopUp
 from mufasa.ui.pop_ups.csv_2_parquet_pop_up import (Csv2ParquetPopUp,
                                                    Parquet2CsvPopUp)
-from mufasa.ui.pop_ups.cue_light_main_popup import CueLightMainPopUp
+# Patch 122ck: cue-light pop-ups removed (Qt forms `CueLight*Form`
+# under `mufasa.ui_qt.forms.addons` are the live surface; see
+# `docs/backend_audit.md` §4e). Legacy import + button left as a
+# breadcrumb-comment for git blame; SimBA.py itself is on the
+# deletion roadmap with the rest of the Tk surface.
+# from mufasa.ui.pop_ups.cue_light_main_popup import CueLightMainPopUp
 from mufasa.ui.pop_ups.data_plot_pop_up import DataPlotterPopUp
 from mufasa.ui.pop_ups.delete_all_rois_pop_up import delete_all_rois_pop_up
 from mufasa.ui.pop_ups.directing_animal_to_bodypart_plot_pop_up import \
@@ -585,8 +590,9 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         lbl_addon = CreateLabelFrameWithIcon(parent=tab11, header="SimBA EXPANSIONS", icon_name='plus_green_2')
         #button_bel = SimbaButton(parent=lbl_addon, txt="Pup retrieval - Analysis Protocol 1", txt_clr='blue', cmd=None, cmd_kwargs={'config_path': lambda:self.config_path})
         button_bel = SimbaButton(parent=lbl_addon, txt="PUP RETRIEVAL - ANALYSIS PROTOCOL 1", txt_clr='blue', cmd=PupRetrievalPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
-        #cue_light_analyser_btn = SimbaButton(parent=lbl_addon, txt="Cue light analysis", txt_clr='red', cmd=None, cmd_kwargs={'config_path': lambda:self.config_path})
-        cue_light_analyser_btn = SimbaButton(parent=lbl_addon, txt="CUE LIGHT ANALYSIS", txt_clr='red', img='light_bulb', cmd=CueLightMainPopUp, cmd_kwargs={'config_path': lambda:self.config_path})
+        # Patch 122ck: cue_light_analyser_btn removed; see comment
+        # at the head of this file. The corresponding .grid() call
+        # at the bottom of this method is also gone.
 
 
 
@@ -685,8 +691,10 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
 
         lbl_addon.grid(row=0, sticky=W)
         button_bel.grid(row=0, sticky=W)
-        cue_light_analyser_btn.grid(row=1, sticky=NW)
-        anchored_roi_analysis_btn.grid(row=2, sticky=NW)
+        # Patch 122ck: cue_light_analyser_btn.grid removed with the
+        # button itself. Subsequent rows renumbered to keep the
+        # layout flowing.
+        anchored_roi_analysis_btn.grid(row=1, sticky=NW)
 
         if ENV[ENV_VARS.UNSUPERVISED_INTERFACE.value]:
             from mufasa.unsupervised.unsupervised_main import UnsupervisedGUI
