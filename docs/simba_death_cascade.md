@@ -1,0 +1,208 @@
+# SimBA.py death cascade — scope
+
+**Status:** scoped post-patch 122cw; pending execution (122cy onwards).
+**Authority:** evidence-based reachability audit. All findings reproducible via the AST + grep checks in `tests/smoke_122cx_simba_death_cascade_scope.py`.
+
+---
+
+## Summary
+
+`mufasa.SimBA` is the legacy Tk entry point (`mufasa-tk` in `[project.scripts]`). The Qt entry points (`mufasa`, `mufasa-chooser`, `mufasa-workbench`) do not reach into SimBA.py at any point. Removing the `mufasa-tk` entry point + deleting SimBA.py triggers a clean cascade-delete of **101 files** (plus 1 config edit) across the Tk surface, leaving the Qt workbench fully functional with two exceptions documented below.
+
+| Stage | Files | Notes |
+|---|---:|---|
+| Stage A (entry point) | 0 + 1 config edit | Remove `mufasa-tk` from `pyproject.toml`. SimBA.py becomes unreachable. |
+| Stage B (cascade) | 115 | SimBA.py itself + all files reachable only through it. |
+| Stage C (tail) | 2 | `tkinter_functions.py` + `pop_up_mixin.py` — orphan after Stage B. |
+| **Total** | **117 files** | |
+
+After the cascade, **two Tk dependencies remain** in the Qt-using path:
+
+1. **`mufasa/ui/px_to_mm_ui.py`** — used by `ui_qt/forms/video_utilities.py:318` to launch a Tk-based pixel-calibration UI. Survives the cascade.
+2. **`mufasa/utils/confirm.py`** — lazy Tk importer (already documented in `backend_audit.md` §3d Bucket 4); fires only if no Qt override is installed. Survives.
+
+These two are real Tier-4 close-out work for a follow-on patch (after Stage C).
+
+---
+
+## Stage A: Remove the `mufasa-tk` entry point
+
+**Scope:** 1-line config edit in `pyproject.toml`.
+
+**Before:**
+```toml
+[project.scripts]
+mufasa-tk        = "mufasa.SimBA:main"          # legacy Tk entry point
+mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench
+mufasa-chooser   = "mufasa.ui_qt.app:main"      # legacy Qt chooser
+mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench
+```
+
+**After:**
+```toml
+[project.scripts]
+# mufasa-tk removed in 122cx — legacy Tk launcher retired. The Qt
+# workbench is the only supported surface. See SimBA.py death
+# cascade in docs/simba_death_cascade.md.
+mufasa           = "mufasa.cli.workbench_launcher:main"
+mufasa-chooser   = "mufasa.ui_qt.app:main"
+mufasa-workbench = "mufasa.ui_qt.workbench_app:main"
+```
+
+**Risk:** users with shell history / shell aliases / docs referencing `mufasa-tk` will get `command not found`. Mitigation: keep SimBA.py in tree for Stage A so anyone running `python -m mufasa.SimBA` still works during the transition; Stage B deletes it.
+
+**Why separate from Stage B:** lets the entry-point retirement land cleanly even if Stage B reveals an unexpected consumer.
+
+---
+
+## Stage B: The cascade (99 files)
+
+**Order of deletion within this stage doesn't matter** — every file has only SimBA.py-tree consumers. Listed here grouped by directory for review-clarity.
+
+### B1. SimBA.py itself + ui/ Tk helpers (5 files)
+
+| File | Sole consumer |
+|---|---|
+| `mufasa/SimBA.py` | Entry point only (entry point removed in Stage A) |
+| `mufasa/ui/machine_model_settings_ui.py` | SimBA.py:93 |
+| `mufasa/ui/utils.py` | SimBA.py |
+| `mufasa/ui/get_tree_view.py` | `ui/pop_ups/print_video_meta_popup.py:4` (also dying this stage) |
+| `mufasa/ui/video_timelaps.py` | `ui/pop_ups/video_processing_pop_up.py:28` (also dying this stage) |
+
+### B2. ui/pop_ups (75 files — entire directory)
+
+Every file in `mufasa/ui/pop_ups/` is imported by SimBA.py at module-load time, and ZERO of them have any other consumer. The whole directory cascade-deletes.
+
+Subgroups for review (just for orientation; deletion is bulk):
+
+* **Analytics/visualisation popups (~30 files):** `path_plot`, `heatmap_*`, `distance_*`, `movement_*`, `clf_*`, `gantt`, etc.
+* **Tracking/import popups (~20 files):** `dlc_*`, `sleap_*`, `coco_*`, `yolo_*`, etc.
+* **Project-mgmt popups (~15 files):** `csv_2_parquet`, `print_video_meta`, `check_videos_seekable`, `merge_*`, etc.
+* **Other (~10 files):** ROI-related (kept after 122cr cluster-deletion; the 4 subprocess popups deleted in 122cs/ct/cu/cv leave the rest), `blob_visualizer`, `delete_all_rois`, `about_simba`, etc.
+
+### B3. Tk labelling cluster (5 files)
+
+| File | Status |
+|---|---|
+| `mufasa/labelling/labelling_interface.py` | SimBA.py-only (122cw evidence) |
+| `mufasa/labelling/labelling_advanced_interface.py` | SimBA.py-only |
+| `mufasa/labelling/standard_labeller.py` | SimBA.py-only |
+| `mufasa/labelling/targeted_annotations_clips.py` | SimBA.py-only |
+| `mufasa/mixins/annotator_mixin.py` | consumed only by `labelling/targeted_annotations_clips.py` (also dying) |
+
+The other 5 files in `mufasa/labelling/` (`extract_labelled_frames`, `extract_labelling_meta`, `mitra_style_appender`, `play_annotation_video`, `single_clf_appender_excel`) are **backend utilities consumed by Qt forms** — they stay.
+
+### B4. Unsupervised cluster (30 files)
+
+Entire `mufasa/unsupervised/` directory:
+
+* `unsupervised_main.py` (sole external consumer = SimBA.py:725 deferred import — 122cw evidence)
+* 13 × `unsupervised/pop_ups/*.py` (each consumed only by unsupervised_main.py)
+* 15 × algorithm-backend modules: `bout_aggregator.py`, `cluster_frequentist_calculator.py`, `cluster_validation_calculator.py`, `cluster_video_visualizer.py`, `cluster_xai_calculator.py`, `clusterer_comparison_calculator.py`, `data_extractor.py`, `dataset_creator.py`, `dbcv_calculator.py`, `embedding_correlation_calculator.py`, `grid_search_visualizers.py`, `hdbscan_clusterer.py`, `outlier_detector.py`, `tsne.py`, `umap_embedder.py` — all consumed only inside the cluster (verified in 122cx: zero outside `mufasa/unsupervised/`)
+* `enums.py` (cluster-internal enum constants; zero outside consumers)
+
+Plus `data_map.yaml` (non-py asset; dies with the directory removal).
+
+**The 122cw audit undercounted this cluster as 14 files.** That was the popup + main count — the 15 algorithm-backend modules + `enums.py` were missed. The 122cx re-audit corrects to 30 files. The disposition is unchanged (SimBA.py finale; zero Qt reach); only the file count moves.
+
+Zero Qt-side reach anywhere in the cluster. Cascade-deletes cleanly.
+
+### B5. Stage B file count: 5 + 75 + 5 + 30 = **115 files**
+
+---
+
+## Stage C: Tail (2 files)
+
+After Stage B clears, two remaining mixins/helpers go fully orphan:
+
+| File | Why it dies in Stage C |
+|---|---|
+| `mufasa/ui/tkinter_functions.py` | Consumed by SimBA.py + 75 popups + 4 Tk labelling + 14 unsupervised + 2 mixins. All gone in Stage B. Only `utils/confirm.py` (lazy importer) and `ui/video_timelaps.py` remained — both dying in Stage B too. |
+| `mufasa/mixins/pop_up_mixin.py` | Fan-in from every Tk popup. Dies last. |
+
+`utils/confirm.py` keeps the lazy `from mufasa.ui.tkinter_functions import TwoOptionQuestionPopUp` inside `_default_confirm`. After Stage C deletes `tkinter_functions.py`, this lazy import would fail at call time — but `_default_confirm` is only called as a fallback when no Qt override is registered. The workbench installs an override at startup; this lazy import never fires in practice. **Acceptable broken-fallback path** (see `tk_surface_audit.md` §2g 122cj cleanup).
+
+If the broken-fallback path is undesirable, `utils/confirm.py:_default_confirm` body can be replaced with `raise NotImplementedError("Qt confirm override required after Stage C")` — explicit failure instead of an import-time error. Either acceptable; a follow-on patch can pick.
+
+---
+
+## Tier-4 remaining after Stage C
+
+The following two files **do not die in this cascade** and need separate Tier-4 work:
+
+### 1. `mufasa/ui/px_to_mm_ui.py`
+
+**Consumers (post-Stage-B):**
+- `ui_qt/forms/video_utilities.py:318` — imports `GetPixelsPerMillimeterInterface`
+
+This is a real Tk surface that the Qt form launches when the user clicks "calibrate pixels per millimeter". The Qt form falls through to a Tk window for this specific calibration UI.
+
+**Disposition:**
+- **Option A:** Port `GetPixelsPerMillimeterInterface` to a Qt dialog. Similar pattern to 122cs/ct/cu/cv (subprocess-popup ports). Probably 100–200 lines.
+- **Option B:** Leave as-is. Treat as a known "Qt launches one Tk dialog" exception. Acceptable for v1 if the calibration workflow is rare.
+
+Either way, it survives Stages A–C. Schedule for a future patch.
+
+### 2. `mufasa/utils/confirm.py`
+
+Lazy importer pattern. Documented in `backend_audit.md` §3d Bucket 4 as non-blocking. After Stage C, the lazy `from mufasa.ui.tkinter_functions import ...` inside `_default_confirm` becomes unreachable — file can either stay (cosmetic warning suppression) or get a body rewrite to drop the dead branch. Cosmetic; not urgent.
+
+---
+
+## Risk register
+
+| Risk | Likelihood | Severity | Mitigation |
+|---|---|---|---|
+| Users with shell aliases / docs reference `mufasa-tk` | High | Low | Stage A's commit message + release notes. SimBA.py stays a stage longer so `python -m mufasa.SimBA` works during transition. |
+| Some workflow has no Qt equivalent and was Tk-only | Medium | High | Pre-Stage-B audit checklist (see below). Each major feature category in B2 should have a checked Qt counterpart. |
+| Hidden runtime consumer of one of the 99 files | Low | Medium | The AST audit caught zero non-SimBA consumers. The 122cr lesson (string-literal subprocess imports invisible to AST) applies — grep the codebase for popup filenames in any string context as a pre-flight check. |
+| `tkinter_functions.py` consumed somewhere unexpected | Low | Low | Audit complete (no Qt consumers). If a Stage-B file accidentally remains, Stage C's deletion fails the AST check and we catch it. |
+| `utils/confirm.py` lazy import fires after Stage C | Low | Low | Only fires if no Qt override is set. Workbench installs override at startup. Acceptable broken fallback. |
+
+### Pre-Stage-B audit checklist
+
+Before running Stage B, verify each major feature category has either (a) a Qt counterpart in `mufasa/ui_qt/`, or (b) an explicit "feature not in v1" decision logged. Categories from B2:
+
+- [ ] Analytics/visualisation: path-plot, heatmap, distance, movement, clf-validation, gantt, severity, ROI-aggregate, kleinberg, FSTTC, mutual-exclusivity, pup-retrieval, spontaneous-alternation
+- [ ] Tracking imports: DLC, SLEAP, COCO-keypoints, YOLO-keypoints, labelme
+- [ ] Project management: CSV-to-parquet, print-video-meta, check-videos-seekable, merge-coco-keypoint-files
+- [ ] ROI: delete-all-rois (already covered by Qt ROIManageForm)
+- [ ] Video processing: video_processing_pop_up (parts likely covered by `ui_qt/forms/video_utilities.py`)
+- [ ] About / settings: about_simba_pop_up
+
+This checklist is the work for Stage B's preparation patch (122cy in the staging-plan below).
+
+---
+
+## Staging plan
+
+| Patch | Stage | Files deleted | Config edits | Risk |
+|---|---|---:|---|---|
+| **122cx** (this patch) | — | 0 | 0 | None — scoping doc only |
+| **122cy** | Stage A | 0 | 1 (`pyproject.toml`) | Low — entry point removal |
+| **122cz** (or split) | Stage B | 99 | 0 | Medium — see pre-Stage-B checklist |
+| **122d0** | Stage C | 2 | 0 | Low — AST verifies no consumers |
+| **122d1** | Cleanup | 0 | 0 | Low — `confirm.py` body update, README sweep |
+
+Total: 5 patches over ~1 week (assuming pre-Stage-B checklist sweep takes a session of its own).
+
+Alternatively, Stage B could be split by directory:
+
+* 122cz.1 — ui/pop_ups (75 files)
+* 122cz.2 — labelling Tk UI (5 files)
+* 122cz.3 — unsupervised (14 files)
+* 122cz.4 — SimBA.py + ui/ Tk helpers (5 files)
+
+Split is safer (smaller blast radius per patch) but each split needs the same pre-cascade verification, multiplying review overhead. **Recommended: monolithic Stage B** assuming the pre-Stage-B checklist passes cleanly.
+
+---
+
+## Boundary regression guards
+
+`tests/smoke_122cx_simba_death_cascade_scope.py` pins the exact numbers in this document. If a future patch:
+
+* Adds a Qt-side import of an unsupervised file
+* Adds a non-SimBA consumer of a `ui/pop_ups` file
+* Adds a non-Qt consumer of `px_to_mm_ui.py`
+
+...the smoke test fails and the scoping is re-examined before Stage B can land.
