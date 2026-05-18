@@ -2,10 +2,17 @@
 mufasa.ui_qt.forms.batch_pre_process
 =====================================
 
-Qt port of :class:`mufasa.video_processors.batch_process_menus.BatchProcessFrame`
-— the multi-step video pre-processing wizard (crop → downsample →
+Qt port of the legacy ``BatchProcessFrame`` Tk wizard — the
+multi-step video pre-processing wizard (crop → downsample →
 greyscale → flip/rotate → clip → FPS → CLAHE). Replaces the
 :class:`BatchPreProcessLauncher` placeholder.
+
+The legacy Tk implementation lived at
+``mufasa.video_processors.batch_process_menus.BatchProcessFrame``
+and was deleted in patch 122cm (it had zero live importers; only
+docstring "see also" pointers like this one referenced it). The
+Qt port here is the live surface; consult git history for the
+legacy Tk code if anyone needs it.
 
 Patch 122al (this file)
 -----------------------

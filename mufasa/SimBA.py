@@ -59,7 +59,11 @@ from typing import Union
 import PIL.Image
 from PIL import ImageTk
 
-from mufasa.bounding_box_tools.boundary_menus import BoundaryMenus
+# Patch 122cm: BoundaryMenus removed (Tk surface; only consumer
+# was this file's anchored_roi_analysis_btn button below). No Qt
+# replacement exists yet; see backend_audit.md §3c for the
+# reclassification ("delete-only; Qt port would be substantial").
+# from mufasa.bounding_box_tools.boundary_menus import BoundaryMenus
 from mufasa.labelling.labelling_advanced_interface import \
     select_labelling_video_advanced
 from mufasa.labelling.targeted_annotations_clips import \
@@ -596,7 +600,11 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
 
 
 
-        anchored_roi_analysis_btn = SimbaButton(parent=lbl_addon, txt="ANIMAL-ANCHORED ROIs", txt_clr='orange', cmd=BoundaryMenus, cmd_kwargs={'config_path': lambda:self.config_path})
+        # Patch 122cm: anchored_roi_analysis_btn removed with
+        # BoundaryMenus (see comment at the head of this file).
+        # The corresponding .grid() call at the bottom of this
+        # method is also gone.
+        # anchored_roi_analysis_btn = SimbaButton(parent=lbl_addon, txt="ANIMAL-ANCHORED ROIs", txt_clr='orange', cmd=BoundaryMenus, cmd_kwargs={'config_path': lambda:self.config_path})
         further_methods_frm.grid(row=0, column=1, sticky=NW, pady=10, padx=10)
         extract_frm_btn.grid(row=1, column=0, sticky=NW)
         add_clf_btn.grid(row=3, column=0, sticky=NW)
@@ -694,7 +702,11 @@ class SimbaProjectPopUp(ConfigReader, PopUpMixin):
         # Patch 122ck: cue_light_analyser_btn.grid removed with the
         # button itself. Subsequent rows renumbered to keep the
         # layout flowing.
-        anchored_roi_analysis_btn.grid(row=1, sticky=NW)
+        # Patch 122cm: anchored_roi_analysis_btn.grid removed with
+        # BoundaryMenus drop. No replacement button — feature is
+        # absent from the SimBA Tk window; Qt-side has no Animal-
+        # Anchored-ROIs surface either (delete-only per §3c).
+        # anchored_roi_analysis_btn.grid(row=1, sticky=NW)
 
         if ENV[ENV_VARS.UNSUPERVISED_INTERFACE.value]:
             from mufasa.unsupervised.unsupervised_main import UnsupervisedGUI

@@ -118,16 +118,17 @@ The audit's priority recommendations stand, but the **work content differs from 
 
 ## 3. §2 Backend modules with embedded Tk UI
 
-**Post-patch 122cl:** 21 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import `mufasa.ui.tkinter_functions` at module-load time (was 25 pre-122ch). Plus 1 lazy importer — `mufasa.utils.confirm` — which imports inside a function body only when the default Tk-backed `confirm_two_option` actually fires; designed to be replaceable by a Qt override at workbench startup. 21 + 1 = 22 total importers.
+**Post-patch 122cm:** 19 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import `mufasa.ui.tkinter_functions` at module-load time (was 25 pre-122ch). Plus 1 lazy importer — `mufasa.utils.confirm` — which imports inside a function body only when the default Tk-backed `confirm_two_option` actually fires; designed to be replaceable by a Qt override at workbench startup. 19 + 1 = 20 total importers.
 
 Count trajectory:
 * 25 → 23 in 122ch (video_processing.py + train_model_mixin.py decoupled).
 * 23 → 22 in 122ck (cue_light_main_popup.py deleted — note: 122ck's commit message understated this; the deleted file had a module-level `from mufasa.ui.tkinter_functions import ...` and counted as an importer).
 * 22 → 21 in 122cl (roi_ruler.py decoupled via callback).
+* 21 → 19 in 122cm (boundary_menus.py + batch_process_menus.py deleted; both had zero real consumers).
 
 The module-level importers are the ones that block Tier-4 cleanup (removing `tkinter_functions.py` would break them at load). The lazy importer doesn't have that property — `confirm.py` would survive `tkinter_functions.py` deletion as long as a Qt override is installed first, or the stdin/auto-yes fallback is acceptable.
 
-### 3a. Inventory by category (post-122cl)
+### 3a. Inventory by category (post-122cm)
 
 ```
 unsupervised/  (13 files)   — the entire unsupervised module
@@ -138,12 +139,14 @@ roi_tools/     (1 file)     — roi_ui_mixin (kept; consumed by Qt
                               ROI dialogs transitively per 122ck
                               re-audit)
                               (roi_ruler decoupled in 122cl)
-bounding_box_tools/ (1)     — boundary_menus
+bounding_box_tools/ (0)     — boundary_menus deleted in 122cm
 cue_light_tools/   (0)      — cue_light_main_popup deleted in 122ck
-video_processors/  (1)      — batch_process_menus
+video_processors/  (0)      — batch_process_menus deleted in 122cm
                               (video_processing decoupled in 122ch)
 utils/         (1, lazy)    — confirm (the abstraction; not blocking)
 ```
+
+Module-level count post-122cm: **19**. Trajectory: 25 → 23 (122ch) → 22 (122ck) → 21 (122cl) → 19 (122cm).
 
 ### 3b. Migration disposition
 
@@ -199,6 +202,50 @@ These are backend modules that fire a Tk popup as part of an operation (e.g., a 
 
 The 1-to-1 Qt equivalents are well-known. The real friction is the backend ↔ UI coupling in Group B + C — once those refactors are done, the symbol substitution is mechanical.
 
+### 3d. Strategic disposition (added in patch 122cm)
+
+After the decoupling-via-callback experiments in 122ch (video_processing.py + train_model_mixin.py) and 122cl (roi_ruler.py), a re-audit of the remaining importers shows they fall into four clean buckets. This supersedes the earlier Group A / B / C / D classification, which mixed "delete-able" and "decouple-able" files based on import shape rather than on consumer reality.
+
+**Bucket 1: Already-Qt-replaced or zero-consumer → delete-only (closed in 122cm)**
+
+* `bounding_box_tools/boundary_menus.py` — only real consumer was `SimBA.py:62`. Deleted in 122cm with SimBA.py surgical edits (import + button + grid). No Qt replacement; "Animal-anchored ROIs" feature is absent from both surfaces now. Acceptable feature loss for v1.
+* `video_processors/batch_process_menus.py` — zero real consumers anywhere. Two docstring "see also" pointers (`ui_qt/forms/batch_pre_process.py`, `video_processors/blob_tracking_executor.py`) updated to point at the Qt replacement and git history.
+
+**Bucket 2: Dies with another Tier-4 work item — wait, don't decouple (17 files)**
+
+| File | Dies with |
+|---|---|
+| 13× `unsupervised/*` | Tier 3b Unsupervised Qt port |
+| `mixins/annotator_mixin.py` | Labelling Qt port (consumed only by `labelling/`) |
+| `labelling/labelling_interface.py` | Labelling Qt port (itself the surface to be ported) |
+| `labelling/standard_labeller.py` | Labelling Qt port (sibling) |
+| `mixins/pop_up_mixin.py` | Last — once all other Tk popups are gone |
+
+These are Tk surfaces with structural Tk coupling. The 5 `Entry_Box` constructions in `annotator_mixin.py` aren't a single intrusion the way `TwoOptionQuestionPopUp` was in `video_processing.py` — they're primary UI primitives. Decoupling them piecemeal would 5x file size and fight the file's nature. Better to wait for the parent work item and delete the file whole.
+
+**Bucket 3: Deferred — Qt code currently consumes it (1 file)**
+
+* `roi_tools/roi_ui_mixin.py` — Qt ROI dialogs (`mufasa/ui_qt/dialogs/roi_canvas.py`, `roi_define_panel.py`) subclass through `roi_tools/roi_ui.py` which subclasses `ROI_mixin`. Resolving this needs either inlining what `ROI_ui` uses from the mixin (substantial), or a parallel Qt mixin (parallel maintenance burden). Identified in 122ck re-audit; tracked for future planning.
+
+**Bucket 4: Lazy importer, non-blocking (1 file)**
+
+* `mufasa/utils/confirm.py` — imports Tk inside `_default_confirm`'s function body only when no Qt override is installed (and only when called). Does NOT block Tier-4 cleanup; `tkinter_functions.py` deletion would still let `confirm.py` import fine (the Tk fallback call would fail with the normal `ImportError`, which is the expected behavior once Qt is the only surface).
+
+#### Lessons from the decoupling experiments
+
+1. **`video_processing.py` + `train_model_mixin.py` (122ch)** — correctly decoupled. Tk use was a single intrusion (`TwoOptionQuestionPopUp` confirm) in otherwise pure-backend files. The lazy-import-helper-with-override pattern worked because the rest of the file had no Tk dependence.
+
+2. **`roi_ruler.py` (122cl)** — partially decoupled. The `SimBALabel` parameter became a `Callable[[str], None]` callback (Tk-functions import dropped). But the file still has `from tkinter import *` for the `Toplevel` type hint and `nametowidget` call. The class is fundamentally a Tk widget; the decoupling moved the file off the "tkinter_functions" importer list (count metric improved) without making the file Tk-independent. Honest progress, marginal benefit.
+
+3. **`annotator_mixin.py` (considered, rejected in 122cm)** — 5 Entry_Box instantiations are primary UI primitives, not a single intrusion. Decoupling would 5x file size and fight the file's structural Tk-surface nature. Reclassified to Bucket 2 (dies with labelling Qt port).
+
+#### Decision rule for future audits
+
+* **Tk use is a single intrusion in a pure-backend file** → decouple via callback or lazy-import abstraction (the 122ch / 122cl pattern).
+* **File is a Tk surface (uses `tkinter.*` widgets directly, renders UI, has Tk-typed parameters)** → wait for the parent work item (Qt port or bulk delete); don't decouple piecemeal.
+
+The new classification removes Group A / B / C / D ambiguity. Future Tier-4 work follows Bucket 2 + 3 closures.
+
 ---
 
 ## 4. §3 Combined cleanup plan
@@ -243,7 +290,7 @@ Order suggested:
 11. ~~**`video_processors/video_processing.py`** — replace `TwoOptionQuestionPopUp` import.~~ ✓ **DONE in patch 122ch.** Both the module-level Tk import and the `TwoOptionQuestionPopUp(...)` call site (in `extract_frames_from_all_videos_in_directory`) replaced with a `from mufasa.utils.confirm import confirm_two_option` import + a `confirm_two_option(...)` call. The new helper lazy-imports Tk only if no Qt override is installed; backend file is now Tk-import-free at module load.
 12. ~~**`mixins/train_model_mixin.py`** — same `TwoOptionQuestionPopUp` replacement.~~ ✓ **DONE in patch 122ch.** Same pattern: Tk import dropped; `TrainModelMixin.read_meta_dicts_from_dir` (META CONFIG FILE ERROR confirmation) now routes through `confirm_two_option`.
 13. ~~**`roi_tools/roi_ruler.py`** — refactor `SimBALabel` use into a callback.~~ ✓ **DONE in patch 122cl.** Replaced `info_label: Optional[SimBALabel]` parameter with `on_info_text: Optional[Callable[[str], None]]`. The `.configure(text=, fg=)` + `.update_idletasks()` calls inside `_get_attributes()` are now a single `self.on_info_text(text)` call. Consumer (`roi_ui_mixin.py`) wraps its `status_bar` in a local closure that does the Tk-specific configure + idletask pair, so the toolkit-specific knowledge stays at the consumer side. The file still uses `from tkinter import *` for the `Toplevel` type hint — that's a separate coupling tracked under the Tier-4 deletion roadmap.
-14. **`mixins/annotator_mixin.py`** — refactor `Entry_Box` use.
+14. ~~**`mixins/annotator_mixin.py`** — refactor `Entry_Box` use.~~ **RECLASSIFIED in patch 122cm.** Considered in 122cm; rejected on inspection. The file has 5 separate `Entry_Box(...)` constructions which are primary UI primitives, not a single intrusion that lifts cleanly. Decoupling would 5x file size and fight the file's structural Tk-surface nature. Reclassified to Bucket 2 (see §3d) — dies with the labelling Qt port. No per-file work scheduled.
 
 **New helper:** `mufasa/utils/confirm.py` — provides `confirm_two_option(question, option_one, option_two, title)`. Default implementation lazy-imports the Tk popup; falls back to stdin prompt if Tk unavailable; falls back to `option_one` if stdin unavailable. Qt code overrides by reassigning the module-level binding at workbench startup (see the module docstring for the pattern).
 
@@ -258,9 +305,9 @@ Order suggested:
 
 ### 4f. Last items (Tier 4 close-out)
 
-16. **`labelling/labelling_interface.py` + `standard_labeller.py`** — Qt port of the labelling UI. Substantial.
-17. **`video_processors/batch_process_menus.py`** — Qt port or accept removal.
-18. **`bounding_box_tools/boundary_menus.py`** — Qt port or accept removal.
+16. **`labelling/labelling_interface.py` + `standard_labeller.py`** — Qt port of the labelling UI. Substantial. (`annotator_mixin.py` dies with this port — see §3d Bucket 2.)
+17. ~~**`video_processors/batch_process_menus.py`** — Qt port or accept removal.~~ ✓ **DONE in patch 122cm.** Deleted (zero real consumers). Two docstring "see also" pointers in `ui_qt/forms/batch_pre_process.py` + `video_processors/blob_tracking_executor.py` updated.
+18. ~~**`bounding_box_tools/boundary_menus.py`** — Qt port or accept removal.~~ ✓ **DONE in patch 122cm.** Accepted removal (only consumer was SimBA.py). Animal-anchored-ROIs feature is absent from both Tk and Qt surfaces now. Acceptable feature loss for v1; can be reintroduced as a Qt-native form later if needed.
 
 After 4a-4f: `mufasa/ui/tkinter_functions.py` is unreachable; can be deleted, completing the Tier 4 cleanup.
 

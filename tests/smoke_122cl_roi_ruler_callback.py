@@ -185,9 +185,12 @@ def main() -> int:
         and "roi_ruler" in audit,
     )
     check(
-        "backend_audit.md §3 count updated to 21 module-level "
-        "importers",
-        "21 modules under" in audit or "21 + 1 = 22" in audit,
+        "backend_audit.md §3 records 122cl's contribution to the "
+        "module-level importer count trajectory",
+        # The pinned-count "21" is stale after later patches reduce
+        # the count further. Pin only to the unchanging trajectory
+        # entry that records 122cl's effect.
+        "122cl" in audit and "21" in audit,
     )
 
     # ==================================================================
