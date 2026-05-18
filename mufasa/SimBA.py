@@ -261,7 +261,11 @@ from mufasa.ui.pop_ups.visualize_pose_in_dir_pop_up import \
 # as "YOLO pose — inference".
 # from mufasa.ui.pop_ups.yolo_inference_popup import YOLOPoseInferencePopUP
 from mufasa.ui.pop_ups.yolo_plot_results import YoloPoseVisualizerPopUp
-from mufasa.ui.pop_ups.yolo_pose_train_popup import YOLOPoseTrainPopUP
+# Patch 122d3: YOLOPoseTrainPopUP removed (Tk popup). Qt
+# replacement is YOLOPoseTrainForm in
+# `mufasa.ui_qt.forms.yolo_train`, wired into classifier_page as
+# "YOLO pose — train".
+# from mufasa.ui.pop_ups.yolo_pose_train_popup import YOLOPoseTrainPopUP
 from mufasa.ui.tkinter_functions import (CreateLabelFrameWithIcon, Entry_Box,
                                         FileSelect, SimbaButton, SimbaCheckbox,
                                         MufasaDropDown, SimBALabel,
@@ -906,7 +910,10 @@ class App(object):
         batch_process_menu.add_cascade(label="Blob tracking...", compound="left", image=self.menu_icons["bubble"]["img"], menu=blob_tracking_menu, font=Formats.FONT_REGULAR.value)
 
         yolo_tracking_menu = Menu(batch_process_menu)
-        yolo_tracking_menu.add_command(label="Train YOLO model", compound="left", image=self.menu_icons["ultralytics_2"]["img"], command=YOLOPoseTrainPopUP, font=Formats.FONT_REGULAR.value, state=yolo_state)
+        # Patch 122d3: 'Train YOLO model' menu entry removed —
+        # Qt YOLOPoseTrainForm covers it on classifier_page →
+        # "YOLO pose — train" section.
+        # yolo_tracking_menu.add_command(label="Train YOLO model", compound="left", image=self.menu_icons["ultralytics_2"]["img"], command=YOLOPoseTrainPopUP, font=Formats.FONT_REGULAR.value, state=yolo_state)
         # Patch 122d2: 'Predict with YOLO model' menu entry
         # removed — Qt YOLOPoseInferenceForm covers it on
         # classifier_page → "YOLO pose — inference" section.

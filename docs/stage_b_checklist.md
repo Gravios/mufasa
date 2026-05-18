@@ -10,10 +10,10 @@
 | Covered by Qt workbench | **69** |
 | Hard drops (admin/cosmetic) | **2** |
 | Workflow gaps requiring Qt work before Stage B | ~~1~~ **0 (resolved 122cz)** |
-| Feature decisions required (YOLO/conversion) | **3** |
-| **Total** | **75 → 74 (1 ported in 122cz)** |
+| Feature decisions required (YOLO/conversion) | ~~3~~ **0 (resolved 122d1/d2/d3 by porting)** |
+| **Total** | **75 → 71 (4 ported in 122cz/d1/d2/d3)** |
 
-**Verdict (post-122cz):** Stage B is **ready for monolithic execution** once the 3 feature decisions are made. The blocking workflow gap (`direction_animal_to_bodypart_settings`) was resolved by porting it to a Qt-native form in patch 122cz. The 3 remaining feature decisions don't block other workflows — they affect whether 3 specific popups get ported or dropped.
+**Verdict (post-122d3):** Stage B is **fully ready for execution**. All 4 popup gaps from the original 122cy sweep are now resolved — 1 via Qt port (122cz; was blocker), 3 via Qt port (122d1/d2/d3; were feature decisions). No more pre-Stage-B preparation needed.
 
 ---
 
@@ -146,42 +146,21 @@ After this patch, the AnalysisForm's "Directing toward body-part — statistics"
 
 ---
 
-## §4. Feature-decision-required (3 popups — NON-BLOCKING)
+## §4. Feature-decision-required ~~(3 popups — NON-BLOCKING)~~ ✓ ALL 3 PORTED 122d1/d2/d3
 
-These popups have no Qt counterpart, but the workflow has no Qt-side caller — deleting them just drops the GUI for a feature that's not exposed in the workbench. Backend modules survive.
+The 3 non-blocking gap popups identified in 122cy were ported to Qt rather than dropped, after the user opted to keep the YOLO/ROI conversion features in v1.
 
-### 4.1. `simba_rois_to_yolo_pop_up.py`
+### 4.1. `simba_rois_to_yolo_pop_up.py` — ✓ Ported 122d1
 
-**Class:** `SimBAROIs2YOLOPopUp`
-**What it does:** converts SimBA ROI definitions to YOLO bounding-box training data.
+Replaced by `SimBARoisToYoloForm` on the Tools workbench page, section "SimBA ROIs → YOLO conversion". Mirrors the existing `SLEAPToYoloForm` pattern (sibling on the same page). Supports the same parameters as the Tk popup (config path, optional video_dir/save_dir, OBB toggle, frame count, train size, greyscale, CLAHE, verbose).
 
-**Disposition options:**
-1. **Add a converter to tools_page.** ConverterForm already covers similar formats (DLC, SLEAP, Labelme); adding ROI→YOLO is consistent.
-2. **Drop the feature.** The workbench's existing converters cover all the main pose-data formats. ROI→YOLO is a niche workflow; users wanting it can use the backend directly.
+### 4.2. `yolo_inference_popup.py` — ✓ Ported 122d2
 
-**Recommendation:** Drop unless explicitly required. If kept, port via tools_page in a follow-on patch.
+Replaced by `YOLOPoseInferenceForm` on the Classifier workbench page, section "YOLO pose — inference". Single form with a Mode selector (Single video / Video directory) replacing the Tk popup's two-button layout. 14 parameters from the original popup mapped to Qt widgets. Branches between `YOLOPoseInference` and `YOLOPoseTrackInference` based on optional tracker .yml. CUDA + ultralytics availability checked in `collect_args` (friendly error path).
 
-### 4.2. `yolo_inference_popup.py`
+### 4.3. `yolo_pose_train_popup.py` — ✓ Ported 122d3
 
-**Class:** `YOLOPoseInferencePopUP`
-**What it does:** GUI for `YOLOPoseInference` — runs a trained YOLO pose model on input videos.
-
-**Disposition options:**
-1. **Port to a workbench form.** Could go on classifier_page next to RunInferenceForm (which handles SimBA classifiers, not YOLO).
-2. **Drop the GUI.** YOLO inference is typically a CLI workflow; users with YOLO models will scripts invoking `YOLOPoseInference` directly.
-
-**Recommendation:** Drop unless YOLO model inference is a v1 workbench feature. The backend stays.
-
-### 4.3. `yolo_pose_train_popup.py`
-
-**Class:** `YOLOPoseTrainPopUP`
-**What it does:** GUI for training a YOLO pose model — wraps the YOLO training subprocess with CUDA detection and parameter configuration.
-
-**Disposition options:**
-1. **Port to a workbench form.** Similar to TrainClassifierForm but for YOLO pose.
-2. **Drop the GUI.** YOLO training is a long-running offline operation typically done outside a GUI; the backend training script can be invoked directly.
-
-**Recommendation:** Drop. The backend stays accessible from CLI.
+Replaced by `YOLOPoseTrainForm` on the Classifier workbench page, section "YOLO pose — train". Detached subprocess pattern preserved — `subprocess.Popen` launches `python -m mufasa.model.yolo_fit` so the workbench doesn't wait for hours-long training. Info dialog confirms launch with save directory.
 
 ---
 
