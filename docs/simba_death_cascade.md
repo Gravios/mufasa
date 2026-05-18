@@ -11,7 +11,7 @@
 
 | Stage | Files | Notes |
 |---|---:|---|
-| Stage A (entry point) | 0 + 1 config edit | Remove `mufasa-tk` from `pyproject.toml`. SimBA.py becomes unreachable. |
+| Stage A (entry point) | 0 + 1 config edit | ✓ **EXECUTED 122d4** — `mufasa-tk` removed from `pyproject.toml`. Legacy launcher unreachable via CLI; `python -m mufasa.SimBA` still works as backstop until Stage B deletes the file. |
 | Stage B (cascade) | 111 | SimBA.py itself + all files reachable only through it. Was 115 at 122cx scoping; 4 popups pre-ported in 122cz/d1/d2/d3 (the unblock + 3 YOLO conversion ports). |
 | Stage C (tail) | 2 | `tkinter_functions.py` + `pop_up_mixin.py` — orphan after Stage B. |
 | **Total** | **113 files** | (was 117 at 122cx; -4 after 122cz/d1/d2/d3 pre-deletions) |
@@ -25,33 +25,33 @@ These two are real Tier-4 close-out work for a follow-on patch (after Stage C).
 
 ---
 
-## Stage A: Remove the `mufasa-tk` entry point
+## Stage A: Remove the `mufasa-tk` entry point — ✓ EXECUTED 122d4
 
 **Scope:** 1-line config edit in `pyproject.toml`.
 
-**Before:**
+**Status (post-122d4):** the entry point is commented out with a 122d4 breadcrumb. The legacy launcher (`mufasa-tk`) no longer appears in the installed scripts. SimBA.py stays in tree as a `python -m mufasa.SimBA` backstop until Stage B (122d5) deletes it.
+
+**Before (pre-122d4):**
 ```toml
 [project.scripts]
 mufasa-tk        = "mufasa.SimBA:main"          # legacy Tk entry point
-mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench
-mufasa-chooser   = "mufasa.ui_qt.app:main"      # legacy Qt chooser
-mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench
-```
-
-**After:**
-```toml
-[project.scripts]
-# mufasa-tk removed in 122cx — legacy Tk launcher retired. The Qt
-# workbench is the only supported surface. See SimBA.py death
-# cascade in docs/simba_death_cascade.md.
 mufasa           = "mufasa.cli.workbench_launcher:main"
 mufasa-chooser   = "mufasa.ui_qt.app:main"
 mufasa-workbench = "mufasa.ui_qt.workbench_app:main"
 ```
 
-**Risk:** users with shell history / shell aliases / docs referencing `mufasa-tk` will get `command not found`. Mitigation: keep SimBA.py in tree for Stage A so anyone running `python -m mufasa.SimBA` still works during the transition; Stage B deletes it.
+**After (post-122d4):**
+```toml
+[project.scripts]
+# mufasa-tk        = "mufasa.SimBA:main"          # removed 122d4
+mufasa           = "mufasa.cli.workbench_launcher:main"
+mufasa-chooser   = "mufasa.ui_qt.app:main"
+mufasa-workbench = "mufasa.ui_qt.workbench_app:main"
+```
 
-**Why separate from Stage B:** lets the entry-point retirement land cleanly even if Stage B reveals an unexpected consumer.
+**Risk realisation:** users with shell history / shell aliases / docs referencing `mufasa-tk` will get `command not found` on a fresh install / `pip install -e .` re-run. The `python -m mufasa.SimBA` backstop softens the transition; Stage B removes that too.
+
+**Why kept the comment line instead of clean delete:** future archaeology — easier to see "this used to exist" than to need a git blame. Cosmetic; either acceptable.
 
 ---
 
@@ -183,17 +183,23 @@ Stage B is now fully ready for execution.
 
 ---
 
-## Staging plan
+## Staging plan (actuals)
 
-| Patch | Stage | Files deleted | Config edits | Risk |
+| Patch | Stage | Files deleted | Config edits | Status |
 |---|---|---:|---|---|
-| **122cx** (this patch) | — | 0 | 0 | None — scoping doc only |
-| **122cy** | Stage A | 0 | 1 (`pyproject.toml`) | Low — entry point removal |
-| **122cz** (or split) | Stage B | 99 | 0 | Medium — see pre-Stage-B checklist |
-| **122d0** | Stage C | 2 | 0 | Low — AST verifies no consumers |
-| **122d1** | Cleanup | 0 | 0 | Low — `confirm.py` body update, README sweep |
+| **122cx** | Scoping | 0 | 0 | ✓ Done — scoping doc + smoke test |
+| **122cy** | Pre-Stage-B checklist | 0 | 0 | ✓ Done — checklist sweep, 1 blocker + 3 feature-decisions surfaced |
+| **122cz** | Stage B prep (blocker port) | 1 | 0 | ✓ Done — directing-bodypart settings ported to Qt |
+| **122d0** | Drive-by (QWI-4) | 0 | 1 (`workbench_app.py`) | ✓ Done — Qt-workbench bug tracking + page order fix |
+| **122d1** | Stage B prep (YOLO port #1) | 1 | 0 | ✓ Done — simba_rois_to_yolo ported |
+| **122d2** | Stage B prep (YOLO port #2) | 1 | 0 | ✓ Done — yolo_inference ported |
+| **122d3** | Stage B prep (YOLO port #3) | 1 | 0 | ✓ Done — yolo_pose_train ported |
+| **122d4** | Stage A | 0 | 1 (`pyproject.toml`) | ✓ Done — `mufasa-tk` entry point removed |
+| **122d5** (next) | Stage B | 111 | 0 | Medium — checklist passes; bulk delete |
+| **122d6** | Stage C tail | 2 | 0 | Low — AST verifies no consumers |
+| **122d7+** | Cleanup | 0 | 0 | Low — confirm.py body, README sweep, QWI-1/2/3 |
 
-Total: 5 patches over ~1 week (assuming pre-Stage-B checklist sweep takes a session of its own).
+Total elapsed: 8 patches (122cx → 122d4). Stage B is the remaining hot work; Stage C + cleanup are mechanical.
 
 Alternatively, Stage B could be split by directory:
 
