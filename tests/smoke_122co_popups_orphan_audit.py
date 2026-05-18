@@ -184,7 +184,7 @@ def main() -> int:
         "duplicate_rois_by_source_target_popup.py",
         "import_roi_csv_popup.py",
         "min_max_draw_size_popup.py",
-        "roi_size_standardizer_popup.py",
+        # roi_size_standardizer_popup.py removed in 122cs (Qt port).
     }
     if popups_dir.exists():
         n_orphan, n_referenced = _ast_orphan_audit(popups_dir, pkg)
