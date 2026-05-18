@@ -325,13 +325,20 @@ def main() -> int:
         "simba_death_cascade.md" in ba,
     )
 
-    # 15. mufasa-tk entry point still exists (Stage A not executed)
+    # 15. mufasa-tk entry point: snapshot-resilient — pre-122d4
+    # the active `mufasa-tk = "mufasa.SimBA:main"` line exists;
+    # post-122d4 the line is commented out. The hard regression
+    # guard is `smoke_122d4_stage_a.py` which pins the
+    # post-removal state.
     pyproject = (REPO_ROOT / "pyproject.toml").read_text()
+    # Accept either state — the cascade work moves through these
+    # in order.
     check(
-        "mufasa-tk entry point still exists in pyproject.toml "
-        "(Stage A has NOT been executed yet)",
-        "mufasa-tk" in pyproject
-        and "mufasa.SimBA:main" in pyproject,
+        "pyproject.toml exists with [project.scripts] block "
+        "(122cx scoping invariant)",
+        "mufasa-tk" in pyproject  # still mentioned (active or
+                                  # in a comment for archaeology)
+        and "[project.scripts]" in pyproject,
     )
 
     # 16. Parse-clean

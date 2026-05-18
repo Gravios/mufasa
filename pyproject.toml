@@ -169,7 +169,14 @@ Documentation = "https://simba-docs.readthedocs.io"
 Issues        = "https://github.com/sgoldenlab/simba/issues"
 
 [project.scripts]
-mufasa-tk        = "mufasa.SimBA:main"          # legacy Tk entry point
+# Patch 122d4 (Stage A of the SimBA.py death cascade):
+# `mufasa-tk` entry point removed — the legacy Tk launcher is
+# retired. The Qt workbench is the only supported surface. See
+# docs/simba_death_cascade.md for the full plan. SimBA.py still
+# exists in the tree for one more patch as a `python -m
+# mufasa.SimBA` backstop; Stage B (122d5) deletes it along with
+# the rest of the Tk surface.
+# mufasa-tk        = "mufasa.SimBA:main"          # removed 122d4
 mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench (default; env diagnostics)
 mufasa-chooser   = "mufasa.ui_qt.app:main"      # legacy Qt chooser / standalone popups
 mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench launch (no env diagnostics)
