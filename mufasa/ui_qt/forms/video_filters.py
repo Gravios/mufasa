@@ -35,9 +35,13 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFormLayout, QLabel, QPushButton, QSpinBox,
-                               QStackedWidget, QVBoxLayout, QWidget)
+from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog,
+                               QDialogButtonBox, QDoubleSpinBox,
+                               QFormLayout, QHBoxLayout, QLabel,
+                               QMessageBox, QPushButton, QSlider,
+                               QSpinBox, QStackedWidget, QVBoxLayout,
+                               QWidget)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm
@@ -45,6 +49,167 @@ from mufasa.ui_qt.workbench import OperationForm
 
 # --------------------------------------------------------------------------- #
 # Per-filter parameter panels
+# --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# CLAHE interactive-preview dialog (patch 122ci)
+# --------------------------------------------------------------------------- #
+def _cv2_to_qpixmap(img) -> QPixmap:
+    """Convert a CV2/numpy image (2D grayscale or 3D RGB888) to a
+    QPixmap. Mirrors the helper in
+    :mod:`mufasa.ui_qt.forms.blob_quick_check` — kept local here
+    to avoid a cross-module dependency.
+    """
+    import numpy as np
+    if img.ndim == 2:
+        h, w = img.shape
+        qimg = QImage(img.tobytes(), w, h, w, QImage.Format_Grayscale8)
+    elif img.ndim == 3 and img.shape[2] == 3:
+        h, w, _ = img.shape
+        qimg = QImage(np.ascontiguousarray(img).tobytes(), w, h,
+                      w * 3, QImage.Format_RGB888)
+    else:
+        raise ValueError(
+            f"Unsupported image shape {img.shape}")
+    return QPixmap.fromImage(qimg)
+
+
+class _ClahePreviewDialog(QDialog):
+    """Live-preview tuning dialog for CLAHE. Lets the user iterate
+    on `clip_limit` and `tile_size` against a chosen frame, then
+    confirms the final values (OK) or aborts (Cancel).
+
+    Patch 122ci. Same architecture pattern as
+    :class:`_BlobCheckDialog`:
+
+    * QLabel-backed image display, auto-scaled.
+    * Live `clip_limit` (QDoubleSpinBox) + `tile_size` (QSpinBox);
+      changes trigger immediate re-render of the displayed frame.
+    * Frame slider for navigation across the video; CLAHE re-runs
+      on the new frame whenever the slider moves.
+    * Standard OK / Cancel buttons via QDialogButtonBox.
+
+    The CLAHE application is OpenCV's ``cv2.createCLAHE`` —
+    matches the actual backend (`clahe_enhance_video_mp`'s per-
+    frame transform) so the preview is faithful, not a stand-in.
+    """
+
+    def __init__(self, video_path: str,
+                 init_clip_limit: float,
+                 init_tile_size: int,
+                 parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("CLAHE — live preview")
+        self.video_path = video_path
+
+        # Lazy-import the backend pieces — AST tests don't need
+        # cv2 / utils to load this module.
+        from mufasa.utils.read_write import (get_video_meta_data,
+                                             read_frm_of_video)
+        self._read_frm = read_frm_of_video
+
+        meta = get_video_meta_data(video_path=video_path)
+        self.frame_count = int(meta["frame_count"])
+        self.img_idx = 0
+
+        self._build_ui(init_clip_limit, init_tile_size)
+        self._refresh()
+
+    # ------------------------------------------------------------------ #
+    # UI
+    # ------------------------------------------------------------------ #
+    def _build_ui(self, init_clip: float, init_tile: int) -> None:
+        root = QVBoxLayout(self)
+
+        # Image canvas
+        self.image_lbl = QLabel(self)
+        self.image_lbl.setAlignment(Qt.AlignCenter)
+        self.image_lbl.setMinimumSize(640, 360)
+        root.addWidget(self.image_lbl, 1)
+
+        # Tunables
+        params = QFormLayout()
+        params.setLabelAlignment(Qt.AlignRight)
+        self.clip_sp = QDoubleSpinBox(self)
+        self.clip_sp.setRange(0.1, 40.0); self.clip_sp.setSingleStep(0.5)
+        self.clip_sp.setValue(init_clip)
+        self.clip_sp.valueChanged.connect(self._refresh)
+        params.addRow("Clip limit:", self.clip_sp)
+        self.tile_sp = QSpinBox(self)
+        self.tile_sp.setRange(2, 64); self.tile_sp.setValue(init_tile)
+        self.tile_sp.valueChanged.connect(self._refresh)
+        params.addRow("Tile grid size:", self.tile_sp)
+        root.addLayout(params)
+
+        # Frame nav
+        nav_row = QHBoxLayout()
+        self.frame_slider = QSlider(Qt.Horizontal, self)
+        self.frame_slider.setRange(0, max(0, self.frame_count - 1))
+        self.frame_slider.setValue(0)
+        self.frame_slider.valueChanged.connect(self._on_frame_changed)
+        nav_row.addWidget(self.frame_slider, 1)
+        self.frame_lbl = QLabel(
+            f"frame 0 / {self.frame_count - 1}", self)
+        nav_row.addWidget(self.frame_lbl)
+        root.addLayout(nav_row)
+
+        # OK / Cancel
+        btns = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        # Rename OK to "Apply & run" so the action is unambiguous
+        ok_btn = btns.button(QDialogButtonBox.Ok)
+        if ok_btn is not None:
+            ok_btn.setText("Apply && run")
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        root.addWidget(btns)
+
+    # ------------------------------------------------------------------ #
+    # Render
+    # ------------------------------------------------------------------ #
+    def _on_frame_changed(self, idx: int) -> None:
+        self.img_idx = int(idx)
+        self.frame_lbl.setText(
+            f"frame {self.img_idx} / {self.frame_count - 1}")
+        self._refresh()
+
+    def _refresh(self, *_args) -> None:
+        import cv2
+        try:
+            frame = self._read_frm(video_path=self.video_path,
+                                   frame_index=self.img_idx)
+        except Exception:
+            return
+        # CLAHE operates on grayscale; convert if needed
+        if frame.ndim == 3:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = frame
+        clahe = cv2.createCLAHE(
+            clipLimit=float(self.clip_sp.value()),
+            tileGridSize=(int(self.tile_sp.value()),
+                          int(self.tile_sp.value())),
+        )
+        result = clahe.apply(gray)
+        rgb = cv2.cvtColor(result, cv2.COLOR_GRAY2RGB)
+        pm = _cv2_to_qpixmap(rgb)
+        self.image_lbl.setPixmap(pm.scaled(
+            self.image_lbl.width(), self.image_lbl.height(),
+            Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+    # ------------------------------------------------------------------ #
+    # Accessors — read after exec() returns Accepted
+    # ------------------------------------------------------------------ #
+    @property
+    def clip_limit(self) -> float:
+        return float(self.clip_sp.value())
+
+    @property
+    def tile_size(self) -> int:
+        return int(self.tile_sp.value())
+
+
+# --------------------------------------------------------------------------- #
+# _ClahePanel — small inline parameter widget shown in the form
 # --------------------------------------------------------------------------- #
 class _ClahePanel(QWidget):
     """CLAHE (contrast-limited adaptive histogram equalization)."""
@@ -213,19 +378,92 @@ class VideoFiltersForm(OperationForm):
             "params":  panel.to_kwargs(),
         }
 
+    def on_run(self) -> None:
+        """Override to intercept the interactive-CLAHE-preview case.
+
+        Patch 122ci. When `op == "clahe"` AND `params["interactive"]`
+        is True, opens :class:`_ClahePreviewDialog` modally so the
+        user can tune `clip_limit` / `tile_size` against a live
+        preview frame. On Accept, mutates the kwargs with the
+        dialog's final tuning and proceeds to the worker-thread
+        dispatch. On Reject (user cancelled), aborts silently.
+
+        All other ops fall through to the standard worker-thread
+        path inherited from :class:`OperationForm`.
+        """
+        try:
+            kwargs = self.collect_args()
+        except Exception as exc:
+            QMessageBox.warning(
+                self, f"{self.title}: invalid input", str(exc))
+            return
+
+        params = kwargs.get("params") or {}
+        if kwargs.get("op") == "clahe" and params.get("interactive"):
+            # Resolve a sample video for the preview. In directory
+            # scope, pick the first video in the directory — same
+            # video the worker would hit first anyway.
+            sample_path = kwargs["path"]
+            if kwargs["is_dir"]:
+                from mufasa.utils.read_write import (
+                    find_all_videos_in_directory)
+                vids = find_all_videos_in_directory(
+                    directory=sample_path, as_dict=True,
+                    raise_error=True)
+                sample_path = next(iter(vids.values()))
+            try:
+                dlg = _ClahePreviewDialog(
+                    video_path=sample_path,
+                    init_clip_limit=float(params["clip_limit"]),
+                    init_tile_size=int(params["tile_grid"]),
+                    parent=self.window(),
+                )
+            except Exception as exc:
+                QMessageBox.critical(
+                    self, "Could not open CLAHE preview",
+                    f"{type(exc).__name__}: {exc}")
+                return
+            result = dlg.exec()
+            if result != QDialog.Accepted:
+                return  # user cancelled the preview
+            # Mutate params with the dialog's final values; drop
+            # the `interactive` flag so target()'s pop() never
+            # sees True again.
+            params["clip_limit"] = dlg.clip_limit
+            params["tile_grid"] = dlg.tile_size
+            params["interactive"] = False
+            kwargs["params"] = params
+
+        # Standard worker-thread dispatch (lifted from
+        # OperationForm.on_run; can't call super().on_run()
+        # because that would re-run collect_args).
+        from mufasa.ui_qt.progress import run_with_progress
+
+        def _work() -> None:
+            self.target(**kwargs)
+
+        run_with_progress(
+            parent=self.window(),
+            title=f"{self.title}…",
+            target=_work,
+            on_success=lambda: (
+                self.completed.emit(),
+                QMessageBox.information(self, self.title, "Done."),
+            ),
+        )
+
     def target(self, *, path: str, is_dir: bool, op: str,
                params: dict) -> None:
         from mufasa.video_processors import video_processing as _vp
         # Dispatch table. Where a backend doesn't match the kwargs
         # shape exactly, adapt here rather than in the panel.
         if op == "clahe":
-            # Interactive preview is deliberately NOT wired through the
-            # thread-off-GUI runner — it needs the main event loop.
-            # Surface that mismatch with an explicit error for now;
-            # when the preview dialog lands, this branch dispatches to it.
-            if params.pop("interactive"):
-                raise NotImplementedError(
-                    "Interactive preview launches a dialog; not yet wired.")
+            # Patch 122ci: interactive preview is handled by on_run
+            # (opens a dialog on the main thread, then mutates
+            # params to interactive=False before reaching target).
+            # If interactive is still True here, it's a logic bug
+            # in on_run — drop it defensively rather than raising.
+            params.pop("interactive", None)
             fn = _vp.clahe_enhance_video_mp
             fn(file_path=path, **params)
         elif op == "greyscale":

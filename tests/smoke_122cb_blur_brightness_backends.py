@@ -188,9 +188,14 @@ def main() -> int:
         and ("brightness" in gaps.lower() or "Brightness" in gaps),
     )
     check(
-        "qt_form_runtime_gaps.md §2b reflects 1-of-5 failing count "
-        "(only CLAHE preview)",
-        "1 OPERATION FAILS" in gaps,
+        "qt_form_runtime_gaps.md §2b reflects reduced VideoFiltersForm "
+        "failing count (no longer 3 or 4 of 5; CLAHE preview later "
+        "closed in 122ci → 0)",
+        # Don't pin a specific count — later patches reduce it
+        # further. Just check the original 3-failing / 4-failing
+        # status is gone.
+        "3 OPERATIONS FAIL" not in gaps
+        and "4 OPERATIONS FAIL" not in gaps,
     )
 
     audit = (REPO_ROOT / "docs" / "backend_audit.md").read_text()
