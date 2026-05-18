@@ -118,20 +118,28 @@ The audit's priority recommendations stand, but the **work content differs from 
 
 ## 3. §2 Backend modules with embedded Tk UI
 
-**Post-patch 122ch:** 23 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import `mufasa.ui.tkinter_functions` at module-load time (was 25 pre-122ch). Plus 1 lazy importer — `mufasa.utils.confirm` — which imports inside a function body only when the default Tk-backed `confirm_two_option` actually fires; designed to be replaceable by a Qt override at workbench startup. 23 + 1 = 24 total importers.
+**Post-patch 122cl:** 21 modules under `mufasa/` (excluding `ui/`, `ui_qt/`, and `SimBA.py`) import `mufasa.ui.tkinter_functions` at module-load time (was 25 pre-122ch). Plus 1 lazy importer — `mufasa.utils.confirm` — which imports inside a function body only when the default Tk-backed `confirm_two_option` actually fires; designed to be replaceable by a Qt override at workbench startup. 21 + 1 = 22 total importers.
+
+Count trajectory:
+* 25 → 23 in 122ch (video_processing.py + train_model_mixin.py decoupled).
+* 23 → 22 in 122ck (cue_light_main_popup.py deleted — note: 122ck's commit message understated this; the deleted file had a module-level `from mufasa.ui.tkinter_functions import ...` and counted as an importer).
+* 22 → 21 in 122cl (roi_ruler.py decoupled via callback).
 
 The module-level importers are the ones that block Tier-4 cleanup (removing `tkinter_functions.py` would break them at load). The lazy importer doesn't have that property — `confirm.py` would survive `tkinter_functions.py` deletion as long as a Qt override is installed first, or the stdin/auto-yes fallback is acceptable.
 
-### 3a. Inventory by category (post-122ch)
+### 3a. Inventory by category (post-122cl)
 
 ```
 unsupervised/  (13 files)   — the entire unsupervised module
 labelling/     (2 files)    — frame labelling + standard_labeller
 mixins/        (2 files)    — annotator_mixin, pop_up_mixin
                               (train_model_mixin decoupled in 122ch)
-roi_tools/     (2 files)    — roi_ruler, roi_ui_mixin
+roi_tools/     (1 file)     — roi_ui_mixin (kept; consumed by Qt
+                              ROI dialogs transitively per 122ck
+                              re-audit)
+                              (roi_ruler decoupled in 122cl)
 bounding_box_tools/ (1)     — boundary_menus
-cue_light_tools/   (1)      — cue_light_main_popup
+cue_light_tools/   (0)      — cue_light_main_popup deleted in 122ck
 video_processors/  (1)      — batch_process_menus
                               (video_processing decoupled in 122ch)
 utils/         (1, lazy)    — confirm (the abstraction; not blocking)
@@ -234,7 +242,7 @@ Order suggested:
 
 11. ~~**`video_processors/video_processing.py`** — replace `TwoOptionQuestionPopUp` import.~~ ✓ **DONE in patch 122ch.** Both the module-level Tk import and the `TwoOptionQuestionPopUp(...)` call site (in `extract_frames_from_all_videos_in_directory`) replaced with a `from mufasa.utils.confirm import confirm_two_option` import + a `confirm_two_option(...)` call. The new helper lazy-imports Tk only if no Qt override is installed; backend file is now Tk-import-free at module load.
 12. ~~**`mixins/train_model_mixin.py`** — same `TwoOptionQuestionPopUp` replacement.~~ ✓ **DONE in patch 122ch.** Same pattern: Tk import dropped; `TrainModelMixin.read_meta_dicts_from_dir` (META CONFIG FILE ERROR confirmation) now routes through `confirm_two_option`.
-13. **`roi_tools/roi_ruler.py`** — refactor `SimBALabel` use into a callback.
+13. ~~**`roi_tools/roi_ruler.py`** — refactor `SimBALabel` use into a callback.~~ ✓ **DONE in patch 122cl.** Replaced `info_label: Optional[SimBALabel]` parameter with `on_info_text: Optional[Callable[[str], None]]`. The `.configure(text=, fg=)` + `.update_idletasks()` calls inside `_get_attributes()` are now a single `self.on_info_text(text)` call. Consumer (`roi_ui_mixin.py`) wraps its `status_bar` in a local closure that does the Tk-specific configure + idletask pair, so the toolkit-specific knowledge stays at the consumer side. The file still uses `from tkinter import *` for the `Toplevel` type hint — that's a separate coupling tracked under the Tier-4 deletion roadmap.
 14. **`mixins/annotator_mixin.py`** — refactor `Entry_Box` use.
 
 **New helper:** `mufasa/utils/confirm.py` — provides `confirm_two_option(question, option_one, option_two, title)`. Default implementation lazy-imports the Tk popup; falls back to stdin prompt if Tk unavailable; falls back to `option_one` if stdin unavailable. Qt code overrides by reassigning the module-level binding at workbench startup (see the module docstring for the pattern).
