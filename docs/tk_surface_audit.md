@@ -75,6 +75,35 @@ In both cases, the class name lives on a different line from the `import` keywor
 
 The corrected AST-based audit re-ran in under a second and reported 0 orphans — a 1-line code change (regex → AST loop) that completely flipped the conclusion.
 
+### 2f. Companion audits (added 122cp)
+
+Two further AST orphan-audits run after §2e succeeded for `pop_ups/`. Both produce zero orphans but reveal different consumer-graph shapes worth documenting before future Tier-4 work.
+
+#### 2f.1. `mufasa/ui/` non-popup files (8 files)
+
+| File | Importer cluster | Notes |
+|---|---|---|
+| `blob_quick_check_interface.py` | UI (`ui/blob_tracker_ui.py`) | Tk-internal chain |
+| `blob_tracker_ui.py` | UI_POPUP (`ui/pop_ups/initialize_blob_tracking_pop_up.py`) | Tk-internal chain |
+| `get_tree_view.py` | UI_POPUP (`ui/pop_ups/print_video_meta_popup.py`) | Tk-internal chain |
+| `machine_model_settings_ui.py` | SIMBA | Reached only via SimBA.py menus |
+| `px_to_mm_ui.py` | **QT + UI_POPUP** | LOAD-BEARING-FOR-QT (§2a); the single Qt → Tk coupling point |
+| `tkinter_functions.py` | EVERYTHING (520 import edges) | The central Tk module; the dependency target of every Tk-importer audit |
+| `utils.py` | BACKEND + SIMBA | Consumed by `roi_tools/roi_ui.py` + `roi_ui_mixin.py` (§3d Bucket 3 deferral) and SimBA.py |
+| `video_timelaps.py` | UI_POPUP (`ui/pop_ups/video_processing_pop_up.py`) | Tk-internal chain |
+
+**0 orphans.** The picture matches §2a's count of 1 LOAD-BEARING-FOR-QT file — `px_to_mm_ui.py` confirmed. The remaining 7 files split between SimBA-reachable (`machine_model_settings_ui.py`), backend-reachable via Qt-ROI dialog chain (`utils.py`), the central Tk module itself (`tkinter_functions.py`), and internal Tk-chains (4 files).
+
+Implication: same as §2e for `pop_ups/`. None of these 8 files is independently deletable. Each goes when its parent work item completes (SimBA.py deletion + Qt ROI dialog port + Tier-4 finale).
+
+#### 2f.2. `mufasa/unsupervised/pop_ups/` (13 files)
+
+**0 orphans, but with a notable property: the entire 13-file cluster is self-contained.** Each file's only importer is `mufasa/unsupervised/unsupervised_main.py`. No SimBA.py reference, no Qt-side coupling, no backend module reaches in.
+
+This makes the unsupervised cluster the cleanest possible cascade-deletion target. When Tier 3b ships the Qt port and `unsupervised_main.py` is replaced (or deleted), all 13 files become orphans in a single move — no SimBA.py surgical edits needed (unlike the 122ck cue-light cleanup or the future ui/pop_ups bulk delete). The closed-cluster shape is what `backend_audit.md` §3d Bucket 2 was implicitly describing for the "dies with Tier 3b" line.
+
+`backend_audit.md` §3d Bucket 2 updated post-122cp with this "closed-cluster" observation.
+
 ### 2b. UNREFERENCED (2 files)
 
 | File | Lines | Defines | Notes |
