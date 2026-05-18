@@ -183,7 +183,7 @@ def main() -> int:
     KNOWN_SUBPROCESS_POPUPS = {
         "duplicate_rois_by_source_target_popup.py",
         "import_roi_csv_popup.py",
-        "min_max_draw_size_popup.py",
+        # min_max_draw_size_popup.py removed in 122ct (Qt port).
         # roi_size_standardizer_popup.py removed in 122cs (Qt port).
     }
     if popups_dir.exists():
