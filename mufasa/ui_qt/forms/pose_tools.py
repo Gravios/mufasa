@@ -399,4 +399,178 @@ class SLEAPToYoloForm(OperationForm):
         runner.run()
 
 
-__all__ = ["PoseReorganizerForm", "SLEAPToYoloForm"]
+__all__ = ["PoseReorganizerForm", "SLEAPToYoloForm",
+           "SimBARoisToYoloForm"]
+
+
+# =========================================================================== #
+# SimBARoisToYoloForm (patch 122d1)
+# =========================================================================== #
+class SimBARoisToYoloForm(OperationForm):
+    """Convert a SimBA project's ROI definitions into a YOLO
+    detection training set.
+
+    Replaces :class:`SimBAROIs2YOLOPopUp`. The popup was identified
+    as a non-blocking gap in the 122cy pre-Stage-B checklist;
+    122d1 ports it instead of dropping the feature.
+
+    Different from :class:`SLEAPToYoloForm` (the sibling on the
+    same page): inputs are a SimBA-project config + optional video
+    and save directories (the backend can resolve them from the
+    project if omitted), and there's a "OBB" toggle for oriented
+    bounding boxes that's unique to ROI-based conversion (ROIs
+    can be rotated rectangles or polygons).
+
+    Backend:
+    :class:`mufasa.third_party_label_appenders.transform.simba_roi_to_yolo.SimBAROI2Yolo`.
+    """
+
+    title = "SimBA ROIs → YOLO conversion"
+    description = (
+        "Convert the ROI definitions of a SimBA project into a "
+        "YOLO detection training set. Sub-samples frames per "
+        "video, splits into train/val, and writes images + label "
+        "files. Use OBB for rotated rectangles / polygon ROIs."
+    )
+
+    def build(self) -> None:
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignRight)
+
+        self.config_edit = self._make_file_row(
+            form, "SimBA config path:",
+            "Project config .ini file",
+            file_filter="SimBA config (*.ini);;All files (*)",
+        )
+        # video_dir and save_dir are OPTIONAL — the backend uses
+        # project defaults when they're empty. Mirrors the Tk
+        # popup's "if not isdir, set to None" behaviour.
+        self.video_dir_edit = self._make_dir_row(
+            form, "Video directory:",
+            "(optional — falls back to project's videos dir)",
+        )
+        self.save_dir_edit = self._make_dir_row(
+            form, "Save directory:",
+            "(optional — falls back to project default)",
+        )
+
+        # Numeric / dropdown options — defaults match the legacy
+        # popup. Tk used range(50, 650, 50) for the frame-count
+        # dropdown and range(10, 110, 10) for train-size.
+        self.frames_per_video = QSpinBox(self)
+        self.frames_per_video.setRange(50, 600)
+        self.frames_per_video.setSingleStep(50)
+        self.frames_per_video.setValue(100)
+        form.addRow("Frames per video:", self.frames_per_video)
+
+        self.train_size = QSpinBox(self)
+        self.train_size.setRange(10, 100)
+        self.train_size.setSingleStep(10)
+        self.train_size.setValue(70)
+        self.train_size.setSuffix(" %")
+        form.addRow("Train size:", self.train_size)
+
+        # Toggles — the legacy popup used MufasaDropDown with
+        # TRUE/FALSE; QCheckBox is the Qt-idiomatic substitute.
+        self.obb = QCheckBox("OBB (oriented bounding boxes)", self)
+        self.obb.setChecked(True)  # Tk default = TRUE
+        form.addRow("", self.obb)
+        self.greyscale = QCheckBox("Greyscale output", self)
+        form.addRow("", self.greyscale)
+        self.clahe = QCheckBox("Apply CLAHE", self)
+        form.addRow("", self.clahe)
+        self.verbose = QCheckBox("Verbose progress logging", self)
+        self.verbose.setChecked(True)
+        form.addRow("", self.verbose)
+
+        self.body_layout.addLayout(form)
+
+    # ------------------------------------------------------------------ #
+    # Picker helpers — same idiom as SLEAPToYoloForm above
+    # ------------------------------------------------------------------ #
+    def _make_dir_row(self, form: QFormLayout, label: str,
+                      placeholder: str) -> QLineEdit:
+        edit = QLineEdit(self)
+        edit.setReadOnly(True)
+        edit.setPlaceholderText(placeholder)
+        browse = QPushButton("Browse…", self)
+
+        def _pick() -> None:
+            d = QFileDialog.getExistingDirectory(
+                self, f"Pick {label.rstrip(':')}", "",
+            )
+            if d:
+                edit.setText(d)
+        browse.clicked.connect(_pick)
+        row = QHBoxLayout()
+        row.addWidget(edit, 1)
+        row.addWidget(browse)
+        form.addRow(label, row)
+        return edit
+
+    def _make_file_row(self, form: QFormLayout, label: str,
+                       placeholder: str,
+                       file_filter: str) -> QLineEdit:
+        edit = QLineEdit(self)
+        edit.setReadOnly(True)
+        edit.setPlaceholderText(placeholder)
+        browse = QPushButton("Browse…", self)
+
+        def _pick() -> None:
+            f, _ = QFileDialog.getOpenFileName(
+                self, f"Pick {label.rstrip(':')}", "", file_filter,
+            )
+            if f:
+                edit.setText(f)
+        browse.clicked.connect(_pick)
+        row = QHBoxLayout()
+        row.addWidget(edit, 1)
+        row.addWidget(browse)
+        form.addRow(label, row)
+        return edit
+
+    # ------------------------------------------------------------------ #
+    # OperationForm contract
+    # ------------------------------------------------------------------ #
+    def collect_args(self) -> dict:
+        cfg = self.config_edit.text().strip()
+        if not cfg or not Path(cfg).is_file():
+            raise ValueError(
+                "Pick a valid SimBA project config (.ini) file.")
+        # Optional directories — accept empty + verify-if-given
+        video_dir = self.video_dir_edit.text().strip()
+        save_dir = self.save_dir_edit.text().strip()
+        # Match Tk behaviour: "if not isdir, set to None"
+        video_dir_arg = (video_dir if (video_dir
+                                       and Path(video_dir).is_dir())
+                         else None)
+        save_dir_arg = (save_dir if (save_dir
+                                     and Path(save_dir).is_dir())
+                        else None)
+        return {
+            "config_path": cfg,
+            "video_dir":   video_dir_arg,
+            "save_dir":    save_dir_arg,
+            "roi_frm_cnt": int(self.frames_per_video.value()),
+            "train_size":  int(self.train_size.value()) / 100.0,
+            "obb":         bool(self.obb.isChecked()),
+            "greyscale":   bool(self.greyscale.isChecked()),
+            "clahe":       bool(self.clahe.isChecked()),
+            "verbose":     bool(self.verbose.isChecked()),
+        }
+
+    def target(self, *, config_path: str,
+               video_dir: Optional[str], save_dir: Optional[str],
+               roi_frm_cnt: int, train_size: float, obb: bool,
+               greyscale: bool, clahe: bool, verbose: bool) -> None:
+        from mufasa.third_party_label_appenders.transform.simba_roi_to_yolo import (
+            SimBAROI2Yolo,
+        )
+        runner = SimBAROI2Yolo(
+            config_path=config_path, roi_path=None,
+            video_dir=video_dir, save_dir=save_dir,
+            roi_frm_cnt=roi_frm_cnt, train_size=train_size,
+            obb=obb, greyscale=greyscale, clahe=clahe,
+            verbose=verbose,
+        )
+        runner.run()
