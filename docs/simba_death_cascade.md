@@ -170,7 +170,14 @@ Before running Stage B, verify each major feature category has either (a) a Qt c
 - [ ] Video processing: video_processing_pop_up (parts likely covered by `ui_qt/forms/video_utilities.py`)
 - [ ] About / settings: about_simba_pop_up
 
-This checklist is the work for Stage B's preparation patch (122cy in the staging-plan below).
+**Sweep completed in 122cy** — see `docs/stage_b_checklist.md` for the full results. **TL;DR:**
+
+* **69** of 75 popups have verified Qt counterparts (covered).
+* **2** are hard drops (about, splash — cosmetic/admin).
+* **1** is a **blocking workflow gap** — `direction_animal_to_bodypart_settings_pop_up.py` writes config keys the Qt AnalysisForm depends on. Must be ported to Qt before Stage B.
+* **3** are non-blocking gaps requiring feature-disposition decisions (`simba_rois_to_yolo`, `yolo_inference`, `yolo_pose_train`) — currently recommended to drop as features.
+
+Stage B execution is gated on resolving the 1 blocker and the 3 feature decisions. See checklist §5 for the recommended preparation patches.
 
 ---
 
