@@ -577,13 +577,20 @@ class ROI_mixin(ConfigReader):
         self.root = parent_frame
         self.set_status_bar_panel(text="RULER MODE ENTERED", fg="blue")
         self.click_event = BooleanVar(value=False)
+        # Patch 122cl: ROIRuler's `info_label=` parameter became an
+        # `on_info_text=` callback (UI-agnostic). Wrap status_bar's
+        # Tk-specific configure() + update_idletasks() pair here so
+        # roi_ruler.py doesn't need to know about SimBALabel's API.
+        def _set_ruler_status(text: str) -> None:
+            self.status_bar.configure(text=text, fg='blue')
+            self.status_bar.update_idletasks()
         self.ruler = ROIRuler(img_window=self.img_window,
                               thickness=int(self.thickness_dropdown.getChoices()),
                               clr=self.color_option_dict[self.color_dropdown.getChoices()],
                               second_clr=(0, 0, 0),
                               tolerance=int(self.settings[KEYBOARD_SENSITIVITY] * 2),
                               px_per_mm=self.px_per_mm,
-                              info_label=self.status_bar,
+                              on_info_text=_set_ruler_status,
                               img_scale_factor=self.downscale_factor)
 
         self.root.bind(TkBinds.B1_PRESS.value, exit_click); self.root.bind(TkBinds.ESCAPE.value, exit_click); self.img_window.bind(TkBinds.ESCAPE.value, exit_click)

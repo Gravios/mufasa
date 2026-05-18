@@ -2,7 +2,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
 from tkinter import *
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -10,7 +10,12 @@ from PIL import Image, ImageTk
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.roi_tools.roi_utils import get_image_from_label
-from mufasa.ui.tkinter_functions import SimBALabel
+# Patch 122cl: dropped `from mufasa.ui.tkinter_functions import
+# SimBALabel`. The status-label rendering is delegated to the
+# caller via the `on_info_text` callback (see __init__ below).
+# The file still uses `from tkinter import *` for `Toplevel` —
+# the class is fundamentally a Tk widget; that's a separate
+# coupling, tracked under the Tier-4 deletion roadmap.
 from mufasa.utils.checks import (check_float, check_if_valid_rgb_tuple,
                                 check_instance, check_int)
 from mufasa.utils.enums import TkBinds
@@ -36,7 +41,7 @@ class ROIRuler(object):
     :param Optional[Tuple[int, int, int]] second_clr: RGB color tuple (R, G, B) for the outline line. If None, no outline is drawn. Default None.
     :param int tolerance: Maximum distance in pixels from a line endpoint to detect a click for moving it. Also minimum line length required to register the line. Default 10.
     :param Optional[float] px_per_mm: Pixels per millimeter conversion factor. If provided, calculates line length in millimeters. Must be > 0. Default None.
-    :param Optional[SimBALabel] info_label: Optional Tkinter label to display line length information. If provided, automatically updates with "RULER LENGTH: X mm, Y pixels" when line is drawn. Default None.
+    :param Optional[Callable[[str], None]] on_info_text: Optional callback invoked with the formatted ruler-info text (``"RULER LENGTH: X mm, Y pixels"``) whenever a line is drawn. Decoupled from any specific widget toolkit in patch 122cl; Tk callers wrap their ``SimBALabel.configure(text=...)``; future Qt callers wrap ``QLabel.setText(...)``. Default None.
     """
 
     def __init__(self,
@@ -47,7 +52,7 @@ class ROIRuler(object):
                  second_clr: Tuple[int, int, int] = None,
                  tolerance: int = 10,
                  px_per_mm: Optional[float] = None,
-                 info_label: Optional[SimBALabel] = None,
+                 on_info_text: Optional[Callable[[str], None]] = None,
                  img_scale_factor: float = 1.0) -> None:
 
         check_instance(source=self.__class__.__name__, instance=img_window, accepted_types=(Toplevel,))
@@ -56,7 +61,11 @@ class ROIRuler(object):
         if px_per_mm is not None: check_float(name=f'{self.__class__.__name__} px_per_mm', value=px_per_mm, min_value=10e-16)
         check_float(name=f'{self.__class__.__name__} img_scale_factor', value=img_scale_factor, allow_negative=False, allow_zero=False, raise_error=True)
         check_int(name=f'{self.__class__.__name__} tolerance', value=tolerance, min_value=1)
-        #if info_label is not None: check_instance(source=f'{self.__class__.__name__} info_label', instance=info_label, accepted_types=type(SimBALabel), raise_error=True, warning=False)
+        # Patch 122cl: caller-supplied callback (was SimBALabel).
+        if on_info_text is not None and not callable(on_info_text):
+            raise TypeError(
+                f"{self.__class__.__name__} on_info_text must be "
+                f"callable or None, got {type(on_info_text).__name__}")
         if clr is not None:
             check_if_valid_rgb_tuple(data=clr, raise_error=True, source=f'{self.__class__.__name__} clr')
         else:
@@ -65,7 +74,7 @@ class ROIRuler(object):
         self.thickness, self.clr, self.img_window = thickness, clr, img_window
         self.drawing, self.clr, self.thickness, self.second_thickness, self.tolerance = False, clr, thickness, second_thickness, tolerance
         self.img_lbl = img_window.nametowidget("img_lbl")
-        self.img, self.info_lbl = get_image_from_label(self.img_lbl), info_label
+        self.img, self.on_info_text = get_image_from_label(self.img_lbl), on_info_text
         self.click_locs, self.px_per_mm, self.img_scale_factor = {'start': None, 'end': None}, px_per_mm, img_scale_factor
         self.move_tag, self.second_clr = None, second_clr
         self.auto_size = PlottingMixin().get_optimal_circle_size(frame_size=tuple(self.img.shape[0:2]), circle_frame_ratio=200)
@@ -162,7 +171,7 @@ class ROIRuler(object):
         if self.px_per_mm is not None: self.length_mm = round((self.length_px / self.px_per_mm), 4)
         else: self.length_mm = None
         self.got_attributes = True
-        if self.info_lbl is not None:
+        if self.on_info_text is not None:
             scale_pct = round(100 * self.img_scale_factor)
             if self.length_mm is not None:
                 line1 = f'Real world: {self.length_mm} mm  |  Video: {self.length_px} px  |  On-screen: {self.length_px_display} px'
@@ -174,8 +183,12 @@ class ROIRuler(object):
             else:
                 line2_parts.append('no mm conversion set')
             line2 = '  •  '.join(line2_parts)
-            self.info_lbl.configure(text=f'{line1}\n{line2}', fg='blue')
-            self.info_lbl.update_idletasks()
+            # Patch 122cl: was
+            #   self.info_lbl.configure(text=..., fg='blue')
+            #   self.info_lbl.update_idletasks()
+            # Now delegated to caller's callback. The caller decides
+            # the widget toolkit + styling (fg color, refresh).
+            self.on_info_text(f'{line1}\n{line2}')
 
 
 
