@@ -30,7 +30,7 @@ except:
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.image_mixin import ImageMixin
-from mufasa.ui.tkinter_functions import TwoOptionQuestionPopUp
+from mufasa.utils.confirm import confirm_two_option
 from mufasa.utils.checks import (check_ffmpeg_available,
                                 check_file_exist_and_readable, check_float,
                                 check_if_dir_exists,
@@ -2186,8 +2186,19 @@ def extract_frames_from_all_videos_in_directory(config_path: Union[str, os.PathL
 
 
     if confirm_popup:
-        question = TwoOptionQuestionPopUp(question='Are you sure you want to EXTRACT ALL frames \nfrom all VIDEOS in project? \n(WARNING TIME-CONSUMING)', option_one='YES', option_two='NO', title='EXTRACT ALL FRAMES')
-        if question.selected_option != "YES":
+        # Patch 122ch: was TwoOptionQuestionPopUp(...).selected_option.
+        # Now routed through mufasa.utils.confirm.confirm_two_option
+        # — UI-agnostic; Qt workbench can override the default Tk
+        # popup with a QMessageBox.question variant via module
+        # attribute reassignment.
+        choice = confirm_two_option(
+            question=('Are you sure you want to EXTRACT ALL frames \n'
+                      'from all VIDEOS in project? \n'
+                      '(WARNING TIME-CONSUMING)'),
+            option_one='YES', option_two='NO',
+            title='EXTRACT ALL FRAMES',
+        )
+        if choice != "YES":
             return
 
     stdout_information(msg=f"Extracting frames for {len(video_paths)} video(s) into project_folder/frames/input directory...")
