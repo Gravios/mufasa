@@ -40,7 +40,8 @@ from typing import Optional
 from mufasa.ui_qt.forms.data_export import ExportToCSVForm
 from mufasa.ui_qt.forms.data_import import ConverterForm
 from mufasa.ui_qt.forms.pose_tools import (PoseReorganizerForm,
-                                            SLEAPToYoloForm)
+                                            SLEAPToYoloForm,
+                                            SimBARoisToYoloForm)
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
@@ -55,6 +56,12 @@ def build_tools_page(workbench,
                      [(PoseReorganizerForm, {})])
     page.add_section("SLEAP → YOLO conversion",
                      [(SLEAPToYoloForm, {})])
+    # Patch 122d1: SimBA ROIs → YOLO bounding-box conversion.
+    # Sibling to the SLEAP→YOLO converter above; different in
+    # that the source is a SimBA project's ROI definitions
+    # rather than SLEAP CSV predictions.
+    page.add_section("SimBA ROIs → YOLO conversion",
+                     [(SimBARoisToYoloForm, {})])
     # Patch 122ae-6: v1 → CSV export. Project-scoped — uses the
     # workbench's currently-open config_path via OperationForm.
     page.add_section("Export to CSV",

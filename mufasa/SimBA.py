@@ -209,7 +209,10 @@ from mufasa.ui.pop_ups.select_video_for_labelling_popup import \
 from mufasa.ui.pop_ups.select_video_for_pseudo_labelling_popup import \
     SelectPseudoLabellingVideoPupUp
 from mufasa.ui.pop_ups.severity_analysis_pop_up import AnalyzeSeverityPopUp
-from mufasa.ui.pop_ups.simba_rois_to_yolo_pop_up import SimBAROIs2YOLOPopUp
+# Patch 122d1: SimBAROIs2YOLOPopUp removed (Tk popup). Qt
+# replacement is SimBARoisToYoloForm in `mufasa.ui_qt.forms.pose_tools`,
+# wired into the Tools page as "SimBA ROIs → YOLO conversion".
+# from mufasa.ui.pop_ups.simba_rois_to_yolo_pop_up import SimBAROIs2YOLOPopUp
 from mufasa.ui.pop_ups.simba_to_yolo_keypoints_popup import \
     SimBA2YoloKeypointsPopUp
 from mufasa.ui.pop_ups.single_video_to_frames_popup import \
@@ -969,7 +972,10 @@ class App(object):
         # page → 'SLEAP → YOLO conversion' section.
         convert_pose_file_format_menu.add_command(label="SLEAP H5 inference -> YOLO pose-estimation annotations", compound="left", image=self.menu_icons["sleap_small"]["img"], command=SLEAPH5Inference2YoloPopUp, font=Formats.FONT_REGULAR.value)
         convert_pose_file_format_menu.add_command(label="SLEAP SLP annotations -> YOLO pose-estimation annotations", compound="left", image=self.menu_icons["sleap_small"]["img"], command=SLEAPAnnotations2YoloPopUp, font=Formats.FONT_REGULAR.value)
-        convert_pose_file_format_menu.add_command(label="SimBA ROI -> YOLO bounding-box annotations", compound="left", image=self.menu_icons["SimBA_logo_3_small"]["img"], command=SimBAROIs2YOLOPopUp, font=Formats.FONT_REGULAR.value)
+        # Patch 122d1: 'SimBA ROI -> YOLO bounding-box annotations'
+        # menu entry removed — Qt SimBARoisToYoloForm covers it on
+        # the Tools page → 'SimBA ROIs → YOLO conversion' section.
+        # convert_pose_file_format_menu.add_command(label="SimBA ROI -> YOLO bounding-box annotations", compound="left", image=self.menu_icons["SimBA_logo_3_small"]["img"], command=SimBAROIs2YOLOPopUp, font=Formats.FONT_REGULAR.value)
         convert_pose_file_format_menu.add_command(label="SimBA -> YOLO pose-estimation annotations", compound="left", image=self.menu_icons["SimBA_logo_3_small"]["img"], command=SimBA2YoloKeypointsPopUp, font=Formats.FONT_REGULAR.value)
         convert_pose_file_format_menu.add_command(label="Labelme key-points -> Images", compound="left", image=self.menu_icons["labelme"]["img"], command=Labelme2ImgsPopUp, font=Formats.FONT_REGULAR.value)
         convert_pose_file_format_menu.add_command(label="Labelme key-points -> CSV", compound="left", image=self.menu_icons["labelme"]["img"], command=Labelme2DataFramePopUp, font=Formats.FONT_REGULAR.value)
