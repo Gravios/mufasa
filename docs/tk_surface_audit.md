@@ -146,10 +146,10 @@ Qt replacements verified before deletion:
 
 Same pattern as the 122ck cue-light cleanup (6 files + SimBA.py edits) but with the audit-corrected dependency picture from 122cq.
 
-**Caveat: subprocess-launched popups (122cr discovery; 122cs/ct partial port).** After the 122cr cluster-deletion, the AST orphan-audit reported 4 files in `mufasa/ui/pop_ups/` as newly-orphan. 2 remain post-122ct:
+**Caveat: subprocess-launched popups (122cr discovery; 122cs/ct/cu partial port).** After the 122cr cluster-deletion, the AST orphan-audit reported 4 files in `mufasa/ui/pop_ups/` as newly-orphan. Only 1 remains post-122cu:
 
-* `duplicate_rois_by_source_target_popup.py`
-* `import_roi_csv_popup.py`
+* `duplicate_rois_by_source_target_popup.py` (197 lines — the substantial one)
+* ~~`import_roi_csv_popup.py`~~ ✓ **DELETED 122cu** (Qt-native port at `ui_qt/dialogs/import_roi_csv.py`)
 * ~~`min_max_draw_size_popup.py`~~ ✓ **DELETED 122ct** (Qt-native port at `ui_qt/dialogs/min_max_draw_size.py`)
 * ~~`roi_size_standardizer_popup.py`~~ ✓ **DELETED 122cs** (Qt-native port at `ui_qt/dialogs/roi_size_standardizer.py`)
 

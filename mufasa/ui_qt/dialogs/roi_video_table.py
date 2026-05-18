@@ -514,10 +514,21 @@ class ROIVideoTableDialog(QDialog):
         )
 
     def _action_import_csv(self) -> None:
-        self._launch_tk_popup(
-            "from mufasa.ui.pop_ups.import_roi_csv_popup import ROIDefinitionsCSVImporterPopUp\n"
-            "ROIDefinitionsCSVImporterPopUp(config_path=sys.argv[1], roi_table_frm=None)\n"
-        )
+        # Patch 122cu: ported to Qt-native (was a subprocess-
+        # launched Tk popup; see docs/tk_surface_audit.md §2g).
+        from mufasa.ui_qt.dialogs.import_roi_csv import (
+            ImportRoiCsvDialog)
+        dlg = ImportRoiCsvDialog(
+            config_path=self.config_path, parent=self)
+        if dlg.init_failed():
+            return
+        if dlg.exec() == QDialog.Accepted:
+            # CSV import writes new ROIs to disk — refresh the
+            # rendered table so the user sees the imported ROIs.
+            try:
+                self.rois_modified.emit()
+            except Exception:
+                pass
 
     def _action_min_max_draw_size(self) -> None:
         # Patch 122ct: ported to Qt-native (was a subprocess-
