@@ -38,6 +38,7 @@ from mufasa.ui_qt.forms.run_inference import RunInferenceForm
 from mufasa.ui_qt.forms.train_classifier import TrainClassifierForm
 from mufasa.ui_qt.forms.validate_classifier import ValidateClassifierForm
 from mufasa.ui_qt.forms.yolo_inference import YOLOPoseInferenceForm
+from mufasa.ui_qt.forms.yolo_train import YOLOPoseTrainForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
@@ -63,6 +64,12 @@ def build_classifier_page(workbench,
     # is inert without them.
     page.add_section("YOLO pose — inference",
                      [(YOLOPoseInferenceForm, {})])
+    # Patch 122d3: YOLO pose training — fires off a detached
+    # subprocess (`python -m mufasa.model.yolo_fit`); workbench
+    # doesn't wait for completion. Same hardware/package
+    # requirements as inference.
+    page.add_section("YOLO pose — train",
+                     [(YOLOPoseTrainForm, {})])
     return page
 
 

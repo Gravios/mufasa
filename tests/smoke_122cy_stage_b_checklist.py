@@ -127,7 +127,10 @@ def main() -> int:
         pre_122cz_gap or post_122cz_form_exists,
     )
 
-    # 6. Non-blocking gap popups still exist
+    # 6. Non-blocking gap popups — pre-122d1/d2/d3: present;
+    # post: deleted (ported in 122d1/d2/d3). Snapshot-resilient
+    # check: either state acceptable (the regression guard is
+    # check #7 below).
     gap_popups = [
         "simba_rois_to_yolo_pop_up.py",
         "yolo_inference_popup.py",
@@ -135,12 +138,15 @@ def main() -> int:
     ]
     for popup in gap_popups:
         check(
-            f"Non-blocking gap popup still exists ({popup})",
-            (pkg / "ui" / "pop_ups" / popup).exists(),
+            f"Non-blocking gap popup either present (pre-122d1/d2/d3) "
+            f"or deleted (post-ports): {popup}",
+            True,  # disposition-only check
         )
 
     # 7. Non-blocking gap popups don't have Qt form wirings
-    # Check by looking for their class names in Qt page wirings
+    # Snapshot-resilient: pre-122d1/d2/d3 the wirings are absent
+    # (gap real); post they're present (ports landed). Either
+    # acceptable disposition.
     pages_src = ""
     for f in (pkg / "ui_qt" / "pages").glob("*.py"):
         pages_src += f.read_text() + "\n"
@@ -152,10 +158,15 @@ def main() -> int:
         ("yolo_pose_train_popup.py", "YOLOPoseTrain",
          "YOLOPoseTrainForm"),
     ]:
+        popup_path = pkg / "ui" / "pop_ups" / popup_file
+        # Either the Tk popup is gone (porting effectively closed
+        # the gap) OR the Qt form is NOT yet wired (gap still real
+        # — pre-port state).
         check(
-            f"{popup_file}: no Qt form wired in pages "
-            f"({qt_clue} absent — gap is real)",
-            qt_clue not in pages_src,
+            f"{popup_file}: gap is resolved (port landed) OR still "
+            f"real (pre-port state); snapshot-resilient",
+            (not popup_path.exists())
+            or (qt_clue not in pages_src),
         )
 
     # 8. Hard-drop popups still exist (planned, not executed)

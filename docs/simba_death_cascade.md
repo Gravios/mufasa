@@ -12,9 +12,9 @@
 | Stage | Files | Notes |
 |---|---:|---|
 | Stage A (entry point) | 0 + 1 config edit | Remove `mufasa-tk` from `pyproject.toml`. SimBA.py becomes unreachable. |
-| Stage B (cascade) | 114 | SimBA.py itself + all files reachable only through it. Was 115 at 122cx scoping; 122cz ported + pre-deleted one popup (the unblock). |
+| Stage B (cascade) | 111 | SimBA.py itself + all files reachable only through it. Was 115 at 122cx scoping; 4 popups pre-ported in 122cz/d1/d2/d3 (the unblock + 3 YOLO conversion ports). |
 | Stage C (tail) | 2 | `tkinter_functions.py` + `pop_up_mixin.py` — orphan after Stage B. |
-| **Total** | **116 files** | (was 117 at 122cx; -1 after 122cz pre-deletion) |
+| **Total** | **113 files** | (was 117 at 122cx; -4 after 122cz/d1/d2/d3 pre-deletions) |
 
 After the cascade, **two Tk dependencies remain** in the Qt-using path:
 
@@ -69,11 +69,11 @@ mufasa-workbench = "mufasa.ui_qt.workbench_app:main"
 | `mufasa/ui/get_tree_view.py` | `ui/pop_ups/print_video_meta_popup.py:4` (also dying this stage) |
 | `mufasa/ui/video_timelaps.py` | `ui/pop_ups/video_processing_pop_up.py:28` (also dying this stage) |
 
-### B2. ui/pop_ups (74 files — was 75 pre-122cz)
+### B2. ui/pop_ups (71 files — was 75 pre-122cz)
 
 Every file in `mufasa/ui/pop_ups/` is imported by SimBA.py at module-load time, and ZERO of them have any other consumer. The whole directory cascade-deletes.
 
-(Was 75 files at 122cx scoping. Patch 122cz pre-deleted `direction_animal_to_bodypart_settings_pop_up.py` as part of the workflow-gap unblock — the file was both ported to Qt and removed in 122cz rather than waiting for Stage B.)
+(Was 75 files at 122cx scoping. Four popups have been pre-deleted as part of cascade-prep work: 122cz deleted `direction_animal_to_bodypart_settings_pop_up.py` (the workflow-gap unblock); 122d1/d2/d3 deleted the 3 YOLO/conversion popups (`simba_rois_to_yolo_pop_up.py`, `yolo_inference_popup.py`, `yolo_pose_train_popup.py`) as Qt-port ports rather than feature drops.)
 
 Subgroups for review (just for orientation; deletion is bulk):
 
@@ -109,7 +109,7 @@ Plus `data_map.yaml` (non-py asset; dies with the directory removal).
 
 Zero Qt-side reach anywhere in the cluster. Cascade-deletes cleanly.
 
-### B5. Stage B file count: 5 + 74 + 5 + 30 = **114 files** (post-122cz)
+### B5. Stage B file count: 5 + 71 + 5 + 30 = **111 files** (post-122d3)
 
 ---
 
@@ -172,14 +172,14 @@ Before running Stage B, verify each major feature category has either (a) a Qt c
 - [ ] Video processing: video_processing_pop_up (parts likely covered by `ui_qt/forms/video_utilities.py`)
 - [ ] About / settings: about_simba_pop_up
 
-**Sweep completed in 122cy; blocker resolved in 122cz.** See `docs/stage_b_checklist.md` for the full results. **TL;DR:**
+**Sweep completed in 122cy; blocker resolved in 122cz; 3 feature-decision items resolved in 122d1/d2/d3 (all ported).** See `docs/stage_b_checklist.md` for the full results. **TL;DR:**
 
 * **69** of 75 popups have verified Qt counterparts (covered).
 * **2** are hard drops (about, splash — cosmetic/admin).
-* ~~**1** is a **blocking workflow gap**~~ ✓ **RESOLVED 122cz** — `direction_animal_to_bodypart_settings` ported to `DirectingBodyPartSettingsForm` on addons_page.
-* **3** are non-blocking gaps requiring feature-disposition decisions (`simba_rois_to_yolo`, `yolo_inference`, `yolo_pose_train`) — currently recommended to drop as features.
+* ~~**1** is a **blocking workflow gap**~~ ✓ **RESOLVED 122cz** — directing-bodypart settings ported to `DirectingBodyPartSettingsForm` on addons_page.
+* ~~**3** are non-blocking gaps requiring feature-disposition decisions~~ ✓ **RESOLVED 122d1/d2/d3** — all 3 YOLO/conversion popups ported (SimBARoisToYoloForm on tools_page; YOLOPoseInferenceForm + YOLOPoseTrainForm on classifier_page).
 
-Stage B execution is gated only on the 3 feature decisions. See checklist §5 for the recommended preparation patches.
+Stage B is now fully ready for execution.
 
 ---
 
