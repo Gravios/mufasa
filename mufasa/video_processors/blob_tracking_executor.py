@@ -75,7 +75,7 @@ class BlobTrackingExecutor():
     - ``open_iterations``: Number of iterations for morphological opening
 
     .. seealso::
-       For GUI used to create ``data``, see :func:`mufasa.video_processors.batch_process_menus.BatchProcessFrame`.
+       For GUI used to create ``data``, see :class:`mufasa.ui_qt.forms.batch_pre_process.BatchPreProcessForm` (the Qt-side wizard; replaces the legacy ``BatchProcessFrame`` Tk class deleted in patch 122cm).
        This is a wrapper for calling background subtraction through :func:`mufasa.video_processors.video_processing.video_bg_subtraction_mp` or :func:`~mufasa.video_processors.video_processing.video_bg_subtraction`.
        For finding the animal, this class wraps :func:`mufasa.data_processors.find_animal_blob_location.get_blob_vertices_from_video`.
        For GPU based bg subtraction methods, see :func:`~mufasa.data_processors.cuda.image.bg_subtraction_cuda` or :func:`~mufasa.data_processors.cuda.image.bg_subtraction_cupy`.
