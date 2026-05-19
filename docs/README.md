@@ -4,6 +4,22 @@ Index of documents in `docs/`. Three tracks: **workflow / user-facing**, **Tk â†
 
 ---
 
+## User-facing entry points
+
+If you're new to Mufasa, start here.
+
+### `v1_project_layout.md` (122df)
+**v1 project layout reference.** What a v1 project looks like on disk, run-id semantics, the path-abstraction layer (`mufasa.project_layout.project_paths_from_config`) for backend code, and how to create a fresh v1 project.
+
+Read this if you're starting a new project or want to understand how v1 differs from legacy SimBA.
+
+### `migration_guide.md` (122df)
+**Migrate legacy â†’ v1.** How to use `python -m mufasa.cli.migrate_project` to move an existing SimBA-layout project to v1. Includes dry-run workflow, troubleshooting, and rollback.
+
+Read this if you have an existing `project_folder/`-style project and want to adopt v1.
+
+---
+
 ## Workflow & usage
 
 ### `workflow_audit.md`
