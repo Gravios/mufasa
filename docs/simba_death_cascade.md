@@ -18,7 +18,7 @@
 
 After the cascade, **two Tk dependencies remain** in the Qt-using path:
 
-1. **`mufasa/ui/px_to_mm_ui.py`** — used by `ui_qt/forms/video_utilities.py:318` to launch a Tk-based pixel-calibration UI. Survives the cascade.
+1. **`mufasa/ui/px_to_mm_ui.py`** — used by `ui_qt/forms/video_utilities.py:318` to launch a **cv2-based** (NOT Tk-based, as the 122cx audit initially claimed) pixel-calibration UI. Uses `cv2.namedWindow` + `cv2.imshow` + `cv2.setMouseCallback` — pure OpenCV. Survives the cascade because the cascade scope was "Tk surface", and this file isn't Tk. The "Tk dependency in Qt path" framing in earlier patch notes was incorrect; the actual disposition is "cv2-window dependency, opens a separate OS window when the Qt video-calibration form is run." A future Qt-native port (embedded QGraphicsView + Qt mouse events instead of a standalone cv2 window) would be a UX polish item, not a Tk-elimination item.
 2. **`mufasa/utils/confirm.py`** — lazy Tk importer (already documented in `backend_audit.md` §3d Bucket 4); fires only if no Qt override is installed. Survives.
 
 These two are real Tier-4 close-out work for a follow-on patch (after Stage C).
@@ -151,17 +151,24 @@ The following two files **do not die in this cascade** and need separate Tier-4 
 **Consumers (post-Stage-B):**
 - `ui_qt/forms/video_utilities.py:318` — imports `GetPixelsPerMillimeterInterface`
 
-This is a real Tk surface that the Qt form launches when the user clicks "calibrate pixels per millimeter". The Qt form falls through to a Tk window for this specific calibration UI.
+**Correction (patch 122dd):** This file is NOT a Tk surface, despite the 122cx audit's framing. It uses pure OpenCV (`cv2.namedWindow`, `cv2.imshow`, `cv2.setMouseCallback`) — no Tk imports anywhere. The "Qt falls through to Tk" framing was wrong; it's "Qt falls through to cv2 standalone window."
+
+When the user clicks "calibrate pixels per millimeter" on the Qt video-utilities form, an OpenCV window opens for click-to-place calibration. This works for both v1 and legacy projects (the function takes `video_path` directly, no config_path resolution).
 
 **Disposition:**
-- **Option A:** Port `GetPixelsPerMillimeterInterface` to a Qt dialog. Similar pattern to 122cs/ct/cu/cv (subprocess-popup ports). Probably 100–200 lines.
-- **Option B:** Leave as-is. Treat as a known "Qt launches one Tk dialog" exception. Acceptable for v1 if the calibration workflow is rare.
+- **Option A:** Port `GetPixelsPerMillimeterInterface` to a Qt dialog with `QGraphicsView` + `QGraphicsScene` + mouse-event handlers. ~150–250 lines. Pure UX polish — embedded panel instead of standalone window. Doesn't change behaviour or fix any bug.
+- **Option B (current):** Leave as-is. The cv2 window opens, the user calibrates, the form receives the result via the `iface.ppm` attribute. Functional; just visually inconsistent with the rest of the Qt workbench.
 
-Either way, it survives Stages A–C. Schedule for a future patch.
+Either way, this file survives Stages A–C cleanly. Scheduled for a future UX polish patch if/when desired.
 
 ### 2. `mufasa/utils/confirm.py`
 
-Lazy importer pattern. Documented in `backend_audit.md` §3d Bucket 4 as non-blocking. After Stage C, the lazy `from mufasa.ui.tkinter_functions import ...` inside `_default_confirm` becomes unreachable — file can either stay (cosmetic warning suppression) or get a body rewrite to drop the dead branch. Cosmetic; not urgent.
+**Correction (patch 122dd):** The pre-122dd characterization of this file ("broken fallback path", "needs body rewrite") was wrong. Closer inspection found:
+
+* `_default_confirm` already wraps the Tk import in `try/except ImportError`. Post-Stage-C, the import always raises ImportError, the `except` branch fires, and the function gracefully routes to `_stdin_confirm`. **Working as designed** — the stdin fallback is the documented headless path.
+* The Qt override IS installed at workbench startup (patch 122cj — `mufasa/ui_qt/qt_confirm.py` + workbench_app.py:185). Backend `confirm_two_option` calls from a Qt session route through `QMessageBox.question` automatically. The `_default_confirm` stdin path is only reached in headless / CLI contexts.
+
+**Status:** patch 122dd cosmetic-rewrites the module docstring to reflect post-Stage-C reality and adds a comment clarifying that the lazy Tk-import try/except is retained for diff-stability rather than rewritten. No behaviour change. The file is correctly designed for both interactive (Qt) and headless (stdin) contexts.
 
 ---
 

@@ -2,9 +2,34 @@
 
 **Renamed from SimBA.** Mufasa is a fork of
 [`sgoldenlab/simba`](https://github.com/sgoldenlab/simba) targeting
-Linux-only, Python ≥ 3.11, PySide6 (Qt 6.8), with the legacy Tkinter
-GUI being progressively replaced. The original SimBA README follows
-below for historical context.
+Linux-only, Python ≥ 3.11, PySide6 (Qt 6.8). The legacy Tkinter GUI
+has been retired; the Qt workbench is the only supported entry surface.
+
+## Running Mufasa
+
+After `pip install -e .`, four console entry points are installed:
+
+| Command | What it does |
+|---|---|
+| `mufasa` | Smart launcher with environment diagnostics; opens the Qt workbench. |
+| `mufasa-workbench` | Direct workbench launch (no env diagnostics). |
+| `mufasa-chooser` | Legacy Qt chooser / standalone popups. |
+| `mufasa-tk` | **Removed in patch 122d4.** The legacy Tkinter launcher is no longer installed. |
+
+`python -m mufasa.SimBA` also no longer works — the SimBA.py entry point was deleted in the 122d5 cascade. Use one of the entry points above.
+
+## Project layout
+
+Mufasa supports two project layouts:
+
+* **Legacy SimBA layout** (`project_config.ini`): `<project>/{videos, csv/input_csv, csv/outlier_corrected_movement_location, csv/features_extracted, csv/targets_inserted, csv/machine_results, logs, models, frames}`.
+* **v1 layout** (`project.toml`): `<root>/{sources/{videos, pose, annotations, video_info.csv}, derived/{outlier_corrected, features, labels, classifications, frames}, logs, models, project.toml}`. Run-id-scoped subdirectories under `derived/`.
+
+The detection rule everywhere: `config_path.endswith(".toml")` → v1; else legacy. Backend code should use `mufasa.project_layout.project_paths_from_config(config_path)` for layout-agnostic path resolution.
+
+See [`docs/hardwired_paths_audit.md`](docs/hardwired_paths_audit.md) for the path-abstraction layer's public surface and triage workflow.
+
+The original SimBA README follows below for historical context.
 
 ---
 
