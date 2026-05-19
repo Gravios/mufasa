@@ -1,315 +1,160 @@
 # Mufasa
 
-**Renamed from SimBA.** Mufasa is a fork of
-[`sgoldenlab/simba`](https://github.com/sgoldenlab/simba) targeting
-Linux-only, Python ≥ 3.11, PySide6 (Qt 6.8). The legacy Tkinter GUI
-has been retired; the Qt workbench is the only supported entry surface.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Python: 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![GUI: PySide6 / Qt 6.8](https://img.shields.io/badge/GUI-PySide6%2FQt%206.8-green.svg)](https://www.qt.io/)
+[![Platform: Linux](https://img.shields.io/badge/Platform-Linux-orange.svg)](#)
+
+Mufasa is a fork of [SimBA (sgoldenlab/simba)](https://github.com/sgoldenlab/simba) targeting Linux, Python ≥ 3.11, and PySide6 (Qt 6.8). The legacy Tkinter GUI has been retired; the Qt workbench is the only supported entry surface.
+
+It provides:
+
+* **Pose-data import** from many trackers (DLC, SLEAP, MARS, TRK, FaceMap, YOLO, SuperAnimal-TopView, SimBA blob).
+* **Pipeline stages** — outlier correction, feature extraction, supervised classifier training and inference, ROI analysis, directionality, classification visualization.
+* **Two project layouts:**
+  * Legacy SimBA (`project_config.ini`-driven) — preserved for compatibility with existing projects.
+  * v1 (`project.toml`-driven, run-id-scoped) — the new layout with proper run separation and cleaner directory grouping.
 
 ## Running Mufasa
 
-After `pip install -e .`, four console entry points are installed:
+After `pip install -e .`, three console entry points are installed:
 
 | Command | What it does |
 |---|---|
 | `mufasa` | Smart launcher with environment diagnostics; opens the Qt workbench. |
 | `mufasa-workbench` | Direct workbench launch (no env diagnostics). |
 | `mufasa-chooser` | Legacy Qt chooser / standalone popups. |
-| `mufasa-tk` | **Removed in patch 122d4.** The legacy Tkinter launcher is no longer installed. |
 
-`python -m mufasa.SimBA` also no longer works — the SimBA.py entry point was deleted in the 122d5 cascade. Use one of the entry points above.
+The legacy `mufasa-tk` Tkinter launcher was **Removed in patch 122d4**; the `python -m mufasa.SimBA` entry point followed in patch 122d5. The Qt workbench replaces both.
+
+The migration tool runs as a Python module rather than a console script:
+
+```bash
+python -m mufasa.cli.migrate_project /path/to/legacy_project
+```
+
+See [`docs/migration_guide.md`](docs/migration_guide.md) for the full workflow.
 
 ## Project layout
 
-Mufasa supports two project layouts:
+Mufasa supports two project layouts; detection is by config-file extension (`.toml` → v1, `.ini` → legacy).
 
-* **Legacy SimBA layout** (`project_config.ini`): `<project>/{videos, csv/input_csv, csv/outlier_corrected_movement_location, csv/features_extracted, csv/targets_inserted, csv/machine_results, logs, models, frames}`.
-* **v1 layout** (`project.toml`): `<root>/{sources/{videos, pose, annotations, video_info.csv}, derived/{outlier_corrected, features, labels, classifications, frames}, logs, models, project.toml}`. Run-id-scoped subdirectories under `derived/`.
+**v1 layout:**
 
-The detection rule everywhere: `config_path.endswith(".toml")` → v1; else legacy. Backend code should use `mufasa.project_layout.project_paths_from_config(config_path)` for layout-agnostic path resolution.
-
-See [`docs/hardwired_paths_audit.md`](docs/hardwired_paths_audit.md) for the path-abstraction layer's public surface and triage workflow.
-
-The original SimBA README follows below for historical context.
-
----
-
-# SimBA (Simple Behavioral Analysis)
-
-[![pypi](https://img.shields.io/pypi/v/simba-uw-tf-dev.svg)]([https://pepy.tech/project/simba-uw-tf-dev](https://pypi.org/project/Simba-UW-tf-dev/))
-[![py3.10 tests](https://github.com/sgoldenlab/simba/actions/workflows/tests_py310.yml/badge.svg)](https://github.com/sgoldenlab/simba/actions/workflows/tests_py310.yml)
-[![py3.6 tests](https://github.com/sgoldenlab/simba/actions/workflows/tests_py36.yml/badge.svg)](https://github.com/sgoldenlab/simba/actions/workflows/tests_py36.yml)
-![Docs](https://readthedocs.org/projects/simba-uw-tf-dev/badge/?version=latest&style=flat)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Gitter chat](https://badges.gitter.im/USER/REPO.png)](https://gitter.im/SimBA-Resource/community)
-[![Download: Weights](https://img.shields.io/badge/Download-Weights-orange.svg)](https://osf.io/5t4y9/)
-[![SimBA: listserv](https://img.shields.io/static/v1?label=SimBA&message=listserv&color=blue)](https://docs.google.com/forms/d/e/1FAIpQLSfjbjae0XqNcl7GYOxmqvRsCveG-cmf4p4hBNNJ8gu5vPLHng/viewform)
-[![DOI](https://zenodo.org/badge/206670333.svg)](https://zenodo.org/badge/latestdoi/206670333)
-
-[![Downloads](https://pepy.tech/badge/simba-uw-tf-dev/month)](https://pepy.tech/project/simba-uw-tf-dev)
-[![Downloads](https://pepy.tech/badge/simba-uw-tf-dev)](https://pepy.tech/project/simba-uw-tf-dev)
-[![Live Stats](https://img.shields.io/website?url=https%3A%2F%2Fsronilsson.github.io%2Fdownload_stats%2F&up_message=online&down_message=offline&label=download%20statistics%20dashboard)](https://sronilsson.github.io/download_stats/)
-
-**Manuscript: [Simple Behavioral Analysis (SimBA) as a platform for explainable machine learning in behavioral neuroscience](https://www.nature.com/articles/s41593-024-01649-9)**
-**Pre-print: [Simple Behavioral Analysis (SimBA) – an open source toolkit for computer classification of complex social behaviors in experimental animals](https://www.biorxiv.org/content/10.1101/2020.04.19.049452v2)**
-
-<p align="center">
-<img src="https://github.com/sgoldenlab/simba/blob/master/images/landing_1.gif" />
-</p>
-
-
-To install SimBA via pip, use the following command (preferably using python3.6, or python 3.10 if necessary):
-```bash
-pip install simba-uw-tf-dev
 ```
-For detailed installation instructions, click [HERE](https://github.com/sgoldenlab/simba/blob/master/docs/installation_new.md)
+my_project/
+├── project.toml                ← layout marker + metadata
+├── sources/
+│   ├── videos/
+│   ├── pose/
+│   ├── annotations/            (optional, for training)
+│   └── video_info.csv
+├── derived/
+│   ├── outlier_corrected/<run_id>/
+│   ├── features/<run_id>/
+│   ├── labels/<run_id>/
+│   ├── classifications/        (flat; one parquet per video)
+│   ├── directionality/
+│   └── frames/{extracted,annotated}/
+├── models/
+└── logs/
+    └── measures/ROI_definitions.h5
+```
 
-## Installation ⚙️
+**Legacy SimBA layout** is preserved for backward compatibility; existing `project_folder/`-style projects continue to work without modification.
 
-- [Install SimBA](https://github.com/sgoldenlab/simba/blob/master/docs/installation_new.md)
+Backend code that needs layout-agnostic path resolution should use the `mufasa.project_layout.project_paths_from_config(config_path)` helper, which returns a dict of layout-correct paths for either layout.
 
-- [Install SimBA using Anaconda](https://github.com/sgoldenlab/simba/blob/master/docs/anaconda_2025.md)
+See [`docs/v1_project_layout.md`](docs/v1_project_layout.md) for the full v1 reference (directory contents, run-id semantics, the path-abstraction layer for backend code).
 
-##  Documentation: Scenario tutorials
+## Installation
 
-To faciliate the initial use of SimBA, we provide several use scenarios. We have created these scenarios around a hypothetical experiment that take a user from initial use (completely new start) all the way through analyzing a complete experiment and then adding additional experimental datasets to an initial project.
+```bash
+git clone https://github.com/<your-fork>/mufasa.git
+cd mufasa
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
 
-### Scenario 1: [Building classifiers from scratch](https://github.com/sgoldenlab/simba/blob/master/docs/Scenario1.md)
+Requires Python 3.11 or later. Optional dependencies: GPU-enabled PyTorch / TensorFlow / FFmpeg for video-heavy workflows.
 
-### Scenario 2: [Using a classifier on new experimental data](https://github.com/sgoldenlab/simba/blob/master/docs/Scenario2.md)
+After install, run `mufasa` to open the workbench. On first launch the smart launcher checks for missing native deps (OpenCV, FFmpeg, etc.) and prints what's missing if anything; the workbench still loads regardless.
 
-### Scenario 3: [Updating a classifier with further annotated data](https://github.com/sgoldenlab/simba/blob/master/docs/Scenario3.md)
+## Documentation
 
-### Scenario 4: [Analyzing and adding new Experimental data to a previously started project](https://github.com/sgoldenlab/simba/blob/master/docs/Scenario4_new.md)
+Doc index: [`docs/README.md`](docs/README.md).
 
-## Tutorial 📚
-- [API](https://simba-uw-tf-dev.readthedocs.io/en/latest/index.html) 📘
-- [Visualization tools](docs/Visualizations.md) 👁️
-- [Process video using SimBA tools](docs/Tools.md) 🔨
-- [Batch pre-process video using SimBA](docs/tutorial_process_videos.md) 🏭
-- [Using DeepPoseKit in SimBA](docs/DeepPoseKit_in_SimBA.md) 📙
-- [Using DeepLabCut through SimBA](docs/Tutorial_DLC.md) 📗
-- [SimBA generic tutorial](docs/tutorial.md) 📘
-- [SimBA friendly asked questions (FAQ)](docs/FAQ.md) 📕 
-- [SimBA behavioral annotation interface](docs/label_behavior.md) 🏷️
-- [SimBA Advanced behavioral annotation interface](docs/advanced_labelling.md) 🏷️
-- [Using third-party annotation tools in SimBA](docs/third_party_annot.md) 🏷️
-- [Using user-defined ROIs in SimBA](/docs/ROI_tutorial_new.md) 🗺️
-- [Using multi-animal pose (maDLC/SLEAP/APT) in SimBA](/docs/Multi_animal_pose.md) 🐭🐭
-- [Using the SimBA data analysis and export dashboard](docs/plotly_dash.md) 📊
-- [Explainable machine classifications in SimBA (SHAP)](docs/SHAP.md) 🧮
-- [Mutual exclusivity using heuristic rules in SimBA](docs/mutual_exclusivity_heuristic_rules.md) 📗
-- [Compute feature subsets in SimBA](docs/feature_subsets.md) 📕 
-- [Kleinberg markov chain classification smoothing in SimBA](docs/kleinberg_filter.md) 🔗
-- [Cue-light analyses in SimBA](docs/cue_light_tutorial.md)💡💡
-- [Bounding boxes in SimBA](docs/anchored_rois.md)📦
-- [Reversing the directionality of classifiers in SimBA](docs/reverse_annotations.md) ⏪
-- [Spike-time correlation coefficients in SimBA](docs/FSTTC.md) 📔
-- [Spontaneous alternation in SimBA](/docs/spontaneous_alternation.md)🌽
-- [Analysing animal directions in SimBA](docs/directionality_between_animals.md) 🧭
-- [Recommended hardware](https://github.com/sgoldenlab/simba/blob/master/misc/system_requirements.md) 🖥️
-- [Downloading compressed data from the SimBA OSF repository](https://github.com/sgoldenlab/simba/blob/master/docs/using_OSF.md) 💾
+User-facing:
 
-## Legacy documentation: General methods
+| Doc | When to read |
+|---|---|
+| [`docs/v1_project_layout.md`](docs/v1_project_layout.md) | Creating a v1 project, understanding the directory layout. |
+| [`docs/migration_guide.md`](docs/migration_guide.md) | Moving an existing legacy project to v1. |
+| [`docs/workflow_recipes.md`](docs/workflow_recipes.md) | Eleven end-to-end recipes for common experimental setups. |
+| [`docs/data_source_guides.md`](docs/data_source_guides.md) | Per-tracker import guide (DLC, SLEAP, MARS, etc.). |
 
-### Step 1: [Pre-process videos](docs/tutorial_process_videos.md) 
+Developer-facing:
 
-### Step 2: [Create tracking model and generate pose-estimation data](docs/Tutorial_DLC.md) 
+| Doc | When to read |
+|---|---|
+| [`docs/workflows.md`](docs/workflows.md) | Codebase audit: which workflow lives where, port status, known gaps. |
+| [`docs/hardwired_paths_audit.md`](docs/hardwired_paths_audit.md) | Path-abstraction triage rules + the 107-hit audit. |
+| [`docs/workflow_audit.md`](docs/workflow_audit.md) | Topological view of the system (pages, forms, backends, pipeline). |
+| [`docs/simba_death_cascade.md`](docs/simba_death_cascade.md) | Tk surface removal plan (now complete). |
+| [`docs/qt_workbench_known_issues.md`](docs/qt_workbench_known_issues.md) | QWI tracker. |
 
-### Step 3: [Building classfier(s)](https://github.com/sgoldenlab/simba/blob/master/docs/tutorial.md#step-6-label-behavior)
+## Relationship to SimBA
 
-### Step 4: [Analysis/Visualization](https://github.com/sgoldenlab/simba/blob/master/docs/tutorial.md#step-9-analyze-machine-results)
+Mufasa is a soft fork of SimBA — the scientific intent, behavioral-analysis pipeline, and core algorithms are identical. The differences are infrastructural:
 
-### [Click here for the full legacy *generic* tutorial on building classifiers in SimBA](https://github.com/sgoldenlab/simba/blob/master/docs/tutorial.md).
+* **GUI:** Qt (PySide6) instead of Tkinter. The Tk surface is entirely removed.
+* **Project layout:** v1 layout with per-run separation under `derived/<stage>/<run_id>/`.
+* **Platform:** Linux + Python 3.11+ only. Windows / macOS / older Pythons not supported.
+* **No PyPI distribution.** Mufasa is install-from-source. The SimBA `simba-uw-tf-dev` PyPI package is unaffected and remains the canonical SimBA distribution.
 
-## Apr-03-2025: Blob (contour) tracking in SimBA
+If you're starting a new project and want the cross-platform GUI, PyPI distribution, and the broader SimBA tutorial ecosystem, use SimBA. If you're on Linux and want Qt + the v1 layout, use Mufasa.
 
-For documentation, see [THIS](https://github.com/sgoldenlab/simba/blob/master/docs/blob_track.md) tutorial on GitHub or [THIS](https://simba-uw-tf-dev.readthedocs.io/en/latest/tutorials_rst/blob_tracking.html) tutorial in the documentation. 
-<p align="center">
-  <img src="https://github.com/sgoldenlab/simba/blob/master/images/blob_tracking_example.gif" width="650" alt="Demo GIF">
-</p>
+## Citation
 
-## Feb-11-2025: SimBA ROI interface update
+If you use Mufasa in published work, **cite the original SimBA paper** — Mufasa is a re-skin of SimBA's pipeline, not a separate scientific contribution.
 
-<p align="center">
-<img src="https://github.com/sgoldenlab/simba/blob/master/images/roi_new_1.png" />
-</p>
+```bibtex
+@article{Goodwin2024,
+  author    = {Goodwin, Nastacia L. and Choong, Jia J. and Hwang, Sophia and
+               Pitts, Kayla and Bloom, Liana and Islam, Aasiya and
+               Zhang, Yizhe Y. and Szelenyi, Eric R. and Tong, Xiaoyu and
+               Newman, Emily L. and Miczek, Klaus and Wright, Hayden R. and
+               McLaughlin, Ryan J. and Norville, Zane C. and Eshel, Neir and
+               Heshmati, Mitra and Nilsson, Simon R. O. and Golden, Sam A.},
+  title     = {Simple Behavioral Analysis (SimBA) as a platform for
+               explainable machine learning in behavioral neuroscience},
+  journal   = {Nature Neuroscience},
+  volume    = {27},
+  pages     = {1411--1424},
+  year      = {2024},
+  doi       = {10.1038/s41593-024-01649-9},
+  publisher = {Nature Publishing Group},
+  url       = {https://www.nature.com/articles/s41593-024-01649-9},
+}
+```
 
-We have improved the GUI for region-of-interest segmentation and analysis, which includes new interactive controls for drawing shapes. 
-[Click here to go to the new ROI documentation page.](https://github.com/sgoldenlab/simba/blob/master/docs/roi_tutorial_new_2025.md)
+Optional acknowledgment for Mufasa-specific features (v1 layout, Qt workbench, etc.) is welcome but not required.
 
-The updates primarily serves to improve stability, but includes new methods for [drawing circles](https://github.com/sgoldenlab/simba/blob/master/docs/roi_tutorial_new_2025.md#draw-circle), [interactive ROI resizing](https://github.com/sgoldenlab/simba/blob/master/docs/roi_tutorial_new_2025.md#changing-roi-shapes), [interactive 
-ROI moving](https://github.com/sgoldenlab/simba/blob/master/docs/roi_tutorial_new_2025.md#changing-roi-locations) and aesthetics. 
+## License
 
-The SimBA region of interest (ROI) interface allows users to define and 
-draw ROIs on videos. ROI data can be used to calculate basic descriptive 
-statistics based on animals movements and locations such as:
+GPL v3 — see [`LICENSE`](LICENSE).
 
-* How much time the animals have spent in different ROIs.
-* How many times the animals have entered different ROIs.
-* The distance animals have moved in the different ROIs.
-* Calculate how animals have engaged in different classified behaviors in each ROI.
-* etc....
+Inherited from SimBA's GPL v3 license; this is a derivative work.
 
+## Acknowledgments
 
-Furthermore, the ROI data can  be used to build potentially valuable, additional, features for random forest predictive classifiers. Such features can be used to generate a machine model that classify behaviors that depend on the spatial location of body parts in relation to the ROIs. **CAUTION**: If spatial locations are irrelevant for the behaviour being classified, then such features should *not* be included in the machine model generation as they just 
-only introduce noise.
+Mufasa builds on the work of the SimBA project at the [Golden Lab, University of Washington](https://goldenneurolab.com/). Mufasa-specific changes are documented in the patch series (see `docs/simba_death_cascade.md` for the v1 migration history).
 
+Original SimBA contributors:
 
-## Apr-16-2023: API Reference
+* [Simon Nilsson](https://github.com/sronilsson)
+* [Jia Jie Choong](https://github.com/inoejj)
+* [Sophia Hwang](https://github.com/sophihwang26)
 
-See SimBA on [readthedocs](https://simba-uw-tf-dev.readthedocs.io/) for [API reference](https://simba-uw-tf-dev.readthedocs.io/en/latest/api.html) and [example notebooks](https://simba-uw-tf-dev.readthedocs.io/en/latest/notebooks.html) when you prefer to run methods available in SimBA through the command line over the GUI. If you find that notebook examples are lacking, please reach out to us [Gitter](https://gitter.im/SimBA-Resource/community) or by opening an issue and let's chat about typing up further examples!
-
-## Apr-04-2023: SimBA version 1.55 release
-
-Although core methods remain, the SimBA code and documentation has sprawled significantly. If you are curious about the methods in the GUI, try clicking the header icons which should take you to the relevant documentation.
-
-<p align = "center">
-<img src="/images/doc_inst.png" alt=""
-	title="SimBA" />
-<p/>
-
-As always, reach out to us on [Gitter chat](https://gitter.im/SimBA-Resource/community) or open an issue if you have questions, bug reports of feature requests! 
-
-## Oct-07-2021: SimBA version 1.31 release
-
-We have released a significantly improved GUI for region-of-interest segmentation and analysis.
-[Click here to go to the new ROI documentation page.](https://github.com/sgoldenlab/simba/blob/master/docs/ROI_tutorial_new.md)
-
-## Feb-08-2021: SimBA version 1.3 release
-
-It has been nearly a year since the first public iteration of SimBA was released! We would like to thank the open-source community who have supported us and provided invaluable feedback and motivation to continue developing and supporting SimBA to where it is now. We have recently passed well over 150,000 downloads via pip install across all branches, and average between ~5000 to 10,000 weekly downloads alongside a gitter community of >100 users. We have just passed 15 citations for the SimBA preprint, which was released ~8 months ago. This would not be possible without your support. Thank you.
-
-The newest release of SimBA, v1.3, provides a significant jump in features, quality of life improvements, and bug fixes. Several are highlighted below.
-
-Please update using `pip install simba-uw-tf==1.3.7`, [this version](https://pypi.org/project/Simba-UW-tf/) has native deeplabcut and deepposekit GUI support disabled. Hence, tensorflow is not needed. Pose-estimation developers have created excellent GUIs for their pipelines, and we do a disservice to you by not supporting the most updated versions. SimBA now supports pose-estimation dataframe imports from Deeplabcut, DeepPoseKit, SLEAP, MARS and others. If you are developing a new pose-estimation method and would like it directly supported in SimBA, please let us know! 
-
-### Selected New Features
-- Easy install of SimBA via `pip` - [Documentation](https://github.com/sgoldenlab/simba/blob/master/docs/installation_new.md)
-- Install simba using anaconda - [Documentation](https://github.com/sgoldenlab/simba/blob/master/docs/anaconda_2025.md)
-- Introduction of SHAP for behavioral neuroscience classifier explainability and standarization- [Documentation](/docs/SHAP.md)
-- Plotly integration for immediate data visualization - [Documentation](/docs/plotly_dash.md)
-- Labelling/annotating behaviors with many third-party apps - [Documentation](/docs/third_party_annot.md)
-- Kleinberg Filter for smoothing - [Documentation](/docs/kleinberg_filter.md)
-- ROI Visualization update - [Documentation](/docs/ROI_tutorial.md)
-- User define features extraction - [Documentation](/docs/extractFeatures.md)
-- Quick line plot - Allow user to make line plots with selected bodypart and tracking data (located under **Tools**)
-- Many, many, many, many bug-fixes
-
-
-## June-12-2020: SimBA version 1.2 release
-### New Features
-- Multi-animal DLC support - [Documentation](/docs/Multi_animal_pose.md)
-- Multi-animal SLEAP support - [Documentation](/docs/Multi_animal_pose.md)
-- SimBA 'pseudo-labelling' module - [Documentation](/docs/pseudoLabel.md)
-- Easy install of SimBA via `pip` - [Documentation](https://github.com/sgoldenlab/simba/blob/master/docs/installation_new.md)
-- Plenty of new quality-of-life features (e.g., time-bin analyzes / improved visualizations options) - [Documentation](/docs/Scenario1.md)
-- Many, many, many, many bug-fixes
-
-Please join our [Gitter chat](https://gitter.im/SimBA-Resource/community) if you have any questions, or even if you would simply like to discuss potential applications for SimBA in your work.  Please come by, stay inside, wash your hands, and check on your lab mates reguarly!
-
-## April-25-2020: SimBA pre-print manuscript release
-
-A pre-print SimBA manuscript on bioRxiv! The manuscript details the use of SimBA for generation of social predictive classifiers in rat and mouse resident-intruder protocols - please check it out using the link above. All data, pose-estimation models, and the final classifiers generated in the manuscript, can be accessed through our [OSF repository](https://osf.io/tmu6y/) and through the [Resource](https://github.com/sgoldenlab/simba#resource-) menu further down this page.
-
-## March-05-2020: SimBA version 1.1 release
-### New Features
-- Region of Interest support (ROI Module) - [Documentation](/docs/ROI_tutorial.md)
-- DeepPoseKit support (DPK Module) - [Documentation](/docs/DeepPoseKit_in_SimBA.md)
-- SimBA accepts user-defined pose-configurations (Flexible Annotation Module) - [Documentation](/docs/Pose_config.md)
-- Interactive classifer discrimination thresholding - [Documentation](/docs/validation_tutorial.md#validate-model-on-single-video)
-- Individual discrimination thresholds for classifiers - [Documentation](https://github.com/sgoldenlab/simba/blob/master/docs/Scenario2.md#part-3-run-the-classifier-on-new-data)
-- Heatmap visualizations -[Documentation](https://github.com/sgoldenlab/simba/blob/master/docs/Scenario2.md#part-5--visualizing-machine-predictions)
-- Multi-crop tool - [Documentation](https://github.com/sgoldenlab/simba/blob/master/docs/Tutorial_tools.md#multi-crop-videos)
-- Post-classification validation method for false-positives - [Documentation](/docs/classifier_validation.md#classifier-validation)
-- Many, many, many bug-fixes
-
-## What is SimBA?
-Several excellent computational frameworks exist that enable high-throughput and consistent tracking of freely moving unmarked animals. Here we introduce and distribute a pipeline that enabled users to use these pose-estimation approaches in combination with behavioral annotation and generation of supervised machine-learning behavioral predictive classifiers. We have developed this pipeline for the analysis of complex social behaviors, but have included the flexibility for users to generate predictive classifiers across other behavioral modalities with minimal effort and no specialized computational background.  
-
-SimBA does not require computer science and programing experience, and SimBA is optimized for wide-ranging video acquisition parameters and quality. We may be able to provide support and advice for specific use instances, especially if it benefits multiple users and advances the scope of SimBA. Feel free to post issues and bugs here or contact us directly and we'll work on squashing them as they appear. We hope that users will contribute to the community!
-
-- The SimBA pipeline requires no programing knowledge 
-- Specialized commercial or custom-made equipment is not required
-- Extensive annotations are not required
-- The pipeline is flexible and can be used to create and validate classifiers for different behaviors and environments
-- Currently included behavioral classifiers have been validated in mice and rats
-- SimBA is written on Windows/MacOS and compatible with Linux
-
-**SimBA provides several validated classifer libraries using videos filmed from above at 90° angle with pose-estimation data from 8 body parts per animal; please see our [OSF repository](https://osf.io/tmu6y/) for access to all files. SimBA now accepts any user-defined pose-estimation annotation schemes with the inclusion of the [Flexible Annotation Module in v1.1](https://github.com/sgoldenlab/simba/blob/master/docs/Pose_config.md). SimBA now supports maDLC and SLEAP for similar looking animals with the release of [maDLC/SLEAP module in v1.2](/docs/Multi_animal_pose.md).** 
-
-**Installation note:** SimBA can be installed either with TensorFlow compatability (for generating DeepLabCut, DeepPoseKit and SLEAP pose-estimation models), or without TensorFlow (for stand-alone use with classifiers and other functions). Please choose the appropriate branch for your needs, using pip install. More details are found in the [Installation Documentation](https://github.com/sgoldenlab/simba/blob/master/docs/installation_new.md).
-
-**Listserv for release information:** If you would like to receive notification for new releases of SimBA, please **[fill out this form](https://forms.gle/R47RWN4stNSJBj9D9)** and you will be added to the listserv.
-
-#### Mouse
-![](https://github.com/sgoldenlab/simba/blob/master/images/mouse_videos.gif)
-
-#### Rat
-![](https://github.com/sgoldenlab/simba/blob/master/images/rat_videos.gif)
-
-#### SimBA GUI workflow
-![](https://github.com/sgoldenlab/simba/blob/master/images/SimBA_tkinter_3.png)
-
-## Pipeline 👷
-![](https://github.com/sgoldenlab/simba/blob/master/images/overallflow.PNG)
-
-## Resource 💾
-
-All data (classifiers etc.) is available on our [Open Science Framework repository](https://osf.io/tmu6y/). For a schematic overview of the data respository folder structure (as of March-20-2020), click [HERE](https://github.com/sgoldenlab/simba/blob/master/images/OSF_folder_structure_031820.jpg).
-
-### API reference
-- [SimBA on readthedocs](https://simba-uw-tf-dev.readthedocs.io/en/latest/index.html)
-
-### Models
-Below is a link to download trained  behavior classification models to apply it on your dataset
-- [Random forest models](https://osf.io/kwge8/) 🌲
-
-### Docker images
-- [Docker hub](https://hub.docker.com/repositories/goldenlab)
-
-
-### SimBA visualization examples
-- [YouTube playlist](https://www.youtube.com/playlist?list=PLi5Vwf0hhy1R6NDQJ3U28MOUJPfl2YWYl) 📺
-
-### Labelled images
-- [Annotated images for tracking models](https://osf.io/sr3ck/) 📷
-
-### Tracking weights
-- [DeepLabCut tracking weights](https://osf.io/sr3ck/) 🏋️
-
-### Golden Lab webpage
-- [Sam Golden Lab UW](https://goldenneurolab.com/) 🧪🧫🐁
-
-### Downloads
-- [Downloads statistics dashboard](https://sronilsson.github.io/download_stats/)
-
-
-## License 📃
-This project is licensed under the GPLv3. Note that the software is provided 'as is', without warranty of any kind, express or implied. 
-
-If you find **any** part of the code or data useful for your own work, please cite us. You can view and download the citation file by clicking the <kbd>Cite this repository</kbd> button at the top right of this page. Thank you 🙏!
-
-	@article{Goodwin2024,
-  		author = {Goodwin, Nastacia L. and Choong, Jia J. and Hwang, Sophia and Pitts, Kayla and Bloom, Liana and Islam, Aasiya and Zhang, Yizhe Y. and Szelenyi, Eric R. and Tong, Xiaoyu and Newman, Emily L. and Miczek, Klaus and Wright, 	Hayden R. and McLaughlin, Ryan J. and Norville, Zane C. and Eshel, Neir and Heshmati, Mitra and Nilsson, Simon R. O. and Golden, Sam A.},
-  		title = {Simple Behavioral Analysis (SimBA) as a platform for explainable machine learning in behavioral neuroscience},
-  		journal = {Nature Neuroscience},
-  		volume = {27},
-  		pages = {1411--1424},
-  		year = {2024},
-  		doi = {10.1038/s41593-024-01649-9},
-  		publisher = {Nature Publishing Group},
-  		URL = {https://simba-uw-tf-dev.readthedocs.io/},
-  		repository = {https://github.com/sgoldenlab/simba},
-    		license = {GPL-3.0}
-			}
-## References 📜
-
-[![Foo](https://github.com/sgoldenlab/simba/blob/master/images/cos_center_logo_small.original.png)](https://osf.io/d69jt/)
-
-## Contributors 🤼
-- [Simon Nilsson](https://github.com/sronilsson)
-- [Jia Jie Choong](https://github.com/inoejj)
-- [Sophia Hwang](https://github.com/sophihwang26)
-
-#
-Author [Simon N](https://github.com/sronilsson), [JJ Choong](https://github.com/inoejj)
+See [github.com/sgoldenlab/simba](https://github.com/sgoldenlab/simba) for the upstream project, the full contributor list, and the original SimBA documentation, tutorials, and scientific references.
