@@ -6,7 +6,7 @@
 |---|---|---|---|
 | QWI-1 | High | Open | ROI: Apply-all fails on v1 projects |
 | QWI-2 | Medium | Open | Features: destination label shows raw HTML markup |
-| QWI-3 | Medium | Open | Features: max_workers=0 crash on empty project |
+| QWI-3 | Medium | ✓ Fixed 122d7 | Features: max_workers=0 crash on empty project |
 | QWI-4 | Medium | ✓ Fixed 122d0 | Workbench: page ordering (Annotation before Classifier) |
 
 ---
@@ -91,16 +91,16 @@ Option A is the pragmatic fix; Option B is structurally cleaner but more code-ch
 
 ---
 
-## QWI-3 — Features: `max_workers=0` crash on empty project
+## QWI-3 — Features: `max_workers=0` crash on empty project — ✓ Fixed 122d7
 
-**Reproduce:** Qt workbench → Features → Compute feature subsets → Run (on a project with 0 eligible videos for feature extraction).
+**Reproduce (pre-fix):** Qt workbench → Features → Compute feature subsets → Run (on a project with 0 eligible videos for feature extraction).
 
-**Error:**
+**Error (pre-fix):**
 ```
 ValueError: max_workers must be greater than 0
 ```
 
-Traceback ends at:
+Traceback ended at:
 ```
 File ".../feature_extractors/feature_subsets.py", line 650, in _run_parallel
     with ProcessPoolExecutor(max_workers=n_workers) as pool:
@@ -113,28 +113,32 @@ File "/usr/lib/python3.12/concurrent/futures/process.py", line 679, in __init__
 ```python
 n_videos = len(self.data_paths)
 n_workers = min(self.n_workers, n_videos)
-print(f"Running feature extraction on {n_videos} videos across {n_workers} workers...")
-failures: list[tuple[str, str]] = []
+# ...
 with ProcessPoolExecutor(max_workers=n_workers) as pool:
 ```
 
 When `n_videos == 0`, `n_workers = min(self.n_workers, 0) = 0`. `ProcessPoolExecutor(max_workers=0)` raises immediately.
 
-**Recommended fix:** short-circuit before pool creation:
+**Fix landed in 122d7 (two-sided):**
 
-```python
-n_videos = len(self.data_paths)
-if n_videos == 0:
-    print("Feature extraction: no eligible videos. Nothing to do.")
-    return
-n_workers = max(1, min(self.n_workers, n_videos))
-```
+1. **Backend** (`feature_subsets.py:_run_parallel`): short-circuit on empty input + clamp `n_workers ≥ 1` as belt-and-braces.
 
-The `max(1, ...)` is belt-and-braces. The short-circuit catches the actual empty-project case cleanly.
+   ```python
+   n_videos = len(self.data_paths)
+   if n_videos == 0:
+       print("Feature extraction: no eligible videos in this "
+             "project. Nothing to do.")
+       return
+   n_workers = max(1, min(self.n_workers, n_videos))
+   ```
 
-The Qt form should also display a clearer message — "No eligible videos in this project. Add videos via Data Import first." — instead of letting the backend ValueError bubble up.
+2. **Qt form** (`ui_qt/forms/features.py:_run_preflight` + `on_run`): the preflight returns `None` instead of an empty conflicts dict when the project has no eligible videos. `on_run` then surfaces a clear `QMessageBox.warning`:
 
-**Severity rationale:** Crashes the run on otherwise-valid empty-state. Easy fix but exposes the no-video-state which is common during fresh project setup. Medium.
+   > "No eligible videos in this project. Feature extraction needs outlier-corrected pose data. Make sure the project has imported videos and run the outlier-correction step (or 'Skip outlier correction' on the Preprocessing page) before running feature extraction."
+
+   The Qt-side message is more useful than the backend's stdout print — it tells the user *why* the project might look empty (need pose data, not just video files) and *what to do next* (run outlier correction or its skip variant).
+
+**Severity rationale:** Crashed the run on otherwise-valid empty-state. Fixed two-sided so both CLI (backend) and GUI (Qt form) users get clean behaviour.
 
 ---
 
