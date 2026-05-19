@@ -118,28 +118,36 @@ def main() -> int:
     )
 
     # 9-10. SimBA.py cleanup
-    simba_src = (pkg / "SimBA.py").read_text()
-    simba_tree = ast.parse(simba_src)
-    active_import = any(
-        isinstance(n, ast.ImportFrom)
-        and any(a.name == "YOLOPoseTrainPopUP" for a in n.names)
-        for n in simba_tree.body
-    )
-    check(
-        "SimBA.py has no active import of YOLOPoseTrainPopUP",
-        not active_import,
-    )
-    leaked = []
-    for i, line in enumerate(simba_src.split("\n"), 1):
-        if line.lstrip().startswith("#"):
-            continue
-        if "YOLOPoseTrainPopUP" in line:
-            leaked.append(f"line {i}")
-    check(
-        "SimBA.py: no non-commented occurrence of the symbol",
-        leaked == [],
-        detail=", ".join(leaked[:3]),
-    )
+    simba_path = pkg / "SimBA.py"
+    if not simba_path.exists():
+        # Post-Stage-B (122d5): SimBA.py gone → no
+        # active references possible. Both checks pass
+        # trivially.
+        check("SimBA.py gone (post-Stage-B 122d5) — no active import of YOLOPoseTrainPopUP", True)
+        check("SimBA.py gone (post-Stage-B 122d5) — no non-commented occurrence of YOLOPoseTrainPopUP", True)
+    else:
+        simba_src = simba_path.read_text()
+        simba_tree = ast.parse(simba_src)
+        active_import = any(
+            isinstance(n, ast.ImportFrom)
+            and any(a.name == "YOLOPoseTrainPopUP" for a in n.names)
+            for n in simba_tree.body
+        )
+        check(
+            "SimBA.py has no active import of YOLOPoseTrainPopUP",
+            not active_import,
+        )
+        leaked = []
+        for i, line in enumerate(simba_src.split("\n"), 1):
+            if line.lstrip().startswith("#"):
+                continue
+            if "YOLOPoseTrainPopUP" in line:
+                leaked.append(f"line {i}")
+        check(
+            "SimBA.py: no non-commented occurrence of the symbol",
+            leaked == [],
+            detail=", ".join(leaked[:3]),
+        )
 
     # 11. No leftover importers
     leftover = []

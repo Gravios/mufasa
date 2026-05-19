@@ -129,35 +129,49 @@ def main() -> int:
         '"DirectingBodyPartSettingsForm"' in addons_src,
     )
 
-    # 8-9. SimBA.py cleanup
-    simba_src = (pkg / "SimBA.py").read_text()
-    simba_tree = ast.parse(simba_src)
-    deleted_sym = "DirectionAnimalToBodyPartSettingsPopUp"
-    active_import = False
-    for n in simba_tree.body:
-        if isinstance(n, ast.ImportFrom):
-            for alias in n.names:
-                if alias.name == deleted_sym:
-                    active_import = True
-    check(
-        "SimBA.py has no active import of "
-        "DirectionAnimalToBodyPartSettingsPopUp",
-        not active_import,
-    )
+    # 8-9. SimBA.py cleanup — post-Stage-B (122d5) SimBA.py is
+    # gone, so the "no active reference" checks pass trivially.
+    simba_path = pkg / "SimBA.py"
+    if not simba_path.exists():
+        check(
+            "SimBA.py gone (post-Stage-B 122d5) — import + "
+            "button references trivially absent",
+            True,
+        )
+        check(
+            "SimBA.py gone (post-Stage-B 122d5) — "
+            "button_analyzeDirection_bp trivially absent",
+            True,
+        )
+    else:
+        simba_src = simba_path.read_text()
+        simba_tree = ast.parse(simba_src)
+        deleted_sym = "DirectionAnimalToBodyPartSettingsPopUp"
+        active_import = False
+        for n in simba_tree.body:
+            if isinstance(n, ast.ImportFrom):
+                for alias in n.names:
+                    if alias.name == deleted_sym:
+                        active_import = True
+        check(
+            "SimBA.py has no active import of "
+            "DirectionAnimalToBodyPartSettingsPopUp",
+            not active_import,
+        )
 
-    leaked = []
-    for i, line in enumerate(simba_src.split("\n"), 1):
-        if line.lstrip().startswith("#"):
-            continue
-        if ("button_analyzeDirection_bp" in line
-                or deleted_sym in line):
-            leaked.append(f"line {i}")
-    check(
-        "SimBA.py has no non-commented occurrence of the deleted "
-        "symbol / button name",
-        leaked == [],
-        detail=", ".join(leaked[:3]),
-    )
+        leaked = []
+        for i, line in enumerate(simba_src.split("\n"), 1):
+            if line.lstrip().startswith("#"):
+                continue
+            if ("button_analyzeDirection_bp" in line
+                    or deleted_sym in line):
+                leaked.append(f"line {i}")
+        check(
+            "SimBA.py has no non-commented occurrence of the deleted "
+            "symbol / button name",
+            leaked == [],
+            detail=", ".join(leaked[:3]),
+        )
 
     # 10. No leftover importers
     leftover = []
