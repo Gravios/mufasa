@@ -459,19 +459,16 @@ def multiply_ROIs(filename: Union[str, os.PathLike],
         check_file_exist_and_readable(file_path=config_path)
         config = read_config_file(config_path=config_path)
         project_path = config.get(ConfigKey.GENERAL_SETTINGS.value, ConfigKey.PROJECT_PATH.value)
-        # Patch 122d9 (QWI-1): resolve videos_dir via the
-        # layout-agnostic project_paths_from_config helper. The
-        # pre-fix `os.path.join(project_path, "videos")` hard-
-        # coded the legacy SimBA layout and broke for v1 projects,
-        # which store videos at `<root>/sources/videos/` instead.
-        # The helper handles both layouts; ConfigReader, the Qt
-        # video-import form, and the InputSourcePicker all use
-        # the same detection rule (config_path ends with `.toml`
-        # → v1; else legacy).
+        # Patch 122d9 (QWI-1) + 122da (sibling): resolve both
+        # videos_dir AND roi_coordinates_path via the layout-
+        # agnostic helper. 122d9 fixed only videos_dir; the
+        # roi_coordinates_path line below was a sibling miss —
+        # same root cause (hardcoded legacy join), different
+        # subpath. Caught by the 122da hardwired-paths audit.
         from mufasa.project_layout import project_paths_from_config
-        videos_dir = project_paths_from_config(
-            config_path=config_path)["video_dir"]
-        roi_coordinates_path = os.path.join(project_path, "logs", Paths.ROI_DEFINITIONS.value)
+        _paths = project_paths_from_config(config_path=config_path)
+        videos_dir = _paths["video_dir"]
+        roi_coordinates_path = _paths["roi_definitions_path"]
 
     check_file_exist_and_readable(file_path=filename)
     _, video_name, video_ext = get_fn_ext(filename)
@@ -558,7 +555,13 @@ def reset_video_ROIs(config_path: Union[str, os.PathLike],
     _, video_name, video_ext = get_fn_ext(filename)
     config = read_config_file(config_path=config_path)
     project_path = config.get(ConfigKey.GENERAL_SETTINGS.value, ConfigKey.PROJECT_PATH.value)
-    roi_coordinates_path = os.path.join(project_path, "logs", Paths.ROI_DEFINITIONS.value)
+    # Patch 122da: same layout-agnostic fix as multiply_ROIs.
+    # Pre-122da this hardcoded the legacy
+    # `<project_path>/logs/measures/ROI_definitions.h5`; v1
+    # projects have a different project root.
+    from mufasa.project_layout import project_paths_from_config
+    roi_coordinates_path = project_paths_from_config(
+        config_path=config_path)["roi_definitions_path"]
     if not os.path.isfile(roi_coordinates_path):
         raise NoROIDataError(msg=f"Cannot reset/delete ROI definitions: no ROI definitions exist in Mufasa project. Could find find a file at expected location {roi_coordinates_path}. Create ROIs before deleting ROIs.", source=reset_video_ROIs.__name__)
     with pd.HDFStore(roi_coordinates_path) as hdf: roi_data_keys = [x[1:] for x in hdf.keys()]
