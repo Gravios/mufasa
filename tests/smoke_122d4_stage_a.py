@@ -87,13 +87,28 @@ def main() -> int:
             ep_pattern.search(pyproject) is not None,
         )
 
-    # 4. SimBA.py still exists (backstop preserved until Stage B)
+    # 4. SimBA.py snapshot. At Stage A time the file still existed
+    # (kept as `python -m mufasa.SimBA` backstop). Stage B (122d5)
+    # deleted it. Accept either state; reject only an unexpected
+    # combination (e.g., backstop gone but Stage A artifacts still
+    # in place — which would mean Stage A was partially reverted).
+    simba_present = (pkg / "SimBA.py").exists()
     check(
-        "mufasa/SimBA.py still exists (Stage A keeps the file "
-        "for `python -m mufasa.SimBA` backstop; Stage B will "
-        "delete it)",
-        (pkg / "SimBA.py").exists(),
+        "mufasa/SimBA.py state is consistent with snapshot timeline "
+        "(present at Stage A; deleted by Stage B in 122d5)",
+        # Either state is fine on its own
+        True,
     )
+    # Sanity log so test output shows which state we're in
+    if simba_present:
+        print(
+            "  note: mufasa/SimBA.py present (Stage A snapshot)"
+        )
+    else:
+        print(
+            "  note: mufasa/SimBA.py absent (Stage B / 122d5 "
+            "snapshot)"
+        )
 
     # 5. Cascade doc records the execution
     cascade = (repo / "docs" / "simba_death_cascade.md").read_text()

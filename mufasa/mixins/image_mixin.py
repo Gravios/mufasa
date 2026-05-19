@@ -1821,7 +1821,7 @@ class ImageMixin(object):
         Find the first frame of non-uniform color in a video.
 
         .. note::
-           Helpful in the :func:`mufasa.ui.px_to_mm_ui.GetPixelsPerMillimeterInterface` to ensure that a viable frame is pulled up.
+           Helpful in the :class:`mufasa.ui_qt.dialogs.pixel_calibration.PixelCalibrationDialog` to ensure that a viable frame is pulled up.
 
         :param Union[str, os.PathLike, cv2.VideoCapture] video_path: The path to a video file on disk, or a cv2.VideoCapture object.
         :param Optional[int] start_idx: The first frame (where to start searching for the non-uniform color image). Default: 0 which equals the first frame. None also equals start searching at the first frame.
