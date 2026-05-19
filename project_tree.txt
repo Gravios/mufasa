@@ -1,0 +1,359 @@
+Mufasa — project structure (post-122dg)
+========================================
+
+416 .py files. Annotations:
+  ★  primary entry point
+  🟢 fully or mostly active (≥75% reachable from entry points)
+  🟡 partially active (25–75%)
+  ⚪ mostly dormant (<25%)
+  💀 fully orphan (0% — legacy/SimBA-only with no Qt path)
+  📦 data/config, not really code
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ENTRY POINTS  (installed by `pip install -e .` as console_scripts)          │
+└──────────────────────────────────────────────────────────────────────────────┘
+│
+├─ ★ mufasa                                  → cli/workbench_launcher.py
+│                                                (smart launcher; env diagnostics;
+│                                                 then dispatches to workbench)
+├─ ★ mufasa-workbench                        → ui_qt/workbench_app.py
+│                                                (direct workbench launch)
+├─ ★ mufasa-chooser                          → ui_qt/app.py
+│                                                (legacy Qt chooser; standalone popups)
+└─ ★ python -m mufasa.cli.migrate_project    → cli/migrate_project.py
+                                                 (legacy → v1 migration)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  TOP-LEVEL INFRASTRUCTURE  (the path abstraction; consulted everywhere)      │
+└──────────────────────────────────────────────────────────────────────────────┘
+│
+mufasa/
+├─ 🟢 __init__.py
+├─ 🟢 project_layout.py            ← path abstraction layer; 18 public functions
+│                                    (project_paths_from_config, generate_run_id,
+│                                     read_project_toml, etc.)
+└─ 🟢 legacy_layout.py             ← LEGACY_TO_V1_MAPPING table; migration tool
+                                     consumes this. By-design legacy.
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  QT WORKBENCH  (ui_qt/)                                              74/81   │
+│  Workbench shell, pages, forms, dialogs. The actual GUI.                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+│
+mufasa/ui_qt/                                                          🟢 91%
+│
+├─ workbench_app.py             ★ workbench entry point
+├─ app.py                       ★ chooser entry point
+├─ workbench.py                 ← OperationForm base class (all forms inherit)
+│
+├─ qt_confirm.py                ← installs Qt-native confirm_two_option override
+│                                  at workbench startup (patch 122cj). Replaces
+│                                  the Tk popup default in utils/confirm.py.
+├─ recent_project.py            ← MRU list, auto-discovery
+├─ progress.py                  ← run-with-progress dispatch + worker threads
+├─ runner.py                    ← long-task worker scheduling
+├─ linux_env.py                 ← QPA platform autodetect, native dep checks
+│
+├─ icon_cache.py                ← per-icon lazy load
+├─ widgets.py                   ← shared widget helpers (QLabel, etc.)
+├─ frame_labeller.py            ← per-frame annotation widget
+├─ frame_scrubber.py            ← video scrubber widget
+├─ clip_review.py               ← classifier validation viewer
+├─ targeted_clips.py            ← advanced clip annotator (frame extraction)
+├─ input_source_picker.py       ← project-pose-data discovery dialog
+├─ create_project_dialog.py     ← New Project... dialog
+├─ reconfigure_dialog.py        ← Project → Reconfigure body parts
+├─ operations.py                ← OperationsTree (sidebar menu)
+├─ dialog.py                    ← base dialog helpers
+│
+├─ pages/                       🟢 13/13   ← one page per workflow area
+│  ├─ project_setup_page.py        ← New / Open / Recent Projects
+│  ├─ data_import_page.py          ← Import pose data + video metadata
+│  ├─ video_processing_page.py     ← Reverse / Resize / Frame extract / etc.
+│  ├─ pose_cleanup_page.py         ← Outlier correction + smoothing
+│  ├─ features_page.py             ← Feature extraction
+│  ├─ annotation_page.py           ← Targets, label-clip viewer
+│  ├─ classifier_page.py           ← Train + Inference
+│  ├─ analysis_page.py             ← Aggregations, statistics
+│  ├─ visualizations_page.py       ← Per-route plot launcher
+│  ├─ roi_page.py                  ← ROI definitions
+│  ├─ addons_page.py               ← Pup retrieval, etc.
+│  └─ tools_page.py                ← Calibration, video utilities, etc.
+│
+├─ forms/                       🟢 34/34   ← per-operation form (most are routes;
+│  │                                          they collect args, dispatch via
+│  │                                          run_with_progress to backends below)
+│  ├─ video_info.py                ← Video parameters + pixel calibration
+│  ├─ video_utilities.py           ← Reverse/ChangeSpeed/PixelsPerMM/CheckSeekable
+│  │                                  (PixelsPerMMForm routes to
+│  │                                   dialogs/pixel_calibration.py per 122de)
+│  ├─ video_processing.py          ← Crop / resize / frame extract
+│  ├─ pose_cleanup.py              ← Smoother, outlier-correct routes
+│  ├─ features.py                  ← Feature-extraction route launcher
+│  ├─ visualizations.py            ← 12 plot routes; per-route src_dir via
+│  │                                  _VIZ_SOURCE_V1_MAP (patch 122dc)
+│  ├─ data_import.py               ← Per-tracker import (DLC, SLEAP, MARS, …)
+│  ├─ classifier_training.py       ← train_random_forest with progress
+│  ├─ classifier_inference.py      ← Apply model → per-video predictions
+│  ├─ roi_*.py                     ← ROI define/draw/analyze
+│  ├─ annotation_*.py              ← Label appender + clip viewer
+│  └─ … (~20 more route-specific forms)
+│
+└─ dialogs/                     🟢 10/10   ← modal dialogs (vs forms which embed)
+   ├─ pixel_calibration.py            ← Qt-native click-2-point ppm calibration
+   │                                    Used by 3 callers as of 122de.
+   ├─ roi_canvas.py                   ← interactive ROI drawing surface
+   ├─ roi_define_panel.py             ← ROI shape picker + Apply controls
+   ├─ roi_size_standardizer.py
+   ├─ duplicate_rois_source_target.py
+   ├─ edit_project_metadata_dialog.py
+   ├─ import_roi_csv.py
+   ├─ min_max_draw_size.py
+   └─ __init__.py
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  BACKEND PIPELINE  (run-time data flow; called by Qt forms via target())    │
+└──────────────────────────────────────────────────────────────────────────────┘
+│
+mufasa/
+│  Pipeline data-flow (canonical order):
+│    video + raw pose
+│      → pose_importers → outlier_tools → feature_extractors
+│      → labelling (training only) → model (train / infer)
+│      → data_processors (aggregations) → plotting
+│  ROIs sit alongside as a cross-cutting concern.
+│
+├─ pose_importers/              ⚪ 2/17    ← per-tracker pose readers
+│                                            Active: dlc_importer, sleap_importer.
+│                                            Dormant: 15 legacy SimBA importers
+│                                            (DANNCE, MARS, FaceMap, etc.)
+│
+├─ pose_processors/             🟢 3/4     ← post-import normalization
+│
+├─ outlier_tools/               🟡 4/8     ← movement + location outlier correction
+│                                            Active: outlier_corrector_movement +
+│                                            location; smoother. Dormant: legacy
+│                                            heuristic variants.
+│
+├─ feature_extractors/          🟡 14/23   ← per-feature backends (bouts, distances,
+│                                            angles, speeds, …). Most are active;
+│                                            some legacy variants dormant.
+│
+├─ labelling/                   🟡 3/6     ← supervised-training target insertion
+│
+├─ model/                       ⚪ 5/20    ← classifier train + inference
+│                                            Active: random-forest training,
+│                                            inference, basic eval.
+│                                            Dormant: most evaluation/validation
+│                                            variants (inference_validation,
+│                                            cross_validation alternatives, etc.)
+│
+├─ data_processors/             🟡 17/51   ← aggregation calculators
+│  │                                          Active core: timebins, severity,
+│  │                                          aggregate-clf counts (a subset).
+│  ├─ cuda/                                 ← 💀 0/6  CUDA-accelerated variants
+│  │                                          (kalman_smoother, etc.) — orphan;
+│  │                                          no Qt route imports them.
+│  └─ … (34 more legacy SimBA backends — orphan; reached only via deleted SimBA.py)
+│
+├─ roi_tools/                   🟡 11/21   ← shapely-based ROI engine
+│                                            roi_utils.py (122d9/122da fixes),
+│                                            roi_logic.py, statistics.
+│
+├─ video_processors/            🟡 10/17   ← ffmpeg / cv2 video transforms
+│                                            video_processing.py: extract_frames
+│                                            (122db v1-routed), reverse, downsample.
+│
+└─ plotting/                    ⚪ 9/53    ← matplotlib / pyplot / opencv backends
+                                              Most are legacy SimBA backends that
+                                              the deleted Tk surface called.
+                                              Active set: ~9 used by the Qt
+                                              visualizations route table.
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  SUPPORT MODULES  (utility-grade; shared infrastructure)                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+│
+mufasa/
+│
+├─ mixins/                      🟢 11/14   ← base classes for everything pipeline
+│  ├─ config_reader.py             ★ ConfigReader: layout-aware project paths
+│  │                                  for both v1 and legacy. Used by virtually
+│  │                                  every backend class.
+│  ├─ feature_extraction_mixin.py  ← shared feature calc helpers
+│  ├─ statistics_mixin.py          ← bout calcs, classifier metrics
+│  ├─ plotting_mixin.py            ← shared plot helpers
+│  ├─ image_mixin.py               ← OpenCV frame I/O (find_first_non_uniform_clr)
+│  ├─ pose_importer_mixin.py       ← shared importer helpers
+│  ├─ train_model_mixin.py         ← classifier training scaffolding
+│  ├─ geometry_mixin.py            ← shapely ROI math
+│  ├─ timeseries_features_mixin.py
+│  ├─ circular_statistics.py
+│  ├─ network_mixin.py             ⚪ kept as library-API building block
+│  │                                  (zero internal callers — see 122dd)
+│  └─ feature_extraction_supplement_mixin.py
+│
+└─ utils/                       🟢 18/21   ← cross-cutting helpers
+   ├─ checks.py                     ← validation helpers (check_float, …)
+   ├─ enums.py                      ← Paths, ConfigKey, ROI_SETTINGS, …
+   ├─ errors.py                     ← typed exception hierarchy
+   ├─ data.py                       ← color palettes, ranked-color picks
+   ├─ read_write.py                 ← get_video_meta_data, file I/O
+   ├─ confirm.py                    ← UI-agnostic confirm_two_option
+   │                                    (122dd/de: stdin default; Qt override
+   │                                     installed at workbench startup)
+   ├─ project_reconfigure.py        ← legacy bp_names rewriter
+   ├─ toml_to_configparser.py       ← v1→legacy translator
+   └─ … (small misc helpers)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  STANDALONE CLI TOOLS  (python -m mufasa.tools.<name>; not in workbench)    │
+└──────────────────────────────────────────────────────────────────────────────┘
+│
+mufasa/
+├─ cli/                         🟡 2/3
+│  ├─ workbench_launcher.py     ★ console-script entry: `mufasa`
+│  └─ migrate_project.py        ★ console-form entry: `python -m … migrate_project`
+│
+└─ tools/                       🟢 5/5     ← each invokable as `python -m …`
+   ├─ csv_to_dlc.py                 ← convert pose CSVs to DLC format
+   ├─ csv_to_parquet.py             ← legacy CSV tree → parquet
+   ├─ pose_video_overlay.py         ← render pose on video
+   └─ pose_viewer.py                ← quick pose visualizer
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  DATA / CONFIG  (not really code; counted as .py but data/template-shaped)   │
+└──────────────────────────────────────────────────────────────────────────────┘
+│
+mufasa/
+├─ assets/                      📦 0/10    ← PNG, CSS, fonts, icons, lookup CSVs
+│                                            Plus __init__.py stubs (10 total
+│                                            "Python files" but no real code).
+│
+├─ pose_configurations/         📦 0/4     ← bp_names / configuration_names /
+│                                            no_animals / schematics templates.
+│                                            Data tree consumed by legacy
+│                                            pose-config code.
+│
+└─ _native/                     🟢 1/1     ← native extensions (compiled C code
+                                              shim; one Python wrapper).
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  DORMANT CLUSTERS  (legacy SimBA-only; not reachable from current entries)  │
+└──────────────────────────────────────────────────────────────────────────────┘
+│
+│  These clusters were reached only through SimBA.py + the Tk launcher, both of
+│  which were deleted in patches 122d4/d5/d6. They survive in the tree because
+│  out-of-tree code may import them; deletion is a separate decision.
+│
+mufasa/
+├─ bounding_box_tools/          💀 0/6     ← shapely bbox engine (legacy-only;
+│                                            confirmed by 122db audit). No Qt
+│                                            route imports any of these.
+│
+├─ cue_light_tools/             💀 2/6     ← cue-light experiment workflow
+│                                            (Tk-only UI; deleted in 122ck).
+│                                            2 backends marginally referenced.
+│
+└─ third_party_label_appenders/ ⚪ 7/42    ← annotation-format importers
+                                              (~35 legacy formats not wired into
+                                              the Qt workbench). The active 7
+                                              are reached via current data-import
+                                              routes.
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  KEY CROSS-CLUSTER RELATIONSHIPS  (the load-bearing arrows)                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Workbench startup
+  -----------------
+  ui_qt/workbench_app.py
+    → ui_qt/qt_confirm.py    (installs Qt confirm override; patch 122cj)
+    → ui_qt/recent_project.py
+    → ui_qt/operations.py    (build sidebar)
+    → ui_qt/pages/*          (mount per-workflow pages)
+
+  Pages → Forms (one-to-many)
+  ---------------------------
+  ui_qt/pages/X_page.py
+    → ui_qt/forms/X_form_1.py    \
+    → ui_qt/forms/X_form_2.py     >  each form is one operation
+    → ui_qt/forms/X_form_3.py    /
+
+  Form → Backend (collect args → run_with_progress → backend.target)
+  -----------------------------------------------------------------
+  ui_qt/forms/X.py
+    .collect_args()
+    .target(config_path=…, kwargs=…)
+      → mufasa.project_layout.project_paths_from_config(config_path)
+      → mufasa.mixins.config_reader.ConfigReader(config_path=…)
+      → <backend cluster>.<class>(...).run()
+
+  Per-cluster backend hop (sample chain — outlier correction)
+  -----------------------------------------------------------
+  ui_qt/forms/pose_cleanup.py
+    → outlier_tools/outlier_corrector_movement.py
+       → mixins/config_reader.py   (resolve dirs)
+       → mixins/feature_extraction_mixin.py (distance helpers)
+       → utils/checks.py           (validation)
+
+  Visualization route resolution (122dc)
+  --------------------------------------
+  ui_qt/forms/visualizations.py
+    .target(route, config_path, …)
+      → _resolve_viz_source_dir(config_path, project_root, source_name)
+         → _VIZ_SOURCE_V1_MAP[source_name]   (v1 path)
+         → or <project_root>/csv/<source_name>/   (legacy path)
+      → plotting/<backend>.py.<class>(data_paths=…).run()
+
+  ROI Apply-all v1 path (122d9 / 122da fixes)
+  -------------------------------------------
+  ui_qt/dialogs/roi_video_table.py
+    → roi_tools/roi_utils.py
+       multiply_ROIs() / reset_video_ROIs()
+         → project_layout.project_paths_from_config(config_path)
+            ["video_dir", "roi_definitions_path"]
+
+  Frame extraction v1 path (122db fix)
+  ------------------------------------
+  ui_qt/forms/video_processing.py
+    → video_processors/video_processing.py
+       extract_frames_from_all_videos_in_directory(config_path, …)
+         → project_paths_from_config(config_path)["project_root"]
+         → branch by .endswith(".toml") →
+              v1:     <root>/derived/frames/extracted/<video>/
+              legacy: <root>/frames/input/<video>/
+
+  Migration tool
+  --------------
+  cli/migrate_project.py  (python -m invocation; not console-script)
+    → legacy_layout.LEGACY_TO_V1_MAPPING (the move table)
+    → project_layout.write_project_toml (emit the v1 project.toml)
+    → project_layout.detect_layout (idempotence guard)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  TOTALS                                                                      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+  Total .py files:                            416
+  Reachable from main entry points:           196   (47%)
+  Reachable + standalone tools/:              201   (48%)
+  Imported by anything in the codebase:       236   (57%)
+  Truly orphan (importable but unimported):   180   (43%)
+
+  Of the 180 orphans, ~120 are concentrated in 5 clusters:
+    plotting/ (44 orphans) — most legacy backends
+    data_processors/ (34 orphans) — legacy SimBA calculators
+    third_party_label_appenders/ (35 orphans) — unwired importers
+    pose_importers/ (15 orphans) — unwired importers
+    model/ (15 orphans) — alternate validation paths
