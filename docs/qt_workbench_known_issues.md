@@ -5,7 +5,7 @@
 | ID | Severity | Status | Component |
 |---|---|---|---|
 | QWI-1 | High | Open | ROI: Apply-all fails on v1 projects |
-| QWI-2 | Medium | Open | Features: destination label shows raw HTML markup |
+| QWI-2 | Medium | ✓ Fixed 122d8 | Features: destination label shows raw HTML markup |
 | QWI-3 | Medium | ✓ Fixed 122d7 | Features: max_workers=0 crash on empty project |
 | QWI-4 | Medium | ✓ Fixed 122d0 | Workbench: page ordering (Annotation before Classifier) |
 
@@ -50,44 +50,35 @@ The error message wording — "SimBA expected" — is also stale; should be "Muf
 
 ---
 
-## QWI-2 — Features: destination label shows raw HTML markup
+## QWI-2 — Features: destination label shows raw HTML markup — ✓ Fixed 122d8
 
-**Reproduce:** Qt workbench → Features → Compute feature subsets → look at the "Destination" radio buttons.
+**Reproduce (pre-fix):** Qt workbench → Features → Compute feature subsets → look at the "Destination" radio buttons.
 
-**Symptom:** The "Write per-family parquet to ..." radio button renders as raw text:
+**Symptom (pre-fix):** The "Write per-family parquet to ..." radio button rendered as raw text:
 
 ```
 Write per-family parquet to <code>derived/features/<lt;familygt;/<lt;videogt;.parquet</code> <i>(recommended, v1-native)</i>
 ```
 
-The `<code>`, `<i>`, and entity-encoded `&lt;` / `&gt;` are visible as literal characters instead of being rendered as styled text.
+The `<code>`, `<i>`, and entity-encoded `&lt;` / `&gt;` were visible as literal characters.
 
-**Root cause:** `mufasa/ui_qt/forms/features.py:198-201` (and similar lines):
+**Root cause:** `mufasa/ui_qt/forms/features.py:198-202` used HTML markup inside a `QRadioButton`. `QRadioButton.text` inherits from `QAbstractButton` and supports **plain text only** — no `setTextFormat(Qt.RichText)` toggle exists.
+
+Investigation note: the other HTML uses in this file (lines 132, 157, 188, 282, 294, 487-509) are inside `QLabel` instances, which DO auto-detect HTML by default (`TextFormat.AutoText`). Those render correctly. Only line 198 was broken — the single QRadioButton offender.
+
+**Fix landed in 122d8:** stripped the HTML markup; used curly braces (familiar from `str.format` syntax) as placeholder visualisation instead of angle brackets that look HTML-y:
 
 ```python
-QLabel(
-    "<code>derived/features/&lt;family&gt;/&lt;video&gt;.parquet</code>"
-    " <i>(recommended, v1-native)</i>", self,
+self.dest_derived_parquet = QRadioButton(
+    "Write per-family parquet to "
+    "derived/features/{family}/{video}.parquet "
+    "(recommended, v1-native)", self,
 )
 ```
 
-The string contains HTML markup, but the widget is likely a `QRadioButton` (not a `QLabel`), and `QRadioButton.text` is plain-text-only by default. Or it's a `QLabel` whose parent layout-context overrides the text format.
+The italics (`<i>(recommended, v1-native)</i>`) couldn't be preserved without restructuring to a QLabel-next-to-radio-button layout. Cost-vs-benefit: italics aren't load-bearing for a "recommended" tag; plain parentheses convey the same meaning. Left as plain text.
 
-Other affected lines in the same file: 95, 96, 188, 200, 201, 283, 294, 468.
-
-**Recommended fix:**
-
-Option A — Strip the HTML markup (simpler):
-* Replace `<code>...</code>` and `<i>...</i>` with plain text.
-* Use Unicode replacements where needed (`«family»`, `〈video〉`, etc.) or simply spell things out.
-
-Option B — Force rich-text rendering:
-* For each affected widget, call `setTextFormat(Qt.RichText)`.
-* But this only works for `QLabel` — `QRadioButton.text` doesn't support rich text. Would need to either wrap in a `QLabel` next to the radio button, or use a different widget tree.
-
-Option A is the pragmatic fix; Option B is structurally cleaner but more code-churn.
-
-**Severity rationale:** Cosmetic but visible on a primary workflow page. Confuses users about what the actual path format is. Medium.
+**Severity rationale:** Cosmetic but visible on a primary workflow page. Pre-fix confused users about what the actual path format was. Fix is 4 lines, no UI restructuring needed.
 
 ---
 
