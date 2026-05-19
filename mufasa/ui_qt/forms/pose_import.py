@@ -16,19 +16,25 @@ The branching is delegated to
 underlying ``mufasa.pose_importers.*`` backends; the form itself
 doesn't need to know which layout is active.
 
-As of patch 122dh, seven routes are wired:
+As of patch 122di, nine routes are wired:
 
+Step 1 (patch 122dh) — most-used 2D pose trackers:
 * DLC H5 / CSV (single animal)
 * DLC H5 (multi-animal / maDLC)
 * SLEAP CSV / H5 / .slp
 * SuperAnimal-TopView
 
-The dormant importers (FaceMap, MARS, TRK, YOLO-pose, DANNCE, SimBA
-blob) can be wired with the same declarative route pattern when their
+Step 2 (patch 122di) — speed-prioritized + Caltech-MARS community:
+* YOLO-pose
+* MARS (two-mouse social)
+
+The dormant importers (FaceMap, TRK, DANNCE, SimBA blob) can be
+wired with the same declarative route pattern when their
 communities call for them. **3D marker trajectory data** (Vicon /
 mocap / AniPose 3D / DANNCE) is a separate concern — needs a
 different ingestion path since the data is already-tracked 3D
-coordinates rather than 2D-pose-from-video; see the project roadmap.
+coordinates rather than 2D-pose-from-video; see the project
+roadmap.
 
 Requires an open project (``config_path``). If no project is loaded
 the form disables itself with a hint pointing at File → New /
@@ -167,6 +173,47 @@ POSE_IMPORT_ROUTES: dict = {
         accepts_p_threshold=False,
         source_hint=("Directory containing SuperAnimal-TopView "
                      "inference output"),
+    ),
+    # Patch 122di — pose-importers step 2.
+    "YOLO-pose": dict(
+        backend=_lazy("mufasa.pose_importers.simba_yolo_importer",
+                      "SimBAYoloImporter"),
+        # YOLO importer takes `data_dir` rather than `data_folder`.
+        kwargs_map={"source_path": "data_dir"},
+        requires_animal_ids=False,
+        accepts_p_threshold=False,
+        source_hint=("Directory containing YOLO-pose inference "
+                     "results"),
+    ),
+    "MARS (two-mouse social)": dict(
+        backend=_lazy("mufasa.pose_importers.import_mars",
+                      "MarsImporter"),
+        # MARS uses `data_path` (accepts directory OR single .json
+        # file; the form validates directory only, which is fine —
+        # MARS's directory branch globs for .json inside it).
+        kwargs_map={"source_path": "data_path"},
+        requires_animal_ids=False,
+        accepts_p_threshold=False,
+        # MARS requires interpolation_method + smoothing_method as
+        # positional args (no defaults — unlike DLC/SLEAP where
+        # they're optional). The form's policy is to NOT expose
+        # interp/smoothing at import time (run on the Preprocessing
+        # page instead). Pass sentinel "no-op" values so the
+        # backend instantiates cleanly. Specifically:
+        #
+        # - interpolation_method="None" — Interpolate.fix_missing_values
+        #   treats this as a skip.
+        # - smoothing_method={"Method": "None", "Parameters": {}} —
+        #   MARS's __run_smoothing branches on the Method value
+        #   (Gaussian / Savitzky Golay); "None" matches neither and
+        #   falls through without smoothing.
+        extra_backend_kwargs={
+            "interpolation_method": "None",
+            "smoothing_method": {"Method": "None",
+                                 "Parameters": {}},
+        },
+        source_hint=("Directory containing MARS JSON pose-detection "
+                     "output (one .json per video)"),
     ),
 }
 

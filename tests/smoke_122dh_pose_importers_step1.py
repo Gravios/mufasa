@@ -101,12 +101,15 @@ def main() -> int:
     src = pose_form.read_text()
     tree = ast.parse(src)
 
-    # 1. Route count = 7
+    # 1. Route count ≥ 7 (snapshot-resilient — later patches add
+    # more routes; this test only cares about the step-1 set.
+    # See smoke_122di for the YOLO + MARS additions in step 2.)
     route_labels = re.findall(r'^    "([^"]+)":\s*dict\(',
                                src, re.MULTILINE)
     check(
-        f"POSE_IMPORT_ROUTES has 7 entries (got {len(route_labels)})",
-        len(route_labels) == 7,
+        f"POSE_IMPORT_ROUTES has at least 7 entries from step 1 "
+        f"(got {len(route_labels)})",
+        len(route_labels) >= 7,
     )
 
     # 2. Each expected label present
@@ -277,13 +280,17 @@ def main() -> int:
                 or 'km.get("config_path"' in target_src,
             )
 
-    # 12. Module docstring updated
+    # 12. Module docstring mentions the step-1 trackers + 3D as
+    # future scope. Snapshot-resilient — later patches may rephrase
+    # the route count (122di moves to nine, etc.); the spirit of
+    # the check is "Step 1 + 3D-future-scope are documented."
     docstring = ast.get_docstring(tree)
     check(
-        "Module docstring lists 7 trackers + mentions 3D as "
-        "future scope",
+        "Module docstring documents step-1 trackers (DLC, SLEAP, "
+        "SuperAnimal) + 3D as future scope",
         docstring is not None
-        and "seven routes" in docstring.lower()
+        and "SLEAP" in docstring
+        and "SuperAnimal" in docstring
         and "3D" in docstring,
     )
 
