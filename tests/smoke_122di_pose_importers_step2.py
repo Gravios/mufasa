@@ -73,13 +73,15 @@ def main() -> int:
     src = pose_form.read_text()
     tree = ast.parse(src)
 
-    # 1. Route count = 9
+    # 1. Route count ≥ 9 (snapshot-resilient — later patches add
+    # more routes; this test only cares about the step-2 set.
+    # See smoke_122dj for the TRK + FaceMap additions in step 3.)
     labels = re.findall(r'^    "([^"]+)":\s*dict\(',
                          src, re.MULTILINE)
     check(
-        f"POSE_IMPORT_ROUTES has 9 entries "
-        f"(7 from step 1 + 2 new; got {len(labels)})",
-        len(labels) == 9,
+        f"POSE_IMPORT_ROUTES has at least 9 entries from steps "
+        f"1+2 (got {len(labels)})",
+        len(labels) >= 9,
     )
 
     # Find the POSE_IMPORT_ROUTES dict node
@@ -176,15 +178,18 @@ def main() -> int:
             smoothing_has_method_key,
         )
 
-    # 9. Docstring mentions 9 routes + step 1/2 + 3D
+    # 9. Docstring documents step 2 trackers + 3D scope.
+    # Snapshot-resilient — later patches may rephrase the route
+    # count (122dj moves to eleven, etc.); the spirit of the check
+    # is "step 2 + 3D-future-scope are documented."
     docstring = ast.get_docstring(tree)
     check(
-        "Docstring lists 9 routes split by step 1/2 + 3D as "
-        "future scope",
+        "Docstring documents step 2 trackers (YOLO + MARS) + "
+        "3D as future scope",
         docstring is not None
-        and "nine routes" in docstring.lower()
-        and "Step 1" in docstring
         and "Step 2" in docstring
+        and "YOLO" in docstring
+        and "MARS" in docstring
         and "3D" in docstring,
     )
 

@@ -16,7 +16,7 @@ The branching is delegated to
 underlying ``mufasa.pose_importers.*`` backends; the form itself
 doesn't need to know which layout is active.
 
-As of patch 122di, nine routes are wired:
+As of patch 122dj, eleven routes are wired:
 
 Step 1 (patch 122dh) — most-used 2D pose trackers:
 * DLC H5 / CSV (single animal)
@@ -28,13 +28,16 @@ Step 2 (patch 122di) — speed-prioritized + Caltech-MARS community:
 * YOLO-pose
 * MARS (two-mouse social)
 
-The dormant importers (FaceMap, TRK, DANNCE, SimBA blob) can be
-wired with the same declarative route pattern when their
-communities call for them. **3D marker trajectory data** (Vicon /
-mocap / AniPose 3D / DANNCE) is a separate concern — needs a
-different ingestion path since the data is already-tracked 3D
-coordinates rather than 2D-pose-from-video; see the project
-roadmap.
+Step 3 (patch 122dj) — Janelia / face-tracking community:
+* TRK (Animal Part Tracker)
+* FaceMap (face / whisker / pupil)
+
+The remaining importers (DANNCE, SimBA blob) are deferred — DANNCE
+is partly subsumed by the carved-out 3D-marker scope and has a
+smaller user base; SimBA blob is contour-based legacy. **3D marker
+trajectory data** (Vicon / mocap / AniPose 3D / DANNCE) is a
+separate concern — needs a different ingestion path since the data
+is already-tracked 3D coordinates rather than 2D-pose-from-video.
 
 Requires an open project (``config_path``). If no project is loaded
 the form disables itself with a hint pointing at File → New /
@@ -214,6 +217,42 @@ POSE_IMPORT_ROUTES: dict = {
         },
         source_hint=("Directory containing MARS JSON pose-detection "
                      "output (one .json per video)"),
+    ),
+    # Patch 122dj — pose-importers step 3.
+    "TRK (Animal Part Tracker)": dict(
+        backend=_lazy("mufasa.pose_importers.trk_importer",
+                      "TRKImporter"),
+        # TRK uses `data_path` (vs `data_folder`) AND
+        # `animal_id_lst` (vs the typical `id_lst` from SLEAP /
+        # maDLC). Two kwargs_map renames required.
+        kwargs_map={"source_path": "data_path",
+                    "animal_ids": "animal_id_lst"},
+        requires_animal_ids=True,
+        accepts_p_threshold=False,
+        # TRK requires interpolation_method + smoothing_settings as
+        # positional dict args (no defaults). Same sentinel pattern
+        # as MARS — the form's policy is "no preprocessing at
+        # import time; run on the Preprocessing page". Empty dict
+        # for smoothing_settings since TRK reads it as a dict but
+        # has no schema expectations beyond that.
+        extra_backend_kwargs={
+            "interpolation_method": "None",
+            "smoothing_settings": {},
+        },
+        source_hint=("Directory containing .trk files (Animal Part "
+                     "Tracker output)"),
+    ),
+    "FaceMap (face / whisker / pupil)": dict(
+        backend=_lazy("mufasa.pose_importers.facemap_h5_importer",
+                      "FaceMapImporter"),
+        # FaceMap uses `data_path` (vs `data_folder`); single-face
+        # so no animal IDs. All preprocessing args are optional
+        # with sane defaults — no extra_backend_kwargs needed.
+        kwargs_map={"source_path": "data_path"},
+        requires_animal_ids=False,
+        accepts_p_threshold=False,
+        source_hint=("Directory containing FaceMap .h5 inference "
+                     "output (pupil, whisker, face keypoints)"),
     ),
 }
 
@@ -422,16 +461,20 @@ class PoseImportForm(OperationForm):
         km = route["kwargs_map"]
         # Build the canonical kwargs dict; the kwargs_map can rename
         # any of these keys onto the backend's expected name.
-        # config_path → backend's project_path for sleap_slp only.
+        # - config_path → backend's project_path for sleap_slp.
+        # - animal_ids → backend's animal_id_lst for TRK (patch
+        #   122dj). Defaults to id_lst (SLEAP / maDLC convention).
         config_kwarg = km.get("config_path", "config_path")
         source_kwarg = km.get("source_path", "data_folder")
+        animal_ids_kwarg = km.get("animal_ids", "id_lst")
         kwargs = {
-            config_kwarg: config_path,
-            source_kwarg: source_path,
-            "p_threshold": p_threshold,
-            "id_lst":      animal_ids,
+            config_kwarg:     config_path,
+            source_kwarg:     source_path,
+            "p_threshold":    p_threshold,
+            animal_ids_kwarg: animal_ids,
         }
-        # Tracker-specific fixed kwargs (e.g., maDLC's file_type="h5").
+        # Tracker-specific fixed kwargs (e.g., maDLC's file_type="h5";
+        # MARS / TRK sentinel preprocessing args).
         kwargs.update(route.get("extra_backend_kwargs", {}))
         # Defensive filter — drops kwargs the backend doesn't accept.
         # DLC single-animal backends don't accept id_lst; SLEAP /
