@@ -325,6 +325,110 @@ def _lazy_factory(modpath: str, classname: str) -> Callable[..., Any]:
     return _factory
 
 
+# =========================================================================== #
+# Layout-aware viz source-dir resolution (patch 122dc)
+# =========================================================================== #
+# Each visualisation route declares `data_paths_source` (plural) or
+# `data_path_source` (singular) as a string naming the pipeline
+# stage that produces its input files. Pre-122dc, this string was
+# joined unconditionally as `<project_root>/csv/<name>/`, which is
+# the legacy SimBA layout. v1 projects don't have a `csv/` tree;
+# their per-stage data lives under `derived/<stage>/` (typically
+# with run-id subdirs).
+#
+# `_resolve_viz_source_dir` maps each route source name to the
+# right v1 directory under `derived/`. The run-id subdir resolution
+# (latest-run-or-parent) matches ConfigReader's behaviour in
+# `_apply_v1_path_overrides`: if the parent has run-id subdirs,
+# return the newest one; otherwise return the parent itself.
+#
+# Adding a new route source: extend `_VIZ_SOURCE_V1_MAP` below.
+# If a route source name doesn't appear in the map, the helper
+# falls back to `derived/<name>/` — a best-effort guess that may
+# or may not match where the v1 stage actually writes. The caller
+# `target()` raises a clear "not a directory" error in that case,
+# so the symptom is loud rather than silent-wrong.
+
+_VIZ_SOURCE_V1_MAP: dict = {
+    # Route source name → v1 subpath under <root>/.
+    # Matches ConfigReader._apply_v1_path_overrides assignments
+    # so visualisations see the same dirs as the rest of the code.
+    "machine_results": ("derived", "classifications"),
+    "outlier_corrected_movement_location":
+        ("derived", "outlier_corrected"),
+    "outlier_corrected_movement":
+        ("derived", "outlier_corrected"),  # alias used by some routes
+    "features_extracted": ("derived", "features"),
+    "directing_data": ("derived", "directionality"),
+    # input_csv routes (raw pose) — v1 has these at sources/pose
+    "input_csv": ("sources", "pose"),
+    # targets_inserted (labels) — v1 puts at derived/labels
+    "targets_inserted": ("derived", "labels"),
+}
+
+
+def _resolve_viz_source_dir(*, config_path: str,
+                            project_root, source_name: str):
+    """Layout-aware resolver for a viz route's data source dir.
+
+    Parameters
+    ----------
+    config_path : str
+        Project config path; used to detect layout. Anything
+        ending `.toml` (case-insensitive) is v1; else legacy.
+    project_root : Path
+        Project root for the active layout. From
+        `project_paths_from_config(config_path)["project_root"]`.
+    source_name : str
+        Value of the route's `data_paths_source` or
+        `data_path_source` attribute (e.g. "machine_results").
+
+    Returns
+    -------
+    pathlib.Path
+        Resolved source directory. For v1 projects with run-id
+        subdirs, returns the latest run's directory; for stages
+        without run subdirs, returns the parent stage directory.
+        For legacy projects, returns `<root>/csv/<source_name>/`.
+    """
+    from pathlib import Path as _P
+    from mufasa.project_layout import is_run_id
+
+    is_v1 = str(config_path).lower().endswith(".toml")
+    project_root = _P(project_root)
+
+    if not is_v1:
+        return project_root / "csv" / source_name
+
+    # v1 mapping
+    if source_name in _VIZ_SOURCE_V1_MAP:
+        parts = _VIZ_SOURCE_V1_MAP[source_name]
+    else:
+        # Best-effort fallback: derived/<name>/. If the caller
+        # passes a source name not in the map AND that's wrong,
+        # the downstream "data source directory not found" error
+        # will be loud and recoverable.
+        parts = ("derived", source_name)
+
+    stage_parent = project_root.joinpath(*parts)
+    # Latest-run-or-parent (matches ConfigReader's logic). If the
+    # stage_parent has run-id subdirs, return the newest; otherwise
+    # return stage_parent itself (some v1 outputs are written flat,
+    # e.g. derived/classifications/<video>.parquet without a run
+    # subdir per 122ax's flat-classifier-output decision).
+    if stage_parent.is_dir():
+        try:
+            runs = sorted(
+                d for d in stage_parent.iterdir()
+                if d.is_dir() and is_run_id(d.name)
+            )
+        except OSError:
+            runs = []
+        if runs:
+            return runs[-1]
+    return stage_parent
+
+
 @dataclass
 class _VizRoute:
     """Declaration of a single visualisation route.
@@ -1207,12 +1311,16 @@ class VisualizationForm(OperationForm):
         # synthesise themselves; declaring data_paths_source on the
         # route lets us fill this in without a picker widget.
         #
-        # Patch 122f: layout-agnostic project resolution. For v1
-        # projects the legacy ``csv/<subdir>`` composition won't
-        # resolve to a real directory (v1 has no top-level ``csv/``)
-        # — the form raises a clear "data source directory not
-        # found" error in that case, surfaced the same way as a
-        # missing-pipeline-output error in legacy.
+        # Patch 122f: layout-agnostic project resolution.
+        # Patch 122dc: layout-agnostic SOURCE DIR resolution too.
+        # Pre-122dc, the source dir was unconditionally
+        # `<root>/csv/<subdir>` — works for legacy SimBA, but v1
+        # projects have no top-level `csv/` so EVERY route that
+        # declared `data_paths_source` raised a "data source not
+        # found" error. _resolve_viz_source_dir maps the route's
+        # source name to the right v1 directory under
+        # `derived/` (with latest-run selection matching
+        # ConfigReader's _latest_run_or_parent behaviour).
         if route.data_paths_source or route.data_path_source:
             if not config_path:
                 raise RuntimeError(
@@ -1230,7 +1338,11 @@ class VisualizationForm(OperationForm):
             proj = paths["project_root"]
             file_type = meta["file_type"]
             subdir = route.data_paths_source or route.data_path_source
-            src_dir = _P(proj) / "csv" / subdir
+            src_dir = _resolve_viz_source_dir(
+                config_path=config_path,
+                project_root=_P(proj),
+                source_name=subdir,
+            )
             if not src_dir.is_dir():
                 raise RuntimeError(
                     f"{route.label!r}: data source directory not found: "
