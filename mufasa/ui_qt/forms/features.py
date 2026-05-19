@@ -443,6 +443,25 @@ class FeatureSubsetExtractorForm(OperationForm):
             finally:
                 QGuiApplication.restoreOverrideCursor()
 
+            # Patch 122d7 (QWI-3): empty-project sentinel from
+            # _run_preflight → surface a clear "no eligible
+            # videos" message and exit cleanly. Without this the
+            # user would either crash (pre-122d7 backend) or see
+            # a misleading "Done." dialog (post-122d7 backend
+            # short-circuit but silent in the UI).
+            if conflicts is None:
+                QMessageBox.warning(
+                    self, self.title,
+                    "No eligible videos in this project.\n\n"
+                    "Feature extraction needs outlier-corrected "
+                    "pose data. Make sure the project has imported "
+                    "videos and run the outlier-correction step "
+                    "(or 'Skip outlier correction' on the "
+                    "Preprocessing page) before running feature "
+                    "extraction.",
+                )
+                return
+
             if conflicts:
                 # Categorize conflicts: file-exists in save_dir vs
                 # column collisions in append destinations. Different
@@ -520,10 +539,15 @@ class FeatureSubsetExtractorForm(OperationForm):
             ),
         )
 
-    def _run_preflight(self, kwargs: dict) -> dict:
+    def _run_preflight(self, kwargs: dict) -> Optional[dict]:
         """Build a FeatureSubsetsCalculator and call its preflight
         check. Lives in the form so the UI can prompt before
-        target() (which dispatches into a worker) is invoked."""
+        target() (which dispatches into a worker) is invoked.
+
+        Returns the conflicts dict on success, or `None` if the
+        project has zero eligible videos — the caller surfaces a
+        friendly empty-state message in that case (122d7 / QWI-3).
+        """
         from mufasa.feature_extractors.feature_subsets import (
             FeatureSubsetsCalculator,
         )
@@ -537,6 +561,12 @@ class FeatureSubsetExtractorForm(OperationForm):
             n_workers=kwargs["n_workers"],
             overwrite_existing=False,  # preflight runs in non-overwrite mode
         )
+        # Patch 122d7 (QWI-3): if the project has no eligible
+        # videos, signal that to on_run so it can show a clear
+        # message instead of going through the run-with-progress
+        # dance for a zero-iteration loop.
+        if not calc.data_paths:
+            return None
         return calc.preflight_check()
 
     def target(self, *, config_path: str, feature_families: list[str],

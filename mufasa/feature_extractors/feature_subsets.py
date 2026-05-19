@@ -641,7 +641,24 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         n_videos = len(self.data_paths)
-        n_workers = min(self.n_workers, n_videos)
+        if n_videos == 0:
+            # Patch 122d7 (QWI-3): without this short-circuit,
+            # `ProcessPoolExecutor(max_workers=0)` below would
+            # raise `ValueError: max_workers must be greater than
+            # 0`. Empty-project state (no eligible videos) is a
+            # legitimate input — common right after Data Import
+            # before any videos have been added. Return cleanly
+            # so the caller can decide what to surface.
+            print(
+                "Feature extraction: no eligible videos in this "
+                "project. Nothing to do."
+            )
+            return
+        # Belt-and-braces: clamp to ≥ 1 even though the
+        # short-circuit above should make this unreachable for the
+        # known n_videos==0 path. Defensive against future paths
+        # that might call _run_parallel with self.n_workers==0.
+        n_workers = max(1, min(self.n_workers, n_videos))
         print(
             f"Running feature extraction on {n_videos} videos "
             f"across {n_workers} workers..."
