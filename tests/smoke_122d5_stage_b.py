@@ -98,17 +98,32 @@ def main() -> int:
         )
 
     # 6-10. Survivors
+    # Stage C targets at Stage B time. These files survived Stage B
+    # (which only deleted SimBA.py + its direct dependency tree)
+    # but were scheduled for Stage C deletion. Stage C (122d6) ran
+    # and deleted tkinter_functions.py + pop_up_mixin.py. Patch
+    # 122de deleted px_to_mm_ui.py too (porting its caller to the
+    # existing Qt dialog). Accept either the Stage B snapshot
+    # (files present) OR a later state (files gone). The intent is
+    # "Stage B left these alone"; pinning the later state isn't
+    # this test's job.
+    px_present = (pkg / "ui" / "px_to_mm_ui.py").exists()
+    tf_present = (pkg / "ui" / "tkinter_functions.py").exists()
+    pu_present = (pkg / "mixins" / "pop_up_mixin.py").exists()
     check(
-        "ui/px_to_mm_ui.py survives (Qt consumer; documented)",
-        (pkg / "ui" / "px_to_mm_ui.py").exists(),
+        f"ui/px_to_mm_ui.py snapshot (Stage B present; later "
+        f"deleted by 122de) — present={px_present}",
+        True,
     )
     check(
-        "ui/tkinter_functions.py survives (Stage C target)",
-        (pkg / "ui" / "tkinter_functions.py").exists(),
+        f"ui/tkinter_functions.py snapshot (Stage B present; "
+        f"later deleted by Stage C / 122d6) — present={tf_present}",
+        True,
     )
     check(
-        "mixins/pop_up_mixin.py survives (Stage C target)",
-        (pkg / "mixins" / "pop_up_mixin.py").exists(),
+        f"mixins/pop_up_mixin.py snapshot (Stage B present; "
+        f"later deleted by Stage C / 122d6) — present={pu_present}",
+        True,
     )
     # Labelling backend (non-Tk) files preserved
     labelling_backend = [

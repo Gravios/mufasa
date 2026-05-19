@@ -10,10 +10,12 @@ Small inline forms for single-utility video operations.
   one or many videos. Replaces :class:`ChangeSpeedPopup`.
 * :class:`PixelsPerMMForm` — interactive pixel-to-millimetre
   calibration. Replaces :class:`CalculatePixelsPerMMInVideoPopUp`.
-  The calibration UI itself is the legacy
-  :class:`GetPixelsPerMillimeterInterface`, an OpenCV-window
-  click-to-pick affair — this form just orchestrates the
-  inputs (video path + known distance) and reports the result.
+  Patch 122de routed the calibration UI to the Qt-native
+  :class:`mufasa.ui_qt.dialogs.pixel_calibration.PixelCalibrationDialog`
+  (was previously launching the cv2-based
+  ``mufasa.ui.px_to_mm_ui.GetPixelsPerMillimeterInterface``).
+  This form orchestrates the inputs (video path + known
+  distance) and reports the result.
 * :class:`CheckVideoSeekableForm` — verify that frame seeks work
   correctly on a video or directory of videos. Replaces
   :class:`CheckVideoSeekablePopUp` (patch 122bx).
@@ -28,10 +30,11 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QFormLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QMessageBox,
-                               QPushButton, QSpinBox)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog,
+                               QDoubleSpinBox, QFileDialog,
+                               QFormLayout, QHBoxLayout, QLabel,
+                               QLineEdit, QMessageBox, QPushButton,
+                               QSpinBox)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm
@@ -235,16 +238,19 @@ class PixelsPerMMForm(OperationForm):
     """Calibrate pixels-per-millimetre by clicking two points of
     known real-world distance.
 
-    Replaces :class:`CalculatePixelsPerMMInVideoPopUp`. The
-    calibration UI itself is the legacy
-    :class:`mufasa.ui.px_to_mm_ui.GetPixelsPerMillimeterInterface`,
-    an OpenCV-window click-to-pick affair. This form supplies its
-    inputs and reports the resulting ratio.
+    Replaces :class:`CalculatePixelsPerMMInVideoPopUp`. Patch 122de
+    ports the calibration UI from the legacy cv2-window-based
+    ``mufasa.ui.px_to_mm_ui.GetPixelsPerMillimeterInterface``
+    (deleted in 122de) to the existing Qt-native
+    :class:`mufasa.ui_qt.dialogs.pixel_calibration.PixelCalibrationDialog`
+    — the same dialog that the Data Import → Video parameters
+    & calibration flow uses. Sharing the one dialog means a
+    single source of truth for calibration UX across the
+    workbench, and removes the last cv2 standalone-window
+    surface.
 
     Output is printed to stdout (matching the legacy popup's
-    behaviour) and surfaced as a QMessageBox when the OpenCV
-    window closes so the user sees the value without scanning a
-    terminal.
+    behaviour) and surfaced as a QMessageBox.
     """
 
     title = "Calculate pixels per millimetre"
@@ -277,10 +283,13 @@ class PixelsPerMMForm(OperationForm):
         self.known_mm.setSuffix(" mm")
         form.addRow("Known distance:", self.known_mm)
 
+        # Patch 122de: hint updated for the Qt-native dialog.
+        # Pre-122de this read "An OpenCV window will open" — stale
+        # now that the calibration UI is embedded.
         hint = QLabel(
-            "<i>An OpenCV window will open showing the first frame "
-            "of the video. Click two points spanning the known "
-            "distance; close the window when done.</i>",
+            "<i>A calibration dialog will open showing the first "
+            "frame of the video. Click two points spanning the "
+            "known distance, then click OK.</i>",
             self,
         )
         hint.setTextFormat(Qt.RichText)
@@ -310,20 +319,62 @@ class PixelsPerMMForm(OperationForm):
             "known_metric_mm": float(self.known_mm.value()),
         }
 
-    def target(self, *, video_path: str,
-               known_metric_mm: float) -> None:
-        # The interactive UI pops its own OpenCV window; the form
-        # blocks until the user closes it. Print + dialog the
-        # result.
-        from mufasa.ui.px_to_mm_ui import (
-            GetPixelsPerMillimeterInterface,
-        )
-        iface = GetPixelsPerMillimeterInterface(
-            video_path=video_path,
-            known_metric_mm=known_metric_mm,
-        )
-        iface.run()
-        ppm = float(iface.ppm)
+    # ------------------------------------------------------------------ #
+    # on_run override (patch 122de)
+    # ------------------------------------------------------------------ #
+    # OperationForm.on_run defaults to dispatching target() onto a
+    # worker thread via run_with_progress. That doesn't fit here —
+    # the "work" is opening a modal QDialog and waiting for the
+    # user to click points, which must happen on the GUI thread.
+    # Override on_run to: validate inputs, open the dialog directly,
+    # handle the result inline. No worker thread involved.
+    def on_run(self) -> None:  # type: ignore[override]
+        try:
+            kwargs = self.collect_args()
+        except ValueError as exc:
+            QMessageBox.warning(self, self.title, str(exc))
+            return
+        self._launch_calibration(**kwargs)
+
+    def _launch_calibration(self, *, video_path: str,
+                            known_metric_mm: float) -> None:
+        # Patch 122de: routed through the existing
+        # `PixelCalibrationDialog` (introduced for the Data Import
+        # → Video parameters & calibration path; already in use by
+        # `ui_qt/forms/video_info.py` and `pages/video_processing_page.py`).
+        # The dialog takes the same shape as the legacy cv2 widget
+        # (`video_path`, known distance → `.ppm` after Accept).
+        # Both call sites now share the one Qt dialog instead of
+        # one going through Qt and another through cv2.
+        try:
+            from mufasa.ui_qt.dialogs.pixel_calibration import (
+                PixelCalibrationDialog,
+            )
+        except ImportError as exc:
+            QMessageBox.critical(
+                self, self.title,
+                f"Calibration dialog unavailable: {exc}",
+            )
+            return
+        try:
+            dlg = PixelCalibrationDialog(
+                video_path=video_path,
+                known_mm_distance=known_metric_mm,
+                parent=self.window(),
+            )
+        except RuntimeError as exc:
+            # First-frame read failure (corrupt / missing / codec)
+            QMessageBox.critical(
+                self, self.title,
+                f"Could not load video frame: {exc}",
+            )
+            return
+        if dlg.exec() != QDialog.Accepted:
+            # User cancelled — silent return (matches the legacy
+            # cv2 ESC-with-no-clicks behaviour as far as the form
+            # is concerned).
+            return
+        ppm = float(dlg.ppm)
         name = os.path.basename(video_path)
         msg = (
             f"One (1) pixel represents {ppm:.4f} millimetres in "
@@ -332,6 +383,21 @@ class PixelsPerMMForm(OperationForm):
         print(msg)
         QMessageBox.information(
             self, "Calibration result", msg,
+        )
+
+    # The OperationForm contract still requires `target` — but the
+    # on_run override above means it's never invoked on the
+    # worker thread. Keep a no-op stub so introspection/AST checks
+    # that look for `target` still find one, and so subclasses
+    # could in principle invoke it directly.
+    def target(self, *, video_path: str,
+               known_metric_mm: float) -> None:
+        # Re-route to the GUI-thread path. Calling this on a worker
+        # thread would crash inside QDialog.exec(); only call from
+        # the GUI thread (e.g., for tests that monkey-patch
+        # PixelsPerMMDialog).
+        self._launch_calibration(
+            video_path=video_path, known_metric_mm=known_metric_mm,
         )
 
 

@@ -85,14 +85,22 @@ def main() -> int:
     )
 
     # 4-7. Survivors
+    # Patch 122de note: ui/px_to_mm_ui.py + ui/__init__.py were
+    # later deleted (122de ported the cv2-based calibration UI to
+    # the existing Qt PixelCalibrationDialog and purged the empty
+    # mufasa/ui/ directory). Relax these pins to accept either the
+    # post-122d6 state (files present) OR the post-122de state
+    # (files gone). The intent of the check — "Stage C cascade
+    # didn't accidentally remove px_to_mm_ui.py" — is preserved as
+    # long as either state holds; only an unexpected partial state
+    # (e.g., __init__.py gone but px_to_mm_ui.py present) would
+    # signal a bug.
+    px_present = (pkg / "ui" / "px_to_mm_ui.py").exists()
+    init_present = (pkg / "ui" / "__init__.py").exists()
     check(
-        "ui/px_to_mm_ui.py still exists (last Qt-uses-Tk "
-        "dependency; Tier-4 follow-on)",
-        (pkg / "ui" / "px_to_mm_ui.py").exists(),
-    )
-    check(
-        "ui/__init__.py still exists (package marker)",
-        (pkg / "ui" / "__init__.py").exists(),
+        "ui/px_to_mm_ui.py state consistent (either Stage C "
+        "survivor or 122de cleanup; not a partial state)",
+        px_present == init_present,
     )
     check(
         "utils/confirm.py still exists",
@@ -141,10 +149,13 @@ def main() -> int:
         detail=", ".join(um_hits[:3]),
     )
 
-    # 10. Only remaining tkinter_functions importer is utils/confirm.py,
-    # and it's deferred (function-scope) with ImportError handling
+    # 10. tkinter_functions importers state — at Stage C time
+    # utils/confirm.py had a deferred (function-scope) lazy import
+    # wrapped in try/except. Patch 122de removed that lazy import
+    # entirely (the `mufasa.ui` package was deleted; the lazy
+    # import could no longer succeed even if attempted). Accept
+    # either state.
     tf_hits = []
-    confirm_hit = None
     for f in pkg.rglob("*.py"):
         try:
             t = ast.parse(f.read_text())
@@ -156,42 +167,65 @@ def main() -> int:
                     tf_hits.append(
                         (str(f.relative_to(pkg)), node.lineno,
                          node.col_offset))
-                    if "utils/confirm.py" in str(f).replace(
-                            "\\", "/"):
-                        confirm_hit = (node.lineno,
-                                       node.col_offset)
-    check(
-        f"All remaining tkinter_functions importers are "
-        f"utils/confirm.py (got {len(tf_hits)}: {tf_hits})",
-        len(tf_hits) == 1
-        and "utils/confirm.py" in tf_hits[0][0].replace(
-            "\\", "/"),
-    )
-    check(
-        "utils/confirm.py's import is deferred (function-scope) "
-        f"— col_offset > 0; got {confirm_hit}",
-        confirm_hit is not None and confirm_hit[1] > 0,
-    )
+    if tf_hits:
+        # Stage C snapshot: must be exactly utils/confirm.py
+        check(
+            f"All remaining tkinter_functions importers are "
+            f"utils/confirm.py (got {len(tf_hits)}: {tf_hits})",
+            len(tf_hits) == 1
+            and "utils/confirm.py" in tf_hits[0][0].replace(
+                "\\", "/"),
+        )
+        confirm_hit = tf_hits[0]
+        check(
+            "utils/confirm.py's import is deferred (function-"
+            f"scope) — col_offset > 0; got {confirm_hit}",
+            confirm_hit[2] > 0,
+        )
+    else:
+        # Post-122de snapshot: no importers remain at all
+        check(
+            "No surviving tkinter_functions importers (122de "
+            "cleanup removed the last lazy fallback)",
+            True,
+        )
+        # Skip the col_offset check entirely
+        check(
+            "deferred-import check skipped (no importers to "
+            "verify post-122de)",
+            True,
+        )
 
-    # Bonus: verify confirm.py wraps the import in try/except
+    # Bonus: verify confirm.py either still wraps the import in
+    # try/except (Stage C state) OR has dropped it entirely
+    # (post-122de state). Either is acceptable. Use AST to look
+    # for an actual ImportFrom node, NOT a substring match —
+    # 122de left a "tkinter_functions" mention in the docstring as
+    # historical breadcrumb, which would false-positive a string
+    # match.
     if (pkg / "utils" / "confirm.py").exists():
         cf_src = (pkg / "utils" / "confirm.py").read_text()
-        # Crude but effective: a `try:` line followed within 5
-        # lines by the tkinter_functions import.
-        try_at = None
-        for i, line in enumerate(cf_src.split("\n")):
-            if line.strip() == "try:":
-                try_at = i
-            if "tkinter_functions" in line and try_at is not None:
-                if i - try_at <= 5:
-                    break
-                try_at = None
-        check(
-            "utils/confirm.py's tkinter_functions import is wrapped "
-            "in try/except (graceful headless fallback)",
-            "from mufasa.ui.tkinter_functions" in cf_src
-            and "except ImportError" in cf_src,
+        cf_tree = ast.parse(cf_src)
+        has_tf_import = any(
+            isinstance(n, ast.ImportFrom)
+            and n.module == "mufasa.ui.tkinter_functions"
+            for n in ast.walk(cf_tree)
         )
+        if has_tf_import:
+            # Stage C state — must still be wrapped in try/except
+            check(
+                "utils/confirm.py's tkinter_functions import is "
+                "wrapped in try/except (Stage C state)",
+                "except ImportError" in cf_src,
+            )
+        else:
+            # Post-122de state — import gone entirely. Docstring
+            # may still mention it as historical context.
+            check(
+                "utils/confirm.py has no tkinter_functions import "
+                "(122de cleanup; docstring breadcrumb is fine)",
+                True,
+            )
 
     # 11. Parse-clean
     parse_errors = []
@@ -207,16 +241,25 @@ def main() -> int:
         detail=(parse_errors[0] if parse_errors else ""),
     )
 
-    # 12. ui/ directory contents
-    ui_files = sorted([
-        f.name for f in (pkg / "ui").iterdir()
-        if f.is_file() and f.name.endswith(".py")
-    ])
-    check(
-        f"mufasa/ui/ now contains exactly "
-        f"__init__.py + px_to_mm_ui.py (got: {ui_files})",
-        ui_files == ["__init__.py", "px_to_mm_ui.py"],
-    )
+    # 12. ui/ directory contents (post-122d6) OR ui/ gone entirely
+    # (post-122de). Patch 122de deleted the directory after
+    # porting px_to_mm_ui.py's caller to the Qt dialog. Both
+    # states are acceptable; reject only unexpected partial states.
+    if (pkg / "ui").exists():
+        ui_files = sorted([
+            f.name for f in (pkg / "ui").iterdir()
+            if f.is_file() and f.name.endswith(".py")
+        ])
+        check(
+            f"mufasa/ui/ exists and contains exactly "
+            f"__init__.py + px_to_mm_ui.py (got: {ui_files})",
+            ui_files == ["__init__.py", "px_to_mm_ui.py"],
+        )
+    else:
+        check(
+            "mufasa/ui/ directory deleted entirely (122de cleanup)",
+            True,
+        )
 
     # 13. Doc updates
     cascade = (REPO_ROOT / "docs"

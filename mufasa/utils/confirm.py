@@ -85,40 +85,22 @@ def _default_confirm(question: str,
                      title: Optional[str] = None) -> str:
     """Default confirmation. Stdin if available; auto-yes if not.
 
-    Post-Stage-C (122d6), the lazy `from mufasa.ui.tkinter_functions
-    import …` always raises ImportError (the Tk module is gone), so
-    this function effectively always routes to `_stdin_confirm`.
-    The try/except block is kept for diff-stability — the behaviour
-    is identical with or without it.
+    Patch 122de simplified this function — the prior lazy
+    ``from mufasa.ui.tkinter_functions import …`` try/except block
+    was removed when ``mufasa/ui/`` itself was deleted (122de also
+    purged the directory after the Stage C cascade left it
+    effectively empty). The lazy import could never succeed once
+    that happened; keeping it as dead code was just diff cost.
+
+    Post-122de behaviour:
+    * Qt sessions: the Qt confirm override (installed at workbench
+      startup by patch 122cj) handles confirmations as QMessageBox
+      dialogs. The default below is not reached.
+    * CLI / headless: routes to ``_stdin_confirm``.
+    * No controlling terminal: stdin returns empty/EOF; the
+      function defaults to ``option_one`` (typical YES / CONTINUE).
     """
-    # Lazy import retained for diff-stability. The except ImportError
-    # branch is now the de-facto only path post-Stage-C (the Tk
-    # tkinter_functions module was deleted in 122d6). Behaviour is
-    # unchanged from the user's perspective.
-    try:
-        from mufasa.ui.tkinter_functions import (
-            TwoOptionQuestionPopUp,
-        )
-    except ImportError:
-        return _stdin_confirm(question, option_one, option_two,
-                              title)
-    try:
-        popup = TwoOptionQuestionPopUp(
-            question=question,
-            option_one=option_one,
-            option_two=option_two,
-            title=title or "Confirm",
-        )
-        choice = getattr(popup, "selected_option", None)
-        # Tk popup might fail to render (e.g., no display);
-        # fall back to stdin in that case.
-        if choice not in (option_one, option_two):
-            return _stdin_confirm(question, option_one,
-                                  option_two, title)
-        return choice
-    except Exception:
-        return _stdin_confirm(question, option_one,
-                              option_two, title)
+    return _stdin_confirm(question, option_one, option_two, title)
 
 
 def _stdin_confirm(question: str,
