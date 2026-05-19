@@ -12,9 +12,9 @@
 | Stage | Files | Notes |
 |---|---:|---|
 | Stage A (entry point) | 0 + 1 config edit | ✓ **EXECUTED 122d4** — `mufasa-tk` removed from `pyproject.toml`. |
-| Stage B (cascade) | 114 | ✓ **EXECUTED 122d5** — bulk deletion of SimBA.py + all Tk-only files. 111 .py files + 3 ancillary (2 `__init__.py` + 1 .yaml asset). |
-| Stage C (tail) | 2 | `tkinter_functions.py` + `pop_up_mixin.py` — orphan after Stage B (zero remaining importers except `utils/confirm.py`'s lazy/broken-fallback path). |
-| **Total** | **117 files** | (was 117 at 122cx scoping; same total — 4 popups pre-deleted in 122cz/d1/d2/d3 + 110 in 122d5 = 114 in B, plus 2 in C, plus 1 config edit) |
+| Stage B (cascade) | 114 | ✓ **EXECUTED 122d5** — bulk deletion of SimBA.py + all Tk-only files. |
+| Stage C (tail) | 3 | ✓ **EXECUTED 122d6** — `tkinter_functions.py` + `pop_up_mixin.py` (planned) + `unsupervised_mixin.py` (newly exposed by Stage B; folded in). Was scoped as 2 in 122cx; +1 for `unsupervised_mixin.py` which lives in `mufasa/mixins/` and so wasn't swept by Stage B's `git rm -r mufasa/unsupervised/`. |
+| **Total** | **118 files** | (was 117 at 122cx scoping; +1 for the unsupervised_mixin discovery in 122d6) |
 
 After the cascade, **two Tk dependencies remain** in the Qt-using path:
 
@@ -113,18 +113,32 @@ Zero Qt-side reach anywhere in the cluster. Cascade-deletes cleanly.
 
 ---
 
-## Stage C: Tail (2 files)
+## Stage C: Tail (3 files) — ✓ EXECUTED 122d6
 
-After Stage B clears, two remaining mixins/helpers go fully orphan:
+After Stage B cleared, two planned + one newly-discovered orphan went fully unreferenced:
 
-| File | Why it dies in Stage C |
-|---|---|
-| `mufasa/ui/tkinter_functions.py` | Consumed by SimBA.py + 75 popups + 4 Tk labelling + 14 unsupervised + 2 mixins. All gone in Stage B. Only `utils/confirm.py` (lazy importer) and `ui/video_timelaps.py` remained — both dying in Stage B too. |
-| `mufasa/mixins/pop_up_mixin.py` | Fan-in from every Tk popup. Dies last. |
+| File | Why it died in Stage C | Detected when |
+|---|---|---|
+| `mufasa/ui/tkinter_functions.py` | Consumed by SimBA.py + 75 popups + 4 Tk labelling + 14 unsupervised + 2 mixins. All gone in Stage B. The remaining importer (`utils/confirm.py`'s lazy `from mufasa.ui.tkinter_functions import TwoOptionQuestionPopUp`) is wrapped in a `try/except ImportError`; post-Stage-C it always raises and the function falls back to `_stdin_confirm` — **working as designed**, NOT a broken-fallback. | 122cx scoping |
+| `mufasa/mixins/pop_up_mixin.py` | Fan-in from every Tk popup. All deleted in Stage B. Zero surviving importers post-122d5. | 122cx scoping |
+| `mufasa/mixins/unsupervised_mixin.py` | **Newly discovered in 122d6.** The 122cx audit missed this — it lives in `mufasa/mixins/`, not `mufasa/unsupervised/`, so Stage B's `git rm -r mufasa/unsupervised/` didn't sweep it. Zero surviving importers after Stage B. | 122d6 pre-flight |
 
-`utils/confirm.py` keeps the lazy `from mufasa.ui.tkinter_functions import TwoOptionQuestionPopUp` inside `_default_confirm`. After Stage C deletes `tkinter_functions.py`, this lazy import would fail at call time — but `_default_confirm` is only called as a fallback when no Qt override is registered. The workbench installs an override at startup; this lazy import never fires in practice. **Acceptable broken-fallback path** (see `tk_surface_audit.md` §2g 122cj cleanup).
+**Re-evaluation of `utils/confirm.py` (the audit's "broken-fallback" claim):**
 
-If the broken-fallback path is undesirable, `utils/confirm.py:_default_confirm` body can be replaced with `raise NotImplementedError("Qt confirm override required after Stage C")` — explicit failure instead of an import-time error. Either acceptable; a follow-on patch can pick.
+122cx's scoping doc said the lazy import would "fail at call time" after Stage C, calling it a "broken fallback path". On closer inspection of the file, that's not quite right — `_default_confirm` already wraps the Tk import in `try/except ImportError`:
+
+```python
+try:
+    from mufasa.ui.tkinter_functions import TwoOptionQuestionPopUp
+except ImportError:
+    return _stdin_confirm(question, option_one, option_two, title)
+```
+
+After 122d6 deletes `tkinter_functions.py`, the import always raises `ImportError`, the `except` branch fires, and the function gracefully routes to stdin. This was already the intended fallback for headless / minimal environments (per the module docstring's §"Default behaviour" point #2). It's **not** broken; it's the documented headless path.
+
+No follow-on `confirm.py` body rewrite is needed. The 122d7+ "cleanup" item for `confirm.py` is reduced to a cosmetic doc tweak (remove the now-misleading "Tk fallback" wording in the docstring, since Tk is no longer in the tree) — or just leave the docstring alone since it describes the general design pattern.
+
+**Pre-existing orphan note:** `mufasa/mixins/network_mixin.py` was already orphan **before** Stage B (NetworkMixin had no importers in any of the Stage-B-deleted files). It's pre-existing dead code, NOT exposed by the cascade. Disposition deferred to a separate "pre-existing-orphans" cleanup patch (or formally accept it as a library-API entry point — `NetworkMixin` is feature-grade analytical code that user code might subclass). Not Stage C's concern.
 
 ---
 
@@ -195,9 +209,9 @@ Stage B is now fully ready for execution.
 | **122d2** | Stage B prep (YOLO port #2) | 1 | 0 | ✓ Done — yolo_inference ported |
 | **122d3** | Stage B prep (YOLO port #3) | 1 | 0 | ✓ Done — yolo_pose_train ported |
 | **122d4** | Stage A | 0 | 1 (`pyproject.toml`) | ✓ Done — `mufasa-tk` entry point removed |
-| **122d5** | Stage B | 114 | 0 | ✓ **Done — bulk delete (this patch)** |
-| **122d6** (next) | Stage C tail | 2 | 0 | Low — AST verifies no consumers |
-| **122d7+** | Cleanup | 0 | 0 | Low — confirm.py body, README sweep, QWI-1/2/3 |
+| **122d5** | Stage B | 114 | 0 | ✓ Done — bulk delete |
+| **122d6** | Stage C tail | 3 | 0 | ✓ **Done — tail deletion (this patch); 2 planned + 1 newly discovered orphan** |
+| **122d7+** | Cleanup | 0 | 0 | Optional — README sweep, QWI-1/2/3 fixes, network_mixin disposition, px_to_mm_ui Qt port |
 
 Total elapsed: 9 patches (122cx → 122d5). Stage C is mechanical; cleanup is optional polish.
 
