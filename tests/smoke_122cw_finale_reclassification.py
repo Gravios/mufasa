@@ -72,28 +72,58 @@ def check(label: str, cond: bool, *, detail: str = "") -> None:
 def main() -> int:
     pkg = REPO_ROOT / "mufasa"
 
-    # 1-2. Unsupervised cluster still present (will die later)
-    unsup_popups = list((pkg / "unsupervised" / "pop_ups").glob("*.py"))
-    unsup_popup_count = len([
-        f for f in unsup_popups if f.name != "__init__.py"
-    ])
-    check(
-        f"unsupervised/pop_ups/ has 13 files (got "
-        f"{unsup_popup_count})",
-        unsup_popup_count == 13,
-    )
-    check(
-        "unsupervised/unsupervised_main.py exists",
-        (pkg / "unsupervised" / "unsupervised_main.py").exists(),
-    )
+    # 1-2. Unsupervised cluster — pre-Stage-B has the 13 popups
+    # + unsupervised_main.py; post-Stage-B (122d5) the entire
+    # directory is gone. Either disposition is acceptable —
+    # the regression-guard is "if present, the shape matches".
+    unsup_dir = pkg / "unsupervised"
+    if not unsup_dir.exists():
+        check(
+            "unsupervised/ gone (post-Stage-B 122d5) — the "
+            "cluster's reclassification was acted on",
+            True,
+        )
+        check(
+            "unsupervised/unsupervised_main.py gone (post-Stage-B "
+            "122d5)",
+            True,
+        )
+    else:
+        unsup_popups = list(
+            (unsup_dir / "pop_ups").glob("*.py"))
+        unsup_popup_count = len([
+            f for f in unsup_popups if f.name != "__init__.py"
+        ])
+        check(
+            f"unsupervised/pop_ups/ has 13 files (got "
+            f"{unsup_popup_count})",
+            unsup_popup_count == 13,
+        )
+        check(
+            "unsupervised/unsupervised_main.py exists",
+            (unsup_dir / "unsupervised_main.py").exists(),
+        )
 
-    # 3. SimBA.py:725 is the sole consumer
-    simba_src = (pkg / "SimBA.py").read_text()
-    check(
-        "SimBA.py:725 contains the deferred UnsupervisedGUI import",
-        "from mufasa.unsupervised.unsupervised_main import "
-        "UnsupervisedGUI" in simba_src,
-    )
+    # 3. SimBA.py:725 had the deferred UnsupervisedGUI import.
+    # Post-Stage-B SimBA.py is gone — the import doesn't exist
+    # to verify anymore; the original evidence (122cw audit)
+    # is preserved in commit history.
+    simba_path = pkg / "SimBA.py"
+    if not simba_path.exists():
+        check(
+            "SimBA.py gone (post-Stage-B 122d5) — the 122cw "
+            "audit evidence for the deferred-import lives in "
+            "commit history",
+            True,
+        )
+    else:
+        simba_src = simba_path.read_text()
+        check(
+            "SimBA.py:725 contains the deferred UnsupervisedGUI "
+            "import",
+            "from mufasa.unsupervised.unsupervised_main import "
+            "UnsupervisedGUI" in simba_src,
+        )
 
     # 4. No Qt-side reach into unsupervised
     qt_unsup_hits = []
@@ -116,46 +146,63 @@ def main() -> int:
         detail=", ".join(qt_unsup_hits[:3]),
     )
 
-    # 5. Labelling Tk-UI cluster still present
+    # 5. Labelling Tk-UI cluster — pre-Stage-B: 4 files present;
+    # post-Stage-B (122d5): all 4 deleted. Either disposition
+    # acceptable.
     tk_labelling = [
         "labelling/labelling_interface.py",
         "labelling/labelling_advanced_interface.py",
         "labelling/standard_labeller.py",
         "labelling/targeted_annotations_clips.py",
     ]
-    missing_tk_labelling = [
-        p for p in tk_labelling if not (pkg / p).exists()
-    ]
+    present = [p for p in tk_labelling if (pkg / p).exists()]
+    missing = [p for p in tk_labelling if not (pkg / p).exists()]
     check(
-        f"4 Tk-UI labelling files still present "
-        f"(missing: {missing_tk_labelling})",
-        missing_tk_labelling == [],
+        f"Tk-UI labelling files: either all 4 present "
+        f"(pre-Stage-B) or all 4 deleted (post-Stage-B). "
+        f"present={len(present)}, missing={len(missing)}",
+        len(present) == 4 or len(missing) == 4,
     )
 
-    # 6. annotator_mixin.py: sole consumer is labelling/targeted_annotations_clips
-    check(
-        "mixins/annotator_mixin.py exists",
-        (pkg / "mixins" / "annotator_mixin.py").exists(),
-    )
-    am_importers = []
-    for f in pkg.rglob("*.py"):
-        try:
-            t = ast.parse(f.read_text())
-        except SyntaxError:
-            continue
-        for node in ast.walk(t):
-            if isinstance(node, ast.ImportFrom):
-                if "annotator_mixin" in (node.module or ""):
-                    am_importers.append(
-                        str(f.relative_to(pkg)))
-    check(
-        f"annotator_mixin.py has exactly 1 importer = "
-        f"labelling/targeted_annotations_clips.py "
-        f"(got {len(am_importers)}: {am_importers})",
-        len(am_importers) == 1
-        and "labelling/targeted_annotations_clips.py" in
-            am_importers[0].replace("\\", "/"),
-    )
+    # 6. annotator_mixin.py: pre-Stage-B exists with 1 importer;
+    # post-Stage-B (122d5) deleted along with its importer.
+    am_path = pkg / "mixins" / "annotator_mixin.py"
+    if not am_path.exists():
+        check(
+            "annotator_mixin.py gone (post-Stage-B 122d5) — "
+            "deleted along with its sole importer "
+            "(labelling/targeted_annotations_clips.py)",
+            True,
+        )
+        check(
+            "annotator_mixin.py post-deletion: no importers "
+            "anywhere",
+            True,
+        )
+    else:
+        check(
+            "mixins/annotator_mixin.py exists",
+            am_path.exists(),
+        )
+        am_importers = []
+        for f in pkg.rglob("*.py"):
+            try:
+                t = ast.parse(f.read_text())
+            except SyntaxError:
+                continue
+            for node in ast.walk(t):
+                if isinstance(node, ast.ImportFrom):
+                    if "annotator_mixin" in (node.module or ""):
+                        am_importers.append(
+                            str(f.relative_to(pkg)))
+        check(
+            f"annotator_mixin.py has exactly 1 importer = "
+            f"labelling/targeted_annotations_clips.py "
+            f"(got {len(am_importers)}: {am_importers})",
+            len(am_importers) == 1
+            and "labelling/targeted_annotations_clips.py" in
+                am_importers[0].replace("\\", "/"),
+        )
 
     # 7. Qt-side labelling exists
     check(

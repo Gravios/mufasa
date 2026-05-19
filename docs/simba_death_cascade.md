@@ -11,10 +11,10 @@
 
 | Stage | Files | Notes |
 |---|---:|---|
-| Stage A (entry point) | 0 + 1 config edit | ✓ **EXECUTED 122d4** — `mufasa-tk` removed from `pyproject.toml`. Legacy launcher unreachable via CLI; `python -m mufasa.SimBA` still works as backstop until Stage B deletes the file. |
-| Stage B (cascade) | 111 | SimBA.py itself + all files reachable only through it. Was 115 at 122cx scoping; 4 popups pre-ported in 122cz/d1/d2/d3 (the unblock + 3 YOLO conversion ports). |
-| Stage C (tail) | 2 | `tkinter_functions.py` + `pop_up_mixin.py` — orphan after Stage B. |
-| **Total** | **113 files** | (was 117 at 122cx; -4 after 122cz/d1/d2/d3 pre-deletions) |
+| Stage A (entry point) | 0 + 1 config edit | ✓ **EXECUTED 122d4** — `mufasa-tk` removed from `pyproject.toml`. |
+| Stage B (cascade) | 114 | ✓ **EXECUTED 122d5** — bulk deletion of SimBA.py + all Tk-only files. 111 .py files + 3 ancillary (2 `__init__.py` + 1 .yaml asset). |
+| Stage C (tail) | 2 | `tkinter_functions.py` + `pop_up_mixin.py` — orphan after Stage B (zero remaining importers except `utils/confirm.py`'s lazy/broken-fallback path). |
+| **Total** | **117 files** | (was 117 at 122cx scoping; same total — 4 popups pre-deleted in 122cz/d1/d2/d3 + 110 in 122d5 = 114 in B, plus 2 in C, plus 1 config edit) |
 
 After the cascade, **two Tk dependencies remain** in the Qt-using path:
 
@@ -195,11 +195,11 @@ Stage B is now fully ready for execution.
 | **122d2** | Stage B prep (YOLO port #2) | 1 | 0 | ✓ Done — yolo_inference ported |
 | **122d3** | Stage B prep (YOLO port #3) | 1 | 0 | ✓ Done — yolo_pose_train ported |
 | **122d4** | Stage A | 0 | 1 (`pyproject.toml`) | ✓ Done — `mufasa-tk` entry point removed |
-| **122d5** (next) | Stage B | 111 | 0 | Medium — checklist passes; bulk delete |
-| **122d6** | Stage C tail | 2 | 0 | Low — AST verifies no consumers |
+| **122d5** | Stage B | 114 | 0 | ✓ **Done — bulk delete (this patch)** |
+| **122d6** (next) | Stage C tail | 2 | 0 | Low — AST verifies no consumers |
 | **122d7+** | Cleanup | 0 | 0 | Low — confirm.py body, README sweep, QWI-1/2/3 |
 
-Total elapsed: 8 patches (122cx → 122d4). Stage B is the remaining hot work; Stage C + cleanup are mechanical.
+Total elapsed: 9 patches (122cx → 122d5). Stage C is mechanical; cleanup is optional polish.
 
 Alternatively, Stage B could be split by directory:
 
