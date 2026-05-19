@@ -22,6 +22,34 @@ from mufasa.utils.enums import Formats
 from mufasa.utils.errors import CountError, InvalidInputError
 
 
+# =========================================================================== #
+# Module status (patch 122dd)
+# =========================================================================== #
+# NetworkMixin currently has **no internal callers** anywhere in the
+# Mufasa codebase — the 122d6 / 122dd orphan sweep confirmed it. The
+# class was pre-existing dead code BEFORE the SimBA.py death cascade
+# (verified via git history: not imported by any Stage-B-deleted
+# file either).
+#
+# Disposition (122dd): **kept as a library-API building block.**
+# The class is feature-grade (871 lines; networkx + pyvis-based
+# multi-animal graph analysis with documented examples + academic
+# references). Out-of-tree user code may subclass or call it
+# directly even with zero in-tree consumers. Deleting it would
+# silently break any such consumer.
+#
+# If a future audit finds it's genuinely unused outside this repo
+# too — and the maintainer wants to remove it — the simplest path
+# is `git rm mufasa/mixins/network_mixin.py` + smoke test for
+# parse-clean + no surviving importers. The deletion itself is
+# mechanical; the decision is the only hard part.
+#
+# Until then, the class is part of the public surface. Any
+# breaking changes to its method signatures should be treated as
+# such.
+# =========================================================================== #
+
+
 class NetworkMixin(object):
     """
     Methods to create and analyze time-dependent graphs from pose-estimation data.

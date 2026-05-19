@@ -15,12 +15,26 @@ Several backend files (``video_processors/video_processing.py``,
 made those files Tk-coupled even though they're fundamental
 backend code with no reason to know about the UI.
 
-Patch 122ch introduces this helper to break that coupling. The
-backend files now import :func:`confirm_two_option` from this
-module instead of pulling in Tk. The Tk popup is still the
-default implementation (lazy-imported only when needed), but Qt
-code (or tests, or headless callers) can swap in a different
-implementation by reassigning the module-level attribute.
+Patch 122ch introduced this helper to break that coupling. The
+backend files import :func:`confirm_two_option` from this
+module instead of pulling in Tk. Qt code (or tests, or headless
+callers) installs an override by reassigning the module-level
+attribute.
+
+The Tk popup that was originally the default implementation is
+gone (deleted in 122d6 Stage C). The default now does:
+
+1. Try a stdin prompt — works for CLI / CI / interactive shells.
+2. If stdin is unavailable (no controlling terminal), default to
+   ``option_one`` — the typical "YES / SKIP / CONTINUE" choice.
+
+Patch 122dd updates this docstring to match the post-Stage-C
+behaviour and removes the now-stale "Tk default" framing. The
+old Tk-import-with-ImportError-fallback code path still exists
+in ``_default_confirm`` as a no-op safety net (the ImportError
+branch always fires post-Stage-C, since the module is gone) —
+keeping it for diff-stability rather than rewriting the function
+body. The behaviour is identical either way.
 
 Override patterns
 -----------------
@@ -40,23 +54,22 @@ Override patterns
 
     _cf.confirm_two_option = _qt_confirm
 
+The Qt override **IS now installed at workbench startup** (patch
+122dd) — see ``mufasa/ui_qt/qt_confirm_override.py``. When a
+backend function calls ``confirm_two_option`` from a workbench
+session, the user sees a QMessageBox dialog. CLI / headless
+callers still fall through to the stdin path.
+
 **Tests / scripts** (auto-confirm without prompting):
 ::
 
     import mufasa.utils.confirm as _cf
     _cf.confirm_two_option = lambda **_: "YES"
 
-The Qt-side override is **not** installed by this module. Patch
-122ch is backend-only; the Qt workbench falls back to the Tk
-default until/unless a separate patch wires the Qt override at
-workbench startup.
-
-Default behaviour
------------------
-1. Try to lazy-import the Tk popup. If available, open it and
-   return the user's choice.
-2. If Tk isn't installed (headless / minimal environment), fall
-   back to a stdin prompt. Useful for CLI / CI contexts.
+Default behaviour (post-Stage-C)
+--------------------------------
+1. If a Qt override has been installed, the override handles it.
+2. Otherwise, prompt via stdin. Useful for CLI / CI contexts.
 3. If stdin is unavailable (no controlling terminal), default to
    ``option_one`` — the typical "YES / SKIP / CONTINUE" choice.
 """
@@ -70,12 +83,18 @@ def _default_confirm(question: str,
                      option_one: str = "YES",
                      option_two: str = "NO",
                      title: Optional[str] = None) -> str:
-    """Default Tk-backed confirmation. Falls back to stdin /
-    auto-yes if Tk isn't usable.
+    """Default confirmation. Stdin if available; auto-yes if not.
+
+    Post-Stage-C (122d6), the lazy `from mufasa.ui.tkinter_functions
+    import …` always raises ImportError (the Tk module is gone), so
+    this function effectively always routes to `_stdin_confirm`.
+    The try/except block is kept for diff-stability — the behaviour
+    is identical with or without it.
     """
-    # Lazy import: callers don't pay the Tk dependency cost at
-    # module load. The import happens only when this default is
-    # actually invoked AND a Qt override hasn't been installed.
+    # Lazy import retained for diff-stability. The except ImportError
+    # branch is now the de-facto only path post-Stage-C (the Tk
+    # tkinter_functions module was deleted in 122d6). Behaviour is
+    # unchanged from the user's perspective.
     try:
         from mufasa.ui.tkinter_functions import (
             TwoOptionQuestionPopUp,
