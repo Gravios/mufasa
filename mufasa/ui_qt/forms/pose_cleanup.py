@@ -1313,12 +1313,23 @@ class KalmanV2SmoothingForm(OperationForm):
                     default_in = paths["input_pose_dir"]
                     if os.path.isdir(default_in):
                         self.input_dir.setText(default_in)
-                    # smoothed_v2 sibling of input_csv in legacy
-                    # projects — keep the original convention.
-                    default_out = os.path.join(
-                        paths["project_root"], "csv", "smoothed_v2",
-                    )
-                    self.output_dir.setText(default_out)
+                    # Patch 122db: legacy-only default-output. v1
+                    # projects use the smoothed_v2 form's run-dir
+                    # allocator (target() picks a fresh
+                    # derived/smoothed/<run_id>/ when save_dir is
+                    # blank), so we leave the field empty for v1
+                    # to make that mechanism kick in. Pre-122db
+                    # this unconditionally set
+                    # `<root>/csv/smoothed_v2/` which created a
+                    # foreign csv/ tree under v1 projects.
+                    # Same gate as the L1855 legacy_default sibling.
+                    if not str(self.config_path).lower().endswith(".toml"):
+                        # smoothed_v2 sibling of input_csv in legacy
+                        # projects — keep the original convention.
+                        default_out = os.path.join(
+                            paths["project_root"], "csv", "smoothed_v2",
+                        )
+                        self.output_dir.setText(default_out)
                 except (ValueError, OSError):
                     pass
 

@@ -2180,8 +2180,24 @@ def extract_frames_from_all_videos_in_directory(config_path: Union[str, os.PathL
     timer = SimbaTimer(start=True)
     video_paths = find_all_videos_in_directory(directory=directory, as_dict=True, raise_error=True)
     video_paths = list(video_paths.values())
-    config = read_config_file(config_path)
-    project_path = read_config_entry(config, "General settings", "project_path", data_type="folder_path")
+    # Patch 122db: layout-agnostic project_root + frames-dir
+    # resolution. Pre-fix, this used
+    # `read_config_entry(config, "General settings", "project_path")`
+    # which doesn't work on v1 .toml configs (no [General
+    # settings] section in TOML), AND hardcoded the legacy
+    # `frames/input/` subpath. For v1 projects, extracted frames
+    # belong under `<root>/derived/frames/extracted/<video>/` to
+    # match ConfigReader.input_frames_dir's v1 resolution.
+    from mufasa.project_layout import project_paths_from_config
+    project_root = project_paths_from_config(
+        config_path=config_path)["project_root"]
+    is_v1 = str(config_path).lower().endswith(".toml")
+    if is_v1:
+        frames_root = os.path.join(
+            project_root, "derived", "frames", "extracted",
+        )
+    else:
+        frames_root = os.path.join(project_root, "frames", "input")
     check_valid_boolean(value=confirm_popup, source=f'{extract_frames_from_all_videos_in_directory.__name__} confirm_popup', raise_error=True)
 
 
@@ -2201,10 +2217,10 @@ def extract_frames_from_all_videos_in_directory(config_path: Union[str, os.PathL
         if choice != "YES":
             return
 
-    stdout_information(msg=f"Extracting frames for {len(video_paths)} video(s) into project_folder/frames/input directory...")
+    stdout_information(msg=f"Extracting frames for {len(video_paths)} video(s) into {frames_root} ...")
     for video_path in video_paths:
         dir_name, video_name, ext = get_fn_ext(video_path)
-        save_path = os.path.join(project_path, "frames", "input", video_name)
+        save_path = os.path.join(frames_root, video_name)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         else:
