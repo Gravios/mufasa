@@ -14,7 +14,6 @@ modules so they can be scripted or driven by the legacy Tk UI too.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import List, Optional
 
 from PySide6.QtCore import Qt

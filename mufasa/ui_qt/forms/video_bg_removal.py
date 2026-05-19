@@ -36,8 +36,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox,
-                               QFileDialog, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QRadioButton,
+                               QFileDialog, QHBoxLayout, QLineEdit, QPushButton, QRadioButton,
                                QSpinBox, QFormLayout, QVBoxLayout,
                                QWidget)
 

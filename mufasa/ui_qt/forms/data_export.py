@@ -25,14 +25,10 @@ silently working on the wrong directory.
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import Optional
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QFormLayout, QGroupBox, QHBoxLayout,
-                               QLabel, QLineEdit, QMessageBox,
-                               QPushButton, QVBoxLayout, QWidget)
+                               QFormLayout, QHBoxLayout,
+                               QLineEdit, QPushButton)
 
 from mufasa.ui_qt.workbench import OperationForm
 

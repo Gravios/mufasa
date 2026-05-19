@@ -54,14 +54,11 @@ so we don't need to paper over UI-control divergence.
 """
 from __future__ import annotations
 
-import os
-from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFormLayout, QGridLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit,
+                               QFormLayout, QHBoxLayout, QLabel, QLineEdit,
                                QListWidget, QListWidgetItem,
                                QPushButton, QSpinBox, QStackedWidget,
                                QVBoxLayout, QWidget)

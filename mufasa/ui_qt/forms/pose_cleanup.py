@@ -38,8 +38,7 @@ from typing import Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout,
                                QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QListWidgetItem, QMessageBox,
-                               QSpinBox, QDoubleSpinBox, QVBoxLayout, QWidget,
+                               QListWidget, QListWidgetItem, QSpinBox, QDoubleSpinBox, QVBoxLayout, QWidget,
                                QPushButton, QFileDialog)
 
 from mufasa.ui_qt.workbench import OperationForm

@@ -61,7 +61,6 @@ backend doesn't need to change.
 """
 from __future__ import annotations
 
-import configparser
 import os
 from typing import Optional
 
@@ -69,7 +68,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QDockWidget, QFileDialog, QHBoxLayout,
                                QHeaderView, QLabel, QLineEdit, QMessageBox,
                                QPushButton, QTableWidget, QTableWidgetItem,
-                               QVBoxLayout, QWidget)
+                               QWidget)
 
 from mufasa.ui_qt.workbench import OperationForm
 

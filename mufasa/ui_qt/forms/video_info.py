@@ -50,13 +50,12 @@ Workflow
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QMessageBox, QPushButton,
-                               QSizePolicy, QTableWidget, QTableWidgetItem,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QHBoxLayout, QHeaderView, QLabel,
+                               QMessageBox, QPushButton,
+                               QSizePolicy, QTableWidget, QTableWidgetItem)
 
 from mufasa.ui_qt.workbench import OperationForm
 

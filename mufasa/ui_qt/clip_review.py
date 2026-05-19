@@ -34,7 +34,7 @@ Existing rating files are loaded on dialog open so reviews can resume.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -43,8 +43,7 @@ from PySide6.QtCore import QRect, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog,
                                QDialogButtonBox, QFileDialog, QFormLayout,
-                               QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QSizePolicy,
+                               QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPushButton, QSizePolicy,
                                QTableWidget, QTableWidgetItem, QVBoxLayout,
                                QWidget)
 

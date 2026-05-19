@@ -47,7 +47,7 @@ from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.dialog import MufasaDialog
 from mufasa.ui_qt.progress import run_with_progress
 from mufasa.ui_qt.widgets import (DISABLED, NORMAL, NW, CreateLabelFrameWithIcon,
-                                  Entry_Box, Formats, MufasaButton,
+                                  Entry_Box, MufasaButton,
                                   MufasaCheckbox, MufasaDropDown)
 
 AUTO = "auto"

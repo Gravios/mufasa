@@ -54,8 +54,7 @@ from typing import Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
                                QFormLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QSpinBox,
-                               QWidget)
+                               QLineEdit, QPushButton, QSpinBox)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm

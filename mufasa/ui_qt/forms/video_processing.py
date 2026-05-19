@@ -31,9 +31,7 @@ from typing import Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QButtonGroup, QFileDialog, QFormLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QRadioButton, QStackedWidget, QVBoxLayout,
-                               QComboBox, QSpinBox, QCheckBox, QWidget,
-                               QDoubleSpinBox)
+                               QRadioButton, QStackedWidget, QComboBox, QSpinBox, QCheckBox, QWidget)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.workbench import OperationForm

@@ -58,9 +58,8 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QColorDialog, QComboBox,
-                               QDoubleSpinBox, QFormLayout, QFrame,
-                               QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
+                               QDoubleSpinBox, QFormLayout, QHBoxLayout, QLineEdit, QPushButton,
+                               QSpinBox, QStackedWidget, QWidget)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.forms.data_import import _PathField

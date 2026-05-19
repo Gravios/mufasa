@@ -42,8 +42,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout,
                                QLabel, QMainWindow, QMessageBox, QPushButton,
                                QStatusBar, QTabWidget, QVBoxLayout, QWidget)

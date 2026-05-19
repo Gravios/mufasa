@@ -37,9 +37,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QListWidgetItem, QSpinBox,
+from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox,
+                               QFormLayout, QListWidget, QListWidgetItem, QSpinBox,
                                QStackedWidget, QVBoxLayout, QWidget)
 
 from mufasa.ui_qt import linux_env

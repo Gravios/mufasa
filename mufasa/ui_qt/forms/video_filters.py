@@ -39,7 +39,7 @@ from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog,
                                QDialogButtonBox, QDoubleSpinBox,
                                QFormLayout, QHBoxLayout, QLabel,
-                               QMessageBox, QPushButton, QSlider,
+                               QMessageBox, QSlider,
                                QSpinBox, QStackedWidget, QVBoxLayout,
                                QWidget)
 

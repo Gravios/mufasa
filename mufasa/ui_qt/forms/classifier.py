@@ -23,8 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout, QLabel,
-                               QLineEdit, QMessageBox, QStackedWidget,
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout, QLineEdit, QStackedWidget,
                                QTextBrowser, QVBoxLayout, QWidget, QPushButton,
                                QHBoxLayout)
 
