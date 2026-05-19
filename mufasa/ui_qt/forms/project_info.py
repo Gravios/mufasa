@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QFormLayout, QFrame, QGroupBox,
+from PySide6.QtWidgets import (QFormLayout, QGroupBox,
                                QHBoxLayout, QLabel, QPushButton,
                                QSizePolicy, QVBoxLayout, QWidget)
 

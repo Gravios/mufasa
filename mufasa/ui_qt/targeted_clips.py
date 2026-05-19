@@ -43,7 +43,7 @@ from typing import Optional
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
                                QFileDialog, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QMessageBox, QPushButton,
+                               QMessageBox, QPushButton,
                                QTableWidget, QTableWidgetItem, QVBoxLayout,
                                QWidget)
 

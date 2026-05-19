@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtWidgets import (QDoubleSpinBox, QFileDialog, QMessageBox)
+from PySide6.QtWidgets import (QFileDialog, QMessageBox)
 
 from mufasa.ui_qt.forms.addons import (BlobTrackerInitLauncher,
                                        CueLightClfForm, CueLightDataForm,

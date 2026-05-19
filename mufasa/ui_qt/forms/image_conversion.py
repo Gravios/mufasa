@@ -23,14 +23,13 @@ Utilities (patch 122bx).
 """
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QFormLayout, QGroupBox, QHBoxLayout,
+                               QFormLayout, QHBoxLayout,
                                QLabel, QLineEdit, QPushButton, QSpinBox,
                                QStackedWidget, QTimeEdit, QVBoxLayout,
                                QWidget)

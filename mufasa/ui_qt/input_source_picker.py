@@ -45,7 +45,6 @@ from mufasa.project_layout import (
     SmoothingFlavors,
     Stages,
     detect_layout,
-    is_run_id,
     resolve_v1_project_root,
 )
 
@@ -342,7 +341,7 @@ def discover_input_sources(
 #       the path is empty/invalid.
 
 try:
-    from PySide6.QtCore import Qt, Signal  # type: ignore
+    from PySide6.QtCore import Signal  # type: ignore
     from PySide6.QtWidgets import (  # type: ignore
         QComboBox, QFileDialog, QHBoxLayout, QLineEdit, QPushButton,
         QVBoxLayout, QWidget,

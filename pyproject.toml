@@ -211,11 +211,13 @@ mufasa = [
 [tool.ruff]
 target-version = "py311"
 line-length    = 100
-# ``simba/ui/`` uses ``from tkinter import *`` extensively; the codemod
-# (see tools/codemod_tk_wildcards.py) converts these one package at a
-# time. Until then, allow F403/F405 in the Tk UI dir only.
+# Patch 122dg note: pre-122de this list excluded ``mufasa/ui`` (the
+# legacy Tk UI surface) since it used ``from tkinter import *``
+# extensively and would fire F403/F405 across hundreds of files.
+# That directory was deleted entirely in patch 122de (see
+# docs/simba_death_cascade.md). The exclusion entry is removed
+# along with the directory it referenced.
 extend-exclude = [
-    "mufasa/ui",                       # legacy Tk UI — temporary
     "build",
     "dist",
     ".venv",

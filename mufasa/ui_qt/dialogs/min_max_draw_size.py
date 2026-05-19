@@ -36,10 +36,9 @@ from __future__ import annotations
 import os
 from typing import Optional, Union
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QDoubleSpinBox,
-                               QFormLayout, QGroupBox, QHBoxLayout, QLabel,
-                               QMessageBox, QVBoxLayout, QWidget)
+                               QFormLayout, QGroupBox, QLabel,
+                               QMessageBox, QVBoxLayout)
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import check_float

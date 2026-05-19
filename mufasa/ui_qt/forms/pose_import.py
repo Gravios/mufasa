@@ -34,13 +34,13 @@ directories explicitly.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox,
                                QFileDialog, QFormLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QVBoxLayout, QWidget)
+                               QWidget)
 
 from mufasa.ui_qt.workbench import OperationForm
 

@@ -25,9 +25,8 @@ import configparser
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog,
-                               QFormLayout, QLineEdit, QListWidget,
-                               QListWidgetItem, QMessageBox, QSpinBox,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QLineEdit, QListWidget,
+                               QListWidgetItem, QSpinBox,
                                QVBoxLayout, QWidget)
 
 from mufasa.ui_qt import linux_env

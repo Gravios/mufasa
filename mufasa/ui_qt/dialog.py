@@ -36,12 +36,11 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (QApplication, QDialog, QGridLayout, QGroupBox,
                                QScrollArea, QVBoxLayout, QWidget)
 
 from mufasa.ui_qt.icon_cache import icon as _icon
-from mufasa.ui_qt.widgets import (NW, Formats, MufasaButton, MufasaDropDown,
+from mufasa.ui_qt.widgets import (NW, MufasaButton, MufasaDropDown,
                                  MufasaCheckbox, _MufasaCheckbox)
 
 

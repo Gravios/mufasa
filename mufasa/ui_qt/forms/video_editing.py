@@ -27,12 +27,11 @@ OpenCV's window is live-video-rendering, Qt would be over-engineering.
 """
 from __future__ import annotations
 
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox,
-                               QFormLayout, QLabel, QRadioButton, QSpinBox,
-                               QStackedWidget, QVBoxLayout, QWidget,
+from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox,
+                               QFormLayout, QLabel, QSpinBox,
+                               QStackedWidget, QWidget,
                                QCheckBox, QHBoxLayout)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker

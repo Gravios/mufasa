@@ -31,8 +31,8 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
 from PySide6.QtCore import Qt, QRunnable, QThreadPool, QTimer, Signal
-from PySide6.QtGui import QFont, QIcon, QIntValidator, QDoubleValidator
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog,
+from PySide6.QtGui import QFont, QIcon, QIntValidator
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QPushButton, QSizePolicy, QVBoxLayout,
                                QWidget)

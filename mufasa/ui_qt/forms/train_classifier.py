@@ -56,8 +56,6 @@ What's deferred from Tk parity
 """
 from __future__ import annotations
 
-import configparser
-import os
 from typing import Optional
 
 from PySide6.QtCore import Qt

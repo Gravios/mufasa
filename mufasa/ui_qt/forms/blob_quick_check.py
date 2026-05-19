@@ -49,8 +49,7 @@ from typing import Optional
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog,
-                               QFileDialog, QFormLayout, QGridLayout,
-                               QHBoxLayout, QLabel, QLineEdit,
+                               QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QPushButton, QSlider,
                                QSpinBox, QVBoxLayout, QWidget)
 

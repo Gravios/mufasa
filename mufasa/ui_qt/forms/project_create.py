@@ -37,7 +37,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout,
                                QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QPlainTextEdit,
-                               QPushButton, QSizePolicy, QSpinBox,
+                               QPushButton, QSpinBox,
                                QVBoxLayout, QWidget)
 
 import mufasa

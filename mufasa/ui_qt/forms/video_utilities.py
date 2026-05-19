@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog,
+from PySide6.QtWidgets import (QCheckBox, QDialog,
                                QDoubleSpinBox, QFileDialog,
                                QFormLayout, QHBoxLayout, QLabel,
                                QLineEdit, QMessageBox, QPushButton,

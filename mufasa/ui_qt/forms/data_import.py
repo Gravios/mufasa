@@ -42,8 +42,8 @@ from typing import Any, Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QFormLayout, QFrame, QHBoxLayout,
-                               QLabel, QLineEdit, QPushButton, QSpinBox,
+                               QFileDialog, QFormLayout, QHBoxLayout,
+                               QLineEdit, QPushButton, QSpinBox,
                                QStackedWidget, QVBoxLayout, QWidget)
 
 from mufasa.ui_qt.workbench import OperationForm

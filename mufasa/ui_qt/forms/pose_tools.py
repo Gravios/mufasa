@@ -382,9 +382,6 @@ class SLEAPToYoloForm(OperationForm):
         from mufasa.third_party_label_appenders.transform.sleap_csv_to_yolo import (
             Sleap2Yolo,
         )
-        from mufasa.third_party_label_appenders.transform.utils import (
-            get_yolo_keypoint_flip_idx,
-        )
         # flip_idx + names derived from the SLEAP data files at
         # run time. The backend's own helpers know how to read
         # them; we pass through with sensible defaults.
