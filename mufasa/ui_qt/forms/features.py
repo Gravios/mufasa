@@ -195,10 +195,17 @@ class FeatureSubsetExtractorForm(OperationForm):
         # load_features_for_video() helper (122ae-2). This is the
         # native v1 shape and the path forward for the parquet-
         # only direction.
+        # Patch 122d8 (QWI-2): QRadioButton.text is plain-text-only
+        # — pre-fix this label rendered the raw `<code>...</code>`
+        # and `&lt;family&gt;` HTML markup as literal characters.
+        # Strip to plain text; use curly braces as the
+        # placeholder convention (familiar from
+        # str.format syntax / Python pathlib examples) rather
+        # than angle brackets that look HTML-y.
         self.dest_derived_parquet = QRadioButton(
             "Write per-family parquet to "
-            "<code>derived/features/&lt;family&gt;/&lt;video&gt;.parquet</code>"
-            " <i>(recommended, v1-native)</i>", self,
+            "derived/features/{family}/{video}.parquet "
+            "(recommended, v1-native)", self,
         )
         form.addRow("", self.dest_derived_parquet)
 
