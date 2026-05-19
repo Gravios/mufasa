@@ -48,18 +48,26 @@ Public surface (18 functions in `mufasa.project_layout`):
 
 ### Qt-reachable bugs (require fixing for v1 workflows)
 
+**Note (post-re-triage):** the initial scan flagged 12 sites; closer inspection during 122db reduced this to just **3 actually-broken** sites. The rest were false positives in three categories:
+
+* **`self.project_path` + same-path-both-layouts.** ConfigReader's `self.project_path` is set to the project root for BOTH layouts (v1 root for v1; legacy root for legacy). Subpaths like `logs/` are identical in both layouts (`<root>/logs/`), so `os.path.join(self.project_path, "logs")` is correct for both. Sites: `data_processors/pup_retrieval_calculator.py:83`.
+* **Defensive `except` fallbacks.** Several flagged hits were inside `try/except` blocks where the primary path uses `project_paths_from_config` correctly; the `except` branch fires only on malformed configs and uses a best-effort legacy guess. Acceptable. Sites: `roi_logic.py:145, 149`, `video_info.py:265, 291, 292`.
+* **Branch-gated legacy paths.** Sites that look like hardcoded legacy paths but are inside `if not v1` / `if v1_root is None` branches where they're meant to fire. Acceptable. Sites: `pose_cleanup.py:1855, 1960`.
+
 | Site | Status | Notes |
 |---|---|---|
 | `roi_tools/roi_utils.py:462` (multiply_ROIs videos_dir) | ✓ Fixed 122d9 | The original QWI-1 fix |
-| `roi_tools/roi_utils.py:474` (multiply_ROIs roi_coordinates_path) | ✓ Fixed 122da | **Sibling miss from 122d9.** Same function, next line, same bug pattern (hardcoded legacy `logs/measures/ROI_definitions.h5` via `project_path` rather than helper) |
-| `roi_tools/roi_utils.py:561` (reset_video_ROIs roi_coordinates_path) | ✓ Fixed 122da | **Sibling function** with same pattern |
-| `ui_qt/forms/visualizations.py:1233` (per-route src_dir) | Deferred | Hardcoded `<root>/csv/<subdir>`. Refactor needed (route metadata vs path helpers). |
-| `ui_qt/forms/pose_cleanup.py:1318, 1855, 1960` | Deferred | 3 sites; need per-site triage. |
-| `ui_qt/forms/video_info.py:265, 291, 292` | Deferred | Mix of defensive fallback + unconditional. The defensive ones from QWI-1 audit are still here. |
-| `roi_tools/roi_logic.py:145, 149` | Deferred | Used by Qt ROI canvas + define panel. |
-| `data_processors/pup_retrieval_calculator.py:83` | Deferred | Used by addons_page (Pup Retrieval analysis). Should follow ConfigReader path. |
-| `video_processors/video_processing.py:2207` (frames extraction) | Deferred | Used by targeted_clips + addons_page. v1 should write to `derived/frames/extracted/`. |
-| `utils/project_reconfigure.py:96` | Deferred | Migration helper; needs careful review. |
+| `roi_tools/roi_utils.py:474` (multiply_ROIs roi_coordinates_path) | ✓ Fixed 122da | Sibling miss from 122d9 |
+| `roi_tools/roi_utils.py:561` (reset_video_ROIs roi_coordinates_path) | ✓ Fixed 122da | Same sibling pattern |
+| `video_processors/video_processing.py:2207` | ✓ Fixed 122db | `extract_frames_from_all_videos_in_directory` used `read_config_entry(config, "General settings", "project_path")` (fails on v1 .toml) + hardcoded legacy `frames/input/` subpath. Now uses `project_paths_from_config()["project_root"]` and branches to `derived/frames/extracted/` for v1 |
+| `ui_qt/forms/pose_cleanup.py:1318` | ✓ Fixed 122db | Unconditionally set `<root>/csv/smoothed_v2/` as default-output even for v1 projects. Now gated to legacy-only (same as the L1855 sibling) so v1 projects leave the field blank and target()'s run-dir allocator handles it. |
+| `ui_qt/forms/visualizations.py:1233` (per-route src_dir) | Deferred | Hardcoded `<root>/csv/<subdir>`. Requires route-metadata refactor (each route should declare its v1 path explicitly). Real bug, but the scope is larger than a one-liner. Tracked for a separate "visualizations v1 routing" patch. |
+| `data_processors/pup_retrieval_calculator.py:83` | NOT A BUG (re-triage) | `self.project_path` + `"logs"` — both correct for both layouts. |
+| `ui_qt/forms/video_info.py:265, 291, 292` | NOT A BUG (re-triage) | All inside `except Exception:` defensive fallback. Primary path uses helper. |
+| `roi_tools/roi_logic.py:145, 149` | NOT A BUG (re-triage) | Same — defensive fallback inside try/except. |
+| `ui_qt/forms/pose_cleanup.py:1855` | NOT A BUG (re-triage) | Explicitly gated `if not str(self.config_path).lower().endswith(".toml")` — legacy-only by design. |
+| `ui_qt/forms/pose_cleanup.py:1960` | NOT A BUG (re-triage) | Inside `if v1_root is None:` (legacy) branch of a `resolve_v1_project_root` check at L1934. |
+| `utils/project_reconfigure.py:96` | NOT A BUG (re-triage) | Legacy-only by design — v1 stores body_parts in `project.toml`, not a separate `bp_names` CSV. This function reconfigures the legacy `bp_names` CSV; it wouldn't be called for v1. |
 
 ### Qt-internal intentional decisions (NOT bugs — flagged by scan but author-justified)
 
@@ -155,3 +163,20 @@ For sites that need the legacy directory as a *starting point* (e.g. a CSV-to-pa
 3. **Intentional legacy-discovery is OK.** `input_source_picker`, `csv_to_parquet`, `toml_to_configparser` all hardcode legacy paths *as their job*. Don't reflexively replace those with the abstraction layer.
 
 4. **The abstraction layer is in good shape.** 18 public functions; both layouts handled cleanly; consistent detection rule. The bugs aren't from the helper being missing — they're from earlier code that wasn't touched during the layout migration. Migration-by-attrition rather than migration-by-sweep.
+
+5. **Triage rule: not every join to a legacy-looking subpath is a bug.** Three classes of false positive surfaced during 122db's re-triage:
+
+   a) **`self.project_path` is layout-resolved.** On any `ConfigReader` subclass, `self.project_path` is set to the project root for BOTH layouts (v1 root for v1; legacy root for legacy). Subpaths that are identical in both layouts (`logs/`, `derived/features/`, `derived/labels/`) are safe to join directly.
+   
+   b) **Defensive try/except fallbacks.** Many files use `project_paths_from_config` in the primary path and a hardcoded legacy guess in the `except` branch. The `except` fires only on malformed configs — acceptable.
+   
+   c) **Branch-gated legacy paths.** Code paths inside `if not v1:` / `else:` branches of explicit layout checks are SUPPOSED to construct legacy paths.
+
+   The right triage workflow:
+   1. Find `os.path.join(X, "Y", …)` hits.
+   2. For each: does subpath Y differ between layouts? (If `logs/`, `derived/features/`, `models/` after the v1 layout absorbs them, the answer is "no" → false positive.)
+   3. Where does X come from? `self.project_path` on a ConfigReader subclass is layout-resolved. `config.get(GENERAL_SETTINGS, PROJECT_PATH)` directly on a configparser is **broken for v1**.
+   4. Is the join inside a `try/except` whose primary path uses the helper? → defensive fallback, not a bug.
+   5. Is it inside an explicit `if v1_root is None:` legacy branch? → intentional.
+   
+   Following this workflow during 122db reduced the initially-flagged 12 "Qt-reachable bugs" to 3 actual ones.
