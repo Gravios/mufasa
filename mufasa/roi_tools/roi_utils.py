@@ -459,14 +459,29 @@ def multiply_ROIs(filename: Union[str, os.PathLike],
         check_file_exist_and_readable(file_path=config_path)
         config = read_config_file(config_path=config_path)
         project_path = config.get(ConfigKey.GENERAL_SETTINGS.value, ConfigKey.PROJECT_PATH.value)
-        videos_dir = os.path.join(project_path, "videos")
+        # Patch 122d9 (QWI-1): resolve videos_dir via the
+        # layout-agnostic project_paths_from_config helper. The
+        # pre-fix `os.path.join(project_path, "videos")` hard-
+        # coded the legacy SimBA layout and broke for v1 projects,
+        # which store videos at `<root>/sources/videos/` instead.
+        # The helper handles both layouts; ConfigReader, the Qt
+        # video-import form, and the InputSourcePicker all use
+        # the same detection rule (config_path ends with `.toml`
+        # → v1; else legacy).
+        from mufasa.project_layout import project_paths_from_config
+        videos_dir = project_paths_from_config(
+            config_path=config_path)["video_dir"]
         roi_coordinates_path = os.path.join(project_path, "logs", Paths.ROI_DEFINITIONS.value)
 
     check_file_exist_and_readable(file_path=filename)
     _, video_name, video_ext = get_fn_ext(filename)
 
     if not os.path.isdir(videos_dir):
-        raise NotDirectoryError(msg=f'Could not find the videos directory in the Mufasa project. SimBA expected a directory at location: {videos_dir}')
+        # Patch 122d9 (QWI-1): error message updated. Pre-fix the
+        # "SimBA expected a directory" wording was both stale
+        # ("Mufasa", not "SimBA") and unhelpful for v1 users who
+        # would see the legacy path here and not understand why.
+        raise NotDirectoryError(msg=f'Could not find the videos directory in the Mufasa project. Mufasa expected a directory at location: {videos_dir}')
     if not os.path.isfile(roi_coordinates_path):
         raise NoROIDataError(msg=f"Cannot multiply ROI definitions: no ROI definitions exist in Mufasa project. Could find find a file at expected location {roi_coordinates_path}", source=multiply_ROIs.__name__)
 

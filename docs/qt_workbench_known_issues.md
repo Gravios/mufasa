@@ -4,18 +4,18 @@
 
 | ID | Severity | Status | Component |
 |---|---|---|---|
-| QWI-1 | High | Open | ROI: Apply-all fails on v1 projects |
+| QWI-1 | High | ✓ Fixed 122d9 | ROI: Apply-all fails on v1 projects |
 | QWI-2 | Medium | ✓ Fixed 122d8 | Features: destination label shows raw HTML markup |
 | QWI-3 | Medium | ✓ Fixed 122d7 | Features: max_workers=0 crash on empty project |
 | QWI-4 | Medium | ✓ Fixed 122d0 | Workbench: page ordering (Annotation before Classifier) |
 
 ---
 
-## QWI-1 — ROI: Apply-all fails on v1 projects
+## QWI-1 — ROI: Apply-all fails on v1 projects — ✓ Fixed 122d9
 
-**Reproduce:** Open Qt workbench → ROI → Definitions → draw a ROI on one video → click "APPLY TO ALL" on the same row in the video table.
+**Reproduce (pre-fix):** Open Qt workbench → ROI → Definitions → draw a ROI on one video → click "APPLY TO ALL" on the same row in the video table.
 
-**Error:**
+**Error (pre-fix):**
 ```
 Apply-all failed
 Could not apply ROIs: NotDirectoryError: NOT A DIRECTORY ERROR:
@@ -30,23 +30,39 @@ SimBA expected a directory at location:
 videos_dir = os.path.join(project_path, "videos")
 ```
 
-Hard-codes the **legacy SimBA layout** (`<project>/videos/`). The v1 layout stores videos at `<project>/sources/videos/` (per `config_reader.py:367` v1 branch). The legacy assumption is baked into `multiply_ROIs()`, so any v1 project gets the wrong path even though `ConfigReader` would resolve it correctly.
+Hard-coded the **legacy SimBA layout** (`<project>/videos/`). The v1 layout stores videos at `<project>/sources/videos/`. The legacy assumption was baked into `multiply_ROIs()`, so any v1 project got the wrong path even though `ConfigReader` (and the rest of the codebase) resolved it correctly.
 
-The Qt UI (`roi_video_table.py` → `_apply_all`) calls `multiply_ROIs()` directly and inherits the bad assumption.
+The Qt UI (`roi_video_table.py` → `_apply_all`) calls `multiply_ROIs()` directly and inherited the bad assumption.
 
-**Recommended fix:**
+**Fix landed in 122d9:**
 
-Replace the hard-coded `videos_dir` computation in `multiply_ROIs()` with layout-agnostic resolution. Either:
+Replaced the hard-coded join with the layout-agnostic `project_paths_from_config` helper:
 
-(a) Instantiate `ConfigReader(config_path=...)` and use `reader.video_dir` (which has the v1-vs-legacy branch built in).
+```python
+from mufasa.project_layout import project_paths_from_config
+videos_dir = project_paths_from_config(
+    config_path=config_path)["video_dir"]
+```
 
-(b) Use `project_metadata_from_config()` helper from `mufasa/utils/v1_meta.py` (or wherever the layout resolver lives).
+This helper resolves both layouts using the same detection rule the rest of the codebase uses (`config_path` ends with `.toml` → v1; else legacy). Sibling code (`ConfigReader`, `InputSourcePicker`, the Qt video-import form) already uses this helper — `multiply_ROIs` is now consistent with the rest of the codebase.
 
-Approach (a) is the smaller diff. Same root function still works for legacy users since `ConfigReader` resolves the legacy path correctly when it sees a legacy-shaped project.
+Also updated the stale "SimBA expected" wording in the error message to "Mufasa expected" — minor branding fix.
 
-The error message wording — "SimBA expected" — is also stale; should be "Mufasa expected" to match current branding. Cosmetic but worth doing in the same patch.
+**Sibling audit performed during 122d9:**
 
-**Severity rationale:** ROI Apply-all is a primary workflow for any project with > 1 video. Blocks v1 users. High.
+The 122d0 doc flagged "audit other multiply_ROIs siblings". Whole-codebase grep for `os.path.join(.+, "videos")` found 5 sites:
+
+| Site | Disposition |
+|---|---|
+| `mufasa/mixins/config_reader.py:243` | Legacy-branch-correct (inside `if not self._is_v1:`) — not a bug |
+| `mufasa/roi_tools/roi_utils.py:462` | **The reported bug — fixed in 122d9** |
+| `mufasa/ui_qt/forms/video_info.py:291` | Defensive fallback inside `try/except` after a successful call to `project_paths_from_config`; only reached if the helper itself raises. Cosmetic concern; left alone |
+| `mufasa/utils/data.py:420` (`smooth_data_savitzky_golay`) | **Same bug pattern**, but the function is marked LEGACY in its own docstring and is only called from MARS-format legacy pose import (`pose_importers/import_mars.py`). Disposition deferred — fix when the MARS import surface gets a v1 review |
+| `mufasa/utils/data.py:477` (`smooth_data_gaussian`) | Same as above — legacy MARS-only function; deferred |
+
+The two `data.py` deferred fixes don't affect Qt workbench users on v1 projects (MARS import is not exposed in the workbench's main flows). If MARS import ever becomes a v1 priority, those sites get the same `project_paths_from_config` treatment.
+
+**Severity rationale:** ROI Apply-all is a primary workflow for any project with > 1 video. Pre-fix blocked all v1 users from this operation. High → resolved.
 
 ---
 
