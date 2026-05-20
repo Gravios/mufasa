@@ -23,6 +23,16 @@ Read this if you have an existing `project_folder/`-style project and want to ad
 
 Read this when planning the next typing/lint sweep or asking "is this file lint-clean?"
 
+### `testing_workflow.md` (122dk)
+**End-to-end test workflow.** Step-by-step verification plan tailored to parquet pose data + cage videos + multi-condition setups. Identifies the spots that need specific manual checks because recent patches changed behaviour vs the legacy SimBA implementation.
+
+Read this when you have a real dataset and want to validate the patch series before relying on it.
+
+### `roi_enhancements_proposal.md` (122dk)
+**ROI tool audit + proposed enhancements.** Honest status of the ROI tool's current capabilities (what's wired, what's fixed, what's missing). Two design proposals: "Apply to selected videos" subset-apply (122dk-future) and drag-to-adjust placed ROIs (122dl-future).
+
+Read this when planning the next ROI feature patches or deciding whether the current ROI tool meets a specific user need.
+
 ---
 
 ## Workflow & usage
