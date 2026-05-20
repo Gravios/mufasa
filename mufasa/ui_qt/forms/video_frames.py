@@ -49,16 +49,22 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QFormLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QSpinBox)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSpinBox,
+)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm
-
 
 _VIDEO_EXTS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v"}
 
@@ -198,8 +204,8 @@ class ExtractFramesForm(OperationForm):
         }
 
     def target(self, *, path: str, is_dir: bool,
-               save_dir: Optional[str],
-               start: Optional[int], end: Optional[int],
+               save_dir: str | None,
+               start: int | None, end: int | None,
                fmt: str, greyscale: bool, clahe: bool,
                include_fn: bool) -> None:
         from mufasa.video_processors import video_processing as _vp

@@ -54,14 +54,23 @@ so we don't need to paper over UI-control divergence.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QListWidgetItem,
-                               QPushButton, QSpinBox, QStackedWidget,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.forms.data_import import _PathField
@@ -86,8 +95,8 @@ class _BodyPartPicker(QWidget):
     analysis and feature-append forms that need the user to pick which
     tracking points count for the analysis."""
 
-    def __init__(self, config_path: Optional[str] = None,
-                 parent: Optional[QWidget] = None) -> None:
+    def __init__(self, config_path: str | None = None,
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
         self.list = QListWidget(self)
@@ -404,9 +413,9 @@ class ROIFeaturesForm(OperationForm):
         return args
 
     def target(self, *, config_path: str, action: str,
-               body_parts: Optional[list[str]] = None,
+               body_parts: list[str] | None = None,
                append_existing: bool = True,
-               data_dir: Optional[str] = None) -> None:
+               data_dir: str | None = None) -> None:
         if action.startswith("append"):
             from mufasa.roi_tools.ROI_feature_analyzer import ROIFeatureCreator
             ROIFeatureCreator(
@@ -754,7 +763,7 @@ class ROIVisualizeForm(OperationForm):
         }
 
     def target(self, *, config_path: str, target: str, video_path: str,
-               body_parts: Optional[list[str]], show_names: bool,
+               body_parts: list[str] | None, show_names: bool,
                show_bp: bool, show_bbox: bool, threshold: float,
                cores: int, gpu: bool) -> None:
         if target == "tracking":

@@ -38,18 +38,26 @@ Functional differences from the Tk original
 from __future__ import annotations
 
 import os
-from typing import Optional, Union
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox,
-                               QFileDialog, QGridLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit, QMessageBox,
-                               QPushButton, QVBoxLayout)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+)
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.roi_tools.import_roi_csvs import ROIDefinitionsCSVImporter
 from mufasa.utils.errors import InvalidInputError
-
 
 _CSV_FILTER = "CSV files (*.csv *.CSV);;All files (*)"
 
@@ -91,8 +99,8 @@ class ImportRoiCsvDialog(QDialog):
     """Qt port of `ROIDefinitionsCSVImporterPopUp` (122cu)."""
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 parent: Optional[QDialog] = None) -> None:
+                 config_path: str | os.PathLike,
+                 parent: QDialog | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self.setWindowTitle("Import ROI definitions from CSV")
@@ -174,7 +182,7 @@ class ImportRoiCsvDialog(QDialog):
     # ------------------------------------------------------------------ #
     # Internals
     # ------------------------------------------------------------------ #
-    def _resolved_path(self, edit: QLineEdit) -> Optional[str]:
+    def _resolved_path(self, edit: QLineEdit) -> str | None:
         """Return an existing file-path from the edit, or None."""
         text = edit.text().strip()
         if text and os.path.isfile(text):

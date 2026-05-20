@@ -38,7 +38,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from mufasa.project_layout import (
     ProjectPaths,
@@ -47,7 +46,6 @@ from mufasa.project_layout import (
     detect_layout,
     resolve_v1_project_root,
 )
-
 
 # --------------------------------------------------------------------------- #
 # Source kinds + discovery
@@ -108,7 +106,7 @@ class InputSource:
 # the assumption being that downstream stages usually want the
 # latest output of the previous stage. Override by passing a
 # different ``prefer_order``.
-_DEFAULT_PREFER_ORDER: Tuple[str, ...] = (
+_DEFAULT_PREFER_ORDER: tuple[str, ...] = (
     SourceKinds.SMOOTHED_KALMAN_V2,
     SourceKinds.OUTLIER_CORRECTED,
     SourceKinds.SMOOTHED_SAVITZKY,
@@ -139,7 +137,7 @@ def _dir_has_pose_files(d: Path) -> bool:
     return False
 
 
-def _legacy_sources(project_path: Path) -> List[InputSource]:
+def _legacy_sources(project_path: Path) -> list[InputSource]:
     """Discover legacy SimBA-style sources under
     ``<project_path>/csv/``.
 
@@ -150,7 +148,7 @@ def _legacy_sources(project_path: Path) -> List[InputSource]:
     Golay smoothing in legacy SimBA writes back over input_csv
     in-place, so there's no distinct "savitzky" dir to list.
     """
-    out: List[InputSource] = []
+    out: list[InputSource] = []
     csv_root = project_path / "csv"
     candidates = [
         (
@@ -180,7 +178,7 @@ def _legacy_sources(project_path: Path) -> List[InputSource]:
     return out
 
 
-def _v1_sources(project_root: Path) -> List[InputSource]:
+def _v1_sources(project_root: Path) -> list[InputSource]:
     """Discover v1 sources under ``<project_root>/sources/`` and
     ``<project_root>/derived/``.
 
@@ -188,7 +186,7 @@ def _v1_sources(project_root: Path) -> List[InputSource]:
     newest-first (run-ids are lexically sortable by timestamp).
     Empty run dirs are skipped.
     """
-    out: List[InputSource] = []
+    out: list[InputSource] = []
     paths = ProjectPaths(project_root)
 
     # Raw under sources/pose/
@@ -237,9 +235,9 @@ def _v1_sources(project_root: Path) -> List[InputSource]:
 
 
 def _mark_default(
-    sources: List[InputSource],
-    prefer_order: Tuple[str, ...],
-) -> List[InputSource]:
+    sources: list[InputSource],
+    prefer_order: tuple[str, ...],
+) -> list[InputSource]:
     """Return ``sources`` with at most one entry marked default.
 
     Walks ``prefer_order`` looking for the first kind that has any
@@ -263,11 +261,11 @@ def _mark_default(
 
 
 def discover_input_sources(
-    config_path: Optional[str] = None,
-    project_root: Optional[Path] = None,
+    config_path: str | None = None,
+    project_root: Path | None = None,
     *,
-    prefer_order: Tuple[str, ...] = _DEFAULT_PREFER_ORDER,
-) -> List[InputSource]:
+    prefer_order: tuple[str, ...] = _DEFAULT_PREFER_ORDER,
+) -> list[InputSource]:
     """Return candidate input directories for a downstream operation.
 
     Either ``config_path`` (legacy INI) or ``project_root`` (v1 root)
@@ -289,7 +287,7 @@ def discover_input_sources(
     * If neither path resolves to anything usable, an empty list
       is returned — callers should fall back to a custom-only UI.
     """
-    out: List[InputSource] = []
+    out: list[InputSource] = []
 
     # v1 first (preferred when present)
     eff_project_root = project_root
@@ -343,8 +341,13 @@ def discover_input_sources(
 try:
     from PySide6.QtCore import Signal  # type: ignore
     from PySide6.QtWidgets import (  # type: ignore
-        QComboBox, QFileDialog, QHBoxLayout, QLineEdit, QPushButton,
-        QVBoxLayout, QWidget,
+        QComboBox,
+        QFileDialog,
+        QHBoxLayout,
+        QLineEdit,
+        QPushButton,
+        QVBoxLayout,
+        QWidget,
     )
     _HAVE_QT = True
 except ImportError:  # pragma: no cover - sandbox has no PySide6
@@ -374,11 +377,11 @@ if _HAVE_QT:
 
         def __init__(
             self,
-            parent: Optional[QWidget] = None,
+            parent: QWidget | None = None,
             *,
-            config_path: Optional[str] = None,
-            project_root: Optional[Path] = None,
-            prefer_order: Optional[Tuple[str, ...]] = None,
+            config_path: str | None = None,
+            project_root: Path | None = None,
+            prefer_order: tuple[str, ...] | None = None,
         ) -> None:
             super().__init__(parent)
             self._config_path = config_path
@@ -387,7 +390,7 @@ if _HAVE_QT:
                 prefer_order if prefer_order is not None
                 else _DEFAULT_PREFER_ORDER
             )
-            self._sources: List[InputSource] = []
+            self._sources: list[InputSource] = []
 
             outer = QVBoxLayout(self)
             outer.setContentsMargins(0, 0, 0, 0)
@@ -426,7 +429,7 @@ if _HAVE_QT:
             when possible, falls back to the default-marked source
             when not.
             """
-            prev_path: Optional[str] = None
+            prev_path: str | None = None
             if self._combo.count() > 0:
                 # Preserve current path if user has typed one
                 prev_path = self._path_edit.text().strip()
@@ -437,7 +440,7 @@ if _HAVE_QT:
             )
             self._rebuild_combo(prefer_existing=prev_path)
 
-        def selected_source(self) -> Optional[InputSource]:
+        def selected_source(self) -> InputSource | None:
             """Return the picked :class:`InputSource`, or ``None``
             when Custom is selected (use :meth:`selected_path`
             then).
@@ -482,7 +485,7 @@ if _HAVE_QT:
 
         # --- Internals -----------------------------------------------------
         def _rebuild_combo(
-            self, *, prefer_existing: Optional[str] = None,
+            self, *, prefer_existing: str | None = None,
         ) -> None:
             self._combo.blockSignals(True)
             self._combo.clear()

@@ -53,13 +53,24 @@ same escape hatch as the converter form's labelme-df extras.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QColorDialog, QComboBox,
-                               QDoubleSpinBox, QFormLayout, QHBoxLayout, QLineEdit, QPushButton,
-                               QSpinBox, QStackedWidget, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QWidget,
+)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.forms.data_import import _PathField
@@ -72,7 +83,7 @@ from mufasa.ui_qt.workbench import OperationForm
 class _ColorButton(QPushButton):
     """Tiny colour picker — single button that opens QColorDialog."""
 
-    def __init__(self, default: str = "#000000", parent: Optional[QWidget] = None) -> None:
+    def __init__(self, default: str = "#000000", parent: QWidget | None = None) -> None:
         super().__init__(default, parent)
         self._color = default
         self.setStyleSheet(f"background-color: {default};")
@@ -144,7 +155,7 @@ class _ExtrasFormBuilder:
     underscores with spaces and title-casing.
     """
 
-    def __init__(self, descriptors: list[tuple], parent: Optional[QWidget] = None
+    def __init__(self, descriptors: list[tuple], parent: QWidget | None = None
                  ) -> None:
         self.descriptors = descriptors
         self.host = QWidget(parent)
@@ -391,6 +402,7 @@ def _resolve_viz_source_dir(*, config_path: str,
         For legacy projects, returns `<root>/csv/<source_name>/`.
     """
     from pathlib import Path as _P
+
     from mufasa.project_layout import is_run_id
 
     is_v1 = str(config_path).lower().endswith(".toml")
@@ -481,16 +493,16 @@ class _VizRoute:
     label: str
     scope_kind: str = "project"
     extras: list = field(default_factory=list)
-    backend_sp: Optional[Callable[..., Any]] = None
-    backend_mp: Optional[Callable[..., Any]] = None
+    backend_sp: Callable[..., Any] | None = None
+    backend_mp: Callable[..., Any] | None = None
     needs_video: bool = False
     needs_save_dir: bool = False
     common_toggles: set = field(default_factory=lambda: set())
     kwargs_map: dict = field(default_factory=dict)
     default_kwargs: dict = field(default_factory=dict)
-    data_paths_source: Optional[str] = None
-    data_path_source: Optional[str] = None
-    kwargs_transform: Optional[Callable[[dict], dict]] = None
+    data_paths_source: str | None = None
+    data_path_source: str | None = None
+    kwargs_transform: Callable[[dict], dict] | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -1283,13 +1295,15 @@ class VisualizationForm(OperationForm):
             "cores":  int(self.cores.value()),
         }
 
-    def target(self, *, route: _VizRoute, config_path: Optional[str],
-               source: Optional[str], video: Optional[str],
-               save: Optional[str], extras: dict, common: dict,
+    def target(self, *, route: _VizRoute, config_path: str | None,
+               source: str | None, video: str | None,
+               save: str | None, extras: dict, common: dict,
                cores: int) -> None:
         from pathlib import Path as _P
+
         from mufasa.project_layout import (
-            project_metadata_from_config, project_paths_from_config,
+            project_metadata_from_config,
+            project_paths_from_config,
         )
 
         km = route.kwargs_map

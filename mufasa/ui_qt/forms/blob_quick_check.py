@@ -44,14 +44,25 @@ the dialog removes the need to close and reopen the tool.
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog,
-                               QFileDialog, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QSlider,
-                               QSpinBox, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
 
@@ -103,7 +114,7 @@ class _BlobCheckDialog(QDialog):
     """
 
     def __init__(self, video_path: str, bg_video_path: str,
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Blob quick-check — preview")
         self.video_path = video_path
@@ -112,8 +123,7 @@ class _BlobCheckDialog(QDialog):
         # Lazy-import the backend pieces so this module can be
         # AST-parsed without cv2/PIL/etc. on the path. They're
         # required to ACTUALLY render, but not to define the form.
-        from mufasa.utils.read_write import (get_video_meta_data,
-                                             read_frm_of_video)
+        from mufasa.utils.read_write import get_video_meta_data, read_frm_of_video
         from mufasa.video_processors.video_processing import (
             create_average_frm,
         )
@@ -304,6 +314,7 @@ class _BlobCheckDialog(QDialog):
         if self.avg_frm is None:
             return
         import cv2
+
         from mufasa.mixins.image_mixin import ImageMixin
 
         try:

@@ -41,15 +41,13 @@ Patch history
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from mufasa.ui_qt.forms.pose_import import PoseImportForm
 from mufasa.ui_qt.forms.video_import import VideoImportForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_data_import_page(workbench,
-                           config_path: Optional[str] = None
+                           config_path: str | None = None
                            ) -> WorkflowPage:
     page = workbench.add_page("Data Import", icon_name="pose")
     page.add_section("Import Pose Data",

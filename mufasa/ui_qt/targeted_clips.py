@@ -38,14 +38,23 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
-                               QFileDialog, QHBoxLayout, QHeaderView, QLabel,
-                               QMessageBox, QPushButton,
-                               QTableWidget, QTableWidgetItem, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.frame_scrubber import FrameScrubberWidget
 
@@ -92,12 +101,12 @@ class TargetedClipsDialog(QDialog):
                  config_path: str,
                  video_path: str,
                  *,
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self.video_path = video_path
         self.video_name = Path(video_path).stem
-        self._pending_start: Optional[int] = None
+        self._pending_start: int | None = None
         self._dirty: bool = False
 
         self.setWindowTitle(f"Clip ranges — {self.video_name}")
@@ -132,8 +141,7 @@ class TargetedClipsDialog(QDialog):
           only consumer; could be added if more emerge.
         * ``machine_results_dir`` — already in the helper from 122ab.
         """
-        from mufasa.project_layout import (project_metadata_from_config,
-                                           project_paths_from_config)
+        from mufasa.project_layout import project_metadata_from_config, project_paths_from_config
         paths = project_paths_from_config(self.config_path)
         meta = project_metadata_from_config(self.config_path)
         self.file_type = meta.get("file_type", "csv")

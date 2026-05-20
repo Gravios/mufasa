@@ -45,18 +45,27 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QAbstractItemView, QButtonGroup, QCheckBox,
-                               QComboBox, QFileDialog, QFormLayout,
-                               QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QMessageBox, QPushButton,
-                               QRadioButton, QTableWidget,
-                               QTableWidgetItem)
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QRadioButton,
+    QTableWidget,
+    QTableWidgetItem,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 _VIDEO_FORMATS = ("mp4", "avi", "mov", "mkv", "webm", "m4v")
 
@@ -210,7 +219,7 @@ class VideoImportForm(OperationForm):
     # ------------------------------------------------------------------ #
     # Duplicate detection (patch 122v)
     # ------------------------------------------------------------------ #
-    def _videos_dir(self) -> Optional[Path]:
+    def _videos_dir(self) -> Path | None:
         """Resolve the project's videos directory, or None if no
         project is loaded or the layout helper isn't reachable.
 

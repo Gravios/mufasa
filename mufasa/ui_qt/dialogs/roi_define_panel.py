@@ -54,30 +54,46 @@ Compatibility
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox,
-                               QDialog, QHBoxLayout, QHeaderView,
-                               QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMessageBox, QPushButton,
-                               QSizePolicy, QSlider, QSpinBox, QSplitter,
-                               QTableWidget, QTableWidgetItem, QToolButton,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QComboBox,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QSlider,
+    QSpinBox,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-from mufasa.roi_tools.roi_logic import (CIRCLE, POLYGON, RECTANGLE,
-                                        ROILogic)
+from mufasa.roi_tools.roi_logic import CIRCLE, POLYGON, RECTANGLE, ROILogic
 from mufasa.ui_qt.dialogs.roi_canvas import ROICanvas
+
 # Patch 122ag (hotfix on 122ab): the v1-awareness rename of
 # _project_path_from_config → _project_paths_lite (returns a paths
 # dict instead of a bare string) and the signature change of
 # _list_project_videos (now takes a video_dir directly) missed this
 # import call site. Updated to use the new helper API.
-from mufasa.ui_qt.dialogs.roi_video_table import (_list_project_videos,
-                                                  _project_paths_lite,
-                                                  _videos_with_rois)
-
+from mufasa.ui_qt.dialogs.roi_video_table import (
+    _list_project_videos,
+    _project_paths_lite,
+    _videos_with_rois,
+)
 
 # Standard color palette (BGR for OpenCV consistency).
 _COLORS: list[tuple[str, tuple[int, int, int]]] = [
@@ -122,27 +138,27 @@ class ROIDefineWidget(QWidget):
 
     rois_modified = Signal()   # emitted when any save / reset happens
 
-    def __init__(self, config_path: Optional[str] = None,
-                 video_path: Optional[str] = None,
-                 parent: Optional[QWidget] = None) -> None:
+    def __init__(self, config_path: str | None = None,
+                 video_path: str | None = None,
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         # Patch 122dn — graceful no-project handling. The widget
         # can be constructed without a project (workbench startup
         # without an open project) and just shows a placeholder.
         # All real init happens inside _initialize_for_project().
-        self.config_path: Optional[str] = config_path
+        self.config_path: str | None = config_path
         self.project_path: str = ""
         self.video_dir: str = ""
         self._videos: list[str] = []
         self._cur_idx: int = 0
-        self.logic: Optional[ROILogic] = None
+        self.logic: ROILogic | None = None
         self._dirty = False
         # Track our own layout so we can swap between the
         # placeholder and the full UI without leaks.
         self._root_layout = QVBoxLayout(self)
         self._root_layout.setContentsMargins(0, 0, 0, 0)
         self._root_layout.setSpacing(0)
-        self._content_widget: Optional[QWidget] = None
+        self._content_widget: QWidget | None = None
         # Stash the requested starting video so it survives a
         # set_config_path call (used by the dialog wrapper).
         self._requested_video_path = video_path
@@ -208,7 +224,7 @@ class ROIDefineWidget(QWidget):
         self._refresh_video_list()
         self._load_video(self._cur_idx)
 
-    def set_config_path(self, config_path: Optional[str]) -> None:
+    def set_config_path(self, config_path: str | None) -> None:
         """Switch to a different project (or to no-project mode).
         Rebuilds the UI in place. Used by the page wrapper when a
         new project is loaded after the widget was already built.
@@ -1025,8 +1041,8 @@ class ROIDefineWidget(QWidget):
         # graph at module load time (matches the pattern used by
         # _on_apply_all_clicked above).
         from pathlib import Path as _Path
-        from mufasa.ui_qt.dialogs.duplicate_rois_source_target import (
-            DuplicateRoisDialog)
+
+        from mufasa.ui_qt.dialogs.duplicate_rois_source_target import DuplicateRoisDialog
         cur_video_name = _Path(
             self._videos[self._cur_idx]).stem
         dlg = DuplicateRoisDialog(
@@ -1124,8 +1140,8 @@ class ROIDefinePanel(QDialog):
     rois_modified = Signal()
 
     def __init__(self, config_path: str,
-                 video_path: Optional[str] = None,
-                 parent: Optional[QWidget] = None) -> None:
+                 video_path: str | None = None,
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("ROI Definitions — Mufasa")
         self.setWindowFlags(self.windowFlags() | Qt.Window)

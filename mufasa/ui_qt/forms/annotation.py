@@ -25,11 +25,20 @@ Inline forms for the annotation workflow:
 """
 from __future__ import annotations
 
-
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QMessageBox,
-                               QPushButton, QSpinBox, QStackedWidget,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QWidget,
+)
+
 from mufasa.ui_qt.forms.analysis import _ClassifierPicker
 from mufasa.ui_qt.forms.data_import import _PathField
 from mufasa.ui_qt.workbench import OperationForm

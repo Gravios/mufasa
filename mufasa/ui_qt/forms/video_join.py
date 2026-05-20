@@ -27,14 +27,21 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout,
-                               QHBoxLayout, QLineEdit,
-                               QListWidget, QListWidgetItem,
-                               QPushButton, QSpinBox, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
 
@@ -47,7 +54,7 @@ class _VideoListPicker(QWidget):
     2-video-special-case + N-video-list pattern.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
 
@@ -169,6 +176,7 @@ class JoinVideosForm(OperationForm):
     def target(self, *, paths: list[str], mode: str,
                rows: int) -> None:
         import math
+
         from mufasa.video_processors import video_processing as _vp
 
         # All four concatenators require explicit save_path (no default

@@ -33,10 +33,8 @@ the Qt port surfaces it as a message).
 from __future__ import annotations
 
 import os
-from typing import Optional, Union
 
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QFormLayout, QLabel, QMessageBox)
+from PySide6.QtWidgets import QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLabel, QMessageBox
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.roi_tools.ROI_size_standardizer import ROISizeStandardizer
@@ -48,8 +46,8 @@ class ROISizeStandardizerDialog(QDialog):
     """Qt port of `ROISizeStandardizerPopUp` (122cs)."""
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 parent: Optional[QDialog] = None) -> None:
+                 config_path: str | os.PathLike,
+                 parent: QDialog | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self.setWindowTitle("ROI Size Standardizer")

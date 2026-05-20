@@ -15,8 +15,6 @@ project path) consume from here.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
-
 
 _RECENT_PROJECT_PATH = (
     Path.home() / ".config" / "mufasa" / "recent"
@@ -45,7 +43,7 @@ def save_recent_project(config_path: str) -> None:
         pass
 
 
-def load_recent_project() -> Optional[Path]:
+def load_recent_project() -> Path | None:
     """Read ~/.config/mufasa/recent and return its path if
     valid.
 

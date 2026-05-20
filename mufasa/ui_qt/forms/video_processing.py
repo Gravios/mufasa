@@ -26,12 +26,23 @@ radio replaces the need for a dedicated window per variant.
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QButtonGroup, QFileDialog, QFormLayout,
-                               QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QRadioButton, QStackedWidget, QComboBox, QSpinBox, QCheckBox, QWidget)
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QRadioButton,
+    QSpinBox,
+    QStackedWidget,
+    QWidget,
+)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.workbench import OperationForm
@@ -47,7 +58,7 @@ class _ScopePicker(QWidget):
     in every Convert2*PopUp (and many others). One control handles both.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None,
+    def __init__(self, parent: QWidget | None = None,
                  allow_multiple: bool = True,
                  file_filter: str = "Video files (*.mp4 *.avi *.mov *.mkv *.webm);;All files (*)"
                  ) -> None:
@@ -293,7 +304,7 @@ class VideoOverlayForm(OperationForm):
         overlay_idx = self.overlay_type.currentIndex()
         overlay_kind = ["frame_count", "timer", "text", "filename",
                         "watermark", "progress_bar", "pip_video"][overlay_idx]
-        content: Optional[str] = None
+        content: str | None = None
         if overlay_kind == "text":
             content = self.text_field.text().strip()
             if not content:
@@ -316,7 +327,7 @@ class VideoOverlayForm(OperationForm):
         }
 
     def target(self, *, path: str, is_dir: bool, kind: str,
-               content: Optional[str], position: str, font_size: int) -> None:
+               content: str | None, position: str, font_size: int) -> None:
         from mufasa.video_processors import video_processing as _vp
         dispatch = {
             "frame_count":  _vp.superimpose_frame_count,

@@ -12,14 +12,12 @@ extractor is wired inline it can be appended here.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from mufasa.ui_qt.forms.features import FeatureSubsetExtractorForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_features_page(workbench,
-                        config_path: Optional[str] = None) -> WorkflowPage:
+                        config_path: str | None = None) -> WorkflowPage:
     page = workbench.add_page("Features", icon_name="features")
     page.add_section("Compute feature subsets",
                      [(FeatureSubsetExtractorForm, {})])

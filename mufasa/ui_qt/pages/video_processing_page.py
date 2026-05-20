@@ -67,33 +67,35 @@ workbench pages.
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from mufasa.ui_qt.forms.video_processing import (ClipVideosForm,
-                                                 VideoFormatConverterForm,
-                                                 VideoOverlayForm)
-from mufasa.ui_qt.forms.video_editing import (CropVideosForm, ResizeVideosForm,
-                                              RotateFlipForm)
-from mufasa.ui_qt.forms.video_filters import VideoFiltersForm
+from mufasa.ui_qt.forms.image_conversion import AverageFrameForm, ImageFormatConverterForm
 from mufasa.ui_qt.forms.video_bg_removal import BackgroundRemovalForm
-from mufasa.ui_qt.forms.video_frames import (ExtractFramesForm,
-                                              ImportFrameDirectoryForm,
-                                              MergeFramesToVideoForm)
-from mufasa.ui_qt.forms.video_join import (CrossfadeVideosForm,
-                                            JoinVideosForm)
-from mufasa.ui_qt.forms.video_utilities import (ChangeSpeedForm,
-                                                 CheckVideoSeekableForm,
-                                                 PixelsPerMMForm,
-                                                 ReverseVideoForm)
-from mufasa.ui_qt.forms.image_conversion import (AverageFrameForm,
-                                                 ImageFormatConverterForm)
+from mufasa.ui_qt.forms.video_editing import CropVideosForm, ResizeVideosForm, RotateFlipForm
+from mufasa.ui_qt.forms.video_filters import VideoFiltersForm
+from mufasa.ui_qt.forms.video_frames import (
+    ExtractFramesForm,
+    ImportFrameDirectoryForm,
+    MergeFramesToVideoForm,
+)
+from mufasa.ui_qt.forms.video_join import CrossfadeVideosForm, JoinVideosForm
+from mufasa.ui_qt.forms.video_processing import (
+    ClipVideosForm,
+    VideoFormatConverterForm,
+    VideoOverlayForm,
+)
+from mufasa.ui_qt.forms.video_utilities import (
+    ChangeSpeedForm,
+    CheckVideoSeekableForm,
+    PixelsPerMMForm,
+    ReverseVideoForm,
+)
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_video_processing_page(workbench,
-                                config_path: Optional[str] = None
+                                config_path: str | None = None
                                 ) -> WorkflowPage:
     """Populate and return the Video Processing workflow page."""
     page = workbench.add_page("Video Processing", icon_name="video")
@@ -142,7 +144,7 @@ def build_video_processing_page(workbench,
 def register_video_processing_menu_actions(workbench) -> None:
     """Zero-field / read-only video operations as Tools-menu items."""
 
-    def _pick_video(prompt: str = "Select a video") -> Optional[str]:
+    def _pick_video(prompt: str = "Select a video") -> str | None:
         path, _ = QFileDialog.getOpenFileName(
             workbench, prompt, "",
             "Video files (*.mp4 *.avi *.mov *.mkv *.webm)",

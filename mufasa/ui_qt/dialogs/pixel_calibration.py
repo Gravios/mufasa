@@ -42,16 +42,23 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
-from PySide6.QtGui import (QColor, QImage, QMouseEvent, QPaintEvent, QPainter,
-                           QPen, QPixmap)
-from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QDoubleSpinBox,
-                               QFormLayout, QHBoxLayout, QLabel, QPushButton,
-                               QSizePolicy, QVBoxLayout, QWidget)
+from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QPaintEvent, QPen, QPixmap
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 # Same coordinate-mapping pattern as the ROI canvas: a dataclass
@@ -68,7 +75,7 @@ class _ImageMapping:
     frame_w: int
     frame_h: int
 
-    def widget_to_frame(self, wx: int, wy: int) -> Optional[Tuple[int, int]]:
+    def widget_to_frame(self, wx: int, wy: int) -> tuple[int, int] | None:
         if self.scale <= 0:
             return None
         fx = (wx - self.offset_x) / self.scale
@@ -77,7 +84,7 @@ class _ImageMapping:
             return int(round(fx)), int(round(fy))
         return None
 
-    def frame_to_widget(self, fx: float, fy: float) -> Tuple[int, int]:
+    def frame_to_widget(self, fx: float, fy: float) -> tuple[int, int]:
         return (
             int(round(fx * self.scale + self.offset_x)),
             int(round(fy * self.scale + self.offset_y)),
@@ -95,18 +102,18 @@ class _CalibrationCanvas(QWidget):
 
     points_changed = Signal()
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setMinimumSize(480, 360)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setCursor(Qt.CrossCursor)
         # Frame data
-        self._frame_bgr: Optional[np.ndarray] = None
-        self._frame_pixmap: Optional[QPixmap] = None
-        self._mapping: Optional[_ImageMapping] = None
+        self._frame_bgr: np.ndarray | None = None
+        self._frame_pixmap: QPixmap | None = None
+        self._mapping: _ImageMapping | None = None
         # Click points in FRAME coords
-        self._point_a: Optional[Tuple[int, int]] = None
-        self._point_b: Optional[Tuple[int, int]] = None
+        self._point_a: tuple[int, int] | None = None
+        self._point_b: tuple[int, int] | None = None
 
     def set_frame(self, bgr: np.ndarray) -> None:
         self._frame_bgr = bgr
@@ -128,12 +135,12 @@ class _CalibrationCanvas(QWidget):
 
     def get_points(
         self,
-    ) -> Tuple[Optional[Tuple[int, int]], Optional[Tuple[int, int]]]:
+    ) -> tuple[tuple[int, int] | None, tuple[int, int] | None]:
         """Returns (point_a, point_b) in frame pixel coords. Either
         may be None if not yet placed."""
         return self._point_a, self._point_b
 
-    def pixel_distance(self) -> Optional[float]:
+    def pixel_distance(self) -> float | None:
         """Euclidean distance between A and B in frame pixels.
         Returns None if both points aren't placed yet."""
         if self._point_a is None or self._point_b is None:
@@ -286,7 +293,7 @@ class PixelCalibrationDialog(QDialog):
         self,
         video_path: str,
         known_mm_distance: float = 100.0,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(
@@ -297,8 +304,8 @@ class PixelCalibrationDialog(QDialog):
         # Result attributes set on accept. Initialized to None so
         # callers can distinguish "user cancelled" from "user
         # accepted" via the attribute being None vs. set.
-        self.ppm: Optional[float] = None
-        self.known_mm_distance: Optional[float] = None
+        self.ppm: float | None = None
+        self.known_mm_distance: float | None = None
         self._video_path = video_path
 
         # Read first frame
@@ -385,7 +392,7 @@ class PixelCalibrationDialog(QDialog):
         self._update_readouts()
 
     @staticmethod
-    def _load_first_frame(video_path: str) -> Optional[np.ndarray]:
+    def _load_first_frame(video_path: str) -> np.ndarray | None:
         """Read the first frame of the video as a BGR ndarray.
         Returns None on any failure."""
         if not os.path.isfile(video_path):

@@ -80,23 +80,23 @@ rationale.
 """
 from __future__ import annotations
 
-from typing import Optional
-
-from mufasa.ui_qt.forms.pose_cleanup import (DropBodypartsForm,
-                                             EgocentricAlignmentForm,
-                                             InterpolateForm,
-                                             KalmanV2SmoothingForm,
-                                             OutlierSettingsForm,
-                                             RunOutlierCorrectionForm,
-                                             SkipOutlierCorrectionForm,
-                                             SmoothingForm)
 from mufasa.ui_qt.forms.batch_pre_process import BatchPreProcessForm
+from mufasa.ui_qt.forms.pose_cleanup import (
+    DropBodypartsForm,
+    EgocentricAlignmentForm,
+    InterpolateForm,
+    KalmanV2SmoothingForm,
+    OutlierSettingsForm,
+    RunOutlierCorrectionForm,
+    SkipOutlierCorrectionForm,
+    SmoothingForm,
+)
 from mufasa.ui_qt.forms.video_info import VideoInfoForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_pose_cleanup_page(workbench,
-                            config_path: Optional[str] = None
+                            config_path: str | None = None
                             ) -> WorkflowPage:
     """Build and return the Preprocessing page."""
     page = workbench.add_page("Preprocessing", icon_name="outlier")

@@ -33,11 +33,12 @@ Usage::
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Dict
+from collections.abc import Callable
+from typing import Any
 
 
 def filter_kwargs(backend: Callable[..., Any],
-                  kwargs: Dict[str, Any]) -> Dict[str, Any]:
+                  kwargs: dict[str, Any]) -> dict[str, Any]:
     """Drop kwargs the backend's ``__init__`` (or callable) signature
     doesn't accept. Returns a new dict; does not mutate the input.
 

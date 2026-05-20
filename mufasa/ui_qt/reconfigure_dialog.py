@@ -14,18 +14,27 @@ modules so they can be scripted or driven by the legacy Tk UI too.
 """
 from __future__ import annotations
 
-from typing import List, Optional
-
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QMessageBox, QPushButton,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-from mufasa.pose_importers.dlc_autodetect import (DLCAutodetectError,
-                                                  extract_bodyparts)
-from mufasa.utils.project_reconfigure import (ProjectReconfigureError,
-                                              reconfigure_project_user_defined)
+from mufasa.pose_importers.dlc_autodetect import DLCAutodetectError, extract_bodyparts
+from mufasa.utils.project_reconfigure import (
+    ProjectReconfigureError,
+    reconfigure_project_user_defined,
+)
 
 
 class ReconfigureProjectDialog(QDialog):
@@ -40,14 +49,14 @@ class ReconfigureProjectDialog(QDialog):
 
     def __init__(self,
                  config_path: str,
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self.setWindowTitle("Reconfigure project from DLC file")
         self.setModal(True)
         self.resize(620, 560)
 
-        self._detected_bps: List[str] = []
+        self._detected_bps: list[str] = []
 
         # ------------------ Widgets ---------------------------------- #
         hint = QLabel(

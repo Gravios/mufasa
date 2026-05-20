@@ -30,15 +30,22 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Union
 
 from PySide6.QtWidgets import QMessageBox
 
 from mufasa.ui_qt.dialog import MufasaDialog
 from mufasa.ui_qt.operations import DatasetOp
-from mufasa.ui_qt.widgets import (NW, CreateLabelFrameWithIcon, Entry_Box,
-                                 FileSelect, FolderSelect, Formats,
-                                 MufasaButton, MufasaDropDown, MufasaLabel)
+from mufasa.ui_qt.widgets import (
+    NW,
+    CreateLabelFrameWithIcon,
+    Entry_Box,
+    FileSelect,
+    FolderSelect,
+    Formats,
+    MufasaButton,
+    MufasaDropDown,
+    MufasaLabel,
+)
 
 # TODO: relocate to ``mufasa.data_processors.smoothing.Smoothing.METHODS``
 # when the backend is touched — per audit schema #2 (processors expose
@@ -107,7 +114,7 @@ class SmoothingPopUp(MufasaDialog):
     Ported from :class:`mufasa.ui.pop_ups.smoothing_popup.SmoothingPopUp`.
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike]) -> None:
+    def __init__(self, config_path: str | os.PathLike) -> None:
         MufasaDialog.__init__(
             self,
             title="SMOOTH POSE-ESTIMATION DATA",
@@ -201,8 +208,8 @@ class SmoothingPopUp(MufasaDialog):
 
     # ---- dispatch ------------------------------------------------- #
     def _run(self, multiple: bool) -> None:
-        from mufasa.utils.checks import check_int  # lazy import
         from mufasa.ui_qt.runner import ProcessorRunner
+        from mufasa.utils.checks import check_int  # lazy import
 
         time_window_text = self.time_window.entry_get
         try:

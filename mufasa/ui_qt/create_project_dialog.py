@@ -26,11 +26,8 @@ share the same code path.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QLabel,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout, QWidget
 
 from mufasa.ui_qt.forms.project_create import ProjectCreateForm
 
@@ -45,12 +42,12 @@ class CreateProjectDialog(QDialog):
     remains ``None``.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Create new Mufasa project")
         self.setModal(True)
         self.resize(560, 540)
-        self.config_path: Optional[str] = None
+        self.config_path: str | None = None
 
         # Embed the inline form. show_create_button=False because
         # the dialog supplies its own action button via

@@ -30,15 +30,12 @@ panel.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from mufasa.ui_qt.dialogs.roi_define_panel import ROIDefineWidget
-from mufasa.ui_qt.forms.roi import (ROIAnalysisForm, ROIFeaturesForm,
-                                    ROIManageForm, ROIVisualizeForm)
+from mufasa.ui_qt.forms.roi import ROIAnalysisForm, ROIFeaturesForm, ROIManageForm, ROIVisualizeForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
-def _make_define_widget(config_path: Optional[str]) -> ROIDefineWidget:
+def _make_define_widget(config_path: str | None) -> ROIDefineWidget:
     """Factory used by WorkflowPage.add_section_widget. Constructs a
     ROIDefineWidget with embedded-mode visibility (hides the dialog-
     only Close / Save&Close buttons since the page section provides
@@ -48,7 +45,7 @@ def _make_define_widget(config_path: Optional[str]) -> ROIDefineWidget:
     return w
 
 
-def build_roi_page(workbench, config_path: Optional[str] = None
+def build_roi_page(workbench, config_path: str | None = None
                    ) -> WorkflowPage:
     page = workbench.add_page("ROI", icon_name="roi")
     # Patch 122dn — Definitions section hosts the ROI define widget

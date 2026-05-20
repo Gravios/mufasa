@@ -27,14 +27,21 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QDialog,
-                               QDoubleSpinBox, QFileDialog,
-                               QFormLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QMessageBox, QPushButton,
-                               QSpinBox)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm
@@ -109,7 +116,7 @@ class ReverseVideoForm(OperationForm):
             "gpu":      bool(self.gpu.isChecked()),
         }
 
-    def target(self, *, path: str, save_dir: Optional[str],
+    def target(self, *, path: str, save_dir: str | None,
                quality: int, gpu: bool) -> None:
         from mufasa.video_processors import video_processing as _vp
         _vp.reverse_videos(
@@ -206,7 +213,7 @@ class ChangeSpeedForm(OperationForm):
         }
 
     def target(self, *, path: str, is_dir: bool, speed: float,
-               save_dir: Optional[str], quality: int,
+               save_dir: str | None, quality: int,
                gpu: bool) -> None:
         from mufasa.video_processors import video_processing as _vp
         if is_dir:
@@ -493,12 +500,11 @@ class CheckVideoSeekableForm(OperationForm):
         }
 
     def target(self, *, path: str, gpu: bool,
-               batch_size: Optional[int],
-               save_path: Optional[str]) -> None:
+               batch_size: int | None,
+               save_path: str | None) -> None:
         from datetime import datetime
 
-        from mufasa.utils.read_write import (get_desktop_path,
-                                             get_downloads_path)
+        from mufasa.utils.read_write import get_desktop_path, get_downloads_path
         from mufasa.video_processors.video_processing import (
             is_video_seekable,
         )

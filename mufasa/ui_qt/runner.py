@@ -51,7 +51,8 @@ from __future__ import annotations
 import threading
 import time
 import traceback
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from PySide6.QtCore import QThread, Signal
 
@@ -85,9 +86,9 @@ class ProcessorRunner(QThread):
         self,
         target: Callable[..., Any],
         args: tuple = (),
-        kwargs: Optional[dict] = None,
+        kwargs: dict | None = None,
         *,
-        inject_runner_kw: Optional[str] = None,
+        inject_runner_kw: str | None = None,
     ) -> None:
         """
         :param target: the callable (usually ``some_processor.run``).
@@ -105,8 +106,8 @@ class ProcessorRunner(QThread):
         self.cancel_event = threading.Event()
         # Populated post-run for tests / debugging.
         self.result: Any = None
-        self.exception: Optional[BaseException] = None
-        self.wall_time_s: Optional[float] = None
+        self.exception: BaseException | None = None
+        self.wall_time_s: float | None = None
 
     # ----- control ------------------------------------------------------ #
     def request_cancel(self) -> None:

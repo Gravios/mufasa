@@ -45,17 +45,24 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import cv2
 import numpy as np
-from PySide6.QtCore import (QFileSystemWatcher, QSize, Qt, QTimer, Signal)
+from PySide6.QtCore import QFileSystemWatcher, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QImage, QPixmap
-from PySide6.QtWidgets import (QDialog, QHBoxLayout, QHeaderView, QLabel,
-                               QMenuBar, QMessageBox, QPushButton,
-                               QTableWidget, QTableWidgetItem, QVBoxLayout,
-                               QWidget)
-
+from PySide6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMenuBar,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 # Column indices for the table — referenced in several places.
 COL_INDEX = 0
@@ -183,7 +190,7 @@ class ROIVideoTableDialog(QDialog):
     # operation). The page can use this to refresh anything dependent.
     rois_modified = Signal()
 
-    def __init__(self, config_path: str, parent: Optional[QWidget] = None
+    def __init__(self, config_path: str, parent: QWidget | None = None
                  ) -> None:
         super().__init__(parent)
         self.config_path = config_path
@@ -491,8 +498,7 @@ class ROIVideoTableDialog(QDialog):
         # Patch 122cs: ported to Qt-native (was a subprocess-
         # launched Tk popup; see docs/tk_surface_audit.md §2g
         # for the subprocess-bridge pattern this replaces).
-        from mufasa.ui_qt.dialogs.roi_size_standardizer import (
-            ROISizeStandardizerDialog)
+        from mufasa.ui_qt.dialogs.roi_size_standardizer import ROISizeStandardizerDialog
         dlg = ROISizeStandardizerDialog(
             config_path=self.config_path, parent=self)
         if dlg.init_failed():
@@ -512,8 +518,7 @@ class ROIVideoTableDialog(QDialog):
         # helper is now removed from this file — there are no
         # remaining callers. See docs/tk_surface_audit.md §2g
         # for the full subprocess-bridge history.)
-        from mufasa.ui_qt.dialogs.duplicate_rois_source_target import (
-            DuplicateRoisDialog)
+        from mufasa.ui_qt.dialogs.duplicate_rois_source_target import DuplicateRoisDialog
         dlg = DuplicateRoisDialog(
             config_path=self.config_path, parent=self)
         if dlg.init_failed():
@@ -527,8 +532,7 @@ class ROIVideoTableDialog(QDialog):
     def _action_import_csv(self) -> None:
         # Patch 122cu: ported to Qt-native (was a subprocess-
         # launched Tk popup; see docs/tk_surface_audit.md §2g).
-        from mufasa.ui_qt.dialogs.import_roi_csv import (
-            ImportRoiCsvDialog)
+        from mufasa.ui_qt.dialogs.import_roi_csv import ImportRoiCsvDialog
         dlg = ImportRoiCsvDialog(
             config_path=self.config_path, parent=self)
         if dlg.init_failed():
@@ -544,8 +548,7 @@ class ROIVideoTableDialog(QDialog):
     def _action_min_max_draw_size(self) -> None:
         # Patch 122ct: ported to Qt-native (was a subprocess-
         # launched Tk popup; see docs/tk_surface_audit.md §2g).
-        from mufasa.ui_qt.dialogs.min_max_draw_size import (
-            MinMaxDrawSizeDialog)
+        from mufasa.ui_qt.dialogs.min_max_draw_size import MinMaxDrawSizeDialog
         dlg = MinMaxDrawSizeDialog(
             config_path=self.config_path, parent=self)
         if dlg.init_failed():

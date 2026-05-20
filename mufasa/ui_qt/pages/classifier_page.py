@@ -31,8 +31,6 @@ not the Classifier page.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from mufasa.ui_qt.forms.classifier import ClassifierManageForm
 from mufasa.ui_qt.forms.run_inference import RunInferenceForm
 from mufasa.ui_qt.forms.train_classifier import TrainClassifierForm
@@ -43,7 +41,7 @@ from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_classifier_page(workbench,
-                          config_path: Optional[str] = None
+                          config_path: str | None = None
                           ) -> WorkflowPage:
     page = workbench.add_page("Classifier", icon_name="clf")
     page.add_section("Manage classifiers", [(ClassifierManageForm, {})])

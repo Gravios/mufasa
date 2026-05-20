@@ -40,16 +40,20 @@ Patch 122ae-3 supersedes the 122z destination notes
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QFormLayout, QLabel, QListWidget,
-                               QListWidgetItem, QSpinBox, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QFormLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.forms.data_import import _PathField
 from mufasa.ui_qt.workbench import OperationForm
-
 
 # Default feature families — mirrors the hard-coded list in the legacy
 # popup. If the backend later exposes a registry, swap to that.
@@ -184,7 +188,7 @@ class FeatureSubsetExtractorForm(OperationForm):
         # features_extracted/. Most users didn't intend that.
         # Radio buttons enforce a single choice and make each
         # mode's behavior explicit in the label.
-        from PySide6.QtWidgets import QRadioButton, QButtonGroup
+        from PySide6.QtWidgets import QButtonGroup, QRadioButton
         dest_label = QLabel("<b>Destination:</b>", self)
         form.addRow("", dest_label)
 
@@ -393,6 +397,7 @@ class FeatureSubsetExtractorForm(OperationForm):
         is expected.
         """
         from PySide6.QtWidgets import QMessageBox
+
         from mufasa.ui_qt.progress import run_with_progress
 
         try:
@@ -430,7 +435,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             # few seconds; show a busy cursor so it's obvious
             # something is happening.
             from PySide6.QtCore import Qt as _Qt
-            from PySide6.QtGui import QGuiApplication, QCursor
+            from PySide6.QtGui import QCursor, QGuiApplication
             QGuiApplication.setOverrideCursor(QCursor(_Qt.WaitCursor))
             try:
                 conflicts = self._run_preflight(kwargs)
@@ -546,7 +551,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             ),
         )
 
-    def _run_preflight(self, kwargs: dict) -> Optional[dict]:
+    def _run_preflight(self, kwargs: dict) -> dict | None:
         """Build a FeatureSubsetsCalculator and call its preflight
         check. Lives in the form so the UI can prompt before
         target() (which dispatches into a worker) is invoked.
@@ -577,8 +582,8 @@ class FeatureSubsetExtractorForm(OperationForm):
         return calc.preflight_check()
 
     def target(self, *, config_path: str, feature_families: list[str],
-               file_checks: bool, save_dir: Optional[str],
-               derived_features_dir: Optional[str],
+               file_checks: bool, save_dir: str | None,
+               derived_features_dir: str | None,
                n_workers: int, overwrite_existing: bool = False) -> None:
         from mufasa.feature_extractors.feature_subsets import (
             FeatureSubsetsCalculator,

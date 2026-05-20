@@ -27,7 +27,6 @@ from __future__ import annotations
 
 from mufasa.ui_qt.forms.batch_pre_process import BatchPreProcessForm
 
-
 # --------------------------------------------------------------------------- #
 # BatchPreProcessLauncher — alias for back-compat (patch 122al)
 # --------------------------------------------------------------------------- #

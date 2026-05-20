@@ -30,15 +30,23 @@ non-blocking-after-dismissal), matching the legacy UX.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout,
-                               QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPlainTextEdit,
-                               QPushButton, QSpinBox,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 import mufasa
 from mufasa.utils.enums import Paths
@@ -72,7 +80,7 @@ class ProjectCreateForm(QWidget):
     project_created = Signal(str)
 
     def __init__(self,
-                 parent: Optional[QWidget] = None,
+                 parent: QWidget | None = None,
                  *,
                  show_create_button: bool = True) -> None:
         super().__init__(parent)
@@ -84,10 +92,10 @@ class ProjectCreateForm(QWidget):
         mufasa_dir = Path(mufasa.__file__).parent
         names_path = mufasa_dir / Paths.PROJECT_POSE_CONFIG_NAMES.value
         animals_path = mufasa_dir / Paths.SIMBA_NO_ANIMALS_PATH.value
-        self._preset_names: List[str] = list(
+        self._preset_names: list[str] = list(
             pd.read_csv(names_path, header=None)[0],
         )
-        self._preset_animal_counts: List[int] = list(
+        self._preset_animal_counts: list[int] = list(
             pd.read_csv(animals_path, header=None)[0],
         )
         self._preset_codes = get_bp_config_codes()
@@ -222,7 +230,8 @@ class ProjectCreateForm(QWidget):
         if not path:
             return
         from mufasa.pose_importers.dlc_autodetect import (
-            DLCAutodetectError, extract_bodyparts,
+            DLCAutodetectError,
+            extract_bodyparts,
         )
         try:
             bps = extract_bodyparts(path)
@@ -256,7 +265,7 @@ class ProjectCreateForm(QWidget):
     # ------------------------------------------------------------------ #
     # Submission
     # ------------------------------------------------------------------ #
-    def submit(self) -> Optional[str]:
+    def submit(self) -> str | None:
         """Validate fields and attempt to create the project.
 
         :returns: the absolute path to the new ``project.toml`` on

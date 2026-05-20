@@ -40,12 +40,21 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout,
-                               QLabel, QMainWindow, QMessageBox, QPushButton,
-                               QStatusBar, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QStatusBar,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.icon_cache import icon
@@ -352,7 +361,7 @@ class ProjectWindow(QMainWindow):
 # --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
-def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="mufasa")
     p.add_argument("--project", type=str, default=None,
                    help="auto-load a project_config.ini on launch")
@@ -361,7 +370,7 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry — invoked by the ``mufasa`` console script."""
     args = _parse_args(argv)
 

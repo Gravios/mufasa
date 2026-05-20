@@ -33,15 +33,22 @@ Key differences from the Tk original:
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QApplication, QDialog, QGridLayout, QGroupBox,
-                               QScrollArea, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QGridLayout,
+    QGroupBox,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.icon_cache import icon as _icon
-from mufasa.ui_qt.widgets import (NW, MufasaButton, MufasaDropDown,
-                                 MufasaCheckbox, _MufasaCheckbox)
+from mufasa.ui_qt.widgets import NW, MufasaButton, MufasaCheckbox, MufasaDropDown, _MufasaCheckbox
 
 
 class MufasaDialog(QDialog):
@@ -54,11 +61,11 @@ class MufasaDialog(QDialog):
     def __init__(
         self,
         title: str,
-        config_path: Optional[str] = None,
+        config_path: str | None = None,
         main_scrollbar: bool = True,
         size: tuple[int, int] = (960, 720),
-        icon: Optional[str] = None,
-        parent: Optional[QWidget] = None,
+        icon: str | None = None,
+        parent: QWidget | None = None,
     ) -> None:
         # Auto-parent to the active top-level window so popups behave
         # transient-to-root (matching the Tk default).
@@ -159,12 +166,12 @@ class MufasaDialog(QDialog):
     # ---- create_cb_frame: checkbox group --------------------------------- #
     def create_cb_frame(
         self,
-        cb_titles: List[str],
-        main_frm: Optional[QWidget] = None,
+        cb_titles: list[str],
+        main_frm: QWidget | None = None,
         frm_title: str = "",
         idx_row: int = -1,
-        command: Optional[Callable[[str], Any]] = None,
-    ) -> Dict[str, _MufasaCheckbox]:
+        command: Callable[[str], Any] | None = None,
+    ) -> dict[str, _MufasaCheckbox]:
         """Port of :meth:`PopUpMixin.create_cb_frame`.
 
         Returns a dict mapping title → checkbox widget. Call-sites that
@@ -180,7 +187,7 @@ class MufasaDialog(QDialog):
         cb_frm = QGroupBox(frm_title, parent)
         inner = QGridLayout(cb_frm)
         inner.setContentsMargins(6, 6, 6, 6)
-        cb_dict: Dict[str, _MufasaCheckbox] = {}
+        cb_dict: dict[str, _MufasaCheckbox] = {}
         for cnt, title in enumerate(cb_titles):
             cb, _ = MufasaCheckbox(
                 cb_frm,
@@ -199,12 +206,12 @@ class MufasaDialog(QDialog):
     # ---- create_dropdown_frame: dropdown group --------------------------- #
     def create_dropdown_frame(
         self,
-        drop_down_titles: List[str],
-        drop_down_options: List[str],
+        drop_down_titles: list[str],
+        drop_down_options: list[str],
         frm_title: str = "",
         idx_row: int = -1,
-        main_frm: Optional[QWidget] = None,
-    ) -> Dict[str, MufasaDropDown]:
+        main_frm: QWidget | None = None,
+    ) -> dict[str, MufasaDropDown]:
         """Port of :meth:`PopUpMixin.create_dropdown_frame`."""
         if not drop_down_titles:
             raise ValueError("drop_down_titles must contain at least one entry")
@@ -215,7 +222,7 @@ class MufasaDialog(QDialog):
         dd_frm = QGroupBox(frm_title, parent)
         inner = QGridLayout(dd_frm)
         inner.setContentsMargins(6, 6, 6, 6)
-        dd_dict: Dict[str, MufasaDropDown] = {}
+        dd_dict: dict[str, MufasaDropDown] = {}
         for cnt, title in enumerate(drop_down_titles):
             dd = MufasaDropDown(
                 dd_frm, drop_down_options, label=title, label_width=35,
@@ -235,8 +242,8 @@ class MufasaDialog(QDialog):
         run_function: Callable,
         title: str = "RUN",
         btn_txt_clr: str = "black",
-        idx: Optional[int] = None,
-        btn_icon_name: Optional[str] = "rocket",
+        idx: int | None = None,
+        btn_icon_name: str | None = "rocket",
         padx: int = 0,
         pady: int = 0,
     ) -> None:
@@ -267,7 +274,7 @@ class MufasaDialog(QDialog):
             self._next_row = row + 1
 
     # ---- place_window_at_corner / place_frm_at_top_right ---------------- #
-    def place_frm_at_top_right(self, frm: Optional[QWidget] = None) -> None:
+    def place_frm_at_top_right(self, frm: QWidget | None = None) -> None:
         """Move the dialog to the top-right of its screen. Tk-parity method."""
         target = frm if frm is not None else self
         screen = target.screen() or QApplication.primaryScreen()

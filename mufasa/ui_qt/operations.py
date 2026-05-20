@@ -24,8 +24,8 @@ trivial widget wiring.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
 
 
 class DatasetOp:
@@ -45,7 +45,7 @@ class DatasetOp:
         config_path: os.PathLike | str,
         data_path: os.PathLike | str,
         *,
-        raw_input_dir: Optional[os.PathLike | str] = None,
+        raw_input_dir: os.PathLike | str | None = None,
     ) -> None:
         self.config_path = Path(config_path).resolve()
         self.data_path = Path(data_path).resolve()

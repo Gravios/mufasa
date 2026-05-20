@@ -50,15 +50,20 @@ Workflow
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Tuple
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QHBoxLayout, QHeaderView, QLabel,
-                               QMessageBox, QPushButton,
-                               QSizePolicy, QTableWidget, QTableWidgetItem)
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 # Column indices for the table. Don't reorder without updating
 # the cellChanged handler and the save() column-name mapping.
@@ -263,7 +268,7 @@ class VideoInfoForm(OperationForm):
             project_folder = os.path.dirname(self.config_path)
             return os.path.join(project_folder, "logs", "video_info.csv")
 
-    def _discover_rows(self) -> List[Tuple[str, str]]:
+    def _discover_rows(self) -> list[tuple[str, str]]:
         """List of (video_name, video_path) for the current project.
 
         Looks in the project's videos directory first
@@ -290,7 +295,7 @@ class VideoInfoForm(OperationForm):
             videos_dir = os.path.join(project_folder, "videos")
             pose_dir = os.path.join(project_folder, "csv", "input_csv")
 
-        rows: List[Tuple[str, str]] = []
+        rows: list[tuple[str, str]] = []
         if os.path.isdir(videos_dir):
             for entry in sorted(os.listdir(videos_dir)):
                 full = os.path.join(videos_dir, entry)
@@ -316,7 +321,7 @@ class VideoInfoForm(OperationForm):
                             rows.append((name, ""))
         return rows
 
-    def _load_existing_csv(self) -> Dict[str, Dict[str, str]]:
+    def _load_existing_csv(self) -> dict[str, dict[str, str]]:
         """Read existing video_info.csv into a dict keyed by Video
         name. Returns empty dict if the file doesn't exist or is
         unreadable. Values are stored as strings so the table can
@@ -334,8 +339,8 @@ class VideoInfoForm(OperationForm):
 
     def _fill_table(
         self,
-        rows: List[Tuple[str, str]],
-        existing: Dict[str, Dict[str, str]],
+        rows: list[tuple[str, str]],
+        existing: dict[str, dict[str, str]],
     ) -> None:
         """Populate the table widget from discovered rows + existing
         CSV values."""
@@ -409,7 +414,7 @@ class VideoInfoForm(OperationForm):
             )
             self.table.setCellWidget(idx, _COL_CALIBRATE, btn)
 
-    def _video_meta(self, video_path: str) -> Tuple[str, str, str]:
+    def _video_meta(self, video_path: str) -> tuple[str, str, str]:
         """Return (fps, width, height) for a video file as strings.
         Empty strings if path is empty or read fails."""
         if not video_path or not os.path.isfile(video_path):
