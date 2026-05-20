@@ -332,6 +332,23 @@ class ROIDefinePanel(QDialog):
         self.apply_all_btn.clicked.connect(self._on_apply_all_clicked)
         bot.addWidget(self.apply_all_btn)
 
+        # Patch 122dl: subset-apply button. Solves the multi-
+        # condition pain — users with two arena layouts can copy
+        # the current video's ROIs only to videos that share the
+        # same condition (typically a name-prefix subset). Opens
+        # the existing DuplicateRoisDialog with the current video
+        # pre-selected as the source and a friendlier titlebar.
+        # See docs/roi_enhancements_proposal.md (Proposal 1).
+        self.apply_selected_btn = QPushButton(
+            "Apply to selected…", self)
+        self.apply_selected_btn.setToolTip(
+            "Copy this video's ROIs to a subset of other videos "
+            "you pick by name / filter."
+        )
+        self.apply_selected_btn.clicked.connect(
+            self._on_apply_selected_clicked)
+        bot.addWidget(self.apply_selected_btn)
+
         bot.addStretch(1)
 
         self.save_status = QLabel("", self)
@@ -709,6 +726,55 @@ class ROIDefinePanel(QDialog):
                 self, "Apply-all failed",
                 f"Could not apply ROIs: {type(exc).__name__}: {exc}",
             )
+
+    # Patch 122dl: subset-apply handler. Opens the existing
+    # DuplicateRoisDialog with the current video pre-selected as
+    # the source. The dialog's source-combo defaults to alphabetic-
+    # first; we override with the current video so users coming
+    # from this button don't have to re-pick. They CAN still
+    # change the source inside the dialog if they want — the
+    # default_source is just the pre-fill, not a constraint.
+    def _on_apply_selected_clicked(self) -> None:
+        if self.logic is None:
+            return
+        if not self.logic.all_roi_names:
+            self._flash_status("No ROIs to apply.", error=True)
+            return
+        # Save first so the dialog reads the freshest H5 state.
+        try:
+            self.logic.save()
+            self._dirty = False
+            QApplication.processEvents()
+        except Exception as exc:
+            QMessageBox.critical(
+                self, "Apply-to-selected failed",
+                f"Could not save current ROIs before opening "
+                f"the subset-apply dialog: "
+                f"{type(exc).__name__}: {exc}",
+            )
+            return
+
+        # Lazy import keeps the dialog out of the panel's import
+        # graph at module load time (matches the pattern used by
+        # _on_apply_all_clicked above).
+        from pathlib import Path as _Path
+        from mufasa.ui_qt.dialogs.duplicate_rois_source_target import (
+            DuplicateRoisDialog)
+        cur_video_name = _Path(
+            self._videos[self._cur_idx]).stem
+        dlg = DuplicateRoisDialog(
+            config_path=self.config_path,
+            parent=self,
+            default_source=cur_video_name,
+            window_title="Apply ROIs to selected videos",
+        )
+        if dlg.init_failed():
+            return
+        if dlg.exec() == QDialog.Accepted:
+            self._refresh_video_list()
+            self.rois_modified.emit()
+            self._flash_status(
+                "Applied ROIs to selected videos.")
 
     # ------------------------------------------------------------------ #
     # Save / close
