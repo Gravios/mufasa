@@ -1,6 +1,6 @@
 # Migration guide: legacy SimBA → v1
 
-How to migrate a legacy SimBA-layout Mufasa project to the v1 layout using the `mufasa.cli.migrate_project` tool.
+How to migrate a legacy SimBA-layout Mufasa project to the v1 layout using the `mufasa-migrate-project` tool (a console-script entry point added in patch 122dp; same code as `python -m mufasa.cli.migrate_project`).
 
 **Audience:** users with existing SimBA-style projects who want to adopt the v1 layout.
 
@@ -12,15 +12,17 @@ How to migrate a legacy SimBA-layout Mufasa project to the v1 layout using the `
 
 ```bash
 # 1. Dry run — prints every operation but doesn't touch files
-python -m mufasa.cli.migrate_project /path/to/legacy_project
+mufasa-migrate-project /path/to/legacy_project
 
 # 2. Commit
-python -m mufasa.cli.migrate_project /path/to/legacy_project --commit
+mufasa-migrate-project /path/to/legacy_project --commit
 
 # 3. Open the new project in the workbench
 mufasa-workbench
 # → File → Open Project → /path/to/legacy_project/project.toml
 ```
+
+(The console-script entry point `mufasa-migrate-project` is equivalent to `python -m mufasa.cli.migrate_project`; either form works.)
 
 After the migration:
 * `project.toml` appears at the project root.
@@ -82,7 +84,7 @@ For large projects (videos can be many GB), use a snapshot tool (btrfs/zfs/rsync
 ### 2. Dry run
 
 ```bash
-python -m mufasa.cli.migrate_project /path/to/legacy_project
+mufasa-migrate-project /path/to/legacy_project
 ```
 
 The output lists every operation the tool would perform, in order. Read through it:
@@ -100,7 +102,7 @@ If something looks off, **stop**. Investigate before committing. Common causes:
 When the dry run looks right:
 
 ```bash
-python -m mufasa.cli.migrate_project /path/to/legacy_project --commit
+mufasa-migrate-project /path/to/legacy_project --commit
 ```
 
 Watch for errors. Per-operation output goes to stdout; errors go to stderr. If a single move fails the tool continues with the rest, so check stderr at the end.
@@ -146,7 +148,8 @@ Keep `MIGRATION.toml` — it's your audit trail. The backup from step 1 can be d
 ## Tool flags
 
 ```
-python -m mufasa.cli.migrate_project <path> [options]
+mufasa-migrate-project <path> [options]
+   # equivalent: python -m mufasa.cli.migrate_project <path> [options]
 
 Positional:
   path                 Legacy project location. Either the parent of

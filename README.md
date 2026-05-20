@@ -24,14 +24,18 @@ After `pip install -e .`, three console entry points are installed:
 | `mufasa` | Smart launcher with environment diagnostics; opens the Qt workbench. |
 | `mufasa-workbench` | Direct workbench launch (no env diagnostics). |
 | `mufasa-chooser` | Legacy Qt chooser / standalone popups. |
+| `mufasa-migrate-project` | Legacy SimBA layout → v1 layout migration tool. |
 
 The legacy `mufasa-tk` Tkinter launcher was **Removed in patch 122d4**; the `python -m mufasa.SimBA` entry point followed in patch 122d5. The Qt workbench replaces both.
 
-The migration tool runs as a Python module rather than a console script:
+Migrate a legacy SimBA-style project to v1:
 
 ```bash
-python -m mufasa.cli.migrate_project /path/to/legacy_project
+mufasa-migrate-project /path/to/legacy_project          # dry run
+mufasa-migrate-project /path/to/legacy_project --commit # actually move files
 ```
+
+(Same code is also reachable as `python -m mufasa.cli.migrate_project` for installs where the console script isn't on `$PATH`.)
 
 See [`docs/migration_guide.md`](docs/migration_guide.md) for the full workflow.
 
