@@ -189,6 +189,14 @@ class WorkflowPage(QWidget):
         self.config_path = config_path
         # declared: {section_title: [(form_cls, kwargs)]}
         self._declared: dict[str, list[tuple[Type[OperationForm], dict]]] = {}
+        # Patch 122dn — sections whose content is an arbitrary
+        # QWidget (built by a factory) rather than a list of
+        # OperationForms. Keyed by section index; the factory is
+        # called when the section first expands. Used for embedding
+        # the ROI define panel directly in the page; see
+        # ROIDefineWidget + roi_page.py.
+        self._declared_widget_factories: dict[
+            int, Callable[..., QWidget]] = {}
         # instantiated forms by section index
         self._instantiated: set[int] = set()
         self._section_hosts: dict[int, QWidget] = {}
@@ -227,6 +235,35 @@ class WorkflowPage(QWidget):
         if index == 0:
             self._instantiate(index)
 
+    def add_section_widget(
+        self, section_title: str,
+        widget_factory: Callable[..., QWidget],
+    ) -> None:
+        """Add a section that hosts an arbitrary ``QWidget`` instead
+        of a list of ``OperationForm`` instances. Used for embedded
+        UIs (e.g., ``ROIDefineWidget``) that don't fit the
+        parameter-form-with-Run-button mould.
+
+        Patch 122dn — added so the ROI page's Definitions section
+        can host ``ROIDefineWidget`` directly inline rather than
+        opening a popup. The factory is called once on first
+        expand; the returned widget is parented to the section's
+        host. If the factory signature accepts ``config_path``,
+        the page's ``config_path`` is passed; otherwise the
+        factory is called with no arguments.
+        """
+        host = QWidget(self.toolbox)
+        host_layout = QVBoxLayout(host)
+        host_layout.setContentsMargins(0, 0, 0, 0)  # widget owns
+                                                     # its own
+                                                     # padding
+        host_layout.setSpacing(0)
+        index = self.toolbox.addItem(host, section_title)
+        self._declared_widget_factories[index] = widget_factory
+        self._section_hosts[index] = host
+        if index == 0:
+            self._instantiate(index)
+
     def _on_section_changed(self, index: int) -> None:
         if index not in self._instantiated and index >= 0:
             self._instantiate(index)
@@ -234,6 +271,22 @@ class WorkflowPage(QWidget):
     def _instantiate(self, index: int) -> None:
         host = self._section_hosts.get(index)
         if host is None:
+            return
+        # Patch 122dn — widget-factory sections take precedence
+        # over form sections at the same index. (Both can't exist
+        # at the same index, but the lookup order needs to be
+        # explicit so future maintainers don't get surprised.)
+        if index in self._declared_widget_factories:
+            factory = self._declared_widget_factories[index]
+            try:
+                # Try passing config_path if the factory accepts it.
+                widget = factory(config_path=self.config_path)
+            except TypeError:
+                # Factory doesn't take kwargs — call with no args.
+                widget = factory()
+            widget.setParent(host)
+            host.layout().addWidget(widget)
+            self._instantiated.add(index)
             return
         title = self.toolbox.itemText(index)
         forms = self._declared.get(title, [])

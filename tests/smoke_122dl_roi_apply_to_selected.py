@@ -162,13 +162,20 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # ROIDefinePanel — new button + handler
+    # ROIDefinePanel / ROIDefineWidget — new button + handler
     # ------------------------------------------------------------------ #
+    # Patch 122dn refactor moved the panel's content from
+    # ROIDefinePanel (now a thin QDialog wrapper) to
+    # ROIDefineWidget (the embeddable QWidget). The handler we
+    # check for lives on whichever class actually has the
+    # apply-selected button — prefer the widget post-122dn but
+    # fall back to the panel for pre-122dn compatibility.
     panel_tree = ast.parse(panel.read_text())
     panel_src = panel.read_text()
     panel_cls = next(
         (n for n in panel_tree.body
-         if isinstance(n, ast.ClassDef) and n.name == "ROIDefinePanel"),
+         if isinstance(n, ast.ClassDef)
+         and n.name in ("ROIDefineWidget", "ROIDefinePanel")),
         None,
     )
     methods = (
