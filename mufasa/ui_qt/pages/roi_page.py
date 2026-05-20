@@ -35,24 +35,29 @@ from mufasa.ui_qt.forms.roi import ROIAnalysisForm, ROIFeaturesForm, ROIManageFo
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
-def _make_define_widget(config_path: str | None) -> ROIDefineWidget:
-    """Factory used by WorkflowPage.add_section_widget. Constructs a
-    ROIDefineWidget with embedded-mode visibility (hides the dialog-
-    only Close / Save&Close buttons since the page section provides
-    its own dismiss affordance via collapse)."""
-    w = ROIDefineWidget(config_path=config_path)
-    w.set_embedded_mode(True)
-    return w
-
-
 def build_roi_page(workbench, config_path: str | None = None
                    ) -> WorkflowPage:
     page = workbench.add_page("ROI", icon_name="roi")
+
     # Patch 122dn — Definitions section hosts the ROI define widget
     # inline. Replaces the legacy `(ROIManageForm, {})` form entry
     # which opened the panel as a popup. ROIManageForm moved to a
     # separate "Maintenance" section since its non-Draw actions
     # (Import CSV, Standardize) are still needed.
+    #
+    # Patch 122dq — wire ``workbench.projectChanged`` to the widget's
+    # existing ``set_config_path`` API. The factory is invoked lazily
+    # (on first section expand) so the connection is established at
+    # widget-construction time. Today this signal effectively never
+    # fires on the wired widget (the workbench tears down on project
+    # switch), but the API is no longer dead code and a future
+    # page-persistence architecture will work without further changes.
+    def _make_define_widget(config_path: str | None) -> ROIDefineWidget:
+        w = ROIDefineWidget(config_path=config_path)
+        w.set_embedded_mode(True)
+        workbench.projectChanged.connect(w.set_config_path)
+        return w
+
     page.add_section_widget("Definitions",
                              _make_define_widget)
     page.add_section("Maintenance",    [(ROIManageForm, {})])

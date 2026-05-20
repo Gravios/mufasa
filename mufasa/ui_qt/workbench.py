@@ -324,6 +324,22 @@ class WorkflowPage(QWidget):
 class MufasaWorkbench(QMainWindow):
     """Main workbench window — sidebar nav + workflow pages."""
 
+    # Patch 122dq: forward-compat signal for project switches. Today
+    # ``_switch_to_project`` tears the workbench down and builds a new
+    # one, so every embedded widget is re-constructed with the new
+    # ``config_path`` and this signal is effectively never observed
+    # by any surviving listener. The signal is wired anyway so that:
+    #
+    # 1. ``ROIDefineWidget.set_config_path()`` — which already exists
+    #    as a public API — is not dead code. ``build_roi_page``
+    #    connects this signal to it.
+    # 2. A future architectural change toward page-persistence (where
+    #    the workbench would mutate in place instead of tearing down)
+    #    will find the widget-side wiring already in place.
+    #
+    # See session_handoff.md caveat #3 for the original motivation.
+    projectChanged = Signal(str)
+
     def __init__(self, project_config_path: str | None = None,
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -472,6 +488,15 @@ class MufasaWorkbench(QMainWindow):
             self._switch_to_project(self.project_config_path)
 
     def _switch_to_project(self, config_path: str) -> None:
+        # Patch 122dq: emit the project-changed signal before tearing
+        # down. Any listener connected to ``self.projectChanged`` (e.g.,
+        # an embedded ``ROIDefineWidget.set_config_path``) gets the new
+        # path. In the current teardown-and-rebuild architecture this
+        # signal fires moments before the widget is destroyed, so the
+        # effective behavior comes from the rebuild — but the wiring is
+        # established so widgets that live through a project switch
+        # (a future architecture) update correctly.
+        self.projectChanged.emit(config_path)
         # Patch 121i: persist the freshly-opened project so the
         # next launch picks it up. Imports recent_project directly
         # rather than going through workbench_app (which would be
