@@ -180,6 +180,7 @@ Issues        = "https://github.com/sgoldenlab/simba/issues"
 mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench (default; env diagnostics)
 mufasa-chooser   = "mufasa.ui_qt.app:main"      # legacy Qt chooser / standalone popups
 mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench launch (no env diagnostics)
+mufasa-migrate-project = "mufasa.cli.migrate_project:main"  # patch 122dp: legacy → v1 layout migration tool
                                         # until simba/ui_qt/app.py lands)
 
 # ============================================================================
