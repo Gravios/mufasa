@@ -32,16 +32,24 @@ a window.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog,
-                               QDialogButtonBox, QDoubleSpinBox,
-                               QFormLayout, QHBoxLayout, QLabel,
-                               QMessageBox, QSlider,
-                               QSpinBox, QStackedWidget, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QSlider,
+    QSpinBox,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm
@@ -96,15 +104,14 @@ class _ClahePreviewDialog(QDialog):
     def __init__(self, video_path: str,
                  init_clip_limit: float,
                  init_tile_size: int,
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("CLAHE — live preview")
         self.video_path = video_path
 
         # Lazy-import the backend pieces — AST tests don't need
         # cv2 / utils to load this module.
-        from mufasa.utils.read_write import (get_video_meta_data,
-                                             read_frm_of_video)
+        from mufasa.utils.read_write import get_video_meta_data, read_frm_of_video
         self._read_frm = read_frm_of_video
 
         meta = get_video_meta_data(video_path=video_path)
@@ -214,7 +221,7 @@ class _ClahePreviewDialog(QDialog):
 class _ClahePanel(QWidget):
     """CLAHE (contrast-limited adaptive histogram equalization)."""
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         form = QFormLayout(self)
         form.setContentsMargins(0, 0, 0, 0)
@@ -239,7 +246,7 @@ class _ClahePanel(QWidget):
 class _BrightnessContrastPanel(QWidget):
     """Manual brightness / contrast."""
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         form = QFormLayout(self)
         form.setContentsMargins(0, 0, 0, 0)
@@ -260,7 +267,7 @@ class _BrightnessContrastPanel(QWidget):
 class _BoxBlurPanel(QWidget):
     """Box / Gaussian blur — one-parameter."""
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         form = QFormLayout(self)
         form.setContentsMargins(0, 0, 0, 0)
@@ -277,7 +284,7 @@ class _BoxBlurPanel(QWidget):
 
 class _GreyscalePanel(QWidget):
     """No parameters — just a note."""
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -301,7 +308,7 @@ class _BlackWhitePanel(QWidget):
     the field here.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         form = QFormLayout(self)
         form.setContentsMargins(0, 0, 0, 0)
@@ -405,8 +412,7 @@ class VideoFiltersForm(OperationForm):
             # video the worker would hit first anyway.
             sample_path = kwargs["path"]
             if kwargs["is_dir"]:
-                from mufasa.utils.read_write import (
-                    find_all_videos_in_directory)
+                from mufasa.utils.read_write import find_all_videos_in_directory
                 vids = find_all_videos_in_directory(
                     directory=sample_path, as_dict=True,
                     raise_error=True)
@@ -479,8 +485,7 @@ class VideoFiltersForm(OperationForm):
             # directory case.
             threshold = float(params["threshold"]) / 255.0
             if is_dir:
-                from mufasa.utils.read_write import (
-                    find_all_videos_in_directory)
+                from mufasa.utils.read_write import find_all_videos_in_directory
                 for vp in find_all_videos_in_directory(
                         directory=path, raise_error=True):
                     _vp.video_to_bw(video_path=vp, threshold=threshold)

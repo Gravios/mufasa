@@ -55,15 +55,23 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QCheckBox, QDialog, QDialogButtonBox,
-                               QDockWidget, QFileDialog, QHBoxLayout,
-                               QLabel, QMainWindow, QMessageBox,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QDockWidget,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.forms.analysis import _load_classifier_names
 from mufasa.ui_qt.frame_scrubber import FrameScrubberWidget
@@ -86,7 +94,7 @@ class FrameLabellerWidget(QWidget):
                  video_path: str,
                  *,
                  mode: str = "new",
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         """
         Parameters
         ----------
@@ -177,8 +185,7 @@ class FrameLabellerWidget(QWidget):
                 "least one via the Classifier → Manage page before "
                 "labelling."
             )
-        from mufasa.project_layout import (project_metadata_from_config,
-                                           project_paths_from_config)
+        from mufasa.project_layout import project_metadata_from_config, project_paths_from_config
         paths = project_paths_from_config(self.config_path)
         meta = project_metadata_from_config(self.config_path)
         self.file_type = meta.get("file_type", "csv")
@@ -415,6 +422,7 @@ class FrameLabellerWidget(QWidget):
         """
         try:
             import pandas as pd
+
             from mufasa.utils.label_io import save_labels_for_video
             labels_df = pd.DataFrame({
                 name: self._labels[name].astype(np.int64)
@@ -465,7 +473,7 @@ class FrameLabellerDialog(QDialog):
                  video_path: str,
                  *,
                  mode: str = "new",
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.widget = FrameLabellerWidget(
             config_path=config_path,
@@ -490,7 +498,7 @@ class FrameLabellerDialog(QDialog):
 # --------------------------------------------------------------------------- #
 # Dock helper — preferred surface
 # --------------------------------------------------------------------------- #
-def _find_main_window(start: Optional[QWidget]) -> Optional[QMainWindow]:
+def _find_main_window(start: QWidget | None) -> QMainWindow | None:
     """Walk up the parent chain looking for a QMainWindow. The
     workbench is one; arbitrary dialogs and forms are not.
     Returns None if no main window found — caller should fall
@@ -508,7 +516,7 @@ def open_frame_labeller_dock(parent: QWidget,
                              video_path: str,
                              *,
                              mode: str = "new",
-                             ) -> Optional[QWidget]:
+                             ) -> QWidget | None:
     """Open the labeler in a :class:`QDockWidget` attached to the
     workbench's main window. Floats by default; the user can
     drag-dock it into the workbench layout or float it back out.

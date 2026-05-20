@@ -27,12 +27,18 @@ OpenCV's window is live-video-rendering, Qt would be over-engineering.
 """
 from __future__ import annotations
 
-
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox,
-                               QFormLayout, QLabel, QSpinBox,
-                               QStackedWidget, QWidget,
-                               QCheckBox, QHBoxLayout)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QSpinBox,
+    QStackedWidget,
+    QWidget,
+)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm
@@ -142,6 +148,7 @@ class CropVideosForm(OperationForm):
     def target(self, *, path: str, is_dir: bool, shape: str,
                multi: bool, crop_count: int = 2) -> None:
         from pathlib import Path as _P
+
         from mufasa.video_processors import video_processing as _vp
 
         def _sibling_dir(in_dir: str, tag: str) -> str:
@@ -161,10 +168,10 @@ class CropVideosForm(OperationForm):
                 # the form's "ONE video → MULTIPLE outputs" UX.
                 # See docs/backend_audit.md §2g.
                 import os as _os
+
                 from mufasa.utils.errors import CountError
                 from mufasa.utils.read_write import get_fn_ext
-                from mufasa.video_processors.roi_selector import (
-                    ROISelector)
+                from mufasa.video_processors.roi_selector import ROISelector
                 _ = _vp.get_video_meta_data(video_path=path)
                 dir_name, file_name, _ext = get_fn_ext(filepath=path)
                 for i in range(crop_count):

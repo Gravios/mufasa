@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Union
 
 import numpy as np
 from PySide6.QtWidgets import QMessageBox
@@ -46,9 +45,16 @@ from PySide6.QtWidgets import QMessageBox
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.dialog import MufasaDialog
 from mufasa.ui_qt.progress import run_with_progress
-from mufasa.ui_qt.widgets import (DISABLED, NORMAL, NW, CreateLabelFrameWithIcon,
-                                  Entry_Box, MufasaButton,
-                                  MufasaCheckbox, MufasaDropDown)
+from mufasa.ui_qt.widgets import (
+    DISABLED,
+    NORMAL,
+    NW,
+    CreateLabelFrameWithIcon,
+    Entry_Box,
+    MufasaButton,
+    MufasaCheckbox,
+    MufasaDropDown,
+)
 
 AUTO = "auto"
 VIDEO_FRM = "VIDEO FRAME"
@@ -59,7 +65,7 @@ HEATMAP_BG_OPTIONS = ["NONE", VIDEO, VIDEO_FRM]
 class HeatmapClfPopUp(MufasaDialog):
     """Classification-heatmap video / frame generator."""
 
-    def __init__(self, config_path: Union[str, os.PathLike]) -> None:
+    def __init__(self, config_path: str | os.PathLike) -> None:
         MufasaDialog.__init__(
             self,
             title="CREATE CLASSIFICATION HEATMAP PLOTS",
@@ -292,9 +298,11 @@ class HeatmapClfPopUp(MufasaDialog):
 
         Validation failures raise, caller handles them via QMessageBox.
         """
-        from mufasa.utils.checks import (check_if_string_value_is_valid_video_timestamp,
-                                         check_int,
-                                         check_that_hhmmss_start_is_before_end)
+        from mufasa.utils.checks import (
+            check_if_string_value_is_valid_video_timestamp,
+            check_int,
+            check_that_hhmmss_start_is_before_end,
+        )
 
         core_cnt = int(self.core_cnt_dd.get_value())
 

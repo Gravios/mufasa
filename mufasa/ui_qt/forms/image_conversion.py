@@ -25,15 +25,23 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QFormLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QPushButton, QSpinBox,
-                               QStackedWidget, QTimeEdit, QVBoxLayout,
-                               QWidget)
-from PySide6.QtCore import QTime
+from PySide6.QtCore import Qt, QTime
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QTimeEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.forms.video_processing import _ScopePicker
 from mufasa.ui_qt.workbench import OperationForm
@@ -257,10 +265,10 @@ class ImageFormatConverterForm(OperationForm):
         return kwargs
 
     def target(self, *, path: str, is_dir: bool, fmt: str,
-               save_dir: Optional[str], verbose: bool,
-               quality: Optional[int] = None,
-               compression: Optional[str] = None,
-               stack: Optional[bool] = None) -> None:
+               save_dir: str | None, verbose: bool,
+               quality: int | None = None,
+               compression: str | None = None,
+               stack: bool | None = None) -> None:
         # Backend dispatch — per-format functions live in
         # video_processors.video_processing. Each has a slightly
         # different signature, so kwargs are built per-fn rather
@@ -442,11 +450,11 @@ class AverageFrameForm(OperationForm):
         return args
 
     def target(self, *, video_path: str,
-               save_path: Optional[str],
-               start_frm: Optional[int] = None,
-               end_frm: Optional[int] = None,
-               start_time: Optional[str] = None,
-               end_time: Optional[str] = None) -> None:
+               save_path: str | None,
+               start_frm: int | None = None,
+               end_frm: int | None = None,
+               start_time: str | None = None,
+               end_time: str | None = None) -> None:
         from mufasa.video_processors.video_processing import (
             create_average_frm,
         )

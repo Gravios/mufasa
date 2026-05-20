@@ -27,14 +27,19 @@ Design
 """
 from __future__ import annotations
 
-from typing import Optional
-
 import cv2
 import numpy as np
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QPushButton, QSlider,
-                               QSpinBox, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class FrameScrubberWidget(QWidget):
@@ -48,13 +53,13 @@ class FrameScrubberWidget(QWidget):
 
     frame_changed = Signal(int)
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._cap: Optional[cv2.VideoCapture] = None
+        self._cap: cv2.VideoCapture | None = None
         self._total_frames: int = 0
         self._fps: float = 30.0
         self._current_frame: int = 0
-        self._last_pixmap: Optional[QPixmap] = None
+        self._last_pixmap: QPixmap | None = None
         # Playback state. _play_direction is +1 (forward), -1
         # (backward), or 0 (paused). The single timer drives both
         # directions; the direction flips by clicking the opposite

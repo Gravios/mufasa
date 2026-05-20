@@ -62,17 +62,27 @@ from __future__ import annotations
 import json
 import os
 from copy import deepcopy
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDockWidget, QFileDialog,
-                               QGroupBox, QHBoxLayout, QHeaderView, QLabel,
-                               QLineEdit, QMessageBox, QPushButton,
-                               QTableWidget, QTableWidgetItem, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDockWidget,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 # --------------------------------------------------------------------------- #
 # Module-level settings — mirror the Tk module's SETTINGS dict
@@ -140,16 +150,16 @@ class BatchPreProcessForm(OperationForm):
 
     # ----------------------------------------------------------- State
     def __init__(self,
-                 parent: Optional[QWidget] = None,
-                 config_path: Optional[str] = None) -> None:
+                 parent: QWidget | None = None,
+                 config_path: str | None = None) -> None:
         # State must be set BEFORE build() runs (super().__init__
         # calls self.build).
-        self.input_dir: Optional[str] = None
-        self.output_dir: Optional[str] = None
+        self.input_dir: str | None = None
+        self.output_dir: str | None = None
         self.videos_in_dir_dict: dict = {}
         self.crop_dict: dict = {}
         self.settings = deepcopy(SETTINGS)
-        self._docked_widget: Optional[QDockWidget] = None
+        self._docked_widget: QDockWidget | None = None
         super().__init__(parent=parent, config_path=config_path)
 
     # ----------------------------------------------------------- UI
@@ -470,8 +480,8 @@ class BatchPreProcessForm(OperationForm):
         same ROISelector the Tk widget called — that's a native
         OpenCV dialog, host-agnostic."""
         try:
-            from mufasa.video_processors.roi_selector import ROISelector
             from mufasa.utils.lookups import get_color_dict
+            from mufasa.video_processors.roi_selector import ROISelector
         except Exception as exc:
             QMessageBox.critical(
                 self, "Crop unavailable",
@@ -571,7 +581,7 @@ class BatchPreProcessForm(OperationForm):
             dock.close()
             self.pop_out_btn.setText("Pop out ⇱")
 
-    def _find_main_window(self) -> Optional[QWidget]:
+    def _find_main_window(self) -> QWidget | None:
         from PySide6.QtWidgets import QMainWindow
         w = self.parentWidget()
         while w is not None:
@@ -685,8 +695,9 @@ class BatchPreProcessForm(OperationForm):
     def target(self, *, save_path: str, codec: str) -> None:
         """Drive the FFMPEGCommandCreator pipeline. Runs in a worker
         thread (handled by OperationForm.on_run)."""
-        from mufasa.video_processors.batch_process_create_ffmpeg_commands \
-            import FFMPEGCommandCreator
+        from mufasa.video_processors.batch_process_create_ffmpeg_commands import (
+            FFMPEGCommandCreator,
+        )
         runner = FFMPEGCommandCreator(json_path=save_path, codec=codec)
         # The Tk widget calls each op explicitly so that exceptions
         # surface per-op. Mirror that.

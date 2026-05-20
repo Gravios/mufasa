@@ -24,20 +24,21 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtWidgets import QApplication
 
 from mufasa.ui_qt import linux_env
-from mufasa.ui_qt.workbench import MufasaWorkbench
 from mufasa.ui_qt.pages.video_processing_page import build_video_processing_page
 from mufasa.ui_qt.recent_project import (
-    save_recent_project as _save_recent_project,
     load_recent_project as _load_recent_project,
 )
+from mufasa.ui_qt.recent_project import (
+    save_recent_project as _save_recent_project,
+)
+from mufasa.ui_qt.workbench import MufasaWorkbench
 
 
-def build_workbench(project_config_path: Optional[str] = None
+def build_workbench(project_config_path: str | None = None
                     ) -> MufasaWorkbench:
     """Assemble a workbench with all currently-ported pages.
 
@@ -103,7 +104,7 @@ def build_workbench(project_config_path: Optional[str] = None
     return wb
 
 
-def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="mufasa-workbench")
     p.add_argument("--project", type=str, default=None,
                    help="auto-load a project_config.ini on launch")
@@ -132,7 +133,7 @@ _PROJECT_CONFIG_FILENAME = "project_config.ini"
 _PROJECT_FOLDER_NAME = "project_folder"
 
 
-def _auto_discover_project(start: Path) -> Optional[Path]:
+def _auto_discover_project(start: Path) -> Path | None:
     """Walk up from ``start`` looking for a ``project_config.ini``.
 
     At each level checks two locations:
@@ -166,7 +167,7 @@ def _auto_discover_project(start: Path) -> Optional[Path]:
     return None
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Workbench entry — invoked by the ``mufasa-workbench`` console script."""
     args = _parse_args(argv)
     linux_env.setup_multiprocessing()
@@ -185,7 +186,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     from mufasa.ui_qt.qt_confirm import install_qt_confirm_override
     install_qt_confirm_override()
 
-    project_config_path: Optional[str] = None
+    project_config_path: str | None = None
     if args.project:
         # User specified an explicit path — respect it. Don't auto-search.
         if not Path(args.project).is_file():

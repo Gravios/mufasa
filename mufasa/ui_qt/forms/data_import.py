@@ -37,14 +37,25 @@ not a new window, not a new file.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QFormLayout, QHBoxLayout,
-                               QLineEdit, QPushButton, QSpinBox,
-                               QStackedWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
 
@@ -59,7 +70,7 @@ class _PathField(QWidget):
     def __init__(self, *, is_file: bool = False,
                  file_filter: str = "",
                  placeholder: str = "",
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.is_file = is_file
         self.file_filter = file_filter
@@ -205,7 +216,7 @@ class _Route:
     source_filter: str = ""
     needs_video: bool = False
     extras_key: str = "none"
-    backend: Optional[Callable[..., Any]] = None
+    backend: Callable[..., Any] | None = None
     kwargs_map: dict = field(default_factory=dict)
     common_flags: set = field(default_factory=lambda: {"verbose"})
 
@@ -484,7 +495,7 @@ class ConverterForm(OperationForm):
     # ------------------------------------------------------------------ #
     # State management
     # ------------------------------------------------------------------ #
-    def _current_route(self) -> Optional[_Route]:
+    def _current_route(self) -> _Route | None:
         src = self.source_cb.currentText()
         tgt = self.target_cb.currentText()
         for r in ROUTES:
@@ -522,9 +533,9 @@ class ConverterForm(OperationForm):
         self.flag_clahe.setEnabled("clahe" in route.common_flags)
         self.flag_verbose.setEnabled("verbose" in route.common_flags)
 
-    def _form_label_at(self, row: int) -> Optional[QWidget]:
+    def _form_label_at(self, row: int) -> QWidget | None:
         """Fetch the label widget of the Nth form row (or None)."""
-        form: Optional[QFormLayout] = None
+        form: QFormLayout | None = None
         for i in range(self.body_layout.count()):
             item = self.body_layout.itemAt(i)
             lo = item.layout()
@@ -581,7 +592,7 @@ class ConverterForm(OperationForm):
         }
 
     def target(self, *, route: _Route, source: str, save: str,
-               video: Optional[str], extras: dict, flags: dict) -> None:
+               video: str | None, extras: dict, flags: dict) -> None:
         # Build backend kwargs using the route's kwargs_map
         km = route.kwargs_map
         kwargs: dict = {}

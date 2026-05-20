@@ -30,12 +30,19 @@ in 122i.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QFormLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QPushButton,
-                               QSizePolicy, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -69,8 +76,8 @@ class ProjectInfoForm(QWidget):
 
     refreshed = Signal()
 
-    def __init__(self, parent: Optional[QWidget] = None,
-                 config_path: Optional[str] = None) -> None:
+    def __init__(self, parent: QWidget | None = None,
+                 config_path: str | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self._build_shell()
@@ -352,9 +359,9 @@ class NewProjectForm(QWidget):
 
     title = ""
 
-    def __init__(self, parent: Optional[QWidget] = None,
-                 config_path: Optional[str] = None,
-                 workbench: Optional[Any] = None) -> None:
+    def __init__(self, parent: QWidget | None = None,
+                 config_path: str | None = None,
+                 workbench: Any | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self._workbench = workbench
@@ -425,7 +432,7 @@ class NewProjectForm(QWidget):
         except Exception:
             recent = None
         if recent is not None:
-            current_resolved: Optional[Path] = None
+            current_resolved: Path | None = None
             if self.config_path:
                 try:
                     current_resolved = Path(self.config_path).resolve()

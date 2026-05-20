@@ -36,16 +36,28 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from PySide6.QtCore import QRect, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import (QAbstractItemView, QComboBox, QDialog,
-                               QDialogButtonBox, QFileDialog, QFormLayout,
-                               QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPushButton, QSizePolicy,
-                               QTableWidget, QTableWidgetItem, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.forms.analysis import _load_classifier_names
 from mufasa.ui_qt.frame_scrubber import FrameScrubberWidget
@@ -122,7 +134,7 @@ class GanttStrip(QWidget):
         "unsure":     QColor(220, 200,  60),
     }
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._bouts: list[Bout] = []
         self._total_frames: int = 1
@@ -178,7 +190,7 @@ class BoutTable(QTableWidget):
 
     _COLS = ["Bout", "Start", "End", "Length (s)", "Rating", "Notes"]
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setColumnCount(len(self._COLS))
         self.setHorizontalHeaderLabels(self._COLS)
@@ -264,7 +276,7 @@ class ClipReviewDialog(QDialog):
                  video_path: str,
                  machine_results_path: str,
                  *,
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self.video_path = video_path
@@ -304,8 +316,7 @@ class ClipReviewDialog(QDialog):
         # for both layouts (it's not currently surfaced as a key in
         # project_paths_from_config — derived from project_root +
         # convention).
-        from mufasa.project_layout import (project_metadata_from_config,
-                                           project_paths_from_config)
+        from mufasa.project_layout import project_metadata_from_config, project_paths_from_config
         paths = project_paths_from_config(self.config_path)
         meta = project_metadata_from_config(self.config_path)
         self.file_type = meta.get("file_type", "csv")
@@ -587,8 +598,7 @@ def launch_clip_review(parent: QWidget, config_path: str) -> None:
     # Patch 122ag: route through project_paths_from_config +
     # project_metadata_from_config rather than reading the legacy
     # INI directly, so v1 TOML projects work.
-    from mufasa.project_layout import (project_metadata_from_config,
-                                       project_paths_from_config)
+    from mufasa.project_layout import project_metadata_from_config, project_paths_from_config
     try:
         paths = project_paths_from_config(config_path)
         meta = project_metadata_from_config(config_path)

@@ -1,8 +1,8 @@
-# Lint status — codebase audit (patch 122dg)
+# Lint status — codebase audit (patches 122dg + 122do)
 
 **Audience:** maintainers planning future lint / typing sweeps.
 
-**Scope:** snapshot of `ruff check` findings across the whole codebase after the 122dg targeted sweep, with disposition for each category.
+**Scope:** snapshot of `ruff check` findings across the whole codebase after the 122dg targeted sweep (F401/W292/W293) and the 122do modernization sweep (UP045/UP006/UP007/UP035/I001/F401 cascade), with disposition for each remaining category.
 
 ---
 
@@ -18,19 +18,20 @@
 
 ---
 
-## Total findings (post-122dg snapshot)
+## Total findings (post-122do snapshot)
 
 ```
-ruff check mufasa/   → 9765 errors (down from 9846 pre-122dg)
+ruff check mufasa/          → 9292 errors  (was 9846 pre-122dg, 9765 post-122dg)
+ruff check mufasa/ui_qt/    →  173 errors  (was ~650 post-122dg)
 ```
 
-The 81-error drop is the F401/W292/W293 sweep on `mufasa/ui_qt/`. The remaining 9765 are concentrated in legacy SimBA backend code and largely consist of modernization warnings (UP-prefix rules) that haven't been swept yet.
+122do dropped the codebase-wide total by another 473 and shrank `mufasa/ui_qt/` by ~73% on top of 122dg. The remaining 9292 are concentrated in legacy SimBA backend code. Within `mufasa/ui_qt/` what's left is behavior-sensitive (E702 multiple-statements-on-line, B904 raise-without-from, SIM suggestions) — not mechanically swept.
 
 ### By directory
 
 | Directory | Errors | Disposition |
 |---|---:|---|
-| `mufasa/ui_qt/` | ~650 | **Active code; needs lint work.** 122dg fixed the safe subset (F401/W292/W293 = 81 errors). The remaining ~650 are mostly pyupgrade (UP045 modernization to `X \| None`) and would be worth a follow-up sweep. |
+| `mufasa/ui_qt/` | 173 | **Active code; modernized.** 122dg cleared F401/W292/W293 (81 errors); 122do cleared UP045/UP006/UP007/UP035/I001/F401 (571 errors). What remains is mostly behavior-sensitive style (E702 multi-statement-on-line, B904 raise-without-from-inside-except, SIM suggestions) — not appropriate for a mechanical sweep. |
 | `mufasa/mixins/` | 1658 | Legacy SimBA backend. Mix of pyupgrade modernization and real issues. |
 | `mufasa/utils/` | 1036 | Mix of utility code (active) and SimBA legacy. Per-file triage needed. |
 | `mufasa/video_processors/` | ~1200 | Legacy SimBA backend with heavy old-style typing. Largely modernization. |
@@ -41,30 +42,58 @@ The 81-error drop is the F401/W292/W293 sweep on `mufasa/ui_qt/`. The remaining 
 | `mufasa/legacy_layout.py` | 16 | By-design legacy; very small surface. |
 | Other | ~3400 | Pose importers, plotting, model code, etc. Mostly legacy SimBA. |
 
-### By rule (top 20)
+### By rule (top 20, post-122do)
 
 | Rule | Count | Description | Auto-fixable? | Disposition |
 |---|---:|---|---|---|
-| UP045 | 2081 | Use `X \| None` instead of `Optional[X]` | Yes | Modernization. Safe to auto-fix per-directory. |
-| UP006 | 1695 | Use `list` instead of `List` (PEP 585) | Yes | Modernization. Safe. |
-| UP007 | 1275 | Use `X \| Y` instead of `Union[X, Y]` | Yes | Modernization. Safe. |
+| UP045 | 1811 | Use `X \| None` instead of `Optional[X]` | Yes | Modernization. Down from 2081 (122do cleared 270 in `ui_qt/`). |
+| UP006 | 1641 | Use `list` instead of `List` (PEP 585) | Yes | Modernization. Down from 1695. |
+| UP007 | 1266 | Use `X \| Y` instead of `Union[X, Y]` | Yes | Modernization. Down from 1275. |
 | E701 | 716 | Multiple statements on one line (colon) | Some | Style; existing codebase pattern. |
-| UP035 | 469 | Import from typing is deprecated | Yes | Modernization. Safe. |
 | UP032 | 458 | Use f-string instead of `.format()` | Yes | Modernization. Mostly safe (some `.format()` calls have dynamic kwargs that don't translate). |
-| F401 | 334 | Unused imports (down from 415) | Yes | Always safe in non-`__init__.py`. 122dg cleared these in `ui_qt/`. |
-| I001 | 377 | Unsorted imports | Yes | Style; large noisy diff if applied broadly. |
-| B007 | 365 | Loop variable not used | No | Often legitimate (using index but not value). Per-site triage. |
+| UP035 | 443 | Import from typing is deprecated | Yes | Modernization. Down from 469. |
+| B007 | 364 | Loop variable not used | No | Often legitimate (using index but not value). Per-site triage. |
+| F401 | 333 | Unused imports | Yes | Down from 334. 122do cleared 65 in `ui_qt/` via the UP-cascade. |
+| I001 | 263 | Unsorted imports | Yes | Style. Down from 377 (122do cleared 114 + 18 in `ui_qt/`). |
 | E402 | 224 | Module-level imports not at top | No | Often intentional (lazy imports after path setup). |
 | SIM118 | 167 | Use `key in dict` instead of `key in dict.keys()` | Yes | Style. Safe. |
-| E702 | 149 | Multiple statements on one line (semicolon) | No | Style; existing pattern. |
+| E702 | 152 | Multiple statements on one line (semicolon) | No | Style; existing pattern. |
 | B905 | 142 | `zip()` without explicit strict= | No | Per-site triage (could mask bugs). |
 | B904 | 113 | Use `raise from` in except | No | Per-site triage. |
 | F541 | 109 | f-string without placeholders | Yes | Safe. |
 | F841 | 108 | Unused local variable | No | Sometimes intentional (held for stack-trace context). |
 | E722 | 103 | Bare except | No | Often legitimate fallback handling. Per-site triage. |
-| W292 | 0 (down from 75) | No newline at end of file | Yes | 122dg cleared in `ui_qt/`. |
+| W292 | 75 | No newline at end of file | Yes | 122dg cleared in `ui_qt/`; remaining are in legacy backend dirs. |
 | F405 | 67 | Possibly undefined name from wildcard | No | From `from X import *`; harder to fix. |
-| W293 | 6 (down from 66) | Trailing whitespace | Yes | 122dg cleared in `ui_qt/`; 6 remaining in legacy. |
+| W293 | 66 | Trailing whitespace | Yes | 122dg cleared in `ui_qt/`; remaining are in legacy. |
+
+---
+
+## 122do sweep — what landed
+
+**Targeted scope:** `mufasa/ui_qt/` only.
+
+**Rules applied:** `UP045 UP006 UP007 UP035 I001` (pyupgrade modernization + isort), with a cascading `F401` follow-up for orphaned typing imports.
+
+**Files touched:** 75.
+
+**Errors eliminated:** 571 total in `mufasa/ui_qt/`:
+- 488 by the initial `--select UP045,UP006,UP007,UP035,UP032,I001 --fix` pass
+- 65 by the `--select F401 --fix` follow-up (orphaned `typing.Optional` and `typing.Union` imports that became unused after the UP-rule conversions)
+- 18 by a final `--select I001 --fix` pass to re-sort import blocks that the F401 cleanup shuffled
+
+**Manual touches:**
+- 10 files needed manual cleanup of `from typing import …` lines that ruff considered unsafe to remove even with `--unsafe-fixes`. These were UP035 leftovers where the named imports (`Optional`, `Union`, `List`, `Dict`, `Tuple`, `Type`) became orphans after the auto-conversions but the import statement itself stayed. Files: `dialog.py`, `dialogs/edit_project_metadata_dialog.py`, `dialogs/pixel_calibration.py`, `dialogs/roi_canvas.py`, `forms/_backend_dispatch.py`, `forms/project_create.py`, `forms/video_info.py`, `input_source_picker.py`, `reconfigure_dialog.py`, `workbench.py`.
+- `forms/pose_cleanup.py` — added `from typing import Any`. This was a **pre-existing latent F821** (`Any` referenced in two `dict[str, Any]` annotations but never imported). `from __future__ import annotations` made the annotations lazy strings so it didn't blow up at import time, but the file would have failed `typing.get_type_hints()` and any static type-check. Fixed under this sweep because it's in the typing-imports area anyway.
+
+**Why this scope:** the chosen rules are PEP-aligned modernization (PEP 604 unions, PEP 585 builtin generics) for a Python-3.11+ codebase and produce purely cosmetic AST changes. Verified by an AST-level semantic diff: stripping annotations and imports from each file before/after the sweep yields **0 files with semantic differences** — proof that no runtime logic was touched.
+
+**Verified clean post-sweep:** `UP045` `UP006` `UP007` `UP035` `I001` `F401` `F821` all return 0 errors on `mufasa/ui_qt/`. The 122dg `W292`/`W293` baseline is also preserved.
+
+**What was NOT included:**
+- `UP032` (f-string conversion): ruff reported 0 hits in `ui_qt/` at sweep time, so the rule was a no-op. Left in the rule list for completeness.
+- `UP033` (lru_cache_with_maxsize_none) and `UP037` (quoted-annotation): 2 + 1 hits respectively but `--select` was scoped only to the original rule set. Easy follow-up if desired.
+- The codebase outside `ui_qt/` — the legacy SimBA backend dirs still have ~9100 errors of the same kinds.
 
 ---
 
@@ -92,9 +121,10 @@ Each is a candidate for its own focused patch. Order is approximate; pick what m
 
 ### Tier 1 — Safe + valuable
 
-* **`ui_qt/` pyupgrade sweep** (~270 errors). UP045 / UP006 / UP007 / UP035 / UP032. Modernizes Qt code to PEP 604 / 585 syntax (`X | None`, `list[T]`, etc.). Diff is mechanical but touches most files. Worth a single patch with maintainer review on the diff style.
-* **`ui_qt/` isort sweep** (~114 errors). I001. Standardizes import grouping. Cosmetic but unifies style across the directory. Bundle with the pyupgrade sweep or do separately depending on diff-review preference.
 * **`project_layout.py` + `cli/` full sweep** (~90 errors total). Small surface; can fix everything in one patch.
+* **`ui_qt/` UP033/UP037 mop-up** (3 errors). `ruff check mufasa/ui_qt --select UP033,UP037 --fix` would clean these; left out of 122do only because they weren't in the original target rule set.
+* **Tier-2 `B904` sweep on `ui_qt/`** (20 errors). `raise … from exc` inside except blocks. Mechanical but benefits from a per-site sanity check that the `from` is actually informative (vs `from None` for noise suppression). Worth a small focused patch.
+* **`ui_qt/` `E702` audit** (116 errors). Multiple statements on one line; ruff doesn't auto-fix. Per-site decision — most are likely Qt boilerplate (`x.foo(); y.bar()`) that's a deliberate compactness choice; some may benefit from a line break.
 
 ### Tier 2 — Per-file triage required
 

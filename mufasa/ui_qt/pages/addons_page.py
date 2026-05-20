@@ -22,24 +22,26 @@ alongside the existing video-processing actions.
 """
 from __future__ import annotations
 
-from typing import Optional
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from PySide6.QtWidgets import (QFileDialog, QMessageBox)
-
-from mufasa.ui_qt.forms.addons import (BlobTrackerInitLauncher,
-                                       CueLightClfForm, CueLightDataForm,
-                                       CueLightMovementForm,
-                                       CueLightVisualizerForm,
-                                       DirectingBodyPartSettingsForm,
-                                       KleinbergForm,
-                                       MutualExclusivityForm, PupRetrievalForm,
-                                       SpontaneousAlternationForm)
+from mufasa.ui_qt.forms.addons import (
+    BlobTrackerInitLauncher,
+    CueLightClfForm,
+    CueLightDataForm,
+    CueLightMovementForm,
+    CueLightVisualizerForm,
+    DirectingBodyPartSettingsForm,
+    KleinbergForm,
+    MutualExclusivityForm,
+    PupRetrievalForm,
+    SpontaneousAlternationForm,
+)
 from mufasa.ui_qt.forms.blob_quick_check import BlobQuickCheckForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_addons_page(workbench,
-                      config_path: Optional[str] = None) -> WorkflowPage:
+                      config_path: str | None = None) -> WorkflowPage:
     page = workbench.add_page("Add-ons", icon_name="add_on")
 
     # Cue-light family: four separate QToolBox entries so each form

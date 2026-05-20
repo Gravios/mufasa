@@ -33,15 +33,28 @@ from __future__ import annotations
 import configparser
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout, QGridLayout,
-                               QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QListWidgetItem, QSpinBox, QDoubleSpinBox, QVBoxLayout, QWidget,
-                               QPushButton, QFileDialog)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
-from mufasa.ui_qt.workbench import OperationForm
 from mufasa.project_layout import (
     import_model_into_project,
     mirror_model_to_global_cache,
@@ -49,6 +62,7 @@ from mufasa.project_layout import (
     project_paths_from_config,
     resolve_v1_project_root,
 )
+from mufasa.ui_qt.workbench import OperationForm
 
 
 # --------------------------------------------------------------------------- #
@@ -162,7 +176,8 @@ def _write_outlier_settings(
     sections are untouched (Audit A2 fix, preserved).
     """
     from mufasa.project_layout import (
-        read_project_toml, write_project_toml,
+        read_project_toml,
+        write_project_toml,
     )
     cp = Path(config_path)
     cp_str = str(cp).lower()
@@ -601,7 +616,7 @@ class DropBodypartsForm(OperationForm):
         if d:
             self.data_folder_edit.setText(d)
 
-    def _default_data_folder(self) -> Optional[str]:
+    def _default_data_folder(self) -> str | None:
         """Return <project>/csv/input_csv if it exists, else None."""
         if not self.config_path:
             return None
@@ -620,8 +635,7 @@ class DropBodypartsForm(OperationForm):
             self.data_folder_edit.setText(default)
         # Infer pose_tool + file_type for the status line.
         try:
-            from mufasa.project_layout import (
-                project_metadata_from_config)
+            from mufasa.project_layout import project_metadata_from_config
             meta = project_metadata_from_config(self.config_path)
             pose_tool = ("maDLC" if int(meta.get("animal_count", 1)) > 1
                          else "DLC")
@@ -1003,8 +1017,10 @@ class KalmanV2SmoothingForm(OperationForm):
 
     def build(self) -> None:
         from PySide6.QtWidgets import (
-            QHBoxLayout, QRadioButton, QButtonGroup,
             QAbstractItemView,
+            QButtonGroup,
+            QHBoxLayout,
+            QRadioButton,
         )
         outer_form = QFormLayout()
         outer_form.setLabelAlignment(Qt.AlignRight)
@@ -1283,12 +1299,14 @@ class KalmanV2SmoothingForm(OperationForm):
         # in-run-dir copy.
         #
         # Legacy fallback for projects still on project_config.ini.
-        self._v1_run_id: Optional[str] = None
+        self._v1_run_id: str | None = None
         if self.config_path:
             v1_root = resolve_v1_project_root(self.config_path)
             if v1_root is not None:
                 from mufasa.project_layout import (
-                    ProjectPaths, SmoothingFlavors, generate_run_id,
+                    ProjectPaths,
+                    SmoothingFlavors,
+                    generate_run_id,
                 )
                 paths = ProjectPaths(v1_root)
                 self._v1_run_id = generate_run_id()
@@ -1449,7 +1467,7 @@ class KalmanV2SmoothingForm(OperationForm):
         # Mode-specific validation & arg packing
         if train_mode:
             # Training file subset
-            training_files: Optional[list[str]] = None
+            training_files: list[str] | None = None
             if self.train_subset.isChecked():
                 selected = self.train_file_list.selectedItems()
                 if not selected:
@@ -1464,7 +1482,7 @@ class KalmanV2SmoothingForm(OperationForm):
                 ]
 
             # Save-model path
-            save_path: Optional[str] = None
+            save_path: str | None = None
             if self.save_model_chk.isChecked():
                 save_path = self.save_model_path.text().strip()
                 if not save_path:
@@ -1533,8 +1551,10 @@ class KalmanV2SmoothingForm(OperationForm):
         # forcing the entire numerics stack on workbench users
         # who never run smoothing.
         import dataclasses as _dc
+
         from mufasa.data_processors.kalman_pose_smoother_v2 import (
-            smooth_pose_v2, standard_rat_layout,
+            smooth_pose_v2,
+            standard_rat_layout,
         )
 
         # Patch 122b: dual-save provenance. Any model that crosses
@@ -1548,7 +1568,7 @@ class KalmanV2SmoothingForm(OperationForm):
         # the toml's run_id field. None on legacy projects.
         v1_run_id = getattr(self, "_v1_run_id", None)
 
-        def _post_train_dual_save(saved_path: Optional[str]) -> None:
+        def _post_train_dual_save(saved_path: str | None) -> None:
             """Mirror a freshly-saved model to the global cache and
             (if a v1 project is reachable) into the project's
             ``models/`` store.
@@ -1746,7 +1766,8 @@ class KalmanV2SmoothingForm(OperationForm):
             if output_dir and os.path.isdir(output_dir):
                 try:
                     from mufasa.project_layout import (
-                        RUN_PROVENANCE_FILENAME, write_run_toml,
+                        RUN_PROVENANCE_FILENAME,
+                        write_run_toml,
                     )
                     # Trim kwargs to JSON-friendly scalars for
                     # the params block; lists pass through, the
@@ -1822,7 +1843,8 @@ class RunOutlierCorrectionForm(OperationForm):
 
     def build(self) -> None:
         from mufasa.ui_qt.input_source_picker import (
-            InputSourcePicker, SourceKinds,
+            InputSourcePicker,
+            SourceKinds,
         )
         # Outlier correction usually runs before smoothing, so the
         # raw pose is the preferred input. Reorder the picker's
@@ -1930,23 +1952,25 @@ class RunOutlierCorrectionForm(OperationForm):
         }
 
     def target(self, *, config_path: str, data_dir: str,
-               save_dir: Optional[str], do_movement: bool,
+               save_dir: str | None, do_movement: bool,
                do_location: bool) -> None:
-        from mufasa.outlier_tools.outlier_corrector_movement import (
-            OutlierCorrecterMovement,
-        )
         from mufasa.outlier_tools.outlier_corrector_location import (
             OutlierCorrecterLocation,
+        )
+        from mufasa.outlier_tools.outlier_corrector_movement import (
+            OutlierCorrecterMovement,
         )
 
         # Resolve save_dir. For v1 projects with no explicit
         # target, allocate a fresh derived/outlier_corrected/<run>/.
         v1_root = resolve_v1_project_root(config_path)
-        run_id: Optional[str] = None
+        run_id: str | None = None
         if save_dir is None:
             if v1_root is not None:
                 from mufasa.project_layout import (
-                    ProjectPaths, Stages, generate_run_id,
+                    ProjectPaths,
+                    Stages,
+                    generate_run_id,
                 )
                 run_id = generate_run_id()
                 paths = ProjectPaths(v1_root)
@@ -2025,7 +2049,8 @@ class RunOutlierCorrectionForm(OperationForm):
         if v1_root is not None and run_id is not None:
             try:
                 from mufasa.project_layout import (
-                    RUN_PROVENANCE_FILENAME, write_run_toml,
+                    RUN_PROVENANCE_FILENAME,
+                    write_run_toml,
                 )
                 write_run_toml(
                     Path(save_dir) / RUN_PROVENANCE_FILENAME,
@@ -2115,8 +2140,11 @@ class SkipOutlierCorrectionForm(OperationForm):
         if v1_root is not None:
             try:
                 from mufasa.project_layout import (
-                    ProjectPaths, RUN_PROVENANCE_FILENAME, Stages,
-                    generate_run_id, write_run_toml,
+                    RUN_PROVENANCE_FILENAME,
+                    ProjectPaths,
+                    Stages,
+                    generate_run_id,
+                    write_run_toml,
                 )
                 run_id = generate_run_id()
                 paths = ProjectPaths(v1_root)

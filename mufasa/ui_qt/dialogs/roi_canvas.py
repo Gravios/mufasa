@@ -70,13 +70,20 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
-from PySide6.QtGui import (QColor, QImage, QKeyEvent, QMouseEvent, QPainter,
-                           QPaintEvent, QPen, QPixmap)
+from PySide6.QtGui import (
+    QColor,
+    QImage,
+    QKeyEvent,
+    QMouseEvent,
+    QPainter,
+    QPaintEvent,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import QWidget
 
 from mufasa.roi_tools.roi_logic import CIRCLE, POLYGON, RECTANGLE
@@ -138,7 +145,7 @@ class _ImageMapping:
     frame_h: int
 
     def widget_to_frame(self, wx: int, wy: int
-                        ) -> Optional[Tuple[int, int]]:
+                        ) -> tuple[int, int] | None:
         """Convert widget coords to frame coords. Returns None if the
         widget point is in the black bars (outside the frame)."""
         if self.scale <= 0:
@@ -150,7 +157,7 @@ class _ImageMapping:
         return None
 
     def frame_to_widget(self, fx: float, fy: float
-                        ) -> Tuple[int, int]:
+                        ) -> tuple[int, int]:
         """Convert frame coords to widget coords (for painting)."""
         return (
             int(round(fx * self.scale + self.offset_x)),
@@ -163,14 +170,14 @@ class _DrawState:
     """All currently-being-drawn shape state. Coordinates are
     always in FRAME pixel space, never widget pixel space."""
     # Rectangle: corner anchors
-    rect_start: Optional[Tuple[int, int]] = None
-    rect_end: Optional[Tuple[int, int]] = None
+    rect_start: tuple[int, int] | None = None
+    rect_end: tuple[int, int] | None = None
     # Circle: center + current radius point
-    circle_center: Optional[Tuple[int, int]] = None
-    circle_edge: Optional[Tuple[int, int]] = None
+    circle_center: tuple[int, int] | None = None
+    circle_edge: tuple[int, int] | None = None
     # Polygon: committed vertices + current rubber-band end point
-    poly_vertices: List[Tuple[int, int]] = field(default_factory=list)
-    poly_rubber_end: Optional[Tuple[int, int]] = None
+    poly_vertices: list[tuple[int, int]] = field(default_factory=list)
+    poly_rubber_end: tuple[int, int] | None = None
 
     def reset(self) -> None:
         self.rect_start = None
@@ -217,11 +224,11 @@ class ROICanvas(QWidget):
     shape_edited = Signal(int, dict)
     shape_deleted = Signal(int)
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._frame_bgr: Optional[np.ndarray] = None
-        self._frame_pixmap: Optional[QPixmap] = None
-        self._mapping: Optional[_ImageMapping] = None
+        self._frame_bgr: np.ndarray | None = None
+        self._frame_pixmap: QPixmap | None = None
+        self._mapping: _ImageMapping | None = None
 
         # Existing ROIs to display (overlay only, not editable here).
         # List of dicts: {"kind": str, "color_bgr": (b,g,r), "thickness": int,
@@ -236,13 +243,13 @@ class ROICanvas(QWidget):
         # which handle on it (None = body), the cursor offset at
         # drag-start, and the pre-drag geometry (for potential
         # rollback if a future undo lands).
-        self._selected_idx: Optional[int] = None
-        self._selected_handle: Optional[str] = None
-        self._drag_offset_frame: Optional[tuple[float, float]] = None
-        self._pre_drag_geom: Optional[dict] = None
+        self._selected_idx: int | None = None
+        self._selected_handle: str | None = None
+        self._drag_offset_frame: tuple[float, float] | None = None
+        self._pre_drag_geom: dict | None = None
         self.setFocusPolicy(Qt.StrongFocus)  # for Delete key
         self._draw_state = _DrawState()
-        self._draw_color_bgr: Tuple[int, int, int] = (0, 0, 255)
+        self._draw_color_bgr: tuple[int, int, int] = (0, 0, 255)
         self._draw_thickness: int = 3
 
         # Widget config
@@ -256,7 +263,7 @@ class ROICanvas(QWidget):
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
-    def set_frame(self, bgr: Optional[np.ndarray]) -> None:
+    def set_frame(self, bgr: np.ndarray | None) -> None:
         """Replace the displayed frame.
 
         Importantly, this does NOT cancel any in-progress drawing.
@@ -288,7 +295,7 @@ class ROICanvas(QWidget):
         self.update()
 
     def start_draw(self, kind: str,
-                   color_bgr: Tuple[int, int, int],
+                   color_bgr: tuple[int, int, int],
                    thickness: int) -> None:
         """Enter drawing mode for ``kind`` (one of RECTANGLE / CIRCLE /
         POLYGON from mufasa.roi_tools.roi_logic).
@@ -398,7 +405,7 @@ class ROICanvas(QWidget):
 
     def _hit_test(
         self, frame_pt: tuple[float, float]
-    ) -> tuple[Optional[int], Optional[str]]:
+    ) -> tuple[int | None, str | None]:
         """Find the placed shape under the cursor in select mode.
 
         Iterates back-to-front (top-most first; matches z-order
@@ -820,7 +827,7 @@ class ROICanvas(QWidget):
 
     def _reference_point_for_drag(
         self, idx: int
-    ) -> Optional[tuple[float, float]]:
+    ) -> tuple[float, float] | None:
         """Reference point for body-drag offset (so the cursor stays
         relative to the same point on the shape during the drag).
 
@@ -1158,7 +1165,7 @@ class ROICanvas(QWidget):
     # Helpers
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _bgr_to_qcolor(bgr: Tuple[int, int, int]) -> QColor:
+    def _bgr_to_qcolor(bgr: tuple[int, int, int]) -> QColor:
         b, g, r = bgr
         return QColor(int(r), int(g), int(b))
 

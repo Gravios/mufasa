@@ -56,16 +56,24 @@ What's deferred from Tk parity
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIntValidator, QDoubleValidator
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDockWidget, QFormLayout,
-                               QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtGui import QDoubleValidator, QIntValidator
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDockWidget,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 # Algorithm and option vocabulary mirrors Options.* in enums.py
 _MAX_FEATURES = ["sqrt", "log2", "None"]
@@ -92,9 +100,9 @@ class TrainClassifierForm(OperationForm):
 
     # ----------------------------------------------------------- State
     def __init__(self,
-                 parent: Optional[QWidget] = None,
-                 config_path: Optional[str] = None) -> None:
-        self._docked_widget: Optional[QDockWidget] = None
+                 parent: QWidget | None = None,
+                 config_path: str | None = None) -> None:
+        self._docked_widget: QDockWidget | None = None
         super().__init__(parent=parent, config_path=config_path)
 
     # ----------------------------------------------------------- UI
@@ -374,7 +382,7 @@ class TrainClassifierForm(OperationForm):
             dock.close()
             self.pop_out_btn.setText("Pop out ⇱")
 
-    def _find_main_window(self) -> Optional[QWidget]:
+    def _find_main_window(self) -> QWidget | None:
         from PySide6.QtWidgets import QMainWindow
         w = self.parentWidget()
         while w is not None:

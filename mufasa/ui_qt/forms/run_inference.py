@@ -62,16 +62,23 @@ backend doesn't need to change.
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDockWidget, QFileDialog, QHBoxLayout,
-                               QHeaderView, QLabel, QLineEdit, QMessageBox,
-                               QPushButton, QTableWidget, QTableWidgetItem,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QDockWidget,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 # Column layout for the per-classifier QTableWidget
 COL_CLF       = 0
@@ -99,9 +106,9 @@ class RunInferenceForm(OperationForm):
 
     # ----------------------------------------------------------- State
     def __init__(self,
-                 parent: Optional[QWidget] = None,
-                 config_path: Optional[str] = None) -> None:
-        self._docked_widget: Optional[QDockWidget] = None
+                 parent: QWidget | None = None,
+                 config_path: str | None = None) -> None:
+        self._docked_widget: QDockWidget | None = None
         self._classifier_targets: list[str] = []
         super().__init__(parent=parent, config_path=config_path)
 
@@ -364,7 +371,7 @@ class RunInferenceForm(OperationForm):
             dock.close()
             self.pop_out_btn.setText("Pop out ⇱")
 
-    def _find_main_window(self) -> Optional[QWidget]:
+    def _find_main_window(self) -> QWidget | None:
         from PySide6.QtWidgets import QMainWindow
         w = self.parentWidget()
         while w is not None:

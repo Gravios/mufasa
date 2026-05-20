@@ -25,7 +25,6 @@ import glob
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import QSize
 from PySide6.QtGui import QIcon, QPixmap
@@ -71,7 +70,7 @@ def icon(name: str) -> QIcon:
 
 
 @lru_cache(maxsize=None)
-def pixmap(name: str, size: Optional[tuple[int, int]] = None) -> QPixmap:
+def pixmap(name: str, size: tuple[int, int] | None = None) -> QPixmap:
     """Return a cached :class:`QPixmap` for a logical name."""
     path = _icon_map().get(name)
     if path is None or not path.is_file():
@@ -82,7 +81,7 @@ def pixmap(name: str, size: Optional[tuple[int, int]] = None) -> QPixmap:
     return pm
 
 
-def tooltip(key: str) -> Optional[str]:
+def tooltip(key: str) -> str | None:
     """Look up a tooltip string by key, or ``None`` if missing."""
     return _tooltips().get(key)
 

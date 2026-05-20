@@ -27,17 +27,29 @@ mechanically.
 """
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, Callable, Iterable, Optional
+from typing import Any
 
-from PySide6.QtCore import Qt, QRunnable, QThreadPool, QTimer, Signal
+from PySide6.QtCore import QRunnable, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QFont, QIcon, QIntValidator
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QSizePolicy, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
-from mufasa.ui_qt.icon_cache import icon as _icon, tooltip as _tooltip
+from mufasa.ui_qt.icon_cache import icon as _icon
+from mufasa.ui_qt.icon_cache import tooltip as _tooltip
 
 
 # --------------------------------------------------------------------------- #
@@ -205,20 +217,20 @@ class _MufasaButton(_GeometryShim, QPushButton):
         parent: QWidget,
         txt: str,
         *,
-        txt_clr: Optional[str] = None,      # deprecated; ignored
-        bg_clr: Optional[str] = None,       # deprecated; ignored
-        hover_bg_clr: Optional[str] = None,  # deprecated; ignored
+        txt_clr: str | None = None,      # deprecated; ignored
+        bg_clr: str | None = None,       # deprecated; ignored
+        hover_bg_clr: str | None = None,  # deprecated; ignored
         font: tuple = Formats.FONT_REGULAR.value,
         hover_font: tuple = Formats.FONT_REGULAR_BOLD.value,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
-        img: Optional[str | QIcon] = None,
-        cmd: Optional[Callable] = None,
-        cmd_kwargs: Optional[dict] = None,
+        width: int | None = None,
+        height: int | None = None,
+        img: str | QIcon | None = None,
+        cmd: Callable | None = None,
+        cmd_kwargs: dict | None = None,
         enabled: bool = True,
         thread: bool = False,
-        tooltip_txt: Optional[str] = None,
-        tooltip_key: Optional[str] = None,
+        tooltip_txt: str | None = None,
+        tooltip_key: str | None = None,
         **_ignored,
     ) -> None:
         super().__init__(txt, parent)
@@ -284,15 +296,15 @@ class _MufasaLabel(_GeometryShim, QLabel):
         parent: QWidget,
         txt: str = "",
         *,
-        txt_clr: Optional[str] = None,
-        bg_clr: Optional[str] = None,
+        txt_clr: str | None = None,
+        bg_clr: str | None = None,
         font: tuple = Formats.FONT_REGULAR.value,
-        img: Optional[str] = None,
-        link: Optional[str] = None,
-        cursor: Optional[str] = None,
-        width: Optional[int] = None,
+        img: str | None = None,
+        link: str | None = None,
+        cursor: str | None = None,
+        width: int | None = None,
         anchor: str = "w",
-        compound: Optional[str] = "left",
+        compound: str | None = "left",
         **_ignored,
     ) -> None:
         super().__init__(txt, parent)
@@ -334,11 +346,11 @@ class _MufasaCheckbox(_GeometryShim, QCheckBox):
         parent: QWidget,
         txt: str,
         *,
-        txt_clr: Optional[str] = None,   # deprecated; ignored
+        txt_clr: str | None = None,   # deprecated; ignored
         font: tuple = Formats.FONT_REGULAR.value,
         val: bool = False,
         state: str = NORMAL,
-        cmd: Optional[Callable] = None,
+        cmd: Callable | None = None,
         **_ignored,
     ) -> None:
         super().__init__(txt, parent)
@@ -379,15 +391,15 @@ class Entry_Box(_GeometryShim, QWidget):
         parent: QWidget,
         fileDescription: str = "",
         *,
-        labelwidth: Optional[int] = None,
+        labelwidth: int | None = None,
         status: str = NORMAL,
-        validation: Optional[str] = None,
-        entry_box_width: Optional[int] = None,
-        value: Optional[Any] = None,
+        validation: str | None = None,
+        entry_box_width: int | None = None,
+        value: Any | None = None,
         label_font: tuple = Formats.FONT_REGULAR.value,
         entry_font: tuple = Formats.FONT_REGULAR.value,
         justify: str = "left",
-        cmd: Optional[Callable] = None,
+        cmd: Callable | None = None,
         allow_blank: bool = False,
         **_ignored,
     ) -> None:
@@ -445,11 +457,11 @@ class _PathSelect(_GeometryShim, QWidget):
         parent: QWidget,
         fileDescription: str = "",
         *,
-        title: Optional[str] = None,
-        lblwidth: Optional[int] = None,
-        file_types: Optional[list[tuple[str, str]]] = None,
-        initialdir: Optional[str | Path] = None,
-        initial_path: Optional[str | Path] = None,
+        title: str | None = None,
+        lblwidth: int | None = None,
+        file_types: list[tuple[str, str]] | None = None,
+        initialdir: str | Path | None = None,
+        initial_path: str | Path | None = None,
         _mode: str = "file",
         **_ignored,
     ) -> None:
@@ -529,13 +541,13 @@ class MufasaDropDown(_GeometryShim, QWidget):
         parent: QWidget,
         dropdown_options: Iterable[Any],
         *,
-        label: Optional[str] = None,
-        label_width: Optional[int] = None,
+        label: str | None = None,
+        label_width: int | None = None,
         label_font: tuple = Formats.FONT_REGULAR.value,
-        dropdown_width: Optional[int] = None,
-        command: Optional[Callable] = None,
-        value: Optional[Any] = None,
-        state: Optional[str] = None,
+        dropdown_width: int | None = None,
+        command: Callable | None = None,
+        value: Any | None = None,
+        state: str | None = None,
         searchable: bool = False,
         **_ignored,
     ) -> None:
@@ -606,8 +618,8 @@ def CreateLabelFrameWithIcon(
     parent: QWidget,
     header: str = "",
     *,
-    icon_name: Optional[str] = None,
-    icon_link: Optional[str] = None,
+    icon_name: str | None = None,
+    icon_link: str | None = None,
     **kwargs,
 ) -> _LabelFrame:
     """Factory matching the Tk version's keyword surface.

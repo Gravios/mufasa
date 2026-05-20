@@ -40,15 +40,28 @@ Design notes
 """
 from __future__ import annotations
 
-from typing import Callable, Optional, Type
+from collections.abc import Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
-                               QListWidget, QListWidgetItem, QMainWindow,
-                               QMessageBox, QPushButton, QScrollArea,
-                               QSplitter, QStackedWidget, QStatusBar,
-                               QToolBox, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSplitter,
+    QStackedWidget,
+    QStatusBar,
+    QToolBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.icon_cache import icon
@@ -80,12 +93,12 @@ class OperationForm(QWidget):
 
     title: str = ""
     description: str = ""
-    help_url: Optional[str] = None
+    help_url: str | None = None
 
     completed = Signal()
 
-    def __init__(self, parent: Optional[QWidget] = None,
-                 config_path: Optional[str] = None) -> None:
+    def __init__(self, parent: QWidget | None = None,
+                 config_path: str | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self._build_shell()
@@ -182,13 +195,13 @@ class WorkflowPage(QWidget):
     the page declares.
     """
 
-    def __init__(self, title: str, parent: Optional[QWidget] = None,
-                 config_path: Optional[str] = None) -> None:
+    def __init__(self, title: str, parent: QWidget | None = None,
+                 config_path: str | None = None) -> None:
         super().__init__(parent)
         self.title = title
         self.config_path = config_path
         # declared: {section_title: [(form_cls, kwargs)]}
-        self._declared: dict[str, list[tuple[Type[OperationForm], dict]]] = {}
+        self._declared: dict[str, list[tuple[type[OperationForm], dict]]] = {}
         # Patch 122dn — sections whose content is an arbitrary
         # QWidget (built by a factory) rather than a list of
         # OperationForms. Keyed by section index; the factory is
@@ -219,7 +232,7 @@ class WorkflowPage(QWidget):
         self._outer.insertWidget(0, widget)
 
     def add_section(self, section_title: str,
-                    forms: list[tuple[Type[OperationForm], dict]]) -> None:
+                    forms: list[tuple[type[OperationForm], dict]]) -> None:
         """Add a named section with a list of (form_class, kwargs) pairs.
         Forms are built lazily on first expand.
         """
@@ -311,8 +324,8 @@ class WorkflowPage(QWidget):
 class MufasaWorkbench(QMainWindow):
     """Main workbench window — sidebar nav + workflow pages."""
 
-    def __init__(self, project_config_path: Optional[str] = None,
-                 parent: Optional[QWidget] = None) -> None:
+    def __init__(self, project_config_path: str | None = None,
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.project_config_path = project_config_path
         self.setWindowTitle(
@@ -347,7 +360,7 @@ class MufasaWorkbench(QMainWindow):
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
-    def add_page(self, title: str, icon_name: Optional[str] = None
+    def add_page(self, title: str, icon_name: str | None = None
                  ) -> WorkflowPage:
         """Add a new sidebar entry + workflow page; return the page."""
         page = WorkflowPage(title, parent=self.stack,
@@ -363,7 +376,7 @@ class MufasaWorkbench(QMainWindow):
             self.sidebar.setCurrentRow(0)
         return page
 
-    def launch_dialog(self, dialog_cls: Type[QWidget], **kwargs) -> None:
+    def launch_dialog(self, dialog_cls: type[QWidget], **kwargs) -> None:
         """Escape hatch for popups that legitimately need their own window.
 
         Subclasses of :class:`MufasaDialog` take ``config_path`` and render
@@ -463,8 +476,8 @@ class MufasaWorkbench(QMainWindow):
         # next launch picks it up. Imports recent_project directly
         # rather than going through workbench_app (which would be
         # circular — workbench_app imports workbench).
-        from mufasa.ui_qt.workbench_app import build_workbench
         from mufasa.ui_qt.recent_project import save_recent_project
+        from mufasa.ui_qt.workbench_app import build_workbench
         save_recent_project(config_path)
         new_wb = build_workbench(project_config_path=config_path)
         new_wb.show()
@@ -481,7 +494,7 @@ class MufasaWorkbench(QMainWindow):
 
     def add_tools_action(self, label: str,
                          callback: Callable[[], None],
-                         shortcut: Optional[str] = None) -> None:
+                         shortcut: str | None = None) -> None:
         """Register a menu action (for zero-field operations that used
         to be popups: reverse, flip, archive, etc.).
         """
@@ -503,7 +516,9 @@ class MufasaWorkbench(QMainWindow):
         sb.showMessage(msg)
 
     def _about(self) -> None:
-        import sys, PySide6
+        import sys
+
+        import PySide6
         QMessageBox.about(
             self, "About Mufasa",
             f"<b>Mufasa</b><br>"

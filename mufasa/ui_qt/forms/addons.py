@@ -22,12 +22,20 @@ Specialty / add-on workflows. Replaces 10 legacy popups:
 from __future__ import annotations
 
 import configparser
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QLineEdit, QListWidget,
-                               QListWidgetItem, QSpinBox,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.forms.analysis import _ClassifierPicker
@@ -73,8 +81,8 @@ class _CueLightPicker(QWidget):
     """Multi-select list of cue-light ROI names, or a free-text line
     edit fallback when the config hasn't been populated yet."""
 
-    def __init__(self, config_path: Optional[str] = None,
-                 parent: Optional[QWidget] = None) -> None:
+    def __init__(self, config_path: str | None = None,
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
         self._known_names: list[str] = []
@@ -720,7 +728,7 @@ class DirectingBodyPartSettingsForm(OperationForm):
                     seen.append(bp)
         return seen
 
-    def _current_setting(self) -> Optional[str]:
+    def _current_setting(self) -> str | None:
         """Read the current bodypart_direction from project config,
         or None if unset / project not loaded."""
         if not self.config_path:

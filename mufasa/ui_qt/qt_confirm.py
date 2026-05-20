@@ -38,13 +38,11 @@ forcing "Yes" / "No" everywhere.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 
 def qt_confirm_two_option(question: str,
                           option_one: str = "YES",
                           option_two: str = "NO",
-                          title: Optional[str] = None) -> str:
+                          title: str | None = None) -> str:
     """Qt-native confirmation dialog. Returns the chosen option's
     label (``option_one`` or ``option_two``).
 

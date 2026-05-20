@@ -33,13 +33,22 @@ Two analysis-specific reusable widgets live here:
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox,
-                               QFormLayout, QListWidget, QListWidgetItem, QSpinBox,
-                               QStackedWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QListWidget,
+    QListWidgetItem,
+    QSpinBox,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt import linux_env
 from mufasa.ui_qt.forms.roi import _BodyPartPicker
@@ -70,8 +79,8 @@ def _load_classifier_names(config_path: str) -> list[str]:
 class _ClassifierPicker(QWidget):
     """Multi-select classifier list, populated from project_config.ini."""
 
-    def __init__(self, config_path: Optional[str] = None,
-                 parent: Optional[QWidget] = None) -> None:
+    def __init__(self, config_path: str | None = None,
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         lay = QVBoxLayout(self); lay.setContentsMargins(0, 0, 0, 0)
         self.list = QListWidget(self)
@@ -121,7 +130,7 @@ class _AnalysisRoute:
     """
     label: str
     backend_sp: Callable[..., Any]
-    backend_mp: Optional[Callable[..., Any]] = None
+    backend_mp: Callable[..., Any] | None = None
     needs: set = field(default_factory=set)
     extras: list = field(default_factory=list)
     kwargs_map: dict = field(default_factory=dict)

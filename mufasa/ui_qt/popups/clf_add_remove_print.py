@@ -18,13 +18,19 @@ Here we use :class:`mufasa.ui_qt.dialog.MufasaDialog`'s composition +
 from __future__ import annotations
 
 import os
-from typing import Union
 
 from PySide6.QtWidgets import QMessageBox
 
 from mufasa.ui_qt.dialog import MufasaDialog
-from mufasa.ui_qt.widgets import (NW, CreateLabelFrameWithIcon, Entry_Box,
-                                 FileSelect, MufasaDropDown, MufasaButton, W)
+from mufasa.ui_qt.widgets import (
+    NW,
+    CreateLabelFrameWithIcon,
+    Entry_Box,
+    FileSelect,
+    MufasaButton,
+    MufasaDropDown,
+    W,
+)
 
 # These non-GUI imports are the same ones the Tk version uses. None of
 # them pull tkinter — they were already neutral utilities.
@@ -55,7 +61,7 @@ class AddClfPopUp(MufasaDialog):
       ConfigReader proxy.
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike]) -> None:
+    def __init__(self, config_path: str | os.PathLike) -> None:
         MufasaDialog.__init__(
             self,
             title="ADD CLASSIFIER",
@@ -133,7 +139,7 @@ class RemoveAClassifierPopUp(MufasaDialog):
     else is a no-op.
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike]) -> None:
+    def __init__(self, config_path: str | os.PathLike) -> None:
         # Create the ConfigReader first so we can validate *before*
         # building the UI (matching Tk version's ordering).
         MufasaDialog.__init__(

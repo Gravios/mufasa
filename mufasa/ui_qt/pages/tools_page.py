@@ -35,18 +35,14 @@ Add other project-less utilities here as they show up.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from mufasa.ui_qt.forms.data_export import ExportToCSVForm
 from mufasa.ui_qt.forms.data_import import ConverterForm
-from mufasa.ui_qt.forms.pose_tools import (PoseReorganizerForm,
-                                            SLEAPToYoloForm,
-                                            SimBARoisToYoloForm)
+from mufasa.ui_qt.forms.pose_tools import PoseReorganizerForm, SimBARoisToYoloForm, SLEAPToYoloForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_tools_page(workbench,
-                     config_path: Optional[str] = None
+                     config_path: str | None = None
                      ) -> WorkflowPage:
     page = workbench.add_page("Tools", icon_name="convert")
     page.add_section("Convert pose / annotation data",

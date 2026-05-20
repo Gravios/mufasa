@@ -26,12 +26,17 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QFormLayout, QHBoxLayout,
-                               QLineEdit, QPushButton)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 # Export "what" choices — string constants keep the dropdown labels
 # and backend dispatch in sync without an enum import dance.
@@ -136,8 +141,7 @@ class ExportToCSVForm(OperationForm):
         if not self.config_path:
             return
         try:
-            from mufasa.project_layout import \
-                project_paths_from_config
+            from mufasa.project_layout import project_paths_from_config
             paths = project_paths_from_config(self.config_path)
             vid_dir = paths.get("video_dir")
         except Exception:
@@ -169,8 +173,7 @@ class ExportToCSVForm(OperationForm):
         if not self.config_path:
             return []
         try:
-            from mufasa.project_layout import \
-                project_paths_from_config
+            from mufasa.project_layout import project_paths_from_config
             paths = project_paths_from_config(self.config_path)
             vid_dir = paths.get("video_dir")
         except Exception:
@@ -227,9 +230,11 @@ class ExportToCSVForm(OperationForm):
         """Run the export. Dispatches one backend call per
         video; per-video failures don't abort the batch but
         accumulate for the final summary."""
-        from mufasa.utils.csv_export import (export_combined_csv,
-                                             export_features_csv,
-                                             export_labels_csv)
+        from mufasa.utils.csv_export import (
+            export_combined_csv,
+            export_features_csv,
+            export_labels_csv,
+        )
         # Patch 122ae-6: dispatch table keyed by user-facing
         # "what" string. Matches the dropdown values constructed
         # in build(); no enum coercion needed.

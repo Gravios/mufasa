@@ -23,14 +23,24 @@ legacy project rather than silently corrupting the INI.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QFileDialog, QFormLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QMessageBox,
-                               QPlainTextEdit, QPushButton, QSpinBox,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class EditProjectMetadataDialog(QDialog):
@@ -51,7 +61,7 @@ class EditProjectMetadataDialog(QDialog):
 
     def __init__(self,
                  config_path: str,
-                 parent: Optional[QWidget] = None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Edit project information")
         self.setModal(True)
@@ -253,7 +263,7 @@ class EditProjectMetadataDialog(QDialog):
         self._body_parts_edit.setPlainText("\n".join(bps))
 
     @staticmethod
-    def _extract_bodyparts_from_pose_file(path: str) -> List[str]:
+    def _extract_bodyparts_from_pose_file(path: str) -> list[str]:
         """Strategy chain — try DLC's extract_bodyparts first
         (handles raw DLC h5/csv with multi-index headers), fall
         back to a flat-CSV parser that strips ``_x``/``_y``/
@@ -394,7 +404,8 @@ class EditProjectMetadataDialog(QDialog):
         # ----- Read-modify-write project.toml ----- #
         try:
             from mufasa.project_layout import (
-                read_project_toml, write_project_toml,
+                read_project_toml,
+                write_project_toml,
             )
             data = read_project_toml(self.config_path)
         except (ValueError, OSError) as exc:

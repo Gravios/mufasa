@@ -34,17 +34,22 @@ Functional differences from the Tk original
 from __future__ import annotations
 
 import os
-from typing import Optional, Union
 
-from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QDoubleSpinBox,
-                               QFormLayout, QGroupBox, QLabel,
-                               QMessageBox, QVBoxLayout)
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
+    QLabel,
+    QMessageBox,
+    QVBoxLayout,
+)
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import check_float
 from mufasa.utils.enums import ConfigKey, Dtypes
 from mufasa.utils.read_write import read_config_entry
-
 
 _RATIO_MIN = 0.0
 _RATIO_MAX = 1.0
@@ -65,8 +70,8 @@ class MinMaxDrawSizeDialog(QDialog):
     """Qt port of `SetMinMaxDrawWindowSize` (122ct)."""
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 parent: Optional[QDialog] = None) -> None:
+                 config_path: str | os.PathLike,
+                 parent: QDialog | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         self.setWindowTitle("Set drawing window size")

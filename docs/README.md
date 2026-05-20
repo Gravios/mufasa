@@ -18,8 +18,8 @@ Read this if you're starting a new project or want to understand how v1 differs 
 
 Read this if you have an existing `project_folder/`-style project and want to adopt v1.
 
-### `lint_status.md` (122dg)
-**Codebase lint snapshot + follow-up plan.** Audit of `ruff check` findings across the whole codebase after the 122dg targeted sweep. Top-rule breakdown, per-directory disposition, recommended tier-1/2/3 follow-up patches.
+### `lint_status.md` (122dg + 122do)
+**Codebase lint snapshot + follow-up plan.** Audit of `ruff check` findings across the whole codebase after the 122dg targeted sweep (F401/W292/W293) and the 122do modernization sweep (UP045/UP006/UP007/UP035/I001/F401 cascade). Top-rule breakdown, per-directory disposition, recommended tier-1/2/3 follow-up patches.
 
 Read this when planning the next typing/lint sweep or asking "is this file lint-clean?"
 

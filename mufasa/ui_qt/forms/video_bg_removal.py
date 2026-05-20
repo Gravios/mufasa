@@ -32,13 +32,22 @@ from __future__ import annotations
 
 import os
 from copy import deepcopy
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox,
-                               QFileDialog, QHBoxLayout, QLineEdit, QPushButton, QRadioButton,
-                               QSpinBox, QFormLayout, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QRadioButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
 
@@ -56,7 +65,7 @@ class _OptionalRefPath(QWidget):
     instead of the source itself.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None,
+    def __init__(self, parent: QWidget | None = None,
                  file_filter: str = ("Video files (*.mp4 *.avi *.mov "
                                       "*.mkv *.webm);;All files (*)")
                  ) -> None:
@@ -118,7 +127,7 @@ class _BgScopePicker(QWidget):
     Keeping it local avoids changing the shared widget's contract.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None,
+    def __init__(self, parent: QWidget | None = None,
                  on_scope_change=None,
                  file_filter: str = ("Video files (*.mp4 *.avi *.mov "
                                       "*.mkv *.webm);;All files (*)")
@@ -385,11 +394,13 @@ class BackgroundRemovalForm(OperationForm):
         """Dispatch to single-process or multi-process backend,
         per-video for directory scope.
         """
-        from mufasa.video_processors.video_processing import (
-            video_bg_subtraction, video_bg_subtraction_mp,
-        )
         from mufasa.utils.read_write import (
-            find_all_videos_in_directory, get_video_meta_data,
+            find_all_videos_in_directory,
+            get_video_meta_data,
+        )
+        from mufasa.video_processors.video_processing import (
+            video_bg_subtraction,
+            video_bg_subtraction_mp,
         )
 
         def _resolve_bg_window(video_path: str, bg_video_path: str

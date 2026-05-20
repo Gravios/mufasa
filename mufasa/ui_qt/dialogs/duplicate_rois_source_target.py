@@ -63,19 +63,32 @@ from __future__ import annotations
 import os
 import re
 from copy import deepcopy
-from typing import Optional, Union
 
 import pandas as pd
-from PySide6.QtWidgets import (QAbstractItemView, QApplication, QComboBox,
-                               QDialog, QDialogButtonBox, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMessageBox, QPushButton,
-                               QStyle, QVBoxLayout)
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QStyle,
+    QVBoxLayout,
+)
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.roi_tools.roi_utils import (change_roi_dict_video_name,
-                                       get_roi_data_for_video_name,
-                                       get_roi_df_from_dict)
+from mufasa.roi_tools.roi_utils import (
+    change_roi_dict_video_name,
+    get_roi_data_for_video_name,
+    get_roi_df_from_dict,
+)
 from mufasa.utils.enums import Keys
 from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.read_write import find_all_videos_in_directory
@@ -93,11 +106,11 @@ class DuplicateRoisDialog(QDialog):
     """Qt port of `DuplicateROIsBySourceTarget` (122cv)."""
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 roi_data_path: Optional[Union[str, os.PathLike]] = None,
-                 parent: Optional[QDialog] = None,
-                 default_source: Optional[str] = None,
-                 window_title: Optional[str] = None) -> None:
+                 config_path: str | os.PathLike,
+                 roi_data_path: str | os.PathLike | None = None,
+                 parent: QDialog | None = None,
+                 default_source: str | None = None,
+                 window_title: str | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
         # Patch 122dl: `window_title` lets callers override the
@@ -131,8 +144,7 @@ class DuplicateRoisDialog(QDialog):
                 read_video_info=False,
                 create_logger=False)
             if roi_data_path is not None:
-                from mufasa.utils.checks import (
-                    check_file_exist_and_readable)
+                from mufasa.utils.checks import check_file_exist_and_readable
                 check_file_exist_and_readable(file_path=roi_data_path)
                 self._reader.roi_coordinates_path = deepcopy(roi_data_path)
 

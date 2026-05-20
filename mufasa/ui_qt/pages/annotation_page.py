@@ -39,18 +39,18 @@ Patch 122aa
 """
 from __future__ import annotations
 
-from typing import Optional
-
-from mufasa.ui_qt.forms.annotation import (AnnotationReportsForm,
-                                           ClipReviewLauncher,
-                                           FrameLabellingLauncher,
-                                           TargetedAnnotationClipsLauncher,
-                                           ThirdPartyAppenderForm)
+from mufasa.ui_qt.forms.annotation import (
+    AnnotationReportsForm,
+    ClipReviewLauncher,
+    FrameLabellingLauncher,
+    TargetedAnnotationClipsLauncher,
+    ThirdPartyAppenderForm,
+)
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_annotation_page(workbench,
-                          config_path: Optional[str] = None) -> WorkflowPage:
+                          config_path: str | None = None) -> WorkflowPage:
     page = workbench.add_page("Annotation", icon_name="label")
     page.add_section("Frame labelling",          [(FrameLabellingLauncher, {})])
     page.add_section("Targeted annotation clips",

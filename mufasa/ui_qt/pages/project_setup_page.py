@@ -39,16 +39,13 @@ Removed in patch 122i:
 """
 from __future__ import annotations
 
-from typing import Optional
-
-from mufasa.ui_qt.forms.project_info import (NewProjectForm,
-                                             ProjectInfoForm)
+from mufasa.ui_qt.forms.project_info import NewProjectForm, ProjectInfoForm
 from mufasa.ui_qt.forms.project_setup import register_project_menu_actions
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
 def build_project_setup_page(workbench,
-                             config_path: Optional[str] = None
+                             config_path: str | None = None
                              ) -> WorkflowPage:
     """Build and return the Projects page.
 

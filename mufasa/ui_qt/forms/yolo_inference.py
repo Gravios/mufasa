@@ -41,16 +41,24 @@ from __future__ import annotations
 import math
 import os
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QFormLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QPushButton,
-                               QSpinBox, QStackedWidget, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSpinBox,
+    QStackedWidget,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 # Same option lists as the legacy popup, kept lazy where possible
 # so importing this module doesn't trigger find_core_cnt() etc.
@@ -304,7 +312,7 @@ class YOLOPoseInferenceForm(OperationForm):
     # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
-    def _availability_hint(self) -> Optional[str]:
+    def _availability_hint(self) -> str | None:
         """Return a human-readable hint if CUDA or ultralytics is
         missing, else None."""
         missing: list[str] = []
@@ -466,24 +474,25 @@ class YOLOPoseInferenceForm(OperationForm):
         }
 
     def target(self, *, weights: str, save_dir: str, bp_csv: str,
-               tracker_path: Optional[str], mode: str,
+               tracker_path: str | None, mode: str,
                video_target: str, recursive: bool, device,
                workers: int, batch_size: int, img_size: int,
-               threshold: float, iou: float, fmt: Optional[str],
-               max_tracks: Optional[int],
-               max_per_id: Optional[int],
-               smoothing: Optional[int], verbose: bool,
+               threshold: float, iou: float, fmt: str | None,
+               max_tracks: int | None,
+               max_per_id: int | None,
+               smoothing: int | None, verbose: bool,
                interpolate: bool, stream: bool) -> None:
         from mufasa.model.yolo_pose_inference import YOLOPoseInference
         from mufasa.model.yolo_pose_track_inference import (
             YOLOPoseTrackInference,
         )
+        from mufasa.utils.enums import Options
         from mufasa.utils.read_write import (
             find_files_of_filetypes_in_directory,
-            get_video_meta_data, read_yolo_bp_names_file,
+            get_video_meta_data,
+            read_yolo_bp_names_file,
             recursive_file_search,
         )
-        from mufasa.utils.enums import Options
 
         keypoint_names = read_yolo_bp_names_file(file_path=bp_csv)
 

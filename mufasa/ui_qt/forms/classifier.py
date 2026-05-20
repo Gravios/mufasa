@@ -20,15 +20,22 @@ Left as dedicated dialogs for now (interactive / long-running):
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QFormLayout, QLineEdit, QStackedWidget,
-                               QTextBrowser, QVBoxLayout, QWidget, QPushButton,
-                               QHBoxLayout)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QStackedWidget,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 # --------------------------------------------------------------------------- #
 # Layout-agnostic classifier-list helpers (patch 122f)
@@ -52,7 +59,8 @@ def _write_classifiers(config_path: str, targets: list[str]) -> None:
     cp = Path(config_path)
     if str(cp).lower().endswith(".toml"):
         from mufasa.project_layout import (
-            read_project_toml, write_project_toml,
+            read_project_toml,
+            write_project_toml,
         )
         data = read_project_toml(cp)
         classifiers = dict(data.get("classifiers", {}))
@@ -79,7 +87,7 @@ def _write_classifiers(config_path: str, targets: list[str]) -> None:
 class _AddClfPanel(QWidget):
     """Collect the classifier name for the Add action."""
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         form = QFormLayout(self); form.setContentsMargins(0, 0, 0, 0)
         self.name = QLineEdit(self)
@@ -90,7 +98,7 @@ class _AddClfPanel(QWidget):
 class _RemoveClfPanel(QWidget):
     """Choose which classifier to remove from a dropdown."""
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         form = QFormLayout(self); form.setContentsMargins(0, 0, 0, 0)
         self.name_cb = QComboBox(self)
@@ -104,7 +112,7 @@ class _RemoveClfPanel(QWidget):
 class _PrintClfPanel(QWidget):
     """Pick a ``.sav`` and show its metadata in a read-only pane."""
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         outer = QVBoxLayout(self); outer.setContentsMargins(0, 0, 0, 0)
         row = QHBoxLayout()

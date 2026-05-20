@@ -60,17 +60,25 @@ from __future__ import annotations
 
 import math
 import os
-from typing import Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QDoubleValidator, QIntValidator
-from PySide6.QtWidgets import (QComboBox, QDockWidget, QFileDialog,
-                               QFormLayout, QGroupBox, QHBoxLayout, QLabel,
-                               QLineEdit, QMessageBox, QPushButton,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDockWidget,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 AUTO = "AUTO"
 GANTT_NONE  = "None"
@@ -137,9 +145,9 @@ class ValidateClassifierForm(OperationForm):
 
     # ----------------------------------------------------------- State
     def __init__(self,
-                 parent: Optional[QWidget] = None,
-                 config_path: Optional[str] = None) -> None:
-        self._docked_widget: Optional[QDockWidget] = None
+                 parent: QWidget | None = None,
+                 config_path: str | None = None) -> None:
+        self._docked_widget: QDockWidget | None = None
         self._cpu_cnt = _find_core_count()
         super().__init__(parent=parent, config_path=config_path)
 
@@ -366,7 +374,7 @@ class ValidateClassifierForm(OperationForm):
             dock.close()
             self.pop_out_btn.setText("Pop out ⇱")
 
-    def _find_main_window(self) -> Optional[QWidget]:
+    def _find_main_window(self) -> QWidget | None:
         from PySide6.QtWidgets import QMainWindow
         w = self.parentWidget()
         while w is not None:
@@ -377,7 +385,7 @@ class ValidateClassifierForm(OperationForm):
 
     # ----------------------------------------------------------- Helpers
     @staticmethod
-    def _gantt_value(text: str) -> Optional[int]:
+    def _gantt_value(text: str) -> int | None:
         """Translate the dropdown text into the int the validator
         expects: 1 = final-frame, 2 = video, None = no Gantt."""
         if text == GANTT_FRAME:
@@ -387,13 +395,13 @@ class ValidateClassifierForm(OperationForm):
         return None
 
     @staticmethod
-    def _bbox_value(text: str) -> Optional[str]:
+    def _bbox_value(text: str) -> str | None:
         """Translate the bbox dropdown into kwarg expected by
         ValidateModelOneVideoMultiprocess (None when FALSE)."""
         return None if text == BBOX_FALSE else text
 
     @staticmethod
-    def _auto_or_int(text: str) -> Optional[int]:
+    def _auto_or_int(text: str) -> int | None:
         return None if text == AUTO else int(text)
 
     # ----------------------------------------------------------- Execute
@@ -479,13 +487,13 @@ class ValidateClassifierForm(OperationForm):
 
     def target(self, *, config_path: str, model_path: str,
                feature_path: str, discrimination_threshold: float,
-               shortest_bout: int, font_size: Optional[int],
-               text_spacing: Optional[int],
-               circle_size: Optional[int], text_opacity: float,
+               shortest_bout: int, font_size: int | None,
+               text_spacing: int | None,
+               circle_size: int | None, text_opacity: float,
                text_thickness: int, bp_palette: str,
                show_pose: bool, show_animal_names: bool,
-               show_clf_confidence: bool, bbox: Optional[str],
-               core_cnt: int, create_gantt: Optional[int]) -> None:
+               show_clf_confidence: bool, bbox: str | None,
+               core_cnt: int, create_gantt: int | None) -> None:
         """Dispatch single-core vs multi-core based on core_cnt.
         Mirrors the Tk popup's __run logic exactly: single-core
         ignores bbox / bp_palette / core_cnt; multi-core takes

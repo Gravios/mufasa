@@ -39,7 +39,8 @@ Design notes
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox, QProgressDialog, QWidget
@@ -53,10 +54,10 @@ def run_with_progress(
     title: str,
     target: Callable[..., Any],
     args: tuple = (),
-    kwargs: Optional[dict] = None,
-    inject_runner_kw: Optional[str] = None,
-    on_success: Optional[Callable[[], None]] = None,
-    on_error: Optional[Callable[[Exception], None]] = None,
+    kwargs: dict | None = None,
+    inject_runner_kw: str | None = None,
+    on_success: Callable[[], None] | None = None,
+    on_error: Callable[[Exception], None] | None = None,
     cancellable: bool = True,
     label_template: str = "Running…",
 ) -> ProcessorRunner:

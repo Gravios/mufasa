@@ -42,7 +42,6 @@ import shutil
 import subprocess
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 
 # --------------------------------------------------------------------------- #
@@ -165,7 +164,7 @@ def nvenc_available() -> bool:
 
 
 @lru_cache(maxsize=1)
-def cuda_capability() -> Optional[tuple[int, int]]:
+def cuda_capability() -> tuple[int, int] | None:
     """Compute capability of device 0, or ``None`` if no CUDA.
 
     For RTX 5070 Ti (Blackwell) this returns ``(12, 0)``. Used to pick

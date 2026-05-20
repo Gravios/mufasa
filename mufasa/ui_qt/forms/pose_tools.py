@@ -27,14 +27,25 @@ Data Import.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QFormLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QScrollArea,
-                               QSpinBox, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
 
@@ -122,10 +133,10 @@ class PoseReorganizerForm(OperationForm):
         self.body_layout.addWidget(self.reorder_group)
 
         # Storage populated by _load_order
-        self._original_animals: Optional[list[str]] = None
+        self._original_animals: list[str] | None = None
         self._original_bps: list[str] = []
         self._row_combos: list[
-            tuple[Optional[QComboBox], QComboBox]
+            tuple[QComboBox | None, QComboBox]
         ] = []
         self._reorganizer = None
 
@@ -180,7 +191,7 @@ class PoseReorganizerForm(OperationForm):
             row_layout = QHBoxLayout(row_widget)
             row_layout.setContentsMargins(0, 0, 0, 0)
 
-            animal_cb: Optional[QComboBox] = None
+            animal_cb: QComboBox | None = None
             if is_madlc:
                 animal_cb = QComboBox(row_widget)
                 # de-dupe while preserving order
@@ -232,7 +243,7 @@ class PoseReorganizerForm(OperationForm):
         return {"bp_lst": new_bps, "animal_list": new_animals}
 
     def target(self, *, bp_lst: list[str],
-               animal_list: Optional[list[str]]) -> None:
+               animal_list: list[str] | None) -> None:
         if self._reorganizer is None:
             raise RuntimeError(
                 "Reorganizer not initialised — re-load order.",
@@ -557,7 +568,7 @@ class SimBARoisToYoloForm(OperationForm):
         }
 
     def target(self, *, config_path: str,
-               video_dir: Optional[str], save_dir: Optional[str],
+               video_dir: str | None, save_dir: str | None,
                roi_frm_cnt: int, train_size: float, obb: bool,
                greyscale: bool, clahe: bool, verbose: bool) -> None:
         from mufasa.third_party_label_appenders.transform.simba_roi_to_yolo import (

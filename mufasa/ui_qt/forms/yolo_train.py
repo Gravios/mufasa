@@ -21,16 +21,22 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QFormLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QMessageBox, QPushButton,
-                               QSpinBox)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+)
 
 from mufasa.ui_qt.workbench import OperationForm
-
 
 _IMG_SIZE_OPTIONS = [256, 320, 416, 480, 512, 640, 720, 768, 960, 1280]
 _BATCH_SIZE_OPTIONS = [2, 4, 8, 16, 32, 64, 128]
@@ -165,7 +171,7 @@ class YOLOPoseTrainForm(OperationForm):
     # ------------------------------------------------------------------ #
     # Helpers (mirroring yolo_inference.py — same idioms)
     # ------------------------------------------------------------------ #
-    def _availability_hint(self) -> Optional[str]:
+    def _availability_hint(self) -> str | None:
         missing: list[str] = []
         if not self._cuda_available:
             missing.append("CUDA GPU")
@@ -279,10 +285,10 @@ class YOLOPoseTrainForm(OperationForm):
             "verbose":     bool(self.verbose.isChecked()),
         }
 
-    def target(self, *, yolo_map: str, weights: Optional[str],
+    def target(self, *, yolo_map: str, weights: str | None,
                save_dir: str, device: str, workers: int,
                epochs: int, img_size: int, batch_size: int,
-               patience: int, fmt: Optional[str], plots: bool,
+               patience: int, fmt: str | None, plots: bool,
                verbose: bool) -> None:
         """Fire off `python -m mufasa.model.yolo_fit` as a detached
         subprocess. The workbench doesn't wait for completion."""
