@@ -98,12 +98,23 @@ def _bgr_to_qcolor(bgr: tuple[int, int, int]) -> QColor:
     return QColor(r, g, b)
 
 
-class ROIDefinePanel(QDialog):
-    """Unified Qt panel for ROI definition across an entire project.
+class ROIDefineWidget(QWidget):
+    """Unified Qt widget for ROI definition across an entire project.
 
-    Open with ``ROIDefinePanel(config_path, video_path=None)`` to start
-    on the first video, or pass a specific ``video_path`` to start
-    there.
+    Patch 122dn refactor — was previously `ROIDefinePanel(QDialog)`.
+    Split into a content-only ``QWidget`` (this class) plus a thin
+    ``ROIDefinePanel(QDialog)`` wrapper (defined at the bottom of
+    this module) so the panel can be embedded inline in the ROI
+    page's Definitions section while existing popup callers keep
+    working unchanged.
+
+    Open with ``ROIDefineWidget(config_path, video_path=None)`` to
+    start on the first video, or pass a specific ``video_path`` to
+    start there. If ``config_path`` is None or points to a project
+    with no videos, the widget renders a placeholder ("Open a
+    project first") instead of throwing — required so the workbench
+    can include this in the page layout at startup without a
+    project loaded.
 
     Page Up / Page Down step between videos. Switching videos with
     unsaved changes auto-saves them first.
@@ -111,50 +122,183 @@ class ROIDefinePanel(QDialog):
 
     rois_modified = Signal()   # emitted when any save / reset happens
 
-    def __init__(self, config_path: str,
+    def __init__(self, config_path: Optional[str] = None,
                  video_path: Optional[str] = None,
                  parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.config_path = config_path
+        # Patch 122dn — graceful no-project handling. The widget
+        # can be constructed without a project (workbench startup
+        # without an open project) and just shows a placeholder.
+        # All real init happens inside _initialize_for_project().
+        self.config_path: Optional[str] = config_path
+        self.project_path: str = ""
+        self.video_dir: str = ""
+        self._videos: list[str] = []
+        self._cur_idx: int = 0
+        self.logic: Optional[ROILogic] = None
+        self._dirty = False
+        # Track our own layout so we can swap between the
+        # placeholder and the full UI without leaks.
+        self._root_layout = QVBoxLayout(self)
+        self._root_layout.setContentsMargins(0, 0, 0, 0)
+        self._root_layout.setSpacing(0)
+        self._content_widget: Optional[QWidget] = None
+        # Stash the requested starting video so it survives a
+        # set_config_path call (used by the dialog wrapper).
+        self._requested_video_path = video_path
+
+        # Try to populate; falls back to placeholder if anything
+        # is missing (no config, no project, no videos).
+        self._initialize_for_project()
+
+    def _initialize_for_project(self) -> None:
+        """Try to bring up the full UI for the current config_path.
+        Falls back to a no-project placeholder on any failure.
+        """
+        if not self.config_path:
+            self._show_placeholder(
+                "No project loaded. Use <b>File → Open project…</b> "
+                "to load a project with videos, then return here."
+            )
+            return
         # Patch 122ag: resolve project paths through the layout
         # helper so v1 (project.toml) and legacy (project_config.ini)
-        # both work. The dialog needs project_path for the header
-        # bar display and video_dir for the table population.
-        paths = _project_paths_lite(config_path)
+        # both work.
+        try:
+            paths = _project_paths_lite(self.config_path)
+        except Exception as exc:
+            self._show_placeholder(
+                f"Could not read project config — "
+                f"{type(exc).__name__}: {exc}"
+            )
+            return
         self.project_path = paths.get("project_root", "")
         self.video_dir = paths.get("video_dir", "")
 
         # Discover videos — _list_project_videos takes the video
         # directory directly (post-122ab signature change), so we
         # pass video_dir rather than project_path + 'videos/'.
-        self._videos: list[str] = _list_project_videos(self.video_dir)
-        if not self._videos:
-            raise RuntimeError(
-                f"No videos found in {self.video_dir or '<no project>'}"
+        try:
+            self._videos = _list_project_videos(self.video_dir)
+        except Exception as exc:
+            self._show_placeholder(
+                f"Could not list project videos — "
+                f"{type(exc).__name__}: {exc}"
             )
+            return
+        if not self._videos:
+            self._show_placeholder(
+                f"No videos found in <code>{self.video_dir or '&lt;no project&gt;'}</code>.<br>"
+                "Import videos via <b>Data Import → Video Parameters</b> first."
+            )
+            return
+
         # Pick starting video
+        video_path = self._requested_video_path
         if video_path is not None and video_path in self._videos:
             self._cur_idx = self._videos.index(video_path)
         else:
             self._cur_idx = 0
-
-        # Logic for the currently-selected video. Created lazily —
-        # _load_video() initializes it.
-        self.logic: Optional[ROILogic] = None
+        self.logic = None
         self._dirty = False
 
-        self.setWindowFlags(self.windowFlags() | Qt.Window)
-        self.resize(1300, 850)
-
+        # Clear placeholder (if any) and build the full UI.
+        self._clear_content()
         self._build_ui()
         self._refresh_video_list()
         self._load_video(self._cur_idx)
+
+    def set_config_path(self, config_path: Optional[str]) -> None:
+        """Switch to a different project (or to no-project mode).
+        Rebuilds the UI in place. Used by the page wrapper when a
+        new project is loaded after the widget was already built.
+        """
+        self.config_path = config_path
+        self._requested_video_path = None
+        self._initialize_for_project()
+
+    def set_embedded_mode(self, embedded: bool) -> None:
+        """Toggle UI affordances appropriate for embedded vs popup
+        contexts.
+
+        When embedded in a workbench page (Definitions section):
+            * Hide "Close" and "Save && close" buttons — there's no
+              window to close.
+            * The page's collapsible section is the dismiss
+              affordance.
+        When in a popup dialog (legacy entry points):
+            * Show "Close" and "Save && close" buttons.
+
+        Idempotent. Safe to call before _build_ui — visibility is
+        re-applied when buttons are created.
+        """
+        self._embedded = bool(embedded)
+        if hasattr(self, "close_btn"):
+            self._apply_embedded_visibility()
+
+    def _apply_embedded_visibility(self) -> None:
+        """Apply current _embedded flag to button visibility."""
+        if getattr(self, "_embedded", False):
+            self.close_btn.hide()
+            self.save_close_btn.hide()
+        else:
+            self.close_btn.show()
+            self.save_close_btn.show()
+
+    def _clear_content(self) -> None:
+        """Remove the current placeholder / content widget so the
+        next builder can populate fresh. We delete the immediate
+        child of _root_layout; child widgets are reparented to
+        None (deleted on next Qt event loop pass)."""
+        if self._content_widget is not None:
+            self._root_layout.removeWidget(self._content_widget)
+            self._content_widget.deleteLater()
+            self._content_widget = None
+
+    def _show_placeholder(self, message_html: str) -> None:
+        """Display a centered placeholder message instead of the
+        full ROI UI. Called when there's nothing to operate on."""
+        self._clear_content()
+        # Also reset state so any subsequent operations on this
+        # widget fail gracefully rather than half-execute against
+        # stale state from a previous project.
+        self.project_path = ""
+        self.video_dir = ""
+        self._videos = []
+        self._cur_idx = 0
+        self.logic = None
+        self._dirty = False
+
+        host = QWidget(self)
+        layout = QVBoxLayout(host)
+        layout.setContentsMargins(40, 60, 40, 60)
+        layout.addStretch()
+        lbl = QLabel(message_html, host)
+        lbl.setTextFormat(Qt.RichText)
+        lbl.setWordWrap(True)
+        lbl.setAlignment(Qt.AlignCenter)
+        lbl.setStyleSheet(
+            "color: palette(placeholder-text); "
+            "font-size: 11pt; padding: 12px;"
+        )
+        layout.addWidget(lbl)
+        layout.addStretch()
+        self._root_layout.addWidget(host)
+        self._content_widget = host
 
     # ------------------------------------------------------------------ #
     # UI construction
     # ------------------------------------------------------------------ #
     def _build_ui(self) -> None:
-        outer = QVBoxLayout(self)
+        # Patch 122dn — build the full UI into a `content` widget
+        # that gets added to self._root_layout, so the
+        # placeholder/content swap in _initialize_for_project /
+        # _show_placeholder works cleanly. Pre-122dn this method
+        # built directly into self (as the only direct child of
+        # the QDialog).
+        self._clear_content()
+        content = QWidget(self)
+        outer = QVBoxLayout(content)
         outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(6)
 
@@ -376,19 +520,29 @@ class ROIDefinePanel(QDialog):
         bot.addWidget(self.save_status)
         bot.addSpacing(20)
 
-        cancel_btn = QPushButton("Close", self)
-        cancel_btn.clicked.connect(self._on_close_clicked)
-        bot.addWidget(cancel_btn)
+        # Close + save buttons. Patch 122dn promoted to instance
+        # attrs so set_embedded_mode() can hide the dialog-only
+        # affordances ("Close", "Save && close") when the widget
+        # is embedded in a workbench page rather than a popup.
+        self.close_btn = QPushButton("Close", self)
+        self.close_btn.clicked.connect(self._on_close_clicked)
+        bot.addWidget(self.close_btn)
 
         self.save_btn = QPushButton("Save", self)
         self.save_btn.clicked.connect(self._on_save_clicked)
         bot.addWidget(self.save_btn)
 
-        save_close_btn = QPushButton("Save && close", self)
-        save_close_btn.setDefault(True)
-        save_close_btn.clicked.connect(self._on_save_and_close)
-        bot.addWidget(save_close_btn)
+        self.save_close_btn = QPushButton("Save && close", self)
+        self.save_close_btn.setDefault(True)
+        self.save_close_btn.clicked.connect(self._on_save_and_close)
+        bot.addWidget(self.save_close_btn)
         outer.addLayout(bot)
+        if getattr(self, "_embedded", False):
+            self._apply_embedded_visibility()
+
+        # Patch 122dn — mount the content widget into root.
+        self._root_layout.addWidget(content)
+        self._content_widget = content
 
         # Keyboard shortcuts: R/C/P switch tools; PgUp/PgDn nav videos
         QShortcut(QKeySequence("R"), self,
@@ -937,4 +1091,72 @@ class ROIDefinePanel(QDialog):
         self.save_status.setText(msg)
 
 
-__all__ = ["ROIDefinePanel"]
+# --------------------------------------------------------------------------- #
+# Patch 122dn — backward-compatible QDialog wrapper.
+# --------------------------------------------------------------------------- #
+class ROIDefinePanel(QDialog):
+    """Thin QDialog wrapper around :class:`ROIDefineWidget`.
+
+    Preserves the pre-122dn entry-point API so callers that opened
+    the panel as a popup (``roi_video_table.py:_action_define_rois``
+    and ``forms/roi.py:ROIManageForm.on_run``) keep working
+    unchanged. The new embedded-in-page path uses
+    :class:`ROIDefineWidget` directly via
+    :func:`WorkflowPage.add_section_widget`.
+
+    Forwarded API
+    -------------
+    * ``rois_modified`` signal — re-emitted from the wrapped widget.
+    * ``config_path`` attribute — copy of the wrapped widget's.
+    * Same constructor signature as the pre-122dn dialog
+      (``config_path``, ``video_path=None``, ``parent=None``).
+
+    Raises
+    ------
+    RuntimeError
+        If the project has no videos. Preserves the pre-122dn
+        contract — popup callers expected this exception and
+        handled it (showing a QMessageBox). The new embedded
+        widget displays a placeholder instead; the dialog wrapper
+        keeps the raise-on-empty contract for legacy callers.
+    """
+
+    rois_modified = Signal()
+
+    def __init__(self, config_path: str,
+                 video_path: Optional[str] = None,
+                 parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("ROI Definitions — Mufasa")
+        self.setWindowFlags(self.windowFlags() | Qt.Window)
+        self.resize(1300, 850)
+        self.config_path = config_path
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self.widget = ROIDefineWidget(
+            config_path=config_path,
+            video_path=video_path,
+            parent=self,
+        )
+        outer.addWidget(self.widget)
+
+        # Forward the signal so existing callers can do
+        # `dlg.rois_modified.connect(...)`.
+        self.widget.rois_modified.connect(self.rois_modified)
+
+        # Preserve the pre-122dn contract: callers expected a
+        # RuntimeError when there were no videos. The widget now
+        # renders a placeholder instead — check for that case
+        # after construction and raise to match legacy callers'
+        # exception-handler paths.
+        if not self.widget._videos:
+            raise RuntimeError(
+                f"No videos found in "
+                f"{self.widget.video_dir or '<no project>'}"
+            )
+
+
+__all__ = ["ROIDefinePanel", "ROIDefineWidget"]

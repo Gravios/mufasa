@@ -297,7 +297,12 @@ def main() -> int:
     # ------------------------------------------------------------------ #
     # ROIDefinePanel
     # ------------------------------------------------------------------ #
-    panel_cls = get_class(panel_tree, "ROIDefinePanel")
+    # Patch 122dn moved the panel content from ROIDefinePanel
+    # (now a thin QDialog wrapper) to ROIDefineWidget (the
+    # embeddable QWidget). Prefer the widget; fall back to the
+    # panel for pre-122dn compatibility.
+    panel_cls = (get_class(panel_tree, "ROIDefineWidget")
+                 or get_class(panel_tree, "ROIDefinePanel"))
     panel_methods = (
         {m.name for m in panel_cls.body
          if isinstance(m, ast.FunctionDef)}
