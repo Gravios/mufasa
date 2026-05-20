@@ -219,6 +219,23 @@ class ROIDefinePanel(QDialog):
         self.draw_btn.setStyleSheet("font-weight: bold; padding: 4px 12px;")
         self.draw_btn.clicked.connect(self._on_draw_clicked)
         tool_row.addWidget(self.draw_btn)
+
+        # Patch 122dm — Edit / Select toggle. When checked, the
+        # canvas enters select mode: click a placed shape to
+        # select it, then drag the body to move or drag a
+        # corner / radius handle to resize. Delete key on a
+        # selected shape removes it. See
+        # docs/roi_enhancements_proposal.md Proposal 2.
+        self.edit_btn = QPushButton("Edit", self)
+        self.edit_btn.setCheckable(True)
+        self.edit_btn.setToolTip(
+            "Toggle edit mode — click placed ROIs to select, "
+            "drag body to move, drag corner/radius handle to "
+            "resize, press Delete to remove."
+        )
+        self.edit_btn.setStyleSheet("padding: 4px 10px;")
+        self.edit_btn.clicked.connect(self._on_edit_toggled)
+        tool_row.addWidget(self.edit_btn)
         outer.addLayout(tool_row)
 
         # ---- Splitter: video list (left) | preview/table (right) ---- #
@@ -293,6 +310,9 @@ class ROIDefinePanel(QDialog):
                                    QSizePolicy.Expanding)
         self.preview.shape_committed.connect(self._on_shape_committed)
         self.preview.shape_cancelled.connect(self._on_shape_cancelled)
+        # Patch 122dm — edit signals (drag-to-adjust + delete).
+        self.preview.shape_edited.connect(self._on_shape_edited)
+        self.preview.shape_deleted.connect(self._on_shape_deleted)
         right_layout.addWidget(self.preview, 1)
 
         # Shape table
@@ -480,6 +500,11 @@ class ROIDefinePanel(QDialog):
             self.preview.set_frame(self.logic.current_frame)
         # Build the overlay list for the canvas
         overlay_rois = []
+        # Patch 122dm — track which overlay-index corresponds to
+        # which (kind, name) so canvas signals (shape_edited,
+        # shape_deleted) can map back to the logic. Must match
+        # the iteration order used to build overlay_rois.
+        self._overlay_idx_to_kind_name: list[tuple[str, str]] = []
         for kind, d in self.logic.defs.items():
             for name, roi in d.items():
                 overlay_rois.append({
@@ -488,6 +513,7 @@ class ROIDefinePanel(QDialog):
                     "thickness": roi.thickness,
                     "geometry": roi.geometry,
                 })
+                self._overlay_idx_to_kind_name.append((kind, name))
         self.preview.set_existing_rois(overlay_rois)
         self.frame_label.setText(
             f"Frame {self.logic.frame_idx} / "
@@ -669,6 +695,93 @@ class ROIDefinePanel(QDialog):
         """Slot for ROICanvas.shape_cancelled."""
         self._pending_shape = None
         self._flash_status("Drawing cancelled.")
+
+    # ------------------------------------------------------------------ #
+    # Patch 122dm — Edit / select-mode handlers (Proposal 2)
+    # ------------------------------------------------------------------ #
+    def _on_edit_toggled(self, checked: bool) -> None:
+        """Toggle the canvas's select / edit mode. While in edit
+        mode the Draw button is disabled (the two modes don't
+        compose cleanly — you can't be both placing and selecting)."""
+        if checked:
+            # Cancel any in-progress draw, then enter select mode.
+            self._pending_shape = None
+            self.preview.start_select()
+            self.draw_btn.setEnabled(False)
+            self._flash_status(
+                "Edit mode: click a placed ROI to select; "
+                "drag to move; Delete to remove."
+            )
+        else:
+            self.preview.stop_select()
+            self.draw_btn.setEnabled(True)
+            self._flash_status("Edit mode off.")
+
+    def _on_shape_edited(self, idx: int, geom: dict) -> None:
+        """Slot for ROICanvas.shape_edited. Pushes the new geometry
+        into the logic so save-time writes the edit back to H5.
+
+        idx maps to self._overlay_idx_to_kind_name (built by
+        _sync_preview); the canvas's internal _existing_rois list
+        is parallel to it.
+        """
+        if self.logic is None:
+            return
+        if not (0 <= idx < len(self._overlay_idx_to_kind_name)):
+            return
+        kind, name = self._overlay_idx_to_kind_name[idx]
+        ok = False
+        try:
+            if kind == RECTANGLE:
+                ok = self.logic.update_rectangle_geometry(
+                    name=name,
+                    top_left=tuple(geom["top_left"]),
+                    bottom_right=tuple(geom["bottom_right"]),
+                )
+            elif kind == CIRCLE:
+                ok = self.logic.update_circle_geometry(
+                    name=name,
+                    center=tuple(geom["center"]),
+                    radius=int(geom["radius"]),
+                )
+            elif kind == POLYGON:
+                ok = self.logic.update_polygon_geometry(
+                    name=name,
+                    vertices=[tuple(v) for v in geom["vertices"]],
+                )
+        except Exception as exc:
+            self._flash_status(
+                f"Edit failed: {exc}", error=True)
+            return
+        if not ok:
+            self._flash_status(
+                f"Could not update {name}", error=True)
+            return
+        self._dirty = True
+        # Re-sync the table so any derived numbers (width, height,
+        # center coords) reflect the new geometry. Don't re-sync
+        # preview here — the canvas already mutated its overlay
+        # copy in place during the drag; calling _sync_preview
+        # would rebuild from logic and force a repaint which is
+        # fine but unnecessary churn at this point.
+        self._sync_table()
+        self._flash_status(f"Adjusted {name}")
+
+    def _on_shape_deleted(self, idx: int) -> None:
+        """Slot for ROICanvas.shape_deleted (Delete key in edit
+        mode). Removes the ROI from the logic + refreshes preview
+        + table.
+        """
+        if self.logic is None:
+            return
+        if not (0 <= idx < len(self._overlay_idx_to_kind_name)):
+            return
+        _kind, name = self._overlay_idx_to_kind_name[idx]
+        if self.logic.delete_roi(name):
+            self._dirty = True
+            self._sync_preview()
+            self._sync_table()
+            self._flash_status(f"Deleted {name}.")
 
     def _on_delete_roi(self, name: str) -> None:
         if self.logic is None:
