@@ -95,12 +95,34 @@ class DuplicateRoisDialog(QDialog):
     def __init__(self,
                  config_path: Union[str, os.PathLike],
                  roi_data_path: Optional[Union[str, os.PathLike]] = None,
-                 parent: Optional[QDialog] = None) -> None:
+                 parent: Optional[QDialog] = None,
+                 default_source: Optional[str] = None,
+                 window_title: Optional[str] = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
-        self.setWindowTitle("Duplicate ROIs from source to target videos")
+        # Patch 122dl: `window_title` lets callers override the
+        # dialog's titlebar text. The default ("Duplicate ROIs from
+        # source to target videos") is accurate but reads as
+        # technical-jargon to users who came in via the "Apply to
+        # selected videos…" entry point on `roi_define_panel`.
+        # That entry passes a friendlier title that matches the
+        # button label they clicked.
+        self.setWindowTitle(
+            window_title
+            if window_title is not None
+            else "Duplicate ROIs from source to target videos"
+        )
         self.setModal(True)
         self.resize(640, 720)
+        # Patch 122dl: `default_source` lets callers pre-select a
+        # specific video as the source — used by the new "Apply to
+        # selected videos…" button on `roi_define_panel` so the
+        # user doesn't have to re-pick the video they were just
+        # working on. None preserves the legacy default-to-first-
+        # video behaviour for the menu entry point.
+        self._default_source = (
+            str(default_source) if default_source else None
+        )
 
         # Load project state + ROI inventory.
         try:
@@ -175,6 +197,17 @@ class DuplicateRoisDialog(QDialog):
         self._source_combo.setInsertPolicy(QComboBox.NoInsert)
         self._source_combo.addItems(self._videos_w_rois)
         self._source_combo.setCurrentIndex(0)
+        # Patch 122dl: if a default_source was passed by the
+        # caller AND it matches a video that has ROIs, pre-select
+        # it. Otherwise keep the index-0 default (alphabetic
+        # first). The default_source's basename (no extension) is
+        # the canonical form used in self._videos_w_rois; tolerate
+        # callers passing either basename or full path.
+        if self._default_source:
+            from pathlib import Path as _P
+            cand = _P(self._default_source).stem
+            if cand in self._videos_w_rois:
+                self._source_combo.setCurrentText(cand)
         self._source_combo.currentTextChanged.connect(
             self._on_source_changed)
         source_layout.addWidget(QLabel("Source:"))
