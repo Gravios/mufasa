@@ -331,6 +331,65 @@ class ROILogic:
                 return True
         return False
 
+    # ------------------------------------------------------------------ #
+    # Patch 122dm — geometry updates for drag-to-adjust (Proposal 2).
+    # Each method preserves the existing ROIDefinition's color /
+    # thickness / ear_tag_size metadata and writes the new geometry
+    # using the SAME key conventions as the matching add_* method.
+    # This keeps the H5 serializer and the painter's legacy-form
+    # readers (which use topLeftX / Bottom_right_X / centerX etc.)
+    # backward-compatible. Returns True on success, False if the
+    # named ROI doesn't exist or is of the wrong kind.
+    # ------------------------------------------------------------------ #
+    def update_rectangle_geometry(
+        self, name: str,
+        top_left: Tuple[int, int],
+        bottom_right: Tuple[int, int],
+    ) -> bool:
+        if name not in self.defs[RECTANGLE]:
+            return False
+        x1, y1 = int(top_left[0]), int(top_left[1])
+        x2, y2 = int(bottom_right[0]), int(bottom_right[1])
+        w = abs(x2 - x1); h = abs(y2 - y1)
+        cx = (x1 + x2) // 2; cy = (y1 + y2) // 2
+        self.defs[RECTANGLE][name].geometry = {
+            "topLeftX": x1, "topLeftY": y1,
+            "Bottom_right_X": x2, "Bottom_right_Y": y2,
+            "Center_X": cx, "Center_Y": cy,
+            "width": w, "height": h,
+        }
+        return True
+
+    def update_circle_geometry(
+        self, name: str,
+        center: Tuple[int, int],
+        radius: int,
+    ) -> bool:
+        if name not in self.defs[CIRCLE]:
+            return False
+        cx, cy = int(center[0]), int(center[1])
+        self.defs[CIRCLE][name].geometry = {
+            "centerX": cx, "centerY": cy, "radius": int(radius),
+            "Center_X": cx, "Center_Y": cy,
+        }
+        return True
+
+    def update_polygon_geometry(
+        self, name: str,
+        vertices: List[Tuple[int, int]],
+    ) -> bool:
+        if name not in self.defs[POLYGON]:
+            return False
+        if len(vertices) < 3:
+            return False
+        verts = np.asarray(vertices, dtype=np.int32)
+        center = verts.mean(axis=0).astype(int)
+        self.defs[POLYGON][name].geometry = {
+            "vertices": verts.tolist(),
+            "Center_X": int(center[0]), "Center_Y": int(center[1]),
+        }
+        return True
+
     def delete_all(self) -> None:
         for d in self.defs.values():
             d.clear()
