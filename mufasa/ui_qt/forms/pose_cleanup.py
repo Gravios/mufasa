@@ -1003,6 +1003,16 @@ class KalmanV2SmoothingForm(OperationForm):
     """
 
     title = "Kalman v2 smoothing"
+    # Patch 122dt — provenance wiring. Kalman v2 writes to
+    # derived/smoothed/kalman_v2/<run_id>/. publish_target_stage =
+    # "outlier_corrected" makes the run discoverable to the
+    # downstream backends (Features etc.) that still hard-code reads
+    # from there. The published symlink resolves to the smoothed/
+    # output, so consumers transparently get the smoothed data.
+    section_id = "kalman_v2"
+    publish_target_stage = "outlier_corrected"
+    publish_source_stage = "smoothed"
+    publish_source_flavor = "kalman_v2"
     description = (
         "Skeletal-model EM smoother (forward-filter + RTS). "
         "Slower than Savitzky-Golay but handles missing frames, "
@@ -1762,6 +1772,13 @@ class KalmanV2SmoothingForm(OperationForm):
         # raised) so a provenance hiccup doesn't invalidate
         # results that are already on disk.
         if v1_root is not None and v1_run_id is not None:
+            # Patch 122dt — capture run_id on self so the base
+            # OperationForm._record_provenance hook records
+            # [provenance.kalman_v2] and publishes the symlink at
+            # derived/outlier_corrected/<run_id> -> ../smoothed/
+            # kalman_v2/<run_id>. Same run_id as the run.toml's, so
+            # the project.toml entry and the run.toml stay in sync.
+            self._last_run_id = v1_run_id
             output_dir = kwargs.get("output_dir")
             if output_dir and os.path.isdir(output_dir):
                 try:
@@ -1831,9 +1848,16 @@ class RunOutlierCorrectionForm(OperationForm):
     configured in the **Outlier correction settings** form
     (which writes to ``project_config.ini``). This form just
     runs the backends; it doesn't surface the criteria.
+
+    Patch 122dt — wired to section_provenance: writes
+    ``[provenance.outlier_correction]`` to project.toml on success.
+    Doesn't publish (writes directly to
+    ``derived/outlier_corrected/<run_id>/``); the publish-to-stage
+    mechanism is unnecessary for this producer.
     """
 
     title = "Run outlier correction"
+    section_id = "outlier_correction"  # provenance recording target
     description = (
         "Run movement + location outlier correction on the chosen "
         "pose data. Thresholds and reference body-parts are "
@@ -2047,6 +2071,14 @@ class RunOutlierCorrectionForm(OperationForm):
 
         # Write run.toml provenance if we're in a v1 project.
         if v1_root is not None and run_id is not None:
+            # Patch 122dt: capture run_id on self so the base
+            # OperationForm._record_provenance hook (fires after
+            # this method returns on the worker thread) can write
+            # the [provenance.outlier_correction] entry to
+            # project.toml. Settings sections without a run_id are
+            # the only intentional no-record case; producers must
+            # always record on success.
+            self._last_run_id = run_id
             try:
                 from mufasa.project_layout import (
                     RUN_PROVENANCE_FILENAME,

@@ -89,11 +89,46 @@ class OperationForm(QWidget):
 
     The form never opens a new window by itself; it lives inline in a
     :class:`WorkflowPage`.
+
+    Provenance (patch 122dt)
+    ------------------------
+    A producer subclass can opt into provenance recording — green
+    checkmarks / orange stale-circles in the UI — by setting
+    class-level attributes:
+
+    * ``section_id: str`` — must be a key in
+      :data:`mufasa.section_provenance.SECTIONS`. The base class
+      calls ``record_run(config_path, section_id, run_id)`` after
+      successful completion.
+    * ``publish_target_stage: str | None`` — if non-None, the base
+      class calls ``publish_to_stage`` after success so the run is
+      discoverable under that stage too (typically
+      ``"outlier_corrected"`` for smoothers that downstream still
+      reads from there). Requires ``publish_source_stage`` to be
+      set.
+    * ``publish_source_stage: str | None`` — the stage the producer
+      actually wrote to (e.g., ``"smoothed"`` for Kalman v2).
+    * ``publish_source_flavor: str | None`` — optional sub-segment
+      under ``publish_source_stage`` (e.g., ``"kalman_v2"`` for
+      ``derived/smoothed/kalman_v2/<run_id>/``).
+
+    For provenance to fire, the subclass's :meth:`target` must set
+    ``self._last_run_id`` to the run-id directory name (e.g.,
+    ``"20260520-233610-6203f1"``) before returning. Targets that
+    don't set it skip recording silently — useful for sections that
+    are also producers but didn't allocate a run on this invocation
+    (e.g., the user picked an explicit save dir).
     """
 
     title: str = ""
     description: str = ""
     help_url: str | None = None
+
+    # Provenance opt-in. See class docstring for the contract.
+    section_id: str | None = None
+    publish_target_stage: str | None = None
+    publish_source_stage: str | None = None
+    publish_source_flavor: str | None = None
 
     completed = Signal()
 
@@ -101,6 +136,11 @@ class OperationForm(QWidget):
                  config_path: str | None = None) -> None:
         super().__init__(parent)
         self.config_path = config_path
+        # Set by :meth:`target` when a producer subclass allocates a
+        # run dir; consumed by :meth:`_record_provenance` after
+        # success. None on every successful invocation that didn't
+        # produce a new run (skip-recording case).
+        self._last_run_id: str | None = None
         self._build_shell()
         self.build()
 
@@ -159,18 +199,85 @@ class OperationForm(QWidget):
             QMessageBox.warning(self, f"{self.title}: invalid input", str(exc))
             return
 
-        # Discover work function. Some forms override ``on_run`` directly
-        # and never hit this path; others rely on ``target``.
+        # Reset run-id snapshot before each invocation so a previous
+        # run's id can't leak into the next provenance write.
+        self._last_run_id = None
+
         def _work() -> None:
             self.target(**kwargs)
+
+        def _on_success() -> None:
+            # Provenance write happens BEFORE the completed signal so
+            # any UI listener observing the signal can immediately
+            # re-query SectionStatus and find the new entry.
+            self._record_provenance()
+            self.completed.emit()
+            QMessageBox.information(self, self.title, "Done.")
 
         run_with_progress(
             parent=self.window(),
             title=f"{self.title}…",
             target=_work,
-            on_success=lambda: (self.completed.emit(),
-                                QMessageBox.information(self, self.title, "Done.")),
+            on_success=_on_success,
         )
+
+    def _record_provenance(self) -> None:
+        """Patch 122dt — write [provenance.<section_id>] and (if
+        configured) publish a symlink into ``publish_target_stage``.
+
+        Silently skips if any precondition isn't met (no section_id
+        declared, no config_path, no run_id captured by target).
+        Errors during recording are swallowed with a print — they
+        shouldn't crash the UI or block the "Done." dialog the user
+        just earned by running a successful operation.
+        """
+        if self.section_id is None:
+            return
+        if self.config_path is None:
+            return
+        run_id = self._last_run_id  # may be None for settings sections
+
+        # Import here so the workbench module's import tree doesn't
+        # depend on the provenance module at startup. (The module is
+        # cheap, but localizing imports keeps the workbench bootstrap
+        # path obvious.)
+        try:
+            from mufasa.section_provenance import record_run
+            record_run(self.config_path, self.section_id, run_id)
+        except Exception as exc:
+            print(
+                f"[provenance] record_run failed for "
+                f"{self.section_id!r}: {type(exc).__name__}: {exc}"
+            )
+            # Don't return — still attempt the publish below, since
+            # they're independent concerns.
+
+        if (
+            self.publish_target_stage is not None
+            and self.publish_source_stage is not None
+            and run_id is not None
+        ):
+            try:
+                from pathlib import Path
+
+                from mufasa.project_layout import publish_to_stage
+                # Project root is the directory containing
+                # project.toml — that's how every other v1 path is
+                # constructed throughout the codebase.
+                project_root = Path(self.config_path).parent
+                publish_to_stage(
+                    project_root,
+                    self.publish_source_stage,
+                    self.publish_target_stage,
+                    run_id,
+                    source_flavor=self.publish_source_flavor,
+                )
+            except Exception as exc:
+                print(
+                    f"[provenance] publish_to_stage failed for "
+                    f"{self.section_id!r}: {type(exc).__name__}: "
+                    f"{exc}"
+                )
 
 
 # --------------------------------------------------------------------------- #
