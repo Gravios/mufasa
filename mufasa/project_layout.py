@@ -201,25 +201,26 @@ def publish_to_stage(
     source_stage: str,
     target_stage: str,
     run_id: str,
+    source_flavor: str | None = None,
 ) -> Path:
     """Publish a run from one stage into another via relative symlink.
 
     Use this when a producer that natively writes to
-    ``derived/<source_stage>/<run_id>`` wants its output discoverable
-    under ``derived/<target_stage>/<run_id>`` too — typically
-    Interpolate / Kalman v2 / Data Import publishing into the
-    ``outlier_corrected/`` stage so downstream backends (Features,
-    Classifier, Visualizations) that hard-code reads from there pick
-    up the data without needing to be re-plumbed onto the input-source
-    picker.
+    ``derived/<source_stage>[/<source_flavor>]/<run_id>`` wants its
+    output discoverable under ``derived/<target_stage>/<run_id>``
+    too — typically Interpolate / Kalman v2 / Data Import publishing
+    into the ``outlier_corrected/`` stage so downstream backends
+    (Features, Classifier, Visualizations) that hard-code reads from
+    there pick up the data without needing to be re-plumbed onto the
+    input-source picker.
 
-    The link is **relative** (``../<source_stage>/<run_id>``) so it
-    survives project moves and ``rsync`` copies. Downstream consumers
-    that ``glob`` or ``rglob`` for files follow it transparently;
-    so does ``pandas.read_parquet`` / ``pyarrow.parquet``. Callers that
-    deliberately want the underlying path (e.g., for logging) should
-    call ``os.path.realpath`` on the result, but most callers don't
-    care.
+    The link is **relative** (``../<source_stage>[/<source_flavor>]/<run_id>``)
+    so it survives project moves and ``rsync`` copies. Downstream
+    consumers that ``glob`` or ``rglob`` for files follow it
+    transparently; so does ``pandas.read_parquet`` / ``pyarrow.parquet``.
+    Callers that deliberately want the underlying path (e.g., for
+    logging) should call ``os.path.realpath`` on the result, but most
+    callers don't care.
 
     Atomicity
     ---------
@@ -239,8 +240,17 @@ def publish_to_stage(
         (NOT paths). ``ValueError`` is raised if a separator is
         embedded.
     run_id
-        Run-id directory name. Must already exist under
-        ``derived/<source_stage>/`` or ``FileNotFoundError`` is raised.
+        Run-id directory name. Must already exist at
+        ``derived/<source_stage>[/<source_flavor>]/<run_id>`` or
+        ``FileNotFoundError`` is raised.
+    source_flavor
+        Optional sub-stage segment under ``source_stage``. Used by
+        producers that write to a flavored subdir (e.g., Kalman v2
+        writes to ``derived/smoothed/kalman_v2/<run_id>/`` — pass
+        ``source_stage="smoothed"`` and ``source_flavor="kalman_v2"``).
+        Defaults to ``None`` (no flavor segment). Same separator
+        validation as the stage names. Added in patch 122dt to
+        support the Kalman-v2 publish path.
 
     Returns
     -------
@@ -251,8 +261,8 @@ def publish_to_stage(
     Raises
     ------
     ValueError
-        If ``source_stage`` or ``target_stage`` contains a path
-        separator (must be a bare directory name).
+        If ``source_stage``, ``target_stage``, or ``source_flavor``
+        contains a path separator (must be bare directory names).
     FileNotFoundError
         If the source run doesn't exist.
     FileExistsError
@@ -274,9 +284,22 @@ def publish_to_stage(
             f"target_stage must be a bare directory name; "
             f"got {target_stage!r}"
         )
+    if source_flavor is not None and (
+        "/" in source_flavor or "\\" in source_flavor
+    ):
+        raise ValueError(
+            f"source_flavor must be a bare directory name; "
+            f"got {source_flavor!r}"
+        )
 
     derived = project_root / "derived"
-    source = derived / source_stage / run_id
+    # Build the source path. With a flavor segment Kalman v2 writes
+    # to derived/smoothed/kalman_v2/<run_id>/; without one, the
+    # generic stage_run_dir layout is derived/<stage>/<run_id>/.
+    if source_flavor is not None:
+        source = derived / source_stage / source_flavor / run_id
+    else:
+        source = derived / source_stage / run_id
     if not source.exists():
         raise FileNotFoundError(
             f"source run not found: {source}"
@@ -288,8 +311,14 @@ def publish_to_stage(
     # Relative target — survives ``mv``/``rsync`` of the whole
     # project. Computed from the symlink's directory (target_dir)
     # to the source — they're siblings under derived/, so one ``..``
-    # gets us up to ``derived/`` and then down into source_stage.
-    relative_target = Path("..") / source_stage / run_id
+    # gets us up to ``derived/`` and then down into source_stage
+    # (optionally through source_flavor).
+    if source_flavor is not None:
+        relative_target = (
+            Path("..") / source_stage / source_flavor / run_id
+        )
+    else:
+        relative_target = Path("..") / source_stage / run_id
 
     # If the final path already exists, branch on what it is.
     if final.is_symlink():
