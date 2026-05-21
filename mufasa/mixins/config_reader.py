@@ -358,7 +358,11 @@ class ConfigReader(object):
           backends that use it migrate.
         """
         from pathlib import Path
-        from mufasa.project_layout import is_run_id
+        from mufasa.project_layout import (
+            is_run_id,  # noqa: F401  — kept in scope for downstream
+                        # readers of this module who grep for it.
+            latest_populated_run_or_parent,
+        )
 
         root = Path(self.project_path)
 
@@ -368,19 +372,17 @@ class ConfigReader(object):
         self.video_info_path = str(root / "sources" / "video_info.csv")
 
         # ----- Multi-run stage resolution ------------------------------ #
+        # Patch 122dr — was a local closure named ``_latest_run_or_parent``
+        # that picked the newest run subdir by name only, including empty
+        # ones. Extracted to :func:`mufasa.project_layout.latest_populated_run_or_parent`
+        # so it can be unit-tested directly, and made content-aware so
+        # empty (aborted/in-progress) run subdirs no longer shadow earlier
+        # populated runs. See the helper's docstring for the in-the-wild
+        # repro that motivated the change.
         def _latest_run_or_parent(stage_parent: Path) -> str:
-            """Pick the newest run subdir under ``stage_parent`` if
-            any exist; else return the parent itself. Sort key is
-            the directory name — v1 run-ids are timestamp-prefixed
-            so lexical sort == chronological sort."""
-            if stage_parent.is_dir():
-                runs = sorted(
-                    d for d in stage_parent.iterdir()
-                    if d.is_dir() and is_run_id(d.name)
-                )
-                if runs:
-                    return str(runs[-1])
-            return str(stage_parent)
+            return latest_populated_run_or_parent(
+                stage_parent, self.file_type,
+            )
 
         self.outlier_corrected_dir = _latest_run_or_parent(
             root / "derived" / "outlier_corrected",
