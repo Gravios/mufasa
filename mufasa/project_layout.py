@@ -193,6 +193,137 @@ def latest_populated_run_or_parent(
 
 
 # ---------------------------------------------------------------------------
+# Stage-symlink publishing (patch 122ds)
+# ---------------------------------------------------------------------------
+
+def publish_to_stage(
+    project_root: Path,
+    source_stage: str,
+    target_stage: str,
+    run_id: str,
+) -> Path:
+    """Publish a run from one stage into another via relative symlink.
+
+    Use this when a producer that natively writes to
+    ``derived/<source_stage>/<run_id>`` wants its output discoverable
+    under ``derived/<target_stage>/<run_id>`` too — typically
+    Interpolate / Kalman v2 / Data Import publishing into the
+    ``outlier_corrected/`` stage so downstream backends (Features,
+    Classifier, Visualizations) that hard-code reads from there pick
+    up the data without needing to be re-plumbed onto the input-source
+    picker.
+
+    The link is **relative** (``../<source_stage>/<run_id>``) so it
+    survives project moves and ``rsync`` copies. Downstream consumers
+    that ``glob`` or ``rglob`` for files follow it transparently;
+    so does ``pandas.read_parquet`` / ``pyarrow.parquet``. Callers that
+    deliberately want the underlying path (e.g., for logging) should
+    call ``os.path.realpath`` on the result, but most callers don't
+    care.
+
+    Atomicity
+    ---------
+    The "create temp symlink then ``os.replace`` into final name"
+    pattern means that at no point does an intermediate state contain
+    an empty run directory at the target — closing the producer-side
+    of the 122dr-bug shape. (122dr fixes the consumer side: even if
+    an empty target run did exist, the resolver would skip it.) Belt
+    and suspenders.
+
+    Parameters
+    ----------
+    project_root
+        Project directory (the one containing ``project.toml``).
+    source_stage, target_stage
+        Bare stage names like ``"smoothed"`` or ``"outlier_corrected"``
+        (NOT paths). ``ValueError`` is raised if a separator is
+        embedded.
+    run_id
+        Run-id directory name. Must already exist under
+        ``derived/<source_stage>/`` or ``FileNotFoundError`` is raised.
+
+    Returns
+    -------
+    Path
+        The published symlink path:
+        ``<project_root>/derived/<target_stage>/<run_id>``.
+
+    Raises
+    ------
+    ValueError
+        If ``source_stage`` or ``target_stage`` contains a path
+        separator (must be a bare directory name).
+    FileNotFoundError
+        If the source run doesn't exist.
+    FileExistsError
+        If the target already exists and is NOT a symlink (i.e., a
+        real directory or file). The caller must resolve the
+        collision explicitly rather than have the publisher clobber
+        unknown data.
+    """
+    import os
+    import secrets
+
+    if "/" in source_stage or "\\" in source_stage:
+        raise ValueError(
+            f"source_stage must be a bare directory name; "
+            f"got {source_stage!r}"
+        )
+    if "/" in target_stage or "\\" in target_stage:
+        raise ValueError(
+            f"target_stage must be a bare directory name; "
+            f"got {target_stage!r}"
+        )
+
+    derived = project_root / "derived"
+    source = derived / source_stage / run_id
+    if not source.exists():
+        raise FileNotFoundError(
+            f"source run not found: {source}"
+        )
+
+    target_dir = derived / target_stage
+    target_dir.mkdir(parents=True, exist_ok=True)
+    final = target_dir / run_id
+    # Relative target — survives ``mv``/``rsync`` of the whole
+    # project. Computed from the symlink's directory (target_dir)
+    # to the source — they're siblings under derived/, so one ``..``
+    # gets us up to ``derived/`` and then down into source_stage.
+    relative_target = Path("..") / source_stage / run_id
+
+    # If the final path already exists, branch on what it is.
+    if final.is_symlink():
+        # Idempotent if it already points where we want.
+        if Path(os.readlink(final)) == relative_target:
+            return final
+        # Otherwise atomically replace via temp + os.replace.
+        tmp = target_dir / f".__publish_tmp_{secrets.token_hex(4)}"
+        try:
+            tmp.symlink_to(relative_target, target_is_directory=True)
+            os.replace(tmp, final)
+        except Exception:
+            # Clean up the temp on failure so we don't litter.
+            if tmp.is_symlink():
+                tmp.unlink()
+            raise
+        return final
+    if final.exists():
+        # Real directory or file. Refuse to clobber — that's
+        # potentially user data this helper has no business
+        # destroying.
+        raise FileExistsError(
+            f"refusing to publish over non-symlink at {final}; "
+            f"remove it explicitly to replace"
+        )
+
+    # Doesn't exist — simple create. No need for temp-rename here
+    # because a partial state mid-create is "no link yet", not
+    # "empty dir" — the 122dr bug shape doesn't reappear.
+    final.symlink_to(relative_target, target_is_directory=True)
+    return final
+
+
+# ---------------------------------------------------------------------------
 # project.toml read/write
 # ---------------------------------------------------------------------------
 
