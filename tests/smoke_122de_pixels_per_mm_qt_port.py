@@ -212,12 +212,20 @@ def main() -> int:
         detail=", ".join(gpm_hits[:3]),
     )
 
-    # 11. Total .py count = 416
+    # 11. Total .py count >= 416 (was an exact == 416 pin; relaxed
+    # to a floor in 122ds because that patch added section_provenance.py
+    # — and future patches will add more modules. The semantic check
+    # 122de needed was "px_to_mm_ui.py and ui/__init__.py have been
+    # removed and stayed removed"; the file count was a proxy for that.
+    # The dedicated checks 1-10 above already verify the removal
+    # directly. Following the snapshot-resilience convention
+    # documented in session_handoff.md.)
     total_py = sum(1 for _ in pkg.rglob("*.py"))
     check(
-        f"Total mufasa/**/*.py count is 416 (was 418 post-122dd; "
-        f"got {total_py}; -2 from px_to_mm_ui.py + ui/__init__.py)",
-        total_py == 416,
+        f"Total mufasa/**/*.py count is >= 416 "
+        f"(was 418 pre-122de, dropped to 416 by removing 2 files; "
+        f"got {total_py}; later patches add modules)",
+        total_py >= 416,
     )
 
     # 12. Parse-clean
