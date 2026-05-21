@@ -129,6 +129,69 @@ def is_run_id(name: str) -> bool:
     return bool(_RUN_ID_PATTERN.match(name))
 
 
+def latest_populated_run_or_parent(
+    stage_parent: Path, file_type: str,
+) -> str:
+    """Resolve a stage directory to its newest populated run subdir.
+
+    Walks ``stage_parent`` for child directories whose names pass
+    :func:`is_run_id`, picks the newest one that contains at least
+    one file matching ``file_type`` (anywhere in its tree, recursive),
+    and returns it as a string. Lexical sort is chronological because
+    run-ids are timestamp-prefixed.
+
+    If no run-id subdir qualifies — none exist, or all are empty of
+    ``file_type`` files — returns ``stage_parent`` as a string. This
+    preserves the original behavior for projects with flat per-stage
+    files at the parent level (legacy and migrated layouts).
+
+    Patch 122dr — extracted from the closure inside
+    :meth:`mufasa.mixins.config_reader.ConfigReader._apply_v1_path_overrides`
+    so it's directly unit-testable. The previous closure picked the
+    newest run by name alone, even if it was empty. Real-world repro:
+    a project with::
+
+        derived/outlier_corrected/
+          <old_run>/*.parquet              ← actual outlier-corrected data
+          <newer_run>/                     ← empty (aborted run)
+
+    used to resolve to ``<newer_run>`` and every downstream consumer
+    (FeatureSubsetsCalculator, classifier, visualizations) saw zero
+    eligible files. Now ``<newer_run>`` is skipped and ``<old_run>``
+    wins.
+
+    Parameters
+    ----------
+    stage_parent
+        The stage's directory under ``derived/`` (e.g.,
+        ``<project>/derived/outlier_corrected``).
+    file_type
+        The project's declared ``file_type`` (e.g., ``"parquet"`` or
+        ``"csv"``). A run is considered populated iff it contains at
+        least one file with this extension at any depth.
+
+    Returns
+    -------
+    str
+        Absolute or relative path (matching ``stage_parent``'s form),
+        pointing at the chosen run subdir or the stage parent itself.
+    """
+    if stage_parent.is_dir():
+        runs = sorted(
+            d for d in stage_parent.iterdir()
+            if d.is_dir() and is_run_id(d.name)
+        )
+        # Walk newest-first; first populated run wins. ``any(...)``
+        # short-circuits on the first hit, so the cost is bounded by
+        # the depth needed to find any matching file — not by the
+        # run's total size. ``rglob`` over an empty dir terminates
+        # immediately on the first iteration.
+        for d in reversed(runs):
+            if any(d.rglob(f"*.{file_type}")):
+                return str(d)
+    return str(stage_parent)
+
+
 # ---------------------------------------------------------------------------
 # project.toml read/write
 # ---------------------------------------------------------------------------
