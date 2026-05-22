@@ -323,9 +323,45 @@ class InterpolateForm(OperationForm):
     """Fill missing / low-confidence frames with interpolation.
 
     Same ``multi_index_df_headers`` auto-detect as SmoothingForm.
+
+    Provenance (patch 122ec)
+    ------------------------
+    Declares ``section_id = "interpolate"`` so the
+    :class:`mufasa.ui_qt.workbench.OperationForm` base class's
+    success hook records ``[provenance.interpolate]`` in
+    ``project.toml`` after every successful run. The DAG has
+    ``interpolate`` depending on ``import_pose``, so:
+
+    * A re-import of pose data marks this section STALE
+      (orange badge) until the user re-runs interpolation.
+    * Running interpolation transitions the badge back to
+      CURRENT (green).
+
+    Like :class:`PoseImportForm` (wired in 122eb), this is the
+    record-only pattern: ``self._last_run_id`` is NOT set in
+    ``target()`` because the underlying
+    :class:`mufasa.data_processors.interpolate.Interpolate`
+    backend mutates pose data in place at ``sources/pose/`` —
+    it doesn't allocate a v1 run directory. ``publish_target_stage``
+    is similarly unset; the interpolated data overwrites the
+    imported pose data, so downstream consumers that find files
+    via the resolver chain (``sources/pose/`` → eventual
+    ``outlier_corrected/`` publish from Kalman v2 or
+    RunOutlierCorrection) already see the interpolated values
+    transparently.
+
+    A future patch could refactor the Interpolate backend to
+    write to ``derived/interpolated/<run_id>/`` instead of
+    overwriting in place, enabling publish-to-stage on top of
+    the record-only wiring; that's deferred (filed under the
+    backend-refactor track alongside Pose Import's publish work).
     """
 
     title = "Interpolate missing frames"
+    # Patch 122ec — provenance wiring. Record-only (no publish
+    # target). Closes the 4th and last of the 4 producers
+    # identified in 122dt's deferred list.
+    section_id = "interpolate"
     description = ("Fill gaps left by tracker dropouts. Nearest is fastest "
                    "and least biased; linear/quadratic are smoother but can "
                    "invent values during long gaps.")

@@ -344,14 +344,17 @@ def main() -> int:
          and kv2_sid.value == "kalman_v2"),
     )
 
-    # 12. InterpolateForm still deferred.
+    # 12. InterpolateForm — was an unwired-tripwire here, flipped
+    # by 122ec.
     interp = _ast_find_class(pc_tree, "InterpolateForm")
     assert interp is not None
+    interp_sid = _ast_class_attr(interp, "section_id")
     check(
-        "InterpolateForm still has no section_id (still deferred — "
-        "Interpolate backend's in-place write needs a real refactor "
-        "that 122eb didn't take on)",
-        _ast_class_attr(interp, "section_id") is None,
+        "InterpolateForm.section_id == 'interpolate' (was an "
+        "unwired-tripwire here in 122eb; flipped by 122ec which "
+        "applied the same record-only pattern to Interpolate)",
+        isinstance(interp_sid, ast.Constant)
+        and interp_sid.value == "interpolate",
     )
 
     # 13. 122ea state preserved.
