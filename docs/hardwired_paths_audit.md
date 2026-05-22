@@ -38,7 +38,7 @@ Public surface (18 functions in `mufasa.project_layout`):
 
 | Disposition | Count | Description |
 |---|---:|---|
-| DEFINITION | 33 | `project_layout.py` + `config_reader.py` + `legacy_layout.py` + `cli/migrate_project.py`. Intentional — they define the layouts. |
+| DEFINITION | 33 | `project_layout.py` + `config_reader.py` + `legacy_layout.py`. Intentional — they define the layouts. (Patch 122dw deleted `cli/migrate_project.py`, which was previously also a DEFINITION file.) |
 | LEGACY-BRANCH (inside `if not self._is_v1:`) | — | Many hits within DEFINITION files are inside legacy branches; correct. |
 | LEGACY-ONLY CLUSTER | 10 | `bounding_box_tools/` — SimBA-only backend, no Qt entry. |
 | DEFENSIVE-TRY | 3 | Hardcodes inside `try/except` fallbacks for malformed configs. |

@@ -217,7 +217,7 @@ A scan for `os.path.join(X, "Y")` patterns will surface many false positives. Us
 | `os.path.join(project_path, …)` where `project_path` is from `config.get("General settings", "project_path")` | YES | `configparser.get()` doesn't work on `.toml`; the value is bogus for v1. Use `project_paths_from_config()` instead. |
 | Inside `try: … except: <legacy fallback>` | NO | Defensive fallback for malformed configs. Acceptable. |
 | Inside `if not is_v1:` / `if v1_root is None:` branches | NO | Branch-gated to legacy; intentional. |
-| In `cli/migrate_project.py`, `utils/toml_to_configparser.py`, `tools/csv_to_parquet.py` | NO | These tools' job IS the legacy layout. Intentional. |
+| In `utils/toml_to_configparser.py`, `tools/csv_to_parquet.py` | NO | These tools' job IS the legacy layout. Intentional. (Patch 122dw deleted `cli/migrate_project.py`, which used to be on this list too.) |
 
 See [`hardwired_paths_audit.md`](hardwired_paths_audit.md) for the full audit + per-site disposition.
 
@@ -274,7 +274,7 @@ Then drop videos into `sources/videos/`, pose CSVs into `sources/pose/`, and ope
 
 ## Migrating an existing legacy project
 
-See [`migration_guide.md`](migration_guide.md) for the `mufasa-migrate-project` (or `python -m mufasa.cli.migrate_project`) workflow.
+**No longer supported.** Patch 122dw deleted the legacy → v1 migration tool. v1 is the only supported project layout going forward; if you have an existing `project_folder/`-style project, create a fresh v1 project (see "Creating a new v1 project" above) and copy your source data into the new `sources/` tree by hand. The legacy reader in `mufasa.legacy_layout` is still in the codebase for backward source-compatibility of in-repo code paths, but no longer exposes a migration path.
 
 ---
 
@@ -282,5 +282,4 @@ See [`migration_guide.md`](migration_guide.md) for the `mufasa-migrate-project` 
 
 * Layout helpers: [`mufasa/project_layout.py`](../mufasa/project_layout.py) — 18 public functions; the source of truth.
 * ConfigReader integration: [`mufasa/mixins/config_reader.py`](../mufasa/mixins/config_reader.py), specifically `_apply_v1_path_overrides`.
-* Migration tool: [`mufasa/cli/migrate_project.py`](../mufasa/cli/migrate_project.py).
 * Triage rules: [`hardwired_paths_audit.md`](hardwired_paths_audit.md).

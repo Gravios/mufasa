@@ -13,11 +13,6 @@ If you're new to Mufasa, start here.
 
 Read this if you're starting a new project or want to understand how v1 differs from legacy SimBA.
 
-### `migration_guide.md` (122df)
-**Migrate legacy → v1.** How to use `python -m mufasa.cli.migrate_project` to move an existing SimBA-layout project to v1. Includes dry-run workflow, troubleshooting, and rollback.
-
-Read this if you have an existing `project_folder/`-style project and want to adopt v1.
-
 ### `lint_status.md` (122dg + 122do)
 **Codebase lint snapshot + follow-up plan.** Audit of `ruff check` findings across the whole codebase after the 122dg targeted sweep (F401/W292/W293) and the 122do modernization sweep (UP045/UP006/UP007/UP035/I001/F401 cascade). Top-rule breakdown, per-directory disposition, recommended tier-1/2/3 follow-up patches.
 

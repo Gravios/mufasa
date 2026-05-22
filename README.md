@@ -24,24 +24,12 @@ After `pip install -e .`, three console entry points are installed:
 | `mufasa` | Smart launcher with environment diagnostics; opens the Qt workbench. |
 | `mufasa-workbench` | Direct workbench launch (no env diagnostics). |
 | `mufasa-chooser` | Legacy Qt chooser / standalone popups. |
-| `mufasa-migrate-project` | Legacy SimBA layout → v1 layout migration tool. |
 
-The legacy `mufasa-tk` Tkinter launcher was **Removed in patch 122d4**; the `python -m mufasa.SimBA` entry point followed in patch 122d5. The Qt workbench replaces both.
-
-Migrate a legacy SimBA-style project to v1:
-
-```bash
-mufasa-migrate-project /path/to/legacy_project          # dry run
-mufasa-migrate-project /path/to/legacy_project --commit # actually move files
-```
-
-(Same code is also reachable as `python -m mufasa.cli.migrate_project` for installs where the console script isn't on `$PATH`.)
-
-See [`docs/migration_guide.md`](docs/migration_guide.md) for the full workflow.
+The legacy `mufasa-tk` Tkinter launcher was **Removed in patch 122d4**; the `python -m mufasa.SimBA` entry point followed in patch 122d5. The Qt workbench replaces both. The `mufasa-migrate-project` entry point (added in patch 122dp) was **Removed in patch 122dw** along with the entire migration tool — v1 is the only supported project layout going forward.
 
 ## Project layout
 
-Mufasa supports two project layouts; detection is by config-file extension (`.toml` → v1, `.ini` → legacy).
+Mufasa uses the v1 project layout. Projects are configured via `project.toml`.
 
 **v1 layout:**
 
@@ -64,10 +52,6 @@ my_project/
 └── logs/
     └── measures/ROI_definitions.h5
 ```
-
-**Legacy SimBA layout** is preserved for backward compatibility; existing `project_folder/`-style projects continue to work without modification.
-
-Backend code that needs layout-agnostic path resolution should use the `mufasa.project_layout.project_paths_from_config(config_path)` helper, which returns a dict of layout-correct paths for either layout.
 
 See [`docs/v1_project_layout.md`](docs/v1_project_layout.md) for the full v1 reference (directory contents, run-id semantics, the path-abstraction layer for backend code).
 
@@ -94,7 +78,6 @@ User-facing:
 | Doc | When to read |
 |---|---|
 | [`docs/v1_project_layout.md`](docs/v1_project_layout.md) | Creating a v1 project, understanding the directory layout. |
-| [`docs/migration_guide.md`](docs/migration_guide.md) | Moving an existing legacy project to v1. |
 | [`docs/workflow_recipes.md`](docs/workflow_recipes.md) | Eleven end-to-end recipes for common experimental setups. |
 | [`docs/data_source_guides.md`](docs/data_source_guides.md) | Per-tracker import guide (DLC, SLEAP, MARS, etc.). |
 

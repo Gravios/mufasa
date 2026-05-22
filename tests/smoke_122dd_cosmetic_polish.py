@@ -132,15 +132,25 @@ def main() -> int:
         "mufasa-tk" in readme
         and "Removed in patch 122d4" in readme,
     )
+    # Patch 122dw — relaxed two checks that pinned legacy-aware
+    # README content. 122dw removed the "Legacy SimBA layout is
+    # preserved..." paragraph and the project_paths_from_config
+    # pointer (which existed because backend code needed to choose
+    # between layouts; v1-only doesn't need it). The semantic
+    # check 122dd was trying to assert — that the README covers
+    # project layout — is still met by the v1-layout section.
+    # Replaced both with deletion tripwires so the deprecation
+    # doesn't silently regress.
     check(
-        "README documents both project layouts (v1 + legacy)",
-        ("Legacy SimBA layout" in readme
-         or "legacy SimBA" in readme.lower())
-        and "v1 layout" in readme,
+        "README still documents the v1 project layout "
+        "(was 'both layouts'; legacy support removed in 122dw)",
+        "v1 layout" in readme,
     )
     check(
-        "README points at project_paths_from_config",
-        "project_paths_from_config" in readme,
+        "README no longer mentions project_paths_from_config "
+        "(was a layout-arbitration helper; v1-only doesn't "
+        "need it surfaced in user-facing docs)",
+        "project_paths_from_config" not in readme,
     )
 
     # --- Parse-clean ---

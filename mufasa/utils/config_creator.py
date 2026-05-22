@@ -6,9 +6,13 @@ Patch 122d: rewritten to produce **only** the v1 project layout
 defined in :mod:`mufasa.project_layout`. The previous legacy
 SimBA tree (``project_folder/csv/{input_csv,
 outlier_corrected_*,...}`` + ``project_config.ini``) is gone for
-new projects; existing legacy projects still work via the
-unchanged :mod:`mufasa.legacy_layout` reader and
-:mod:`mufasa.cli.migrate_project` migration tool.
+new projects.
+
+Patch 122dw removed the legacy → v1 migration tool that used to
+live at :mod:`mufasa.cli.migrate_project`; existing legacy projects
+are no longer migrated. The :mod:`mufasa.legacy_layout` reader is
+preserved for now so old in-repo references still resolve, but v1
+is the only supported project layout going forward.
 
 A fresh project lands as::
 
