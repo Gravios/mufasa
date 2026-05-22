@@ -67,7 +67,12 @@ class EditProjectMetadataDialog(QDialog):
         self.setModal(True)
         self.resize(560, 580)
         self.config_path = str(config_path)
-        self._is_v1 = self.config_path.lower().endswith(".toml")
+        # Patch 122dy — `self._is_v1` flag and the three legacy
+        # branches it gated are gone. The dialog used to refuse to
+        # operate on legacy `.ini` projects (showing a warning
+        # banner pointing at File → Reconfigure); that path is
+        # unreachable now because ConfigReader (and the workbench
+        # at large) reject non-v1 projects up front.
 
         self._build_shell()
         self._populate_from_disk()
@@ -78,30 +83,6 @@ class EditProjectMetadataDialog(QDialog):
     def _build_shell(self) -> None:
         root = QVBoxLayout(self)
         root.setSpacing(10)
-
-        if not self._is_v1:
-            # Legacy projects: refuse rather than silently scribble
-            # over project_config.ini. The File → Reconfigure menu
-            # action is the legacy editing path.
-            warning = QLabel(
-                "<b>Legacy project.</b><br>"
-                "Inline editing isn't supported for legacy "
-                "<code>project_config.ini</code> projects. Use "
-                "<b>File → Reconfigure project from DLC file…</b> "
-                "or convert this project to v1 first.",
-                self,
-            )
-            warning.setTextFormat(Qt.RichText)
-            warning.setWordWrap(True)
-            root.addWidget(warning)
-            close_btn = QPushButton("Close", self)
-            close_btn.clicked.connect(self.reject)
-            root.addStretch()
-            row = QHBoxLayout()
-            row.addStretch()
-            row.addWidget(close_btn)
-            root.addLayout(row)
-            return
 
         # Hint at the top — clarify scope so users don't expect
         # this dialog to add new animals' pose data or rename the
@@ -192,8 +173,9 @@ class EditProjectMetadataDialog(QDialog):
     # Population from disk
     # ------------------------------------------------------------------ #
     def _populate_from_disk(self) -> None:
-        if not self._is_v1:
-            return
+        # Patch 122dy — removed the `if not self._is_v1: return`
+        # early-out. The dialog is only reachable on v1 projects;
+        # legacy detection went away with the flag.
         try:
             from mufasa.project_layout import project_metadata_from_config
             meta = project_metadata_from_config(self.config_path)
@@ -333,9 +315,8 @@ class EditProjectMetadataDialog(QDialog):
         return []
 
     def _on_save(self) -> None:
-        if not self._is_v1:
-            self.reject()
-            return
+        # Patch 122dy — removed the `if not self._is_v1: self.reject()`
+        # legacy-refusal guard. Dialog is v1-only.
 
         # ----- Gather + validate fields ----- #
         file_type = self._file_type_combo.currentText().strip()

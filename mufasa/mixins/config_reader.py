@@ -59,85 +59,79 @@ class ConfigReader(object):
 
         self.timer = SimbaTimer(start=True)
         self.config_path = config_path
-        # Patch 122e: v1 projects use project.toml instead of
-        # project_config.ini. Detect by suffix and pre-load the
-        # parsed TOML so downstream branches don't have to
-        # re-open the file. _v1_toml_data is None on legacy
-        # projects.
-        self._is_v1 = str(config_path).lower().endswith(".toml")
-        self._v1_toml_data: Optional[Dict[str, Any]] = None
-        if self._is_v1:
-            import tomllib
-            with open(config_path, "rb") as _f:
-                self._v1_toml_data = tomllib.load(_f)
+
+        # Patch 122dy — legacy SimBA project_config.ini support
+        # removed. ConfigReader is the foundational mixin every
+        # backend extends; rejecting non-v1 paths HERE with a clear
+        # message is much friendlier than failing later in a
+        # ``glob()`` that returns ``[]`` or a ``read_csv()`` against
+        # a missing legacy file. The check pairs with 122dw's
+        # deletion of the migration tool and 122dx's deletion of the
+        # legacy Qt chooser; together they close the path-detection
+        # surface for legacy projects in the workbench.
+        if not str(config_path).lower().endswith(".toml"):
+            raise InvalidInputError(
+                msg=(
+                    f"ConfigReader requires a v1 project.toml path; "
+                    f"got {config_path!r}. Legacy SimBA "
+                    f"project_config.ini support was removed across "
+                    f"patches 122dw (migration tool) and 122dy "
+                    f"(ConfigReader legacy branch). Create a fresh "
+                    f"v1 project — see docs/v1_project_layout.md."
+                ),
+                source=self.__class__.__name__,
+            )
+
+        # Pre-load parsed TOML. Used at the body-parts read site
+        # below and exposed as ``self._project_toml_data`` for
+        # any subclass / external consumer that wants to read
+        # project-level metadata without re-opening the file.
+        # (Renamed from ``_v1_toml_data`` in 122dy — the ``_v1``
+        # qualifier was load-bearing only while a non-v1 branch
+        # existed; gone now.)
+        import tomllib
+        with open(config_path, "rb") as _f:
+            self._project_toml_data: Dict[str, Any] = tomllib.load(_f)
+
         self.config = read_config_file(config_path=config_path)
         self.datetime = datetime.now().strftime("%Y%m%d%H%M%S")
 
         self.project_path, self.file_type = read_project_path_and_file_type(
-            config=self.config
+            config=self.config,
         )
-        self.input_csv_dir = os.path.join(self.project_path, Paths.INPUT_CSV.value)
-        self.features_dir = os.path.join(
-            self.project_path, Paths.FEATURES_EXTRACTED_DIR.value
-        )
-        self.targets_folder = os.path.join(
-            self.project_path, Paths.TARGETS_INSERTED_DIR.value
-        )
-        self.input_frames_dir = os.path.join(
-            self.project_path, Paths.INPUT_FRAMES_DIR.value
-        )
-        self.machine_results_dir = os.path.join(
-            self.project_path, Paths.MACHINE_RESULTS_DIR.value
-        )
-        self.directionality_df_dir = os.path.join(
-            self.project_path, Paths.DIRECTIONALITY_DF_DIR.value
-        )
-        self.body_part_directionality_df_dir = os.path.join(
-            self.project_path, Paths.BODY_PART_DIRECTIONALITY_DF_DIR.value
-        )
-        self.outlier_corrected_dir = os.path.join(
-            self.project_path, Paths.OUTLIER_CORRECTED.value
-        )
-        self.outlier_corrected_movement_dir = os.path.join(
-            self.project_path, Paths.OUTLIER_CORRECTED_MOVEMENT.value
-        )
-        self.heatmap_clf_location_dir = os.path.join(
-            self.project_path, Paths.HEATMAP_CLF_LOCATION_DIR.value
-        )
-        self.heatmap_location_dir = os.path.join(
-            self.project_path, Paths.HEATMAP_LOCATION_DIR.value
-        )
-        self.line_plot_dir = os.path.join(self.project_path, Paths.LINE_PLOT_DIR.value)
-        self.probability_plot_dir = os.path.join(
-            self.project_path, Paths.PROBABILITY_PLOTS_DIR.value
-        )
-        self.gantt_plot_dir = os.path.join(
-            self.project_path, Paths.GANTT_PLOT_DIR.value
-        )
-        self.path_plot_dir = os.path.join(self.project_path, Paths.PATH_PLOT_DIR.value)
-        self.shap_logs_path = os.path.join(self.project_path, Paths.SHAP_LOGS.value)
-        self.video_info_path = os.path.join(self.project_path, Paths.VIDEO_INFO.value)
-        self.cue_lights_data_dir = os.path.join(self.project_path, Paths.CUE_LIGHTS_PATH.value)
-        self.frames_output_dir = os.path.join(
-            self.project_path, Paths.FRAMES_OUTPUT_DIR.value
-        )
+
+        # OpenCV constant — layout-independent.
         self.font = cv2.FONT_HERSHEY_COMPLEX
-        self.roi_features_save_dir = os.path.join(
-            self.project_path, Paths.ROI_FEATURES.value
-        )
-        self.configs_meta_dir = os.path.join(self.project_path, "configs")
-        self.sklearn_plot_dir = os.path.join(
-            self.project_path, Paths.SKLEARN_RESULTS.value
-        )
-        self.detailed_roi_data_dir = os.path.join(
-            self.project_path, Paths.DETAILED_ROI_DATA_DIR.value
-        )
-        self.directing_animals_video_output_path = os.path.join(
-            self.project_path, Paths.DIRECTING_BETWEEN_ANIMALS_OUTPUT_PATH.value
-        )
-        self.directing_body_part_animal_video_output_path = os.path.join(
-            self.project_path,
-            Paths.DIRECTING_BETWEEN_ANIMAL_BODY_PART_OUTPUT_PATH.value,
+
+        # Resolve every project path attribute from the v1 layout.
+        # (Was named ``_apply_v1_path_overrides`` in patches 122e..
+        # 122dx, where it overrode a preceding legacy-path setup
+        # block; that block is gone now, so the method just sets
+        # the paths directly. Renamed in 122dy to reflect that.)
+        self._resolve_v1_paths()
+
+        # Body parts list from project.toml's [pose] table. The
+        # legacy branch (read from a separate body_parts.csv via
+        # ``Paths.BP_NAMES``) was deleted in 122dy along with the
+        # ``self._is_v1`` flag.
+        self.body_parts_path = str(self.config_path)
+        self.body_parts_lst = [
+            bp
+            for bp in self._project_toml_data.get("pose", {}).get(
+                "body_parts", [],
+            )
+            if str(bp) != "nan"
+        ]
+        self.get_body_part_names()
+        self.get_bp_headers()
+        self.bp_col_names = self.x_cols + self.y_cols + self.p_cols
+
+        # ---- Remaining config entries (read from self.config, not paths). ----
+        self.pose_setting = self.read_config_entry(
+            config=self.config,
+            section=ConfigKey.CREATE_ENSEMBLE_SETTINGS.value,
+            option=ConfigKey.POSE_SETTING.value,
+            data_type=Dtypes.STR.value,
         )
         self.animal_cnt = self.read_config_entry(
             config=self.config,
@@ -153,111 +147,42 @@ class ConfigReader(object):
             default_value=Dtypes.NONE.value,
         )
         self.gpu_available = check_nvidea_gpu_available()
-        self.clf_cnt = self.read_config_entry(self.config, ConfigKey.SML_SETTINGS.value, ConfigKey.TARGET_CNT.value, Dtypes.INT.value)
-        self.clf_names = get_all_clf_names(config=self.config, target_cnt=self.clf_cnt)
-        # Patch 122ao (B3): v1-aware enumeration. The legacy
-        # glob.glob(self.features_dir + ...) / glob.glob(self.
-        # targets_folder + ...) returned empty for v1-only
-        # projects after 122ak — features and labels live under
-        # derived/features/ + derived/labels/, not the legacy
-        # tree. list_video_stems_with_* unions both layouts so
-        # consumers see correct counts.
-        #
-        # Paths returned are pseudo-paths under the legacy
-        # location (self.features_dir / self.targets_folder).
-        # Consumers that:
-        #   * count entries: get correct count (UI displays).
-        #   * iterate for stem extraction: get_fn_ext works on
-        #     pseudo-paths just fine.
-        #   * actually open the file: go through
-        #     load_features_for_video / load_labels_for_video
-        #     in v1-migrated training code (122ae-5b/5e).
-        try:
-            from mufasa.utils.feature_io import list_video_stems_with_features
-            from mufasa.utils.label_io import list_video_stems_with_labels
-            self.feature_file_paths = [
-                os.path.join(self.features_dir, f"{stem}.{self.file_type}")
-                for stem in list_video_stems_with_features(self.config_path)
-            ]
-            self.target_file_paths = [
-                os.path.join(self.targets_folder, f"{stem}.{self.file_type}")
-                for stem in list_video_stems_with_labels(self.config_path)
-            ]
-        except Exception:
-            # Defensive: any failure (malformed config, missing
-            # v1 layout, etc.) falls back to an empty list — same
-            # as the legacy glob returned on a fresh project.
-            self.feature_file_paths = []
-            self.target_file_paths = []
-        self.input_csv_paths = glob.glob(self.input_csv_dir + f"/*.{self.file_type}")
-        self.body_part_directionality_paths = glob.glob(
-            self.body_part_directionality_df_dir + f"/*.{self.file_type}"
+        self.clf_cnt = self.read_config_entry(
+            self.config,
+            ConfigKey.SML_SETTINGS.value,
+            ConfigKey.TARGET_CNT.value,
+            Dtypes.INT.value,
         )
-        self.outlier_corrected_paths = glob.glob(
-            self.outlier_corrected_dir + f"/*.{self.file_type}"
-        )
-        self.outlier_corrected_movement_paths = glob.glob(
-            self.outlier_corrected_movement_dir + f"/*.{self.file_type}"
+        self.clf_names = get_all_clf_names(
+            config=self.config, target_cnt=self.clf_cnt,
         )
         self.cpu_cnt, self.cpu_to_use = find_core_cnt()
-        self.machine_results_paths = glob.glob(self.machine_results_dir + f"/*.{self.file_type}")
-        self.logs_path = os.path.join(self.project_path, "logs")
-        # Patch 122e: v1 path overrides happen here, before
-        # body_parts handling and before any read that touches
-        # the filesystem (video_info_df read at end of __init__,
-        # for instance). Up to this point ConfigReader has set
-        # 30+ path attributes assuming the legacy layout. For v1
-        # projects those paths don't exist; we override the
-        # attributes plus re-glob the file lists so dependent
-        # backends operate on the right locations.
-        if self._is_v1:
-            self._apply_v1_path_overrides()
-            # v1 sources body parts from project.toml directly.
-            # body_parts_path is left pointing at the source TOML
-            # so any downstream code that prints the path in an
-            # error message still names a real file.
-            self.body_parts_path = str(self.config_path)
-            self.body_parts_lst = [
-                bp for bp in (self._v1_toml_data or {})
-                                  .get("pose", {})
-                                  .get("body_parts", [])
-                if str(bp) != "nan"
-            ]
-        else:
-            self.body_parts_path = os.path.join(self.project_path, Paths.BP_NAMES.value)
-            check_file_exist_and_readable(file_path=self.body_parts_path)
-            self.body_parts_lst = (pd.read_csv(self.body_parts_path, header=None).iloc[:, 0].to_list())
-            self.body_parts_lst = [x for x in self.body_parts_lst if str(x) != "nan"]
-        self.get_body_part_names()
-        self.get_bp_headers()
-        self.bp_col_names = self.x_cols + self.y_cols + self.p_cols
-        self.pose_setting = self.read_config_entry(
-            config=self.config,
-            section=ConfigKey.CREATE_ENSEMBLE_SETTINGS.value,
-            option=ConfigKey.POSE_SETTING.value,
-            data_type=Dtypes.STR.value,
-        )
-        self.roi_coordinates_path = os.path.join(
-            self.logs_path, Paths.ROI_DEFINITIONS.value
-        )
-        self.video_dir = os.path.join(self.project_path, "videos")
-        self.clf_validation_dir = os.path.join(
-            self.project_path, Paths.CLF_VALIDATION_DIR.value
-        )
-        self.clf_data_validation_dir = os.path.join(
-            self.project_path, "csv", "validation"
-        )
+
+        # Patch 122dy — these path attributes used to live in the
+        # legacy-path setup block at the top of __init__, then get
+        # overridden by ``_apply_v1_path_overrides`` for v1.
+        # The deletion of the legacy block consolidated them down
+        # to a single set of v1-correct assignments (all done
+        # inside _resolve_v1_paths now). The few attributes below
+        # weren't covered by either block and are kept as legacy-
+        # shaped fallbacks pending a per-attribute audit (see
+        # commit message for the deferred-fix list).
         self.annotated_frm_dir = os.path.join(
-            self.project_path, Paths.ANNOTATED_FRAMES_DIR.value
+            self.project_path, Paths.ANNOTATED_FRAMES_DIR.value,
         )
         self.single_validation_video_save_dir = os.path.join(
-            self.project_path, Paths.SINGLE_CLF_VALIDATION.value
+            self.project_path, Paths.SINGLE_CLF_VALIDATION.value,
         )
-        self.data_table_path = os.path.join(self.project_path, Paths.DATA_TABLE.value)
+        self.data_table_path = os.path.join(
+            self.project_path, Paths.DATA_TABLE.value,
+        )
+
         self.check_multi_animal_status()
         self.multiprocess_chunksize = Defaults.CHUNK_SIZE.value
         self.maxtasksperchild = Defaults.MAX_TASK_PER_CHILD.value
-        self.clr_lst = create_color_palettes(self.animal_cnt, int(len(self.x_cols)) + 1)
+        self.clr_lst = create_color_palettes(
+            self.animal_cnt, int(len(self.x_cols)) + 1,
+        )
         self.animal_bp_dict = self.create_body_part_dictionary(
             self.multi_animal_status,
             self.multi_animal_id_list,
@@ -267,34 +192,72 @@ class ConfigReader(object):
             self.p_cols,
             self.clr_lst,
         )
-        self.project_bps = list(set([x[:-2] for x in self.bp_headers]))
+        self.project_bps = list({x[:-2] for x in self.bp_headers})
         self.platform = platform.system()
         self.color_dict = get_color_dict()
         if create_logger:
             self.create_logger()
         self.emojis = get_emojis()
         if read_video_info:
-            self.video_info_df = self.read_video_info_csv(file_path=self.video_info_path)
+            self.video_info_df = self.read_video_info_csv(
+                file_path=self.video_info_path,
+            )
 
-
-        self.min_draw_display_ratio_h = self.read_config_entry(config=self.config, section=ConfigKey.DISPLAY_SETTINGS.value, option=ConfigKey.MIN_ROI_DISPLAY_HEIGHT.value, default_value=0.20, data_type=Dtypes.FLOAT.value)
-        self.min_draw_display_ratio_w = self.read_config_entry(config=self.config, section=ConfigKey.DISPLAY_SETTINGS.value, option=ConfigKey.MIN_ROI_DISPLAY_WIDTH.value, default_value=0.20, data_type=Dtypes.FLOAT.value)
-        self.max_draw_display_ratio_h = self.read_config_entry(config=self.config, section=ConfigKey.DISPLAY_SETTINGS.value, option=ConfigKey.MAX_ROI_DISPLAY_HEIGHT.value, default_value=0.75, data_type=Dtypes.FLOAT.value)
-        self.max_draw_display_ratio_w = self.read_config_entry(config=self.config, section=ConfigKey.DISPLAY_SETTINGS.value, option=ConfigKey.MAX_ROI_DISPLAY_WIDTH.value, default_value=0.50, data_type=Dtypes.FLOAT.value)
+        self.min_draw_display_ratio_h = self.read_config_entry(
+            config=self.config,
+            section=ConfigKey.DISPLAY_SETTINGS.value,
+            option=ConfigKey.MIN_ROI_DISPLAY_HEIGHT.value,
+            default_value=0.20,
+            data_type=Dtypes.FLOAT.value,
+        )
+        self.min_draw_display_ratio_w = self.read_config_entry(
+            config=self.config,
+            section=ConfigKey.DISPLAY_SETTINGS.value,
+            option=ConfigKey.MIN_ROI_DISPLAY_WIDTH.value,
+            default_value=0.20,
+            data_type=Dtypes.FLOAT.value,
+        )
+        self.max_draw_display_ratio_h = self.read_config_entry(
+            config=self.config,
+            section=ConfigKey.DISPLAY_SETTINGS.value,
+            option=ConfigKey.MAX_ROI_DISPLAY_HEIGHT.value,
+            default_value=0.75,
+            data_type=Dtypes.FLOAT.value,
+        )
+        self.max_draw_display_ratio_w = self.read_config_entry(
+            config=self.config,
+            section=ConfigKey.DISPLAY_SETTINGS.value,
+            option=ConfigKey.MAX_ROI_DISPLAY_WIDTH.value,
+            default_value=0.50,
+            data_type=Dtypes.FLOAT.value,
+        )
 
     # ------------------------------------------------------------------ #
-    # Patch 122e: v1 path overrides
+    # Patch 122dy — v1 path resolution (was _apply_v1_path_overrides).
     # ------------------------------------------------------------------ #
-    def _apply_v1_path_overrides(self) -> None:
-        """Replace legacy filesystem path attributes with v1 equivalents.
+    def _resolve_v1_paths(self) -> None:
+        """Set every project filesystem path attribute from the v1 layout.
 
-        Called from ``__init__`` when ``self._is_v1`` is True (i.e.
-        ``config_path`` ends in ``.toml``). Up to the point this runs,
-        ``__init__`` has set all path attributes assuming the legacy
-        ``<root>/project_folder/csv/...`` tree. This method overwrites
-        those with v1-equivalent paths under ``<root>/sources/``,
-        ``<root>/derived/``, ``<root>/models/``, ``<root>/logs/`` —
-        then re-runs the file-list globs against the new locations.
+        Called from ``__init__`` early, before any code that reads the
+        filesystem (body_parts, video_info_df, classifier inputs). Sets
+        ~30 path attributes under ``<root>/sources/``, ``<root>/derived/``,
+        ``<root>/models/``, and ``<root>/logs/`` — then re-runs the
+        file-list globs against those locations.
+
+        History
+        -------
+        * 122e — added as ``_apply_v1_path_overrides``; ran AFTER a
+          legacy-path setup block in ``__init__`` and overrode each
+          attribute. Conditional on ``self._is_v1``.
+        * 122dr — multi-run-stage resolution lifted to
+          :func:`mufasa.project_layout.latest_populated_run_or_parent`
+          and made content-aware (empty run subdirs no longer
+          shadow earlier populated ones).
+        * 122dy — renamed to ``_resolve_v1_paths``. The preceding
+          legacy-path setup block is gone (legacy SimBA support
+          removed), so the method no longer "overrides" anything —
+          it sets the paths directly. Called unconditionally from
+          ``__init__``; the ``self._is_v1`` gate is gone too.
 
         Path mapping
         ------------
@@ -304,9 +267,11 @@ class ConfigReader(object):
         * ``video_dir``            → ``<root>/sources/videos/``
         * ``video_info_path``      → ``<root>/sources/video_info.csv``
 
-        Multi-run stages — point at the latest run directory if any
-        exist, else the stage parent. "Latest" by run-id sort
-        (run-ids are timestamp-prefixed, lexically sortable):
+        Multi-run stages — point at the latest populated run
+        directory if any exist, else the stage parent. "Latest" by
+        run-id sort (run-ids are timestamp-prefixed, lexically
+        sortable); content-aware skip of empty run subdirs added in
+        122dr:
 
         * ``outlier_corrected_dir``         → latest under
           ``<root>/derived/outlier_corrected/``
@@ -345,8 +310,7 @@ class ConfigReader(object):
         * Backends that *write* into "latest run" attributes will
           mutate that prior run's directory in place rather than
           allocating a fresh run. That's incorrect provenance and
-          will be fixed per-backend in subsequent patches (the
-          "iceberg below the waterline" thread in CHANGELOG).
+          will be fixed per-backend in subsequent patches.
           For now, reads work; writes leak.
         * Some derived paths (``shap_logs_path``,
           ``directing_*_path``) point at directories that don't
