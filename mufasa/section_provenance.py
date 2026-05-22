@@ -94,7 +94,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from mufasa.project_layout import read_project_toml, write_project_toml
 
@@ -130,11 +130,33 @@ class SectionSpec:
     depends_on
         Tuple of upstream section_ids. Self-references and cycles are
         rejected at module import time.
+    detect_path
+        Patch 122ei — optional callable ``project_root: Path -> Path``
+        returning the canonical on-disk location where this section's
+        output materializes (a file or non-empty directory). Used by
+        :func:`get_status` as an implicit-evidence fallback when no
+        ``[provenance.<section_id>]`` entry exists — the path's mtime
+        becomes the implicit ``last_run_at``. Without this, projects
+        that pre-date provenance wiring (or projects where the user
+        manually copied data in) would forever show UNKNOWN even with
+        valid output on disk.
+
+        Return value semantics:
+
+        * Returned path is checked via ``Path.exists()``; for
+          directories, additionally for any non-hidden entry inside.
+        * If the callable raises, ``get_status`` swallows the error
+          and behaves as if no fallback existed (UNKNOWN, soft-fail).
+        * Sections without a detect_path (typical for pure-settings
+          sections like Pixels-per-mm calibration that don't produce
+          a file) skip the fallback and remain UNKNOWN until
+          explicit provenance lands.
     """
     section_id: str
     page: str
     section_title: str
     depends_on: tuple[str, ...] = field(default_factory=tuple)
+    detect_path: Callable[[Path], Path] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -163,30 +185,61 @@ SECTIONS: dict[str, SectionSpec] = {
         page="Data Import",
         section_title="Import pose data",
         depends_on=(),
+        # Patch 122ei — implicit-evidence fallback for old projects
+        # that pre-date 122eb's wiring. Any non-hidden file in
+        # sources/pose/ counts as "import has happened"; mtime of
+        # the most recently-modified file is used as the implicit
+        # last_run_at.
+        detect_path=lambda root: root / "sources" / "pose",
     ),
     "pixels_per_mm": SectionSpec(
         section_id="pixels_per_mm",
         page="Pose cleanup",
         section_title="Pixels-per-mm calibration",
         depends_on=(),
+        # No detect_path — pixels_per_mm is a settings-only section,
+        # no on-disk artifact materializes from it. Stays UNKNOWN
+        # until explicit provenance lands (currently unwired).
     ),
     "interpolate": SectionSpec(
         section_id="interpolate",
         page="Pose cleanup",
         section_title="Interpolate missing frames",
         depends_on=("import_pose",),
+        # Patch 122ei — points at derived/interpolated/; if any
+        # run subdir exists, the section is treated as completed
+        # (with implicit timestamp = mtime of latest run dir).
+        detect_path=lambda root: root / "derived" / "interpolated",
     ),
     "kalman_v2": SectionSpec(
         section_id="kalman_v2",
         page="Pose cleanup",
         section_title="Kalman v2 smoother",
         depends_on=("import_pose",),
+        # Patch 122ei — derived/smoothed/kalman_v2/ (the
+        # source-flavor-prefixed layout that 122dt's
+        # publish_source_flavor handles).
+        detect_path=lambda root: (
+            root / "derived" / "smoothed" / "kalman_v2"
+        ),
     ),
     "outlier_correction": SectionSpec(
         section_id="outlier_correction",
         page="Pose cleanup",
         section_title="Run outlier correction",
         depends_on=("import_pose",),
+        # Patch 122ei — derived/outlier_corrected/. Note this
+        # location is shared with kalman_v2 + interpolate +
+        # import_pose (they all publish symlinks here). Filesystem
+        # detection here is "the canonical 'data ready for
+        # features' stage exists," not specifically "outlier
+        # correction was run." Acceptable: the staleness rule
+        # will downgrade to STALE if an upstream producer
+        # (import_pose) has a later mtime — which is the right
+        # behaviour for the implicit-detection case as well.
+        detect_path=lambda root: (
+            root / "derived" / "outlier_corrected"
+        ),
     ),
     "savitzky_golay": SectionSpec(
         section_id="savitzky_golay",
@@ -382,6 +435,18 @@ def get_status(
     rather than ``record_run``-style strict failure modes — UI code
     needs to be tolerant.
 
+    Patch 122ei — added a filesystem-evidence fallback. If no
+    ``[provenance.<section_id>]`` entry exists but the section
+    declares a ``detect_path`` AND the on-disk location has content,
+    the location's mtime is used as the implicit ``last_run_at``.
+    This handles the "old project, pre-dates provenance wiring"
+    case: a user opens a project where pose data was imported
+    before 122eb landed, and the badge should reflect that data
+    exists (CURRENT) rather than that no provenance entry was found
+    (UNKNOWN). The implicit timestamp also composes correctly with
+    the staleness rule: if a parent's later mtime is detected,
+    the child still reads STALE.
+
     See module docstring for the staleness-decision rules.
     """
     if section_id not in SECTIONS:
@@ -396,28 +461,121 @@ def get_status(
         return SectionStatus.UNKNOWN
 
     prov = data.get("provenance", {}) or {}
-    my_entry = prov.get(section_id)
-    if not isinstance(my_entry, dict):
-        return SectionStatus.UNKNOWN
-    my_run_at = _read_run_at(my_entry)
+    spec = SECTIONS[section_id]
+    project_root = config_path.parent
+
+    my_run_at = _resolve_run_at(
+        prov, section_id, spec, project_root,
+    )
     if my_run_at is None:
         return SectionStatus.UNKNOWN
 
-    # Walk declared dependencies, checking only those with known
-    # last_run_at. Unknown parents are ignored — see the module
-    # docstring for why.
-    spec = SECTIONS[section_id]
+    # Walk declared dependencies, checking only those with a known
+    # timestamp (either explicit provenance or implicit detect_path).
+    # Unknown parents are ignored — see the module docstring for why.
     for dep_id in spec.depends_on:
-        dep_entry = prov.get(dep_id)
-        if not isinstance(dep_entry, dict):
+        dep_spec = SECTIONS.get(dep_id)
+        if dep_spec is None:
+            # Shouldn't happen given module-init validation, but
+            # belt-and-suspenders.
             continue
-        dep_run_at = _read_run_at(dep_entry)
+        dep_run_at = _resolve_run_at(
+            prov, dep_id, dep_spec, project_root,
+        )
         if dep_run_at is None:
             continue
         if dep_run_at > my_run_at:
             return SectionStatus.STALE
 
     return SectionStatus.CURRENT
+
+
+def _resolve_run_at(
+    prov: Mapping[str, Any],
+    section_id: str,
+    spec: SectionSpec,
+    project_root: Path,
+) -> datetime | None:
+    """Return the effective ``last_run_at`` for a section.
+
+    Patch 122ei — composes explicit provenance with the
+    filesystem-evidence fallback:
+
+    1. If ``[provenance.<section_id>].last_run_at`` is set, return
+       it (explicit wins over implicit — the user / backend
+       explicitly recorded a run, that's authoritative).
+    2. Else if the section declares a ``detect_path`` AND the
+       returned path exists with content, return the mtime of the
+       most recently-modified file under that path.
+    3. Else return None (UNKNOWN).
+
+    Errors during the filesystem check (permission denied,
+    transient races) are swallowed — returns None as if no fallback
+    existed. UI code can't afford to crash because of a flaky
+    filesystem.
+    """
+    entry = prov.get(section_id)
+    if isinstance(entry, dict):
+        explicit = _read_run_at(entry)
+        if explicit is not None:
+            return explicit
+
+    # Implicit fallback.
+    if spec.detect_path is None:
+        return None
+    try:
+        path = spec.detect_path(project_root)
+        return _path_mtime_if_has_content(path)
+    except Exception:
+        return None
+
+
+def _path_mtime_if_has_content(path: Path) -> datetime | None:
+    """Return the mtime of ``path`` (UTC) if it has content, else None.
+
+    "Has content" means:
+
+    * For a regular file: the file exists.
+    * For a directory: the directory exists AND contains at least
+      one non-hidden entry (file, subdir, or symlink). Hidden
+      entries (dotfiles) are ignored so a ``.DS_Store`` doesn't
+      trick us into reporting "imported" on a freshly-created
+      project.
+
+    For directories with content, returns the MAX mtime across
+    all non-hidden entries (recursively, one level deep — enough
+    for the v1 layout's shape without doing a full rglob which
+    would be slow on large run dirs).
+
+    Returns None if the path doesn't exist or the directory is
+    empty.
+    """
+    if not path.exists():
+        return None
+    if path.is_file():
+        return datetime.fromtimestamp(
+            path.stat().st_mtime, tz=timezone.utc,
+        )
+    if not path.is_dir():
+        return None
+    # Directory: scan one level. Take the max mtime across non-
+    # hidden entries.
+    latest: float | None = None
+    try:
+        for entry in path.iterdir():
+            if entry.name.startswith("."):
+                continue
+            try:
+                m = entry.stat().st_mtime
+            except OSError:
+                continue
+            if latest is None or m > latest:
+                latest = m
+    except (OSError, PermissionError):
+        return None
+    if latest is None:
+        return None
+    return datetime.fromtimestamp(latest, tz=timezone.utc)
 
 
 def get_all_statuses(
