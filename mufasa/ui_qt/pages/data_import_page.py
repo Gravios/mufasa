@@ -4,14 +4,14 @@ mufasa.ui_qt.pages.data_import_page
 
 Data Import workbench page. Two sections after patch 122x:
 
-* **Import Pose Data** — :class:`PoseImportForm`.
+* **Import pose data** — :class:`PoseImportForm`.
   Loads pose data into the currently-open project's
-  ``sources/pose/`` (v1) or ``csv/input_csv/`` (legacy) tree.
+  ``sources/pose/`` tree.
 * **Import video** — :class:`VideoImportForm`. Single video or
-  directory of videos into ``sources/videos/`` (v1) or
-  ``videos/`` (legacy). Patch 122o: replaces the legacy Tk
-  ``ImportVideosFrame`` popup. Patch 122v: symlink default,
-  duplicate detection, already-imported table.
+  directory of videos into ``sources/videos/``. Patch 122o:
+  replaces the legacy Tk ``ImportVideosFrame`` popup.
+  Patch 122v: symlink default, duplicate detection,
+  already-imported table.
 
 Section ordering: bring pose data in, then bring video data in.
 Calibration and batch pre-processing — both of which act on
@@ -38,6 +38,14 @@ Patch history
   of feature extraction — they belong on the page that already
   houses Interpolate / Kalman / Outlier correction / Egocentric
   alignment.
+* **122eb**: section title re-cased from title-case
+  ``Import Pose Data`` (122w) back to sentence-case
+  ``Import pose data``. The change is cosmetic except that the
+  badge-lookup in
+  :mod:`mufasa.section_provenance.find_section_by_title` does
+  exact-string matching against the SECTIONS spec, which uses
+  sentence case throughout — the mismatch was silently
+  suppressing the section-status badge on this page.
 """
 from __future__ import annotations
 
@@ -50,7 +58,12 @@ def build_data_import_page(workbench,
                            config_path: str | None = None
                            ) -> WorkflowPage:
     page = workbench.add_page("Data Import", icon_name="pose")
-    page.add_section("Import Pose Data",
+    # Section title kept in sentence case to match the SECTIONS spec
+    # in mufasa.section_provenance (and the other pages' convention
+    # — "Run outlier correction", "Frame labelling", etc.). The
+    # 122eb badge lookup does exact-string matching against
+    # SECTIONS, so case matters here.
+    page.add_section("Import pose data",
                      [(PoseImportForm, {})])
     page.add_section("Import video",
                      [(VideoImportForm, {})])
