@@ -150,7 +150,7 @@ Tedious but works.
 
 **Workaround 2 — apply per-condition group, using a temporary project split:**
 
-Create two sub-folders or use the `cli/migrate_project.py` `--v1-root` flag (or a manual copy) to make two parallel projects, one per condition. Apply ROIs in each. Then merge if needed. Heavier but cleaner.
+Create two sub-folders by hand (a manual copy of the source data into two separate v1 project trees) to make two parallel projects, one per condition. Apply ROIs in each. Then merge if needed. Heavier but cleaner.
 
 **Workaround 3 — script via the backend:**
 ```python

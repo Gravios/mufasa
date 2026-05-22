@@ -48,9 +48,12 @@ Internal storage under ``derived/`` is parquet-only as of the
 expect to ingest, not what's stored on disk after extraction.
 
 Backward compatibility with the legacy layout lives in
-``mufasa.legacy_layout``; a migration tool sits at
-``mufasa.cli.migrate_project``. Code that doesn't know which
-layout it's looking at should call :func:`detect_layout` first.
+``mufasa.legacy_layout``. Patch 122dw deleted the legacy → v1
+migration tool that used to live at ``mufasa.cli.migrate_project``;
+v1 is the only supported project layout going forward. Code that
+needs to introspect a layout can still call :func:`detect_layout`,
+but it should generally route v1-only paths through
+``project_paths_from_config``.
 """
 from __future__ import annotations
 
@@ -550,8 +553,11 @@ class ProjectPaths:
         if kind != "v1":
             raise ProjectLayoutError(
                 f"{root}: layout is {kind!r}, expected v1. "
-                f"Run `python -m mufasa.cli.migrate_project "
-                f"{root}` to migrate from legacy layout."
+                f"The legacy → v1 migration tool was removed in "
+                f"patch 122dw; v1 is the only supported layout "
+                f"going forward. Convert by creating a fresh v1 "
+                f"project and moving your source data into "
+                f"sources/."
             )
         return cls(root)
 

@@ -53,10 +53,17 @@ Treating those as "STALE" would be alarmist; treating them as
 verifiable staleness signals: a section is STALE only when we
 can *prove* a parent ran later.
 
-Migrated projects start with no provenance at all (patch 122dt's
-``migrate_project`` retro-fill will populate it). Until that lands,
-every section reads UNKNOWN — the UI just shows no badges, which is
-the right behavior for "we don't know yet."
+Projects predating the section-provenance arc (anything before
+122ds) start with no ``[provenance]`` table at all. Every section
+reads UNKNOWN — the UI just shows no badges, which is the right
+behavior for "we don't know yet." Once a section is run by the user,
+its entry is recorded and the badges become meaningful from that
+point forward.
+
+(Patch 122dw deleted the legacy → v1 migration tool, so the
+retro-fill path that earlier comments mentioned no longer
+applies — v1 is the only supported layout, and v1 projects either
+have a ``[provenance]`` table already or haven't run anything yet.)
 
 DAG validation
 ==============
@@ -324,9 +331,8 @@ def record_run(
         run-id concept; the entry will record only ``last_run_at``.
     run_at
         UTC timestamp for the record. Defaults to ``datetime.now(timezone.utc)``.
-        Exposed for testability (deterministic timestamps in tests)
-        and for retro-fill paths like :func:`migrate_project` that
-        want to use the source file's mtime.
+        Exposed for testability — deterministic timestamps in tests
+        are easier to assert on than wall-clock values.
     """
     if section_id not in SECTIONS:
         raise KeyError(

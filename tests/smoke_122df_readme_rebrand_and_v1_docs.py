@@ -114,9 +114,14 @@ def main() -> int:
         "README links to docs/v1_project_layout.md",
         "v1_project_layout.md" in readme,
     )
+    # Patch 122dw: README's migration_guide.md link removed when
+    # the migration tool was deleted. Relaxed from a positive
+    # assertion to a deprecation tripwire — fails only if the dead
+    # link creeps back in.
     check(
-        "README links to docs/migration_guide.md",
-        "migration_guide.md" in readme,
+        "README no longer links to docs/migration_guide.md "
+        "(removed in 122dw; the migration tool was deleted)",
+        "migration_guide.md" not in readme,
     )
 
     # 8. SimBA tutorial bulk dropped
@@ -169,33 +174,15 @@ def main() -> int:
             "Triage rules" in v1_src or "triage rule" in v1_src,
         )
 
-    # 11. Migration guide
+    # 11. Migration guide deleted (patch 122dw). The previous
+    # checks asserted the file existed and covered specific
+    # workflows; they're replaced with deletion tripwires that
+    # guard against the file/links creeping back in.
     check(
-        "docs/migration_guide.md exists",
-        mig_doc.exists(),
+        "docs/migration_guide.md no longer exists "
+        "(removed in 122dw — migration tool was deleted)",
+        not mig_doc.exists(),
     )
-    if mig_doc.exists():
-        mig_src = mig_doc.read_text()
-        check(
-            "Migration guide covers dry-run workflow",
-            "dry run" in mig_src.lower() or "dry-run" in mig_src.lower(),
-        )
-        check(
-            "Migration guide covers --commit flag",
-            "--commit" in mig_src,
-        )
-        check(
-            "Migration guide mentions MIGRATION.toml audit trail",
-            "MIGRATION.toml" in mig_src,
-        )
-        check(
-            "Migration guide has Troubleshooting section",
-            "## Troubleshooting" in mig_src,
-        )
-        check(
-            "Migration guide has Rollback section",
-            "## Rollback" in mig_src,
-        )
 
     # 12. docs/README index
     check(
@@ -203,8 +190,9 @@ def main() -> int:
         "v1_project_layout.md" in docs_index.read_text(),
     )
     check(
-        "docs/README.md indexes migration_guide.md",
-        "migration_guide.md" in docs_index.read_text(),
+        "docs/README.md no longer indexes migration_guide.md "
+        "(removed in 122dw — see deletion tripwire above)",
+        "migration_guide.md" not in docs_index.read_text(),
     )
 
     # 13. Parse-clean
