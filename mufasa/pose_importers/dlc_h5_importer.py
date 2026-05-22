@@ -290,7 +290,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
                     config_path=self.config_path, data_path=save_path,
                     type=self.interpolation_settings['type'],
                     method=self.interpolation_settings['method'],
-                    multi_index_df_headers=True, copy_originals=False,
+                    multi_index_df_headers=True,
                 )
                 interpolator.run()
             if self.smoothing_settings is not None:
@@ -298,7 +298,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
                     config_path=self.config_path, data_path=save_path,
                     time_window=self.smoothing_settings['time_window'],
                     method=self.smoothing_settings['method'],
-                    multi_index_df_headers=True, copy_originals=False,
+                    multi_index_df_headers=True,
                 )
                 smoother.run()
 

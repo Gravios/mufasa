@@ -72,10 +72,10 @@ class FaceMapImporter(ConfigReader):
             save_path = os.path.join(self.save_dir, f'{video_name}.csv')
             write_df(df=data_df, file_type=self.file_type, save_path=save_path, multi_idx_header=False)
             if self.interpolation_settings is not None:
-                interpolator = Interpolate(config_path=self.config_path, data_path=save_path, type=self.interpolation_type, method=self.interpolation_method, multi_index_df_headers=False, copy_originals=False)
+                interpolator = Interpolate(config_path=self.config_path, data_path=save_path, type=self.interpolation_type, method=self.interpolation_method, multi_index_df_headers=False)
                 interpolator.run()
             if self.smoothing_settings is not None:
-                smoother = Smoothing(config_path=self.config_path, data_path=save_path, time_window=self.smoothing_time, method=self.smoothing_method, multi_index_df_headers=False, copy_originals=False)
+                smoother = Smoothing(config_path=self.config_path, data_path=save_path, time_window=self.smoothing_time, method=self.smoothing_method, multi_index_df_headers=False)
                 smoother.run()
             file_timer.stop_timer()
             print(f'Imported data for video {video_name} (elapsed time: {file_timer.elapsed_time}s)')

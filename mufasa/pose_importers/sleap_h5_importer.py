@@ -111,10 +111,10 @@ class SLEAPImporterH5(ConfigReader, PoseImporterMixin):
             self.save_path = os.path.join(os.path.join(self.input_csv_dir, f"{self.output_filename}.{self.file_type}"))
             write_df(df=self.out_df, file_type=self.file_type, save_path=self.save_path, multi_idx_header=True)
             if self.interpolation_settings is not None:
-                interpolator = Interpolate(config_path=self.config_path, data_path=self.save_path, type=self.interpolation_settings['type'], method=self.interpolation_settings['method'], multi_index_df_headers=True, copy_originals=False)
+                interpolator = Interpolate(config_path=self.config_path, data_path=self.save_path, type=self.interpolation_settings['type'], method=self.interpolation_settings['method'], multi_index_df_headers=True)
                 interpolator.run()
             if self.smoothing_settings is not None:
-                smoother = Smoothing(config_path=self.config_path, data_path=self.save_path, time_window=self.smoothing_settings['time_window'], method=self.smoothing_settings['method'], multi_index_df_headers=True, copy_originals=False)
+                smoother = Smoothing(config_path=self.config_path, data_path=self.save_path, time_window=self.smoothing_settings['time_window'], method=self.smoothing_settings['method'], multi_index_df_headers=True)
                 smoother.run()
             video_timer.stop_timer()
             stdout_success(msg=f"Video {self.output_filename} data imported...", elapsed_time=video_timer.elapsed_time_str, source=self.__class__.__name__)
