@@ -350,6 +350,9 @@ class WorkflowPage(QWidget):
         index = self.toolbox.addItem(host, section_title)
         self._declared[section_title] = forms
         self._section_hosts[index] = host
+        # Patch 122du — paint the initial section badge. Cheap; the
+        # icon is rendered once per process and cached.
+        self._paint_initial_badge(index, section_title)
         # If this is the first section, force-instantiate so the page
         # isn't empty on first show.
         if index == 0:
@@ -381,8 +384,40 @@ class WorkflowPage(QWidget):
         index = self.toolbox.addItem(host, section_title)
         self._declared_widget_factories[index] = widget_factory
         self._section_hosts[index] = host
+        # Patch 122du — same initial-badge paint as add_section.
+        self._paint_initial_badge(index, section_title)
         if index == 0:
             self._instantiate(index)
+
+    def _paint_initial_badge(self, index: int, section_title: str) -> None:
+        """Patch 122du — set the initial section-status icon.
+
+        Called from :meth:`add_section` / :meth:`add_section_widget`.
+        Same lookup chain as :meth:`refresh_section_badges` but
+        scoped to one item, avoiding a full ``get_all_statuses``
+        scan when only one section is being added. (Trivial
+        optimization at 14 sections, but keeps page-build cost
+        constant per section.)
+        """
+        if self.config_path is None:
+            return
+        from mufasa.section_provenance import (
+            find_section_by_title,
+            get_status,
+        )
+        from mufasa.ui_qt.provenance_badge import icon_for_status
+
+        spec = find_section_by_title(self.title, section_title)
+        if spec is None:
+            return
+        try:
+            status = get_status(self.config_path, spec.section_id)
+            self.toolbox.setItemIcon(index, icon_for_status(status))
+        except Exception as exc:
+            print(
+                f"[provenance] initial paint failed for "
+                f"{section_title!r}: {exc}"
+            )
 
     def _on_section_changed(self, index: int) -> None:
         if index not in self._instantiated and index >= 0:
@@ -421,8 +456,83 @@ class WorkflowPage(QWidget):
                 hdr.setStyleSheet("font-size: 11pt; padding-top: 4px;")
                 layout.addWidget(hdr)
             layout.addWidget(form)
+            # Patch 122du -- when a form completes successfully, refresh
+            # every section badge across every page in the workbench.
+            # Cross-page invalidation is real: re-running ``import_pose``
+            # marks ``kalman_v2`` stale on a *different* page than the
+            # one the user just ran on. The workbench traversal walks
+            # up via ``self.window()``; ``MufasaWorkbench`` exposes
+            # ``_refresh_all_section_badges`` to do the work.
+            form.completed.connect(self._on_form_completed)
         layout.addStretch()
         self._instantiated.add(index)
+
+    def _on_form_completed(self) -> None:
+        """Patch 122du — bubble form completion up to the workbench
+        for a global badge refresh.
+
+        Walks up the widget tree to find the
+        :class:`MufasaWorkbench` ancestor and asks it to refresh
+        every page. The walk is necessary because forms live many
+        layers deep (Page → QToolBox → host → form) and don't have
+        a direct workbench handle.
+        """
+        wb = self.window()
+        refresh = getattr(wb, "_refresh_all_section_badges", None)
+        if callable(refresh):
+            refresh()
+
+    def refresh_section_badges(self) -> None:
+        """Re-query :class:`SectionStatus` for every section on this
+        page and update each :class:`QToolBox` item icon.
+
+        Patch 122du. Called:
+
+        * Once per section as it's added (initial paint via
+          :meth:`add_section` and :meth:`add_section_widget`).
+        * On every form completion within the workbench (cross-page
+          dependency invalidation).
+
+        No-op if ``config_path`` isn't set (workbench launched with
+        no project) — every section badge stays at its constructor
+        default (which is "no icon," i.e., the toolbox header shows
+        plain title text).
+        """
+        if self.config_path is None:
+            return
+        # Lazy imports — these modules pull in QtSvg / QtGui which we
+        # only want loaded once the workbench is alive.
+        from mufasa.section_provenance import (
+            SectionStatus,
+            find_section_by_title,
+            get_all_statuses,
+        )
+        from mufasa.ui_qt.provenance_badge import icon_for_status
+
+        try:
+            statuses = get_all_statuses(self.config_path)
+        except Exception as exc:
+            # Provenance is informational; a malformed [provenance]
+            # block shouldn't break the workbench. Print and bail.
+            print(f"[provenance] get_all_statuses failed: {exc}")
+            return
+
+        for index in range(self.toolbox.count()):
+            section_title = self.toolbox.itemText(index)
+            spec = find_section_by_title(self.title, section_title)
+            if spec is None:
+                continue  # not a tracked section (e.g., Input source)
+            status = statuses.get(spec.section_id, SectionStatus.UNKNOWN)
+            try:
+                self.toolbox.setItemIcon(index, icon_for_status(status))
+            except Exception as exc:
+                # icon_for_status requires QApplication. If we're
+                # somehow called before it exists, skip silently.
+                print(
+                    f"[provenance] setItemIcon failed for "
+                    f"{section_title!r}: {exc}"
+                )
+                return
 
 
 # --------------------------------------------------------------------------- #
@@ -498,6 +608,27 @@ class MufasaWorkbench(QMainWindow):
         if self.sidebar.count() == 1:
             self.sidebar.setCurrentRow(0)
         return page
+
+    def _refresh_all_section_badges(self) -> None:
+        """Patch 122du — refresh section-status badges on every page.
+
+        Called from :meth:`WorkflowPage._on_form_completed` after any
+        form completion. The walk is cheap (typically <20 sections
+        across all pages, one TOML read each via
+        ``get_all_statuses``) so unconditionally refreshing all pages
+        is fine — it avoids having to track which sections are
+        downstream-dependent on the one that just completed.
+        """
+        for page in self._pages_by_title.values():
+            try:
+                page.refresh_section_badges()
+            except Exception as exc:
+                # Don't let a refresh failure on one page block the
+                # others. Print and continue.
+                print(
+                    f"[provenance] refresh failed for page "
+                    f"{page.title!r}: {exc}"
+                )
 
     def launch_dialog(self, dialog_cls: type[QWidget], **kwargs) -> None:
         """Escape hatch for popups that legitimately need their own window.
