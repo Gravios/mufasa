@@ -1954,8 +1954,10 @@ class RunOutlierCorrectionForm(OperationForm):
                 or self.do_location.isChecked()):
             raise RuntimeError(
                 "Enable at least one of movement / location "
-                "correction (or use 'Skip outlier correction' to "
-                "bypass the stage entirely)."
+                "correction. (To bypass outlier correction entirely, "
+                "use Kalman v2 smoothing instead — it publishes its "
+                "output into derived/outlier_corrected/ so downstream "
+                "stages still see data.)"
             )
         try:
             data_dir = str(self.source_picker.selected_path())
@@ -2106,107 +2108,20 @@ class RunOutlierCorrectionForm(OperationForm):
                 )
 
 
-# --------------------------------------------------------------------------- #
-# SkipOutlierCorrectionForm — patch 122c
-# --------------------------------------------------------------------------- #
-class SkipOutlierCorrectionForm(OperationForm):
-    """Bypass outlier correction by copying the raw pose into the
-    outlier-corrected destination unchanged.
-
-    Useful when:
-
-    * pose data is already clean (e.g. hand-curated DLC or
-      Kalman-v2-smoothed output that's already handling outliers
-      via likelihood weighting),
-    * the SimBA outlier-correction criteria don't translate well
-      to the species or arena being studied,
-    * the downstream pipeline assumes the
-      ``outlier_corrected_movement_location/`` directory exists
-      and is non-empty.
-
-    Wraps
-    :class:`mufasa.outlier_tools.skip_outlier_correction.OutlierCorrectionSkipper`,
-    which reads from ``csv/input_csv/`` and writes to
-    ``csv/outlier_corrected_movement_location/`` while
-    standardizing pose-data headers. The form has no fields —
-    behavior is fixed by the backend.
-    """
-
-    title = "Skip outlier correction"
-    description = (
-        "Copy raw pose data into the outlier-corrected directory "
-        "unchanged. Use when your pose is already clean (e.g. "
-        "hand-curated or Kalman-v2-smoothed)."
-    )
-
-    def build(self) -> None:
-        note = QLabel(
-            "<i>No options — this stage just standardizes pose-data "
-            "headers and copies <code>csv/input_csv/</code> into "
-            "<code>csv/outlier_corrected_movement_location/</code>. "
-            "Run this if downstream stages expect outlier-corrected "
-            "output but you don't want SimBA's outlier criteria "
-            "applied.</i>",
-            self,
-        )
-        note.setTextFormat(Qt.RichText)
-        note.setWordWrap(True)
-        self.body_layout.addWidget(note)
-
-    def collect_args(self) -> dict:
-        if not self.config_path:
-            raise RuntimeError("No project loaded.")
-        return {"config_path": self.config_path}
-
-    def target(self, *, config_path: str) -> None:
-        from mufasa.outlier_tools.skip_outlier_correction import (
-            OutlierCorrectionSkipper,
-        )
-        OutlierCorrectionSkipper(config_path=config_path).run()
-
-        # Write a run.toml stub if this is a v1 project — even a
-        # skipped run is a run, and reproducing the experiment
-        # later requires knowing that outlier correction was
-        # deliberately skipped.
-        v1_root = resolve_v1_project_root(config_path)
-        if v1_root is not None:
-            try:
-                from mufasa.project_layout import (
-                    RUN_PROVENANCE_FILENAME,
-                    ProjectPaths,
-                    Stages,
-                    generate_run_id,
-                    write_run_toml,
-                )
-                run_id = generate_run_id()
-                paths = ProjectPaths(v1_root)
-                run_dir = paths.stage_run_dir(
-                    Stages.OUTLIER_CORRECTED, run_id=run_id,
-                )
-                write_run_toml(
-                    run_dir / RUN_PROVENANCE_FILENAME,
-                    stage="outlier_corrected",
-                    run_id=run_id,
-                    params={"skipped": True},
-                )
-                # Drop a marker file so downstream auto-detection
-                # of the latest run knows this is a skip-run (no
-                # pose data lives inside this run dir — the legacy
-                # csv/outlier_corrected_movement_location/ is the
-                # real output until v1-aware downstream forms land).
-                (run_dir / "SKIPPED").write_text(
-                    "outlier correction was skipped; pose data "
-                    "lives at csv/outlier_corrected_movement_location/\n"
-                )
-                print(
-                    f"[outlier-skip] wrote run.toml: "
-                    f"{run_dir / RUN_PROVENANCE_FILENAME}"
-                )
-            except Exception as exc:
-                print(
-                    f"[outlier-skip] WARNING: could not write "
-                    f"run.toml ({exc}); skip operation completed."
-                )
+# Patch 122dv — ``SkipOutlierCorrectionForm`` and its backend
+# ``mufasa.outlier_tools.skip_outlier_correction.OutlierCorrectionSkipper``
+# were removed. The form was a no-op passthrough whose only purpose
+# was satisfying the downstream contract that consumers
+# (Features, Classifier, Visualizations) read from
+# ``derived/outlier_corrected/``. That contract is now satisfied by
+# producer backends publishing symlinks via
+# :func:`mufasa.project_layout.publish_to_stage` after their actual
+# work completes (Kalman v2 wired in 122dt; Interpolate and Data
+# Import publishing pending). Users with pre-cleaned pose data who
+# previously relied on the Skip form now get the same result by
+# running Kalman v2 (which is cheap on clean data) or, once the
+# deferred wiring lands, by importing — Data Import will auto-
+# publish.
 
 
 __all__ = [
@@ -2217,5 +2132,4 @@ __all__ = [
     "EgocentricAlignmentForm",
     "KalmanV2SmoothingForm",
     "RunOutlierCorrectionForm",
-    "SkipOutlierCorrectionForm",
 ]

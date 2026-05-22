@@ -141,9 +141,9 @@ When `n_videos == 0`, `n_workers = min(self.n_workers, 0) = 0`. `ProcessPoolExec
 
 2. **Qt form** (`ui_qt/forms/features.py:_run_preflight` + `on_run`): the preflight returns `None` instead of an empty conflicts dict when the project has no eligible videos. `on_run` then surfaces a clear `QMessageBox.warning`:
 
-   > "No eligible videos in this project. Feature extraction needs outlier-corrected pose data. Make sure the project has imported videos and run the outlier-correction step (or 'Skip outlier correction' on the Preprocessing page) before running feature extraction."
+   > "No eligible videos in this project. Feature extraction reads from derived/outlier_corrected/. Populate it by running one of these on the Preprocessing page first: Run outlier correction, Kalman v2 smoothing (publishes its output as a symlink), or — once Data Import auto-publish lands — simply (re)importing the pose data."
 
-   The Qt-side message is more useful than the backend's stdout print — it tells the user *why* the project might look empty (need pose data, not just video files) and *what to do next* (run outlier correction or its skip variant).
+   The Qt-side message is more useful than the backend's stdout print — it tells the user *why* the project might look empty (need pose data, not just video files) and *what to do next*. Patch 122dv replaced the old "Skip outlier correction" hint with concrete producer options, since Skip itself was removed.
 
 **Severity rationale:** Crashed the run on otherwise-valid empty-state. Fixed two-sided so both CLI (backend) and GUI (Qt form) users get clean behaviour.
 

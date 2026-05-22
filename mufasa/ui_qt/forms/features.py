@@ -465,12 +465,13 @@ class FeatureSubsetExtractorForm(OperationForm):
                 QMessageBox.warning(
                     self, self.title,
                     "No eligible videos in this project.\n\n"
-                    "Feature extraction needs outlier-corrected "
-                    "pose data. Make sure the project has imported "
-                    "videos and run the outlier-correction step "
-                    "(or 'Skip outlier correction' on the "
-                    "Preprocessing page) before running feature "
-                    "extraction.",
+                    "Feature extraction reads from "
+                    "derived/outlier_corrected/. Populate it by "
+                    "running one of these on the Preprocessing page "
+                    "first: Run outlier correction, Kalman v2 "
+                    "smoothing (publishes its output as a symlink), "
+                    "or — once Data Import auto-publish lands — "
+                    "simply (re)importing the pose data.",
                 )
                 return
 
