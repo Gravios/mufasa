@@ -296,9 +296,12 @@ def write_wide_features_v1(
 
     No-op for legacy (non-TOML) projects so projects that haven't
     migrated don't gain a stray ``derived/`` subtree alongside
-    their ``csv/`` tree. v1 detection is by config file extension
-    — matches what
-    :class:`mufasa.mixins.config_reader.ConfigReader._is_v1` does.
+    their ``csv/`` tree. v1 detection is by config file extension —
+    same suffix check that ``ConfigReader.__init__`` does (122dy
+    deleted ``ConfigReader._is_v1`` because v1 is now the only
+    supported path; this helper's local check is retained because
+    it's still called from contexts that may receive a legacy
+    path before ConfigReader gets to reject it).
 
     :param df: The wide DataFrame to write. Written as-is; no
         column-name suffixing or sorting (the legacy wide CSV
