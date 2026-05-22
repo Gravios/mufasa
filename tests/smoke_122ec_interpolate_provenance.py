@@ -179,23 +179,29 @@ def main() -> int:
                 if isinstance(sid, ast.Constant) else "missing"),
     )
 
-    # 3. No publish_target_stage.
+    # 3. publish_target_stage is now SET (flipped by 122ed —
+    # was "no publish target" in 122ec; backend refactor lets
+    # us publish).
     pub = _ast_class_attr(interp_cls, "publish_target_stage")
     check(
-        "InterpolateForm has NO publish_target_stage declaration "
-        "(record-only — backend modifies in place; no run dir to "
-        "publish)",
-        pub is None,
+        "InterpolateForm.publish_target_stage == 'outlier_corrected' "
+        "(flipped by 122ed — the 122ec record-only contract was "
+        "lifted when the backend refactor landed)",
+        isinstance(pub, ast.Constant) and pub.value == "outlier_corrected",
+        detail=(f"got {pub.value!r}"
+                if isinstance(pub, ast.Constant) else "missing"),
     )
 
-    # 4. target() does NOT set self._last_run_id.
+    # 4. target() NOW sets self._last_run_id (flipped by 122ed —
+    # captures runner.run_id from the refactored backend).
     target_method = _ast_method(interp_cls, "target")
     assert target_method is not None
     target_src = ast.unparse(target_method)
     check(
-        "InterpolateForm.target() does not set self._last_run_id "
-        "(backend mutates pose files in place; no run-id to record)",
-        "self._last_run_id" not in target_src,
+        "InterpolateForm.target() sets self._last_run_id (flipped "
+        "by 122ed — captures the backend's allocated run_id from "
+        "the new run-dir layout)",
+        "self._last_run_id" in target_src,
     )
 
     # 5. Title matches SECTIONS spec.
@@ -297,7 +303,10 @@ def main() -> int:
         )),
     )
 
-    # 10. Of the four, exactly two have publish_target_stage.
+    # 10. Of the four, exactly TWO now have publish_target_stage
+    # (flipped by 122ed — kalman_v2 was the only publisher in
+    # 122ec; the backend refactor adds interpolate to the
+    # publisher set).
     publish_status = {
         "RunOutlierCorrectionForm":
             _ast_class_attr(roc, "publish_target_stage"),
@@ -312,12 +321,13 @@ def main() -> int:
         k: v for k, v in publish_status.items() if v is not None
     }
     check(
-        "Exactly 1 of the 4 producers has publish_target_stage "
-        "(only KalmanV2SmoothingForm; outlier_correction writes "
-        "directly to outlier_corrected/ and so doesn't need a "
-        "symlink-publish; pose-import + interpolate are record-only)",
-        list(publishers.keys()) == ["KalmanV2SmoothingForm"],
-        detail=(f"publishers: {list(publishers.keys())}"),
+        "Exactly 2 of the 4 producers have publish_target_stage "
+        "(kalman_v2 + interpolate; outlier_correction writes "
+        "directly to outlier_corrected/; pose_import is the only "
+        "record-only producer remaining)",
+        sorted(publishers.keys())
+        == ["InterpolateForm", "KalmanV2SmoothingForm"],
+        detail=(f"publishers: {sorted(publishers.keys())}"),
     )
 
     # -----------------------------------------------------------------

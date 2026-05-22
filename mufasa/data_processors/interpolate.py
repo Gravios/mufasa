@@ -20,8 +20,7 @@ from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import DataHeaderError, InvalidInputError
 from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
                                   stdout_success)
-from mufasa.utils.read_write import (copy_files_to_directory,
-                                    find_files_of_filetypes_in_directory,
+from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_fn_ext, read_df, write_df)
 
 
@@ -58,9 +57,33 @@ class Interpolate(ConfigReader):
                  data_path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
                  type: Optional[Literal['body-parts', 'animals']] = 'body-parts',
                  method: Optional[Literal['nearest', 'linear', 'quadratic']] = 'nearest',
-                 multi_index_df_headers: Optional[bool] = None,
-                 copy_originals: Optional[bool] = False) -> None:
+                 multi_index_df_headers: Optional[bool] = None) -> None:
+        """
+        Patch 122ed — backend refactor to write-to-run-dir.
 
+        Before 122ed: interpolated dataframes were written back to
+        the SAME file path as the input — pose data was modified in
+        place at ``sources/pose/<video>.<ext>``. The optional
+        ``copy_originals=True`` parameter saved the pre-interpolation
+        file into a ``Pre_<method>_<type>_interpolation_<datetime>/``
+        subdir alongside the source files so users could recover the
+        unmodified data.
+
+        After 122ed: writes go to
+        ``<project_root>/derived/interpolated/<run_id>/<video>.<ext>``,
+        leaving ``sources/pose/`` untouched. ``copy_originals`` was
+        dropped because originals are preserved by definition now.
+
+        Instance attributes added by 122ed:
+
+        * ``self.run_id`` — v1 run-id (timestamp-prefixed). Form-level
+          caller reads this to set ``OperationForm._last_run_id`` so
+          the base-class success hook records it in
+          ``[provenance.interpolate]``.
+        * ``self.run_dir`` — the absolute path to the run directory.
+          Created at ``__init__`` time so the output dir exists
+          before any file is processed.
+        """
         log_event(logger_name=str(self.__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=self.create_log_msg_from_init_args(locals=locals()))
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         check_str(name=f'{self.__class__.__name__} type', value=type.lower(), options=('body-parts', 'animals'))
@@ -76,9 +99,18 @@ class Interpolate(ConfigReader):
             self.file_paths = [data_path]
         else:
             raise InvalidInputError(msg=f'{data_path} is not a valid data directory, or a valid file path, or a valid list of file paths', source=self.__class__.__name__)
-        if copy_originals:
-            self.originals_dir = os.path.join(os.path.dirname(self.file_paths[0]), f"Pre_{method}_{type}_interpolation_{self.datetime}")
-            os.makedirs(self.originals_dir)
+
+        # Patch 122ed — allocate the v1 run directory now so it
+        # exists when run() starts writing files into it. Lazy-import
+        # ``generate_run_id`` to keep import-time deps minimal.
+        from mufasa.project_layout import generate_run_id
+        from pathlib import Path as _Path
+        self.run_id = generate_run_id()
+        self.run_dir = str(
+            _Path(self.project_path) / "derived"
+            / "interpolated" / self.run_id
+        )
+        os.makedirs(self.run_dir, exist_ok=False)
 
         # Audit A1 fix: auto-detect when multi_index_df_headers is not
         # explicitly passed. See Smoothing.__init__ for the full context.
@@ -88,7 +120,7 @@ class Interpolate(ConfigReader):
             first_parent = _P(self.file_paths[0]).resolve().parent
             multi_index_df_headers = (first_parent == raw_dir)
 
-        self.type, self.method, self.multi_index_df_headers, self.copy_originals = type.lower(), method.lower(), multi_index_df_headers, copy_originals
+        self.type, self.method, self.multi_index_df_headers = type.lower(), method.lower(), multi_index_df_headers
 
     def __insert_multiindex_header(self, df: pd.DataFrame):
         multi_idx_header = []
@@ -115,14 +147,18 @@ class Interpolate(ConfigReader):
                 df = body_part_interpolator(df=df, animal_bp_dict=self.animal_bp_dict, source=file_path, method=self.method)
             if self.multi_index_df_headers:
                 df = self.__insert_multiindex_header(df=df)
-            if self.copy_originals:
-                copy_files_to_directory(file_paths=[file_path], dir=self.originals_dir)
-            write_df(df=df.astype(np.float32), file_type=self.file_type, save_path=file_path, multi_idx_header=self.multi_index_df_headers)
+            # Patch 122ed — write to derived/interpolated/<run_id>/
+            # instead of overwriting file_path.
+            out_path = os.path.join(
+                self.run_dir,
+                f"{self.video_name}.{self.file_type}",
+            )
+            write_df(df=df.astype(np.float32), file_type=self.file_type, save_path=out_path, multi_idx_header=self.multi_index_df_headers)
             video_timer.stop_timer()
             stdout_information(msg=f"Video {self.video_name} interpolated (elapsed time {video_timer.elapsed_time_str}) ...")
         self.timer.stop_timer()
-        if self.copy_originals:
-            msg = f"{len(self.file_paths)} data file(s) interpolated using {self.type} {self.method} methods. Originals saved in {self.originals_dir} directory."
-        else:
-            msg = f"{len(self.file_paths)} data file(s) interpolated using {self.type} {self.method} methods."
+        msg = (
+            f"{len(self.file_paths)} data file(s) interpolated using "
+            f"{self.type} {self.method} methods. Output: {self.run_dir}"
+        )
         stdout_success(msg=msg, elapsed_time=self.timer.elapsed_time_str, source=self.__class__.__name__)

@@ -324,8 +324,8 @@ class InterpolateForm(OperationForm):
 
     Same ``multi_index_df_headers`` auto-detect as SmoothingForm.
 
-    Provenance (patch 122ec)
-    ------------------------
+    Provenance (patches 122ec / 122ed)
+    -----------------------------------
     Declares ``section_id = "interpolate"`` so the
     :class:`mufasa.ui_qt.workbench.OperationForm` base class's
     success hook records ``[provenance.interpolate]`` in
@@ -337,24 +337,33 @@ class InterpolateForm(OperationForm):
     * Running interpolation transitions the badge back to
       CURRENT (green).
 
-    Like :class:`PoseImportForm` (wired in 122eb), this is the
-    record-only pattern: ``self._last_run_id`` is NOT set in
-    ``target()`` because the underlying
-    :class:`mufasa.data_processors.interpolate.Interpolate`
-    backend mutates pose data in place at ``sources/pose/`` —
-    it doesn't allocate a v1 run directory. ``publish_target_stage``
-    is similarly unset; the interpolated data overwrites the
-    imported pose data, so downstream consumers that find files
-    via the resolver chain (``sources/pose/`` → eventual
-    ``outlier_corrected/`` publish from Kalman v2 or
-    RunOutlierCorrection) already see the interpolated values
-    transparently.
+    Patch history:
 
-    A future patch could refactor the Interpolate backend to
-    write to ``derived/interpolated/<run_id>/`` instead of
-    overwriting in place, enabling publish-to-stage on top of
-    the record-only wiring; that's deferred (filed under the
-    backend-refactor track alongside Pose Import's publish work).
+    * 122ec — initial record-only wiring (section_id only;
+      no publish_target_stage; no _last_run_id set in target).
+      The Interpolate backend at that time modified pose data
+      in place at ``sources/pose/`` — there was no run dir to
+      point at.
+
+    * 122ed — backend refactored to write to
+      ``derived/interpolated/<run_id>/`` instead of
+      overwriting in place. Form gained
+      ``publish_target_stage = "outlier_corrected"`` +
+      ``publish_source_stage = "interpolated"``; target()
+      captures ``runner.run_id`` into ``self._last_run_id``.
+      The published symlink at
+      ``derived/outlier_corrected/<run_id> ->
+      ../interpolated/<run_id>`` makes the interpolated data
+      discoverable to downstream backends (Features etc.)
+      without those backends needing to be re-plumbed onto an
+      input-source picker. Same publish-target convention as
+      Kalman v2 — interpolation is now an alternative cleanup
+      path to outlier correction / Kalman v2, and the latest
+      one wins in the resolver chain.
+
+    The 122ed refactor also dropped the ``copy_originals``
+    UI checkbox: with writes going to a new run dir, the
+    originals are preserved by definition.
     """
 
     title = "Interpolate missing frames"
@@ -362,6 +371,15 @@ class InterpolateForm(OperationForm):
     # target). Closes the 4th and last of the 4 producers
     # identified in 122dt's deferred list.
     section_id = "interpolate"
+    # Patch 122ed — backend refactor + publish wiring. Interpolate
+    # writes to derived/interpolated/<run_id>/; the symlink at
+    # derived/outlier_corrected/<run_id> makes the output discover-
+    # able to downstream backends (Features etc.) that read from
+    # outlier_corrected/. Same publish-target convention as Kalman
+    # v2, but no source_flavor (only one flavor of interpolation
+    # per run).
+    publish_target_stage = "outlier_corrected"
+    publish_source_stage = "interpolated"
     description = ("Fill gaps left by tracker dropouts. Nearest is fastest "
                    "and least biased; linear/quadratic are smoother but can "
                    "invent values during long gaps.")
@@ -378,9 +396,11 @@ class InterpolateForm(OperationForm):
         self.method_cb.addItems(["Nearest", "Linear", "Quadratic"])
         form.addRow("Method:", self.method_cb)
 
-        self.copy_originals = QCheckBox("Copy originals before overwriting", self)
-        self.copy_originals.setChecked(True)
-        form.addRow("", self.copy_originals)
+        # Patch 122ed — removed the "Copy originals before
+        # overwriting" checkbox. The backend no longer overwrites:
+        # writes go to derived/interpolated/<run_id>/, leaving
+        # sources/pose/ untouched. Originals are preserved by
+        # definition.
 
         self.body_layout.addLayout(form)
 
@@ -391,22 +411,25 @@ class InterpolateForm(OperationForm):
             "config_path":    self.config_path,
             "type":           self.type_cb.currentText().lower().replace(" ", "-"),
             "method":         self.method_cb.currentText().lower(),
-            "copy_originals": bool(self.copy_originals.isChecked()),
         }
 
-    def target(self, *, config_path: str, type: str, method: str,
-               copy_originals: bool) -> None:
+    def target(self, *, config_path: str, type: str, method: str) -> None:
         from mufasa.data_processors.interpolate import Interpolate
         # Patch 122f: layout-agnostic input dir.
         input_dir = project_paths_from_config(config_path)["input_pose_dir"]
-        Interpolate(
+        runner = Interpolate(
             config_path=config_path,
             data_path=input_dir,
             type=type,
             method=method,
             # multi_index_df_headers=None → auto-detect (A1 fix)
-            copy_originals=copy_originals,
-        ).run()
+        )
+        runner.run()
+        # Patch 122ed — capture the backend's allocated run-id so
+        # the base-class _record_provenance hook writes
+        # last_run_id into [provenance.interpolate] AND publishes
+        # the run to outlier_corrected/.
+        self._last_run_id = runner.run_id
 
 
 # --------------------------------------------------------------------------- #

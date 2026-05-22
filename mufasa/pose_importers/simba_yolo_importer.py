@@ -123,10 +123,10 @@ class SimBAYoloImporter(ConfigReader):
             data_save_path = os.path.join(self.outlier_corrected_dir, f'{video_name}.csv')
             write_df(df=out_df, file_type='csv', save_path=data_save_path)
             if self.interpolation_settings is not None:
-                interpolator = Interpolate(config_path=self.config_path, data_path=data_save_path, type=self.interpolation_type, method=self.interpolation_method, multi_index_df_headers=False, copy_originals=False)
+                interpolator = Interpolate(config_path=self.config_path, data_path=data_save_path, type=self.interpolation_type, method=self.interpolation_method, multi_index_df_headers=False)
                 interpolator.run()
             if self.smoothing_settings is not None:
-                smoother = Smoothing(config_path=self.config_path, data_path=data_save_path, time_window=self.smoothing_time, method=self.smoothing_method, multi_index_df_headers=False, copy_originals=False)
+                smoother = Smoothing(config_path=self.config_path, data_path=data_save_path, time_window=self.smoothing_time, method=self.smoothing_method, multi_index_df_headers=False)
                 smoother.run()
             if hasattr(self, 'video_info_df') and self.add_to_video_info:
                 self.video_info_df = self.video_info_df[self.video_info_df['Video'] != video_name].reset_index(drop=True)
