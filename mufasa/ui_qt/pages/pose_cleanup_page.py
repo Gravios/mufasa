@@ -39,14 +39,18 @@ Sections:
    missing frames, per-marker bias, and (with const-accel
    segments) curvature in motion. Patch 121a–e.
 5. **Run outlier correction** — chains movement + location
-   correction on the chosen input source. Patch 122c.
-6. **Skip outlier correction** — bypass stage entirely while
-   still populating the outlier-corrected output dir so
-   downstream stages find data. Patch 122c.
-7. **Egocentric alignment** — rotate pose (and optionally
+   correction on the chosen input source. Patch 122c. Writes to
+   ``derived/outlier_corrected/<run_id>/``. (Patch 122dv removed the
+   former companion form "Skip outlier correction"; the downstream
+   contract — consumers reading from ``derived/outlier_corrected/``
+   — is now satisfied by producer backends publishing symlinks via
+   :func:`mufasa.project_layout.publish_to_stage` instead of via a
+   no-op passthrough form. Kalman v2 publishes today (patch 122dt);
+   Interpolate and Data Import publishing are pending.)
+6. **Egocentric alignment** — rotate pose (and optionally
    video) to a chosen frame of reference. Now consumes any
    prior stage's output via the picker. Patch 122b.
-8. **Advanced / legacy** — three stacked legacy forms:
+7. **Advanced / legacy** — three stacked legacy forms:
      - Savitzky-Golay smoother (use Kalman v2 above instead)
      - Outlier correction settings (writes thresholds /
        reference body-parts to project_config.ini; consumed
@@ -88,7 +92,6 @@ from mufasa.ui_qt.forms.pose_cleanup import (
     KalmanV2SmoothingForm,
     OutlierSettingsForm,
     RunOutlierCorrectionForm,
-    SkipOutlierCorrectionForm,
     SmoothingForm,
 )
 from mufasa.ui_qt.forms.video_info import VideoInfoForm
@@ -121,8 +124,13 @@ def build_pose_cleanup_page(workbench,
                      [(KalmanV2SmoothingForm, {})])
     page.add_section("Run outlier correction",
                      [(RunOutlierCorrectionForm, {})])
-    page.add_section("Skip outlier correction",
-                     [(SkipOutlierCorrectionForm, {})])
+    # Patch 122dv — "Skip outlier correction" section removed. The
+    # downstream contract (consumers read from
+    # ``derived/outlier_corrected/``) is now satisfied by producer
+    # backends publishing symlinks via
+    # :func:`mufasa.project_layout.publish_to_stage` (Kalman v2
+    # wired in 122dt; Interpolate + Data Import pending). The
+    # passthrough operation that Skip provided is no longer needed.
     page.add_section("Egocentric alignment",
                      [(EgocentricAlignmentForm, {})])
     # All three legacy forms share one section. WorkflowPage's

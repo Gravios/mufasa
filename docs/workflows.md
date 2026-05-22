@@ -624,10 +624,12 @@ the Data Import form.
 **Branches**:
 - "Settings" button (`OutlierSettingsPopUp`) — configure the
   per-bodypart criterion multipliers stored in config
-- "Skip outlier correction" — `OutlierCorrectionSkipper.run()`
-  copies input_csv → outlier_corrected_movement_location
-  unchanged. **Useful when poses are already clean**, e.g.
-  from MARS or a hand-curated DLC model.
+- Patch 122dv removed the former "Skip outlier correction" branch
+  (`OutlierCorrectionSkipper`). Users with already-clean poses
+  (MARS, hand-curated DLC, Kalman-v2-smoothed) now satisfy the
+  downstream `derived/outlier_corrected/` contract via producer
+  backends that publish symlinks — Kalman v2 wired in 122dt,
+  Interpolate and Data Import pending.
 - Multiprocessing variants (`outlier_corrector_*_mp.py`) used
   internally for large projects
 - "Advanced" variants (`outlier_corrector_*_advanced.py`) — more

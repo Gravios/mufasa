@@ -72,7 +72,9 @@ Sections marked **(existing)** already exist in Qt. Sections marked **(new)** ar
 - **Interpolate missing frames** (existing)
 - **Kalman v2 smoothing** (existing)
 - **Run outlier correction** (existing)
-- **Skip outlier correction** (existing)
+- ~~**Skip outlier correction**~~ — removed in patch 122dv. The
+  downstream `derived/outlier_corrected/` contract is now
+  satisfied by producer backends publishing relative symlinks.
 - **Egocentric alignment** (existing, 1) → `EgocentricAlign` ✓
 - **Advanced / legacy** (existing) — has `SmoothingForm` ← from `Smoothing` ✓, `OutlierSettings`, `DropBodyparts` ← from `DropTrackingData` ✓
 

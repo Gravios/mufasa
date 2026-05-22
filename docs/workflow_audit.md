@@ -265,12 +265,16 @@ ROI shape classes:
 
 ## 8. Outlier correction
 
-Three forms feed three backends:
+Two forms feed two backends (patch 122dv removed
+``SkipOutlierCorrectionForm`` and the ``OutlierCorrectionSkipper``
+backend; the no-op-passthrough role they served — populating
+``derived/outlier_corrected/`` so downstream stages find data — is
+now covered by producer backends publishing relative symlinks via
+:func:`mufasa.project_layout.publish_to_stage`):
 
 | Form | Backend | Strategy |
 |---|---|---|
 | `RunOutlierCorrectionForm` | `OutlierCorrecterLocation` + `OutlierCorrecterMovement` | Heuristic thresholds on location (deviation from body center) and movement (frame-to-frame Euclidean) |
-| `SkipOutlierCorrectionForm` | `OutlierCorrectionSkipper` | Marks data as processed without modification |
 | `Advanced / legacy` section | `OutlierCorrecterLocationAdvanced` + `OutlierCorrecterMovementAdvanced` | Per-animal and per-body-part thresholds |
 
 Kalman v2 (`KalmanV2SmoothingForm`) is a separate smoothing path with a richer state model (`StateLayout`, `BodyLayout`, `FittedLengths` types) and EM-fitted noise parameters (`NoiseParamsV2`). Strongly recommended over `Smooth` (the legacy moving-average smoother) for downstream feature quality.
