@@ -181,8 +181,7 @@ class TrainMultiLabelRandomForestClassifier(ConfigReader, TrainModelMixin):
             )
 
 
-model_trainer = TrainMultiLabelRandomForestClassifier(
-    config_path="/Users/simon/Desktop/envs/troubleshooting/multilabel/project_folder/project_config.ini"
-)
-model_trainer.perform_sampling()
-model_trainer.run()
+# Patch 122dz — removed an orphan dev-time invocation that ran
+# on import with a hardcoded legacy `.ini` path. Same shape as the
+# one in reverse_pose.py; same 122bj sweep miss. See 122dz commit
+# message for the full list.

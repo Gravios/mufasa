@@ -78,7 +78,6 @@ class SeverityBoutCalculator(ConfigReader, FeatureExtractionMixin):
             df = load_machine_results_for_video(
                 video_name=video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             if self.settings["clf"] not in df.columns:
                 NoDataFoundWarning(
@@ -136,7 +135,6 @@ class SeverityBoutCalculator(ConfigReader, FeatureExtractionMixin):
             df = load_machine_results_for_video(
                 video_name=video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             check_that_column_exist(
                 df=df, column_name=self.settings["clf"], file_name=file_path

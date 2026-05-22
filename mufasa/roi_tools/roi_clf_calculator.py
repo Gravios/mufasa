@@ -154,7 +154,6 @@ class ROIClfCalculator(ConfigReader):
             data_df = load_machine_results_for_video(
                 video_name=video_name,
                 config_path=self.config_path,
-                legacy_fallback=data_path,
             )
             check_valid_dataframe(df=data_df, source=f'{data_path}', required_fields=self.required_fields)
             data_df = data_df[self.required_fields]

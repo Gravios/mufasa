@@ -125,7 +125,6 @@ class TresholdPlotCreatorSingleProcess(ConfigReader, PlottingMixin):
             data_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             check_that_column_exist(df=data_df, column_name=self.clf_name, file_name=self.video_name)
             if self.frame_setting:

@@ -233,7 +233,6 @@ class GanttCreatorMultiprocess(ConfigReader, PlottingMixin):
             self.data_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             check_that_column_exist(df=self.data_df, column_name=self.clf_names, file_name=file_path)
             stdout_information(msg=f"Processing video {self.video_name}, Frame count: {len(self.data_df)} (Video {(file_cnt + 1)}/{len(self.data_paths)})...")

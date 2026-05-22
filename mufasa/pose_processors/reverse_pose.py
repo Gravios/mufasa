@@ -137,7 +137,12 @@ class Reverse2AnimalTracking(ConfigReader):
             )
 
 
-test = Reverse2AnimalTracking(
-    config_path="/Users/simon/Desktop/troubleshooting/train_model_project/project_folder/project_config.ini"
-)
-test.reverse_tracking()
+# Patch 122dz — removed an orphan dev-time invocation that ran
+# on import with a hardcoded legacy `.ini` path. Was originally a
+# SimBA-era convenience for the maintainer's local workflow;
+# never gated by `if __name__ == "__main__":` so it would crash
+# any import of this module. After 122dy rejected non-v1 paths
+# in ConfigReader the crash was deterministic; before that it
+# crashed on the missing absolute path anyway. The 122bj patch
+# was supposed to clear these orphan footers across the
+# codebase but missed this one.

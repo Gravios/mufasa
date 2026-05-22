@@ -193,7 +193,6 @@ class TresholdPlotCreatorMultiprocess(ConfigReader, PlottingMixin):
             data_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             check_that_column_exist(df=data_df, column_name=[self.clf_name, self.probability_col], file_name=file_path)
             self.save_frame_folder_dir = os.path.join(self.probability_plot_dir, self.video_name + f"_{self.clf_name}")

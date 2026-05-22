@@ -66,7 +66,6 @@ class MutualExclusivityCorrector(ConfigReader):
             self.input_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             self.data_df = deepcopy(self.input_df)
             for rule_cnt, rule_data in self.rules.items():

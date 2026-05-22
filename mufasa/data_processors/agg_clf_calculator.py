@@ -150,7 +150,6 @@ class AggregateClfCalculator(ConfigReader):
             data_df = load_machine_results_for_video(
                 video_name=file_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             check_valid_dataframe(df=data_df, required_fields=self.classifiers, source=file_path)
             bouts_df = detect_bouts(data_df=data_df, target_lst=self.classifiers, fps=fps)

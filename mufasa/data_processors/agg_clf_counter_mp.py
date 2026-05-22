@@ -80,11 +80,7 @@ def _agg_clf_helper(data: tuple,
             )
             data_df = load_machine_results_for_video(
                 video_name=file_name,
-                config_path=config_path,
-                legacy_fallback=(
-                    file_path if os.path.isfile(file_path) else None
-                ),
-            )
+                config_path=config_path,            )
         else:
             check_file_exist_and_readable(file_path)
             data_df = read_df(file_path, 'csv')

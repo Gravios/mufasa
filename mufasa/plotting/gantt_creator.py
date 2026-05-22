@@ -130,7 +130,6 @@ class GanttCreatorSingleProcess(ConfigReader, PlottingMixin):
             self.data_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             ).reset_index(drop=True)
             check_valid_dataframe(df=self.data_df, source=file_path, required_fields=self.clf_names)
             self.video_info_settings, _, self.fps = self.read_video_info(video_name=self.video_name)
