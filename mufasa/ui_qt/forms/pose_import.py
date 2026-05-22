@@ -259,17 +259,42 @@ POSE_IMPORT_ROUTES: dict = {
 
 class PoseImportForm(OperationForm):
     """Form for importing pose-estimation output into the current
-    project's ``csv/input_csv/``. The ``config_path`` supplied at
-    construction binds the form to the open project."""
+    project's ``sources/pose/``. The ``config_path`` supplied at
+    construction binds the form to the open project.
 
-    title = "Import Pose Data"
+    Provenance (patch 122eb)
+    ------------------------
+    Declares ``section_id = "import_pose"`` so the
+    :class:`mufasa.ui_qt.workbench.OperationForm` base class's
+    success hook records ``[provenance.import_pose]`` in
+    ``project.toml`` after every successful import. This is what
+    drives the "STALE" badge state on dependent sections
+    (outlier_correction, kalman_v2, interpolate, etc.) — they all
+    declare ``depends_on=("import_pose",)``, so re-importing pose
+    data makes them visibly stale.
+
+    Unlike :class:`KalmanV2SmoothingForm`, this form does NOT set
+    ``self._last_run_id`` in ``target()`` because the underlying
+    backends write to ``sources/pose/`` directly (no run-id subdir
+    allocated). The provenance entry records ``last_run_at`` only,
+    no ``last_run_id``. ``publish_target_stage`` is similarly
+    unset — publishing pose-import output under
+    ``derived/outlier_corrected/`` requires backend cooperation
+    (either pre-allocating a run dir or returning the allocated
+    id), which is deferred.
+    """
+
+    title = "Import pose data"
+    # Patch 122eb — provenance wiring. No publish target; just
+    # records `last_run_at` so downstream staleness checks fire
+    # when pose data is re-imported.
+    section_id = "import_pose"
     description = (
         "Load pose tracking output into the current project. "
         "Files are normalised to Mufasa's multi-index CSV/parquet "
-        "layout and written to <code>sources/pose/</code> for v1 "
-        "projects or <code>csv/input_csv/</code> for legacy "
-        "projects. The destination is resolved automatically from "
-        "the active project's layout."
+        "layout and written to <code>sources/pose/</code>. "
+        "The destination is resolved automatically from the "
+        "active project's layout."
     )
 
     # ------------------------------------------------------------------ #

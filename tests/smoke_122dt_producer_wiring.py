@@ -32,6 +32,12 @@ their own patches:
   each importer to either return a run-id or write to a v1-shaped
   location the form can discover.
 
+Patch 122eb update — PoseImportForm gained section_id="import_pose"
+via the minimal record-only wiring (no publish target). The 122dt
+deferred-status tripwire for PoseImportForm (check 20 below) was
+flipped to a "wiring is in place" tripwire to detect accidental
+removal. InterpolateForm remains deferred.
+
 What this patch landed
 ----------------------
 1. ``publish_to_stage`` gained an optional ``source_flavor``
@@ -104,7 +110,8 @@ Subclass declarations:
 
 Deferred-producer documentation tripwires:
 19. InterpolateForm does NOT declare section_id (deferred).
-20. PoseImportForm does NOT declare section_id (deferred).
+20. PoseImportForm.section_id == "import_pose" (wired in 122eb;
+    was originally a "deferred" tripwire here).
 
 Cross-patch invariants:
 21. 122ds publish_to_stage 8-check baseline still passes (functional
@@ -410,12 +417,20 @@ def main() -> int:
     pi_tree = ast.parse(pi_path.read_text())
     pi_cls = _ast_find_class(pi_tree, "PoseImportForm")
     assert pi_cls is not None
+    # Patch 122eb — was a deferred-status tripwire ("PoseImportForm
+    # has NO section_id"). Wiring landed in 122eb, so the check is
+    # flipped: now we verify the wiring is in place. If a future
+    # edit accidentally removes the section_id, this fails.
+    pi_sid = _ast_class_attr(pi_cls, "section_id")
     check(
-        "PoseImportForm has NO section_id declaration (deferred — "
-        "the per-tracker importer backends control their own output "
-        "paths; the form has no run-id to record without backend "
-        "changes)",
-        _ast_class_attr(pi_cls, "section_id") is None,
+        "PoseImportForm.section_id == 'import_pose' (wired in 122eb; "
+        "was deferred in 122dt because the per-tracker importer "
+        "backends control their own output paths — 122eb opted for "
+        "the minimal record-only wiring, no publish target)",
+        isinstance(pi_sid, ast.Constant)
+        and pi_sid.value == "import_pose",
+        detail=(f"got {pi_sid.value!r}"
+                if isinstance(pi_sid, ast.Constant) else "missing"),
     )
 
     # -----------------------------------------------------------------
