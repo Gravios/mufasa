@@ -114,7 +114,7 @@ def xdg_data_dir() -> Path:
 
 
 def recent_projects_file() -> Path:
-    """Where to persist the MRU list of project_config.ini paths."""
+    """Where to persist the MRU list of project.toml paths."""
     return xdg_data_dir() / "recent_projects.txt"
 
 

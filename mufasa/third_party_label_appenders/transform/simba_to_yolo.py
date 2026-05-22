@@ -56,7 +56,7 @@ class SimBA2Yolo:
 
     :example:
     >>> SAVE_DIR = r'D:\troubleshooting\mitra\mitra_yolo'
-    >>> CONFIG_PATH = r"C:\troubleshooting\mitra\project_folder\project_config.ini"
+    >>> CONFIG_PATH = r"C:\troubleshooting\mitra\project_folder\project.toml"
     >>> runner = SimBA2Yolo(config_path=CONFIG_PATH, save_dir=SAVE_DIR, sample_size=10, verbose=True)
     >>> runner.run()
     """
@@ -186,6 +186,6 @@ class SimBA2Yolo:
 
 #
 # SAVE_DIR = r'E:\troubleshooting\mitra\yolo_0126\yolo_train_0126'
-# CONFIG_PATH = r"E:\troubleshooting\mitra\project_folder\project_config.ini"
+# CONFIG_PATH = r"E:\troubleshooting\mitra\project_folder\project.toml"
 # runner = SimBA2Yolo(config_path=CONFIG_PATH, save_dir=SAVE_DIR, sample_size=50, verbose=True, names=('animal_1',), threshold=0.5)
 # runner.run()

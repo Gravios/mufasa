@@ -53,7 +53,7 @@ Sections:
 7. **Advanced / legacy** — three stacked legacy forms:
      - Savitzky-Golay smoother (use Kalman v2 above instead)
      - Outlier correction settings (writes thresholds /
-       reference body-parts to project_config.ini; consumed
+       reference body-parts to project.toml; consumed
        by the "Run outlier correction" form)
      - Drop body-parts (project-setup decision; will move to
        project setup once that page exists)
@@ -66,7 +66,7 @@ available output.
 
 The legacy "Outlier correction settings" form remains in the
 Advanced section because the Run/Skip forms above read the
-thresholds it writes to ``project_config.ini``. Editing
+thresholds it writes to ``project.toml``. Editing
 thresholds without exposing the dependency would be confusing.
 
 Page-label history

@@ -8,7 +8,7 @@ DLC file…" flow (and can be called directly from scripts).
 
 The function performs three edits, each backed up first:
 
-  1. ``project_config.ini``:
+  1. ``project.toml``:
      * ``[create ensemble settings] pose_estimation_body_parts = user_defined``
      * ``[General settings] animal_no = <animal_cnt>``
   2. ``project_folder/logs/measures/pose_configs/bp_names/
@@ -71,7 +71,7 @@ def reconfigure_project_user_defined(
     """Switch *config_path*'s project to ``user_defined`` with the
     specified *body_parts* list (in order).
 
-    :param config_path: Path to ``project_config.ini``.
+    :param config_path: Path to ``project.toml``.
     :param body_parts: Body-part names in the order they appear in the
         source data (x/y/likelihood triplets will be inferred).
     :param animal_cnt: Number of animals. Currently only 1 is
@@ -122,7 +122,7 @@ def reconfigure_project_user_defined(
     if not cp.has_section("create ensemble settings"):
         raise ProjectReconfigureError(
             f"{cfg_path.name} is missing [create ensemble settings] "
-            f"section — this doesn't look like a Mufasa project_config.ini."
+            f"section — this doesn't look like a Mufasa project.toml."
         )
     if not cp.has_section("General settings"):
         raise ProjectReconfigureError(
@@ -139,7 +139,7 @@ def reconfigure_project_user_defined(
 
     changes: List[str] = []
 
-    # ------------------ Edit project_config.ini ---------------------- #
+    # ------------------ Edit project.toml ---------------------- #
     if prev_preset != "user_defined":
         cp.set(
             "create ensemble settings",

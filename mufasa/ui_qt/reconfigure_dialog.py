@@ -41,7 +41,7 @@ class ReconfigureProjectDialog(QDialog):
     """Modal dialog for reconfiguring the currently-open project to
     ``user_defined`` with body parts auto-detected from a DLC file.
 
-    Construct with the path to the project's ``project_config.ini``.
+    Construct with the path to the project's ``project.toml``.
     After ``exec()`` returns ``Accepted``, the on-disk files have
     already been updated and the caller should rebuild the workbench
     so pages pick up the new config.
@@ -65,7 +65,7 @@ class ReconfigureProjectDialog(QDialog):
             "file in DLC's column order, and this Mufasa project will "
             "be switched to <code>user_defined</code> with those body "
             "parts.<br><br>"
-            "Both <code>project_config.ini</code> and "
+            "Both <code>project.toml</code> and "
             "<code>project_bp_names.csv</code> will be backed up "
             "before any edits."
         )
@@ -164,7 +164,7 @@ class ReconfigureProjectDialog(QDialog):
         resp = QMessageBox.question(
             self, "Apply reconfigure?",
             f"This will:\n\n"
-            f"  • back up <code>project_config.ini</code> and "
+            f"  • back up <code>project.toml</code> and "
             f"<code>project_bp_names.csv</code>\n"
             f"  • set <code>pose_estimation_body_parts = user_defined</code>\n"
             f"  • set <code>animal_no = 1</code>\n"

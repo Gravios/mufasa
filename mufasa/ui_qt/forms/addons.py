@@ -53,7 +53,7 @@ def _load_cue_light_names(config_path: str) -> list[str]:
     SimBA stores cue-light ROI names as numbered keys under
     ``[ROI settings]`` or ``[Cue light settings]``. For legacy
     projects, this function parses them out of
-    ``project_config.ini``. For v1 projects (``project.toml``),
+    ``project.toml``. For v1 projects (``project.toml``),
     cue-light metadata isn't part of the schema yet — returns
     an empty list so the form falls back to free-text entry.
 
@@ -666,7 +666,7 @@ class DirectingBodyPartSettingsForm(OperationForm):
     description = (
         "Pick the body-part used as the 'direction-from' reference "
         "for the 'Directing toward body-part — statistics' analysis "
-        "route. Writes a single value to project_config.ini's "
+        "route. Writes a single value to project.toml's "
         "[Directionality settings] / bodypart_direction key."
     )
 

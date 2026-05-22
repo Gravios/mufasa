@@ -55,7 +55,7 @@ class SimBA2YoloSegmentation(ConfigReader):
 
     :example:
     >>> SAVE_DIR = r'D:\troubleshooting\mitra\mitra_yolo'
-    >>> CONFIG_PATH = r"C:\troubleshooting\mitra\project_folder\project_config.ini"
+    >>> CONFIG_PATH = r"C:\troubleshooting\mitra\project_folder\project.toml"
     >>> runner = SimBA2Yolo(config_path=CONFIG_PATH, save_dir=SAVE_DIR, sample_size=10, verbose=True)
     >>> runner.run()
     """
@@ -174,6 +174,6 @@ class SimBA2YoloSegmentation(ConfigReader):
         if self.verbose: stdout_success(msg=f'Labelme to YOLO conversion complete. Data saved in directory {self.save_dir}.', elapsed_time=timer.elapsed_time_str)
 
 # SAVE_DIR = r'D:\troubleshooting\mitra\mitra_yolo_seg'
-# CONFIG_PATH = r"C:\troubleshooting\mitra\project_folder\project_config.ini"
+# CONFIG_PATH = r"C:\troubleshooting\mitra\project_folder\project.toml"
 # runner = SimBA2YoloSegmentation(config_path=CONFIG_PATH, save_dir=SAVE_DIR, sample_size=250, verbose=True, padding=None)
 # runner.run()

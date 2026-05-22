@@ -22,12 +22,12 @@ class AnnotationMetaDataExtractor(ConfigReader):
     .. note::
        `Example expected output <https://github.com/sgoldenlab/mufasa/blob/master/misc/ANNOTATION_STATISTICS_20240713132805.xlsx>`__.
 
-    :param Union[str, os.PathLike] config_path: path to SimBA configparser.ConfigParser project_config.ini
+    :param Union[str, os.PathLike] config_path: path to SimBA configparser.ConfigParser project.toml
     :param Optional[bool] annotated_bouts: If True, includes information on annotated bouts (start and stop time and bout length). Default True.
     :param Optional[bool] split_by_video: If True, includes a worksheet where the annotation counts are split by video. Default True.
 
     :example:
-    >>> annotation_meta_extractor = AnnotationMetaDataExtractor(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
+    >>> annotation_meta_extractor = AnnotationMetaDataExtractor(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml')
     >>> annotation_meta_extractor.run()
     >>> annotation_meta_extractor.save()
 
@@ -93,6 +93,6 @@ class AnnotationMetaDataExtractor(ConfigReader):
         stdout_success(msg=f'Annotation data for {len(self.target_file_paths)} video(s) saved at {self.save_path}', source=self.__class__.__name__, elapsed_time=self.timer.elapsed_time)
 
 
-# annotation_meta_extractor = AnnotationMetaDataExtractor(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
+# annotation_meta_extractor = AnnotationMetaDataExtractor(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml')
 # annotation_meta_extractor.run()
 # annotation_meta_extractor.save()

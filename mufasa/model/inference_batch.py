@@ -58,7 +58,7 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
     >>> inferencer.run()
 
     :example II:
-    >>> inferencer = InferenceBatch(config_path=r"D:/troubleshooting/mitra/project_folder/project_config.ini", features_dir=r"D:/troubleshooting/mitra/project_folder/videos/bg_removed/rotated/tail_features/APPENDED")
+    >>> inferencer = InferenceBatch(config_path=r"D:/troubleshooting/mitra/project.toml", features_dir=r"D:/troubleshooting/mitra/project_folder/videos/bg_removed/rotated/tail_features/APPENDED")
     >>> inferencer.run()
     """
 
@@ -212,7 +212,7 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
         stdout_success(msg=f"Machine predictions complete for {len(self.feature_file_paths)} file(s). Files saved in {self.save_dir} directory", elapsed_time=self.timer.elapsed_time_str, source=self.__class__.__name__)
 
 if __name__ == "__main__" and not hasattr(sys, 'ps1'):
-    parser = argparse.ArgumentParser(description="Perform classifications according to rules defined in SimBA project_config.ini.")
+    parser = argparse.ArgumentParser(description="Perform classifications according to rules defined in SimBA project.toml.")
     parser.add_argument('--config_path', type=str, required=True, help='Path to project config (Mufasa TOML or SimBA INI)')
     args = parser.parse_args()
     runner = InferenceBatch(config_path=args.config_path)

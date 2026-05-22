@@ -128,7 +128,7 @@ def load_features_for_video(
     :param video_name: Video stem; ``.mp4`` / ``.avi`` / etc.
         extension is tolerated and stripped.
     :param config_path: Path to ``project.toml`` (v1) or
-        ``project_config.ini`` (legacy).
+        ``project.toml`` (legacy).
     :param families: Optional list of FEATURE_FAMILIES display
         names (e.g. ``'TWO-POINT BODY-PART DISTANCES (MM)'``).
         If ``None``, every family found on disk under
@@ -309,7 +309,7 @@ def write_wide_features_v1(
     :param video_name: Video stem; ``.mp4`` etc. tolerated and
         stripped.
     :param config_path: Path to ``project.toml`` (v1) or
-        ``project_config.ini`` (legacy). Used to (a) detect
+        ``project.toml`` (legacy). Used to (a) detect
         v1-ness and (b) resolve ``derived_features_dir`` via the
         layout helper.
 
@@ -377,7 +377,7 @@ def list_video_stems_with_features(
     merges the available sources.
 
     :param config_path: Path to ``project.toml`` (v1) or
-        ``project_config.ini`` (legacy).
+        ``project.toml`` (legacy).
     :returns: Sorted list of video stems. Empty list if the
         project has no features anywhere.
     """

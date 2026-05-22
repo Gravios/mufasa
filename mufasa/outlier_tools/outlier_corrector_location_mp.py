@@ -81,7 +81,7 @@ class OutlierCorrecterLocationMultiprocess(ConfigReader, FeatureExtractionMixin)
     Detect and amend outliers in pose-estimation data based in the location of the body-parts
     in the current frame relative to the location of the body-part in the preceding frame using heuristic rules.
 
-    Uses heuristic rules critera is grabbed from the SimBA project project_config.ini under the [Outlier settings] header.
+    Uses heuristic rules critera is grabbed from the SimBA project project.toml under the [Outlier settings] header.
 
     .. note::
        `Documentation <https://github.com/sgoldenlab/mufasa/blob/master/misc/Outlier_settings.pdf>`_.

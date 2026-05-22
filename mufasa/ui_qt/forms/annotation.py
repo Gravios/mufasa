@@ -122,7 +122,7 @@ class FrameLabellingLauncher(OperationForm):
         "from <code>derived/classifications/</code>, all under "
         "the active project root. Works for both v1 "
         "(<code>project.toml</code>) and legacy "
-        "(<code>project_config.ini</code>) layouts."
+        "(<code>project.toml</code>) layouts."
     )
 
     MODES = [("New labelling",        "new"),
@@ -157,7 +157,7 @@ class FrameLabellingLauncher(OperationForm):
             QMessageBox.warning(
                 self.window(), "No project",
                 "Load a project (project.toml for v1 or "
-                "project_config.ini for legacy) before labelling.",
+                "project.toml for legacy) before labelling.",
             )
             return
         mode = self.MODES[self.mode_cb.currentIndex()][1]
@@ -467,7 +467,7 @@ class ClipReviewLauncher(OperationForm):
     Patch 122aa: button text shortened to 'Review' for parity with
     the FrameLabellingLauncher rename; project-load error message
     accepts both v1 (``project.toml``) and legacy
-    (``project_config.ini``) projects.
+    (``project.toml``) projects.
     """
 
     title = "Review classifier predictions (interactive)"
@@ -503,7 +503,7 @@ class ClipReviewLauncher(OperationForm):
             QMessageBox.warning(
                 self.window(), "No project",
                 "Load a project (project.toml for v1 or "
-                "project_config.ini for legacy) before reviewing.",
+                "project.toml for legacy) before reviewing.",
             )
             return
         from mufasa.ui_qt.clip_review import launch_clip_review

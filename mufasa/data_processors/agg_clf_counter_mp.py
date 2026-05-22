@@ -158,7 +158,7 @@ class AggregateClfCalculatorMultiprocess(ConfigReader):
 
     :example:
     >>> clf_calculator = AggregateClfCalculatorMultiprocess(
-    ...     config_path="project_folder/project_config.ini",
+    ...     config_path="project.toml",
     ...     classifiers=['Attack', 'Sniffing'],
     ...     detailed_bout_data=True,
     ...     transpose=True
@@ -313,7 +313,7 @@ class AggregateClfCalculatorMultiprocess(ConfigReader):
 #     clf_calculator.save()
 
 if __name__ == "__main__":
-    test = AggregateClfCalculatorMultiprocess(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project_config.ini",
+    test = AggregateClfCalculatorMultiprocess(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project.toml",
                                   classifiers=['attack'],
                                   transpose=True,
                                   mean_event_duration = True,

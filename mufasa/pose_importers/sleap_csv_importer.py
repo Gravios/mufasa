@@ -46,7 +46,7 @@ class SLEAPImporterCSV(ConfigReader, PoseImporterMixin):
     ----------
     .. [1] Pereira et al., SLEAP: A deep learning system for multi-animal pose tracking, `Nature Methods`, 2022.
 
-    >>> sleap_csv_importer = SLEAPImporterCSV(config_path=r'project_folder/project_config.ini', data_folder=r'data_folder', id_lst=['Termite_1', 'Termite_2', 'Termite_3', 'Termite_4', 'Termite_5'], interpolation_settings={'type': 'animals', 'method': 'linear'}, smoothing_settings = {'time_window': 500, 'method': 'gaussian'})
+    >>> sleap_csv_importer = SLEAPImporterCSV(config_path=r'project.toml', data_folder=r'data_folder', id_lst=['Termite_1', 'Termite_2', 'Termite_3', 'Termite_4', 'Termite_5'], interpolation_settings={'type': 'animals', 'method': 'linear'}, smoothing_settings = {'time_window': 500, 'method': 'gaussian'})
     >>> sleap_csv_importer.run()
     """
 

@@ -17,7 +17,7 @@ Two source modes:
   than overwritten.
 
 Destination resolution is layout-aware: v1 projects land in
-``<root>/sources/videos/``; legacy ``project_config.ini``
+``<root>/sources/videos/``; legacy ``project.toml``
 projects land in ``<project>/videos/`` to match SimBA's tree.
 :func:`mufasa.project_layout.project_paths_from_config`
 encapsulates the branching; this form (and the underlying

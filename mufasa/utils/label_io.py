@@ -89,7 +89,7 @@ def load_labels_for_video(
     :param video_name: Video stem; ``.mp4`` / ``.avi`` / etc.
         extension is tolerated and stripped.
     :param config_path: Path to ``project.toml`` (v1) or
-        ``project_config.ini`` (legacy).
+        ``project.toml`` (legacy).
     :param targets: Optional list of classifier-target names to
         project to. ``None`` returns every classifier target the
         project knows about (per
@@ -196,7 +196,7 @@ def save_labels_for_video(
 
     :param video_name: Video stem; extension tolerated and
         stripped.
-    :param config_path: Path to project.toml / project_config.ini.
+    :param config_path: Path to project.toml / project.toml.
     :param labels: DataFrame with one column per classifier
         target. Values should be 0 / 1 / NaN (or pd.NA). Dtype
         flexibility same as load_labels_for_video — cast to
@@ -301,7 +301,7 @@ def list_video_stems_with_labels(config_path: str) -> list[str]:
     — same shape, different layout.
 
     :param config_path: Path to ``project.toml`` (v1) or
-        ``project_config.ini`` (legacy).
+        ``project.toml`` (legacy).
     :returns: Sorted list of video stems. Empty list if the
         project has no labels anywhere.
     """

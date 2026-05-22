@@ -41,14 +41,14 @@ class SimBAYoloImporter(ConfigReader):
     :param Optional[Dict[str, str]] smoothing_settings: Dictionary with 'method' ('savitzky-golay', 'gaussian') and 'time_window' (int, milliseconds). If None, no smoothing applied.
 
     :example:
-        >>> importer = SimBAYoloImporter(data_dir='yolo_results/', config_path='project_config.ini', verbose=True, px_per_mm=1.43, fps=30)
+        >>> importer = SimBAYoloImporter(data_dir='yolo_results/', config_path='project.toml', verbose=True, px_per_mm=1.43, fps=30)
         >>> importer.run()
 
     :example:
         >>> # With interpolation and smoothing
         >>> interpolation = {'method': 'linear', 'type': 'body-parts'}
         >>> smoothing = {'method': 'savitzky-golay', 'time_window': 200}
-        >>> importer = SimBAYoloImporter(data_dir='yolo_results/', config_path='project_config.ini', interpolation_settings=interpolation, smoothing_settings=smoothing)
+        >>> importer = SimBAYoloImporter(data_dir='yolo_results/', config_path='project.toml', interpolation_settings=interpolation, smoothing_settings=smoothing)
         >>> importer.run()
     """
 
@@ -163,5 +163,5 @@ if __name__ == "__main__" and not hasattr(sys, 'ps1'):
 
 
 #
-# importer = SimBAYoloImporter(data_dir=r'E:\maplight_videos\yolo_mdl\mdl\results', config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini", verbose=True, px_per_mm=1.43, fps=30)
+# importer = SimBAYoloImporter(data_dir=r'E:\maplight_videos\yolo_mdl\mdl\results', config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project.toml", verbose=True, px_per_mm=1.43, fps=30)
 # importer.run()

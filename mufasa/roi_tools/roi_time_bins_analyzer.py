@@ -66,7 +66,7 @@ class ROITimebinAnalyzer(ConfigReader):
     .. note::
 
     :example:
-    >>> test = ROITimebinAnalyzer(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini", bin_size=61, body_parts=['Nose'], detailed_bout_data=True, calculate_distances=True, transpose=True)
+    >>> test = ROITimebinAnalyzer(config_path=r"C:\troubleshooting\mitra\project_folder\project.toml", bin_size=61, body_parts=['Nose'], detailed_bout_data=True, calculate_distances=True, transpose=True)
     >>> test.run()
     >>> test.save()
 

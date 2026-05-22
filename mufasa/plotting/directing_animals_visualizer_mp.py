@@ -142,7 +142,7 @@ class DirectingOtherAnimalsVisualizerMultiprocess(ConfigReader, PlottingMixin):
 
     :example:
         >>> style_attr = {'show_pose': True, 'animal_names': False, 'circle_size': 3, 'directionality_color': [(255, 0, 0), (0, 0, 255)], 'direction_thickness': None, 'highlight_endpoints': True}
-        >>> visualizer = DirectingOtherAnimalsVisualizerMultiprocess(config_path='project_config.ini', video_path='video.avi', style_attr=style_attr, core_cnt=-1)
+        >>> visualizer = DirectingOtherAnimalsVisualizerMultiprocess(config_path='project.toml', video_path='video.avi', style_attr=style_attr, core_cnt=-1)
         >>> visualizer.run()
     """
 

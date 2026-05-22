@@ -49,7 +49,7 @@ class ConfigReader(object):
     """
     Methods for reading SimBA configparser.Configparser project config and associated project data.
 
-    :param configparser.Configparser config_path: path to SimBA project_config.ini
+    :param configparser.Configparser config_path: path to SimBA project.toml
     :param bool read_video_info: if true, read the project_folder/logs/video_info.csv file.
     """
 
@@ -60,7 +60,7 @@ class ConfigReader(object):
         self.timer = SimbaTimer(start=True)
         self.config_path = config_path
 
-        # Patch 122dy — legacy SimBA project_config.ini support
+        # Patch 122dy — legacy SimBA project.toml support
         # removed. ConfigReader is the foundational mixin every
         # backend extends; rejecting non-v1 paths HERE with a clear
         # message is much friendlier than failing later in a
@@ -74,7 +74,7 @@ class ConfigReader(object):
                 msg=(
                     f"ConfigReader requires a v1 project.toml path; "
                     f"got {config_path!r}. Legacy SimBA "
-                    f"project_config.ini support was removed across "
+                    f"project.toml support was removed across "
                     f"patches 122dw (migration tool) and 122dy "
                     f"(ConfigReader legacy branch). Create a fresh "
                     f"v1 project — see docs/v1_project_layout.md."
@@ -737,7 +737,7 @@ class ConfigReader(object):
         :returns str
 
         :example:
-        >>> config_reader = ConfigReader(config_path='tests/data/test_projects/two_c57/project_folder/project_config.ini')
+        >>> config_reader = ConfigReader(config_path='tests/data/test_projects/two_c57/project.toml')
         >>> ConfigReader.find_animal_name_from_body_part_name(bp_name='Ear_1', bp_dict=config_reader.animal_bp_dict)
         >>> 'simon'
         """
@@ -876,7 +876,7 @@ class ConfigReader(object):
         """
         Helper to create ordered list of all column header fields for SimBA project dataframes.
 
-        >>> config_reader = ConfigReader(config_path='test/project_folder/project_config.ini')
+        >>> config_reader = ConfigReader(config_path='test/project.toml')
         >>> config_reader.get_bp_headers()
         """
 
@@ -912,7 +912,7 @@ class ConfigReader(object):
         :return Union[str, float, int, os.Pathlike]
 
         :example:
-        >>> config = ConfigReader(config_path='tests/data/test_projects/two_c57/project_folder/project_config.ini')
+        >>> config = ConfigReader(config_path='tests/data/test_projects/two_c57/project.toml')
         >>> config.read_config_entry(config=self.config, section='Multi animal IDs', option='id_list', data_type='str')
         >>> 'simon,jj'
         """
@@ -945,7 +945,7 @@ class ConfigReader(object):
                 return default_value
             else:
                 raise MissingProjectConfigEntryError(
-                    msg=f"Mufasa could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
+                    msg=f"Mufasa could not find an entry for option {option} under section {section} in the project.toml. Please specify the settings in the settings menu.",
                     source=self.__class__.__name__,
                 )
         except ValueError as e:
@@ -953,7 +953,7 @@ class ConfigReader(object):
                 return default_value
             else:
                 raise MissingProjectConfigEntryError(
-                    msg=f"Mufasa could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
+                    msg=f"Mufasa could not find an entry for option {option} under section {section} in the project.toml. Please specify the settings in the settings menu.",
                     source=self.__class__.__name__,
                 )
 
@@ -1213,15 +1213,15 @@ class ConfigReader(object):
         )
 
 
-# config = ConfigReader(config_path='/Users/simon/Desktop/envs/simba_dev/tests/data/test_projects/two_c57/project_folder/project_config.ini', read_video_info=False)
+# config = ConfigReader(config_path='/Users/simon/Desktop/envs/simba_dev/tests/data/test_projects/two_c57/project.toml', read_video_info=False)
 
 # config.read_roi_data()
 
 
-# config = ConfigReader(config_path='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project_folder/project_config.ini', read_video_info=False)
+# config = ConfigReader(config_path='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project.toml', read_video_info=False)
 # config.read_roi_data()
 # config.remove_roi_features('/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project_folder/csv/features_extracted')
 
 # remove_roi_features(
-#     config_path='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project_folder/project_config.ini',
+#     config_path='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project.toml',
 #     data_dir='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project_folder/csv/features_extracted')

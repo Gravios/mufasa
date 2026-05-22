@@ -119,7 +119,7 @@ class ROILogic:
         self.video_name = video_name
 
         # Patch 122ai: route through project_paths_from_config so
-        # both v1 (project.toml) and legacy (project_config.ini)
+        # both v1 (project.toml) and legacy (project.toml)
         # projects resolve cleanly. Prior to 122ai this block read
         # '[General settings].project_path' directly via
         # configparser, which silently parses zero sections out of

@@ -4,7 +4,7 @@ mufasa.tools.csv_to_parquet
 
 Migrate a Mufasa project from CSV to parquet storage. Walks the
 project's pose-data directories, converts every CSV to parquet,
-updates ``project_config.ini`` to reflect the new file_type, and
+updates ``project.toml`` to reflect the new file_type, and
 optionally removes the original CSVs.
 
 Why bother
@@ -50,13 +50,13 @@ Conversion order
 2. (Optional dry-run) print what would be converted, exit
 3. For each CSV, write a sibling .parquet (same basename) and
    verify row count + column set match
-4. Once all conversions succeed, update project_config.ini
+4. Once all conversions succeed, update project.toml
    file_type = parquet
 5. (Optional) remove the original CSVs
 
 The conversion is atomic-ish: parquets are written alongside
 CSVs, NOT replacing them, until all are verified. If any
-conversion fails partway, the project_config.ini is NOT updated
+conversion fails partway, the project.toml is NOT updated
 and you're left with a mixed CSV+parquet state — but no data
 loss.
 
@@ -65,15 +65,15 @@ CLI
 
     # Dry run: just show what would be converted
     python -m mufasa.tools.csv_to_parquet \\
-        --config /path/to/project_config.ini --dry-run
+        --config /path/to/project.toml --dry-run
 
     # Actually convert (keeps CSVs as backup)
     python -m mufasa.tools.csv_to_parquet \\
-        --config /path/to/project_config.ini
+        --config /path/to/project.toml
 
     # Convert AND delete original CSVs (irreversible)
     python -m mufasa.tools.csv_to_parquet \\
-        --config /path/to/project_config.ini --delete-csv
+        --config /path/to/project.toml --delete-csv
 """
 from __future__ import annotations
 
@@ -330,13 +330,13 @@ def verify_parquet(
 
 
 def update_config_file_type(config_path: str, new_file_type: str = "parquet") -> None:
-    """Update [General settings] file_type in project_config.ini."""
+    """Update [General settings] file_type in project.toml."""
     cfg = configparser.ConfigParser()
     cfg.read(config_path)
     if "General settings" not in cfg:
         raise ValueError(
             f"{config_path} has no [General settings] section — "
-            f"is this really a Mufasa project_config.ini?"
+            f"is this really a Mufasa project.toml?"
         )
     cfg["General settings"]["file_type"] = new_file_type
     with open(config_path, "w") as f:
@@ -344,7 +344,7 @@ def update_config_file_type(config_path: str, new_file_type: str = "parquet") ->
 
 
 def find_project_folder(config_path: str) -> str:
-    """Given a project_config.ini path, find the project_folder
+    """Given a project.toml path, find the project_folder
     (parent directory that contains csv/, videos/, etc.)."""
     return os.path.dirname(os.path.abspath(config_path))
 
@@ -380,12 +380,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         description=(
             "Migrate a Mufasa project from CSV to parquet storage. "
             "Converts pose-data CSVs in standard project subdirectories, "
-            "verifies each, and updates project_config.ini."
+            "verifies each, and updates project.toml."
         ),
     )
     parser.add_argument(
         "--config", type=str, required=True,
-        help="path to project_config.ini",
+        help="path to project.toml",
     )
     parser.add_argument(
         "--dry-run", action="store_true",
@@ -540,8 +540,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         )
         return 1
 
-    # Phase 2: update project_config.ini
-    print("\nUpdating project_config.ini file_type to 'parquet'...")
+    # Phase 2: update project.toml
+    print("\nUpdating project.toml file_type to 'parquet'...")
     update_config_file_type(args.config, "parquet")
 
     # Phase 3 (optional): remove original CSVs

@@ -102,7 +102,7 @@ def get_body_part_configurations() -> Dict[str, Union[str, os.PathLike]]:
 
 def get_bp_config_codes() -> Dict[str, str]:
     """
-    Helper to match SimBA project_config.ini [create ensemble settings][pose_estimation_body_parts] to string names.
+    Helper to match SimBA project.toml [create ensemble settings][pose_estimation_body_parts] to string names.
 
     """
 
@@ -128,7 +128,7 @@ def get_bp_config_codes() -> Dict[str, str]:
 
 def get_bp_config_code_class_pairs() -> Dict[str, object]:
     """
-    Helper to match SimBA project_config.ini [create ensemble settings][pose_estimation_body_parts] setting to feature extraction module class.
+    Helper to match SimBA project.toml [create ensemble settings][pose_estimation_body_parts] setting to feature extraction module class.
     """
 
     from mufasa.feature_extractors.amber_feature_extractor import \

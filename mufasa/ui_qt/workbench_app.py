@@ -19,7 +19,7 @@ Today ``mufasa`` (via ``mufasa.cli.workbench_launcher``) and
 CLI:
 
     python -m mufasa.ui_qt.workbench_app
-    python -m mufasa.ui_qt.workbench_app --project /path/to/project_config.ini
+    python -m mufasa.ui_qt.workbench_app --project /path/to/project.toml
 """
 from __future__ import annotations
 
@@ -110,9 +110,9 @@ def build_workbench(project_config_path: str | None = None
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(prog="mufasa-workbench")
     p.add_argument("--project", type=str, default=None,
-                   help="auto-load a project_config.ini on launch")
+                   help="auto-load a project.toml on launch")
     p.add_argument("--no-auto-discover", action="store_true",
-                   help="disable auto-discovery of project_config.ini "
+                   help="disable auto-discovery of project.toml "
                         "in the current directory or its ancestors")
     p.add_argument("--no-recent", action="store_true",
                    help="disable fallback to ~/.config/mufasa/recent "
@@ -126,7 +126,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 # project_folder/, project_folder/csv/, or project_folder/csv/<stage>/.
 # Going higher risks picking up unrelated projects from sibling trees.
 _AUTO_DISCOVER_MAX_DEPTH = 3
-_PROJECT_CONFIG_FILENAME = "project_config.ini"
+_PROJECT_CONFIG_FILENAME = "project.toml"
 # Mufasa creates projects with a hardcoded "project_folder" subdirectory
 # (DirNames.PROJECT.value). The config file lives inside there, NOT at
 # the project root. So when walking up from CWD, we also probe each
@@ -137,12 +137,12 @@ _PROJECT_FOLDER_NAME = "project_folder"
 
 
 def _auto_discover_project(start: Path) -> Path | None:
-    """Walk up from ``start`` looking for a ``project_config.ini``.
+    """Walk up from ``start`` looking for a ``project.toml``.
 
     At each level checks two locations:
-      1. ``<level>/project_config.ini`` — user is inside project_folder/
+      1. ``<level>/project.toml`` — user is inside project_folder/
          or one of its descendants.
-      2. ``<level>/project_folder/project_config.ini`` — user is in
+      2. ``<level>/project.toml`` — user is in
          the parent directory (the named project root) and hasn't
          entered project_folder/ yet.
 
@@ -197,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         project_config_path = args.project
     elif not args.no_auto_discover:
-        # Walk up from CWD looking for a project_config.ini.
+        # Walk up from CWD looking for a project.toml.
         # Tell the user what we found so the auto-load is never
         # silent (avoids surprise "wait, why did it open *that*
         # project?" confusion when working across multiple

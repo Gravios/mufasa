@@ -58,7 +58,7 @@ class CustomFeatureExtractor(ConfigReader):
     >>> test.run()
     >>> test = CustomFeatureExtractor(config_path='/Users/simon/Desktop/envs/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini', file_path='/mufasa/misc/piotr.py')
     >>> test.run()
-    >>> test = CustomFeatureExtractor(extractor_file_path='/Users/simon/Desktop/envs/mufasa/mufasa/mufasa/feature_extractors/amber_feature_extractor.py', config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/Amber_test/project_folder/project_config.ini')
+    >>> test = CustomFeatureExtractor(extractor_file_path='/Users/simon/Desktop/envs/mufasa/mufasa/mufasa/feature_extractors/amber_feature_extractor.py', config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/Amber_test/project.toml')
     >>> test.run()
     """
 

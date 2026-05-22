@@ -2306,7 +2306,7 @@ class PlottingMixin(object):
         :return: None.
 
         :example:
-        >>> plot_clf_cumcount(config_path=r"D:\troubleshooting\mitra\project_folder\project_config.ini", clf='CIRCLING', data_dir=r'D:\troubleshooting\mitra\project_folder\logs\test', seconds=True, bouts=True)
+        >>> plot_clf_cumcount(config_path=r"D:\troubleshooting\mitra\project_folder\project.toml", clf='CIRCLING', data_dir=r'D:\troubleshooting\mitra\project_folder\logs\test', seconds=True, bouts=True)
         """
 
         config = ConfigReader(config_path=config_path, read_video_info=True, create_logger=False)

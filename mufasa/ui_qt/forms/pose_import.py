@@ -9,7 +9,7 @@ produced by an external tracker and loads them into the currently-open
 project's pose tree:
 
 * v1 projects (``project.toml``): ``<root>/sources/pose/``
-* Legacy projects (``project_config.ini``): ``<project>/csv/input_csv/``
+* Legacy projects (``project.toml``): ``<project>/csv/input_csv/``
 
 The branching is delegated to
 :func:`mufasa.project_layout.project_paths_from_config` via the

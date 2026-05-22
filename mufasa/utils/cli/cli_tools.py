@@ -125,7 +125,7 @@ def set_outlier_correction_criteria_cli(
     aggregation: Literal["mean", "median"],
     body_parts: dict,
 ):
-    """Helper to set outlier settings in a SimBA project_config.ini from command line"""
+    """Helper to set outlier settings in a SimBA project.toml from command line"""
     timer = SimbaTimer(start=True)
     config = read_config_file(config_path=config_path)
     check_float(name="MOVEMENT CRITERION", value=movement_criterion, min_value=0.1)
@@ -243,7 +243,7 @@ def blob_tracker(config_path: Union[str, os.PathLike]) -> None:
 # from mufasa.outlier_tools.outlier_corrector_movement import OutlierCorrecterMovement
 # from mufasa.outlier_tools.outlier_corrector_location import OutlierCorrecterLocation
 #
-# CONFIG_PATH = '/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project_folder/project_config.ini'
+# CONFIG_PATH = '/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project.toml'
 # AGGREGATION_METHOD = 'mean'
 # BODY_PARTS = {'Animal_1': {'Movement': ['Nose_1', 'Tail_base_1'],
 #                            'Location': ['Nose_1', 'Tail_base_1']},
@@ -263,4 +263,4 @@ def blob_tracker(config_path: Union[str, os.PathLike]) -> None:
 # _ = OutlierCorrecterLocation(config_path=CONFIG_PATH).run()
 
 
-#set_video_parameters(config_path=r'C:\troubleshooting\ethan_alyssa\project_folder\project_config.ini', px_per_mm=5.6, fps=25, resolution=(400, 400))
+#set_video_parameters(config_path=r'C:\troubleshooting\ethan_alyssa\project_folder\project.toml', px_per_mm=5.6, fps=25, resolution=(400, 400))

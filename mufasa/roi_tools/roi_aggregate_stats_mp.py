@@ -168,7 +168,7 @@ class ROIAggregateStatisticsAnalyzerMultiprocess(ConfigReader, FeatureExtraction
     :param save_path (str | os.PathLike, optional): Path to save summary statistics.
 
     :example:
-    >>> analyzer = ROIAggregateStatisticsAnalyzerMultiprocess(config_path=r"C:/troubleshooting/mitra/project_folder/project_config.ini", body_parts=['Center'], first_entry_time=True, threshold=0.0, calculate_distances=True, transpose=False, detailed_bout_data=True)
+    >>> analyzer = ROIAggregateStatisticsAnalyzerMultiprocess(config_path=r"C:/troubleshooting/mitra/project.toml", body_parts=['Center'], first_entry_time=True, threshold=0.0, calculate_distances=True, transpose=False, detailed_bout_data=True)
     >>> analyzer.run()
     >>> analyzer.save()
     """
@@ -311,7 +311,7 @@ class ROIAggregateStatisticsAnalyzerMultiprocess(ConfigReader, FeatureExtraction
         stdout_success(f'ROI statistics saved at {self.save_path}', elapsed_time=self.timer.elapsed_time_str)
 
 # if __name__ == "__main__":
-#     analyzer = ROIAggregateStatisticsAnalyzerMultiprocess(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project_config.ini",
+#     analyzer = ROIAggregateStatisticsAnalyzerMultiprocess(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project.toml",
 #                                               body_parts=['resident_NOSE'],
 #                                               include_fps=False,
 #                                               threshold=0.5,

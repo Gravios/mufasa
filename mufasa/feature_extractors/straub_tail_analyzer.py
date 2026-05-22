@@ -32,7 +32,7 @@ class StraubTailAnalyzer(ConfigReader):
     """
     Class using background removed - egocentrically rotated - videos, to featurize tail behavior for downstream straub tail classification.
 
-    :param Union[str, os.PathLike] config_path: Path to SimBA project_config.ini.
+    :param Union[str, os.PathLike] config_path: Path to SimBA project.toml.
     :param Optional[Union[str, os.PathLike]] data_dir: Path to directory holding pose-estimation data. If None, the uses `project_folder/csv/outlier_corrected_movement_location` directory in SimBA project.
     :param Union[str, os.PathLike] video_dir: Path to directory holding videos. If None, the uses `project_folder/videos` directory in SimBA project.
     :param Union[str, os.PathLike] save_dir: Path to directory where to saved featurized pose-estimation data.
@@ -44,7 +44,7 @@ class StraubTailAnalyzer(ConfigReader):
     .. [1] Lazaro et al., Brainwide Genetic Capture for Conscious State Transitions, `biorxiv`, doi: https://doi.org/10.1101/2025.03.28.646066
 
     :example:
-    >>> runner = StraubTailAnalyzer(config_path=r"C:/troubleshooting/mitra/project_folder/project_config.ini",
+    >>> runner = StraubTailAnalyzer(config_path=r"C:/troubleshooting/mitra/project.toml",
     >>>                            data_dir=r'C:/troubleshooting/mitra/project_folder/videos/additional/bg_removed/rotated',
     >>>                            video_dir=r'C:/troubleshooting/mitra/project_folder/videos/additional/bg_removed/rotated',
     >>>                            save_dir=r'C:/troubleshooting/mitra/project_folder/videos/additional/bg_removed/rotated/tail_features_additional',
@@ -140,7 +140,7 @@ class StraubTailAnalyzer(ConfigReader):
                     write_df(df=out_df, file_type='csv', save_path=save_path)
                     print(video_timer.elapsed_time_str)
 
-# runner = MitraTailAnalyzer(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini",
+# runner = MitraTailAnalyzer(config_path=r"C:\troubleshooting\mitra\project_folder\project.toml",
 #                            data_dir=r'C:\troubleshooting\mitra\project_folder\videos\additional\bg_removed\rotated',
 #                            video_dir=r'C:\troubleshooting\mitra\project_folder\videos\additional\bg_removed\rotated',
 #                            save_dir=r'C:\troubleshooting\mitra\project_folder\videos\additional\bg_removed\rotated\tail_features_additional',

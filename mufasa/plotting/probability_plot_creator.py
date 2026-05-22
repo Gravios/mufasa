@@ -60,7 +60,7 @@ class TresholdPlotCreatorSingleProcess(ConfigReader, PlottingMixin):
     >>> clf_name='Attack'
     >>> files_found=['/_test/project_folder/derived/classifications/Together_1.parquet']
 
-    >>> threshold_plot_creator = TresholdPlotCreatorSingleProcess(config_path='/_test/project_folder/project_config.ini', frame_setting=False, video_setting=True, last_frame=True, clf_name=clf_name, files_found=files_found, style_attr=style_attr)
+    >>> threshold_plot_creator = TresholdPlotCreatorSingleProcess(config_path='/_test/project.toml', frame_setting=False, video_setting=True, last_frame=True, clf_name=clf_name, files_found=files_found, style_attr=style_attr)
     >>> threshold_plot_creator.run()
     """
 

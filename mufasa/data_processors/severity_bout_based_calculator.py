@@ -33,7 +33,7 @@ class SeverityBoutCalculator(ConfigReader, FeatureExtractionMixin):
     Examples
     ----------
     >>> settings = {'brackets': 10, 'clf': 'Attack', 'animals': ['Simon', 'JJ'], 'normalization': 'ALL VIDEOS', 'save_bin_definitions': True, 'visualize': True, 'visualize_event_cnt': 'ALL', 'video_speed': 1.0, 'show_pose': True}
-    >>> processor = SeverityBoutCalculator(config_path='project_folder/project_config.ini', settings=settings)
+    >>> processor = SeverityBoutCalculator(config_path='project.toml', settings=settings)
     >>> processor.run()
     >>> processor.save()
     """
@@ -305,5 +305,5 @@ class SeverityBoutCalculator(ConfigReader, FeatureExtractionMixin):
 #             'visualize_event_cnt': 'ALL CLIPS',
 #             'video_speed': 0.1,
 #             'show_pose': True}
-# processor = SeverityBoutCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini', settings=settings)
+# processor = SeverityBoutCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', settings=settings)
 # processor.run()

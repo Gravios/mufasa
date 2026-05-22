@@ -35,7 +35,7 @@ class CueLightMovementAnalyzer(ConfigReader):
 
 
     :examples:
-    >>> test = CueLightMovementAnalyzer(config_path=r"C:\troubleshooting\cue_light\t1\project_folder\project_config.ini",
+    >>> test = CueLightMovementAnalyzer(config_path=r"C:\troubleshooting\cue_light\t1\project_folder\project.toml",
     >>>                                 pre_window=0,
     >>>                                 post_window=0,
     >>>                                 cue_light_names=['cl'],

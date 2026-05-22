@@ -34,7 +34,7 @@ class AnimalBoundaryFinder(ConfigReader, FeatureExtractionMixin):
 
     Examples
     ----------
-    >>> animal_boundary_finder = AnimalBoundaryFinder(config_path='project_folder/project_config.ini', roi_type='SINGLE BODY-PART CIRCLE',body_parts={'Animal_1': 'Head_1', 'Animal_2': 'Head_2'}, force_rectangle=False, parallel_offset=15)
+    >>> animal_boundary_finder = AnimalBoundaryFinder(config_path='project.toml', roi_type='SINGLE BODY-PART CIRCLE',body_parts={'Animal_1': 'Head_1', 'Animal_2': 'Head_2'}, force_rectangle=False, parallel_offset=15)
     >>> animal_boundary_finder.run()
     """
 

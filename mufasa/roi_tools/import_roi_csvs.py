@@ -43,7 +43,7 @@ class ROIDefinitionsCSVImporter(ConfigReader):
 
     :example:
     >>> importer = ROIDefinitionsCSVImporter(
-    ...     config_path=r"project_folder/project_config.ini",
+    ...     config_path=r"project.toml",
     ...     rectangles_path=r"logs/measures/rectangles_20251122110043.csv",
     ...     circles_path=r"logs/measures/circles_20251122110043.csv",
     ...     polygon_path=r"logs/measures/polygons_20251122110043.csv",
@@ -53,7 +53,7 @@ class ROIDefinitionsCSVImporter(ConfigReader):
 
     :example:
     >>> importer = ROIDefinitionsCSVImporter(
-    ...     config_path=r"C:\troubleshooting\mouse_open_field\project_folder\project_config.ini",
+    ...     config_path=r"C:\troubleshooting\mouse_open_field\project_folder\project.toml",
     ...     circles_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\circles_20251122110043.csv",
     ...     rectangles_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\rectangles_20251122110043.csv",
     ...     polygon_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\polygons_20251122110043.csv"
@@ -133,5 +133,5 @@ class ROIDefinitionsCSVImporter(ConfigReader):
 
 
 
-# u = ROIDefinitionsCSVImporter(config_path=r"C:\troubleshooting\mouse_open_field\project_folder\project_config.ini",  circles_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\circles_20251122110043.csv", rectangles_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\rectangles_20251122110043.csv", polygon_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\polygons_20251122110043.csv")
+# u = ROIDefinitionsCSVImporter(config_path=r"C:\troubleshooting\mouse_open_field\project_folder\project.toml",  circles_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\circles_20251122110043.csv", rectangles_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\rectangles_20251122110043.csv", polygon_path=r"C:\troubleshooting\mouse_open_field\project_folder\logs\measures\polygons_20251122110043.csv")
 # u.run()

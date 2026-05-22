@@ -177,7 +177,7 @@ if __name__ == "__main__" and not hasattr(sys, 'ps1'):
 
 #
 #
-# CONFIG_PATH = r"F:\troubleshooting\sophiaa\project_folder\project_config.ini"
+# CONFIG_PATH = r"F:\troubleshooting\sophiaa\project_folder\project.toml"
 #
 #
 # r = WingWaveFeatureExtractor(config_path=CONFIG_PATH)

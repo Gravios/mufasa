@@ -31,7 +31,7 @@ class RatSocialFeaturizer(ConfigReader,
     Featurization class for analyzing rat social behaviors.
 
     :example:
-    >>> extractor = RatSocialFeaturizer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/piotr/project_folder/project_config.ini')
+    >>> extractor = RatSocialFeaturizer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/piotr/project.toml')
     >>> extractor.run()
 
     References
@@ -108,5 +108,5 @@ if __name__ == "__main__":
     feature_extractor.run()
 
 #
-# feature_extractor = PiotrFeatureExtractor(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/piotr/project_folder/project_config.ini')
+# feature_extractor = PiotrFeatureExtractor(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/piotr/project.toml')
 # feature_extractor.run()

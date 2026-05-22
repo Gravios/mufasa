@@ -57,7 +57,7 @@ class KleinbergCalculator(ConfigReader):
     :example 2:
     >>> output_dir = r'/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/kleinberg_gridsearch_test'
     >>> input_dir = r'/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/kleinberg_gridsearch_test'
-    >>> kleinberg_calculator = KleinbergCalculator(config_path=r'/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini', classifier_names=['Attack', 'Sniffing', 'Rear'], sigma=2, gamma=0.3, hierarchy=3, hierarchical_search=False, input_dir=input_dir, output_dir=output_dir)
+    >>> kleinberg_calculator = KleinbergCalculator(config_path=r'/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', classifier_names=['Attack', 'Sniffing', 'Rear'], sigma=2, gamma=0.3, hierarchy=3, hierarchical_search=False, input_dir=input_dir, output_dir=output_dir)
 
     References
     ----------

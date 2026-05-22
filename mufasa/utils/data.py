@@ -403,13 +403,13 @@ def smooth_data_savitzky_golay(
 
        Overwrites the input data with smoothened data.
 
-    :param configparser.ConfigParser config: Parsed SimBA project_config.ini file.
+    :param configparser.ConfigParser config: Parsed SimBA project.toml file.
     :param str file_path: Path to pose estimation data.
     :param int time_window_parameter: Savitzky-Golay rolling window size in milliseconds.
     :param bool overwrite: If True, overwrites the input data. If False, returns the smoothened dataframe.
 
     :example:
-    >>> config = read_config_file(config_path='Tests_022023/project_folder/project_config.ini')
+    >>> config = read_config_file(config_path='Tests_022023/project.toml')
     >>> smooth_data_savitzky_golay(config=config, file_path='Tests_022023/project_folder/csv/input_csv/Together_1.csv', time_window_parameter=500)
     """
 
@@ -459,13 +459,13 @@ def smooth_data_gaussian(
     .. important::
        Overwrites the input data with smoothened data.
 
-    :param configparser.ConfigParser config: Parsed SimBA project_config.ini file.
+    :param configparser.ConfigParser config: Parsed SimBA project.toml file.
     :param str file_path: Path to pose estimation data.
     :param int time_window_parameter: Gaussian rolling window size in milliseconds.
 
     Example
     ----------
-    >>> config = read_config_file(ini_path='/Users/simon/Desktop/envs/troubleshooting/Tests_022023/project_folder/project_config.ini')
+    >>> config = read_config_file(ini_path='/Users/simon/Desktop/envs/troubleshooting/Tests_022023/project.toml')
     >>> smooth_data_gaussian(config=config, file_path='/Users/simon/Desktop/envs/troubleshooting/Tests_022023/project_folder/csv/input_csv/Together_1.csv', time_window_parameter=500)
     """
 
@@ -1219,7 +1219,7 @@ def run_user_defined_feature_extraction_class(file_path: Union[str, os.PathLike]
        throttled by the graphical interface mainloop.
 
     :example:
-    >>> run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/project_config.ini', file_path='/Users/simon/Desktop/fish_feature_extractor_2023_version_5.py')
+    >>> run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml', file_path='/Users/simon/Desktop/fish_feature_extractor_2023_version_5.py')
     >>> run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini', file_path='/mufasa/misc/piotr.py')
     """
 
@@ -1968,7 +1968,7 @@ def scale_pose_keypoints(keypoints: np.ndarray,
 
 
 #get_cpu_pool()
-# run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/project_config.ini', file_path='/Users/simon/Desktop/fish_feature_extractor_2023_version_5.py')
+# run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml', file_path='/Users/simon/Desktop/fish_feature_extractor_2023_version_5.py')
 
 
 # user_class(config_path=config_path)
@@ -1978,5 +1978,5 @@ def scale_pose_keypoints(keypoints: np.ndarray,
 
 # data = {'Animal_1': 0.34786870380536705, 'Animal_2': 0.4307923198152757, 'Animal_3': 0.221338976379357}
 # find_ranked_colors(data=data, palette='magma', as_hex=True)
-# run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/project_config.ini',
+# run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml',
 #                                           file_path='/Users/simon/Desktop/fish_feature_extractor_2023_version_5.py')

@@ -68,7 +68,7 @@ class FreezingDetector(ConfigReader):
         - Aggregate results: `aggregate_freezing_results.csv` containing summary statistics for all videos
 
     :example:
-    >>> x = FreezingDetector(data_dir=r'D:\\troubleshooting\\mitra\\project_folder\\csv\\outlier_corrected_movement_location', config_path=r"D:\\troubleshooting\\mitra\\project_folder\\project_config.ini", time_window=3, movement_threshold=5, shortest_bout=100
+    >>> x = FreezingDetector(data_dir=r'D:\\troubleshooting\\mitra\\project_folder\\csv\\outlier_corrected_movement_location', config_path=r"D:\\troubleshooting\\mitra\\project_folder\\project.toml", time_window=3, movement_threshold=5, shortest_bout=100
     >>> x.run()
 
     references
@@ -166,7 +166,7 @@ class FreezingDetector(ConfigReader):
 
 # FreezingDetector(
 #     data_dir=r'F:\troubleshooting\sam\sam\project_folder\csv\outlier_corrected_movement_location',
-#     config_path=r"F:\troubleshooting\sam\sam\project_folder\project_config.ini",
+#     config_path=r"F:\troubleshooting\sam\sam\project_folder\project.toml",
 #     save_dir=r'F:\troubleshooting\sam\sam\project_folder\logs\freezing_500',
 #     time_window=3,
 #     movement_threshold=5,
@@ -176,7 +176,7 @@ class FreezingDetector(ConfigReader):
 
 # FreezingDetector(
 #     data_dir=r'E:\troubleshooting\mitra_emergence_hour\project_folder\csv\outlier_corrected_movement_location',
-#     config_path=r"E:\troubleshooting\mitra_emergence_hour\project_folder\project_config.ini",
+#     config_path=r"E:\troubleshooting\mitra_emergence_hour\project_folder\project.toml",
 #     time_window=3,
 #     movement_threshold=5,
 #     shortest_bout=100

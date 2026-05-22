@@ -50,11 +50,11 @@ class MovementCalculator(ConfigReader, FeatureExtractionMixin):
 
     :examples:
     >>> body_parts=['Animal_1 CENTER OF GRAVITY']
-    >>> movement_processor = MovementCalculator(config_path='project_folder/project_config.ini', body_parts=body_parts)
+    >>> movement_processor = MovementCalculator(config_path='project.toml', body_parts=body_parts)
     >>> movement_processor.run()
     >>> movement_processor.save()
     >>> time_stamps = pd.read_csv('mastersheet.csv')[['VIDEO_FILE_NAME', 'START', 'END']].set_index('VIDEO_FILE_NAME').to_dict(orient='index')
-    >>> movement_processor = MovementCalculator(config_path='project_folder/project_config.ini', body_parts=['center'], video_time_stamps=time_stamps)
+    >>> movement_processor = MovementCalculator(config_path='project.toml', body_parts=['center'], video_time_stamps=time_stamps)
     >>> movement_processor.run()
     >>> movement_processor.save()
     """

@@ -11,9 +11,7 @@ It provides:
 
 * **Pose-data import** from many trackers (DLC, SLEAP, MARS, TRK, FaceMap, YOLO, SuperAnimal-TopView, SimBA blob).
 * **Pipeline stages** — outlier correction, feature extraction, supervised classifier training and inference, ROI analysis, directionality, classification visualization.
-* **Two project layouts:**
-  * Legacy SimBA (`project_config.ini`-driven) — preserved for compatibility with existing projects.
-  * v1 (`project.toml`-driven, run-id-scoped) — the new layout with proper run separation and cleaner directory grouping.
+* **v1 project layout** (`project.toml`-driven, run-id-scoped) — the only supported layout. Run separation under `derived/<stage>/<run_id>/` makes provenance, diffing, and parallel exploration straightforward. (Legacy SimBA `project_config.ini` support was removed across patches 122dw–122dz; see CHANGELOG for details.)
 
 ## Running Mufasa
 

@@ -114,7 +114,7 @@ class PlotAnnotatedBouts(ConfigReader, TrainModelMixin, PlottingMixin):
 
     For each selected classifier and video, detected annotation bouts are exported as individual MP4 clips. Optional pre/post windows can extend each bout. The rendered clips can include pose points, animal labels, bounding boxes, and a timer overlay.
 
-    :param Union[str, os.PathLike] config_path: Path to the SimBA ``project_config.ini`` file.
+    :param Union[str, os.PathLike] config_path: Path to the SimBA ``project.toml`` file.
     :param Optional[Union[List[Union[str, os.PathLike]], Union[str, os.PathLike]]] data_paths: Target annotation file path(s). If ``None``, all target files in the project are used.
     :param bool animal_names: If ``True``, print animal names near the first body-part.
     :param bool show_pose: If ``True``, draw body-part circles.
@@ -138,7 +138,7 @@ class PlotAnnotatedBouts(ConfigReader, TrainModelMixin, PlottingMixin):
 
     :example:
     >>> plotter = PlotAnnotatedBouts(
-    ...     config_path='project_folder/project_config.ini',
+    ...     config_path='project.toml',
     ...     data_paths=['project_folder/csv/targets_inserted/video_1.csv'],
     ...     clf_names=['grooming'],
     ...     pre_window=1.0,
@@ -295,7 +295,7 @@ class PlotAnnotatedBouts(ConfigReader, TrainModelMixin, PlottingMixin):
 
 
 # if __name__ == "__main__":
-#     x = PlotAnnotatedBouts(config_path=r"E:\troubleshooting\mitra\project_folder\project_config.ini",
+#     x = PlotAnnotatedBouts(config_path=r"E:\troubleshooting\mitra\project_folder\project.toml",
 #                             data_paths=r"E:\troubleshooting\mitra\project_folder\csv\targets_inserted\grooming\501_MA142_Gi_CNO_0516.csv",
 #                             pre_window=3,
 #                             post_window=3,

@@ -27,7 +27,7 @@ configured file type (csv or parquet), with the SimBA-standard
 Example
 -------
 >>> DLCSingleAnimalH5Importer(
-...     config_path="/path/to/project_config.ini",
+...     config_path="/path/to/project.toml",
 ...     data_folder="/path/to/dlc/output",
 ... ).run()
 """
@@ -61,7 +61,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
     Mufasa project.
 
     :param Union[str, os.PathLike] config_path: Path to Mufasa project
-        ``project_config.ini``.
+        ``project.toml``.
     :param Union[str, os.PathLike] data_folder: Directory containing
         DLC ``.h5`` output files (one per video).
     :param Optional[Dict[str, str]] interpolation_settings: Dict with
@@ -73,7 +73,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
 
     :example:
     >>> DLCSingleAnimalH5Importer(
-    ...     config_path="/data/project/project_config.ini",
+    ...     config_path="/data/project/project.toml",
     ...     data_folder="/data/dlc_output",
     ...     interpolation_settings={'type': 'body-parts', 'method': 'linear'},
     ... ).run()
@@ -150,7 +150,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
         # User-defined / non-preset bp configs bump the animal_cnt from
         # the default of 1 if the caller went through the UI flow that
         # allows it. For single-animal we keep animal_cnt=1, matching
-        # what ConfigReader parsed from project_config.ini.
+        # what ConfigReader parsed from project.toml.
         if self.pose_setting is Methods.USER_DEFINED.value:
             # User-defined projects set their own bp list; only call
             # the shared update hook if animal_cnt somehow disagrees

@@ -79,8 +79,8 @@ visualizations are entirely Tk-only at present.
 **Tk entry**: File → Create a new project (`ProjectCreatorPopUp`)
 **Qt entry**: Project Setup page → "Create new project" form
 **Reads**: nothing (writes a new tree)
-**Writes**: `project_folder/project_config.ini`,
-  `project_folder/{csv,videos,logs,frames,models}/...` skeleton
+**Writes**: `project.toml`,
+  `{sources,derived,models,logs}/...` skeleton
 **Branches**:
 - Pose-config dropdown (4bp / 7bp / 8bp / 9bp / 14bp / 16bp /
   user-defined / multi-animal variants) — sets `bp_headers` in
@@ -94,7 +94,7 @@ visualizations are entirely Tk-only at present.
 **Tk entry**: File → Load project (`LoadProjectPopUp`)
 **Qt entry**: File → Open project, or auto-discover via
 `mufasa-qt` reading recent-projects file
-**Reads**: `project_config.ini`
+**Reads**: `project.toml`
 **Branches**: none (it's just a path picker that hands off to
 `SimbaProjectPopUp`).
 

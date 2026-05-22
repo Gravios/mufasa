@@ -421,7 +421,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         :param Optional[bool] data_dir ts_plot: Whether to generate a time series plot of velocities for each data file. Defaults to True.
 
         :example:
-        >>> config_path = '/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini'
+        >>> config_path = '/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml'
         >>> data_dir = '/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location'
         >>> body_part = 'Nose_1'
         >>> FeatureExtractionSupplemental.velocity_aggregator(config_path=config_path, data_dir=data_dir, body_part=body_part)

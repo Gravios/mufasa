@@ -15,7 +15,7 @@ also surfaces an **Auto-detect from pose file** button that
 reads body parts from an existing pose file rather than
 forcing the user to retype them.
 
-v1 only. For legacy ``project_config.ini`` projects, the
+v1 only. For legacy ``project.toml`` projects, the
 File → Reconfigure project from DLC file… menu action remains
 the editing entry point; this dialog refuses to open against a
 legacy project rather than silently corrupting the INI.

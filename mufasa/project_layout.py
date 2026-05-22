@@ -11,7 +11,7 @@ the previous result.
 This module defines a replacement layout::
 
     <project_root>/
-    ├── project.toml                     # was project_config.ini
+    ├── project.toml                     # was project.toml
     ├── README.md                        # optional
     ├── sources/                         # read-only inputs; never written
     │   ├── videos/
@@ -496,17 +496,17 @@ def detect_layout(path: Path) -> str:
     ``"v1"`` — has ``project.toml`` with a valid
     ``project_layout_version``.
     ``"legacy"`` — has SimBA-style ``project_folder/
-    project_config.ini``.
+    project.toml``.
     ``"unknown"`` — neither.
     """
     path = Path(path)
     if (path / PROJECT_CONFIG_FILENAME).is_file():
         return "v1"
-    if (path / "project_folder" / "project_config.ini").is_file():
+    if (path / "project_folder" / "project.toml").is_file():
         return "legacy"
     # Edge case: caller might pass the project_folder itself
     # rather than its parent.
-    if (path / "project_config.ini").is_file():
+    if (path / "project.toml").is_file():
         return "legacy"
     return "unknown"
 
@@ -950,9 +950,9 @@ def resolve_v1_project_root(
     Handles three cases:
 
     * ``config_path`` is itself ``project.toml`` → parent is the root.
-    * ``config_path`` is a legacy ``project_config.ini`` whose
+    * ``config_path`` is a legacy ``project.toml`` whose
       enclosing directory (or its parent, for the
-      ``<project>/project_folder/project_config.ini`` layout) has
+      ``<project>/project.toml`` layout) has
       a ``project.toml`` sibling → that directory is the root.
       This is the post-migration case where a project has both
       files transiently.
@@ -966,7 +966,7 @@ def resolve_v1_project_root(
     candidates: List[Path] = []
     if cp.name == PROJECT_CONFIG_FILENAME:
         candidates.append(cp.parent)
-    elif cp.name == "project_config.ini":
+    elif cp.name == "project.toml":
         candidates.append(cp.parent)
         candidates.append(cp.parent.parent)
     else:
@@ -999,7 +999,7 @@ def project_paths_from_config(
     config_path: Union[str, Path],
 ) -> Dict[str, str]:
     """Return a dict of conventional project paths, working for
-    both v1 ``project.toml`` and legacy ``project_config.ini``.
+    both v1 ``project.toml`` and legacy ``project.toml``.
 
     Keys returned (all values are absolute paths as strings):
 
@@ -1131,7 +1131,7 @@ def project_paths_from_config(
     if not project_path:
         raise ValueError(
             f"{config_path} has no [General settings].project_path. "
-            f"Is this a valid Mufasa project_config.ini?"
+            f"Is this a valid Mufasa project.toml?"
         )
     proj = Path(project_path)
     return {
@@ -1304,7 +1304,7 @@ def project_metadata_from_config(
 # storage they land in: ``[classifier_inference]`` / ``[classifier_training]``
 # sub-tables in ``project.toml`` for v1 projects, and the canonical
 # ``[SML settings]`` / ``[threshold_settings]`` / ``[Minimum_bout_lengths]``
-# / ``[create_ensemble_settings]`` sections in ``project_config.ini``
+# / ``[create_ensemble_settings]`` sections in ``project.toml``
 # for legacy projects.
 #
 # Forms call these helpers without branching on file extension. The

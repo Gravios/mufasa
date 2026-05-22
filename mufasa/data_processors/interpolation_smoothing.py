@@ -439,7 +439,7 @@ class AdvancedInterpolator(ConfigReader):
 
     :examples:
     >>> interpolator = AdvancedInterpolator(data_dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv',
-    >>>                                     config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+    >>>                                     config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml',
     >>>                                     type='animal',
     >>>                                     settings={'Simon': 'linear', 'JJ': 'quadratic'}, initial_import_multi_index=True)
     >>> interpolator.run()
@@ -580,7 +580,7 @@ class AdvancedSmoother(ConfigReader):
     :examples:
 
     >>> smoother = AdvancedSmoother(data_dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv',
-    >>>                             config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+    >>>                             config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml',
     >>>                             type='animal',
     >>>                             settings={'Simon': {'method': 'Savitzky Golay', 'time_window': 200},
     >>>                                       'JJ': {'method': 'Savitzky Golay', 'time_window': 200}},
@@ -764,47 +764,47 @@ class AdvancedSmoother(ConfigReader):
 #                                'Tail_base_2': {'method': 'Savitzky Golay', 'time_window': 3500}}}
 
 # smoother = AdvancedSmoother(data_dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv',
-#                             config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+#                             config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml',
 #                             type='body-part',
 #                             settings=SMOOTHING_SETTING,
 #                             initial_import_multi_index=True)
 # smoother.run()
 
 # interpolator = AdvancedInterpolator(data_dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv',
-#                                     config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+#                                     config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml',
 #                                     type='animal',
 #                                     settings={'Simon': 'linear', 'JJ': 'quadratic'}, initial_import_multi_index=True)
 # interpolator.run()
 
 # Interpolate(input_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location',
-#             config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+#             config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml',
 #             method='Body-parts: Nearest',
 #             initial_import_multi_index=False)
 
 # Interpolate(input_path='/Users/simon/Desktop/envs/troubleshooting/dorian_2/project_folder/csv/input_csv',
-#             config_path='/Users/simon/Desktop/envs/troubleshooting/dorian_2/project_folder/project_config.ini',
+#             config_path='/Users/simon/Desktop/envs/troubleshooting/dorian_2/project.toml',
 #             method='Body-parts: Linear',
 #             initial_import_multi_index=True)
 #
 
 
 # Interpolate(input_path='/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project_folder/csv/outlier_corrected_movement_location',
-#             config_path='/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project_folder/project_config.ini',
+#             config_path='/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project.toml',
 #             method='Body-parts: Nearest',
 #             initial_import_multi_index=False)
 
-# PostHocInterpolate(config_path='/Users/simon/Desktop/envs/troubleshooting/ddddfff/project_folder/project_config.ini',
+# PostHocInterpolate(config_path='/Users/simon/Desktop/envs/troubleshooting/ddddfff/project.toml',
 #                    input_dir='/Users/simon/Desktop/envs/troubleshooting/ddddfff/project_folder/csv/outlier_corrected_movement_location',
 #                    method='Animal(s): Nearest')
 
 
-# Smooth(config_path='/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project_folder/project_config.ini',
+# Smooth(config_path='/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project.toml',
 #               input_path='/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project_folder/csv/input_csv',
 #               time_window=100,
 #               smoothing_method=Methods.SAVITZKY_GOLAY.value,
 #               initial_import_multi_index=True)
 
-# Smooth(config_path='/Users/simon/Desktop/envs/troubleshooting/dorian_2/project_folder/project_config.ini',
+# Smooth(config_path='/Users/simon/Desktop/envs/troubleshooting/dorian_2/project.toml',
 #               input_path='/Users/simon/Desktop/envs/troubleshooting/dorian_2/project_folder/csv/input_csv',
 #               time_window=400,
 #               smoothing_method=Methods.SAVITZKY_GOLAY.value,

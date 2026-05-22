@@ -27,7 +27,7 @@ Architecture mirrors :mod:`mufasa.ui_qt.forms.visualizations`:
 Two analysis-specific reusable widgets live here:
 
 * :class:`_ClassifierPicker` — multi-select list of classifier names
-  read from ``SML settings`` in ``project_config.ini``.
+  read from ``SML settings`` in ``project.toml``.
 * :class:`_BodypartPicker` — imported from :mod:`.roi` so we don't
   duplicate the parse-project-config helper.
 """
@@ -77,7 +77,7 @@ def _load_classifier_names(config_path: str) -> list[str]:
 
 
 class _ClassifierPicker(QWidget):
-    """Multi-select classifier list, populated from project_config.ini."""
+    """Multi-select classifier list, populated from project.toml."""
 
     def __init__(self, config_path: str | None = None,
                  parent: QWidget | None = None) -> None:

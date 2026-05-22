@@ -44,7 +44,7 @@ class DistanceTimeBinCalculator(ConfigReader, FeatureExtractionMixin):
 
     :example:
     >>> runner = DistanceTimeBinCalculator(
-    ...     config_path=r"C:\\my_project\\project_config.ini",
+    ...     config_path=r"C:\\my_project\\project.toml",
     ...     body_parts=(("Nose_1", "Nose_2"),),
     ...     time_bin=60.0,
     ...     threshold=0.0,

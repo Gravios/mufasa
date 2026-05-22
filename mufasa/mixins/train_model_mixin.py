@@ -189,7 +189,7 @@ class TrainModelMixin(object):
         """
         Helper to find all field names that are annotations but are not the target.
 
-        :param configparser.ConfigParser config: Configparser object holding data from the project_config.ini
+        :param configparser.ConfigParser config: Configparser object holding data from the project.toml
         :param int model_cnt: Number of classifiers in the SimBA project
         :param str clf_name: Name of the classifier.
         :return: List of non-target annotation column names.
@@ -1094,7 +1094,7 @@ class TrainModelMixin(object):
         """
         Helper to read in N SimBA random forest config meta files to python dict memory.
 
-        :parameter configparser.ConfigParser config: Parsed SimBA project_config.ini
+        :parameter configparser.ConfigParser config: Parsed SimBA project.toml
         :parameter int model_cnt: Count of models
         :return dict: Dictionary with integers as keys and hyperparameter dictionaries as keys.
         """
@@ -1136,7 +1136,7 @@ class TrainModelMixin(object):
 
             except ValueError:
                 model_dict.pop(n, None)
-                MissingUserInputWarning(msg=f'Skipping {str(config.get("SML settings", "target_name_" + str(n + 1)))} classifier analysis: missing information (e.g., no discrimination threshold and/or minimum bout set in the project_config.ini',source=self.__class__.__name__)
+                MissingUserInputWarning(msg=f'Skipping {str(config.get("SML settings", "target_name_" + str(n + 1)))} classifier analysis: missing information (e.g., no discrimination threshold and/or minimum bout set in the project.toml',source=self.__class__.__name__)
 
         if len(model_dict.keys()) == 0:
             raise NoDataError(msg=f"There are no models with accurate data specified in the RUN MODELS menu. Specify the model information to SimBA RUN MODELS menu to use them to analyze videos. PLease check the model paths, thresholds, and minimum bout lengths.", source=self.get_model_info.__name__)
@@ -1147,8 +1147,8 @@ class TrainModelMixin(object):
         """
         Helper to get all classifier names in a SimBA project.
 
-        :parameter configparser.ConfigParser config: Parsed SimBA project_config.ini
-        :parameter int.ConfigParser target_cnt: Parsed SimBA project_config.ini
+        :parameter configparser.ConfigParser config: Parsed SimBA project.toml
+        :parameter int.ConfigParser target_cnt: Parsed SimBA project.toml
         :return: All classifier names in project
         :rtype: List[str]
 
@@ -1639,7 +1639,7 @@ class TrainModelMixin(object):
                     if clf_name.lower() == Dtypes.NONE.value.lower():
                         raise InvalidInputError(msg=f'The classifier {clf_cnt+1} name is set to {clf_name}. Make sure you have correctly set the model hyperparameters as documented at {Links.TRAIN_ML_MODEL.value}', source=TrainModelMixin._read_data_file_helper.__name__)
                     else:
-                        raise MissingColumnsError(msg=f'The Mufasa project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project_config.ini is created correctly as documented here: {Links.TRAIN_ML_MODEL.value}.', source=TrainModelMixin._read_data_file_helper.__name__)
+                        raise MissingColumnsError(msg=f'The Mufasa project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project.toml is created correctly as documented here: {Links.TRAIN_ML_MODEL.value}.', source=TrainModelMixin._read_data_file_helper.__name__)
                 elif (len(set(df[clf_name].unique()) - {0, 1}) > 0 and raise_bool_clf_error):
                     raise InvalidInputError(msg=f"The annotation column for a classifier should contain only 0 or 1 values. However, in file {file_path} the {clf_name} field column contains additional value(s): {list(set(df[clf_name].unique()) - {0, 1})}.", source=TrainModelMixin._read_data_file_helper.__name__)
         timer.stop_timer()
@@ -1753,7 +1753,7 @@ class TrainModelMixin(object):
         if clf_names != None:
             for clf_name in clf_names:
                 if not clf_name in df.columns:
-                    raise MissingColumnsError(msg=f'The Mufasa project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project_config.ini is created correctly.')
+                    raise MissingColumnsError(msg=f'The Mufasa project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project.toml is created correctly.')
                 elif (len(set(df[clf_name].unique()) - {0, 1}) > 0 and raise_bool_clf_error):
                     raise InvalidInputError(msg=f"The annotation column for a classifier should contain only 0 or 1 values. However, in file {file_path} the {clf_name} field contains additional value(s): {list(set(df[clf_name].unique()) - {0, 1})}.")
         timer.stop_timer()
@@ -2751,7 +2751,7 @@ class TrainModelMixin(object):
         :param bool plot: If True, create SHAP aggregation and plots.
 
         :example:
-        >>> CONFIG_PATH = r"C:/troubleshooting/mitra/project_folder/project_config.ini"
+        >>> CONFIG_PATH = r"C:/troubleshooting/mitra/project.toml"
         >>> RF_PATH = r"C:/troubleshooting/mitra/models/validations/straub_tail_5_new/straub_tail_5.sav"
         >>> DATA_PATH = r"C:/troubleshooting/mitra/project_folder/csv/targets_inserted/new_straub/appended/501_MA142_Gi_CNO_0514.csv"
         >>> config = ConfigReader(config_path=CONFIG_PATH)

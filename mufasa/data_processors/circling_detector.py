@@ -63,7 +63,7 @@ class CirclingDetector(ConfigReader):
     .. [2] Lazaro et al., Brainwide Genetic Capture for Conscious State Transitions, `biorxiv`, doi: https://doi.org/10.1101/2025.03.28.646066
 
     :example:
-    >>> CirclingDetector(data_dir=r'D:\troubleshooting\mitra\project_folder\csv\outlier_corrected_movement_location', config_path=r"D:\troubleshooting\mitra\project_folder\project_config.ini")
+    >>> CirclingDetector(data_dir=r'D:\troubleshooting\mitra\project_folder\csv\outlier_corrected_movement_location', config_path=r"D:\troubleshooting\mitra\project_folder\project.toml")
     """
 
     def __init__(self,
@@ -152,9 +152,9 @@ class CirclingDetector(ConfigReader):
         stdout_success(msg=f'Results saved in {self.save_dir} directory.')
 
 
-# detector = CirclingDetector(config_path=r"F:\troubleshooting\sam\sam\project_folder\project_config.ini")
+# detector = CirclingDetector(config_path=r"F:\troubleshooting\sam\sam\project_folder\project.toml")
 # detector.run()
 
-# detector = CirclingDetector(config_path=r"E:\troubleshooting\mitra_emergence_hour\project_folder\project_config.ini")
+# detector = CirclingDetector(config_path=r"E:\troubleshooting\mitra_emergence_hour\project_folder\project.toml")
 # detector.run()
 

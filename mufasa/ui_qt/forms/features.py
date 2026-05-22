@@ -343,7 +343,7 @@ class FeatureSubsetExtractorForm(OperationForm):
         if self.dest_derived_parquet.isChecked():
             # Look up the v1 path via project_paths_from_config —
             # works for both v1 (project.toml) and legacy
-            # (project_config.ini) projects. For legacy projects
+            # (project.toml) projects. For legacy projects
             # this resolves to '<project>/derived/features/' which
             # didn't exist before but is created on-demand by
             # process_one_video.

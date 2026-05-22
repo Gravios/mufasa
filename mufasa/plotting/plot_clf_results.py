@@ -64,7 +64,7 @@ class PlotSklearnResultsSingleCore(ConfigReader, TrainModelMixin, PlottingMixin)
 
     :example:
     >>> text_settings = {'circle_scale': 5, 'font_size': 5, 'spacing_scale': 2, 'text_thickness': 10}
-    >>> test = PlotSklearnResultsSingleCore(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+    >>> test = PlotSklearnResultsSingleCore(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
     >>>                                       video_setting=True,
     >>>                                       frame_setting=False,
     >>>                                       video_file_path='Together_1.avi',

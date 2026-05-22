@@ -317,18 +317,18 @@ def read_config_entry(config: configparser.ConfigParser,
                       default_value: Optional[Any] = None,
                       options: Optional[List] = None) -> Union[float, int, str]:
     """
-    Helper to read entry in SimBA project_config.ini parsed by configparser.ConfigParser.
+    Helper to read entry in SimBA project.toml parsed by configparser.ConfigParser.
 
-    :param configparser.ConfigParser config: Parsed SimBA project_config.ini. Use :meth:`mufasa.utils.read_config_file` to parse file.
+    :param configparser.ConfigParser config: Parsed SimBA project.toml. Use :meth:`mufasa.utils.read_config_file` to parse file.
     :param str section: Section name of entry to parse.
     :param str option: Option name of entry to parse.
     :param str data_type: Type of data to parse. E.g., `str`, `int`, `float`.
-    :param Optional[Any] default_value: If no matching entry can be found in the project_config.ini, use this as default.
+    :param Optional[Any] default_value: If no matching entry can be found in the project.toml, use this as default.
     :param Optional[List] or None options: List of valid options. If not None, checks that the returned entry value exists in this list.
     :return Any
 
     :example:
-    >>> read_config_entry(config='project_folder/project_config.ini', section='General settings', option='project_name', data_type='str')
+    >>> read_config_entry(config='project.toml', section='General settings', option='project_name', data_type='str')
     >>> 'two_animals_14_bps'
     """
 
@@ -360,21 +360,21 @@ def read_config_entry(config: configparser.ConfigParser,
         elif default_value != None:
             return default_value
         else:
-            raise MissingProjectConfigEntryError(msg=f"Mufasa could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu and make sure the path to your project config is correct", source=read_config_entry.__name__)
+            raise MissingProjectConfigEntryError(msg=f"Mufasa could not find an entry for option {option} under section {section} in the project.toml. Please specify the settings in the settings menu and make sure the path to your project config is correct", source=read_config_entry.__name__)
     except ValueError as e:
         print(e.args)
         if default_value != None:
             return default_value
         else:
             raise MissingProjectConfigEntryError(
-                msg=f"Mufasa could not find an entry for option {option} under section {section} in the project_config.ini. Please specify the settings in the settings menu.",
+                msg=f"Mufasa could not find an entry for option {option} under section {section} in the project.toml. Please specify the settings in the settings menu.",
                 source=read_config_entry.__name__,
             )
 
 
 def read_project_path_and_file_type(config: configparser.ConfigParser) -> Tuple[str, str]:
     """
-    Helper to read the path and file type of the SimBA project from the project_config.ini.
+    Helper to read the path and file type of the SimBA project from the project.toml.
 
     :param configparser.ConfigParser config: parsed SimBA config in configparser.ConfigParser format
     :returns: The path of the project ``project_folder`` and  the set file type of the project (i.e., ``csv`` or ``parquet``) as two-part tuple.
@@ -462,7 +462,7 @@ def read_config_file(config_path: Union[str, os.PathLike]) -> configparser.Confi
       :func:`mufasa.utils.toml_to_configparser.read_project_toml_as_configparser`.
       This keeps the 268+ ConfigReader-dependent backends working
       against v1 projects without code changes.
-    * **Legacy ``project_config.ini``** — parsed directly with
+    * **Legacy ``project.toml``** — parsed directly with
       ``configparser`` as before. Behavior is identical to the
       pre-122e shape.
 
@@ -471,7 +471,7 @@ def read_config_file(config_path: Union[str, os.PathLike]) -> configparser.Confi
     extension, for backwards-compat) goes through the INI path.
 
     :param config_path: path to ``project.toml`` (v1) or
-        ``project_config.ini`` (legacy)
+        ``project.toml`` (legacy)
     :return: parsed configuration as a :class:`ConfigParser`
     :raises MissingProjectConfigEntryError: invalid file format
     """
@@ -496,7 +496,7 @@ def read_config_file(config_path: Union[str, os.PathLike]) -> configparser.Confi
     except Exception as e:
         print(e.args)
         raise MissingProjectConfigEntryError(
-            msg=f"{config_path} is not a valid project_config file. Please check the project_config.ini path.",
+            msg=f"{config_path} is not a valid project_config file. Please check the project.toml path.",
             source=read_config_entry.__name__,
         )
     return config
@@ -1358,7 +1358,7 @@ def get_all_clf_names(config: configparser.ConfigParser, target_cnt: int) -> Lis
     """
     Get all classifier names in a SimBA project.
 
-    :param configparser.ConfigParser config: Parsed SimBA project_config.ini
+    :param configparser.ConfigParser config: Parsed SimBA project.toml
     :param int target_cnt: Count of models in SimBA project
     :return: Classifier model names
     :rtype: List[str]
@@ -3952,7 +3952,7 @@ def get_cpu_pool(core_cnt: int = -1,
     return pool
 
 
-#copy_multiple_videos_to_project(config_path=r"C:\troubleshooting\multi_animal_dlc_two_c57\project_folder\project_config.ini", source=r'E:\maplight_videos\video_test', file_type='mp4', recursive_search=False)
+#copy_multiple_videos_to_project(config_path=r"C:\troubleshooting\multi_animal_dlc_two_c57\project_folder\project.toml", source=r'E:\maplight_videos\video_test', file_type='mp4', recursive_search=False)
 
 
 
