@@ -158,24 +158,11 @@ class ConfigReader(object):
         )
         self.cpu_cnt, self.cpu_to_use = find_core_cnt()
 
-        # Patch 122dy — these path attributes used to live in the
-        # legacy-path setup block at the top of __init__, then get
-        # overridden by ``_apply_v1_path_overrides`` for v1.
-        # The deletion of the legacy block consolidated them down
-        # to a single set of v1-correct assignments (all done
-        # inside _resolve_v1_paths now). The few attributes below
-        # weren't covered by either block and are kept as legacy-
-        # shaped fallbacks pending a per-attribute audit (see
-        # commit message for the deferred-fix list).
-        self.annotated_frm_dir = os.path.join(
-            self.project_path, Paths.ANNOTATED_FRAMES_DIR.value,
-        )
-        self.single_validation_video_save_dir = os.path.join(
-            self.project_path, Paths.SINGLE_CLF_VALIDATION.value,
-        )
-        self.data_table_path = os.path.join(
-            self.project_path, Paths.DATA_TABLE.value,
-        )
+        # Patch 122ea — the three legacy-shaped fallback
+        # assignments that lived here pending audit (122dy's
+        # "deferred — not fixed" list) are gone. They're set by
+        # _resolve_v1_paths now alongside the rest of the
+        # ``derived/`` outputs.
 
         self.check_multi_animal_status()
         self.multiprocess_chunksize = Defaults.CHUNK_SIZE.value
@@ -258,6 +245,17 @@ class ConfigReader(object):
           removed), so the method no longer "overrides" anything —
           it sets the paths directly. Called unconditionally from
           ``__init__``; the ``self._is_v1`` gate is gone too.
+        * 122ea — completed the per-attribute audit deferred by
+          122dy. Three attributes that had been left as legacy-
+          shaped fallbacks at the end of ``__init__``
+          (``annotated_frm_dir``, ``single_validation_video_save_dir``,
+          ``data_table_path``) are now resolved here under
+          ``derived/annotated/``, ``derived/validation/``, and
+          ``derived/data_tables/`` respectively. Their consumers
+          (extract_labelled_frames, single_run_model_validation_video_mp,
+          data_plotter) pick up the new locations transparently
+          because they use ``os.makedirs(exist_ok=True)`` against
+          whatever path attribute they read.
 
         Path mapping
         ------------
@@ -404,6 +402,25 @@ class ConfigReader(object):
         self.clf_validation_dir     = str(derived / "clf_validation")
         self.clf_data_validation_dir = str(derived / "clf_data_validation")
         self.cue_lights_data_dir    = str(derived / "cue_lights")
+        # Patch 122ea — three attrs previously left at their
+        # legacy-shaped fallback locations in ``__init__`` (per
+        # 122dy's deferred-fix list) are now resolved here:
+        #
+        # * ``annotated_frm_dir`` — parent dir for the "Extract
+        #   labelled frames" feature's per-classifier image
+        #   subdirs and the (orphan) annotation_videos consumer.
+        # * ``single_validation_video_save_dir`` — output dir
+        #   for the "Validate single model" workbench form's
+        #   videos.
+        # * ``data_table_path`` — output dir for live-data-table
+        #   video renders (consumer is orphaned post-tk-removal,
+        #   but the path stays consistent with the other two for
+        #   future re-wiring).
+        self.annotated_frm_dir      = str(derived / "annotated")
+        self.single_validation_video_save_dir = str(
+            derived / "validation",
+        )
+        self.data_table_path        = str(derived / "data_tables")
 
         # ----- Logs / ROI definitions / configs ------------------------ #
         self.logs_path           = str(root / "logs")
