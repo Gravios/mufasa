@@ -256,6 +256,18 @@ class ConfigReader(object):
           data_plotter) pick up the new locations transparently
           because they use ``os.makedirs(exist_ok=True)`` against
           whatever path attribute they read.
+        * 122eh-hotfix — fixed a 122dy regression: this method had
+          been setting ``roi_coordinates_path`` to
+          ``<root>/logs/roi_definitions.h5`` (lowercase, no
+          ``measures/``), while the actual ROI save location used
+          by :mod:`mufasa.roi_tools.roi_logic` (via
+          ``project_paths_from_config``) is
+          ``<root>/logs/measures/ROI_definitions.h5``. Reader-side
+          consumers crashed on the missing file even when ROIs had
+          been defined. The root issue — two helpers
+          (``ConfigReader._resolve_v1_paths`` and
+          ``project_paths_from_config``) duplicating path-resolution
+          logic — is deferred for a centralization pass.
 
         Path mapping
         ------------
@@ -286,7 +298,7 @@ class ConfigReader(object):
         * ``input_frames_dir``     → ``<root>/derived/frames/extracted/``
         * ``frames_output_dir``    → ``<root>/derived/frames/annotated/``
         * ``logs_path``            → ``<root>/logs/``
-        * ``roi_coordinates_path`` → ``<root>/logs/roi_definitions.h5``
+        * ``roi_coordinates_path`` → ``<root>/logs/measures/ROI_definitions.h5``
 
         Plot output dirs — coalesced under ``derived/plots/``:
 
@@ -424,8 +436,35 @@ class ConfigReader(object):
 
         # ----- Logs / ROI definitions / configs ------------------------ #
         self.logs_path           = str(root / "logs")
+        # Patch 122eh-hotfix — must match what
+        # ``project_paths_from_config`` returns for
+        # ``roi_definitions_path``
+        # (``<root>/logs/measures/ROI_definitions.h5``).
+        # The two helpers disagreed pre-122eh: ConfigReader pointed
+        # at ``<root>/logs/roi_definitions.h5`` (lowercase, no
+        # ``measures/``) while roi_logic.py — which actually
+        # WRITES the ROI definitions file — uses
+        # ``project_paths_from_config`` to get
+        # ``<root>/logs/measures/ROI_definitions.h5``. Reader-side
+        # consumers (duplicate ROIs dialog, ROI size standardizer,
+        # ConfigReader.read_roi_data) looked at the wrong path and
+        # raised ``NoFilesFoundError: Cannot duplicate ROIs: no ROI
+        # definitions file found in this project`` even when ROIs
+        # had been defined.
+        #
+        # The mismatch was load-bearing before 122dy: a line in
+        # __init__ AFTER ``_apply_v1_path_overrides`` clobbered the
+        # v1-path override with ``os.path.join(self.logs_path,
+        # Paths.ROI_DEFINITIONS.value)``, accidentally aligning with
+        # the save location. 122dy deleted the clobber as "a silent
+        # v1-path-clobbering bug" (it WAS a bug — the right hand
+        # didn't know what the left was doing — but removing it
+        # broke the consumer chain). 122eh fixes the root path; the
+        # duplicated path-resolution logic (ConfigReader vs
+        # project_paths_from_config) deserves a centralization
+        # patch — filed as deferred follow-up.
         self.roi_coordinates_path = str(
-            root / "logs" / "roi_definitions.h5"
+            root / "logs" / "measures" / "ROI_definitions.h5"
         )
         self.configs_meta_dir    = str(root / "configs")
 
