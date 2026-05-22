@@ -17,15 +17,14 @@ It provides:
 
 ## Running Mufasa
 
-After `pip install -e .`, three console entry points are installed:
+After `pip install -e .`, two console entry points are installed:
 
 | Command | What it does |
 |---|---|
 | `mufasa` | Smart launcher with environment diagnostics; opens the Qt workbench. |
 | `mufasa-workbench` | Direct workbench launch (no env diagnostics). |
-| `mufasa-chooser` | Legacy Qt chooser / standalone popups. |
 
-The legacy `mufasa-tk` Tkinter launcher was **Removed in patch 122d4**; the `python -m mufasa.SimBA` entry point followed in patch 122d5. The Qt workbench replaces both. The `mufasa-migrate-project` entry point (added in patch 122dp) was **Removed in patch 122dw** along with the entire migration tool — v1 is the only supported project layout going forward.
+The legacy `mufasa-tk` Tkinter launcher was **Removed in patch 122d4**; the `python -m mufasa.SimBA` entry point followed in patch 122d5. The Qt workbench replaces both. The `mufasa-migrate-project` entry point (added in patch 122dp) was **Removed in patch 122dw** along with the entire migration tool — v1 is the only supported project layout going forward. The `mufasa-chooser` entry point (the legacy Qt chooser at `mufasa.ui_qt.app:main`) was **Removed in patch 122dx** — the workbench's Projects page covers create/load/recent-project flows so a separate chooser surface was redundant.
 
 ## Project layout
 

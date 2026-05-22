@@ -13,7 +13,10 @@ Tiny patch — 1 config edit + doc updates. Verifies:
     commented-out line stays for archaeology; check it's not a
     silent clean-delete).
 3.  The other 3 entry points (mufasa, mufasa-chooser,
-    mufasa-workbench) remain active.
+    mufasa-workbench) remain active. (Patch 122dx subsequently
+    removed mufasa-chooser; the check loop in this test was
+    updated to skip it, but the docstring still reflects the
+    Stage A historical state for context.)
 4.  SimBA.py still exists in the tree — `python -m mufasa.SimBA`
     backstop preserved until Stage B (122d5) deletes the file.
 5.  cascade doc records Stage A as EXECUTED 122d4.
@@ -73,9 +76,13 @@ def main() -> int:
     )
 
     # 3. Other 3 entry points still active
+    # Patch 122dx — mufasa-chooser removed from the loop (entry
+    # point was deleted along with mufasa/ui_qt/app.py). The
+    # historical pin on (mufasa-chooser, mufasa.ui_qt.app:main)
+    # gave way to the smoke_122dx tripwire that asserts the
+    # opposite — that the entry is gone.
     for ep, target in [
         ("mufasa", "mufasa.cli.workbench_launcher:main"),
-        ("mufasa-chooser", "mufasa.ui_qt.app:main"),
         ("mufasa-workbench", "mufasa.ui_qt.workbench_app:main"),
     ]:
         ep_pattern = re.compile(

@@ -13,7 +13,7 @@ Mufasa ships with two independent UIs that share backend code:
 | Surface | Entry point | Code location | State |
 |---|---|---|---|
 | **Tk (legacy)** | `mufasa-tk = "mufasa.SimBA:main"` | `mufasa/SimBA.py`, `mufasa/ui/` | maintained, but slated for removal once Qt port is feature-complete |
-| **Qt (current)** | `mufasa = "mufasa.cli.workbench_launcher:main"`, `mufasa-workbench = "mufasa.ui_qt.workbench_app:main"`, `mufasa-chooser = "mufasa.ui_qt.app:main"` | `mufasa/ui_qt/` | active development; 14 workbench pages |
+| **Qt (current)** | `mufasa = "mufasa.cli.workbench_launcher:main"`, `mufasa-workbench = "mufasa.ui_qt.workbench_app:main"` | `mufasa/ui_qt/` | active development; 14 workbench pages. (Patch 122dx removed the third entry, `mufasa-chooser = "mufasa.ui_qt.app:main"` — the legacy Qt chooser is no longer maintained; create/load/recent-project flows live in the workbench's Projects page.) |
 
 Both surfaces drive the same backend (`mufasa/data_processors/`, `mufasa/plotting/`, `mufasa/feature_extractors/`, etc.). The choice of surface only affects how the user invokes a backend — not what runs.
 
@@ -303,7 +303,7 @@ Order matters. Each step unlocks the next.
        │ Step 4 — Remove the mufasa-tk entry point from        │
        │   pyproject.toml. Users now reach mufasa only         │
        │   through the Qt workbench (mufasa /                  │
-       │   mufasa-workbench / mufasa-chooser).                  │
+       │   mufasa-workbench; mufasa-chooser removed in 122dx). │
        └───────────────────────────┬─────────────────────────┘
                                    │
                                    v
@@ -406,4 +406,4 @@ The 122cw audit found that both the unsupervised cluster (14 files) and the labe
 - **Some "TK-REACHABLE via backend" files may have parallel Qt implementations.** The `cue_light_*` popups are an example — they're imported by `cue_light_main_popup.py` (backend) but the Qt workbench has its own Cue-light forms. The Tk path is parallel functionality, not unique.
 - **The 85 TK-REACHABLE count is `>= 85`, not `= 85`.** Some files counted here are also reachable via the backend modules — they appear under both categories in the raw audit. Bucketing is by primary reachability, not exclusive.
 - **The audit is post-122bn / post-122bo.** Both patches renamed Tk-side identifiers and added back-compat aliases. Those aliases are now permanent debt for code that's being deleted. (Sunk cost; not actionable here, just noted.)
-- **`mufasa-chooser` entry point is intermediate.** It's defined as `mufasa.ui_qt.app:main` (a Qt chooser), but it launches Qt pop-ups, not Tk ones — so it doesn't keep the Tk surface alive. It will outlive the Tk removal.
+- **`mufasa-chooser` entry point was intermediate, now gone.** It used to be defined as `mufasa.ui_qt.app:main` (a Qt chooser launching Qt pop-ups). The audit's prediction that it "will outlive the Tk removal" held — it did, until patch 122dx removed it. Once the Projects page covered create / load / recent-project flows inside the workbench, the standalone chooser surface was redundant.

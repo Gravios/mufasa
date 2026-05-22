@@ -126,6 +126,9 @@ def main() -> int:
         stripped = line.strip()
         if stripped.startswith("mufasa") and "=" in stripped:
             # Could be mufasa, mufasa-tk, mufasa-workbench, or mufasa-chooser
+            # (122d4 removed mufasa-tk as a live entry; 122dx removed
+            # mufasa-chooser; both names remain as deprecation
+            # breadcrumb comments in pyproject.toml).
             name = stripped.split("=")[0].strip()
             if name == "mufasa":
                 mufasa_line = stripped
@@ -139,16 +142,23 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------ #
-    # Case 8: existing entry points are preserved
+    # Case 8: existing entry points are preserved (or their breadcrumbs)
     # ------------------------------------------------------------------ #
+    # `mufasa-workbench` is still live. `mufasa-tk` was removed in
+    # 122d4 (Tk launcher gone) but its name is preserved in a
+    # commented-out historical line — both substring checks pass.
     for required in ["mufasa-workbench", "mufasa-tk"]:
         assert required in pyproject, (
-            f"Existing entry point {required!r} should be preserved"
+            f"Existing entry-point name {required!r} should be preserved "
+            f"(either as a live entry or as a deprecation breadcrumb)"
         )
-    # And mufasa-chooser was added as alias for the old `mufasa` behavior
+    # `mufasa-chooser` was removed in 122dx (legacy Qt chooser gone).
+    # The substring still appears in pyproject.toml in the deprecation
+    # comment block; this assertion is now a tripwire that the
+    # breadcrumb itself is intact.
     assert "mufasa-chooser" in pyproject, (
-        "mufasa-chooser alias should preserve old `mufasa` (chooser) "
-        "behavior for any scripts that depended on it"
+        "mufasa-chooser name should appear in pyproject.toml as a "
+        "deprecation breadcrumb (removed as a live entry in 122dx)"
     )
 
     # ------------------------------------------------------------------ #

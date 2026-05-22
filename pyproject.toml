@@ -178,8 +178,12 @@ Issues        = "https://github.com/sgoldenlab/simba/issues"
 # the rest of the Tk surface.
 # mufasa-tk        = "mufasa.SimBA:main"          # removed 122d4
 mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench (default; env diagnostics)
-mufasa-chooser   = "mufasa.ui_qt.app:main"      # legacy Qt chooser / standalone popups
 mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench launch (no env diagnostics)
+# patch 122dx: mufasa-chooser entry point removed along with the
+# legacy Qt chooser (mufasa/ui_qt/app.py). Standalone popups can
+# still be reached via File menu items inside the workbench; the
+# chooser surface itself was redundant once the workbench had
+# create/load/recent-project flows on the Projects page.
 # patch 122dw: mufasa-migrate-project entry point removed along with
 # the migration tool (mufasa/cli/migrate_project.py). v1 is the only
 # supported project layout going forward.

@@ -7,7 +7,7 @@
 
 ## Summary
 
-`mufasa.SimBA` is the legacy Tk entry point (`mufasa-tk` in `[project.scripts]`). The Qt entry points (`mufasa`, `mufasa-chooser`, `mufasa-workbench`) do not reach into SimBA.py at any point. Removing the `mufasa-tk` entry point + deleting SimBA.py triggers a clean cascade-delete of **101 files** (plus 1 config edit) across the Tk surface, leaving the Qt workbench fully functional with two exceptions documented below.
+`mufasa.SimBA` is the legacy Tk entry point (`mufasa-tk` in `[project.scripts]`). The Qt entry points at 122d4 time (`mufasa`, `mufasa-chooser` — later removed in patch 122dx, `mufasa-workbench`) do not reach into SimBA.py at any point. Removing the `mufasa-tk` entry point + deleting SimBA.py triggers a clean cascade-delete of **101 files** (plus 1 config edit) across the Tk surface, leaving the Qt workbench fully functional with two exceptions documented below. Today's entry-point pair is `mufasa` + `mufasa-workbench`; `mufasa-chooser` was removed in 122dx and `mufasa-migrate-project` in 122dw.
 
 | Stage | Files | Notes |
 |---|---:|---|
@@ -48,6 +48,8 @@ mufasa           = "mufasa.cli.workbench_launcher:main"
 mufasa-chooser   = "mufasa.ui_qt.app:main"
 mufasa-workbench = "mufasa.ui_qt.workbench_app:main"
 ```
+
+(The code blocks above are 122d4-era snapshots. Later patches further trimmed the list: 122dw removed `mufasa-migrate-project`; 122dx removed `mufasa-chooser`. Current state is just `mufasa` + `mufasa-workbench`.)
 
 **Risk realisation:** users with shell history / shell aliases / docs referencing `mufasa-tk` will get `command not found` on a fresh install / `pip install -e .` re-run. The `python -m mufasa.SimBA` backstop softens the transition; Stage B removes that too.
 
