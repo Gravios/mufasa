@@ -456,14 +456,29 @@ class WorkflowPage(QWidget):
                 hdr.setStyleSheet("font-size: 11pt; padding-top: 4px;")
                 layout.addWidget(hdr)
             layout.addWidget(form)
-            # Patch 122du -- when a form completes successfully, refresh
+            # Patch 122du — when a form completes successfully, refresh
             # every section badge across every page in the workbench.
             # Cross-page invalidation is real: re-running ``import_pose``
             # marks ``kalman_v2`` stale on a *different* page than the
             # one the user just ran on. The workbench traversal walks
             # up via ``self.window()``; ``MufasaWorkbench`` exposes
             # ``_refresh_all_section_badges`` to do the work.
-            form.completed.connect(self._on_form_completed)
+            #
+            # Patch 122ef-hotfix — guard with ``hasattr``. The original
+            # 122du connect-unconditionally code assumed every form in
+            # the workbench inherits from ``OperationForm`` (which
+            # defines the ``completed`` signal). That assumption holds
+            # for the ~29 OperationForm subclasses but NOT for
+            # ``NewProjectForm`` (project_info.py — plain
+            # ``QWidget``) and any other dialog-shaped widget that
+            # gets ``add_section()``'d. Real-world report: opening a
+            # project that triggers ``build_project_setup_page``
+            # crashed with ``AttributeError: 'NewProjectForm' object
+            # has no attribute 'completed'``. Skip the connect for
+            # forms that don't emit ``completed`` — they don't drive
+            # badges anyway.
+            if hasattr(form, "completed"):
+                form.completed.connect(self._on_form_completed)
         layout.addStretch()
         self._instantiated.add(index)
 
