@@ -36,7 +36,13 @@ Patch 122eb update — PoseImportForm gained section_id="import_pose"
 via the minimal record-only wiring (no publish target). The 122dt
 deferred-status tripwire for PoseImportForm (check 20 below) was
 flipped to a "wiring is in place" tripwire to detect accidental
-removal. InterpolateForm remains deferred.
+removal.
+
+Patch 122ec update — InterpolateForm gained section_id="interpolate"
+via the same record-only pattern. The 122dt deferred-status
+tripwire for InterpolateForm (check 19 below) was flipped to a
+"wiring is in place" tripwire. Both producers are now wired; the
+section-provenance arc's deferred-producer list is empty.
 
 What this patch landed
 ----------------------
@@ -109,7 +115,8 @@ Subclass declarations:
     (substring check for the assignment).
 
 Deferred-producer documentation tripwires:
-19. InterpolateForm does NOT declare section_id (deferred).
+19. InterpolateForm.section_id == "interpolate" (wired in 122ec;
+    was originally a "deferred" tripwire here).
 20. PoseImportForm.section_id == "import_pose" (wired in 122eb;
     was originally a "deferred" tripwire here).
 
@@ -405,12 +412,21 @@ def main() -> int:
     # -----------------------------------------------------------------
     interp = _ast_find_class(pc_tree, "InterpolateForm")
     assert interp is not None
+    # Patch 122ec — was a deferred-status tripwire ("InterpolateForm
+    # has NO section_id"). Wiring landed in 122ec via the same
+    # record-only pattern PoseImportForm got in 122eb; the check is
+    # flipped to assert the wiring is in place.
+    interp_sid = _ast_class_attr(interp, "section_id")
     check(
-        "InterpolateForm has NO section_id declaration (deferred to "
-        "a later patch — Interpolate backend modifies pose data IN "
-        "PLACE; needs a write-to-run-dir refactor before it can "
-        "record provenance)",
-        _ast_class_attr(interp, "section_id") is None,
+        "InterpolateForm.section_id == 'interpolate' (wired in "
+        "122ec via the record-only pattern; backend still "
+        "modifies pose data in place, but the timestamp recording "
+        "is enough to make downstream consumers' staleness "
+        "transitions fire)",
+        isinstance(interp_sid, ast.Constant)
+        and interp_sid.value == "interpolate",
+        detail=(f"got {interp_sid.value!r}"
+                if isinstance(interp_sid, ast.Constant) else "missing"),
     )
 
     pi_path = REPO_ROOT / "mufasa" / "ui_qt" / "forms" / "pose_import.py"
