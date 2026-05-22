@@ -210,25 +210,42 @@ def main() -> int:
                 if isinstance(sid, ast.Constant) else "missing"),
     )
 
-    # 3. NO publish_target_stage declaration (record-only contract).
+    # 3. publish_target_stage is NOW SET (flipped by 122ee — was
+    # "no publish target" in 122eb's record-only contract).
     pub = _ast_class_attr(pi_cls, "publish_target_stage")
     check(
-        "PoseImportForm has NO publish_target_stage declaration "
-        "(record-only — publishing requires backend cooperation "
-        "that 122eb explicitly did not take on)",
-        pub is None,
+        "PoseImportForm.publish_target_stage == 'outlier_corrected' "
+        "(flipped by 122ee — the 122eb record-only contract was "
+        "lifted when the form-level snapshot landed)",
+        isinstance(pub, ast.Constant)
+        and pub.value == "outlier_corrected",
+        detail=(f"got {pub.value!r}"
+                if isinstance(pub, ast.Constant) else "missing"),
     )
 
-    # 4. target() does NOT set self._last_run_id.
-    target_method = _ast_method(pi_cls, "target")
-    assert target_method is not None
-    target_src = ast.unparse(target_method)
+    # 4. _last_run_id IS now set somewhere in PoseImportForm
+    # (flipped by 122ee). The assignment happens in
+    # _snapshot_and_set_run_id (a helper called from target);
+    # walk the class body to find any method that assigns it.
+    sets_run_id = False
+    for member in pi_cls.body:
+        if isinstance(member, ast.FunctionDef):
+            for node in ast.walk(member):
+                if isinstance(node, ast.Assign):
+                    for tgt in node.targets:
+                        if (isinstance(tgt, ast.Attribute)
+                                and isinstance(tgt.value, ast.Name)
+                                and tgt.value.id == "self"
+                                and tgt.attr == "_last_run_id"):
+                            sets_run_id = True
+                            break
     check(
-        "PoseImportForm.target() does not set self._last_run_id "
-        "(per-tracker backends don't allocate run-ids; "
-        "record_run will receive run_id=None and write a "
-        "last_run_at-only entry)",
-        "self._last_run_id" not in target_src,
+        "PoseImportForm sets self._last_run_id somewhere in its "
+        "method body (flipped by 122ee — was 'never set' in the "
+        "122eb record-only contract; now set in the "
+        "_snapshot_and_set_run_id helper that target() calls "
+        "post-import)",
+        sets_run_id,
     )
 
     # 5. title is sentence-cased.

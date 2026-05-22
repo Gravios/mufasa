@@ -303,10 +303,10 @@ def main() -> int:
         )),
     )
 
-    # 10. Of the four, exactly TWO now have publish_target_stage
-    # (flipped by 122ed — kalman_v2 was the only publisher in
-    # 122ec; the backend refactor adds interpolate to the
-    # publisher set).
+    # 10. Of the four, exactly THREE now have publish_target_stage
+    # (flipped by 122ee — added import_pose to the publisher set
+    # via form-level snapshot. Was "exactly 2" after 122ed added
+    # interpolate; was "exactly 1" in original 122ec).
     publish_status = {
         "RunOutlierCorrectionForm":
             _ast_class_attr(roc, "publish_target_stage"),
@@ -321,12 +321,15 @@ def main() -> int:
         k: v for k, v in publish_status.items() if v is not None
     }
     check(
-        "Exactly 2 of the 4 producers have publish_target_stage "
-        "(kalman_v2 + interpolate; outlier_correction writes "
-        "directly to outlier_corrected/; pose_import is the only "
-        "record-only producer remaining)",
-        sorted(publishers.keys())
-        == ["InterpolateForm", "KalmanV2SmoothingForm"],
+        "Exactly 3 of the 4 producers have publish_target_stage "
+        "(kalman_v2 + interpolate + import_pose; outlier_correction "
+        "writes directly to outlier_corrected/ so doesn't need "
+        "a symlink-publish — only producer without one)",
+        sorted(publishers.keys()) == [
+            "InterpolateForm",
+            "KalmanV2SmoothingForm",
+            "PoseImportForm",
+        ],
         detail=(f"publishers: {sorted(publishers.keys())}"),
     )
 
