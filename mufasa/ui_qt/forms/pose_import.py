@@ -262,8 +262,8 @@ class PoseImportForm(OperationForm):
     project's ``sources/pose/``. The ``config_path`` supplied at
     construction binds the form to the open project.
 
-    Provenance (patch 122eb)
-    ------------------------
+    Provenance (patches 122eb / 122ee)
+    -----------------------------------
     Declares ``section_id = "import_pose"`` so the
     :class:`mufasa.ui_qt.workbench.OperationForm` base class's
     success hook records ``[provenance.import_pose]`` in
@@ -273,22 +273,42 @@ class PoseImportForm(OperationForm):
     declare ``depends_on=("import_pose",)``, so re-importing pose
     data makes them visibly stale.
 
-    Unlike :class:`KalmanV2SmoothingForm`, this form does NOT set
-    ``self._last_run_id`` in ``target()`` because the underlying
-    backends write to ``sources/pose/`` directly (no run-id subdir
-    allocated). The provenance entry records ``last_run_at`` only,
-    no ``last_run_id``. ``publish_target_stage`` is similarly
-    unset — publishing pose-import output under
-    ``derived/outlier_corrected/`` requires backend cooperation
-    (either pre-allocating a run dir or returning the allocated
-    id), which is deferred.
+    Patch history:
+
+    * 122eb — initial record-only wiring (section_id only;
+      no publish_target_stage; no _last_run_id set in target).
+      Per-tracker importers wrote to ``sources/pose/`` directly
+      and the form had no clean way to allocate a run-id without
+      backend cooperation.
+
+    * 122ee — form-level snapshot + publish wiring. After the
+      backend's ``.run()`` returns, the form takes a snapshot of
+      ``sources/pose/`` (by symlinking each file into
+      ``derived/pose/<run_id>/``) and sets ``self._last_run_id``.
+      The base class then publishes
+      ``derived/outlier_corrected/<run_id> -> ../pose/<run_id>``,
+      making the imported pose data discoverable to downstream
+      backends (Features etc.) that hard-code reads from
+      ``outlier_corrected/``. Closes the "Skip outlier correction"
+      replacement story 122dv promised; pairs with the 122ed
+      Interpolate publish-to-stage.
+
+    The snapshot approach (form-level, not backend-level) avoids
+    touching the 12 per-tracker importer backends. Tradeoff: the
+    snapshot reflects the *current state* of ``sources/pose/`` at
+    the moment of import return — including any files written by
+    earlier imports that the user never re-imported. That's
+    intentional; downstream consumers want the current state, not
+    just the just-imported files.
     """
 
     title = "Import pose data"
-    # Patch 122eb — provenance wiring. No publish target; just
-    # records `last_run_at` so downstream staleness checks fire
-    # when pose data is re-imported.
+    # Patch 122eb / 122ee — provenance wiring. 122eb declared
+    # section_id with the record-only pattern. 122ee added the
+    # form-level snapshot + publish-to-stage wiring.
     section_id = "import_pose"
+    publish_target_stage = "outlier_corrected"
+    publish_source_stage = "pose"
     description = (
         "Load pose tracking output into the current project. "
         "Files are normalised to Mufasa's multi-index CSV/parquet "
@@ -514,6 +534,76 @@ class PoseImportForm(OperationForm):
         runner = route["backend"](**kwargs)
         if runner is not None and hasattr(runner, "run"):
             runner.run()
+
+        # Patch 122ee — form-level snapshot for publish-to-stage.
+        # Per-tracker importer backends write pose data to
+        # sources/pose/ with their own filename / format
+        # conventions; the form has no clean way to know which
+        # files the backend just touched. Solution: after the
+        # backend's .run() returns, take a snapshot of the
+        # *current state* of sources/pose/ by symlinking every
+        # file into derived/pose/<run_id>/. The base class's
+        # success hook then publishes derived/outlier_corrected/
+        # <run_id> → ../pose/<run_id> so downstream backends
+        # (Features etc.) that hard-code reads from outlier_
+        # corrected/ pick up the imported data without needing
+        # a separate outlier-correction or smoothing run. Same
+        # "Skip outlier correction" replacement story 122ed did
+        # for Interpolate.
+        #
+        # The "snapshot" is conceptually a view of sources/pose/
+        # AS-OF the moment after this import returned. Since the
+        # entries are symlinks (not copies), a future re-import
+        # that overwrites a file in sources/pose/ updates the
+        # content visible through this run_id's snapshot too.
+        # That's intentional — Kalman v2's published symlink has
+        # the same property — and works correctly for the common
+        # case of "downstream consumers want the current pose
+        # state."
+        self._snapshot_and_set_run_id(config_path)
+
+    def _snapshot_and_set_run_id(self, config_path: str) -> None:
+        """Snapshot sources/pose/ into derived/pose/<run_id>/ and
+        set ``self._last_run_id`` so the base class publishes.
+
+        No-op (leaves ``_last_run_id`` as None) if sources/pose/
+        is empty — that's a likely silent-import-failure state
+        and we don't want a phantom run dir. Provenance is still
+        recorded with last_run_at-only in that case (record-only
+        fallback).
+        """
+        import os
+        from pathlib import Path
+
+        from mufasa.project_layout import (
+            generate_run_id,
+            project_paths_from_config,
+        )
+
+        paths = project_paths_from_config(config_path)
+        sources_pose = Path(paths["input_pose_dir"])
+        if not sources_pose.is_dir():
+            return
+        files = sorted(
+            p for p in sources_pose.iterdir()
+            if p.is_file() and not p.name.startswith(".")
+        )
+        if not files:
+            return
+
+        project_root = sources_pose.parent.parent  # sources/pose -> root
+        run_id = generate_run_id()
+        run_dir = project_root / "derived" / "pose" / run_id
+        run_dir.mkdir(parents=True, exist_ok=False)
+
+        # Relative symlinks so the project survives moves /
+        # rsync copies. derived/pose/<run_id>/<file> → ../../../sources/pose/<file>.
+        rel_prefix = Path("..") / ".." / ".." / "sources" / "pose"
+        for src_file in files:
+            link_path = run_dir / src_file.name
+            os.symlink(rel_prefix / src_file.name, link_path)
+
+        self._last_run_id = run_id
 
 
 __all__ = ["PoseImportForm", "POSE_IMPORT_ROUTES"]

@@ -442,11 +442,20 @@ def main() -> int:
         ),
     )
 
-    # 17. Check 10 flipped — now "exactly 2 publishers".
+    # 17. Check 10 flipped — was "exactly 2 publishers" in 122ed.
+    # Patch 122ee re-flipped it to "exactly 3" when Pose Import
+    # joined the publisher set. The check tracks the CURRENT state
+    # of smoke_122ec rather than the state immediately after
+    # 122ed; subsequent patches that change the producer publish
+    # surface flip this assertion again.
     check(
-        "smoke_122ec check 10 is flipped — now 'exactly 2' "
-        "publishers (was 'exactly 1')",
-        "Exactly 2 of the 4 producers" in ec_src,
+        "smoke_122ec check 10 currently asserts 'exactly 3' "
+        "publishers (was bumped to '3' by 122ee — kalman_v2 + "
+        "interpolate + import_pose). 122ed's contribution was "
+        "to take the count from 'exactly 1' to '≥2'; 122ee took "
+        "it from '2' to '3'. This check tracks the current state, "
+        "not an intermediate one.",
+        "Exactly 3 of the 4 producers" in ec_src,
     )
 
     # -----------------------------------------------------------------
