@@ -448,10 +448,11 @@ class ConfigReader(object):
         # the helper writes flat). Enumerate via the helper so the
         # ordering is stable across runs. The returned paths use
         # .parquet extension regardless of `ft` (the project's
-        # legacy file_type) — consumers that pass these paths back
-        # through load_machine_results_for_video as legacy_fallback
-        # don't care about extension since the helper inspects the
-        # suffix itself.
+        # legacy file_type). Patch 122dz removed the
+        # ``legacy_fallback`` shim from
+        # :func:`load_machine_results_for_video`, so the
+        # extension-agnostic comment that used to apply here is
+        # no longer load-bearing — kept as a breadcrumb.
         from mufasa.utils.classification_io import (
             list_video_stems_with_classifications,
         )

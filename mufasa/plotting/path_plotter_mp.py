@@ -279,7 +279,6 @@ class PathPlotterMulticore(ConfigReader, PlottingMixin):
             self.in_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             check_valid_dataframe(df=self.in_df, source=file_path, valid_dtypes=Formats.NUMERIC_DTYPES.value, required_fields=self.data_cols)
             if self.clf_attr is not None:

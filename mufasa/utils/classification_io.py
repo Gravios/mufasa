@@ -224,80 +224,49 @@ def list_video_stems_with_classifications(
 def load_machine_results_for_video(
     video_name: str,
     config_path: str,
-    *,
-    legacy_fallback: Optional[str] = None,
 ) -> pd.DataFrame:
-    """Migration-era helper that returns combined features +
-    predictions for one video in the same shape consumers
-    historically got from the legacy
-    ``csv/machine_results/<video>.csv`` file.
+    """Return combined features + predictions for one video.
 
-    Two read paths:
+    Reads predictions from :func:`load_classifications_for_video`
+    and features from :func:`load_features_for_video`, then
+    ``pd.concat`` them column-wise. Both are positional
+    (frame-indexed); the reset on each side keeps the join
+    positional.
 
-    1. **v1 path** — read predictions from
-       :func:`load_classifications_for_video` and features from
-       :func:`load_features_for_video`, then ``pd.concat`` them
-       column-wise. Both are positional (frame-indexed); the
-       reset on each side keeps the join positional.
-
-    2. **Legacy fallback** — if either of the v1 reads raises
-       ``FileNotFoundError`` (typical when the project hasn't
-       re-run inference under 122at yet, so the predictions
-       sidecar doesn't exist), read the combined CSV at
-       ``legacy_fallback``. Caller passes the legacy
-       ``machine_results_dir/<video>.<ft>`` path it would have
-       used pre-122au.
+    Patch 122dz — the ``legacy_fallback`` keyword parameter was
+    removed. It previously let callers point at the legacy
+    ``csv/machine_results/<video>.csv`` file as a fall-back if
+    the v1 reads raised ``FileNotFoundError``. With 122dy
+    rejecting non-v1 projects at the ConfigReader entry point,
+    a legacy file alongside a live v1 project is no longer a
+    reachable state — every call site was passing a path that
+    didn't / couldn't exist. Callers all updated in the same
+    patch to drop the kwarg.
 
     :param video_name: bare stem or filename of the video.
-    :param config_path: project config path.
-    :param legacy_fallback: path to the legacy combined CSV; if
-        ``None`` and the v1 read fails, raises
-        ``FileNotFoundError``.
+    :param config_path: project config path (v1 ``.toml``).
 
     :returns: DataFrame with feature columns + prediction columns,
         index positional (0..N-1).
 
-    Used during the consumer-migration phase of the
-    machine_results lane. Once all consumers either read v1
-    directly (predictions only) or stop needing the combined
-    shape, this helper goes away. Mirror of the labels
-    migration which had a similar shim during 122ae-5b → 5e.
+    :raises FileNotFoundError: when either the v1 predictions
+        sidecar or the v1 features file is missing for the video.
+        Pre-122dz the function would have tried the legacy CSV;
+        now it just raises.
     """
-    try:
-        from mufasa.utils.feature_io import load_features_for_video
-        predictions = load_classifications_for_video(
-            video_name=video_name, config_path=config_path,
-        )
-        features = load_features_for_video(
-            video_name=video_name, config_path=config_path,
-        )
-        combined = pd.concat(
-            [features.reset_index(drop=True),
-             predictions.reset_index(drop=True)],
-            axis=1,
-        )
-        return combined
-    except FileNotFoundError as exc_v1:
-        if legacy_fallback is None or not os.path.isfile(legacy_fallback):
-            raise FileNotFoundError(
-                f"No v1 predictions / features for {video_name!r} "
-                f"(error: {exc_v1}) and no legacy fallback file "
-                f"available at {legacy_fallback!r}",
-            )
-        # Suffix → reader. Done inline rather than via read_df to
-        # avoid pulling in h5py / cv2 at import time on flows that
-        # only need a CSV / parquet round-trip.
-        suffix = Path(legacy_fallback).suffix.lstrip(".").lower()
-        if suffix in ("csv", "txt", ""):
-            return pd.read_csv(legacy_fallback)
-        if suffix in ("parquet", "pq"):
-            return pd.read_parquet(legacy_fallback)
-        # Fallback to read_df for less-common formats (xlsx, h5).
-        from mufasa.utils.read_write import read_df
-        return read_df(
-            file_path=legacy_fallback,
-            file_type=suffix,
-        )
+    from mufasa.utils.feature_io import load_features_for_video
+    predictions = load_classifications_for_video(
+        video_name=video_name, config_path=config_path,
+    )
+    features = load_features_for_video(
+        video_name=video_name, config_path=config_path,
+    )
+    combined = pd.concat(
+        [features.reset_index(drop=True),
+         predictions.reset_index(drop=True)],
+        axis=1,
+    )
+    return combined
 
 
 __all__.append("load_machine_results_for_video")

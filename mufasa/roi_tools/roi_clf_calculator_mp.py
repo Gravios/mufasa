@@ -92,11 +92,7 @@ def _clf_by_roi_helper(data: tuple,
             )
             data_df = load_machine_results_for_video(
                 video_name=video_name,
-                config_path=config_path,
-                legacy_fallback=(
-                    data_path if os.path.isfile(data_path) else None
-                ),
-            )
+                config_path=config_path,            )
         else:
             data_df = read_df(file_path=data_path)
         check_valid_dataframe(df=data_df, source=f'{data_path}', required_fields=required_fields)

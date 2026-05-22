@@ -241,7 +241,6 @@ class HeatMapperClfMultiprocess(ConfigReader, PlottingMixin):
             self.data_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             check_valid_dataframe(df=self.data_df, required_fields=[self.clf_name] + self.bp_lst, valid_dtypes=Formats.NUMERIC_DTYPES.value)
             if self.time_slice is not None:

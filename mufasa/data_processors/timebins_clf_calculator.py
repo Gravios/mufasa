@@ -147,7 +147,6 @@ class TimeBinsClfCalculator(ConfigReader):
             data_df = load_machine_results_for_video(
                 video_name=file_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             check_that_column_exist(df=data_df, column_name=self.clfs, file_name=file_path)
             video_settings, px_per_mm, fps = self.read_video_info(video_name=file_name)

@@ -349,7 +349,6 @@ class ClipReviewDialog(QDialog):
             self._mr_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=self.machine_results_path,
             )
         except Exception as exc:
             raise RuntimeError(

@@ -195,11 +195,12 @@ class FrameLabellerWidget(QWidget):
         # anyway — _save uses save_labels_for_video which writes
         # to derived/labels/<video>.parquet via the layout
         # helper's derived_labels_dir.
-        # Patch 122ax: machine_results_dir is legacy-only post-122ax.
+        # Patch 122ax: machine_results_dir was legacy-only post-122ax.
         # v1 projects don't define this key; consumers must handle
-        # None. The frame labeller uses it only to build the
-        # legacy_fallback path for pseudo-label seeding —
-        # _load_pseudo_labels handles the None case.
+        # None. The frame labeller used it to build the
+        # legacy_fallback path for pseudo-label seeding before
+        # 122dz removed that helper parameter; the attribute is
+        # now informational only.
         self.machine_results_dir = paths.get("machine_results_dir")
         # derived/labels/ is auto-created by save_labels_for_video
         # on first write.
@@ -359,13 +360,7 @@ class FrameLabellerWidget(QWidget):
             )
             df = load_machine_results_for_video(
                 video_name=self.video_name,
-                config_path=self.config_path,
-                legacy_fallback=(
-                    src
-                    if src is not None and os.path.isfile(src)
-                    else None
-                ),
-            )
+                config_path=self.config_path,            )
         except FileNotFoundError:
             self.status.setText(
                 "Pseudo source not found; starting from zeros."

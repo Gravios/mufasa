@@ -163,7 +163,6 @@ class FSTTCCalculator(ConfigReader, PlottingMixin):
             self.data_df = load_machine_results_for_video(
                 video_name=self.video_name,
                 config_path=self.config_path,
-                legacy_fallback=file_path,
             )
             self.video_sequences[self.video_name]["session_length_frames"] = len(
                 self.data_df

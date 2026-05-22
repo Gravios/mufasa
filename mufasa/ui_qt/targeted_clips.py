@@ -153,10 +153,14 @@ class TargetedClipsDialog(QDialog):
         )
         os.makedirs(self.target_dir, exist_ok=True)
         self.clips_json = os.path.join(self.target_dir, "clips.json")
-        # Patch 122ax: machine_results_dir is now legacy-only.
+        # Patch 122ax: machine_results_dir was legacy-only.
         # v1 projects don't define this key; consumers must handle
-        # None. Used as a legacy_fallback path builder when
-        # available; otherwise the helper handles v1 directly.
+        # None. Was used as a legacy_fallback path builder for
+        # ``load_machine_results_for_video`` — that parameter was
+        # removed in 122dz, so this attribute is now unused by
+        # this class. Kept for backward source-compat with any
+        # external consumer that subclasses; safe to drop in a
+        # future patch.
         self.machine_results_dir = paths.get("machine_results_dir")
 
     def _load_existing_clips(self) -> None:
@@ -492,13 +496,7 @@ class TargetedClipsDialog(QDialog):
             )
             df = load_machine_results_for_video(
                 video_name=self.video_name,
-                config_path=self.config_path,
-                legacy_fallback=(
-                    mr_path
-                    if mr_path is not None and os.path.isfile(mr_path)
-                    else None
-                ),
-            )
+                config_path=self.config_path,            )
         except FileNotFoundError:
             # Non-fatal: a user may want video-only clips (no
             # data slicing) — matches the pre-122aw behaviour
