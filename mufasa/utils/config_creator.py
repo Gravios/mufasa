@@ -5,7 +5,7 @@ mufasa.utils.config_creator
 Patch 122d: rewritten to produce **only** the v1 project layout
 defined in :mod:`mufasa.project_layout`. The previous legacy
 SimBA tree (``project_folder/csv/{input_csv,
-outlier_corrected_*,...}`` + ``project_config.ini``) is gone for
+outlier_corrected_*,...}`` + ``project.toml``) is gone for
 new projects.
 
 Patch 122dw removed the legacy → v1 migration tool that used to

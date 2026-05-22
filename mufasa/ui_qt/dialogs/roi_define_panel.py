@@ -178,7 +178,7 @@ class ROIDefineWidget(QWidget):
             )
             return
         # Patch 122ag: resolve project paths through the layout
-        # helper so v1 (project.toml) and legacy (project_config.ini)
+        # helper so v1 (project.toml) and legacy (project.toml)
         # both work.
         try:
             paths = _project_paths_lite(self.config_path)

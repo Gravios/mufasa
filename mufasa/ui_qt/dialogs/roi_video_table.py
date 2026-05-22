@@ -81,7 +81,7 @@ def _project_paths_lite(config_path: str) -> dict:
     graph. Delegates to
     :func:`mufasa.project_layout.project_paths_from_config` —
     which works for both v1 ``project.toml`` and legacy
-    ``project_config.ini`` files — and returns an empty dict on
+    ``project.toml`` files — and returns an empty dict on
     failure so the dialog can render a polite "no project" state
     instead of crashing.
 
@@ -195,7 +195,7 @@ class ROIVideoTableDialog(QDialog):
         super().__init__(parent)
         self.config_path = config_path
         # Patch 122ab: resolve project paths through the layout
-        # helper so v1 (project.toml) and legacy (project_config.ini)
+        # helper so v1 (project.toml) and legacy (project.toml)
         # both work. ``self.project_path`` retained as a header-bar
         # display string ('Project: <path>') showing the project
         # root; ``self.video_dir`` is the actual videos directory

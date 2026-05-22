@@ -48,11 +48,11 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
 
 
     :example:
-    >>> roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini', body_parts=['Nose_1', 'Nose_2'])
+    >>> roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml', body_parts=['Nose_1', 'Nose_2'])
     >>> roi_featurizer.run()
     >>> roi_featurizer.save()
 
-    >>> roi_featurizer = ROIFeatureCreator(config_path=r"C:\troubleshooting\spontenous_alternation\project_folder\project_config.ini", body_parts=['nose'], data_path=r"C:\troubleshooting\spontenous_alternation\project_folder\csv\outlier_corrected_movement_location\F1 HAB.csv", append_data=True)
+    >>> roi_featurizer = ROIFeatureCreator(config_path=r"C:\troubleshooting\spontenous_alternation\project_folder\project.toml", body_parts=['nose'], data_path=r"C:\troubleshooting\spontenous_alternation\project_folder\csv\outlier_corrected_movement_location\F1 HAB.csv", append_data=True)
     >>> roi_featurizer.run()
     >>> roi_featurizer.save()
     """
@@ -208,7 +208,7 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
             stdout_success(msg=f"{len(self.data_paths)} data files analyzed for ROI features", elapsed_time=self.timer.elapsed_time_str)
 
 
-# #roi_featurizer = ROIFeatureCreator(config_path=r"C:\troubleshooting\roi_feature_issue\project_folder\project_config.ini",
+# #roi_featurizer = ROIFeatureCreator(config_path=r"C:\troubleshooting\roi_feature_issue\project_folder\project.toml",
 #                                    body_parts=['nose'],
 #                                    data_path=r"C:\troubleshooting\roi_feature_issue\project_folder\csv\outlier_corrected_movement_location\20250130_Oxyipn_Vls_D4_Sst-107.csv",
 #                                    append_data=True)
@@ -218,7 +218,7 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
 
 
 
-# roi_featurizer = ROIFeatureCreator(config_path=r"C:\troubleshooting\spontenous_alternation\project_folder\project_config.ini",
+# roi_featurizer = ROIFeatureCreator(config_path=r"C:\troubleshooting\spontenous_alternation\project_folder\project.toml",
 #                                    body_parts=['nose'],
 #                                    data_path=r"C:\troubleshooting\spontenous_alternation\project_folder\csv\outlier_corrected_movement_location\F1 HAB.csv",
 #                                    append_data=True)
@@ -229,18 +229,18 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
 
 
 #
-# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
 #                                    body_parts=['Nose_1', 'Nose_2'],
 #                                    data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location/Together_1.csv')
 # roi_featurizer.run()
 
 
-# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
+# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml')
 # roi_featurizer.roi_directing_viable
 # roi_featurizer.run()
 # roi_featurizer.save()
 
 
-# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project_folder/project_config.ini')
+# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project.toml')
 # roi_featurizer.run()
 # roi_featurizer.save()

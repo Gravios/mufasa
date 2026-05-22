@@ -41,7 +41,7 @@ class BentoAppender(ConfigReader):
 
     :example:
     >>> bento_dir = 'tests/test_data/bento_example'
-    >>> config_path = 'tests/test_data/import_tests/project_folder/project_config.ini'
+    >>> config_path = 'tests/test_data/import_tests/project.toml'
     >>> bento_appender = BentoAppender(config_path=config_path, data_dir=bento_dir)
     >>> bento_appender.run()
 

@@ -2174,7 +2174,7 @@ def extract_frames_from_all_videos_in_directory(config_path: Union[str, os.PathL
     :return: None. Frames are saved in ``project_folder/frames/input`` of the SimBA project.
 
     :example:
-    >>> extract_frames_from_all_videos_in_directory(config_path='project_folder/project_config.ini', directory='/tests/test_data/video_tests')
+    >>> extract_frames_from_all_videos_in_directory(config_path='project.toml', directory='/tests/test_data/video_tests')
     >>> extract_frames_from_all_videos_in_directory(config_path=config_path, directory=video_dir, confirm_popup=True)
     """
     timer = SimbaTimer(start=True)

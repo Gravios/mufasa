@@ -73,7 +73,7 @@ class AggregateClfCalculator(ConfigReader):
 
     :example:
     >>> clf_calculator = AggregateClfCalculator(
-    ...     config_path="project_folder/project_config.ini",
+    ...     config_path="project.toml",
     ...     classifiers=['Attack', 'Sniffing'],
     ...     detailed_bout_data=True,
     ...     transpose=True

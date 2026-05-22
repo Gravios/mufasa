@@ -31,7 +31,7 @@ class AnnotationFrameExtractor(ConfigReader):
     """
     Extract frames annotated as behavior-present and save them as image files.
 
-    :param Union[str, os.PathLike] config_path: Path to the SimBA ``project_config.ini`` file.
+    :param Union[str, os.PathLike] config_path: Path to the SimBA ``project.toml`` file.
     :param List[Union[str, os.PathLike]] data_paths: Annotation file paths to read labels from.
     :param List[str] clfs: Names of classifiers to extract behavior-present images for.
     :param Optional[Union[float, int]] img_downsample_factor: Optional image downsampling factor. If ``None`` or ``1``, no downsampling is applied.
@@ -40,7 +40,7 @@ class AnnotationFrameExtractor(ConfigReader):
 
     :example:
     >>> extractor = AnnotationFrameExtractor(
-    ...     config_path='project_folder/project_config.ini',
+    ...     config_path='project.toml',
     ...     data_paths=['project_folder/csv/targets_inserted/video_1.csv'],
     ...     clfs=['Sniffing', 'Attack'],
     ...     img_downsample_factor=2,

@@ -157,7 +157,7 @@ class Interpolate(ConfigReader):
         )
 
 
-# config_file_path = r"/Users/simon/Desktop/envs/troubleshooting/Vince_time_bins/project_folder/project_config.ini"
+# config_file_path = r"/Users/simon/Desktop/envs/troubleshooting/Vince_time_bins/project.toml"
 # in_file = r"/Users/simon/Desktop/envs/troubleshooting/Vince_time_bins/project_folder/csv/input_csv/2022-06-15_15-26-48_ArC_H_1_1Hrcropped.csv"
 # interpolation_method = 'Body-parts: Linear'
 # csv_df = pd.read_csv(in_file, index_col=0)

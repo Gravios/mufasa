@@ -249,7 +249,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument(
         "--config", type=str, default=None,
-        help="Mufasa project_config.ini to source the scorer string from",
+        help="Mufasa project.toml to source the scorer string from",
     )
     parser.add_argument(
         "--no-index", action="store_true",

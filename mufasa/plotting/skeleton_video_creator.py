@@ -99,7 +99,7 @@ class SkeletonVideoCreator:
        :class:`~mufasa.plotting.pose_plotter_mp.PosePlotterMultiProcess` — overlay pose on the original recording instead of a blank background.
        :func:`~mufasa.video_processors.video_processing.superimpose_overlay_video` — inset one video on another (for example, a skeleton clip over the raw recording).
 
-    :param Optional[Union[str, os.PathLike]] config_path: Path to SimBA project ``project_config.ini``.
+    :param Optional[Union[str, os.PathLike]] config_path: Path to SimBA project ``project.toml``.
         If set, ``data_path``, ``save_dir``, and ``video_info_path`` default from the project unless
         overridden. Required unless all three of those are provided explicitly.
     :param Optional[Union[str, os.PathLike]] data_path: Path to one pose CSV or a directory of ``.csv``
@@ -138,7 +138,7 @@ class SkeletonVideoCreator:
 
     :example:
     >>> creator = SkeletonVideoCreator(
-    ...     config_path=r'E:/project/project_config.ini',
+    ...     config_path=r'E:/project/project.toml',
     ...     resolution=(500, 500),
     ...     bg_color=(0, 0, 0),
     ...     anchor_bp='tail_base',
@@ -330,7 +330,7 @@ class SkeletonVideoCreator:
 
 if __name__ == "__main__":
     creator = SkeletonVideoCreator(
-        config_path=r'E:\troubleshooting\mitra_emergence_hour\project_folder\project_config.ini',
+        config_path=r'E:\troubleshooting\mitra_emergence_hour\project_folder\project.toml',
         data_path=r"E:\troubleshooting\mitra_emergence_hour\project_folder\csv\outlier_corrected_movement_location\Box3_180mISOcontrol_Females.csv",
         resolution=(375, 375),
         bg_color=(255, 255, 255),

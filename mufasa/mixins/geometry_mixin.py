@@ -3908,7 +3908,7 @@ class GeometryMixin(object):
         Convert SimBA dataframes holding ROI geometries to nested dictionary holding Shapley polygons.
 
         :example:
-        >>> config_path = '/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project_folder/project_config.ini'
+        >>> config_path = '/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project.toml'
         >>> config = ConfigReader(config_path=config_path)
         >>> config.read_roi_data()
         >>> GeometryMixin.simba_roi_to_geometries(rectangles_df=config.rectangles_df, circles_df=config.circles_df, polygons_df=config.polygon_df)

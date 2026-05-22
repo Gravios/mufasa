@@ -351,5 +351,5 @@ class GridSearchMulticlassRandomForestClassifier(ConfigReader, TrainModelMixin):
             )
 
 
-# model_trainer = GridSearchMulticlassRandomForestClassifier(config_path='/Users/simon/Desktop/envs/troubleshooting/multilabel/project_folder/project_config.ini')
+# model_trainer = GridSearchMulticlassRandomForestClassifier(config_path='/Users/simon/Desktop/envs/troubleshooting/multilabel/project.toml')
 # model_trainer.run()

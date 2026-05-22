@@ -36,7 +36,7 @@ For each classifier in the project (read from
 On Run:
 
 1. Validates all three values per classifier.
-2. Persists them to ``project_config.ini``'s
+2. Persists them to ``project.toml``'s
    ``[SML settings]`` / ``[threshold_settings]`` /
    ``[Minimum_bout_lengths]`` sections — exactly the same write
    shape the Tk popup did, so :class:`InferenceBatch` reads them
@@ -100,7 +100,7 @@ class RunInferenceForm(OperationForm):
         "and minimum bout lengths, then run the inference batch over "
         "all videos with features. Writes per-video predictions to "
         "<code>derived/classifications/</code>. Settings persist to "
-        "<code>project.toml</code> (v1) or <code>project_config.ini</code> "
+        "<code>project.toml</code> (v1) or <code>project.toml</code> "
         "(legacy)."
     )
 

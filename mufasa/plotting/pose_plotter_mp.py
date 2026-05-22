@@ -91,7 +91,7 @@ class PosePlotterMultiProcess():
     """
     Create pose-estimation visualizations from data within a SimBA project folder using multiprocessing.
 
-    :param Union[str, os.PathLike] data_path: Path to a SimBA project directory containing pose-estimation data (parquet or CSV), or path to a single pose file. Must be under ``project_folder/csv/`` so that ``project_config.ini`` can be located.
+    :param Union[str, os.PathLike] data_path: Path to a SimBA project directory containing pose-estimation data (parquet or CSV), or path to a single pose file. Must be under ``project_folder/csv/`` so that ``project.toml`` can be located.
     :param Optional[Union[str, os.PathLike]] out_dir: Directory where pose-estimation videos are saved. If None, saves to a new folder under the input data directory. Default None.
     :param Optional[Dict[str, str]] palettes: Dict mapping animal names to color palette names (e.g. ``{'Animal_1': 'Set1', 'Animal_2': 'Pastel1'}``). Must have one entry per animal. If None, uses project default body-part colors. Default None.
     :param Optional[int] circle_size: Radius of circles drawn at each body-part location. If None, auto-computed from video resolution. Default None.
@@ -124,13 +124,13 @@ class PosePlotterMultiProcess():
                  verbose: bool = True) -> None:
 
         if os.path.isdir(data_path):
-            config_path = os.path.join(Path(data_path).parents[1], 'project_config.ini')
+            config_path = os.path.join(Path(data_path).parents[1], 'project.toml')
         elif os.path.isfile(data_path):
-            config_path = os.path.join(Path(data_path).parents[2], 'project_config.ini')
+            config_path = os.path.join(Path(data_path).parents[2], 'project.toml')
         else:
             raise InvalidFilepathError(msg=f'{data_path} not not a valid file or directory path.', source=self.__class__.__name__)
         if not os.path.isfile(config_path):
-            raise InvalidFilepathError(msg=f'When visualizing pose-estimation, select an input sub-directory of the project_folder/csv folder OR file in the project_folder/csv/ANY_FOLDER directory. {data_path} does not meet these requirements and therefore SimBA cant locate the project_config.ini (expected at {config_path}', source=self.__class__.__name__)
+            raise InvalidFilepathError(msg=f'When visualizing pose-estimation, select an input sub-directory of the project_folder/csv folder OR file in the project_folder/csv/ANY_FOLDER directory. {data_path} does not meet these requirements and therefore SimBA cant locate the project.toml (expected at {config_path}', source=self.__class__.__name__)
         self.config = ConfigReader(config_path=config_path, read_video_info=False, create_logger=False)
         if os.path.isdir(data_path):
             files_found = find_files_of_filetypes_in_directory(directory=data_path, extensions=[f'.{self.config.file_type}'], raise_error=True)

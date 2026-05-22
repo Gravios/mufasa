@@ -76,7 +76,7 @@ class DLCSingleAnimalCSVImporter(ConfigReader, PoseImporterMixin):
 
     :example:
     >>> DLCSingleAnimalCSVImporter(
-    ...     config_path="/data/project/project_config.ini",
+    ...     config_path="/data/project/project.toml",
     ...     data_folder="/data/dlc_output",
     ...     interpolation_settings={'type': 'body-parts', 'method': 'linear'},
     ...     p_threshold=0.5,

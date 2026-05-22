@@ -27,7 +27,7 @@ class MitraStyleAnnotationAppender(ConfigReader):
     >>> data_path = r"C:\annotations\Start-Stop Annotations.xlsx"
     >>> features_dir = r"C:\project_folder\features"
     >>> save_dir = r"C:\project_folder\features\targets_inserted"
-    >>> config_path = r"C:\project_folder\project_config.ini"
+    >>> config_path = r"C:\project_folder\project.toml"
     >>> appender = MitraStyleAnnotationAppender(data_path=data_path, features_dir=features_dir, save_dir=save_dir, config_path=config_path)
     >>> appender.run()
     """
@@ -76,7 +76,7 @@ class MitraStyleAnnotationAppender(ConfigReader):
 # data_path = r"C:\troubleshooting\mitra\Start-Stop Annotations.xlsx"
 # features_dir = r"C:\troubleshooting\mitra\project_folder\videos\bg_removed\rotated\laying_down_features\APPENDED"
 # save_dir = r"C:\troubleshooting\mitra\project_folder\videos\bg_removed\rotated\laying_down_features\APPENDED\targets_inserted"
-# config_path = r"C:\troubleshooting\mitra\project_folder\project_config.ini"
+# config_path = r"C:\troubleshooting\mitra\project_folder\project.toml"
 #
 # x = MitraStyleAnnotationAppender(data_path=data_path, features_dir=features_dir, save_dir=save_dir, config_path=config_path)
 # x.run()

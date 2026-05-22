@@ -211,7 +211,7 @@ class BoundaryStatisticsCalculator(ConfigReader):
         )
 
 
-# boundary_stats_calculator = BoundaryStatisticsCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project_folder/project_config.ini',
+# boundary_stats_calculator = BoundaryStatisticsCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project.toml',
 #                                                          roi_intersections=True,
 #                                                          roi_keypoint_intersections=True,
 #                                                          save_format='PICKLE')

@@ -57,7 +57,7 @@ class BoundaryRearingFeaturizer(ConfigReader,
 
     r"""
     :example:
-    >>> x = BoundaryRearingFeaturizer(config_path=r"C:\troubleshooting\open_field_rearing\project_folder\project_config.ini")
+    >>> x = BoundaryRearingFeaturizer(config_path=r"C:\troubleshooting\open_field_rearing\project_folder\project.toml")
     >>> x.run()
     """
 
@@ -164,7 +164,7 @@ class BoundaryRearingFeaturizer(ConfigReader,
 
         write_df(df=data, file_type=self.file_type, save_path=save_path)
 
-# x = BoundaryRearingFeaturizer(config_path=r"C:\troubleshooting\mouse_open_field\project_folder\project_config.ini",
+# x = BoundaryRearingFeaturizer(config_path=r"C:\troubleshooting\mouse_open_field\project_folder\project.toml",
 #                               data_dir=r'C:\troubleshooting\mouse_open_field\project_folder\csv\outlier_corrected_movement_location',
 #                               save_dir=r'C:\troubleshooting\mouse_open_field\project_folder\csv\features_extracted')
 # x.run()

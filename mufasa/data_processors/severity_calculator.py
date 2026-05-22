@@ -29,7 +29,7 @@ class SeverityCalculator(ConfigReader):
     Examples
     ----------
     >>> settings = {'brackets': 10, 'clf': 'Attack', 'animals': ['Simon', 'JJ'], 'time': True, 'frames': False}
-    >>> processor = SeverityCalculator(config_path='project_folder/project_config.ini', settings=settings)
+    >>> processor = SeverityCalculator(config_path='project.toml', settings=settings)
     >>> processor.run()
     >>> processor.save()
     """
@@ -123,6 +123,6 @@ class SeverityCalculator(ConfigReader):
 
 
 # settings = {'brackets': 10, 'clf': 'Attack', 'animals': ['Simon', 'JJ'], 'time': True, 'frames': True}
-# processor = SeverityCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini', settings=settings)
+# processor = SeverityCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', settings=settings)
 # processor.run()
 # processor.save()

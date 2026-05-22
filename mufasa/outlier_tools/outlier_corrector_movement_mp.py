@@ -78,7 +78,7 @@ def _movement_outlier_corrector(data_path: str,
 class OutlierCorrecterMovementMultiProcess(ConfigReader, FeatureExtractionMixin):
     """
     Detect and ammend outliers in pose-estimation data based on movement lenghth (Euclidean) of the body-parts
-    in the current frame from preceeding frame. If not passed, then uses critera stored in the SimBA project project_config.ini
+    in the current frame from preceeding frame. If not passed, then uses critera stored in the SimBA project project.toml
     under the [Outlier settings] headed. Uses multiprocessing.
 
     :param Union[str, os.PathLike] config_path: path to SimBA project config file in Configparser format
@@ -175,4 +175,4 @@ class OutlierCorrecterMovementMultiProcess(ConfigReader, FeatureExtractionMixin)
 
 #
 # if __name__ == "__main__":
-#     #test = OutlierCorrecterMovementMultiProcess(config_path=r"C:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini")
+#     #test = OutlierCorrecterMovementMultiProcess(config_path=r"C:\troubleshooting\two_black_animals_14bp\project_folder\project.toml")

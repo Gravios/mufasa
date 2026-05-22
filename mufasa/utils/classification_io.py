@@ -123,7 +123,7 @@ def save_classifications_for_video(
     :param video_name: bare stem or filename — ``Path().stem`` is
         used either way.
     :param config_path: path to project's ``project.toml`` (v1)
-        or ``project_config.ini`` (legacy).
+        or ``project.toml`` (legacy).
     :param predictions: DataFrame with one row per frame. Columns
         should be a subset of:
 

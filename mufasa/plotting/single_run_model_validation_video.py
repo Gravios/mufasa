@@ -66,7 +66,7 @@ class ValidateModelOneVideo(ConfigReader, PlottingMixin, TrainModelMixin):
     :example:
     >>> # Create validation video with pose overlay and static Gantt chart
     >>> validator = ValidateModelOneVideo(
-    ...     config_path=r'/path/to/project_config.ini',
+    ...     config_path=r'/path/to/project.toml',
     ...     feature_path=r'/path/to/features.csv',
     ...     model_path=r'/path/to/classifier.sav',
     ...     show_pose=True,

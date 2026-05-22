@@ -46,7 +46,7 @@ class DirectingAnimalsToBodyPartVisualizer(ConfigReader, PlottingMixin):
     >>>               'Pose_circle_size': 3,
     >>>               "Direction_color": 'Random',
     >>>               'Direction_thickness': 4, 'Highlight_endpoints': True}
-    >>> _ = DirectingAnimalsToBodyPartVisualizer(config_path='/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project_folder/project_config.ini', video_name='Testing_Video_3.mp4', style_attr=style_attr).run()
+    >>> _ = DirectingAnimalsToBodyPartVisualizer(config_path='/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project.toml', video_name='Testing_Video_3.mp4', style_attr=style_attr).run()
     """
 
     def __init__(self, config_path: str, data_path: str, style_attr: dict):
@@ -190,4 +190,4 @@ class DirectingAnimalsToBodyPartVisualizer(ConfigReader, PlottingMixin):
 
 #
 # style_attr = {'Show_pose': True, 'Polyfill': False, 'Pose_circle_size': 3, "Direction_color": 'Random', 'Direction_thickness': 4, 'Highlight_endpoints': True}
-# _ = DirectingAnimalsToBodyPartVisualizer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini', data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location/Together_1.csv', style_attr=style_attr).run()
+# _ = DirectingAnimalsToBodyPartVisualizer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml', data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location/Together_1.csv', style_attr=style_attr).run()

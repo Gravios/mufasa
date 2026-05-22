@@ -584,7 +584,7 @@ def launch_clip_review(parent: QWidget, config_path: str) -> None:
     if not config_path:
         QMessageBox.warning(
             parent, "No project",
-            "Load a project (project_config.ini) before reviewing clips.",
+            "Load a project (project.toml) before reviewing clips.",
         )
         return
     video_path, _ = QFileDialog.getOpenFileName(

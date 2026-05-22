@@ -43,7 +43,7 @@ from mufasa.ui_qt.workbench import OperationForm
 # These wrap the read-modify-write of classifier target names so the form
 # methods don't have to branch on v1 vs legacy. v1 reads/writes
 # ``[classifiers].targets`` in project.toml; legacy reads/writes
-# ``[SML settings] target_name_N`` in project_config.ini.
+# ``[SML settings] target_name_N`` in project.toml.
 
 def _read_classifiers(config_path: str) -> list[str]:
     from mufasa.project_layout import project_metadata_from_config

@@ -33,7 +33,7 @@ class FeatureExtractionMixin(object):
     """
     Methods for featurizing pose-estimation data.
 
-    :param Optional[configparser.Configparser] config_path: Optional path to SimBA project_config.ini
+    :param Optional[configparser.Configparser] config_path: Optional path to SimBA project.toml
     """
 
     def __init__(self, config_path: Optional[str] = None):

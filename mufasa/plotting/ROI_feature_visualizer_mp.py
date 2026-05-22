@@ -181,7 +181,7 @@ class ROIfeatureVisualizerMultiprocess(ConfigReader):
        :align: center
 
     :example:
-    >>> test = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project_folder/project_config.ini',
+    >>> test = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project.toml',
     ...     video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project_folder/videos/NOR ENCODING FExMP8.mp4',
     ...     body_parts=['Center'],
     ...     show_roi_centers=True,
@@ -372,7 +372,7 @@ class ROIfeatureVisualizerMultiprocess(ConfigReader):
 
 
 # if __name__ == '__main__':
-#     x = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/project_config.ini',
+#     x = ROIfeatureVisualizerMultiprocess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project.toml',
 #                                      video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/videos/592_MA147_Gq_Saline_0516.mp4',
 #                                      body_parts=['Nose'],
 #                                      show_pose=True,

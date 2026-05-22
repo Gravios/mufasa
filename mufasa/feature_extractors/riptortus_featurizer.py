@@ -48,11 +48,11 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
        :width: 1022
        :align: center
 
-    :param Union[str, os.PathLike] config_path: Path to SimBA project_config.ini.
+    :param Union[str, os.PathLike] config_path: Path to SimBA project.toml.
     :return: None. Featurized pose-estimation data is saved in the mufasa project `project_folder/csv/features_extracted` directory.
 
     :example:
-    >>> _ = RiptortusFeaturizer(config_path='/Users/simon/Desktop/envs/troubleshooting/naresh/project_folder/project_config.ini')
+    >>> _ = RiptortusFeaturizer(config_path='/Users/simon/Desktop/envs/troubleshooting/naresh/project.toml')
 
     """
 

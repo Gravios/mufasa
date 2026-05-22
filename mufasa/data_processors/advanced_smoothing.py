@@ -57,7 +57,7 @@ class AdvancedSmoother(ConfigReader):
 
     :examples:
     >>> smoother = AdvancedSmoother(data_dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv',
-    >>>                             config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+    >>>                             config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml',
     >>>                             type='animal',
     >>>                             settings={'Simon': {'method': 'Savitzky Golay', 'time_window': 200},
     >>>                                       'JJ': {'method': 'Savitzky Golay', 'time_window': 200}},
@@ -78,7 +78,7 @@ class AdvancedSmoother(ConfigReader):
     >>>                            'Lat_right_2': {'method': 'gaussian', 'time_window': 3500},
     >>>                            'Center_2': {'method': 'gaussian', 'time_window': 2000},
     >>>                            'Tail_base_2': {'method': 'savitzky_golay', 'time_window': 3500}}}
-    >>> advanced_smoother = AdvancedSmoother(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+    >>> advanced_smoother = AdvancedSmoother(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
     >>>                  data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/new_data',
     >>>                  settings=SMOOTHING_SETTINGS, type='body-part', multi_index_data=True, overwrite=False)
     >>> advanced_smoother.run()
@@ -206,7 +206,7 @@ class AdvancedSmoother(ConfigReader):
 
 
 #SMOOTHING_SETTINGS = {'Animal_1': {'method': 'savitzky_golay', 'time_window': 3500}, 'Animal_2': {'method': 'savitzky_golay', 'time_window': 3500}}
-# advanced_smoother = AdvancedSmoother(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini',
+# advanced_smoother = AdvancedSmoother(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
 #                      data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/new_data',
 #                      settings=SMOOTHING_SETTINGS, type='body-part', multi_index_data=True, overwrite=False)
 #

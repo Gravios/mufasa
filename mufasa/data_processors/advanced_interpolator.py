@@ -65,7 +65,7 @@ class AdvancedInterpolator(ConfigReader):
     >>> # Animal-level interpolation
     >>> interpolator = AdvancedInterpolator(
     ...     data_path='/path/to/project_folder/csv/input_csv',
-    ...     config_path='/path/to/project_folder/project_config.ini',
+    ...     config_path='/path/to/project.toml',
     ...     type='animal',
     ...     settings={'Animal_1': 'linear', 'Animal_2': 'quadratic'},
     ...     multi_index_data=True
@@ -75,7 +75,7 @@ class AdvancedInterpolator(ConfigReader):
     >>> # Body-part level interpolation
     >>> interpolator = AdvancedInterpolator(
     ...     data_path='/path/to/project_folder/csv/input_csv',
-    ...     config_path='/path/to/project_folder/project_config.ini',
+    ...     config_path='/path/to/project.toml',
     ...     type='body-part',
     ...     settings={
     ...         'Simon': {

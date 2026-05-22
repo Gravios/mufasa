@@ -42,7 +42,7 @@ Design notes
 ------------
 
 Forms read the project's ``no_targets`` classifier list and per-animal
-body-part list from ``project_config.ini`` via
+body-part list from ``project.toml`` via
 :func:`mufasa.ui_qt.forms.pose_cleanup._load_animal_bps`. That helper
 is now project-setup infrastructure — keeping one canonical loader
 rather than duplicating parsing logic per form.

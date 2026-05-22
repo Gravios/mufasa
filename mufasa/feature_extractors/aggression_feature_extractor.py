@@ -42,7 +42,7 @@ class AgressionFeatureExtractor(ConfigReader, AbstractFeatureExtraction):
     >>> extractor.run()
 
     :example II:
-    >>> f = AgressionFeatureExtractor(config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini")
+    >>> f = AgressionFeatureExtractor(config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project.toml")
     >>> f.run()
     """
 
@@ -178,7 +178,7 @@ if __name__ == "__main__" and not hasattr(sys, 'ps1'):
 
 
 
-# f = AgressionFeatureExtractor(config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini")
+# f = AgressionFeatureExtractor(config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project.toml")
 # f.run()
 
 

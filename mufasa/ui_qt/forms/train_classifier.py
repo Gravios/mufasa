@@ -13,7 +13,7 @@ plumbing for sub-fields gated on parent checkboxes. Replaced
 here with a declarative :class:`QFormLayout` per group +
 helper functions for the enable/disable cascade.
 
-The Tk popup only persisted settings to ``project_config.ini``
+The Tk popup only persisted settings to ``project.toml``
 — it never actually trained. Training was invoked separately
 from SimBA.py's menu hooks. The Qt port consolidates: the same
 Save settings button persists to INI, and a new Train button
@@ -93,7 +93,7 @@ class TrainClassifierForm(OperationForm):
     description = (
         "Configure hyperparameters and evaluation outputs for the "
         "Random Forest classifier trainer, then either save the "
-        "settings to <code>project_config.ini</code> or kick off "
+        "settings to <code>project.toml</code> or kick off "
         "a full training run. Saved settings are picked up by the "
         "trainer the next time it runs."
     )
@@ -131,7 +131,7 @@ class TrainClassifierForm(OperationForm):
         actions = QHBoxLayout()
         self.save_btn = QPushButton("Save settings only", self)
         self.save_btn.setToolTip(
-            "Persist the current settings to project_config.ini "
+            "Persist the current settings to project.toml "
             "without running training."
         )
         self.save_btn.clicked.connect(self._on_save_only)
@@ -147,7 +147,7 @@ class TrainClassifierForm(OperationForm):
 
         self.run_btn.setText("  Train classifier")
 
-        # Hydrate field values from project_config.ini if present
+        # Hydrate field values from project.toml if present
         self._load_from_ini()
 
     # ----------------------------------------------------------- Hyperparams group
@@ -637,7 +637,7 @@ class TrainClassifierForm(OperationForm):
             return
         QMessageBox.information(
             self, "Saved",
-            f"Training settings saved to project_config.ini.",
+            f"Training settings saved to project.toml.",
         )
 
     # ----------------------------------------------------------- Execute

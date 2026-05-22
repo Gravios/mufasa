@@ -99,7 +99,7 @@ def _default_model_dir() -> str:
 def _read_outlier_settings(config_path: str) -> dict[str, Any]:
     """Return the outlier-correction settings stored in a project
     config, working for both v1 (``project.toml``) and legacy
-    (``project_config.ini``).
+    (``project.toml``).
 
     Returned dict keys (all flat, lowercased; missing values are
     simply absent):
@@ -166,7 +166,7 @@ def _write_outlier_settings(
 ) -> None:
     """Persist outlier-correction settings back to a project's
     config, working for both v1 (``project.toml``) and legacy
-    (``project_config.ini``).
+    (``project.toml``).
 
     v1: read-modify-write the project.toml's ``[outlier_settings]``
     table, including the nested ``[outlier_settings.references]``
@@ -215,7 +215,7 @@ def _write_outlier_settings(
 
 def _load_animal_bps(config_path: str) -> dict[str, list[str]]:
     """Return ``{animal_name: [bp_names]}`` for a project, working
-    for both v1 (``project.toml``) and legacy (``project_config.ini``)
+    for both v1 (``project.toml``) and legacy (``project.toml``)
     layouts.
 
     Patch 122f: replaced direct ``configparser`` use with the
@@ -437,7 +437,7 @@ class InterpolateForm(OperationForm):
 # --------------------------------------------------------------------------- #
 class OutlierSettingsForm(OperationForm):
     """Configure outlier-correction thresholds and per-animal reference
-    body-parts. Writes to project_config.ini (Audit A2 fix: writes
+    body-parts. Writes to project.toml (Audit A2 fix: writes
     only to the "Outlier settings" section, no silent mutation
     elsewhere).
 
@@ -760,7 +760,7 @@ class DropBodypartsForm(OperationForm):
 def _load_flat_bps(config_path: str) -> list[str]:
     """Return the project's body-parts as a flat list, in the order
     they appear in the project config (v1 ``project.toml`` /
-    legacy ``project_config.ini`` + ``project_bp_names.csv``).
+    legacy ``project.toml`` + ``project_bp_names.csv``).
 
     Patch 122f: now delegates to ``project_metadata_from_config``;
     returns ``[]`` for unparseable or missing configs so the form
@@ -1367,7 +1367,7 @@ class KalmanV2SmoothingForm(OperationForm):
         # `<project>/models/<run-id-named>/` in addition to the
         # in-run-dir copy.
         #
-        # Legacy fallback for projects still on project_config.ini.
+        # Legacy fallback for projects still on project.toml.
         self._v1_run_id: str | None = None
         if self.config_path:
             v1_root = resolve_v1_project_root(self.config_path)
@@ -1905,7 +1905,7 @@ class RunOutlierCorrectionForm(OperationForm):
 
     The thresholds and reference body-parts themselves are
     configured in the **Outlier correction settings** form
-    (which writes to ``project_config.ini``). This form just
+    (which writes to ``project.toml``). This form just
     runs the backends; it doesn't surface the criteria.
 
     Patch 122dt — wired to section_provenance: writes

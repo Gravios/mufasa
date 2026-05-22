@@ -53,7 +53,7 @@ class ProjectInfoForm(QWidget):
 
     Fields displayed:
 
-    * **Layout**       — "v1 (project.toml)" or "legacy (project_config.ini)"
+    * **Layout**       — "v1 (project.toml)" or "legacy (project.toml)"
     * **Name**         — from project_name / [General settings].project_name
     * **Root**         — project root path (v1: project.toml's parent;
       legacy: <General settings>.project_path)
@@ -203,7 +203,7 @@ class ProjectInfoForm(QWidget):
         self._add_row(
             "Layout",
             "v1 (<code>project.toml</code>)" if is_v1
-            else "legacy (<code>project_config.ini</code>)",
+            else "legacy (<code>project.toml</code>)",
         )
         # Project name — for v1 from project.toml, for legacy we
         # can't trivially get it without parsing the ini, so fall
@@ -403,7 +403,7 @@ class NewProjectForm(QWidget):
 
         open_hint = QLabel(
             "Open a v1 <code>project.toml</code> or a legacy "
-            "<code>project_config.ini</code> from disk. Use "
+            "<code>project.toml</code> from disk. Use "
             "<b>Open most recent</b> to jump back to the previous "
             "project without browsing for it.",
             open_group,

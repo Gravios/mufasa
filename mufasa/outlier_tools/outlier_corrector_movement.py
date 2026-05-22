@@ -21,7 +21,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 class OutlierCorrecterMovement(ConfigReader, FeatureExtractionMixin):
     """
     Detect and ammend outliers in pose-estimation data based on movement lenghth (Euclidean) of the body-parts
-    in the current frame from preceeding frame. Uses critera stored in the SimBA project project_config.ini
+    in the current frame from preceeding frame. Uses critera stored in the SimBA project project.toml
     under the [Outlier settings] header.
 
     .. image:: _static/img/movement_outlier.png

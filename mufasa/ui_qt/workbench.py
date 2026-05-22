@@ -718,7 +718,7 @@ class MufasaWorkbench(QMainWindow):
 
     def _on_open_project(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open Mufasa project_config.ini", "",
+            self, "Open Mufasa project.toml", "",
             "Project config (*.ini);;All files (*)",
         )
         if path:

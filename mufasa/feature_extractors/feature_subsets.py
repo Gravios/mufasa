@@ -155,7 +155,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
        :align: center
 
     :example:
-    >>> test = FeatureSubsetsCalculator(config_path=r"C:/troubleshooting/mitra/project_folder/project_config.ini",
+    >>> test = FeatureSubsetsCalculator(config_path=r"C:/troubleshooting/mitra/project.toml",
     >>>                               feature_families=[FRAME_BP_MOVEMENT, WITHIN_ANIMAL_THREE_POINT_ANGLES],
     >>>                               file_checks=False,
     >>>                               save_dir=r"C:/troubleshooting/mitra/project_folder/csv/new_features")

@@ -31,7 +31,7 @@ class DirectingROIAnalyzer(ConfigReader, FeatureExtractionMixin):
        `Example expected output file <https://github.com/sgoldenlab/mufasa/blob/master/docs/ROI_tutorial_new.md>`__.
 
     :example:
-    >>> test = DirectingROIAnalyzer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/project_config.ini')
+    >>> test = DirectingROIAnalyzer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml')
     >>> test.run()
     >>> test.save()
     """

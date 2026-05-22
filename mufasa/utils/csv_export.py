@@ -79,7 +79,7 @@ def export_features_csv(
     :param video_name: Video stem; ``.mp4`` etc. tolerated and
         stripped.
     :param config_path: Path to ``project.toml`` (v1) or
-        ``project_config.ini`` (legacy).
+        ``project.toml`` (legacy).
     :param dest_dir: Directory to write into. Created if needed.
     :param include_index: When True (default), include a leading
         positional pad column so legacy ``read_df`` consumers

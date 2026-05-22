@@ -164,7 +164,7 @@ class ROIClfCalculatorMultiprocess(ConfigReader):
        'GitHub tutorial <https://github.com/sgoldenlab/mufasa/blob/master/docs/Scenario2.md#part-4--analyze-machine-results`__.
 
     :example:
-    >>> analyzer = ROIClfCalculatorMultiprocess(config_path=r"D:/troubleshooting/maplight_ri/project_folder/project_config.ini", bp_names=['resident_NOSE'], clf_names=['attack'], clf_time=True, started_bout_cnt=True, ended_bout_cnt=False, bout_table=True, transpose=True, core_cnt=20)
+    >>> analyzer = ROIClfCalculatorMultiprocess(config_path=r"D:/troubleshooting/maplight_ri/project.toml", bp_names=['resident_NOSE'], clf_names=['attack'], clf_time=True, started_bout_cnt=True, ended_bout_cnt=False, bout_table=True, transpose=True, core_cnt=20)
     >>> analyzer.run()
     >>> analyzer.save()
     """
@@ -282,7 +282,7 @@ class ROIClfCalculatorMultiprocess(ConfigReader):
             stdout_success(msg=f"Detailed classification by ROI bout data for saved in {self.bout_save_path}.", elapsed_time=self.timer.elapsed_time_str)
 
 # if __name__ == "__main__":
-#     analyzer = ROIClfCalculator(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project_config.ini",
+#     analyzer = ROIClfCalculator(config_path=r"D:\troubleshooting\maplight_ri\project_folder\project.toml",
 #                                 bp_names=['resident_NOSE'],
 #                                 clf_names=['attack'],
 #                                 clf_time=True,
@@ -294,16 +294,16 @@ class ROIClfCalculatorMultiprocess(ConfigReader):
 #     analyzer.run()
 #     analyzer.save()
 
-# analyzer = ROIClfCalculator(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini", bp_names=['Nose'], clf_names=['straub_tail'], roi_names=['Cue_light_1'], bout_table=True)
+# analyzer = ROIClfCalculator(config_path=r"C:\troubleshooting\mitra\project_folder\project.toml", bp_names=['Nose'], clf_names=['straub_tail'], roi_names=['Cue_light_1'], bout_table=True)
 # analyzer.run()
 # analyzer.save()
 
-# analyzer = ROIClfCalculator(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini", bp_names=['Nose'], clf_names=['straub_tail'], measures=['TOTAL BEHAVIOR TIME IN ROI (S)'])
+# analyzer = ROIClfCalculator(config_path=r"C:\troubleshooting\mitra\project_folder\project.toml", bp_names=['Nose'], clf_names=['straub_tail'], measures=['TOTAL BEHAVIOR TIME IN ROI (S)'])
 # analyzer.run()
 #
 
 
-#clf_ROI_analyzer = clf_within_ROI(config_ini="/Users/simon/Desktop/troubleshooting/train_model_project/project_folder/project_config.ini")
+#clf_ROI_analyzer = clf_within_ROI(config_ini="/Users/simon/Desktop/troubleshooting/train_model_project/project.toml")
 #clf_ROI_analyzer.run(behavior_list=['Attack', 'Sniffing'], ROI_dict_lists={'Rectangle': ['rec'], 'Circle': ['Stimulus 1', 'Stimulus 2', 'Stimulus 3']}, body_part_list=['Nose_1'], measurements=['Total time by ROI (s)', 'Started bouts by ROI (count)', 'Ended bouts by ROI (count)'])
 
 
@@ -312,6 +312,6 @@ class ROIClfCalculatorMultiprocess(ConfigReader):
 
 
 #
-# clf_ROI_analyzer = clf_within_ROI(config_ini="/Users/simon/Desktop/troubleshooting/train_model_project/project_folder/project_config.ini")
+# clf_ROI_analyzer = clf_within_ROI(config_ini="/Users/simon/Desktop/troubleshooting/train_model_project/project.toml")
 # clf_ROI_analyzer.run(behavior_list=['Attack', 'Sniffing'], ROI_dict_lists={'Rectangle': ['rec'], 'Circle': ['Stimulus 1', 'Stimulus 2', 'Stimulus 3']}, body_part_list=['Nose_1'], measurements=['Total time by ROI (s)', 'Started bouts by ROI (count)', 'Ended bouts by ROI (count)'])
 #

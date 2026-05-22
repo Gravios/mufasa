@@ -72,11 +72,11 @@ class MitraFeatureExtractor(ConfigReader,
 
 
 
-    :param Union[str, os.PathLike] config_path: Path to SimBA project_config.ini.
+    :param Union[str, os.PathLike] config_path: Path to SimBA project.toml.
     :return: None. Featurized pose-estimation data is saved in the mufasa project `project_folder/csv/features_extracted` directory.
 
     :example:
-    >>> feature_extractor = MitraFeatureExtractor(config_path=r"D:\troubleshooting\mitra\project_folder\project_config.ini")
+    >>> feature_extractor = MitraFeatureExtractor(config_path=r"D:\troubleshooting\mitra\project_folder\project.toml")
     >>> feature_extractor.run()
 
     References
@@ -239,11 +239,11 @@ class MitraFeatureExtractor(ConfigReader,
 #     feature_extractor = MitraFeatureExtractor(config_path=args.config_path)
 #     feature_extractor.run()
 #
-#feature_extractor = MitraFeatureExtractor(config_path=r"F:\troubleshooting\sam\sam\project_folder\project_config.ini")
+#feature_extractor = MitraFeatureExtractor(config_path=r"F:\troubleshooting\sam\sam\project_folder\project.toml")
 #feature_extractor.run()
 
 
-# feature_extractor = MitraFeatureExtractor(config_path=r"E:\troubleshooting\mitra_pbn\mitra_pbn\project_folder\project_config.ini")
+# feature_extractor = MitraFeatureExtractor(config_path=r"E:\troubleshooting\mitra_pbn\mitra_pbn\project_folder\project.toml")
 # feature_extractor.run()
 
 

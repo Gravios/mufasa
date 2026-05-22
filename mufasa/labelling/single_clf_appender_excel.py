@@ -82,6 +82,6 @@ class SingleClfAppenderExcel(ConfigReader):
         self.timer.stop_timer()
         stdout_success(f'{CLASSIFIER_NAME} labels for {len(self.label_dict.keys())} files saved in {self.save_dir} (TOTAL FRAME LABELS: {frm_lbl_cnt})', source=self.__class__.__name__)
 
-# r = SingleClfAppenderExcel(config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project_config.ini", label_path=r"C:\Users\sroni\Downloads\maplight_aggression.xlsx")
+# r = SingleClfAppenderExcel(config_path=r"E:\troubleshooting\two_black_animals_14bp\project_folder\project.toml", label_path=r"C:\Users\sroni\Downloads\maplight_aggression.xlsx")
 # r.run()
 

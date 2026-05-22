@@ -34,7 +34,7 @@ class CueLightClfAnalyzer(ConfigReader):
        `Cue light tutorials <https://github.com/sgoldenlab/mufasa/blob/master/docs/cue_light_tutorial.md>`__.
 
     :example:
-    >>> test = CueLightClfAnalyzer(config_path=r"C:\troubleshooting\cue_light\t1\project_folder\project_config.ini",
+    >>> test = CueLightClfAnalyzer(config_path=r"C:\troubleshooting\cue_light\t1\project_folder\project.toml",
     >>>                            pre_window=1,
     >>>                            post_window=1,
     >>>                            cue_light_names=['cl'],

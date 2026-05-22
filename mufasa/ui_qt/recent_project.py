@@ -2,7 +2,7 @@
 
 Patch 121i. Convention mirrors patch 121h (~/.config/mufasa/
 models/): a single file at ~/.config/mufasa/recent holds the
-absolute path to the last opened project_config.ini. One line,
+absolute path to the last opened project.toml. One line,
 plain text. Silent failures on read/write (read-only home,
 network share quirks) — the launcher just degrades back to its
 prior auto-discover behavior.

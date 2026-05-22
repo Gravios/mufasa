@@ -206,8 +206,7 @@ If you already have **behavioral annotations** (frame-by-frame labels, not pose)
 
 When you create a project (Projects → Create or open project), you choose the project format:
 
-- **v1 TOML** (`project.toml`): recommended for all new projects. Cleaner schema, per-classifier sections under `[classifier_inference.<name>]`, designed for round-tripping. Data tree under `derived/`.
-- **Legacy INI** (`project_config.ini`): SimBA-compatible. Use only if you need to share with an external SimBA workflow. Data tree under `csv/features_extracted/`, `csv/targets_inserted/`, `csv/machine_results/`.
+- **v1 TOML** (`project.toml`): the only supported project format. Cleaner schema, per-classifier sections under `[classifier_inference.<name>]`, designed for round-tripping. Data tree under `derived/`. Legacy SimBA `project_config.ini` support was removed across patches 122dw–122dz.
 
 The form layer dispatches both formats transparently (via `mufasa.project_layout.write_classifier_inference_settings` / `write_classifier_training_settings`). All importers, extractors, training, and inference work on either. **Visualization and analysis output structure differs** between the two — legacy INI projects don't have a `derived/` tree.
 

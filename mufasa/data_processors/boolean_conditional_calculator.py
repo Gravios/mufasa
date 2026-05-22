@@ -38,14 +38,14 @@ class BooleanConditionalCalculator(ConfigReader):
 
     :example I:
     >>> rules = {'Rectangle_1 Simon in zone': 'TRUE', 'Polygon_1 JJ in zone': 'TRUE'} #  OR {'Rectangle_1 Simon in zone': True, 'Polygon_1 JJ in zone': True}
-    >>> conditional_bool_rule_calculator = BooleanConditionalCalculator(rules=rules, config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project_folder/project_config.ini')
+    >>> conditional_bool_rule_calculator = BooleanConditionalCalculator(rules=rules, config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project.toml')
     >>> conditional_bool_rule_calculator.run()
     >>> conditional_bool_rule_calculator.save()
 
 
     :example II:
     >>> rules = {'Stimulus 2 Animal_1 in zone': True, 'Stimulus 6 Animal_1 in zone': 'falsE'}
-    >>> runner = BooleanConditionalCalculator(rules=rules, config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini", data_path=r'C:\troubleshooting\RAT_NOR\project_folder\csv\features_extracted')
+    >>> runner = BooleanConditionalCalculator(rules=rules, config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project.toml", data_path=r'C:\troubleshooting\RAT_NOR\project_folder\csv\features_extracted')
     >>> runner.run()
     >>> runner.save()
 
@@ -136,7 +136,7 @@ class BooleanConditionalCalculator(ConfigReader):
 
 #'Stimulus 2 Animal_1 in zone', 'Stimulus 2 Animal_1 facing'
 # rules = {'Stimulus 2 Animal_1 in zone': True, 'Stimulus 6 Animal_1 in zone': 'falsE'}
-# runner = BooleanConditionalCalculator(rules=rules, config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini", data_path=r'C:\troubleshooting\RAT_NOR\project_folder\csv\features_extracted')
+# runner = BooleanConditionalCalculator(rules=rules, config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project.toml", data_path=r'C:\troubleshooting\RAT_NOR\project_folder\csv\features_extracted')
 # runner.run()
 # runner.save()
 #

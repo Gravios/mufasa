@@ -143,7 +143,7 @@ class CircularPlotting(PlottingMixin):
 # print(np.rad2deg(circmean(np.deg2rad(data))))
 #
 #
-# config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/project_config.ini'
+# config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml'
 # save_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/frames/output/20200730_AB_7dpf_850nm_0002.png'
 # DW = 20
 # MAX_SECONDS = 10

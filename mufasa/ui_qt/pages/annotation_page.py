@@ -34,7 +34,7 @@ Patch 122aa
   through :func:`project_paths_from_config` is a separate
   deferred item.
 * Project-load error messages updated to mention both v1
-  (``project.toml``) and legacy (``project_config.ini``)
+  (``project.toml``) and legacy (``project.toml``)
   project files.
 """
 from __future__ import annotations

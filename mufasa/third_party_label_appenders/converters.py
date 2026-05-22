@@ -752,10 +752,10 @@ def simba_rois_to_yolo(config_path: Optional[Union[str, os.PathLike]] = None,
     :return: None
 
     :example I:
-    >>> simba_rois_to_yolo(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini")
+    >>> simba_rois_to_yolo(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project.toml")
 
     :example II:
-    >>> simba_rois_to_yolo(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project_config.ini", save_dir=r"C:\troubleshooting\RAT_NOR\project_folder\logs\yolo", video_dir=r"C:\troubleshooting\RAT_NOR\project_folder\videos", roi_path=r"C:\troubleshooting\RAT_NOR\project_folder\logs\measures\ROI_definitions.h5")
+    >>> simba_rois_to_yolo(config_path=r"C:\troubleshooting\RAT_NOR\project_folder\project.toml", save_dir=r"C:\troubleshooting\RAT_NOR\project_folder\logs\yolo", video_dir=r"C:\troubleshooting\RAT_NOR\project_folder\videos", roi_path=r"C:\troubleshooting\RAT_NOR\project_folder\logs\measures\ROI_definitions.h5")
 
     :example III:
     >>> simba_rois_to_yolo(video_dir=r"C:\troubleshooting\RAT_NOR\project_folder\videos", roi_path=r"C:\troubleshooting\RAT_NOR\project_folder\logs\measures\ROI_definitions.h5", save_dir=r'C:\troubleshooting\RAT_NOR\project_folder\yolo', verbose=True, roi_frm_cnt=20, obb=True)
@@ -1786,7 +1786,7 @@ def simba_to_yolo_keypoints(config_path: Union[str, os.PathLike],
     :return: None. Saves YOLO-formatted images and annotations to disk in the `save_dir` location.
 
     :example:
-    >>> simba_to_yolo_keypoints(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini", save_dir=r'C:\troubleshooting\mitra\yolo', sample_size=150, verbose=True)
+    >>> simba_to_yolo_keypoints(config_path=r"C:\troubleshooting\mitra\project_folder\project.toml", save_dir=r'C:\troubleshooting\mitra\yolo', sample_size=150, verbose=True)
     """
 
     timer = SimbaTimer(start=True)
@@ -1918,7 +1918,7 @@ def simba_to_yolo_keypoints(config_path: Union[str, os.PathLike],
 
 
 
-#simba_to_yolo_keypoints(config_path=r"C:\troubleshooting\mitra\project_folder\project_config.ini", save_dir=r'C:\troubleshooting\mitra\yolo', sample_size=150, verbose=True)
+#simba_to_yolo_keypoints(config_path=r"C:\troubleshooting\mitra\project_folder\project.toml", save_dir=r'C:\troubleshooting\mitra\yolo', sample_size=150, verbose=True)
 
 #labelme_to_yolo(labelme_dir=r'D:\netholabs\imgs\labels_labelme', save_dir=r'D:\netholabs\imgs\labels_yolo', obb=False, verbose=True)
 #split_yolo_train_test_val(data_dir=r'D:\netholabs\imgs\labels_yolo', save_dir=r"D:\netholabs\imgs\yolo_train_test_val", verbose=True)

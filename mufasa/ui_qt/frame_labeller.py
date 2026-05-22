@@ -100,7 +100,7 @@ class FrameLabellerWidget(QWidget):
         ----------
         config_path : str
             Path to the project config (``project.toml`` for v1 or
-            ``project_config.ini`` for legacy).
+            ``project.toml`` for legacy).
         video_path : str
             Absolute path to the video being annotated.
         mode : {"new", "continue", "pseudo"}
@@ -597,7 +597,7 @@ def launch_frame_labeller(parent: QWidget,
     if not config_path:
         QMessageBox.warning(
             parent, "No project",
-            "Load a project (project.toml or project_config.ini) "
+            "Load a project (project.toml or project.toml) "
             "before labelling.",
         )
         return
