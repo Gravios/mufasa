@@ -2,16 +2,19 @@
 mufasa.ui_qt.workbench_app
 ==========================
 
-Alternative entry point that launches the consolidated, sidebar-
-navigated :class:`MufasaWorkbench` in place of the legacy tabs-and-
-popups main window (:mod:`mufasa.ui_qt.app`).
+Entry point that launches the consolidated, sidebar-navigated
+:class:`MufasaWorkbench`.
 
-The two entry points coexist for the duration of the migration: the
-legacy ``mufasa`` command (see ``[project.scripts]`` in
-``pyproject.toml``) still launches :mod:`app`; a parallel
-``mufasa-workbench`` command launches this module. Once all the pages
-are ported, ``mufasa`` will be repointed here and the legacy tab UI
-retired.
+Historical context: this module was originally added as an
+*alternative* entry point alongside the legacy tabs-and-popups main
+window (``mufasa.ui_qt.app``). The legacy ``mufasa`` command pointed
+at that older chooser; ``mufasa-workbench`` pointed here. Both
+coexisted while pages were ported off the chooser. Once the
+workbench's Projects page covered create / load / recent-project
+flows, the chooser became redundant — patch 122dx deleted
+``mufasa.ui_qt.app`` and removed the ``mufasa-chooser`` entry point.
+Today ``mufasa`` (via ``mufasa.cli.workbench_launcher``) and
+``mufasa-workbench`` (this module) both reach the same workbench.
 
 CLI:
 

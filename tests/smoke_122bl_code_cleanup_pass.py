@@ -282,12 +282,19 @@ def main() -> int:
         not in transform_utils,
     )
 
-    app_py = (pkg_root / "ui_qt" / "app.py").read_text()
+    # Patch 122dx — relaxed. 122bl asserted that `ui_qt/app.py`
+    # had a descriptive legacy-chooser TODO mentioning the
+    # workbench; that was useful while app.py still existed and
+    # we wanted to make sure the deprecation breadcrumb was
+    # discoverable. 122dx deleted app.py entirely, so the file-
+    # existence half of the assertion is impossible. Flipped to
+    # a deletion tripwire so the deprecation doesn't silently
+    # regress.
     check(
-        "ui_qt/app.py: legacy-chooser TODO is now descriptive "
-        "(mentions workbench)",
-        ("# TODO: wire up Interpolate" in app_py
-         and "workbench" in app_py),
+        "ui_qt/app.py: file deleted (was the legacy Qt chooser; "
+        "removed in 122dx — see smoke_122dx_legacy_chooser_removal "
+        "for the strict tripwire)",
+        not (pkg_root / "ui_qt" / "app.py").exists(),
     )
 
     print(

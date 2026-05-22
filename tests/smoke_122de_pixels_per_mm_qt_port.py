@@ -212,20 +212,29 @@ def main() -> int:
         detail=", ".join(gpm_hits[:3]),
     )
 
-    # 11. Total .py count >= 416 (was an exact == 416 pin; relaxed
-    # to a floor in 122ds because that patch added section_provenance.py
-    # — and future patches will add more modules. The semantic check
-    # 122de needed was "px_to_mm_ui.py and ui/__init__.py have been
-    # removed and stayed removed"; the file count was a proxy for that.
-    # The dedicated checks 1-10 above already verify the removal
-    # directly. Following the snapshot-resilience convention
-    # documented in session_handoff.md.)
+    # 11. Total .py count sanity check.
+    #
+    # History: this was originally an exact `== 416` pin tied to
+    # 122de's deletions (removed px_to_mm_ui.py + ui/__init__.py,
+    # 418 → 416). It got relaxed to `>= 416` in 122ds when section_
+    # provenance.py was added, then 122dx invalidated the floor by
+    # deleting ui_qt/app.py (415). Per the snapshot-resilience
+    # convention (session_handoff.md), file-count floors don't
+    # belong here — every cleanup patch (122dv, 122dw, 122dx, the
+    # legacy-deletion arc generally) deletes files, and re-relaxing
+    # the floor at each one is noise. Dropped to a coarse
+    # plausibility band (>= 300, <= 800) that catches catastrophic
+    # repository corruption / accidental rm -rf without re-pinning
+    # to specific values. The semantic check 122de needed (the two
+    # specific files stayed removed) is already covered by checks
+    # 1-10 directly.
     total_py = sum(1 for _ in pkg.rglob("*.py"))
     check(
-        f"Total mufasa/**/*.py count is >= 416 "
-        f"(was 418 pre-122de, dropped to 416 by removing 2 files; "
-        f"got {total_py}; later patches add modules)",
-        total_py >= 416,
+        f"Total mufasa/**/*.py count is in a plausible range "
+        f"(300..800; got {total_py}). Floor previously pinned to "
+        f"specific values; dropped per snapshot-resilience after "
+        f"122dx made the 416 floor untenable.",
+        300 <= total_py <= 800,
     )
 
     # 12. Parse-clean
