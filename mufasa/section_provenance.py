@@ -82,11 +82,12 @@ or moving provenance to a sidecar file with atomic-rename writes).
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from mufasa.project_layout import read_project_toml, write_project_toml
 
@@ -457,11 +458,34 @@ def get_all_statuses(
     return out
 
 
+def find_section_by_title(
+    page: str, section_title: str,
+) -> SectionSpec | None:
+    """Look up a :class:`SectionSpec` by its (page, section_title) pair.
+
+    Patch 122du — used by the UI to bridge between
+    ``WorkflowPage`` (which knows section_title strings) and
+    :data:`SECTIONS` (which keys by section_id). Returns ``None``
+    if no section matches, which is the right behavior for
+    informational-only sections (e.g., "Input source" pickers, the
+    "Advanced / legacy" group on Pose cleanup) that aren't tracked
+    for provenance.
+
+    Linear scan — :data:`SECTIONS` has ~14 entries today; not worth
+    indexing.
+    """
+    for spec in SECTIONS.values():
+        if spec.page == page and spec.section_title == section_title:
+            return spec
+    return None
+
+
 __all__ = [
     "ProvenanceError",
     "SECTIONS",
     "SectionSpec",
     "SectionStatus",
+    "find_section_by_title",
     "get_all_statuses",
     "get_status",
     "record_run",
