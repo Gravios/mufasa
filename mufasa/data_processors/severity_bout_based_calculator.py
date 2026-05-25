@@ -305,5 +305,5 @@ class SeverityBoutCalculator(ConfigReader, FeatureExtractionMixin):
 #             'visualize_event_cnt': 'ALL CLIPS',
 #             'video_speed': 0.1,
 #             'show_pose': True}
-# processor = SeverityBoutCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', settings=settings)
+# processor = SeverityBoutCalculator(config_path='/path/to/troubleshooting/two_black_animals_14bp/project.toml', settings=settings)
 # processor.run()

@@ -242,7 +242,7 @@ class BoundaryVisualizer(ConfigReader, PlottingMixin):
         stdout_success(msg=f"Anchored ROI video created at {self.save_video_path}")
 
 
-# boundary_visualizer = BoundaryVisualizer(config_path='/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project.toml',
+# boundary_visualizer = BoundaryVisualizer(config_path='/path/to/troubleshooting/sleap_5_animals/project.toml',
 #                                          video_name='Testing_Video_3',
 #                                          include_key_points=True,
 #                                          greyscale=True,
@@ -250,7 +250,7 @@ class BoundaryVisualizer(ConfigReader, PlottingMixin):
 #                                          roi_attributes=None)
 # boundary_visualizer.run_visualization()
 
-# boundary_visualizer = BoundaryVisualizer(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml',
+# boundary_visualizer = BoundaryVisualizer(config_path='/path/to/troubleshooting/two_black_animals_14bp/project.toml',
 #                                          video_name='Together_3',
 #                                          include_key_points=True,
 #                                          greyscale=True,

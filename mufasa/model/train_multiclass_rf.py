@@ -350,6 +350,6 @@ class TrainMultiClassRandomForestClassifier(ConfigReader, TrainModelMixin):
         )
 
 
-# model_trainer = TrainMultiClassRandomForestClassifier(config_path='/Users/simon/Desktop/envs/troubleshooting/multilabel/project.toml')
+# model_trainer = TrainMultiClassRandomForestClassifier(config_path='/path/to/troubleshooting/multilabel/project.toml')
 # model_trainer.run()
 # model_trainer.save_model()

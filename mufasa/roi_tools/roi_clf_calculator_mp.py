@@ -303,7 +303,7 @@ class ROIClfCalculatorMultiprocess(ConfigReader):
 #
 
 
-#clf_ROI_analyzer = clf_within_ROI(config_ini="/Users/simon/Desktop/troubleshooting/train_model_project/project.toml")
+#clf_ROI_analyzer = clf_within_ROI(config_ini="/path/to/troubleshooting/train_model_project/project.toml")
 #clf_ROI_analyzer.run(behavior_list=['Attack', 'Sniffing'], ROI_dict_lists={'Rectangle': ['rec'], 'Circle': ['Stimulus 1', 'Stimulus 2', 'Stimulus 3']}, body_part_list=['Nose_1'], measurements=['Total time by ROI (s)', 'Started bouts by ROI (count)', 'Ended bouts by ROI (count)'])
 
 
@@ -312,6 +312,6 @@ class ROIClfCalculatorMultiprocess(ConfigReader):
 
 
 #
-# clf_ROI_analyzer = clf_within_ROI(config_ini="/Users/simon/Desktop/troubleshooting/train_model_project/project.toml")
+# clf_ROI_analyzer = clf_within_ROI(config_ini="/path/to/troubleshooting/train_model_project/project.toml")
 # clf_ROI_analyzer.run(behavior_list=['Attack', 'Sniffing'], ROI_dict_lists={'Rectangle': ['rec'], 'Circle': ['Stimulus 1', 'Stimulus 2', 'Stimulus 3']}, body_part_list=['Nose_1'], measurements=['Total time by ROI (s)', 'Started bouts by ROI (count)', 'Ended bouts by ROI (count)'])
 #

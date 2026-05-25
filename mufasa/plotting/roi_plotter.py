@@ -78,8 +78,8 @@ class ROIPlotter(ConfigReader):
     :param Tuple[int, int, int] border_bg_clr: RGB tuple representing the background color of the border area where statistics are displayed. Default: (0, 0, 0).
 
     :example:
-    >>> test = ROIPlotter(config_path=r'/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project.toml',
-    >>>                video_path="/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT.mp4",
+    >>> test = ROIPlotter(config_path=r'/path/to/mufasa/troubleshooting/mouse_open_field/project.toml',
+    >>>                video_path="/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT.mp4",
     >>>                body_parts=['Nose'],
     >>>                show_body_part=True,
     >>>                show_animal_name=True)

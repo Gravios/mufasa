@@ -465,8 +465,8 @@ def smooth_data_gaussian(
 
     Example
     ----------
-    >>> config = read_config_file(ini_path='/Users/simon/Desktop/envs/troubleshooting/Tests_022023/project.toml')
-    >>> smooth_data_gaussian(config=config, file_path='/Users/simon/Desktop/envs/troubleshooting/Tests_022023/project_folder/csv/input_csv/Together_1.csv', time_window_parameter=500)
+    >>> config = read_config_file(ini_path='/path/to/troubleshooting/Tests_022023/project.toml')
+    >>> smooth_data_gaussian(config=config, file_path='/path/to/troubleshooting/Tests_022023/project_folder/csv/input_csv/Together_1.csv', time_window_parameter=500)
     """
 
     check_int(name="Gaussian time window", value=time_window_parameter)
@@ -1015,7 +1015,7 @@ def slp_to_df_convert(
     >>> headers = ['d_nose_1', 'd_neck_1', 'd_back_1', 'd_tail_1', 'nest_s_2', 'nest_cc_2', 'nest_cv_2', 'nest_cc_2', 'nest_csc_2', 'nest_cscd_2']
     >>> new_headers = []
     >>> for h in headers: new_headers.append(h + '_x'); new_headers.append(h + '_y'); new_headers.append(h + '_p')
-    >>> df = slp_to_df_convert(file_path='/Users/simon/Desktop/envs/troubleshooting/ryan/LBN4a_Ctrl_P05_1_2022-01-15_08-16-20c.h5', headers=new_headers, joined_tracks=True)
+    >>> df = slp_to_df_convert(file_path='/path/to/troubleshooting/ryan/LBN4a_Ctrl_P05_1_2022-01-15_08-16-20c.h5', headers=new_headers, joined_tracks=True)
     """
 
     video_name = get_fn_ext(filepath=file_path)[1]
@@ -1219,8 +1219,8 @@ def run_user_defined_feature_extraction_class(file_path: Union[str, os.PathLike]
        throttled by the graphical interface mainloop.
 
     :example:
-    >>> run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml', file_path='/Users/simon/Desktop/fish_feature_extractor_2023_version_5.py')
-    >>> run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini', file_path='/mufasa/misc/piotr.py')
+    >>> run_user_defined_feature_extraction_class(config_path='/path/to/troubleshooting/circular_features_zebrafish/project.toml', file_path='/path/to/fish_feature_extractor_2023_version_5.py')
+    >>> run_user_defined_feature_extraction_class(config_path='/path/to/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini', file_path='/mufasa/misc/piotr.py')
     """
 
     check_file_exist_and_readable(file_path=file_path)
@@ -1289,7 +1289,7 @@ def animal_interpolator(df: pd.DataFrame,
 
     :example:
     >>> animal_bp_dict = {'Animal_1': {'X_bps': ['Ear_left_1_x', 'Ear_right_1_x', 'Nose_1_x', 'Center_1_x', 'Lat_left_1_x', 'Lat_right_1_x', 'Tail_base_1_x'], 'Y_bps': ['Ear_left_1_y', 'Ear_right_1_y', 'Nose_1_y', 'Center_1_y', 'Lat_left_1_y', 'Lat_right_1_y', 'Tail_base_1_y']}, 'Animal_2': {'X_bps': ['Ear_left_2_x', 'Ear_right_2_x', 'Nose_2_x', 'Center_2_x', 'Lat_left_2_x', 'Lat_right_2_x', 'Tail_base_2_x'], 'Y_bps': ['Ear_left_2_y', 'Ear_right_2_y', 'Nose_2_y', 'Center_2_y', 'Lat_left_2_y', 'Lat_right_2_y', 'Tail_base_2_y']}}
-    >>> df = pd.read_csv('/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/machine_results/Together_1.csv', index_col=0)
+    >>> df = pd.read_csv('/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/machine_results/Together_1.csv', index_col=0)
     >>> interpolated_df = animal_interpolator(df=df, animal_bp_dict=animal_bp_dict, source='test')
 
     """
@@ -1334,7 +1334,7 @@ def body_part_interpolator(df: pd.DataFrame,
 
     :example:
     >>> animal_bp_dict = {'Animal_1': {'X_bps': ['Ear_left_1_x', 'Ear_right_1_x', 'Nose_1_x', 'Center_1_x', 'Lat_left_1_x', 'Lat_right_1_x', 'Tail_base_1_x'], 'Y_bps': ['Ear_left_1_y', 'Ear_right_1_y', 'Nose_1_y', 'Center_1_y', 'Lat_left_1_y', 'Lat_right_1_y', 'Tail_base_1_y']}, 'Animal_2': {'X_bps': ['Ear_left_2_x', 'Ear_right_2_x', 'Nose_2_x', 'Center_2_x', 'Lat_left_2_x', 'Lat_right_2_x', 'Tail_base_2_x'], 'Y_bps': ['Ear_left_2_y', 'Ear_right_2_y', 'Nose_2_y', 'Center_2_y', 'Lat_left_2_y', 'Lat_right_2_y', 'Tail_base_2_y']}}
-    >>> df = pd.read_csv('/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/machine_results/Together_1.csv', index_col=0)
+    >>> df = pd.read_csv('/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/machine_results/Together_1.csv', index_col=0)
     >>> interpolated_df = body_part_interpolator(df=df, animal_bp_dict=animal_bp_dict, source='test')
     """
 
@@ -1381,7 +1381,7 @@ def savgol_smoother(data: Union[pd.DataFrame, np.ndarray],
     :return Union[pd.DataFrame, np.ndarray]: The smoothed data, returned as a DataFrame if the input was a DataFrame, or a NumPy array if the input was an array.
 
     :example:
-    >>> data = pd.read_csv('/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/machine_results/Together_1.csv', index_col=0)
+    >>> data = pd.read_csv('/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/machine_results/Together_1.csv', index_col=0)
     >>> savgol_smoother(data=data.values, fps=15, time_window=1000)
     """
 
@@ -1968,15 +1968,15 @@ def scale_pose_keypoints(keypoints: np.ndarray,
 
 
 #get_cpu_pool()
-# run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml', file_path='/Users/simon/Desktop/fish_feature_extractor_2023_version_5.py')
+# run_user_defined_feature_extraction_class(config_path='/path/to/troubleshooting/circular_features_zebrafish/project.toml', file_path='/path/to/fish_feature_extractor_2023_version_5.py')
 
 
 # user_class(config_path=config_path)
 
-# run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini',
-#                                           file_path='/Users/simon/Desktop/envs/simba_dev/mufasa/feature_extractors/misc/piotr.py')
+# run_user_defined_feature_extraction_class(config_path='/path/to/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini',
+#                                           file_path='/path/to/simba_dev/mufasa/feature_extractors/misc/piotr.py')
 
 # data = {'Animal_1': 0.34786870380536705, 'Animal_2': 0.4307923198152757, 'Animal_3': 0.221338976379357}
 # find_ranked_colors(data=data, palette='magma', as_hex=True)
-# run_user_defined_feature_extraction_class(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml',
-#                                           file_path='/Users/simon/Desktop/fish_feature_extractor_2023_version_5.py')
+# run_user_defined_feature_extraction_class(config_path='/path/to/troubleshooting/circular_features_zebrafish/project.toml',
+#                                           file_path='/path/to/fish_feature_extractor_2023_version_5.py')

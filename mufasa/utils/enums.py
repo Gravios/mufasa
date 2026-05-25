@@ -70,7 +70,7 @@ class Paths(Enum):
     CLUSTER_EXAMPLES = Path("frames/output/cluster_examples/")
     CLF_VALIDATION_DIR = Path("frames/output/classifier_validation/")
     CLF_DATA_VALIDATION_DIR = Path("csv/validation/")
-    TEST_PATH = "/Users/simon/Desktop/envs/simba_dev/mufasa/"
+    TEST_PATH = "/path/to/simba_dev/mufasa/"
     BLOB_POSITION_PATH = Path("csv/output/blob_positions/")
     CUE_LIGHTS_PATH = Path("csv/cue_lights/")
     SINGLE_CLF_VALIDATION = Path("frames/output/validation/")

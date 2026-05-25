@@ -101,7 +101,7 @@ def import_dlc_csv_data(config_path: Union[str, os.PathLike],
     :example:
     >>> interpolation_settings = {'type': 'body-parts', 'method': 'linear'}
     >>> smoothing_settings = None #{'time_window': 500, 'method': 'savitzky-golay'}
-    >>> import_dlc_csv_data(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml', data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/new_data', interpolation_settings=interpolation_settings, smoothing_settings=smoothing_settings)
+    >>> import_dlc_csv_data(config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml', data_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/new_data', interpolation_settings=interpolation_settings, smoothing_settings=smoothing_settings)
 
     """
 

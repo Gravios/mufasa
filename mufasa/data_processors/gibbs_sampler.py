@@ -24,8 +24,8 @@ class GibbSampler():
      :param float pseudo_number: Small error value for fuzzy search and avoid division by zero errors. Default: 10e-6.
 
      :example:
-     >>> data = pd.read_csv(r"/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/sample_data/gibbs_sample_cardinal.csv", index_col=0).values
-     >>> sampler = GibbSampler(data=data, save_path=r'/Users/simon/Desktop/gibbs.csv', epochs=5, iterations=600)
+     >>> data = pd.read_csv(r"/path/to/mufasa/mufasa/tests/data/sample_data/gibbs_sample_cardinal.csv", index_col=0).values
+     >>> sampler = GibbSampler(data=data, save_path=r'/path/to/gibbs.csv', epochs=5, iterations=600)
      >>> sampler.run()
 
      :references:
@@ -148,6 +148,6 @@ class GibbSampler():
 # sampler = GibbSampler(data=data, save_path=r'C:\Users\sroni\OneDrive\Desktop\gibbs.csv', iterations=5)
 # sampler.run()
 
-# data = pd.read_csv(r"/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/sample_data/gibbs_sample_cardinal.csv", index_col=0).values
-# sampler = GibbSampler(data=data, save_path=r'/Users/simon/Desktop/gibbs.csv', epochs=5, iterations=600)
+# data = pd.read_csv(r"/path/to/mufasa/mufasa/tests/data/sample_data/gibbs_sample_cardinal.csv", index_col=0).values
+# sampler = GibbSampler(data=data, save_path=r'/path/to/gibbs.csv', epochs=5, iterations=600)
 # sampler.run()

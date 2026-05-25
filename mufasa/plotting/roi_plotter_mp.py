@@ -186,8 +186,8 @@ class ROIPlotMultiprocess(ConfigReader):
     :param bool gpu: If True, use GPU acceleration for video concatenation. Default: False.
 
     :example:
-    >>> test = ROIPlotMultiprocess(config_path=r'/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project.toml',
-    >>>                            video_path="/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT.mp4",
+    >>> test = ROIPlotMultiprocess(config_path=r'/path/to/mufasa/troubleshooting/mouse_open_field/project.toml',
+    >>>                            video_path="/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT.mp4",
     >>>                            core_cnt=7,
     >>>                            body_parts=['Nose'],
     >>>                            show_body_part=True,

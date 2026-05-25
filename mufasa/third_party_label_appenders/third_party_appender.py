@@ -68,8 +68,8 @@ class ThirdPartyLabelAppender(ConfigReader):
 
 
     :example:
-    >>>test = ThirdPartyLabelAppender(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
-    >>>                           data_dir='/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/test_projects/two_c57/observer_annotations',
+    >>>test = ThirdPartyLabelAppender(config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
+    >>>                           data_dir='/path/to/mufasa/mufasa/tests/data/test_projects/two_c57/observer_annotations',
     >>>                           app=OBSERVER,
     >>>                           file_format='.xlsx',
     >>>                           error_settings=error_settings,

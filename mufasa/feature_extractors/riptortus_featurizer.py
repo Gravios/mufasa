@@ -52,7 +52,7 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
     :return: None. Featurized pose-estimation data is saved in the mufasa project `project_folder/csv/features_extracted` directory.
 
     :example:
-    >>> _ = RiptortusFeaturizer(config_path='/Users/simon/Desktop/envs/troubleshooting/naresh/project.toml')
+    >>> _ = RiptortusFeaturizer(config_path='/path/to/troubleshooting/naresh/project.toml')
 
     """
 

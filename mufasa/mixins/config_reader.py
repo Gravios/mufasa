@@ -1283,15 +1283,15 @@ class ConfigReader(object):
         )
 
 
-# config = ConfigReader(config_path='/Users/simon/Desktop/envs/simba_dev/tests/data/test_projects/two_c57/project.toml', read_video_info=False)
+# config = ConfigReader(config_path='/path/to/simba_dev/tests/data/test_projects/two_c57/project.toml', read_video_info=False)
 
 # config.read_roi_data()
 
 
-# config = ConfigReader(config_path='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project.toml', read_video_info=False)
+# config = ConfigReader(config_path='/path/to/troubleshooting/Nastacia_unsupervised/project.toml', read_video_info=False)
 # config.read_roi_data()
-# config.remove_roi_features('/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project_folder/csv/features_extracted')
+# config.remove_roi_features('/path/to/troubleshooting/Nastacia_unsupervised/project_folder/csv/features_extracted')
 
 # remove_roi_features(
-#     config_path='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project.toml',
-#     data_dir='/Users/simon/Desktop/envs/troubleshooting/Nastacia_unsupervised/project_folder/csv/features_extracted')
+#     config_path='/path/to/troubleshooting/Nastacia_unsupervised/project.toml',
+#     data_dir='/path/to/troubleshooting/Nastacia_unsupervised/project_folder/csv/features_extracted')

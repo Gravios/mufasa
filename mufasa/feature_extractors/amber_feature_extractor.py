@@ -105,7 +105,7 @@ class AmberFeatureExtractor(ConfigReader, FeatureExtractionMixin):
        :align: center
 
     :example:
-    >>> AmberFeatureExtractor(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml')
+    >>> AmberFeatureExtractor(config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml')
 
     References
     ----------
@@ -1632,5 +1632,5 @@ class AmberFeatureExtractor(ConfigReader, FeatureExtractionMixin):
 
 
 #
-# extractor = AmberFeatureExtractor(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml')
+# extractor = AmberFeatureExtractor(config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml')
 # extractor.run()

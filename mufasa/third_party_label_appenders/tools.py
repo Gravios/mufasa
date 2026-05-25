@@ -205,9 +205,9 @@ def read_ethovision_files(
     return dfs
 
 
-# video_info_df = read_video_info_csv(file_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/logs/video_info.csv')
+# video_info_df = read_video_info_csv(file_path='/path/to/troubleshooting/two_black_animals_14bp/project_folder/logs/video_info.csv')
 #
-# df = read_ethovision_files(data_paths=['/Users/simon/Desktop/envs/simba_dev/tests/test_data/import_tests/ethovision_data/correct.xlsx'],
+# df = read_ethovision_files(data_paths=['/path/to/simba_dev/tests/test_data/import_tests/ethovision_data/correct.xlsx'],
 #                                 error_setting='WARNING',
 #                                  log_setting=False,
 #                                  video_info_df=video_info_df)
@@ -283,9 +283,9 @@ def read_observer_files(
     return dfs
 
 
-# video_info_df = read_video_info_csv(file_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/logs/video_info.csv')
+# video_info_df = read_video_info_csv(file_path='/path/to/troubleshooting/two_black_animals_14bp/project_folder/logs/video_info.csv')
 #
-# df = read_observer_files(data_paths=['/Users/simon/Desktop/envs/troubleshooting/Gosia/source/behaviours/Exp_38/03+11WT_20171010-120856_4_no_dupl_no_audio_fps4_grey-simba_crop_frame_n.xlsx'],
+# df = read_observer_files(data_paths=['/path/to/troubleshooting/Gosia/source/behaviours/Exp_38/03+11WT_20171010-120856_4_no_dupl_no_audio_fps4_grey-simba_crop_frame_n.xlsx'],
 #                          error_setting='WARNING',
 #                          log_setting=False,
 #                         video_info_df=video_info_df)
@@ -355,9 +355,9 @@ def read_solomon_files(
     return dfs
 
 
-# video_info_df = read_video_info_csv(file_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/logs/video_info.csv')
+# video_info_df = read_video_info_csv(file_path='/path/to/troubleshooting/two_black_animals_14bp/project_folder/logs/video_info.csv')
 #
-# df = read_solomon_files(data_paths=['/Users/simon/Desktop/envs/simba_dev/tests/test_data/solomon_import/solomon_import/Together_1.csv'],
+# df = read_solomon_files(data_paths=['/path/to/simba_dev/tests/test_data/solomon_import/solomon_import/Together_1.csv'],
 #                          error_setting='WARNING',
 #                          log_setting=False,
 #                          video_info_df=video_info_df)

@@ -158,9 +158,9 @@ class EzPathPlot(object):
 
 
 
-#DATA_PATH = '/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/csv/outlier_corrected_movement_location/2022-06-20_NOB_DOT_4.csv'
-# DATA_PATH = '/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/csv/outlier_corrected_movement_location/2022-06-20_NOB_DOT_4.csv'
-# VIDEO_DIR = '/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos'
+#DATA_PATH = '/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/csv/outlier_corrected_movement_location/2022-06-20_NOB_DOT_4.csv'
+# DATA_PATH = '/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/csv/outlier_corrected_movement_location/2022-06-20_NOB_DOT_4.csv'
+# VIDEO_DIR = '/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos'
 #
 # BP = 'Nose'
 #

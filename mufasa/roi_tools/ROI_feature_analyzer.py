@@ -48,7 +48,7 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
 
 
     :example:
-    >>> roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml', body_parts=['Nose_1', 'Nose_2'])
+    >>> roi_featurizer = ROIFeatureCreator(config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml', body_parts=['Nose_1', 'Nose_2'])
     >>> roi_featurizer.run()
     >>> roi_featurizer.save()
 
@@ -229,18 +229,18 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
 
 
 #
-# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
+# roi_featurizer = ROIFeatureCreator(config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
 #                                    body_parts=['Nose_1', 'Nose_2'],
-#                                    data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location/Together_1.csv')
+#                                    data_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location/Together_1.csv')
 # roi_featurizer.run()
 
 
-# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml')
+# roi_featurizer = ROIFeatureCreator(config_path='/path/to/troubleshooting/two_black_animals_14bp/project.toml')
 # roi_featurizer.roi_directing_viable
 # roi_featurizer.run()
 # roi_featurizer.save()
 
 
-# roi_featurizer = ROIFeatureCreator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project.toml')
+# roi_featurizer = ROIFeatureCreator(config_path='/path/to/troubleshooting/two_animals_16bp_032023/project.toml')
 # roi_featurizer.run()
 # roi_featurizer.save()

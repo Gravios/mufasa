@@ -51,7 +51,7 @@ class SpontaneousAlternationCalculator(ConfigReader):
     :param Optional[Union[str, os.PathLike]] data_path: Directory of path to the file to be analyzed. If None, then ``project_folder/outlier_corrected_movement_location`` directory.
 
     :example:
-    >>> x = SpontaneousAlternationCalculator(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project.toml', arm_names=['A', 'B', 'C'], center_name='Center', threshold=0.0, animal_area=100, buffer=2, detailed_data=True)
+    >>> x = SpontaneousAlternationCalculator(config_path='/path/to/mufasa/troubleshooting/spontenous_alternation/project.toml', arm_names=['A', 'B', 'C'], center_name='Center', threshold=0.0, animal_area=100, buffer=2, detailed_data=True)
     >>> x.run()
     >>> x.save()
     """
@@ -164,7 +164,7 @@ class SpontaneousAlternationCalculator(ConfigReader):
 
             stdout_success(msg=f"Detailed spontaneous alternation data for {len(list(self.results.keys()))} video(s) saved at {save_dir}")
 
-# config_path = '/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project.toml'
+# config_path = '/path/to/mufasa/troubleshooting/spontenous_alternation/project.toml'
 # arm_names = ['A', 'B', 'C']
 # center_name = 'Center'
 # threshold = 0.0

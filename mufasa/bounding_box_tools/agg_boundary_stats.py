@@ -198,7 +198,7 @@ class AggBoundaryStatisticsCalculator(ConfigReader):
         self.detailed_interactions_results[self.file_name] = df
 
 
-# boundary_stats_calculator = AggBoundaryStatisticsCalculator('/Users/simon/Desktop/envs/troubleshooting/sleap_5_animals/project.toml',
+# boundary_stats_calculator = AggBoundaryStatisticsCalculator('/path/to/troubleshooting/sleap_5_animals/project.toml',
 #                                                             measures=['INTERACTION TIME (s)', 'DETAILED INTERACTIONS TABLE'], shortest_allowed_interaction=0)
 # boundary_stats_calculator.run()
 # boundary_stats_calculator.save()

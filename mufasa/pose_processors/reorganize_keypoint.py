@@ -151,10 +151,10 @@ class KeypointReorganizer(object):
         )
 
 
-# keypoint_reorganizer = KeypointReorganizer(data_folder="/Users/simon/Desktop/envs/troubleshooting/Termites_5/import_h5", pose_tool='SLEAP', file_format='csv')
-# keypoint_reorganizer = KeypointReorganizer(data_folder="/Users/simon/Desktop/envs/troubleshooting/Termites_5/import_h5", pose_tool='SLEAP', file_format='SLEAP H5')
-# keypoint_reorganizer = KeypointReorganizer(data_folder="/Users/simon/Desktop/troubleshooting/B1-MS_US/el_import", pose_tool='maDLC', file_format='h5')
+# keypoint_reorganizer = KeypointReorganizer(data_folder="/path/to/troubleshooting/Termites_5/import_h5", pose_tool='SLEAP', file_format='csv')
+# keypoint_reorganizer = KeypointReorganizer(data_folder="/path/to/troubleshooting/Termites_5/import_h5", pose_tool='SLEAP', file_format='SLEAP H5')
+# keypoint_reorganizer = KeypointReorganizer(data_folder="/path/to/troubleshooting/B1-MS_US/el_import", pose_tool='maDLC', file_format='h5')
 # keypoint_reorganizer.run(animal_list=['UM', 'LM', 'LM', 'UM', 'LM', 'UM', 'LM', 'LM', 'UM', 'LM', 'UM', 'UM', 'UM', 'UM', 'LM', 'LM'], bp_lst=['Nose', 'Tail_base', 'Tail_base', 'Lateral_right', 'Ear_right', 'Center', 'Nose', 'Ear_left', 'Ear_right', 'Center', 'Tail_end', 'Ear_left', 'Tail_base', 'Lateral_left', 'Tail_end', 'Lateral_right'])
 
-# keypoint_reorganizer = KeypointReorganizer(data_folder="//Users/simon/Desktop/simbapypi_dev/tests/test_data/misc_test_files", pose_tool='DLC', file_format='csv')
+# keypoint_reorganizer = KeypointReorganizer(data_folder="//path/to/simbapypi_dev/tests/test_data/misc_test_files", pose_tool='DLC', file_format='csv')
 # keypoint_reorganizer.run(bp_lst=['Ear_left_1', 'Ear_right_1', 'Nose_1', 'Center_1', 'Lateral_left_1', 'Lateral_right_1', 'Tail_base_1', 'Ear_left_2', 'Ear_right_2', 'Nose_2', 'Center_2', 'Lateral_left_2', 'Lateral_right_2', 'Tail_base_2'], animal_list=None)
