@@ -244,7 +244,44 @@ class OperationForm(QWidget):
         try:
             from mufasa.section_provenance import record_run
             record_run(self.config_path, self.section_id, run_id)
+        except KeyError as exc:
+            # Patch 122eo — KeyError from record_run means the
+            # form's section_id isn't in
+            # :data:`mufasa.section_provenance.SECTIONS`. That's a
+            # PROGRAMMING bug (form class attribute typo or
+            # missing SECTIONS declaration), not a runtime issue
+            # the user can recover from. Surface it via
+            # ``logging.error`` so developers running the app in
+            # dev mode see it loudly in stderr instead of
+            # the bug being swallowed by the broader
+            # ``except Exception`` clause below.
+            #
+            # The :func:`smoke_122em_section_id_audit` smoke test
+            # catches this class of bug at commit time; this
+            # branch is the runtime fallback for drift that slips
+            # through (e.g., a developer who doesn't run the
+            # smoke before shipping a new form). Defense in depth.
+            #
+            # We don't raise (would crash the success-callback
+            # and disrupt the user) nor show a QMessageBox
+            # (heavy-handed for a dev-time bug). logging.error
+            # is the right balance.
+            import logging
+            logging.error(
+                "[provenance] section_id=%r is not declared in "
+                "SECTIONS — provenance NOT recorded for this "
+                "run. This is a programming bug; the form's "
+                "section_id attribute should match a key in "
+                "mufasa.section_provenance.SECTIONS. Error: %s",
+                self.section_id, exc,
+            )
+            # Don't return — still attempt the publish below;
+            # the symbols are independent concerns.
         except Exception as exc:
+            # Transient runtime issues (IO error, file lock,
+            # malformed project.toml). Console-print is
+            # sufficient — the user shouldn't be blocked by a
+            # transient problem; next run will record correctly.
             print(
                 f"[provenance] record_run failed for "
                 f"{self.section_id!r}: {type(exc).__name__}: {exc}"
