@@ -321,18 +321,33 @@ def get_roi_data(roi_path: Union[str, os.PathLike], video_name: str) -> tuple:
 
     if os.path.isfile(roi_path):
         in_rectangles_df, in_circles_df, in_polygon_df = read_roi_data(roi_path=roi_path)
-        other_video_names_w_rois = list(set(list(in_rectangles_df['Video'].unique()) + list(in_circles_df['Video'].unique()) + list(in_polygon_df['Video'].unique())))
+        # Patch 122er-hotfix — same empty-DataFrame defensive
+        # pattern as 122ek (multiply_ROIs / reset_video_ROIs).
+        # Missed in the 122ek audit; surfaced when the user
+        # exercised the ROI Definitions → Apply-to-selected
+        # flow on a rectangles-only project. ``read_roi_data``
+        # returns empty DataFrames (no columns) for unused
+        # shape types; the naked .unique() and df['Video'] ==
+        # filters then raise KeyError 'Video'.
+        other_video_names_w_rois = list(set(
+            list(safe_videos_in(in_rectangles_df))
+            + list(safe_videos_in(in_circles_df))
+            + list(safe_videos_in(in_polygon_df))
+        ))
         other_video_names_w_rois = [x for x in other_video_names_w_rois if x != video_name]
         if len(other_video_names_w_rois) == 0: other_video_names_w_rois = ['']
-        rectangles_df = in_rectangles_df[in_rectangles_df['Video'] == video_name].reset_index(drop=True)
-        circles_df = in_circles_df[in_circles_df['Video'] == video_name].reset_index(drop=True)
-        polygon_df = in_polygon_df[in_polygon_df['Video'] == video_name].reset_index(drop=True)
-        other_rectangles_df = in_rectangles_df[in_rectangles_df['Video'] != video_name].reset_index(drop=True)
-        other_circles_df = in_circles_df[in_circles_df['Video'] != video_name].reset_index(drop=True)
-        other_polygon_df = in_polygon_df[in_polygon_df['Video'] != video_name].reset_index(drop=True)
+        rectangles_df = safe_filter_by_video(in_rectangles_df, video_name).reset_index(drop=True)
+        circles_df = safe_filter_by_video(in_circles_df, video_name).reset_index(drop=True)
+        polygon_df = safe_filter_by_video(in_polygon_df, video_name).reset_index(drop=True)
+        other_rectangles_df = safe_filter_video_neq(in_rectangles_df, video_name).reset_index(drop=True)
+        other_circles_df = safe_filter_video_neq(in_circles_df, video_name).reset_index(drop=True)
+        other_polygon_df = safe_filter_video_neq(in_polygon_df, video_name).reset_index(drop=True)
         other_roi_dict = get_roi_dict_from_dfs(rectangle_df=other_rectangles_df, circle_df=other_circles_df, polygon_df=other_polygon_df, video_name_nesting=True)
         if len(rectangles_df) + len(circles_df) + len(polygon_df) > 0:
-            roi_names = list(set(list(rectangles_df['Name'].unique()) + list(circles_df['Name'].unique()) + list(polygon_df['Name'].unique())))
+            # Same defensive pattern for 'Name' column.
+            def _names(df):
+                return list(df['Name'].unique()) if 'Name' in df.columns else []
+            roi_names = list(set(_names(rectangles_df) + _names(circles_df) + _names(polygon_df)))
             roi_dict = get_roi_dict_from_dfs(rectangle_df=rectangles_df, circle_df=circles_df, polygon_df=polygon_df, video_name_nesting=False)
 
     return (rectangles_df, circles_df, polygon_df, roi_dict, roi_names, other_roi_dict, other_video_names_w_rois)
@@ -340,9 +355,15 @@ def get_roi_data(roi_path: Union[str, os.PathLike], video_name: str) -> tuple:
 
 def get_roi_data_for_video_name(roi_path: Union[str, os.PathLike], video_name: str):
     in_rectangles_df, in_circles_df, in_polygon_df = read_roi_data(roi_path=roi_path)
-    rectangles_df = in_rectangles_df[in_rectangles_df['Video'] == video_name].reset_index(drop=True)
-    circles_df = in_circles_df[in_circles_df['Video'] == video_name].reset_index(drop=True)
-    polygon_df = in_polygon_df[in_polygon_df['Video'] == video_name].reset_index(drop=True)
+    # Patch 122er-hotfix — same defensive pattern as 122ek.
+    # The user's reported KeyError 'Video' fired here when
+    # clicking Run in the "Apply ROIs to selected videos"
+    # dialog on a rectangles-only project. ``read_roi_data``
+    # returns empty DataFrames (no columns) for unused shape
+    # types; naked df['Video'] filters raise KeyError.
+    rectangles_df = safe_filter_by_video(in_rectangles_df, video_name).reset_index(drop=True)
+    circles_df = safe_filter_by_video(in_circles_df, video_name).reset_index(drop=True)
+    polygon_df = safe_filter_by_video(in_polygon_df, video_name).reset_index(drop=True)
     roi_dict = get_roi_dict_from_dfs(rectangle_df=rectangles_df, circle_df=circles_df, polygon_df=polygon_df, video_name_nesting=False)
     return roi_dict
 
