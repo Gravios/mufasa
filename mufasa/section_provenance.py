@@ -151,12 +151,32 @@ class SectionSpec:
           sections like Pixels-per-mm calibration that don't produce
           a file) skip the fallback and remain UNKNOWN until
           explicit provenance lands.
+    ui_bound
+        Patch 122el — when False, the section is declared in the DAG
+        (for dependency tracking and future planning) but no
+        QGroupBox in the workbench currently corresponds to it. The
+        :func:`smoke_122el_section_binding_audit` smoke test skips
+        the resolution check for these entries. Defaults to True
+        (the normal case — section has a QGroupBox to attach a
+        badge to). Set to False for:
+
+        * Sections whose form is composited inside another
+          QGroupBox (e.g. ``savitzky_golay`` lives inside
+          "Advanced / legacy").
+        * Sections that are aspirationally declared but have no
+          implemented form yet (e.g. ``drop_body_parts``,
+          ``features_subject``).
+
+        Provenance can still be recorded for ui_bound=False sections
+        via explicit ``record_run`` calls from backend code; the
+        badge UI just doesn't render for them.
     """
     section_id: str
     page: str
     section_title: str
     depends_on: tuple[str, ...] = field(default_factory=tuple)
     detect_path: Callable[[Path], Path] | None = None
+    ui_bound: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +215,12 @@ SECTIONS: dict[str, SectionSpec] = {
     "pixels_per_mm": SectionSpec(
         section_id="pixels_per_mm",
         page="Preprocessing",
-        section_title="Pixels-per-mm calibration",
+        # Patch 122el — title was "Pixels-per-mm calibration",
+        # but the workbench section is registered as "Video
+        # Calibration" (which configures pixels-per-mm calibration
+        # via a calibration video). Audit caught the silent
+        # badge-suppression.
+        section_title="Video Calibration",
         depends_on=(),
         # No detect_path — pixels_per_mm is a settings-only section,
         # no on-disk artifact materializes from it. Stays UNKNOWN
@@ -214,7 +239,9 @@ SECTIONS: dict[str, SectionSpec] = {
     "kalman_v2": SectionSpec(
         section_id="kalman_v2",
         page="Preprocessing",
-        section_title="Kalman v2 smoother",
+        # Patch 122el — was "Kalman v2 smoother"; workbench
+        # uses "Kalman v2 smoothing" (audit caught the typo).
+        section_title="Kalman v2 smoothing",
         depends_on=("import_pose",),
         # Patch 122ei — derived/smoothed/kalman_v2/ (the
         # source-flavor-prefixed layout that 122dt's
@@ -246,6 +273,12 @@ SECTIONS: dict[str, SectionSpec] = {
         page="Preprocessing",
         section_title="Savitzky-Golay smoother (legacy)",
         depends_on=("outlier_correction",),
+        # Patch 122el — savitzky_golay form is composited inside
+        # the "Advanced / legacy" QGroupBox on the Preprocessing
+        # page, not registered as its own add_section. No badge
+        # surface exists; mark unbound so the binding audit
+        # skips the resolution check.
+        ui_bound=False,
     ),
     "egocentric": SectionSpec(
         section_id="egocentric",
@@ -258,6 +291,10 @@ SECTIONS: dict[str, SectionSpec] = {
         page="Preprocessing",
         section_title="Drop body parts",
         depends_on=("import_pose",),
+        # Patch 122el — no form for this section currently exists
+        # in the workbench. Aspirational placeholder for the
+        # workflow DAG; mark unbound until the form is implemented.
+        ui_bound=False,
     ),
     "roi_definitions": SectionSpec(
         section_id="roi_definitions",
@@ -270,17 +307,27 @@ SECTIONS: dict[str, SectionSpec] = {
         page="Features",
         section_title="Subject features",
         depends_on=("outlier_correction",),
+        # Patch 122el — Features page only has "Compute feature
+        # subsets" currently; no separate "Subject features"
+        # section. Aspirational; mark unbound.
+        ui_bound=False,
     ),
     "features_roi": SectionSpec(
         section_id="features_roi",
-        page="Features",
-        section_title="ROI features",
+        # Patch 122el — ROI features form is on the ROI page,
+        # registered as "Features", not on the Features page
+        # (which only has "Compute feature subsets"). Audit
+        # caught the cross-page misbinding.
+        page="ROI",
+        section_title="Features",
         depends_on=("outlier_correction", "roi_definitions"),
     ),
     "annotation": SectionSpec(
         section_id="annotation",
         page="Annotation",
-        section_title="Annotate",
+        # Patch 122el — was "Annotate"; the workbench section
+        # that hosts the labelling activity is "Frame labelling".
+        section_title="Frame labelling",
         depends_on=("features_subject",),
     ),
     "classifier_train": SectionSpec(
@@ -292,7 +339,9 @@ SECTIONS: dict[str, SectionSpec] = {
     "classifier_run": SectionSpec(
         section_id="classifier_run",
         page="Classifier",
-        section_title="Run classifier",
+        # Patch 122el — was "Run classifier"; workbench section
+        # is "Run inference". Same shape of typo as 122ej.
+        section_title="Run inference",
         depends_on=("classifier_train",),
     ),
 }
