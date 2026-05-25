@@ -301,6 +301,14 @@ SECTIONS: dict[str, SectionSpec] = {
         page="ROI",
         section_title="Definitions",
         depends_on=("pixels_per_mm",),
+        # Patch 122ep — points at logs/measures/ROI_definitions.h5
+        # (the SINGLE FILE the ROI definitions live in, per 122eh +
+        # 122en's centralized layout). _path_mtime_if_has_content
+        # handles file targets via the ``path.is_file()`` branch.
+        # Detection signal: "the user has saved any ROIs at all."
+        detect_path=lambda root: (
+            root / "logs" / "measures" / "ROI_definitions.h5"
+        ),
     ),
     "features_subject": SectionSpec(
         section_id="features_subject",
@@ -321,6 +329,12 @@ SECTIONS: dict[str, SectionSpec] = {
         page="ROI",
         section_title="Features",
         depends_on=("outlier_correction", "roi_definitions"),
+        # No detect_path — ROI features land in
+        # ``derived/features/`` mixed with subject features;
+        # filesystem evidence can't distinguish "ROI features
+        # appended" from "subject features computed." Skip the
+        # implicit detection; rely on explicit ``record_run``
+        # if/when this section gets wired to a form's section_id.
     ),
     "annotation": SectionSpec(
         section_id="annotation",
@@ -329,12 +343,24 @@ SECTIONS: dict[str, SectionSpec] = {
         # that hosts the labelling activity is "Frame labelling".
         section_title="Frame labelling",
         depends_on=("features_subject",),
+        # Patch 122ep — per-video annotation labels land at
+        # derived/labels/<video>.parquet. Any non-hidden entry
+        # in the dir counts as "annotation has happened."
+        detect_path=lambda root: root / "derived" / "labels",
     ),
     "classifier_train": SectionSpec(
         section_id="classifier_train",
         page="Classifier",
         section_title="Train classifier",
         depends_on=("features_subject", "annotation"),
+        # Patch 122ep — trained classifier .sav files land in
+        # the project's models/ directory. NB: this also fires
+        # if the user merely COPIED in pre-trained models from
+        # another project, which is acceptable — "models exist
+        # to run inference with" is the right semantic for a
+        # CURRENT badge here, even if not literally "this
+        # project trained them."
+        detect_path=lambda root: root / "models",
     ),
     "classifier_run": SectionSpec(
         section_id="classifier_run",
@@ -343,6 +369,13 @@ SECTIONS: dict[str, SectionSpec] = {
         # is "Run inference". Same shape of typo as 122ej.
         section_title="Run inference",
         depends_on=("classifier_train",),
+        # Patch 122ep — per-video inference outputs land at
+        # derived/classifications/<video>.parquet (the post-
+        # 122ax v1 location — no run_id subdir under
+        # derived/classifications/, the writer is flat).
+        detect_path=lambda root: (
+            root / "derived" / "classifications"
+        ),
     ),
 }
 
