@@ -97,7 +97,7 @@ Qt enum (3 checks):
 Cross-patch invariants:
 9.  122ek state preserved: ``multiply_ROIs`` /
     ``reset_video_ROIs`` still use the safe helpers.
-10. 122ep state preserved: 8 of 11 ui_bound sections have
+10. 122ep + 122es state preserved: 9 of 11 ui_bound sections have
     detect_path.
 11. 122en state preserved: v1_project_paths canonical.
 12. Parse-clean.
@@ -304,9 +304,9 @@ def main() -> int:
     ui_bound = [s for s in SECTIONS.values() if s.ui_bound]
     with_detect = [s for s in ui_bound if s.detect_path is not None]
     check(
-        "122ep state preserved: 8 of 11 ui_bound sections "
+        "122ep + 122es state preserved: 9 of 11 ui_bound sections "
         "have detect_path",
-        len(with_detect) == 8 and len(ui_bound) == 11,
+        len(with_detect) == 9 and len(ui_bound) == 11,
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 

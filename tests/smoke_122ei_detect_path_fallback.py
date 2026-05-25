@@ -188,12 +188,17 @@ def main() -> int:
             detail=(f"got {getattr(spec, 'detect_path', None)!r}"),
         )
 
-    # 6. pixels_per_mm has no detect_path (settings-only section).
+    # 6. pixels_per_mm detect_path. Was None pre-122es ("settings-
+    # only — no on-disk artifact"); patch 122es-hotfix flipped
+    # that — the calibration table SAVES to sources/video_info.csv,
+    # which IS the on-disk artifact. This check is now a
+    # reciprocal-tripwire for the 122es flip.
     pp = SECTIONS.get("pixels_per_mm")
     check(
-        "SECTIONS['pixels_per_mm'].detect_path is None "
-        "(settings-only section — no on-disk artifact)",
-        pp is not None and pp.detect_path is None,
+        "SECTIONS['pixels_per_mm'].detect_path is callable "
+        "(post-122es flip — points at sources/video_info.csv, "
+        "the calibration table the form saves)",
+        pp is not None and callable(pp.detect_path),
     )
 
     # -----------------------------------------------------------------
@@ -267,12 +272,21 @@ def main() -> int:
             detail=f"got {s.value!r}",
         )
 
-        # 13. pixels_per_mm → UNKNOWN regardless
+        # 13. pixels_per_mm → reciprocal-tripwire flip post-122es.
+        # The functional check now verifies the OPPOSITE: with
+        # sources/video_info.csv on disk, pixels_per_mm should
+        # read CURRENT (its detect_path picks up the file's
+        # mtime as the implicit last_run_at).
+        # In this tempdir we don't write video_info.csv as part
+        # of the test setup, so pixels_per_mm reads UNKNOWN
+        # here. The "is CURRENT with video_info.csv present"
+        # check is in smoke_122es_video_calibration_detect_path.
         s = get_status(str(cfg), "pixels_per_mm")
         check(
-            "pixels_per_mm reads UNKNOWN regardless of filesystem "
-            "state (no detect_path — settings-only section can't "
-            "be auto-detected)",
+            "pixels_per_mm reads UNKNOWN when sources/"
+            "video_info.csv is absent (122es flip — the file's "
+            "presence is the implicit-evidence signal; absent → "
+            "UNKNOWN)",
             s == SectionStatus.UNKNOWN,
             detail=f"got {s.value!r}",
         )

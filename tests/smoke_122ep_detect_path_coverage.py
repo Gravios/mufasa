@@ -196,7 +196,7 @@ def main() -> int:
     # -----------------------------------------------------------------
     # Deliberate non-coverage
     # -----------------------------------------------------------------
-    for sid in ("egocentric", "features_roi", "pixels_per_mm"):
+    for sid in ("egocentric", "features_roi"):
         spec = SECTIONS.get(sid)
         check(
             f"SECTIONS[{sid!r}].detect_path is None "
@@ -295,9 +295,10 @@ def main() -> int:
     ui_bound = [s for s in SECTIONS.values() if s.ui_bound]
     with_detect = [s for s in ui_bound if s.detect_path is not None]
     check(
-        "8 of 11 ui_bound sections have detect_path post-122ep "
-        "(was 4 of 11 post-122ei — patch 122ep added 4 more)",
-        len(with_detect) == 8 and len(ui_bound) == 11,
+        "9 of 11 ui_bound sections have detect_path "
+        "(122ep added 4 producer-style sections; 122es flipped "
+        "pixels_per_mm from None → sources/video_info.csv)",
+        len(with_detect) == 9 and len(ui_bound) == 11,
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 
