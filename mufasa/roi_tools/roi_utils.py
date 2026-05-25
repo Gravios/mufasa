@@ -39,6 +39,64 @@ warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 DRAW_FRAME_NAME = "DEFINE SHAPE"
 
+
+# ---------------------------------------------------------------------------
+# Patch 122ek — defensive helpers for ROI consumers.
+#
+# Background: roi_logic.RoiLogic writes all three HDF keys (rectangles,
+# circles, polygons) to the ROI definitions file even when the user only
+# drew one shape type. The DataFrames for the unused shape types come back
+# from ``pd.read_hdf`` as empty with NO columns at all. Naked
+# ``df[df["Video"] == name]`` or ``df["Video"].unique()`` accesses raise
+# KeyError 'Video' on these empty DataFrames.
+#
+# 122ej fixed the analogous bug in ``ConfigReader.read_roi_data`` (the dialog-
+# open path). 122ek extends the same tolerance to the other ROI consumers
+# audited in the same session: ``multiply_ROIs`` and ``reset_video_ROIs``
+# here in roi_utils, plus the Duplicate ROIs dialog's Apply body and the ROI
+# size standardizer.
+# ---------------------------------------------------------------------------
+def _empty_like(df: pd.DataFrame) -> pd.DataFrame:
+    """Return an empty DataFrame with the same columns as ``df``. Used as
+    the safe-filter return value when the column being filtered on is
+    absent — preserves callers' downstream assumption that the result is
+    still a DataFrame (just with zero rows)."""
+    return df.iloc[0:0]
+
+
+def safe_filter_by_video(
+    df: pd.DataFrame, video_name: str,
+) -> pd.DataFrame:
+    """Filter ``df`` by ``Video == video_name``, tolerating DataFrames
+    that don't have a ``Video`` column (the empty-from-roi_logic case
+    described in the module-level note). Returns an empty DataFrame
+    when the column is missing; standard pandas filter result
+    otherwise.
+    """
+    if "Video" not in df.columns:
+        return _empty_like(df)
+    return df[df["Video"] == video_name]
+
+
+def safe_filter_video_neq(
+    df: pd.DataFrame, video_name: str,
+) -> pd.DataFrame:
+    """Filter ``df`` by ``Video != video_name``, tolerating missing
+    ``Video`` column. Useful for "remove rows for this video"
+    semantics in re-write loops."""
+    if "Video" not in df.columns:
+        return _empty_like(df)
+    return df[df["Video"] != video_name]
+
+
+def safe_videos_in(df: pd.DataFrame) -> List[str]:
+    """Return list of unique videos in ``df["Video"]``, or empty list
+    if the column is missing (empty-from-roi_logic case)."""
+    if "Video" not in df.columns:
+        return []
+    return list(df["Video"].unique())
+
+
 def create_rectangle_entry(rectangle_selector: Union[ROISelector, "InteractiveROIBufferer"],
                            video_name: str,
                            shape_name: str,
@@ -491,13 +549,24 @@ def multiply_ROIs(filename: Union[str, os.PathLike],
     circles_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_CIRCLES.value)
     polygon_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_POLYGONS.value)
 
-    check_valid_dataframe(df=rectangles_df, source=f'{multiply_ROIs.__name__} rectangles_df', required_fields=['Video', 'Name'])
-    check_valid_dataframe(df=circles_df, source=f'{multiply_ROIs.__name__} circles_df', required_fields=['Video', 'Name'])
-    check_valid_dataframe(df=polygon_df, source=f'{multiply_ROIs.__name__} polygon_df', required_fields=['Video', 'Name'])
+    # Patch 122ek — only apply check_valid_dataframe to non-empty
+    # frames. roi_logic.RoiLogic writes all three HDF keys even
+    # when the user only drew one shape type; the unused-shape
+    # frames come back as empty with no columns at all, and the
+    # check would otherwise raise InvalidInputError "missing
+    # required columns" on a legitimate "no shapes of this type"
+    # state. See the module-level note above safe_filter_by_video
+    # for the broader rationale.
+    if len(rectangles_df) > 0:
+        check_valid_dataframe(df=rectangles_df, source=f'{multiply_ROIs.__name__} rectangles_df', required_fields=['Video', 'Name'])
+    if len(circles_df) > 0:
+        check_valid_dataframe(df=circles_df, source=f'{multiply_ROIs.__name__} circles_df', required_fields=['Video', 'Name'])
+    if len(polygon_df) > 0:
+        check_valid_dataframe(df=polygon_df, source=f'{multiply_ROIs.__name__} polygon_df', required_fields=['Video', 'Name'])
 
-    videos_w_rectangles = list(rectangles_df["Video"].unique())
-    videos_w_circles = list(circles_df["Video"].unique())
-    videos_w_polygons = list(polygon_df["Video"].unique())
+    videos_w_rectangles = safe_videos_in(rectangles_df)
+    videos_w_circles = safe_videos_in(circles_df)
+    videos_w_polygons = safe_videos_in(polygon_df)
     videos_w_shapes = list(set(videos_w_rectangles + videos_w_circles + videos_w_polygons))
     if video_name not in videos_w_shapes:
         raise NoROIDataError(msg=f"Cannot replicate ROIs to all other videos: no ROI records exist for {video_name}. Create ROIs for for video {video_name}", source=multiply_ROIs.__name__)
@@ -507,9 +576,9 @@ def multiply_ROIs(filename: Union[str, os.PathLike],
     if len(other_video_file_paths) == 0:
         raise NoROIDataError(msg=f"Cannot replicate ROIs to other videos. No other videos exist in project {videos_dir} directory.", source=multiply_ROIs.__name__)
 
-    r_df = [pd.DataFrame(columns=get_rectangle_df_headers()) if video_name not in videos_w_rectangles else rectangles_df[rectangles_df["Video"] == video_name]][0]
-    c_df = [pd.DataFrame(columns=get_circle_df_headers()) if video_name not in videos_w_circles else circles_df[circles_df["Video"] == video_name]][0]
-    p_df = [pd.DataFrame(columns=get_polygon_df_headers()) if video_name not in videos_w_polygons else polygon_df[polygon_df["Video"] == video_name]][0]
+    r_df = [pd.DataFrame(columns=get_rectangle_df_headers()) if video_name not in videos_w_rectangles else safe_filter_by_video(rectangles_df, video_name)][0]
+    c_df = [pd.DataFrame(columns=get_circle_df_headers()) if video_name not in videos_w_circles else safe_filter_by_video(circles_df, video_name)][0]
+    p_df = [pd.DataFrame(columns=get_polygon_df_headers()) if video_name not in videos_w_polygons else safe_filter_by_video(polygon_df, video_name)][0]
 
     rectangle_results, circle_results, polygon_results = deepcopy(r_df), deepcopy(c_df), deepcopy(p_df)
     for other_video_file_name in other_video_file_paths:
@@ -572,20 +641,25 @@ def reset_video_ROIs(config_path: Union[str, os.PathLike],
     rectangles_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_RECTANGLES.value)
     circles_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_CIRCLES.value)
     polygon_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_POLYGONS.value)
-    check_valid_dataframe(df=rectangles_df, source=f'{reset_video_ROIs.__name__} rectangles_df', required_fields=['Video'])
-    check_valid_dataframe(df=circles_df, source=f'{reset_video_ROIs.__name__} circles_df', required_fields=['Video'])
-    check_valid_dataframe(df=polygon_df, source=f'{reset_video_ROIs.__name__} polygon_df', required_fields=['Video'])
-    video_rectangle_roi_records = rectangles_df[rectangles_df["Video"] == video_name]
-    video_circle_roi_records = circles_df[circles_df["Video"] == video_name]
-    video_polygon_roi_records = polygon_df[polygon_df["Video"] == video_name]
+    # Patch 122ek — guard column-required checks on empty
+    # DataFrames (see multiply_ROIs above for rationale).
+    if len(rectangles_df) > 0:
+        check_valid_dataframe(df=rectangles_df, source=f'{reset_video_ROIs.__name__} rectangles_df', required_fields=['Video'])
+    if len(circles_df) > 0:
+        check_valid_dataframe(df=circles_df, source=f'{reset_video_ROIs.__name__} circles_df', required_fields=['Video'])
+    if len(polygon_df) > 0:
+        check_valid_dataframe(df=polygon_df, source=f'{reset_video_ROIs.__name__} polygon_df', required_fields=['Video'])
+    video_rectangle_roi_records = safe_filter_by_video(rectangles_df, video_name)
+    video_circle_roi_records = safe_filter_by_video(circles_df, video_name)
+    video_polygon_roi_records = safe_filter_by_video(polygon_df, video_name)
     video_roi_cnt = len(video_rectangle_roi_records) + len(video_circle_roi_records) + len(video_polygon_roi_records)
     if video_roi_cnt == 0:
         raise NoROIDataError(msg=f"Cannot delete ROIs for video {video_name}: no ROI records exist for {video_name}. Create ROIs for for video {video_name} first", source=reset_video_ROIs.__name__)
 
     store = pd.HDFStore(roi_coordinates_path, mode="w")
-    store[Keys.ROI_RECTANGLES.value] = rectangles_df[rectangles_df["Video"] != video_name]
-    store[Keys.ROI_CIRCLES.value] = circles_df[circles_df["Video"] != video_name]
-    store[Keys.ROI_POLYGONS.value] = polygon_df[polygon_df["Video"] != video_name]
+    store[Keys.ROI_RECTANGLES.value] = safe_filter_video_neq(rectangles_df, video_name)
+    store[Keys.ROI_CIRCLES.value] = safe_filter_video_neq(circles_df, video_name)
+    store[Keys.ROI_POLYGONS.value] = safe_filter_video_neq(polygon_df, video_name)
     store.close()
     stdout_trash(msg=f"Deleted ROI records for video {video_name}. Deleted rectangle count: {len(video_rectangle_roi_records)}, circles: {len(video_circle_roi_records)}, polygons: {len(video_polygon_roi_records)}.")
 

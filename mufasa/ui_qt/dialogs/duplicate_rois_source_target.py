@@ -377,12 +377,19 @@ class DuplicateRoisDialog(QDialog):
                  video_polygon_df) = get_roi_df_from_dict(
                     roi_dict=video_roi_dict)
                 # Overwrite any existing entries for this target.
-                self._reader.rectangles_df = self._reader.rectangles_df[
-                    self._reader.rectangles_df["Video"] != target_video]
-                self._reader.circles_df = self._reader.circles_df[
-                    self._reader.circles_df["Video"] != target_video]
-                self._reader.polygon_df = self._reader.polygon_df[
-                    self._reader.polygon_df["Video"] != target_video]
+                # Patch 122ek — use safe_filter_video_neq (defends
+                # against the empty-DataFrame KeyError when the
+                # project only had one shape type drawn; see
+                # roi_utils module note for rationale).
+                from mufasa.roi_tools.roi_utils import (
+                    safe_filter_video_neq,
+                )
+                self._reader.rectangles_df = safe_filter_video_neq(
+                    self._reader.rectangles_df, target_video)
+                self._reader.circles_df = safe_filter_video_neq(
+                    self._reader.circles_df, target_video)
+                self._reader.polygon_df = safe_filter_video_neq(
+                    self._reader.polygon_df, target_video)
                 self._reader.rectangles_df = pd.concat(
                     [self._reader.rectangles_df, video_rectangles_df],
                     axis=0).reset_index(drop=True)
