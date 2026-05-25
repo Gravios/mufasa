@@ -68,7 +68,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
 from mufasa.ui_qt.forms.image_conversion import AverageFrameForm, ImageFormatConverterForm
 from mufasa.ui_qt.forms.video_bg_removal import BackgroundRemovalForm
@@ -244,7 +244,10 @@ def register_video_processing_menu_actions(workbench) -> None:
                 f"Could not load video frame: {exc}",
             )
             return
-        if dlg.exec() != dlg.Accepted:
+        # Patch 122er-hotfix — was ``dlg.Accepted``; raises
+        # AttributeError in PySide6. The Qt enum lives on the
+        # class (``QDialog.Accepted``), not the instance.
+        if dlg.exec() != QDialog.Accepted:
             return
         ppm = dlg.ppm or 0.0
         if ppm <= 0:

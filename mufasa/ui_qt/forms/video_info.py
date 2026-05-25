@@ -53,6 +53,7 @@ import os
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -535,7 +536,15 @@ class VideoInfoForm(OperationForm):
             )
             return
 
-        if dlg.exec() != dlg.Accepted:
+        # Patch 122er-hotfix — was ``dlg.Accepted`` (instance-
+        # scoped access to the Qt enum), which raises
+        # ``AttributeError: 'PixelCalibrationDialog' object has
+        # no attribute 'Accepted'`` in PySide6. The enum lives
+        # on the class (``QDialog.Accepted``), not the instance.
+        # Same class of bug already documented at
+        # workbench.py:752; missed in two other call sites
+        # until the user hit one of them.
+        if dlg.exec() != QDialog.Accepted:
             return  # User cancelled
         ppm = dlg.ppm or 0.0
 
