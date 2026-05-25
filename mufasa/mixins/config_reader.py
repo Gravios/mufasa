@@ -340,10 +340,27 @@ class ConfigReader(object):
 
         root = Path(self.project_path)
 
+        # Patch 122en — delegate the base v1 paths to the canonical
+        # helper :func:`mufasa.project_layout.v1_project_paths`,
+        # then set ConfigReader's named attrs from the returned
+        # dict. The historical legacy attr names (``input_csv_dir``
+        # vs ``input_pose_dir`` etc.) are preserved for backward
+        # compatibility — only the underlying VALUES are
+        # centralized. See ``v1_project_paths``' docstring for the
+        # drift history that motivated this. Attrs not in the
+        # canonical dict (latest-run resolutions, plots,
+        # misc derived dirs) continue to be set inline below.
+        from mufasa.project_layout import v1_project_paths
+        _paths = v1_project_paths(root)
+
         # ----- Source data --------------------------------------------- #
-        self.input_csv_dir = str(root / "sources" / "pose")
-        self.video_dir = str(root / "sources" / "videos")
-        self.video_info_path = str(root / "sources" / "video_info.csv")
+        # Map canonical-key → legacy attr name. The CR-side name
+        # (``input_csv_dir``) is from the SimBA era; the canonical
+        # key (``input_pose_dir``) is what ``project_paths_from_config``
+        # has always returned. Other consumers reference both.
+        self.input_csv_dir = _paths["input_pose_dir"]
+        self.video_dir = _paths["video_dir"]
+        self.video_info_path = _paths["video_info_path"]
 
         # ----- Multi-run stage resolution ------------------------------ #
         # Patch 122dr — was a local closure named ``_latest_run_or_parent``
@@ -435,37 +452,17 @@ class ConfigReader(object):
         self.data_table_path        = str(derived / "data_tables")
 
         # ----- Logs / ROI definitions / configs ------------------------ #
-        self.logs_path           = str(root / "logs")
-        # Patch 122eh-hotfix — must match what
-        # ``project_paths_from_config`` returns for
-        # ``roi_definitions_path``
-        # (``<root>/logs/measures/ROI_definitions.h5``).
-        # The two helpers disagreed pre-122eh: ConfigReader pointed
-        # at ``<root>/logs/roi_definitions.h5`` (lowercase, no
-        # ``measures/``) while roi_logic.py — which actually
-        # WRITES the ROI definitions file — uses
-        # ``project_paths_from_config`` to get
-        # ``<root>/logs/measures/ROI_definitions.h5``. Reader-side
-        # consumers (duplicate ROIs dialog, ROI size standardizer,
-        # ConfigReader.read_roi_data) looked at the wrong path and
-        # raised ``NoFilesFoundError: Cannot duplicate ROIs: no ROI
-        # definitions file found in this project`` even when ROIs
-        # had been defined.
-        #
-        # The mismatch was load-bearing before 122dy: a line in
-        # __init__ AFTER ``_apply_v1_path_overrides`` clobbered the
-        # v1-path override with ``os.path.join(self.logs_path,
-        # Paths.ROI_DEFINITIONS.value)``, accidentally aligning with
-        # the save location. 122dy deleted the clobber as "a silent
-        # v1-path-clobbering bug" (it WAS a bug — the right hand
-        # didn't know what the left was doing — but removing it
-        # broke the consumer chain). 122eh fixes the root path; the
-        # duplicated path-resolution logic (ConfigReader vs
-        # project_paths_from_config) deserves a centralization
-        # patch — filed as deferred follow-up.
-        self.roi_coordinates_path = str(
-            root / "logs" / "measures" / "ROI_definitions.h5"
-        )
+        # Patch 122en — sourced from the canonical v1 helper. Pre-
+        # 122en the values were inline-constructed here, duplicating
+        # the project_layout helper's logic. The drift between the
+        # two implementations led to the 122eh ROI hotfix; the
+        # centralization closes that drift permanently. ConfigReader
+        # keeps its legacy attribute names (``logs_path`` vs the
+        # canonical ``logs_dir``; ``roi_coordinates_path`` vs the
+        # canonical ``roi_definitions_path``) for backward compat
+        # with downstream code that references them.
+        self.logs_path           = _paths["logs_dir"]
+        self.roi_coordinates_path = _paths["roi_definitions_path"]
         self.configs_meta_dir    = str(root / "configs")
 
         # ----- Re-glob file lists with the new paths ------------------- #

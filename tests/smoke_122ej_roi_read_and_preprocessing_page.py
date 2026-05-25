@@ -163,6 +163,8 @@ def _find_method(tree: ast.Module, cls_name: str, method_name: str):
 def main() -> int:
     cr_path = REPO_ROOT / "mufasa" / "mixins" / "config_reader.py"
     cr_src = cr_path.read_text()
+    pl_src = (REPO_ROOT / "mufasa"
+              / "project_layout.py").read_text()
     cr_tree = ast.parse(cr_src)
     method = _find_method(cr_tree, "ConfigReader", "read_roi_data")
     assert method is not None
@@ -367,7 +369,7 @@ def main() -> int:
     check(
         "122eh state preserved: roi_coordinates_path uses "
         "logs/measures/ROI_definitions.h5",
-        '"measures"' in cr_src and '"ROI_definitions.h5"' in cr_src,
+        "measures" in pl_src and "ROI_definitions.h5" in pl_src,
     )
 
     # 19. Parse-clean.

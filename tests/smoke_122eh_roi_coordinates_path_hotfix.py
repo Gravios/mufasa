@@ -156,52 +156,37 @@ def main() -> int:
     assert method is not None
     method_src = ast.unparse(method)
 
-    # 1. roi_coordinates_path points at logs/measures/ROI_definitions.h5.
-    # We check via substring rather than AST literal because the
-    # assignment is via str(root / "logs" / "measures" / ...) which
-    # is a Call expression. ast.unparse normalises string quotes
-    # (typically to single), so test both.
-    has_correct_path = (
-        ('"logs"' in method_src or "'logs'" in method_src)
-        and ('"measures"' in method_src or "'measures'" in method_src)
-        and ('"ROI_definitions.h5"' in method_src
-             or "'ROI_definitions.h5'" in method_src)
+    # 1. roi_coordinates_path resolves correctly. Post-122en this
+    # is centralized — ConfigReader assigns from
+    # ``_paths["roi_definitions_path"]`` where ``_paths`` comes
+    # from ``v1_project_paths(root)``. So we check two things:
+    #   (a) the assignment in _resolve_v1_paths uses the canonical
+    #       dict key (catches drift from the centralization);
+    #   (b) v1_project_paths itself returns the right path
+    #       (checked in check 2 below — agreement check).
+    pl_path = REPO_ROOT / "mufasa" / "project_layout.py"
+    pl_src = pl_path.read_text()
+    routes_via_helper = (
+        '_paths["roi_definitions_path"]' in method_src
+        or "_paths['roi_definitions_path']" in method_src
     )
-    # Sanity: make sure those three substrings appear together in
-    # the roi_coordinates_path assignment context, not scattered
-    # across unrelated lines.
-    roi_block_match = re.search(
-        r'self\.roi_coordinates_path\s*=\s*str\s*\([^)]*\)',
-        method_src,
-    )
-    has_inline_correct = False
-    if roi_block_match:
-        b = roi_block_match.group(0)
-        has_inline_correct = (
-            "'logs'" in b or '"logs"' in b
-        ) and (
-            "'measures'" in b or '"measures"' in b
-        ) and (
-            "'ROI_definitions.h5'" in b
-            or '"ROI_definitions.h5"' in b
-        )
     check(
-        "ConfigReader._resolve_v1_paths sets "
-        "roi_coordinates_path to a path containing "
-        "'logs/measures/ROI_definitions.h5' (the actual save "
-        "location used by roi_logic.py)",
-        has_correct_path and has_inline_correct,
-        detail=("inline assignment block matched: "
-                f"{has_inline_correct}; substrings present: "
-                f"{has_correct_path}"),
+        "ConfigReader._resolve_v1_paths assigns "
+        "roi_coordinates_path from "
+        "_paths['roi_definitions_path'] (the canonical helper "
+        "key from 122en). Pre-122en this was an inline "
+        "str(root / 'logs' / 'measures' / 'ROI_definitions.h5') "
+        "construction; centralization moved the literal into "
+        "v1_project_paths.",
+        routes_via_helper,
+        detail=("substring not found in method body"),
     )
 
     # 2. ConfigReader-side path matches project_paths_from_config.
-    # We can't import project_layout directly without a config_path,
-    # but we can verify the path STRING matches by inspecting both
-    # source files.
-    pl_path = REPO_ROOT / "mufasa" / "project_layout.py"
-    pl_src = pl_path.read_text()
+    # Post-122en they're guaranteed to match (both go through
+    # v1_project_paths), but we still verify the canonical helper
+    # produces the right literal — catches drift in
+    # v1_project_paths itself.
     pl_roi_match = re.search(
         r'"roi_definitions_path":\s*str\s*\([^)]*\)',
         pl_src,
