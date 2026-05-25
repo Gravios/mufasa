@@ -969,8 +969,8 @@ def check_that_dir_has_list_of_filenames(
     Check that all file names in a list has an equivalent file in a specified directory. E.g., check if all files in the outlier corrected folder has an equivalent file in the featurues_extracted directory.
 
     :example:
-    >>> file_name_lst = glob.glob('/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement' + '/*.csv')
-    >>> check_that_dir_has_list_of_filenames(dir = '/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/features_extracted', file_name_lst=file_name_lst)
+    >>> file_name_lst = glob.glob('/path/to/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement' + '/*.csv')
+    >>> check_that_dir_has_list_of_filenames(dir = '/path/to/troubleshooting/two_black_animals_14bp/project_folder/csv/features_extracted', file_name_lst=file_name_lst)
     """
 
     files_in_dir = glob.glob(dir + f"/*.{file_type}")
@@ -1727,8 +1727,8 @@ def check_video_and_data_frm_count_align(video: Union[str, os.PathLike, cv2.Vide
     :return None:
 
     :example:
-    >>> data_1 = '/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/csv/outlier_corrected_movement_location/SI_DAY3_308_CD1_PRESENT.csv'
-    >>> video_1 = '/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/frames/output/ROI_analysis/SI_DAY3_308_CD1_PRESENT.mp4'
+    >>> data_1 = '/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/csv/outlier_corrected_movement_location/SI_DAY3_308_CD1_PRESENT.csv'
+    >>> video_1 = '/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/frames/output/ROI_analysis/SI_DAY3_308_CD1_PRESENT.mp4'
     >>> check_video_and_data_frm_count_align(video=video_1, data=data_1, raise_error=True)
     """
 
@@ -1790,7 +1790,7 @@ def check_if_video_corrupted(video: Union[str, os.PathLike, cv2.VideoCapture],
     :return None:
 
     :example:
-    >>> check_if_video_corrupted(video_path='/Users/simon/Downloads/NOR ENCODING FExMP8.mp4')
+    >>> check_if_video_corrupted(video_path='/path/to/Downloads/NOR ENCODING FExMP8.mp4')
     """
     check_instance(source=f'{check_if_video_corrupted.__name__} video', instance=video, accepted_types=(str, cv2.VideoCapture))
     if isinstance(video, str):

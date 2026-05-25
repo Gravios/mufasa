@@ -68,7 +68,7 @@ class ROIfeatureVisualizer(ConfigReader):
 
     :example:
     >>> style_attr = {'roi_centers': True, 'roi_ear_tags': True, 'directionality': True, 'directionality_style': 'funnel', 'border_color': (0, 0, 0), 'pose_estimation': True, 'animal_names': True}
-    >>> test = ROIfeatureVisualizer(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project.toml', video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/2022-06-20_NOB_DOT_4.mp4', style_attr=style_attr, body_parts=['Nose'])
+    >>> test = ROIfeatureVisualizer(config_path='/path/to/mufasa/troubleshooting/RAT_NOR/project.toml', video_path='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/2022-06-20_NOB_DOT_4.mp4', style_attr=style_attr, body_parts=['Nose'])
     >>> test.run()
     """
 

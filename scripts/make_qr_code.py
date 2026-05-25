@@ -71,7 +71,7 @@ def make_qr_with_text(
 
     # Overlay text inside the QR code
     font_size = max(12, int(img.size[0] * text_scale))
-    font_path = Path("/Users/simon/Desktop/envs/simba/simba/simba/assets/fonts/Poppins Bold.ttf")
+    font_path = Path("/path/to/simba/simba/simba/assets/fonts/Poppins Bold.ttf")
     font = _load_font(font_size, fallback_paths=[font_path])
     text_bbox = ImageDraw.Draw(img).textbbox((0, 0), text, font=font)
     text_width = text_bbox[2] - text_bbox[0]
@@ -160,7 +160,7 @@ def make_qr_with_text(
 
 
 URL = "https://github.com/sgoldenlab/simba"
-SAVE_PATH = Path("/Users/simon/Desktop/envs/simba/simba/misc/simba_qr_github.png")
+SAVE_PATH = Path("/path/to/simba/simba/misc/simba_qr_github.png")
 TEXT = "SimBA"
 SUBHEADING = "GitHub"
 LIGHT_COLOR = "#F8FAFC"

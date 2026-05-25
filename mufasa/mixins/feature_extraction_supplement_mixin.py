@@ -421,8 +421,8 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         :param Optional[bool] data_dir ts_plot: Whether to generate a time series plot of velocities for each data file. Defaults to True.
 
         :example:
-        >>> config_path = '/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml'
-        >>> data_dir = '/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location'
+        >>> config_path = '/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml'
+        >>> data_dir = '/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/outlier_corrected_movement_location'
         >>> body_part = 'Nose_1'
         >>> FeatureExtractionSupplemental.velocity_aggregator(config_path=config_path, data_dir=data_dir, body_part=body_part)
         """
@@ -618,7 +618,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         :rtype: Dict[Tuple[int], List[int]]
 
         :example:
-        >>> data = read_df(file_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/csv/outlier_corrected_movement_location/SI_DAY3_308_CD1_PRESENT.csv', usecols=['Center_x', 'Center_y'], file_type='csv').values.astype(int)
+        >>> data = read_df(file_path='/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/csv/outlier_corrected_movement_location/SI_DAY3_308_CD1_PRESENT.csv', usecols=['Center_x', 'Center_y'], file_type='csv').values.astype(int)
         >>> FeatureExtractionSupplemental.find_path_loops(data=data)
         """
 
@@ -832,7 +832,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
 # # sum_movement, avg_velocity =
 
 
-# df = read_df(file_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/targets_inserted/Together_1.csv', file_type='csv')
+# df = read_df(file_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/targets_inserted/Together_1.csv', file_type='csv')
 #
 # df = pd.DataFrame(np.random.randint(0, 2, (100, 2)), columns=['Attack', 'Sniffing'])
 # FeatureExtractionSupplemental.sequential_lag_analysis(data=df, criterion='Attack', target='Sniffing', fps=5, time_window=2.0)

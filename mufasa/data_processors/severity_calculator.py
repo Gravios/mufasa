@@ -123,6 +123,6 @@ class SeverityCalculator(ConfigReader):
 
 
 # settings = {'brackets': 10, 'clf': 'Attack', 'animals': ['Simon', 'JJ'], 'time': True, 'frames': True}
-# processor = SeverityCalculator(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', settings=settings)
+# processor = SeverityCalculator(config_path='/path/to/troubleshooting/two_black_animals_14bp/project.toml', settings=settings)
 # processor.run()
 # processor.save()

@@ -19,8 +19,8 @@ INSTRUCTIONS:
 7. Run the script by by typing `python boris_source_cleaner.py`
 """
 
-DATA_DIR = r"/Users/simon/Downloads/boris_data"  # Directory with BORIS annotations in CSV format.
-SAVE_DIR = r"/Users/simon/Downloads/save_dir"  # Directory where to save the modified BORIS annotations in CSV format.
+DATA_DIR = r"/path/to/Downloads/boris_data"  # Directory with BORIS annotations in CSV format.
+SAVE_DIR = r"/path/to/Downloads/save_dir"  # Directory where to save the modified BORIS annotations in CSV format.
 SUBJECT_COL = "Subject"  # The name of the Subject column in BORIS files. Change this if the animal names in the BORIS files are encoded in a different column than *Subject*.
 BEHAVIOR_COL = "Behavior"  # The name of the Behavior column in BORIS files. Change this if the behavior names in the BORIS are encoded in a different column than *Behavior*.
 
@@ -53,7 +53,7 @@ class BorisSourceCleaner(object):
     :parameter dict settings: Rules for how to change the behavior names.
 
     :example:
-    >>> boris_cleaner = BorisSourceCleaner(data_dir='/Users/simon/Downloads/boris_data', save_dir='/Users/simon/Downloads/save_dir', settings=SETTINGS)
+    >>> boris_cleaner = BorisSourceCleaner(data_dir='/path/to/Downloads/boris_data', save_dir='/path/to/Downloads/save_dir', settings=SETTINGS)
     >>> boris_cleaner.run()
 
     """

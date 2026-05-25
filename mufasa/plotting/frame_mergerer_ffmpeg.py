@@ -50,8 +50,8 @@ class FrameMergererFFmpeg(ConfigReader):
     :parameter Optional[bool] gpu: If True, use NVIDEA FFMpeg GPU codecs. Default False.
 
     :example:
-    >>> video_paths = ['/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT_downsampled.mp4', '/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT_downsampled.mp4']
-    >>> merger = FrameMergererFFmpeg(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml', video_paths=videos, video_height=600, video_width=600, concat_type='mosaic')
+    >>> video_paths = ['/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT_downsampled.mp4', '/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT_downsampled.mp4']
+    >>> merger = FrameMergererFFmpeg(config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml', video_paths=videos, video_height=600, video_width=600, concat_type='mosaic')
     >>> merger.run()
     """
 
@@ -104,9 +104,9 @@ class FrameMergererFFmpeg(ConfigReader):
         stdout_success(msg=f"Merged video saved at {self.output_path}", source=self.__class__.__name__, elapsed_time=self.timer.elapsed_time_str)
 
 
-# videos = ['/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT_downsampled.mp4', '/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT_downsampled.mp4']
+# videos = ['/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT_downsampled.mp4', '/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/videos/SI_DAY3_308_CD1_PRESENT_downsampled.mp4']
 #
-# merger = FrameMergererFFmpeg(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
+# merger = FrameMergererFFmpeg(config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
 #                     video_paths=videos,
 #                     video_height=600,
 #                     video_width=600,
@@ -116,8 +116,8 @@ class FrameMergererFFmpeg(ConfigReader):
 
 #
 # FrameMergererFFmpeg(config_path=None,
-#                     frame_types={'Video 1': '/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.avi',
-#                                  'Video 2': '/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.avi'},
+#                     frame_types={'Video 1': '/path/to/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.avi',
+#                                  'Video 2': '/path/to/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.avi'},
 #                     video_height=640,
 #                     video_width=480,
 #                     concat_type='vertical') #horizontal, vertical, mosaic, mixed_mosaic

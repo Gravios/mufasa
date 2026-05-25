@@ -81,7 +81,7 @@ class ImageMixin(object):
         :rtype: List[float]
 
         :example:
-        >>> img = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+        >>> img = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
         >>> ImageMixin.brightness_intensity(imgs=[img], ignore_black=False)
         >>> [159.0]
         """
@@ -179,8 +179,8 @@ class ImageMixin(object):
         :rtype: float
 
         :example:
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/3.png').astype(np.uint8)
+        >>> img_1 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+        >>> img_2 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/3.png').astype(np.uint8)
         >>> ImageMixin.get_histocomparison(img_1=img_1, img_2=img_2, method='chi_square_alternative')
         """
         check_if_valid_img(
@@ -223,8 +223,8 @@ class ImageMixin(object):
         :rtype: float
 
         :example:
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/3.png').astype(np.uint8)
+        >>> img_1 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+        >>> img_2 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/3.png').astype(np.uint8)
         >>> ImageMixin.get_contourmatch(img_1=img_1, img_2=img_2, method='exterior')
         """
 
@@ -277,9 +277,9 @@ class ImageMixin(object):
         :returns: List of sliced ROIs from the input image.
         :rtype: List[np.ndarray]
 
-        >>> img = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/img_comparisons_4/1.png')
-        >>> img_video = cv2.VideoCapture('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1.mp4')
-        >>> data_path = '/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv'
+        >>> img = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/img_comparisons_4/1.png')
+        >>> img_video = cv2.VideoCapture('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1.mp4')
+        >>> data_path = '/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv'
         >>> data = pd.read_csv(data_path, nrows=4, usecols=['Nose_x', 'Nose_y']).fillna(-1).values.astype(np.int64)
         >>> shapes = []
         >>> for frm_data in data: shapes.append(GeometryMixin().bodyparts_to_circle(frm_data, 100))
@@ -407,7 +407,7 @@ class ImageMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+        >>> img_1 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
         >>> ImageMixin.img_moments(img=img_1, hu_moments=True)
         >>> [[ 1.01270313e-03], [ 8.85983106e-10], [ 4.67680675e-13], [ 1.00442018e-12], [-4.64181508e-25], [-2.49036749e-17], [ 5.08375216e-25]]
         """
@@ -463,8 +463,8 @@ class ImageMixin(object):
 
         """Perform ORB feature matching between two sets of images.
 
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/10.png').astype(np.uint8)
+        >>> img_1 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+        >>> img_2 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/10.png').astype(np.uint8)
         >>> ImageMixin().orb_matching_similarity_(img_1=img_1, img_2=img_2, method='radius')
         >>> 4
         """
@@ -523,8 +523,8 @@ class ImageMixin(object):
         :rtype: Tuple[ int, dict, Union[None, np.ndarray]]
 
         :example:
-        >>> img = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/videos/Screenshot 2024-01-17 at 12.45.55 PM.png')
-        >>> results = ImageMixin().template_matching_cpu(video_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', img=img, return_img=True)
+        >>> img = cv2.imread('/path/to/troubleshooting/two_black_animals_14bp/videos/Screenshot 2024-01-17 at 12.45.55 PM.png')
+        >>> results = ImageMixin().template_matching_cpu(video_path='/path/to/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', img=img, return_img=True)
         """
 
         results, found_img = [], None
@@ -649,7 +649,7 @@ class ImageMixin(object):
         :return np.ndarray: 4-dimensional array with black and white image.
 
         :example:
-        >>> imgs = ImageMixin.read_img_batch_from_video(video_path='/Users/simon/Downloads/3A_Mouse_5-choice_MouseTouchBasic_a1.mp4', start_frm=0, end_frm=100)
+        >>> imgs = ImageMixin.read_img_batch_from_video(video_path='/path/to/Downloads/3A_Mouse_5-choice_MouseTouchBasic_a1.mp4', start_frm=0, end_frm=100)
         >>> imgs = np.stack(imgs.values(), axis=0)
         >>> bw_imgs = ImageMixin.img_stack_to_bw(imgs=imgs, upper_thresh=255, lower_thresh=20, invert=False)
         """
@@ -700,7 +700,7 @@ class ImageMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> img = cv2.imread('/Users/simon/Desktop/test.png')
+        >>> img = cv2.imread('/path/to/test.png')
         >>> img = ImageMixin.segment_img_horizontal(img=img, pct=10, both=True)
         """
 
@@ -732,7 +732,7 @@ class ImageMixin(object):
            :func:`mufasa.data_processors.cuda.image.segment_img_stack_horizontal`,
 
         :example:
-        >>> imgs = ImageMixin.read_img_batch_from_video(video_path='/Users/simon/Downloads/3A_Mouse_5-choice_MouseTouchBasic_a1.mp4', start_frm=0, end_frm=400)
+        >>> imgs = ImageMixin.read_img_batch_from_video(video_path='/path/to/Downloads/3A_Mouse_5-choice_MouseTouchBasic_a1.mp4', start_frm=0, end_frm=400)
         >>> imgs = np.stack(imgs.values(), axis=0)
         >>> sliced_imgs = ImageMixin.segment_img_stack_horizontal(imgs=imgs, pct=50, lower=True, both=False)
         """
@@ -866,7 +866,7 @@ class ImageMixin(object):
         :rtype: Dict[str, np.ndarray]
 
         :example:
-        >>> imgs = ImageMixin().read_all_img_in_dir(dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/Together_4_cropped_frames')
+        >>> imgs = ImageMixin().read_all_img_in_dir(dir='/path/to/troubleshooting/two_black_animals_14bp/project_folder/Together_4_cropped_frames')
         """
         check_if_dir_exists(in_dir=dir)
         file_paths = find_files_of_filetypes_in_directory(directory=dir, extensions=list(Options.ALL_IMAGE_FORMAT_OPTIONS.value), raise_error=True)
@@ -912,12 +912,12 @@ class ImageMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/10.png').astype(np.uint8)
+        >>> img_1 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+        >>> img_2 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/10.png').astype(np.uint8)
         >>> imgs_1 = np.stack((img_1, img_2)); imgs_2 = np.stack((img_2, img_2))
         >>> ImageMixin.img_stack_mse(imgs_1=imgs_1, imgs_2=imgs_2)
         >>> [637,   0]
-        >>> imgs = ImageMixin().read_all_img_in_dir(dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/Together_4_cropped_frames')
+        >>> imgs = ImageMixin().read_all_img_in_dir(dir='/path/to/troubleshooting/two_black_animals_14bp/project_folder/Together_4_cropped_frames')
         >>> imgs_1 = np.stack(imgs.values())
         >>> imgs_2 = np.roll(imgs_1,-1, axis=0)
         >>> mse = ImageMixin().img_stack_mse(imgs_1=imgs_1, imgs_2=imgs_1)
@@ -957,7 +957,7 @@ class ImageMixin(object):
 
 
         :example:
-        >>> imgs = ImageMixin().read_all_img_in_dir(dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/Together_4_cropped_frames')
+        >>> imgs = ImageMixin().read_all_img_in_dir(dir='/path/to/troubleshooting/two_black_animals_14bp/project_folder/Together_4_cropped_frames')
         >>> imgs = np.stack(imgs.values())
         >>> mse = ImageMixin().img_sliding_mse(imgs=imgs, slide_length=2)
         """
@@ -1016,7 +1016,7 @@ class ImageMixin(object):
         :rtype: Dict[int, np.ndarray]
 
         :example:
-        >>> ImageMixin().read_img_batch_from_video(video_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=50)
+        >>> ImageMixin().read_img_batch_from_video(video_path='/path/to/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=50)
         """
         if platform.system() == "Darwin":
             if not multiprocessing.get_start_method(allow_none=True):
@@ -1073,8 +1073,8 @@ class ImageMixin(object):
         :rtype: float
 
         :example:
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_frames/24.png', 0).astype(np.float32)
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1984.png', 0).astype(np.float32)
+        >>> img_1 = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_frames/24.png', 0).astype(np.float32)
+        >>> img_2 = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1984.png', 0).astype(np.float32)
         >>> ImageMixin.img_emd(img_1=img_1, img_2=img_2, lower_bound=0.5)
         >>> 10.658767700195312
         """
@@ -1164,7 +1164,7 @@ class ImageMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> imgs = ImageMixin().read_img_batch_from_video(video_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=50)
+        >>> imgs = ImageMixin().read_img_batch_from_video(video_path='/path/to/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=50)
         >>> imgs = np.stack(list(imgs.values()))
         >>> ImageMixin().img_matrix_mse(imgs=imgs)
         """
@@ -1264,7 +1264,7 @@ class ImageMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> imgs = ImageMixin().read_img_batch_from_video( video_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=100)
+        >>> imgs = ImageMixin().read_img_batch_from_video( video_path='/path/to/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=100)
         >>> imgs = np.stack(list(imgs.values()))
         >>> imgs_gray = ImageMixin.img_stack_to_greyscale(imgs=imgs)
         """
@@ -1457,10 +1457,10 @@ class ImageMixin(object):
            :align: center
 
         :example I:
-        >>> imgs = ImageMixin().read_img_batch_from_video(video_path='/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1.mp4', start_frm=0, end_frm=10)
+        >>> imgs = ImageMixin().read_img_batch_from_video(video_path='/path/to/troubleshooting/Emergence/project_folder/videos/Example_1.mp4', start_frm=0, end_frm=10)
         >>> imgs = np.stack(list(imgs.values()))
         >>> imgs_gray = ImageMixin().img_stack_to_greyscale(imgs=imgs)
-        >>> data = pd.read_csv('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv', nrows=11).fillna(-1)
+        >>> data = pd.read_csv('/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv', nrows=11).fillna(-1)
         >>> nose_array, tail_array = data.loc[0:10, ['Nose_x', 'Nose_y']].values.astype(np.float32), data.loc[0:10, ['Tail_base_x', 'Tail_base_y']].values.astype(np.float32)
         >>> nose_shapes, tail_shapes = [], []
         >>> for frm_data in nose_array: nose_shapes.append(GeometryMixin().bodyparts_to_circle(frm_data, 80))
@@ -1469,8 +1469,8 @@ class ImageMixin(object):
         >>> sliced_images = ImageMixin().slice_shapes_in_imgs(imgs=imgs_gray, shapes=shapes)
 
         :example II:
-        >>> video_path = '/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_clipped.mp4'
-        >>> data_path = r'/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1_clipped.csv'
+        >>> video_path = '/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_clipped.mp4'
+        >>> data_path = r'/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1_clipped.csv'
         >>> df = pd.read_csv(data_path, usecols=['Nose_x', 'Nose_y', 'Tail_base_x', 'Tail_base_y']).fillna(0).values.astype(int)
         >>> data = df.reshape(len(df), -1, int(df.shape[1]/2))
         >>> geometries = GeometryMixin().multiframe_bodyparts_to_line(data=data, buffer=30, px_per_mm=4.1)
@@ -1581,7 +1581,7 @@ class ImageMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/test')
+        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/test')
         >>> imgs = {k: imgs[k] for k in sorted(imgs, key=lambda x: int(x.split('.')[0]))}
         >>> imgs = list(imgs.values())
         >>> results = ImageMixin.sliding_structural_similarity_index(imgs=imgs, stride=1, verbose=True)
@@ -1621,7 +1621,7 @@ class ImageMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/test')
+        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/test')
         >>> imgs = {k: imgs[k] for k in sorted(imgs, key=lambda x: int(x.split('.')[0]))}
         >>> imgs = list(imgs.values())[0:10]
         >>> results = ImageMixin.structural_similarity_matrix(imgs=imgs)
@@ -1664,8 +1664,8 @@ class ImageMixin(object):
         :rtype: float
 
         :example:
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/a.png').astype(np.uint8)
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/f.png').astype(np.uint8)
+        >>> img_1 = cv2.imread('/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/a.png').astype(np.uint8)
+        >>> img_2 = cv2.imread('/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/f.png').astype(np.uint8)
         >>> ImageMixin.cross_correlation_similarity(img_1=img_1, img_2=img_2)
         """
 
@@ -1700,7 +1700,7 @@ class ImageMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/08102021_DOT_Rat11_12_frames')
+        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/08102021_DOT_Rat11_12_frames')
         >>> imgs = {k: imgs[k] for k in sorted(imgs, key=lambda x: int(x.split('.')[0]))}
         >>> imgs = np.stack(list(imgs.values()))
         >>> results = ImageMixin.sliding_cross_correlation_similarity(imgs=imgs, stride=1)
@@ -1749,8 +1749,8 @@ class ImageMixin(object):
         :rtype: np.array
 
         :example:
-        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/test')
-        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/08102021_DOT_Rat11_12_frames')
+        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/test')
+        >>> imgs = ImageMixin.read_all_img_in_dir(dir='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/08102021_DOT_Rat11_12_frames')
         >>> imgs = {k: imgs[k] for k in sorted(imgs, key=lambda x: int(x.split('.')[0]))}
         >>> imgs = np.stack(list(imgs.values()))
         >>> imgs = ImageMixin.img_stack_to_greyscale(imgs=imgs)
@@ -2204,13 +2204,13 @@ class ImageMixin(object):
 # cv2.waitKey(40000)
 
 #x = ImageMixin.get_blob_locations(video_path=r"C:\troubleshooting\RAT_NOR\project_folder\videos\2022-06-20_NOB_DOT_4_downsampled_bg_subtracted.mp4", gpu=True)
-# imgs = ImageMixin().read_all_img_in_dir(dir='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples')
+# imgs = ImageMixin().read_all_img_in_dir(dir='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples')
 # imgs = np.stack(imgs.values())
 # mse = ImageMixin().img_sliding_mse(imgs=imgs, slide_size=2)
 
 
-# img_1 = cv2.imread('/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/.png', 0).astype(np.float32)
-# img_2 = cv2.imread('/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/4.png', 0).astype(np.float32)
+# img_1 = cv2.imread('/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/.png', 0).astype(np.float32)
+# img_2 = cv2.imread('/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/examples/4.png', 0).astype(np.float32)
 # ImageMixin.img_emd(img_1=img_1, img_2=img_2, lower_bound=0.5, verbose=True)
 
     #
@@ -2218,7 +2218,7 @@ class ImageMixin(object):
     #                            both: Optional[bool] = False
 
 
-# img = cv2.imread('/Users/simon/Desktop/test.png')
+# img = cv2.imread('/path/to/test.png')
 # img = ImageMixin.segment_img_vertical(img=img, pct=20, both=True)
 # cv2.imshow('sdsdf', img)
 # cv2.waitKey(5000)
@@ -2233,7 +2233,7 @@ class ImageMixin(object):
 
 # imgs = np.stack(list(imgs.values()))
 # imgs_gray = ImageMixin().img_stack_to_greyscale(imgs=imgs)
-# data = pd.read_csv('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv', nrows=11).fillna(-1)
+# data = pd.read_csv('/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv', nrows=11).fillna(-1)
 # nose_array, tail_array = data.loc[0:10, ['Nose_x', 'Nose_y']].values.astype(np.float32), data.loc[0:10, ['Tail_base_x', 'Tail_base_y']].values.astype(np.float32)
 # nose_shapes, tail_shapes = [], []
 # from mufasa.mixins.geometry_mixin import GeometryMixin
@@ -2243,15 +2243,15 @@ class ImageMixin(object):
 # sliced_images = ImageMixin().slice_shapes_in_imgs(imgs=imgs_gray, shapes=shapes)
 
 # imgs_.shape
-# imgs = ImageMixin().read_all_img_in_dir(dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/Together_4_cropped_frames')
+# imgs = ImageMixin().read_all_img_in_dir(dir='/path/to/troubleshooting/two_black_animals_14bp/project_folder/Together_4_cropped_frames')
 # imgs_1 = np.stack(imgs.values())
 # mse = ImageMixin().img_sliding_mse(imgs=imgs_1, slide_size=2)
 # #imgs_2 = np.roll(imgs_1,-1, axis=0)
 # #mse = ImageMixin().img_mse(imgs_1=imgs_1, imgs_2=imgs_1)
 # mse = ImageMixin().img_sliding_mse(imgs=imgs_1, slide_size=2)
 
-# img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
-# img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/10.png').astype(np.uint8)
+# img_1 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+# img_2 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/10.png').astype(np.uint8)
 #
 # img_1 = cv2.cvtColor(img_1, cv2.COLOR_BGR2GRAY)
 # img_2 = cv2.cvtColor(img_2, cv2.COLOR_BGR2GRAY)
@@ -2264,14 +2264,14 @@ class ImageMixin(object):
 
 
 # res = ImageMixin.img_moments(img=img_1, hu_moments=True)
-# img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
-# img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/10.png').astype(np.uint8)
+# img_1 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+# img_2 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/10.png').astype(np.uint8)
 # ImageMixin.get_contourmatch(img_1=img_1, img_2=img_2, mode='exterior')
 
 
-# img = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/img_comparisons_4/1.png')
-# img_video = cv2.VideoCapture('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1.mp4')
-# data_path = '/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv'
+# img = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/img_comparisons_4/1.png')
+# img_video = cv2.VideoCapture('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1.mp4')
+# data_path = '/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv'
 # data = pd.read_csv(data_path, nrows=4, usecols=['Nose_x', 'Nose_y']).fillna(-1).values.astype(np.int64)
 # shapes = []
 # for frm_data in data: shapes.append(GeometryMixin().bodyparts_to_circle(frm_data, 100))
@@ -2279,15 +2279,15 @@ class ImageMixin(object):
 # ImageMixin().slice_shapes_in_img(img=(img_video, 1), shapes=shapes)
 
 
-# img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/3.png').astype(np.uint8)
+# img_2 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/3.png').astype(np.uint8)
 # ImageMixin.get_contourmatch(img_1=img_1, img_2=img_2, method='exterior')
 
-# img = cv2.VideoCapture('/Users/simon/Desktop/envs/simba_dev/tests/data/test_projects/zebrafish/project_folder/videos/20200730_AB_7dpf_850nm_0003.mp4')
+# img = cv2.VideoCapture('/path/to/simba_dev/tests/data/test_projects/zebrafish/project_folder/videos/20200730_AB_7dpf_850nm_0003.mp4')
 # ImageMixin.slice_shapes_in_img(img=(img, 1))
 
 
-# img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
-# img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/khan/project_folder/videos/stitched_frames/1.png').astype(np.uint8)
+# img_1 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/0.png').astype(np.uint8)
+# img_2 = cv2.imread('/path/to/troubleshooting/khan/project_folder/videos/stitched_frames/1.png').astype(np.uint8)
 # ImageMixin.get_contourmatch(img_1=img_1, img_2=img_2, method='all', canny=True)
 #
 

@@ -186,7 +186,7 @@ def blob_tracker(config_path: Union[str, os.PathLike]) -> None:
     :rtype: None
 
     :example:
-    >>> blob_tracker('/Users/simon/Downloads/result_bg/blob_definitions.json')
+    >>> blob_tracker('/path/to/Downloads/result_bg/blob_definitions.json')
     """
 
     REQUIRED_KEYS = ['video_data', 'input_dir', 'output_dir', 'gpu', 'save_bg_videos', 'core_cnt', 'core_cnt',
@@ -243,7 +243,7 @@ def blob_tracker(config_path: Union[str, os.PathLike]) -> None:
 # from mufasa.outlier_tools.outlier_corrector_movement import OutlierCorrecterMovement
 # from mufasa.outlier_tools.outlier_corrector_location import OutlierCorrecterLocation
 #
-# CONFIG_PATH = '/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project.toml'
+# CONFIG_PATH = '/path/to/troubleshooting/DLC_2_Black_animals/project.toml'
 # AGGREGATION_METHOD = 'mean'
 # BODY_PARTS = {'Animal_1': {'Movement': ['Nose_1', 'Tail_base_1'],
 #                            'Location': ['Nose_1', 'Tail_base_1']},

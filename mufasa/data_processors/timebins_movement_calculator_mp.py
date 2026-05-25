@@ -120,7 +120,7 @@ class TimeBinsMovementCalculatorMultiprocess(ConfigReader, FeatureExtractionMixi
 
     :example:
     >>> calculator = TimeBinsMovementCalculatorMultiprocess(
-    ...     config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
+    ...     config_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml',
     ...     bin_length=5.0,
     ...     body_parts=['Nose_1', 'Nose_2'],
     ...     plots=True,

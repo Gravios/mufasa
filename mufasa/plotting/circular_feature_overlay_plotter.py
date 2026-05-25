@@ -37,7 +37,7 @@ class CircularFeaturePlotter(ConfigReader, PlottingMixin, FeatureExtractionMixin
 
     :example:
     >>> settings = {'center': {'Animal_1': 'SwimBladder'}, 'text_settings': False, "palette": 'bwr'}
-    >>> circular_feature_plotter = CircularFeaturePlotter(config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml', data_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/csv/circular_features/20200730_AB_7dpf_850nm_0002.csv', settings=settings)
+    >>> circular_feature_plotter = CircularFeaturePlotter(config_path='/path/to/troubleshooting/circular_features_zebrafish/project.toml', data_path='/path/to/troubleshooting/circular_features_zebrafish/project_folder/csv/circular_features/20200730_AB_7dpf_850nm_0002.csv', settings=settings)
     >>> circular_feature_plotter.run()
     """
 

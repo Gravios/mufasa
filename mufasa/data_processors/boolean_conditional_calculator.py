@@ -38,7 +38,7 @@ class BooleanConditionalCalculator(ConfigReader):
 
     :example I:
     >>> rules = {'Rectangle_1 Simon in zone': 'TRUE', 'Polygon_1 JJ in zone': 'TRUE'} #  OR {'Rectangle_1 Simon in zone': True, 'Polygon_1 JJ in zone': True}
-    >>> conditional_bool_rule_calculator = BooleanConditionalCalculator(rules=rules, config_path='/Users/simon/Desktop/envs/troubleshooting/two_animals_16bp_032023/project.toml')
+    >>> conditional_bool_rule_calculator = BooleanConditionalCalculator(rules=rules, config_path='/path/to/troubleshooting/two_animals_16bp_032023/project.toml')
     >>> conditional_bool_rule_calculator.run()
     >>> conditional_bool_rule_calculator.save()
 

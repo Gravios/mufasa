@@ -236,7 +236,7 @@ class PlotSklearnResultsMultiProcess(ConfigReader, TrainModelMixin, PlottingMixi
 
     :example:
     >>> clf_plotter = PlotSklearnResultsMultiProcess(
-    ...     config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/beepboop174/project.toml',
+    ...     config_path='/path/to/mufasa/troubleshooting/beepboop174/project.toml',
     ...     video_setting=True,
     ...     frame_setting=False,
     ...     video_paths='Trial_10.mp4',
@@ -524,10 +524,10 @@ class PlotSklearnResultsMultiProcess(ConfigReader, TrainModelMixin, PlottingMixi
 
 
 # if __name__ == "__main__":
-#     clf_plotter = PlotSklearnResultsMultiProcess(config_path=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project.toml",
+#     clf_plotter = PlotSklearnResultsMultiProcess(config_path=r"/path/to/mufasa/troubleshooting/two_black_animals_14bp/project.toml",
 #                                                 video_setting=True,
 #                                                 frame_setting=False,
-#                                                 video_paths=r"/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.mp4",
+#                                                 video_paths=r"/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/videos/Together_1.mp4",
 #                                                 print_timers=True,
 #                                                 rotate=False,
 #                                                 animal_names=False,
@@ -539,7 +539,7 @@ class PlotSklearnResultsMultiProcess(ConfigReader, TrainModelMixin, PlottingMixi
 
 
 #text_settings = {'circle_scale': 5, 'font_size': 0.528, 'spacing_scale': 28, 'text_thickness': 2}
-# clf_plotter = PlotSklearnResultsMultiProcess(config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/beepboop174/project.toml',
+# clf_plotter = PlotSklearnResultsMultiProcess(config_path='/path/to/mufasa/troubleshooting/beepboop174/project.toml',
 #                                              video_setting=True,
 #                                              frame_setting=False,
 #                                              rotate=False,
@@ -549,7 +549,7 @@ class PlotSklearnResultsMultiProcess(ConfigReader, TrainModelMixin, PlottingMixi
 # clf_plotter.run()
 #
 
-# clf_plotter = PlotSklearnResultsMultiProcess(config_path='/Users/simon/Desktop/envs/troubleshooting/DLC_2_Black_animals/project.toml', video_setting=True, frame_setting=False, rotate=False, video_file_path='Together_1.avi', cores=5)
+# clf_plotter = PlotSklearnResultsMultiProcess(config_path='/path/to/troubleshooting/DLC_2_Black_animals/project.toml', video_setting=True, frame_setting=False, rotate=False, video_file_path='Together_1.avi', cores=5)
 # clf_plotter.run()
 
 # if __name__ == "__main__":

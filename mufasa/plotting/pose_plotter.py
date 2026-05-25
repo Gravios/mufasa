@@ -135,5 +135,5 @@ class PosePlotter(object):
 
 # x = PosePlotter(data_path=r'C:\troubleshooting\mitra\project_folder\csv\input_csv', sample_time=100)
 # x.run()
-# x = PosePlotter(data_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv/Together_1.csv')
+# x = PosePlotter(data_path='/path/to/mufasa/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv/Together_1.csv')
 # x.run()

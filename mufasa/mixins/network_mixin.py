@@ -390,9 +390,9 @@ class NetworkMixin(object):
 
         :example:
         >>> graph = NetworkMixin.create_graph(data={('Animal_1', 'Animal_2'): 1.0, ('Animal_1', 'Animal_3'): 0.2, ('Animal_2', 'Animal_3'): 0.5})
-        >>> graph_pg = NetworkMixin.visualize(graph=graph, node_size={'Animal_1': 10, 'Animal_2': 26, 'Animal_3': 50}, save_path='/Users/simon/Downloads/graph.html', node_shape='box', palette='spring')
+        >>> graph_pg = NetworkMixin.visualize(graph=graph, node_size={'Animal_1': 10, 'Animal_2': 26, 'Animal_3': 50}, save_path='/path/to/Downloads/graph.html', node_shape='box', palette='spring')
         >>> multigraph = NetworkMixin().create_multigraph(data={('Animal_1', 'Animal_2'): [0, 0, 0, 6], ('Animal_1', 'Animal_3'): [0, 0, 0, 0], ('Animal_1', 'Animal_4'): [0, 0, 0, 0], ('Animal_1', 'Animal_5'): [0, 0, 0, 0], ('Animal_2', 'Animal_3'): [0, 0, 0, 0], ('Animal_2', 'Animal_4'): [5, 0, 0, 2], ('Animal_2', 'Animal_5'): [0, 0, 0, 0], ('Animal_3', 'Animal_4'): [0, 0, 0, 0], ('Animal_3', 'Animal_5'): [0, 2, 22, 0], ('Animal_4', 'Animal_5'): [0, 0, 0, 0]})
-        >>> graph_pg = NetworkMixin.visualize(graph=multigraph, node_size={'Animal_1': 10, 'Animal_2': 26, 'Animal_3': 50, 'Animal_4': 50, 'Animal_5': 50}, save_path='/Users/simon/Downloads/graphs', node_shape='box', palette='spring', smooth_type='diagonalCross')
+        >>> graph_pg = NetworkMixin.visualize(graph=multigraph, node_size={'Animal_1': 10, 'Animal_2': 26, 'Animal_3': 50, 'Animal_4': 50, 'Animal_5': 50}, save_path='/path/to/Downloads/graphs', node_shape='box', palette='spring', smooth_type='diagonalCross')
 
         """
 
@@ -803,7 +803,7 @@ class NetworkMixin(object):
 # graph_pg = NetworkMixin().graph_page_rank(graph=graph)
 # graph_clrs = find_ranked_colors(data=graph_pg, palette='jet', as_hex=True)
 # NetworkMixin().visualize(graph=graph,
-#                          save_path='/Users/simon/Desktop/envs/troubleshooting/ARES_data/Termite Test/project/project_data/network_html/graph_101.html',
+#                          save_path='/path/to/troubleshooting/ARES_data/Termite Test/project/project_data/network_html/graph_101.html',
 #                          palette=graph_clrs)
 
 
@@ -814,12 +814,12 @@ class NetworkMixin(object):
 # graph_clrs = find_ranked_colors(data=graph_pg, palette='jet', as_hex=True)
 #
 # NetworkMixin().visualize(graph=graph,
-#                          save_path='/Users/simon/Desktop/envs/troubleshooting/ARES_data/Termite Test/project/project_data/network_html.html',
+#                          save_path='/path/to/troubleshooting/ARES_data/Termite Test/project/project_data/network_html.html',
 #                          palette=graph_clrs)
 
 
 # multigraph = NetworkMixin().create_multigraph(data={('Animal_1', 'Animal_2'): [0, 0, 0, 6], ('Animal_1', 'Animal_3'): [0, 0, 0, 0], ('Animal_1', 'Animal_4'): [0, 0, 0, 0], ('Animal_1', 'Animal_5'): [0, 0, 0, 0], ('Animal_2', 'Animal_3'): [0, 0, 0, 0], ('Animal_2', 'Animal_4'): [5, 0, 0, 2], ('Animal_2', 'Animal_5'): [0, 0, 0, 0], ('Animal_3', 'Animal_4'): [0, 0, 0, 0], ('Animal_3', 'Animal_5'): [0, 2, 22, 0], ('Animal_4', 'Animal_5'): [0, 0, 0, 0]})
-# NetworkMixin().visualize(graph=multigraph, save_path='/Users/simon/Desktop/envs/troubleshooting/ARES_data/Termite Test/project/project_data/network_html')
+# NetworkMixin().visualize(graph=multigraph, save_path='/path/to/troubleshooting/ARES_data/Termite Test/project/project_data/network_html')
 
 
 # graph = NetworkMixin.create_graph(data={('Animal_1', 'Animal_2'): 1.0, ('Animal_1', 'Animal_3'): 0.2, ('Animal_2', 'Animal_3'): 0.5})
@@ -831,7 +831,7 @@ class NetworkMixin(object):
 #
 # #multigraph.edges.data()
 #
-# NetworkMixin().visualize(graph=multigraph, save_dir='/Users/simon/Desktop/envs/troubleshooting/ARES_data/Termite Test/project/project_data/network_html')
+# NetworkMixin().visualize(graph=multigraph, save_dir='/path/to/troubleshooting/ARES_data/Termite Test/project/project_data/network_html')
 
 
 #
@@ -887,7 +887,7 @@ class NetworkMixin(object):
 #
 # #multigraph.edges.data()
 #
-# NetworkMixin().visualize(graph=multigraph, save_dir='/Users/simon/Desktop/envs/troubleshooting/ARES_data/Termite Test/project/project_data/network_html')
+# NetworkMixin().visualize(graph=multigraph, save_dir='/path/to/troubleshooting/ARES_data/Termite Test/project/project_data/network_html')
 
 
 # NetworkMixin().multigraph_page_rank(graph=multigraph)

@@ -137,11 +137,11 @@ class ShapAggregateStatisticsCalculator():
     :param bool plot: If True, creates a visualization of the aggregate SHAP values. Default True.
 
     :example:
-    >>> shap_df = pd.read_csv('/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0)
+    >>> shap_df = pd.read_csv('/path/to/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0)
     >>> test = ShapAggregateStatisticsCalculator(classifier_name='target',
     >>>                                          shap_df=shap_df,
     >>>                                          shap_baseline_value=40,
-    >>>                                          save_dir=None) #'/Users/simon/Desktop/feltz'
+    >>>                                          save_dir=None) #'/path/to/feltz'
     >>> dfs, img = test.run()
     """
 
@@ -213,4 +213,4 @@ class ShapAggregateStatisticsCalculator():
             return (self.results, self.img)
 
 
-# shap_df = pd.read_csv('/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0)
+# shap_df = pd.read_csv('/path/to/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0)

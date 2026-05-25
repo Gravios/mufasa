@@ -46,7 +46,7 @@ class CaveFishFeaturizer(ConfigReader, FeatureExtractionMixin):
     :return: None. Featurized pose-estimation data is saved in the mufasa project `project_folder/csv/features_extracted` directory.
 
     :example:
-    >>> _ = CaveFishFeaturizer(config_path='/Users/simon/Desktop/envs/troubleshooting/naresh/project.toml')
+    >>> _ = CaveFishFeaturizer(config_path='/path/to/troubleshooting/naresh/project.toml')
 
     References
     ----------

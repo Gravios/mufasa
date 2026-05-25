@@ -38,7 +38,7 @@ class CircularPlotting(PlottingMixin):
 
         :example:
         >>> data = np.random.normal(loc=180, scale=99, size=5000)
-        >>> _ = CircularPlotting().diffusion_plot(data=data, title='Mean 180 degree plot', fps=30, degree_width=5, palette='jet', save_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/frames/output/dispersion/20200730_AB_7dpf_850nm_0004.png')
+        >>> _ = CircularPlotting().diffusion_plot(data=data, title='Mean 180 degree plot', fps=30, degree_width=5, palette='jet', save_path='/path/to/troubleshooting/circular_features_zebrafish/project_folder/frames/output/dispersion/20200730_AB_7dpf_850nm_0004.png')
         """
 
         matplotlib.rcParams["font.size"] = 100
@@ -96,7 +96,7 @@ class CircularPlotting(PlottingMixin):
 
         :example:
         >>> data = np.random.normal(loc=180, scale=99, size=5000)
-        >>> _ = CircularPlotting().diffusion_time_bin_plot(data=data, fps=30, degree_width=40, palette='jet', save_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/frames/output/dispertion_time_series/20200730_AB_7dpf_850nm_0004', time_bin=10)
+        >>> _ = CircularPlotting().diffusion_time_bin_plot(data=data, fps=30, degree_width=40, palette='jet', save_path='/path/to/troubleshooting/circular_features_zebrafish/project_folder/frames/output/dispertion_time_series/20200730_AB_7dpf_850nm_0004', time_bin=10)
         """
         time_bin_frame_size = time_bin * fps
         split_data = np.array_split(data, data.shape[0] / time_bin_frame_size)
@@ -120,8 +120,8 @@ class CircularPlotting(PlottingMixin):
 
 
 
-# data = read_df('/Users/simon/Desktop/envs/mufasa/troubleshooting/zebrafish/project_folder/csv/features_extracted/test.csv', file_type='csv', usecols=[f'Fish_clockwise_angle_degrees']).values.flatten()
-# CircularPlotting().diffusion_plot(data=data, title='Mean 180 degree plot', fps=30, degree_width=15, palette='jet', save_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/zebrafish/project_folder/csv/features_extracted/test.png')
+# data = read_df('/path/to/mufasa/troubleshooting/zebrafish/project_folder/csv/features_extracted/test.csv', file_type='csv', usecols=[f'Fish_clockwise_angle_degrees']).values.flatten()
+# CircularPlotting().diffusion_plot(data=data, title='Mean 180 degree plot', fps=30, degree_width=15, palette='jet', save_path='/path/to/mufasa/troubleshooting/zebrafish/project_folder/csv/features_extracted/test.png')
 #
 # #
 #
@@ -134,17 +134,17 @@ class CircularPlotting(PlottingMixin):
 # data = np.random.normal(loc=90, scale=99, size=5000)
 #
 #
-# _ = CircularPlotting().diffusion_plot(data=data, title='test', fps=30, degree_width=20, palette='jet', save_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/frames/output/dispersion/20200730_AB_7dpf_850nm_0004.png')
+# _ = CircularPlotting().diffusion_plot(data=data, title='test', fps=30, degree_width=20, palette='jet', save_path='/path/to/troubleshooting/circular_features_zebrafish/project_folder/frames/output/dispersion/20200730_AB_7dpf_850nm_0004.png')
 #
-# #_ = CircularPlotting().diffusion_time_bin_plot(data=data, fps=30, degree_width=40, palette='jet', save_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/frames/output/dispertion_time_series/20200730_AB_7dpf_850nm_0004', time_bin=10)
+# #_ = CircularPlotting().diffusion_time_bin_plot(data=data, fps=30, degree_width=40, palette='jet', save_path='/path/to/troubleshooting/circular_features_zebrafish/project_folder/frames/output/dispertion_time_series/20200730_AB_7dpf_850nm_0004', time_bin=10)
 #
 #
 # print(np.rad2deg(circstd(np.deg2rad(data))))
 # print(np.rad2deg(circmean(np.deg2rad(data))))
 #
 #
-# config_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project.toml'
-# save_path='/Users/simon/Desktop/envs/troubleshooting/circular_features_zebrafish/project_folder/frames/output/20200730_AB_7dpf_850nm_0002.png'
+# config_path='/path/to/troubleshooting/circular_features_zebrafish/project.toml'
+# save_path='/path/to/troubleshooting/circular_features_zebrafish/project_folder/frames/output/20200730_AB_7dpf_850nm_0002.png'
 # DW = 20
 # MAX_SECONDS = 10
 # SECOND_BIN = 1

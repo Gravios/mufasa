@@ -140,5 +140,5 @@ class MultiCropper(object):
 # cropper.run()
 
 
-# cropper = MultiCropper(file_type='mp4', input_folder='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/videos', output_folder='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/edited', crop_cnt=2)
+# cropper = MultiCropper(file_type='mp4', input_folder='/path/to/troubleshooting/two_black_animals_14bp/project_folder/videos', output_folder='/path/to/troubleshooting/two_black_animals_14bp/project_folder/edited', crop_cnt=2)
 # cropper.run()

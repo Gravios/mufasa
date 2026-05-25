@@ -918,13 +918,13 @@ class TrainModelMixin(object):
 
         :example:
         >>> from mufasa.mixins.train_model_mixin import TrainModelMixin
-        >>> x_cols = list(pd.read_csv('/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0).columns)
+        >>> x_cols = list(pd.read_csv('/path/to/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0).columns)
         >>> x = pd.DataFrame(np.random.randint(0, 500, (9000, len(x_cols))), columns=x_cols)
         >>> y = pd.Series(np.random.randint(0, 2, (9000,)))
         >>> rf_clf = TrainModelMixin().clf_define(n_estimators=100)
         >>> rf_clf = TrainModelMixin().clf_fit(clf=rf_clf, x_df=x, y_df=y)
         >>> feature_names = [str(x) for x in list(x.columns)]
-        >>> TrainModelMixin.create_shap_log(rf_clf=rf_clf, x=x, y=y, x_names=feature_names, clf_name='test', save_it=10, cnt_present=50, cnt_absent=50, plot=True, save_dir=r'/Users/simon/Desktop/feltz')
+        >>> TrainModelMixin.create_shap_log(rf_clf=rf_clf, x=x, y=y, x_names=feature_names, clf_name='test', save_it=10, cnt_present=50, cnt_absent=50, plot=True, save_dir=r'/path/to/feltz')
         """
 
         if SKLEARN in str(rf_clf.__module__).lower():
@@ -1936,7 +1936,7 @@ class TrainModelMixin(object):
 
         :example:
         >>> from mufasa.mixins.train_model_mixin import TrainModelMixin
-        >>> x_cols = list(pd.read_csv('/Users/simon/Desktop/envs/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0).columns)
+        >>> x_cols = list(pd.read_csv('/path/to/mufasa/mufasa/tests/data/sample_data/shap_test.csv', index_col=0).columns)
         >>> x = pd.DataFrame(np.random.randint(0, 500, (9000, len(x_cols))), columns=x_cols)
         >>> y = pd.Series(np.random.randint(0, 2, (9000,)))
         """
@@ -2408,7 +2408,7 @@ class TrainModelMixin(object):
 
 
         :examples:
-        >>> df = pd.read_csv('/Users/simon/Desktop/envs/troubleshooting/multilabel/project_folder/csv/targets_inserted/01.YC015YC016phase45-sample_sampler.csv', index_col=0)
+        >>> df = pd.read_csv('/path/to/troubleshooting/multilabel/project_folder/csv/targets_inserted/01.YC015YC016phase45-sample_sampler.csv', index_col=0)
         >>> TrainModelMixin().random_multiclass_frm_sampler(data_df=df, target_field='syllable_class', target_var=0, sampling_ratio=0.20)
         >>> TrainModelMixin().random_multiclass_frm_sampler(data_df=df, target_field='syllable_class', target_var=0, sampling_ratio={1: 0.1, 2: 0.2, 3: 0.3})
         """
@@ -2501,7 +2501,7 @@ class TrainModelMixin(object):
         :return (pd.DataFrame, pd.DataFrame): resampled features, and resampled associated target.
 
         :examples:
-        >>> df = pd.read_csv('/Users/simon/Desktop/envs/troubleshooting/multilabel/project_folder/csv/targets_inserted/01.YC015YC016phase45-sample_sampler.csv', index_col=0)
+        >>> df = pd.read_csv('/path/to/troubleshooting/multilabel/project_folder/csv/targets_inserted/01.YC015YC016phase45-sample_sampler.csv', index_col=0)
         >>> undersampled_df = TrainModelMixin().random_multiclass_bout_sampler(data=df, target_field='syllable_class', target_var=0, sampling_ratio={1: 1.0, 2: 1, 3: 1}, raise_error=True)
         """
 

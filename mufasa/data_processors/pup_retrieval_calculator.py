@@ -35,7 +35,7 @@ class PupRetrieverCalculator(ConfigReader):
 
     :examples:
     >>> settings = {'pup_track_p': 0.025, 'dam_track_p': 0.5, 'start_distance_criterion': 80.0, 'carry_frames': 90.0, 'core_nest': 'corenest', 'nest': 'nest', 'dam_name': '1_mother', 'pup_name': '2_pup', 'smooth_function': 'gaussian', 'smooth_factor': 5, 'max_time': 90.0, 'clf_carry': 'carry', 'clf_approach': 'approach', 'clf_dig': 'digging', 'distance_plots': True, 'log': True, 'swarm_plot': True}
-    >>> config_path = '/Users/simon/Downloads/Automated PRT_test/project.toml'
+    >>> config_path = '/path/to/Downloads/Automated PRT_test/project.toml'
     >>> calculator = PupRetrieverCalculator(config_path=config_path, settings=settings)
     >>> calculator.run()
 
@@ -422,5 +422,5 @@ class PupRetrieverCalculator(ConfigReader):
 #      'core_nest': 'corenest', 'nest': 'nest', 'dam_name': '1_mother', 'pup_name': '2_pup',
 #      'smooth_function': 'gaussian', 'smooth_factor': 5, 'max_time': 90.0, 'clf_carry': 'carry',
 #      'clf_approach': 'approach', 'clf_dig': 'digging', 'distance_plots': True, 'log': True, 'swarm_plot': True}
-# config_path = '/Users/simon/Downloads/Automated PRT_test/project.toml'
+# config_path = '/path/to/Downloads/Automated PRT_test/project.toml'
 #

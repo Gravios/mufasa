@@ -24,10 +24,10 @@ class BrightnessContrastUI:
      :return Tuple: The scaled brightness and scaled contrast values on scale -1 to +1 and 0-2 respectively, suitable for FFmpeg conversion
 
      :example I:
-     >>> brightness_contrast_ui(video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/frames/output/ROI_features/2022-06-20_NOB_DOT_4.mp4')
+     >>> brightness_contrast_ui(video_path='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/frames/output/ROI_features/2022-06-20_NOB_DOT_4.mp4')
 
      :example II:
-     >>> img = cv2.imread('/Users/simon/Downloads/PXL_20240429_222923838.jpg')
+     >>> img = cv2.imread('/path/to/Downloads/PXL_20240429_222923838.jpg')
      >>> brightness_contrast_ui(data=img)
 
      """

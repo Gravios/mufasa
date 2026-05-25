@@ -45,10 +45,10 @@ class OutlierCorrecterMovementAdvanced(ConfigReader, FeatureExtractionMixin):
     :example:
     >>> settings = {'Simon': 1.1, 'JJ': 1.2}
     >>> criterion_body_parts = {'Simon': ['Nose_1', 'Tail_base_1'], 'JJ': ['Nose_2', 'Tail_base_2']}
-    >>> outlier_corrector = OutlierCorrecterMovementAdvanced(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', input_dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv', type='animal', agg_method='mean', criterion_body_parts=criterion_body_parts, settings=settings)
+    >>> outlier_corrector = OutlierCorrecterMovementAdvanced(config_path='/path/to/troubleshooting/two_black_animals_14bp/project.toml', input_dir='/path/to/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv', type='animal', agg_method='mean', criterion_body_parts=criterion_body_parts, settings=settings)
     >>> outlier_corrector.run()
     >>> settings = {'Simon': {'Ear_left_1': 1.1, 'Ear_right_1': 5.1, 'Nose_1': 2.1, 'Center_1': 1.5, 'Lat_left_1': 3.1, 'Lat_right_1': 1.9, 'Tail_base_1': 2.3, 'Tail_end_1': 1.4}, 'JJ': {'Ear_left_2': 1.2, 'Ear_right_2': 1.2, 'Nose_2': 2, 'Center_2': 4.1, 'Lat_left_2': 9, 'Lat_right_2': 1.2, 'Tail_base_2': 1.6, 'Tail_end_2': 2.2}}
-    >>> outlier_corrector = OutlierCorrecterMovementAdvanced(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', input_dir='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv', type='body-part', agg_method='mean', criterion_body_parts=criterion_body_parts, settings=settings)
+    >>> outlier_corrector = OutlierCorrecterMovementAdvanced(config_path='/path/to/troubleshooting/two_black_animals_14bp/project.toml', input_dir='/path/to/troubleshooting/two_black_animals_14bp/project_folder/csv/input_csv', type='body-part', agg_method='mean', criterion_body_parts=criterion_body_parts, settings=settings)
     """
 
     def __init__(

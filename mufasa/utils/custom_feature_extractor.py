@@ -54,11 +54,11 @@ class CustomFeatureExtractor(ConfigReader):
         We can give prompt help with troubleshooting through Gitter or GitHb.
 
     :example:
-    >>> test = CustomFeatureExtractor(extractor_file_path='/mufasa/misc/piotr.py', config_path='/Users/simon/Desktop/envs/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini')
+    >>> test = CustomFeatureExtractor(extractor_file_path='/mufasa/misc/piotr.py', config_path='/path/to/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini')
     >>> test.run()
-    >>> test = CustomFeatureExtractor(config_path='/Users/simon/Desktop/envs/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini', file_path='/mufasa/misc/piotr.py')
+    >>> test = CustomFeatureExtractor(config_path='/path/to/troubleshooting/piotr/project_folder/train-20231108-sh9-frames-with-p-lt-2_plus3-&3_best-f1.ini', file_path='/mufasa/misc/piotr.py')
     >>> test.run()
-    >>> test = CustomFeatureExtractor(extractor_file_path='/Users/simon/Desktop/envs/mufasa/mufasa/mufasa/feature_extractors/amber_feature_extractor.py', config_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/Amber_test/project.toml')
+    >>> test = CustomFeatureExtractor(extractor_file_path='/path/to/mufasa/mufasa/mufasa/feature_extractors/amber_feature_extractor.py', config_path='/path/to/mufasa/troubleshooting/Amber_test/project.toml')
     >>> test.run()
     """
 

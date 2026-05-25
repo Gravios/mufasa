@@ -981,7 +981,7 @@ class PlottingMixin(object):
         :returns: The rotated image as a numpy array of uint8 format.
 
         :example:
-        >>> img = cv2.imread('/Users/simon/Desktop/test.png')
+        >>> img = cv2.imread('/path/to/test.png')
         >>> rotated_img = PlottingMixin.rotate_img(img=img, right=False)
         """
 
@@ -1579,7 +1579,7 @@ class PlottingMixin(object):
         :example:
         >>> p = np.random.randint(0, 50, (100,))
         >>> y = np.random.randint(0, 50, (200,))
-        >>> img = PlottingMixin.make_line_plot_plotly(data=[p, y], show_box=False, font_size=20, bg_clr='white', show_grid=False, x_lbl_divisor=30, colors=['Red', 'Green'], save_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/beepboop174/project_folder/frames/output/line_plot/Trial     3_final_img.png')
+        >>> img = PlottingMixin.make_line_plot_plotly(data=[p, y], show_box=False, font_size=20, bg_clr='white', show_grid=False, x_lbl_divisor=30, colors=['Red', 'Green'], save_path='/path/to/mufasa/troubleshooting/beepboop174/project_folder/frames/output/line_plot/Trial     3_final_img.png')
         """
 
         def tick_formatter(x):
@@ -2050,7 +2050,7 @@ class PlottingMixin(object):
         :returns Tuple[int, int, int]: The font size, the shift on x between successive columns, the shift in y between successive rows.
 
         :example:
-        >>> img = cv2.imread('/Users/simon/Desktop/Screenshot 2024-07-08 at 4.46.03 PM.png')
+        >>> img = cv2.imread('/path/to/Screenshot 2024-07-08 at 4.46.03 PM.png')
         >>> accepted_px_width = int(img.shape[1] / 4)
         >>> accepted_px_height = int(img.shape[0] / 10)
         >>>>text = 'HELLO MY FELLOW'
@@ -2409,16 +2409,16 @@ class PlottingMixin(object):
            For more complex path plots with multiprocessing and advanced features, see :class:`mufasa.plotting.path_plotter.PathPlotterSingleCore` and :class:`mufasa.plotting.path_plotter_mp.PathPlotterMulticore`.
 
         :example:
-        >>> df = pd.read_csv('/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/csv/outlier_corrected_movement_location/2022-06-20_NOB_DOT_4.csv')
+        >>> df = pd.read_csv('/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/csv/outlier_corrected_movement_location/2022-06-20_NOB_DOT_4.csv')
         >>> data = df[['Nose_x', 'Nose_y']].values
-        >>> img = read_frm_of_video(video_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/videos/2022-06-20_NOB_DOT_4.mp4', frame_index=400)
+        >>> img = read_frm_of_video(video_path='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/2022-06-20_NOB_DOT_4.mp4', frame_index=400)
         >>> PlottingMixin().get_path_img(data=data,
         >>>          size=(1080, 1080),
         >>>          line_thickness=0.5,
         >>>          line_color=(0, 255, 0),
         >>>          bg_clr=(255, 255, 255),
         >>>          bg_img=img,
-        >>>          save_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/RAT_NOR/project_folder/csv/outlier_corrected_movement_location/2022-06-20_NOB_DOT_4_3.png',
+        >>>          save_path='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/csv/outlier_corrected_movement_location/2022-06-20_NOB_DOT_4_3.png',
         >>>          dpi=600,
         >>>          opacity=1.0,
         >>>          color_by=None,

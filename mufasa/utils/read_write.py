@@ -893,7 +893,7 @@ def read_frm_of_video(video_path: Union[str, os.PathLike, cv2.VideoCapture],
     :rtype: Union[np.ndarray, None]
 
     :example:
-    >>> img = read_frm_of_video(video_path='/Users/simon/Desktop/envs/platea_featurizer/data/video/3D_Mouse_5-choice_MouseTouchBasic_s9_a4_grayscale.mp4')
+    >>> img = read_frm_of_video(video_path='/path/to/platea_featurizer/data/video/3D_Mouse_5-choice_MouseTouchBasic_s9_a4_grayscale.mp4')
     >>> cv2.imshow('img', img)
     >>> cv2.waitKey(5000)
     """
@@ -1673,7 +1673,7 @@ def check_if_hhmmss_timestamp_is_valid_part_of_video(timestamp: str, video_path:
     :raises FrameRangeError: If timestamp is not in the video file. E.g., timestamp 00:01:00 will raise FrameRangeError if the video is 59s long.
 
     :example:
-    >>> check_if_hhmmss_timestamp_is_valid_part_of_video(timestamp='01:00:05', video_path='/Users/simon/Desktop/video_tests/Together_1.avi')
+    >>> check_if_hhmmss_timestamp_is_valid_part_of_video(timestamp='01:00:05', video_path='/path/to/video_tests/Together_1.avi')
     >>> "FrameRangeError: The timestamp '01:00:05' does not occur in video Together_1.avi, the video has length 10s"
     """
 
@@ -1985,7 +1985,7 @@ def clean_sleap_filenames_in_directory(dir: Union[str, os.PathLike],
     :param Union[str, os.PathLike] dir: The directory path where the SLEAP CSV or H5 files are located.
 
     :example:
-    >>> clean_sleap_filenames_in_directory(dir='/Users/simon/Desktop/envs/troubleshooting/Hornet_SLEAP/import/')
+    >>> clean_sleap_filenames_in_directory(dir='/path/to/troubleshooting/Hornet_SLEAP/import/')
     """
 
     check_if_dir_exists(in_dir=dir)
@@ -2458,7 +2458,7 @@ def img_stack_to_greyscale(imgs: np.ndarray):
     :returns np.ndarray: A 3D array containing the grayscale versions of the input images. The shape of the output array is (num_images, height, width).
 
     :example:
-    >>> imgs = ImageMixin().read_img_batch_from_video( video_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=100)
+    >>> imgs = ImageMixin().read_img_batch_from_video( video_path='/path/to/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=100)
     >>> imgs = np.stack(list(imgs.values()))
     >>> imgs_gray = ImageMixin.img_stack_to_greyscale(imgs=imgs)
     """
@@ -2482,7 +2482,7 @@ def img_stack_to_bw(imgs: np.ndarray):
     :returns np.ndarray: A 3D array containing the black and white versions of the input images. The shape of the output array is (num_images, height, width).
 
     :example:
-    >>> imgs = ImageMixin().read_img_batch_from_video( video_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=100)
+    >>> imgs = ImageMixin().read_img_batch_from_video( video_path='/path/to/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=100)
     >>> imgs = np.stack(list(imgs.values()))
     >>> imgs_gray = ImageMixin.img_stack_to_greyscale(imgs=imgs)
     """
@@ -3321,7 +3321,7 @@ def read_img_batch_from_video(video_path: Union[str, os.PathLike],
     :rtype: Dict[int, np.ndarray]
 
     :example:
-    >>> read_img_batch_from_video(video_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=50)
+    >>> read_img_batch_from_video(video_path='/path/to/troubleshooting/two_black_animals_14bp/videos/Together_1.avi', start_frm=0, end_frm=50)
     """
 
 

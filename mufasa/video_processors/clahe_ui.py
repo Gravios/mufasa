@@ -144,7 +144,7 @@ def interactive_clahe_ui(data: Union[str, os.PathLike]) -> Tuple[float, int]:
 #     cv2.imshow('CLAHE', img_clahe)
 #
 # # Load an image
-# img = cv2.imread('/Users/simon/Downloads/PXL_20240429_222923838.jpg', cv2.IMREAD_GRAYSCALE)
+# img = cv2.imread('/path/to/Downloads/PXL_20240429_222923838.jpg', cv2.IMREAD_GRAYSCALE)
 #
 # # Create a window
 # cv2.namedWindow('CLAHE', cv2.WINDOW_NORMAL)

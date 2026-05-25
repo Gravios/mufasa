@@ -34,9 +34,9 @@ class ROISelectorCircle(object):
        `Circle crop tutorial <https://github.com/sgoldenlab/mufasa/blob/master/docs/Tutorial_tools.md#circle-crop>`__.
 
     :example:
-    >>> circle_selector = ROISelectorCircle(path='/Users/simon/Desktop/amber.png')
+    >>> circle_selector = ROISelectorCircle(path='/path/to/amber.png')
     >>> circle_selector.run()
-    >>> circle_selector = ROISelectorCircle(path='/Users/simon/Desktop/Box2_IF19_7_20211109T173625_4_851_873_1_cropped.mp4')
+    >>> circle_selector = ROISelectorCircle(path='/path/to/Box2_IF19_7_20211109T173625_4_851_873_1_cropped.mp4')
     >>> circle_selector.run()
     >>> circle_selector = ROISelectorCircle(path=r"C:\troubleshooting\mitra\test\503_MA109_Gi_CNO_0521.mp4")
     >>> circle_selector.run()

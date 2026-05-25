@@ -31,10 +31,10 @@ class MutualExclusivityCorrector(ConfigReader):
 
     :examples:
     >>> rules = {1: {'rule_type': 'threshold_determinator','determinator': 'Attack', 'threshold': 0.5, 'subordinates': ['Sniffing']}, 2: {'rule_type': 'threshold_determinator', 'determinator': 'Attack', 'threshold': 0.0, 'subordinates': ['Sniffing', 'Rear']}}
-    >>> exclusivity_corrector = MutualExclusivityCorrector(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', rules=rules)
+    >>> exclusivity_corrector = MutualExclusivityCorrector(config_path='/path/to/troubleshooting/two_black_animals_14bp/project.toml', rules=rules)
     >>> exclusivity_corrector.run()
     >>> rules = {1: {'rule_type': 'highest_probability', 'subordinates': ['body', 'face'], 'winner': 'body', 'skip_files_with_identical': True}}
-    >>> exclusivity_corrector = MutualExclusivityCorrector(config_path='/Users/simon/Desktop/envs/troubleshooting/two_black_animals_14bp/project.toml', rules=rules)
+    >>> exclusivity_corrector = MutualExclusivityCorrector(config_path='/path/to/troubleshooting/two_black_animals_14bp/project.toml', rules=rules)
     >>> exclusivity_corrector.run()
 
 

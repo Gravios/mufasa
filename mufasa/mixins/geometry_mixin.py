@@ -200,7 +200,7 @@ class GeometryMixin(object):
         :rtype: LineString
 
         :example:
-        >>> data = np.load('/Users/simon/Desktop/envs/mufasa/mufasa/mufasa/sandbox/data.npy')
+        >>> data = np.load('/path/to/mufasa/mufasa/mufasa/sandbox/data.npy')
         >>> linestring = GeometryMixin.to_linestring(data=data)
         """
         check_valid_array(
@@ -2151,7 +2151,7 @@ class GeometryMixin(object):
         :rtype: List[List[Polygon]]
 
         :example:
-        >>> data_path = '/Users/simon/Desktop/envs/troubleshooting/Rat_NOR/project_folder/derived/classifications/08102021_DOT_Rat7_8(2).parquet'
+        >>> data_path = '/path/to/troubleshooting/Rat_NOR/project_folder/derived/classifications/08102021_DOT_Rat7_8(2).parquet'
         >>> data = pd.read_parquet(data_path).head(1000).iloc[:, 0:21]
         >>> data = data[data.columns.drop(list(data.filter(regex='_p')))]
         >>> animal_data = data.values.reshape(len(data), -1, 2).astype(int)
@@ -2355,7 +2355,7 @@ class GeometryMixin(object):
         :rtype: List[Union[LineString, MultiLineString]]
 
         :example:
-        >>> df = pd.read_parquet('/Users/simon/Desktop/envs/troubleshooting/Rat_NOR/project_folder/derived/classifications/08102021_DOT_Rat7_8(2).parquet').head(500).fillna(0).astype(int)
+        >>> df = pd.read_parquet('/path/to/troubleshooting/Rat_NOR/project_folder/derived/classifications/08102021_DOT_Rat7_8(2).parquet').head(500).fillna(0).astype(int)
         >>> skeleton = [['Center', 'Lat_left'], ['Center', 'Lat_right'], ['Center', 'Nose'], ['Center', 'Tail_base'], ['Lat_left', 'Tail_base'], ['Lat_right', 'Tail_base'], ['Nose', 'Ear_left'], ['Nose', 'Ear_right'], ['Ear_left', 'Lat_left'], ['Ear_right', 'Lat_right']]
         >>> geometries = GeometryMixin().multiframe_bodyparts_to_multistring_skeleton(data_df=df, skeleton=skeleton, core_cnt=2, verbose=True)
         """
@@ -2462,8 +2462,8 @@ class GeometryMixin(object):
         :rtype: List[float]
 
         :example:
-        >>> img = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1.png').astype(np.uint8)
-        >>> data_path = '/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv'
+        >>> img = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1.png').astype(np.uint8)
+        >>> data_path = '/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv'
         >>> data = pd.read_csv(data_path, usecols=['Nose_x', 'Nose_y']).sample(n=3).fillna(1).values.astype(np.int64)
         >>> geometries = []
         >>> for frm_data in data: geometries.append(GeometryMixin().bodyparts_to_circle(frm_data, 100))
@@ -2535,18 +2535,18 @@ class GeometryMixin(object):
         :rtype: float
 
         :example:
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1.png')
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_frames/2.png')
-        >>> data_path = '/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv'
+        >>> img_1 = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1.png')
+        >>> img_2 = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_frames/2.png')
+        >>> data_path = '/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv'
         >>> data = pd.read_csv(data_path, nrows=1, usecols=['Nose_x', 'Nose_y']).fillna(-1).values.astype(np.int64)
         >>> polygon = GeometryMixin().bodyparts_to_circle(data[0], 100)
         >>> GeometryMixin().geometry_histocomparison(imgs=[img_1, img_2], geometry=polygon, method='correlation')
         >>> 0.9999769684923543
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_frames/41411.png')
+        >>> img_2 = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_frames/41411.png')
         >>> GeometryMixin().geometry_histocomparison(imgs=[img_1, img_2], geometry=polygon, method='correlation')
         >>> 0.6732792208872572
-        >>> img_1 = (cv2.VideoCapture('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1.mp4'), 1)
-        >>> img_2 = (cv2.VideoCapture('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1.mp4'), 2)
+        >>> img_1 = (cv2.VideoCapture('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1.mp4'), 1)
+        >>> img_2 = (cv2.VideoCapture('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1.mp4'), 2)
         >>> GeometryMixin().geometry_histocomparison(imgs=[img_1, img_2], geometry=polygon, method='correlation')
         >>> 0.9999769684923543
         """
@@ -2705,9 +2705,9 @@ class GeometryMixin(object):
 
 
         :example:
-        >>> img_1 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1978.png').astype(np.uint8)
-        >>> img_2 = cv2.imread('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1977.png').astype(np.uint8)
-        >>> data = pd.read_csv('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv', nrows=1, usecols=['Nose_x', 'Nose_y']).fillna(-1).values.astype(np.int64)
+        >>> img_1 = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1978.png').astype(np.uint8)
+        >>> img_2 = cv2.imread('/path/to/troubleshooting/Emergence/project_folder/videos/Example_1_frames/1977.png').astype(np.uint8)
+        >>> data = pd.read_csv('/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv', nrows=1, usecols=['Nose_x', 'Nose_y']).fillna(-1).values.astype(np.int64)
         >>> geometry = GeometryMixin().bodyparts_to_circle(data[0, :], 100)
         >>> GeometryMixin().geometry_contourcomparison(imgs=[img_1, img_2], geometry=geometry, canny=True, method='exterior')
         >>> 22.54
@@ -2866,10 +2866,10 @@ class GeometryMixin(object):
         :rtype: np.ndarray
 
         :example:
-        >>> data = pd.read_csv('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv', nrows=2100, usecols=['Nose_x', 'Nose_y']).fillna(-1).values.astype(np.int64)
-        >>> results = GeometryMixin().multifrm_geometry_histocomparison(video_path='/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1.mp4', data= data, shape_type='circle', pixels_per_mm=1, parallel_offset=100)
-        >>> data = pd.read_csv('/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_2.csv', nrows=2100, usecols=['Nose_x', 'Nose_y', 'Tail_base_x' , 'Tail_base_y', 'Center_x' , 'Center_y']).fillna(-1).values.astype(np.int64)
-        >>> results = GeometryMixin().multifrm_geometry_histocomparison(video_path='/Users/simon/Desktop/envs/troubleshooting/Emergence/project_folder/videos/Example_1.mp4', data= data, shape_type='rectangle', pixels_per_mm=1, parallel_offset=1)
+        >>> data = pd.read_csv('/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_1.csv', nrows=2100, usecols=['Nose_x', 'Nose_y']).fillna(-1).values.astype(np.int64)
+        >>> results = GeometryMixin().multifrm_geometry_histocomparison(video_path='/path/to/troubleshooting/Emergence/project_folder/videos/Example_1.mp4', data= data, shape_type='circle', pixels_per_mm=1, parallel_offset=100)
+        >>> data = pd.read_csv('/path/to/troubleshooting/Emergence/project_folder/csv/outlier_corrected_movement_location/Example_2.csv', nrows=2100, usecols=['Nose_x', 'Nose_y', 'Tail_base_x' , 'Tail_base_y', 'Center_x' , 'Center_y']).fillna(-1).values.astype(np.int64)
+        >>> results = GeometryMixin().multifrm_geometry_histocomparison(video_path='/path/to/troubleshooting/Emergence/project_folder/videos/Example_1.mp4', data= data, shape_type='rectangle', pixels_per_mm=1, parallel_offset=1)
         """
 
         # [Linux-only] Darwin spawn-force removed.
@@ -3007,7 +3007,7 @@ class GeometryMixin(object):
         :rtype: List[Polygon]
 
         :example:
-        >>> video_frm = read_frm_of_video(video_path='/Users/simon/Desktop/envs/platea_featurizer/data/video/3D_Mouse_5-choice_MouseTouchBasic_s9_a4_grayscale.mp4')
+        >>> video_frm = read_frm_of_video(video_path='/path/to/platea_featurizer/data/video/3D_Mouse_5-choice_MouseTouchBasic_s9_a4_grayscale.mp4')
         >>> contours = ImageMixin.find_contours(img=video_frm)
         >>> GeometryMixin.contours_to_geometries(contours=contours)
         """
@@ -3157,7 +3157,7 @@ class GeometryMixin(object):
         :returns: Size-2 Tuple with (i) Dictionary where the segment index is the key and polygon is the value, and (ii) float representing aspect ratio of each bucket.
 
         :example:
-        >>> img = cv2.imread('/Users/simon/Desktop/Screenshot 2024-01-21 at 10.15.55 AM.png', 1)
+        >>> img = cv2.imread('/path/to/Screenshot 2024-01-21 at 10.15.55 AM.png', 1)
         >>> polygons = GeometryMixin().bucket_img_into_grid_square(bucket_grid_size=(10, 5), bucket_grid_size_mm=None, img_size=(img.shape[1], img.shape[0]), px_per_mm=5.0)
         >>> for k, v in polygons[0].items(): cv2.polylines(img, [np.array(v.exterior.coords).astype(int)], True, (255, 0, 133), 2)
         >>> cv2.imshow('img', img)
@@ -3700,7 +3700,7 @@ class GeometryMixin(object):
         :rtype: List[float]
 
         :example:
-        >>> df = read_df(file_path='/Users/simon/Desktop/envs/mufasa/troubleshooting/mouse_open_field/project_folder/csv/outlier_corrected_movement_location/SI_DAY3_308_CD1_PRESENT.csv', file_type='csv')
+        >>> df = read_df(file_path='/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/csv/outlier_corrected_movement_location/SI_DAY3_308_CD1_PRESENT.csv', file_type='csv')
         >>> cols = [x for x in df.columns if not x.endswith('_p')]
         >>> data = df[cols].values.reshape(len(df), -1 , 2).astype(np.int)
         >>> geometries = GeometryMixin().multiframe_bodyparts_to_polygon(data=data, pixels_per_mm=1, parallel_offset=1, verbose=False, core_cnt=-1)
@@ -3908,7 +3908,7 @@ class GeometryMixin(object):
         Convert SimBA dataframes holding ROI geometries to nested dictionary holding Shapley polygons.
 
         :example:
-        >>> config_path = '/Users/simon/Desktop/envs/mufasa/troubleshooting/spontenous_alternation/project.toml'
+        >>> config_path = '/path/to/mufasa/troubleshooting/spontenous_alternation/project.toml'
         >>> config = ConfigReader(config_path=config_path)
         >>> config.read_roi_data()
         >>> GeometryMixin.simba_roi_to_geometries(rectangles_df=config.rectangles_df, circles_df=config.circles_df, polygons_df=config.polygon_df)
@@ -4233,8 +4233,8 @@ class GeometryMixin(object):
              >>> # Results structure: {track_id: {frame_idx: Polygon, ...}, ...}
 
         :example II
-        >>> data_path = r"/Users/simon/Desktop/envs/mufasa/troubleshooting/ant/ant.csv"
-        >>> save_path = r"/Users/simon/Desktop/envs/mufasa/troubleshooting/ant/ant_geometries.pickle"
+        >>> data_path = r"/path/to/mufasa/troubleshooting/ant/ant.csv"
+        >>> save_path = r"/path/to/mufasa/troubleshooting/ant/ant_geometries.pickle"
         >>> results = GeometryMixin.sleap_csv_to_geometries(data=data_path, save_path=save_path)
          """
 

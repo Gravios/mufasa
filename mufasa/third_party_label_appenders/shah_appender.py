@@ -35,9 +35,9 @@ def shah_appender(labels_dir: Union[str, os.PathLike],
     :return: None
 
     :example:
-    >>> LABELS_DIR = r'/Users/simon/Desktop/envs/mufasa/troubleshooting/shah_data'                                           #PATH TO A DIRECTORY CONTAINING .TXT FILES
-    >>> FEATURES_DIR = r'/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/csv/features_extracted'       #PATH TO A DIRECTORY CONTAINING FEATURIZED POSE ESTIMATION
-    >>> TARGETS_DIR = r'/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/csv/targets_inserted'          #PATH TO A DIRECTORY WHERE FEATURIZED POSE ESTIMATION AND ALIGNED ANNOTATIONS ARE TO BE SAVED
+    >>> LABELS_DIR = r'/path/to/mufasa/troubleshooting/shah_data'                                           #PATH TO A DIRECTORY CONTAINING .TXT FILES
+    >>> FEATURES_DIR = r'/path/to/mufasa/troubleshooting/mitra/project_folder/csv/features_extracted'       #PATH TO A DIRECTORY CONTAINING FEATURIZED POSE ESTIMATION
+    >>> TARGETS_DIR = r'/path/to/mufasa/troubleshooting/mitra/project_folder/csv/targets_inserted'          #PATH TO A DIRECTORY WHERE FEATURIZED POSE ESTIMATION AND ALIGNED ANNOTATIONS ARE TO BE SAVED
     >>> CLF_NAMES = ['Rearing', 'Grooming']                                                                                 #NAMES OF THE ANNOTATED BEHAVIORS TO BUILD CLASSIFIERS FROM
     >>> shah_appender(labels_dir=LABELS_DIR, features_dir=FEATURES_DIR, targets_dir=TARGETS_DIR, clf_names=CLF_NAMES)
     """
@@ -106,9 +106,9 @@ def shah_appender(labels_dir: Union[str, os.PathLike],
 
     stdout_success(msg=f'{len(lbls_paths.keys())} annotation file(s) saved in directory {targets_dir}', source=shah_appender.__name__)
 
-# LABELS_DIR = r'/Users/simon/Desktop/envs/mufasa/troubleshooting/shah_data'                                           #PATH TO A DIRECTORY CONTAINING .TXT FILES
-# FEATURES_DIR = r'/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/csv/features_extracted'       #PATH TO A DIRECTORY CONTAINING FEATURIZED POSE ESTIMATION
-# TARGETS_DIR = r'/Users/simon/Desktop/envs/mufasa/troubleshooting/mitra/project_folder/csv/targets_inserted'          #PATH TO A DIRECTORY WHERE FEATURIZED POSE ESTIMATION AND ALIGNED ANNOTATIONS ARE TO BE SAVED
+# LABELS_DIR = r'/path/to/mufasa/troubleshooting/shah_data'                                           #PATH TO A DIRECTORY CONTAINING .TXT FILES
+# FEATURES_DIR = r'/path/to/mufasa/troubleshooting/mitra/project_folder/csv/features_extracted'       #PATH TO A DIRECTORY CONTAINING FEATURIZED POSE ESTIMATION
+# TARGETS_DIR = r'/path/to/mufasa/troubleshooting/mitra/project_folder/csv/targets_inserted'          #PATH TO A DIRECTORY WHERE FEATURIZED POSE ESTIMATION AND ALIGNED ANNOTATIONS ARE TO BE SAVED
 # CLF_NAMES = ['Rearing', 'Grooming']                                                                                 #NAMES OF THE ANNOTATED BEHAVIORS TO BUILD CLASSIFIERS FROM
 #
 # shah_appender(labels_dir=LABELS_DIR, features_dir=FEATURES_DIR, targets_dir=TARGETS_DIR, clf_names=CLF_NAMES)
