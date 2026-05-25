@@ -995,6 +995,91 @@ def resolve_v1_project_root(
 # :class:`ConfigReader`, and the InputSourcePicker discovery.
 
 
+def v1_project_paths(root: Path) -> dict[str, str]:
+    """Return the canonical set of base paths for a v1 project layout.
+
+    Single source of truth for v1 path knowledge — both
+    :func:`project_paths_from_config` and
+    :meth:`mufasa.mixins.config_reader.ConfigReader._resolve_v1_paths`
+    delegate here. Centralization landed in patch 122en after a
+    history of drift between the two helpers:
+
+    * Patch 122dy first noticed the duplication (one helper was
+      clobbering the other's values post-override). Deleted the
+      clobber as "a silent v1-path-clobbering bug" but didn't
+      finish the audit of every duplicated value.
+
+    * Patch 122ea fixed three attrs (``annotated_frm_dir``,
+      ``single_validation_video_save_dir``, ``data_table_path``)
+      that were missing from ``project_paths_from_config`` and
+      had legacy-shaped fallbacks in ConfigReader.
+
+    * Patch 122eh fixed ``roi_coordinates_path`` which had drifted
+      to ``<root>/logs/roi_definitions.h5`` in ConfigReader while
+      project_paths kept the correct
+      ``<root>/logs/measures/ROI_definitions.h5``. Reader-side
+      consumers (Duplicate ROIs dialog, ROI size standardizer)
+      crashed with NoFilesFoundError on projects with ROIs
+      defined.
+
+    * Patch 122en (this helper's introduction) restructures both
+      helpers to call here, so future v1 layout changes only need
+      one edit. ConfigReader retains all its other attrs (latest-
+      run resolutions, plots, etc.) — only the overlap with
+      project_paths_from_config moves here.
+
+    Parameters
+    ----------
+    root
+        Path to the project root (the directory containing
+        ``project.toml``).
+
+    Returns
+    -------
+    dict
+        Keys (all str, all absolute paths):
+
+        * ``project_root`` — ``<root>``
+        * ``video_dir`` — ``<root>/sources/videos``
+        * ``input_pose_dir`` — ``<root>/sources/pose``
+        * ``logs_dir`` — ``<root>/logs``
+        * ``video_info_path`` — ``<root>/sources/video_info.csv``
+        * ``models_dir`` — ``<root>/models``
+        * ``roi_definitions_path`` —
+          ``<root>/logs/measures/ROI_definitions.h5``
+        * ``derived_features_dir`` — ``<root>/derived/features``
+        * ``derived_labels_dir`` — ``<root>/derived/labels``
+        * ``derived_classifications_dir`` —
+          ``<root>/derived/classifications``
+
+    Notes
+    -----
+    Caller is responsible for creating directories as needed; this
+    function returns path strings even when they don't exist on
+    disk.
+
+    Future v1 layout changes should land here — both consumers
+    pick them up automatically. The
+    :func:`smoke_122en_layout_centralization` smoke test asserts
+    consumer agreement.
+    """
+    root = root.resolve() if root.is_absolute() else root
+    return {
+        "project_root":           str(root),
+        "video_dir":              str(root / "sources" / "videos"),
+        "input_pose_dir":         str(root / "sources" / "pose"),
+        "logs_dir":               str(root / "logs"),
+        "video_info_path":        str(root / "sources" / "video_info.csv"),
+        "models_dir":             str(root / "models"),
+        "roi_definitions_path":   str(root / "logs" / "measures"
+                                      / "ROI_definitions.h5"),
+        "derived_features_dir":   str(root / "derived" / "features"),
+        "derived_labels_dir":     str(root / "derived" / "labels"),
+        "derived_classifications_dir":
+            str(root / "derived" / "classifications"),
+    }
+
+
 def project_paths_from_config(
     config_path: Union[str, Path],
 ) -> Dict[str, str]:
@@ -1089,33 +1174,10 @@ def project_paths_from_config(
     cp = Path(config_path)
     cp_str = str(cp).lower()
     if cp_str.endswith(".toml"):
-        root = cp.parent.resolve()
-        return {
-            "project_root":           str(root),
-            "video_dir":              str(root / "sources" / "videos"),
-            "input_pose_dir":         str(root / "sources" / "pose"),
-            "logs_dir":               str(root / "logs"),
-            "video_info_path":        str(root / "sources" / "video_info.csv"),
-            "models_dir":             str(root / "models"),
-            # Patch 122ax: machine_results_dir is gone from v1
-            # projects. The csv/ subtree no longer exists at all
-            # under a v1 layout — predictions live exclusively
-            # under derived/classifications/<video>.parquet.
-            # This is the last csv/<kind>/ key that was carried
-            # through; with it dropped, the v1 layout is fully
-            # the new shape (logs/, models/, sources/, derived/).
-            "roi_definitions_path":   str(root / "logs" / "measures"
-                                          / "ROI_definitions.h5"),
-            # Patch 122ae-1: per-family parquet trees for derived data.
-            "derived_features_dir":   str(root / "derived" / "features"),
-            "derived_labels_dir":     str(root / "derived" / "labels"),
-            # Patch 122at: per-video classifier predictions land
-            # here (parquet, predictions-only — features stay in
-            # derived/features/). Now the sole write location
-            # post-122ax (was dual-write until then).
-            "derived_classifications_dir":
-                str(root / "derived" / "classifications"),
-        }
+        # Patch 122en — delegate to v1_project_paths (the canonical
+        # v1 layout helper). See that function's docstring for the
+        # drift history that motivated the centralization.
+        return v1_project_paths(cp.parent.resolve())
     # Legacy: parse the [General settings] project_path.
     import configparser as _cp
     parser = _cp.ConfigParser()

@@ -332,10 +332,12 @@ def main() -> int:
     # 16. 122eh state preserved.
     cr_src = (REPO_ROOT / "mufasa" / "mixins"
               / "config_reader.py").read_text()
+    pl_src = (REPO_ROOT / "mufasa"
+              / "project_layout.py").read_text()
     check(
         "122eh state preserved: roi_coordinates_path is set to "
         "logs/measures/ROI_definitions.h5",
-        '"measures"' in cr_src and '"ROI_definitions.h5"' in cr_src,
+        "measures" in pl_src and "ROI_definitions.h5" in pl_src,
     )
 
     # 17. 122eg state preserved.

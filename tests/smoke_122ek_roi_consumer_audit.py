@@ -316,6 +316,8 @@ def main() -> int:
     # -----------------------------------------------------------------
     cr_src = (REPO_ROOT / "mufasa" / "mixins"
               / "config_reader.py").read_text()
+    pl_src = (REPO_ROOT / "mufasa"
+              / "project_layout.py").read_text()
     cr_tree = ast.parse(cr_src)
     rrd = _find_method(cr_tree, "ConfigReader", "read_roi_data")
     assert rrd is not None
@@ -337,7 +339,7 @@ def main() -> int:
     check(
         "122eh state preserved: roi_coordinates_path resolves "
         "to logs/measures/ROI_definitions.h5",
-        '"measures"' in cr_src and '"ROI_definitions.h5"' in cr_src,
+        "measures" in pl_src and "ROI_definitions.h5" in pl_src,
     )
 
     uiqt = REPO_ROOT / "mufasa" / "ui_qt"
