@@ -207,9 +207,9 @@ def main() -> int:
         "SECTIONS by section_id)",
         callable(find_section_by_title),
     )
-    spec = find_section_by_title("Pose cleanup", "Run outlier correction")
+    spec = find_section_by_title("Preprocessing", "Run outlier correction")
     check(
-        "find_section_by_title('Pose cleanup', 'Run outlier correction') "
+        "find_section_by_title('Preprocessing', 'Run outlier correction') "
         "returns the outlier_correction section",
         spec is not None and spec.section_id == "outlier_correction",
         detail=(f"got {spec!r}"),

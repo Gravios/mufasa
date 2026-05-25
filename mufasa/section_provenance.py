@@ -194,7 +194,7 @@ SECTIONS: dict[str, SectionSpec] = {
     ),
     "pixels_per_mm": SectionSpec(
         section_id="pixels_per_mm",
-        page="Pose cleanup",
+        page="Preprocessing",
         section_title="Pixels-per-mm calibration",
         depends_on=(),
         # No detect_path — pixels_per_mm is a settings-only section,
@@ -203,7 +203,7 @@ SECTIONS: dict[str, SectionSpec] = {
     ),
     "interpolate": SectionSpec(
         section_id="interpolate",
-        page="Pose cleanup",
+        page="Preprocessing",
         section_title="Interpolate missing frames",
         depends_on=("import_pose",),
         # Patch 122ei — points at derived/interpolated/; if any
@@ -213,7 +213,7 @@ SECTIONS: dict[str, SectionSpec] = {
     ),
     "kalman_v2": SectionSpec(
         section_id="kalman_v2",
-        page="Pose cleanup",
+        page="Preprocessing",
         section_title="Kalman v2 smoother",
         depends_on=("import_pose",),
         # Patch 122ei — derived/smoothed/kalman_v2/ (the
@@ -225,7 +225,7 @@ SECTIONS: dict[str, SectionSpec] = {
     ),
     "outlier_correction": SectionSpec(
         section_id="outlier_correction",
-        page="Pose cleanup",
+        page="Preprocessing",
         section_title="Run outlier correction",
         depends_on=("import_pose",),
         # Patch 122ei — derived/outlier_corrected/. Note this
@@ -243,19 +243,19 @@ SECTIONS: dict[str, SectionSpec] = {
     ),
     "savitzky_golay": SectionSpec(
         section_id="savitzky_golay",
-        page="Pose cleanup",
+        page="Preprocessing",
         section_title="Savitzky-Golay smoother (legacy)",
         depends_on=("outlier_correction",),
     ),
     "egocentric": SectionSpec(
         section_id="egocentric",
-        page="Pose cleanup",
+        page="Preprocessing",
         section_title="Egocentric alignment",
         depends_on=("outlier_correction",),
     ),
     "drop_body_parts": SectionSpec(
         section_id="drop_body_parts",
-        page="Pose cleanup",
+        page="Preprocessing",
         section_title="Drop body parts",
         depends_on=("import_pose",),
     ),
