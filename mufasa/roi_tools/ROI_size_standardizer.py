@@ -83,9 +83,14 @@ class ROISizeStandardizer(ConfigReader, FeatureExtractionMixin):
             pd.DataFrame(columns=self.circles_df.columns),
         )
         for video_name in self.video_names_to_change:
-            rectangles = self.rectangles_df[self.rectangles_df["Video"] == video_name]
-            circles = self.circles_df[self.circles_df["Video"] == video_name]
-            polygons = self.polygon_df[self.polygon_df["Video"] == video_name]
+            # Patch 122ek — defensive against empty DataFrames
+            # (no columns) from pd.read_hdf when only one shape
+            # type was drawn. See mufasa.roi_tools.roi_utils
+            # module-level note.
+            from mufasa.roi_tools.roi_utils import safe_filter_by_video
+            rectangles = safe_filter_by_video(self.rectangles_df, video_name)
+            circles = safe_filter_by_video(self.circles_df, video_name)
+            polygons = safe_filter_by_video(self.polygon_df, video_name)
 
             # UPDATE RECTANGLES
             for idx, rectangle in rectangles.iterrows():
