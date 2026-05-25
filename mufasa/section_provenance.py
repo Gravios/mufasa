@@ -222,9 +222,37 @@ SECTIONS: dict[str, SectionSpec] = {
         # badge-suppression.
         section_title="Video Calibration",
         depends_on=(),
-        # No detect_path — pixels_per_mm is a settings-only section,
-        # no on-disk artifact materializes from it. Stays UNKNOWN
-        # until explicit provenance lands (currently unwired).
+        # Patch 122es-hotfix — was twice marked "settings-only,
+        # no on-disk artifact" (in 122ei and 122ep). Both wrong.
+        # The Video Calibration form's Save action writes the
+        # whole calibration table (FPS, frame size, distance,
+        # pixels-per-mm per video) to sources/video_info.csv
+        # — the canonical ``video_info_path`` from
+        # v1_project_paths. The CSV mtime IS the natural
+        # implicit timestamp for "the user has saved
+        # calibration values." Same detection contract as
+        # the producer sections; just a flat file instead
+        # of a per-run directory.
+        #
+        # Note: video_info.csv exists from project creation
+        # (with header row + one row per video, ppm blank).
+        # So an OLD uncalibrated project with the CSV still
+        # at creation-time mtime will read CURRENT — false
+        # positive. Acceptable because:
+        #   (1) the user's explicit save action updates
+        #       mtime, which is the case 122es is targeting;
+        #   (2) detection of "calibration values actually
+        #       present" would require reading the CSV and
+        #       checking for non-default ppm values — a
+        #       bigger detect_path infrastructure change
+        #       (filed as deferred);
+        #   (3) the cost of the false-positive is "user sees
+        #       green badge on a project that doesn't have
+        #       calibration values" — visually misleading
+        #       but doesn't block any downstream operation.
+        detect_path=lambda root: (
+            root / "sources" / "video_info.csv"
+        ),
     ),
     "interpolate": SectionSpec(
         section_id="interpolate",
