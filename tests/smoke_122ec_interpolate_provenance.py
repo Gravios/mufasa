@@ -65,7 +65,7 @@ InterpolateForm declarations:
 Title alignment with SECTIONS:
 5.  ``InterpolateForm.title == "Interpolate missing frames"``
     (matches SECTIONS spec; was already correct pre-122ec).
-6.  ``find_section_by_title("Pose cleanup", "Interpolate
+6.  ``find_section_by_title("Preprocessing", "Interpolate
     missing frames")`` resolves to SECTIONS["interpolate"].
 
 122dt tripwire flipped:
@@ -225,10 +225,10 @@ def main() -> int:
 
     # 6. find_section_by_title resolves the interpolate section.
     looked_up = find_section_by_title(
-        "Pose cleanup", "Interpolate missing frames",
+        "Preprocessing", "Interpolate missing frames",
     )
     check(
-        "find_section_by_title('Pose cleanup', 'Interpolate "
+        "find_section_by_title('Preprocessing', 'Interpolate "
         "missing frames') resolves to SECTIONS['interpolate']",
         looked_up is not None
         and looked_up.section_id == "interpolate",

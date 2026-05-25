@@ -529,6 +529,23 @@ class ConfigReader(object):
     def read_roi_data(self) -> None:
         """
         Method to read in ROI definitions from SimBA project
+
+        Patch 122ej-hotfix — added tolerance for empty
+        circles_df / polygon_df frames. ``roi_logic.RoiLogic``
+        writes all three keys to the HDF file even when the user
+        has only drawn (say) rectangles — the resulting circles_df
+        and polygon_df come back as empty DataFrames with NO
+        columns. The previous body did
+        ``self.circles_df["Name"].unique()`` and ``["Video"]``
+        unconditionally, raising ``KeyError: 'Name'`` whenever the
+        user opened the duplicator on a rectangles-only project.
+
+        Latent pre-122eh: the duplicator never reached this code
+        because ConfigReader's roi_coordinates_path pointed at the
+        wrong path and ``os.path.isfile`` returned False first.
+        122eh fixed the path, exposing this bug. Together,
+        122eh + 122ej close the duplicator's "rectangles-only
+        project" failure mode.
         """
 
         if not os.path.isfile(self.roi_coordinates_path):
@@ -547,12 +564,23 @@ class ConfigReader(object):
             if "Center_XCenter_Y" in self.polygon_df.columns:
                 self.polygon_df = self.polygon_df.drop(["Center_XCenter_Y"], axis=1)
             self.polygon_df = self.polygon_df.dropna(how="any")
-            self.shape_names = list(itertools.chain(self.rectangles_df["Name"].unique(), self.polygon_df["Name"].unique(), self.circles_df["Name"].unique()))
+            # Patch 122ej-hotfix — guard against empty DataFrames
+            # without a "Name" / "Video" column. roi_logic.RoiLogic
+            # writes all three keys; a user who has only drawn
+            # rectangles gets back empty circles_df / polygon_df
+            # with no columns at all → KeyError 'Name' / 'Video'.
+            def _col_unique(df, col):
+                return df[col].unique() if col in df.columns else []
+            def _col_list(df, col):
+                return list(df[col]) if col in df.columns else []
+            self.shape_names = list(itertools.chain(
+                _col_unique(self.rectangles_df, "Name"),
+                _col_unique(self.polygon_df, "Name"),
+                _col_unique(self.circles_df, "Name"),
+            ))
             self.roi_names = deepcopy(self.shape_names)
             self.roi_dict = {Keys.ROI_RECTANGLES.value: self.rectangles_df, Keys.ROI_CIRCLES.value: self.circles_df, Keys.ROI_POLYGONS.value: self.polygon_df}
             self.roi_types_names_lst = set()
-
-            #self.roi_dict[Keys.ROI_CIRCLES.value]['Video'] = self.roi_dict[Keys.ROI_CIRCLES.value]['Video'].replace('Trial     1_dSLR1_sample_A1_na', '501_MA142_Gi_Saline_0513')
 
             for idx, r in self.roi_dict[Keys.ROI_RECTANGLES.value].iterrows():
                 self.roi_types_names_lst.add(f'Rectangle: {r["Name"]}')
@@ -563,18 +591,24 @@ class ConfigReader(object):
             self.roi_types_names_lst = list(self.roi_types_names_lst)
             for shape_type, shape_data in self.roi_dict.items():
                 if shape_type == Keys.ROI_CIRCLES.value:
-                    self.roi_dict[Keys.ROI_CIRCLES.value]["Center_X"] = self.roi_dict[Keys.ROI_CIRCLES.value]["centerX"]
-                    self.roi_dict[Keys.ROI_CIRCLES.value]["Center_Y"] = self.roi_dict[Keys.ROI_CIRCLES.value]["centerY"]
+                    if "centerX" in self.roi_dict[Keys.ROI_CIRCLES.value].columns:
+                        self.roi_dict[Keys.ROI_CIRCLES.value]["Center_X"] = self.roi_dict[Keys.ROI_CIRCLES.value]["centerX"]
+                        self.roi_dict[Keys.ROI_CIRCLES.value]["Center_Y"] = self.roi_dict[Keys.ROI_CIRCLES.value]["centerY"]
                 elif shape_type == Keys.ROI_RECTANGLES.value:
-                    self.roi_dict[Keys.ROI_RECTANGLES.value]["Center_X"] = self.roi_dict[Keys.ROI_RECTANGLES.value]["Bottom_right_X"] - (self.roi_dict[Keys.ROI_RECTANGLES.value]["width"] / 2)
-                    self.roi_dict[Keys.ROI_RECTANGLES.value]["Center_Y"] = self.roi_dict[Keys.ROI_RECTANGLES.value]["Bottom_right_Y"] - (self.roi_dict[Keys.ROI_RECTANGLES.value]["height"] / 2)
+                    if "Bottom_right_X" in self.roi_dict[Keys.ROI_RECTANGLES.value].columns:
+                        self.roi_dict[Keys.ROI_RECTANGLES.value]["Center_X"] = self.roi_dict[Keys.ROI_RECTANGLES.value]["Bottom_right_X"] - (self.roi_dict[Keys.ROI_RECTANGLES.value]["width"] / 2)
+                        self.roi_dict[Keys.ROI_RECTANGLES.value]["Center_Y"] = self.roi_dict[Keys.ROI_RECTANGLES.value]["Bottom_right_Y"] - (self.roi_dict[Keys.ROI_RECTANGLES.value]["height"] / 2)
                 elif shape_type == Keys.ROI_POLYGONS.value:
                     try:
                         self.roi_dict[Keys.ROI_POLYGONS.value]["Center_X"] = (self.roi_dict[Keys.ROI_POLYGONS.value]["Center_X"])
                         self.roi_dict[Keys.ROI_POLYGONS.value]["Center_Y"] = (self.roi_dict[Keys.ROI_POLYGONS.value]["Center_Y"])
                     except KeyError:
                         pass
-            self.video_names_w_rois = set(list(self.rectangles_df["Video"]) + list(self.circles_df["Video"]) + list(self.polygon_df["Video"]))
+            self.video_names_w_rois = set(
+                _col_list(self.rectangles_df, "Video")
+                + _col_list(self.circles_df, "Video")
+                + _col_list(self.polygon_df, "Video")
+            )
 
     def get_all_clf_names(self) -> List[str]:
         """
