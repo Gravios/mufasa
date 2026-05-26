@@ -206,6 +206,7 @@ class ROIPlotMultiprocess(ConfigReader):
                  show_body_part: bool = True,
                  show_animal_name: bool = False,
                  bbox: Optional[Literal['axis-aligned', 'animal-aligned']] = None,
+                 show_bbox: bool = False,
                  print_timer: Literal['seconds', 'hh:mm:ss.ssss'] = 'seconds',
                  border_bg_clr: Tuple[int, int, int] = (0, 0, 0),
                  data_path: Optional[Union[str, os.PathLike]] = None,
@@ -213,6 +214,22 @@ class ROIPlotMultiprocess(ConfigReader):
                  bp_colors: Optional[List[Tuple[int, int, int]]] = None,
                  bp_sizes: Optional[List[Union[int]]] = None,
                  gpu: bool = False):
+
+        # Patch 122et-hotfix — ROIPlotter (the single-core sibling)
+        # exposes a simple ``show_bbox: bool`` flag while this class
+        # uses the richer ``bbox: Literal['axis-aligned',
+        # 'animal-aligned']`` enum. The Qt form has a binary
+        # checkbox ("Show bounding boxes") and was passing
+        # ``show_bbox=`` to both backends — which crashed here
+        # ("ROIPlotMultiprocess.__init__() got an unexpected
+        # keyword argument 'show_bbox'") whenever the user picked
+        # workers > 1. To restore API consistency without losing
+        # the richer enum option for script-level callers, accept
+        # ``show_bbox`` as an additional kwarg and bridge it:
+        # ``show_bbox=True`` with ``bbox=None`` → axis-aligned;
+        # explicit ``bbox`` always wins over ``show_bbox``.
+        if bbox is None and show_bbox:
+            bbox = 'axis-aligned'
 
         check_file_exist_and_readable(file_path=config_path)
         ConfigReader.__init__(self, config_path=config_path)
