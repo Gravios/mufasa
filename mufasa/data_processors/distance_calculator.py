@@ -76,7 +76,11 @@ class DistanceCalculator(ConfigReader, FeatureExtractionMixin):
                 if os.path.isfile(file_paths):
                     self.file_paths = [file_paths]
                 elif os.path.isdir(file_paths):
-                    self.file_paths = find_files_of_filetypes_in_directory(directory=file_paths, extensions=['.csv'], as_dict=False, raise_error=True)
+                    # Patch 122ev-hotfix — was extensions=['.csv'];
+                    # inconsistent with the existing self.file_type
+                    # read on line below. v1 projects use parquet;
+                    # the hardcoded .csv filter found 0 files.
+                    self.file_paths = find_files_of_filetypes_in_directory(directory=file_paths, extensions=[f'.{self.file_type}'], as_dict=False, raise_error=True)
                 else:
                     raise NoDataError(msg=f'{file_paths} is not a valid data file path or data directory path', source=self.__class__.__name__)
             else:

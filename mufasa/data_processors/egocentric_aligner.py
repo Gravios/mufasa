@@ -73,7 +73,14 @@ class EgocentricalAligner():
                  videos_dir: Optional[Union[str, os.PathLike]] = None,
                  anchor_location: Optional[Union[Tuple[int, int], str]] = (250, 250)):
 
-        self.data_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=['.csv'])
+        # Patch 122ev-hotfix — was extensions=['.csv'] (v0 layout
+        # only). v1 outlier correction writes ``.parquet`` to
+        # ``derived/outlier_corrected/<run_id>/<video>.parquet``;
+        # the aligner found 0 files because it was looking for
+        # the wrong extension. Accept both — per-file format is
+        # determined by each file's actual extension in the
+        # read/write loop below.
+        self.data_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=['.csv', '.parquet'])
         check_if_dir_exists(in_dir=save_dir, source=f'{self.__class__.__name__} save_dir')
         check_str(name=f'{self.__class__.__name__} anchor_1', value=anchor_1, allow_blank=False)
         check_str(name=f'{self.__class__.__name__} anchor_2', value=anchor_2, allow_blank=False)
@@ -106,15 +113,24 @@ class EgocentricalAligner():
         self.pool = None if not self.rotate_video else get_cpu_pool(core_cnt=self.core_cnt, source=self.__class__.__name__)
         for file_cnt, file_path in enumerate(self.data_paths):
             video_timer = SimbaTimer(start=True)
-            _, self.video_name, _ = get_fn_ext(filepath=file_path)
+            # Patch 122ev-hotfix — capture the input file's
+            # extension and use it for read/write/save_path. Was
+            # hardcoded to Formats.CSV.value at the three call
+            # sites below, which (1) silently produced .csv output
+            # for .parquet input, and (2) caused read_df to fail
+            # on .parquet inputs since file_type would be wrong.
+            # Now: file_type is derived from each input file's
+            # extension, preserving format end-to-end.
+            _, self.video_name, _ext = get_fn_ext(filepath=file_path)
+            file_type = _ext.lstrip('.') or Formats.CSV.value
             if self.verbose:
                 print(f'Rotating data video {self.video_name}... ({file_cnt+1}/{len(self.data_paths)})')
             if self.anchor_location is None:
                 video_path = find_video_of_file(video_dir=self.videos_dir, filename=self.video_name, raise_error=False)
                 video_meta_data = get_video_meta_data(video_path=video_path)
                 self.anchor_location = (int(video_meta_data['width']/2), int(video_meta_data['height']/2))
-            save_path = os.path.join(self.save_dir, f'{self.video_name}.{Formats.CSV.value}')
-            df = read_df(file_path=file_path, file_type=Formats.CSV.value)
+            save_path = os.path.join(self.save_dir, f'{self.video_name}.{file_type}')
+            df = read_df(file_path=file_path, file_type=file_type)
             original_cols, self.file_path = list(df.columns), file_path
             df.columns = [x.lower() for x in list(df.columns)]
             check_valid_dataframe(df=df, source=self.__class__.__name__, valid_dtypes=Formats.NUMERIC_DTYPES.value, required_fields=self.anchor_1_cols + self.anchor_2_cols)
@@ -128,7 +144,7 @@ class EgocentricalAligner():
             self.out_df = pd.DataFrame(results_arr, columns=bp_cols)
             df.update(self.out_df)
             df.columns = original_cols
-            write_df(df=df, file_type=Formats.CSV.value, save_path=save_path)
+            write_df(df=df, file_type=file_type, save_path=save_path)
             video_timer.stop_timer()
             if self.verbose:
                 print(f'{self.video_name} complete, saved at {save_path} (elapsed time: {video_timer.elapsed_time_str}s)')
