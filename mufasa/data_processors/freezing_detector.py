@@ -99,7 +99,9 @@ class FreezingDetector(ConfigReader):
             check_if_dir_exists(in_dir=data_dir)
         else:
             data_dir = self.outlier_corrected_dir
-        self.data_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=['.csv'])
+        # Patch 122ev-hotfix — was extensions=['.csv']. v1 uses
+        # parquet. Self.file_type from ConfigReader handles both.
+        self.data_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=[f'.{self.file_type}'])
         self.nose_heads = [f'{nose_name}_x'.lower(), f'{nose_name}_y'.lower()]
         self.left_ear_heads = [f'{left_ear_name}_x'.lower(), f'{left_ear_name}_y'.lower()]
         self.right_ear_heads = [f'{right_ear_name}_x'.lower(), f'{right_ear_name}_y'.lower()]
@@ -123,7 +125,7 @@ class FreezingDetector(ConfigReader):
             video_name = get_fn_ext(filepath=file_path)[1]
             print(f'[{get_current_time()}] Analyzing freezing {video_name}...(video {file_cnt+1}/{len(self.data_paths)})')
             save_file_path = os.path.join(self.save_dir, f'{video_name}.csv')
-            df = read_df(file_path=file_path, file_type='csv').reset_index(drop=True)
+            df = read_df(file_path=file_path, file_type=self.file_type).reset_index(drop=True)
             _, px_per_mm, fps = read_video_info(vid_info_df=self.video_info_df, video_name=video_name)
             df.columns = [str(x).lower() for x in df.columns]
             check_valid_dataframe(df=df, valid_dtypes=Formats.NUMERIC_DTYPES.value, required_fields=self.required_field)
