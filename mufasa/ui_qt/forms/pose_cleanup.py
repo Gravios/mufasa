@@ -827,6 +827,18 @@ class EgocentricAlignmentForm(OperationForm):
         "heading. Useful before computing direction-relative features."
     )
 
+    # Patch 122ex-hotfix — wire section_id so the form's success
+    # path calls record_run via OperationForm._record_provenance.
+    # Without this the badge never transitioned from UNKNOWN to
+    # CURRENT after a successful run (no explicit provenance entry,
+    # and no detect_path because save_dir is user-picked per 122ep).
+    # User report (May 25, 2026): "the egocentric alignment ran but
+    # its badge did not turn green." section_id is enough — run_id
+    # stays None (settings-section semantic from 122dt); record_run
+    # writes just the timestamp, which is all the badge UI needs to
+    # transition to CURRENT.
+    section_id = "egocentric"
+
     def build(self) -> None:
         bps = _load_flat_bps(self.config_path) if self.config_path else []
         if not bps:

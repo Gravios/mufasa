@@ -104,7 +104,7 @@ document):
 8.  All 4 producer sections (import_pose, interpolate,
     kalman_v2, outlier_correction) have a wired form. If a
     future patch un-wires one, this test surfaces it.
-9.  Currently 4 of 14 SECTIONS keys have wired forms (the
+9.  Currently 5 of 14 SECTIONS keys have wired forms (the
     producers). The remaining 10 are either ``ui_bound=False``
     placeholders (3) or ui-bound sections without a record_run
     pathway yet (7). Pinning this count catches accidental
@@ -289,11 +289,11 @@ def main() -> int:
 
     # 9. Expected count: 4 wired, 14 total.
     check(
-        f"Currently 4 of {len(known_ids)} SECTIONS keys have "
+        f"Currently 5 of {len(known_ids)} SECTIONS keys have "
         f"wired forms — pinned to catch accidental unwiring "
         f"OR accidental over-wiring (a 5th form would surface "
         f"in this check)",
-        len(wired_ids) == 4,
+        len(wired_ids) == 5,
         detail=(f"got {len(wired_ids)} wired: "
                 f"{sorted(wired_ids)}"),
     )
