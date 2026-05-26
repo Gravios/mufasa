@@ -2,32 +2,56 @@
 mufasa.ui_qt.pages.classifier_page
 ==================================
 
-Classifier workbench page.
+Classifier workbench pages.
 
-Sections
---------
-* **Manage** — :class:`ClassifierManageForm`: add / remove / print
-  classifier names (3 legacy popups folded into one form).
-* **Run inference** — :class:`RunInferenceForm`: per-classifier
-  model-path / threshold / min-bout configurator that drives
-  :class:`InferenceBatch`. Patch 122ap port of
-  :class:`RunMachineModelsPopUp`.
-* **Train classifier** — :class:`TrainClassifierForm`: hyperparams
-  + evaluation toggles + Train button that invokes
+Patch 122ey — split the previously-monolithic "Classifier" page into
+six separate sidebar pages, one per section. User request (May 25, 2026):
+
+  > the Classifier tab should just have each section split into its
+  > own tab.
+
+The split also surfaces the dependency order the workflow actually
+follows. ``Manage classifiers`` is a prerequisite for ``Annotation``
+(you can't label frames for a classifier that doesn't exist yet); the
+training / validation / inference pages are post-Annotation. YOLO pose
+pages are an independent workflow (pose-model training/inference
+rather than behavior-classification), grouped at the tail.
+
+The new sidebar order (only the classifier-cluster portion shown):
+
+   Features
+   Manage classifiers          ← Classifier setup (pre-Annotation)
+   Annotation                  ← existing
+   Train classifier            ← train from labelled data
+   Validate classifier         ← out-of-sample check
+   Run inference               ← apply trained model
+   YOLO pose — train           ← independent YOLO workflow
+   YOLO pose — inference
+   Analysis
+
+Each new page exposes its own ``build_*_page`` function. The legacy
+``build_classifier_page`` is removed — workbench_app.py was the only
+caller and was updated in this same patch to call the six new
+functions in workflow order.
+
+Pages
+-----
+* :func:`build_manage_classifiers_page` — :class:`ClassifierManageForm`:
+  add / remove / print classifier names (3 legacy popups folded into
+  one form). Comes BEFORE Annotation in sidebar order.
+* :func:`build_train_classifier_page` — :class:`TrainClassifierForm`:
+  hyperparams + evaluation toggles + Train button that invokes
   :class:`TrainRandomForestClassifier`. Patch 122aq port of
-  :class:`MachineModelSettingsPopUp` plus a Train invocation
-  the Tk popup didn't have.
-* **Validate classifier** — :class:`ValidateClassifierForm`:
-  out-of-sample validation video runner. Picks a model + feature
-  file, runs inference and renders an annotated video with pose
-  tracks + classifier predictions + optional Gantt overlay.
-  Patch 122ar port of :class:`ValidationVideoPopUp`.
-
-All sections follow the 122aj+ in-frame + pop-out-to-dock pattern.
-:class:`ClassifierValidationPopUp` (per-bout clip generator) is
-post-inference visualization rather than validation per se — it
-belongs on the Visualizations page when that gets its own ports,
-not the Classifier page.
+  :class:`MachineModelSettingsPopUp`.
+* :func:`build_validate_classifier_page` —
+  :class:`ValidateClassifierForm`: out-of-sample validation video
+  runner. Patch 122ar port.
+* :func:`build_run_inference_page` — :class:`RunInferenceForm`:
+  per-classifier inference batch runner. Patch 122ap port.
+* :func:`build_yolo_train_page` — :class:`YOLOPoseTrainForm`:
+  detached YOLO-pose subprocess trainer.
+* :func:`build_yolo_inference_page` — :class:`YOLOPoseInferenceForm`:
+  YOLO-pose inference on a video or directory.
 """
 from __future__ import annotations
 
@@ -40,35 +64,72 @@ from mufasa.ui_qt.forms.yolo_train import YOLOPoseTrainForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
-def build_classifier_page(workbench,
-                          config_path: str | None = None
-                          ) -> WorkflowPage:
-    page = workbench.add_page("Classifier", icon_name="clf")
+def build_manage_classifiers_page(workbench,
+                                  config_path: str | None = None
+                                  ) -> WorkflowPage:
+    """Standalone page hosting the classifier-setup form.
+
+    Comes BEFORE Annotation in sidebar order — classifier identity
+    is a prerequisite for labelling its frames.
+    """
+    page = workbench.add_page("Manage classifiers", icon_name="clf")
     page.add_section("Manage classifiers", [(ClassifierManageForm, {})])
-    # Patch 122ap: Run inference is now a proper inline section
-    # (was a Tk popup launched from SimBA.py before).
-    page.add_section("Run inference", [(RunInferenceForm, {})])
-    # Patch 122aq: Train classifier — port of
-    # MachineModelSettingsPopUp plus a Train invocation.
-    page.add_section("Train classifier", [(TrainClassifierForm, {})])
-    # Patch 122ar: Validate classifier — port of
-    # ValidationVideoPopUp.
-    page.add_section("Validate classifier",
-                     [(ValidateClassifierForm, {})])
-    # Patch 122d2: YOLO pose inference — runs a trained YOLO pose
-    # model on a video or directory. Sibling to RunInferenceForm
-    # (which handles SimBA classifier inference) but for the YOLO
-    # pose-estimation lifecycle. Requires CUDA + ultralytics; form
-    # is inert without them.
-    page.add_section("YOLO pose — inference",
-                     [(YOLOPoseInferenceForm, {})])
-    # Patch 122d3: YOLO pose training — fires off a detached
-    # subprocess (`python -m mufasa.model.yolo_fit`); workbench
-    # doesn't wait for completion. Same hardware/package
-    # requirements as inference.
-    page.add_section("YOLO pose — train",
-                     [(YOLOPoseTrainForm, {})])
     return page
 
 
-__all__ = ["build_classifier_page"]
+def build_train_classifier_page(workbench,
+                                config_path: str | None = None
+                                ) -> WorkflowPage:
+    """Standalone page for training classifiers from labelled data."""
+    page = workbench.add_page("Train classifier", icon_name="clf")
+    page.add_section("Train classifier", [(TrainClassifierForm, {})])
+    return page
+
+
+def build_validate_classifier_page(workbench,
+                                   config_path: str | None = None
+                                   ) -> WorkflowPage:
+    """Standalone page for out-of-sample validation videos."""
+    page = workbench.add_page("Validate classifier", icon_name="clf")
+    page.add_section("Validate classifier",
+                     [(ValidateClassifierForm, {})])
+    return page
+
+
+def build_run_inference_page(workbench,
+                             config_path: str | None = None
+                             ) -> WorkflowPage:
+    """Standalone page for running trained classifiers on data."""
+    page = workbench.add_page("Run inference", icon_name="clf")
+    page.add_section("Run inference", [(RunInferenceForm, {})])
+    return page
+
+
+def build_yolo_train_page(workbench,
+                          config_path: str | None = None
+                          ) -> WorkflowPage:
+    """Standalone page for YOLO pose-model training (independent of
+    behavior-classifier workflow)."""
+    page = workbench.add_page("YOLO pose — train", icon_name="clf")
+    page.add_section("YOLO pose — train", [(YOLOPoseTrainForm, {})])
+    return page
+
+
+def build_yolo_inference_page(workbench,
+                              config_path: str | None = None
+                              ) -> WorkflowPage:
+    """Standalone page for YOLO pose-model inference."""
+    page = workbench.add_page("YOLO pose — inference", icon_name="clf")
+    page.add_section("YOLO pose — inference",
+                     [(YOLOPoseInferenceForm, {})])
+    return page
+
+
+__all__ = [
+    "build_manage_classifiers_page",
+    "build_train_classifier_page",
+    "build_validate_classifier_page",
+    "build_run_inference_page",
+    "build_yolo_train_page",
+    "build_yolo_inference_page",
+]

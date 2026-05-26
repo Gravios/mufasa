@@ -74,18 +74,26 @@ def main() -> int:
     # 4. Page order: classifier before annotation in workbench_app.py
     wba_src = (pkg / "ui_qt" / "workbench_app.py").read_text()
     lines = wba_src.split("\n")
+    # Patch 122ey — the single build_classifier_page call was
+    # split into 6 page-builder calls. The QWI-4 ordering constraint
+    # (Classifier setup BEFORE Annotation) now lives on the
+    # build_manage_classifiers_page call — Manage is the prerequisite
+    # for Annotation, the rest of the former Classifier sections are
+    # post-Annotation operations.
     classifier_line = None
     annotation_line = None
     for i, line in enumerate(lines):
-        if line.lstrip().startswith("build_classifier_page("):
+        if line.lstrip().startswith("build_manage_classifiers_page("):
             if classifier_line is None:  # first occurrence
                 classifier_line = i
         if line.lstrip().startswith("build_annotation_page("):
             if annotation_line is None:
                 annotation_line = i
     check(
-        f"workbench_app.py: build_classifier_page line ({classifier_line}) "
-        f"comes before build_annotation_page line ({annotation_line})",
+        f"workbench_app.py: build_manage_classifiers_page line "
+        f"({classifier_line}) comes before build_annotation_page "
+        f"line ({annotation_line}) — Manage is the prerequisite "
+        f"for Annotation per the original QWI-4 intent",
         classifier_line is not None
         and annotation_line is not None
         and classifier_line < annotation_line,
@@ -94,25 +102,29 @@ def main() -> int:
     # 5. Comment block references the fix
     check(
         "workbench_app.py comment block references QWI-4 / 122d0 "
-        "(provenance for the swap)",
+        "/ 122ey (provenance for the page-ordering / split history)",
         ("122d0" in wba_src and "QWI-4" in wba_src)
-        or ("Classifier moved BEFORE Annotation" in wba_src),
+        or ("Classifier moved BEFORE Annotation" in wba_src)
+        or ("122ey" in wba_src),
     )
 
-    # 6. Both build calls still present
+    # 6. Both build calls still present (Manage replaces the
+    # old monolithic build_classifier_page).
     wba_tree = ast.parse(wba_src)
-    found_classifier_call = False
+    found_manage_call = False
     found_annotation_call = False
     for node in ast.walk(wba_tree):
         if (isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Name)):
-            if node.func.id == "build_classifier_page":
-                found_classifier_call = True
+            if node.func.id == "build_manage_classifiers_page":
+                found_manage_call = True
             elif node.func.id == "build_annotation_page":
                 found_annotation_call = True
     check(
-        "build_classifier_page() call still present in workbench_app.py",
-        found_classifier_call,
+        "build_manage_classifiers_page() call present in "
+        "workbench_app.py (122ey replaces "
+        "build_classifier_page)",
+        found_manage_call,
     )
     check(
         "build_annotation_page() call still present in workbench_app.py",
