@@ -697,31 +697,51 @@ def get_all_statuses(
     sections from the in-memory dict. Use this rather than calling
     :func:`get_status` in a loop when refreshing every badge on a
     page.
+
+    Patch 122ew-hotfix — was reading provenance entries directly via
+    ``_read_run_at`` and falling through to UNKNOWN when no entry
+    existed, completely bypassing the filesystem-evidence fallback
+    that ``get_status`` had via ``_resolve_run_at`` since 122ei.
+    The divergence made ``refresh_section_badges`` (post-form
+    completion) produce DIFFERENT results from
+    ``_paint_initial_badge`` (page open) for the same section state
+    — initial paint correctly showed CURRENT via detect_path, but
+    refresh wiped that to UNKNOWN. User-visible symptom: badges
+    turned white the moment any form completed. Fix:
+    ``get_all_statuses`` delegates to the same ``_resolve_run_at``
+    helper, restoring contract parity with ``get_status``.
     """
     config_path = Path(config_path)
     try:
         data = read_project_toml(config_path)
     except (FileNotFoundError, OSError):
-        return {sid: SectionStatus.UNKNOWN for sid in SECTIONS}
+        # Even with no project.toml, detect_path could still find
+        # filesystem evidence (e.g., a partially-set-up project with
+        # data files but no provenance yet). Walk SECTIONS via
+        # _resolve_run_at with an empty prov dict to handle this.
+        prov: Mapping[str, Any] = {}
+    else:
+        prov = data.get("provenance", {}) or {}
 
-    prov = data.get("provenance", {}) or {}
+    project_root = config_path.parent
     out: dict[str, SectionStatus] = {}
+
     for section_id, spec in SECTIONS.items():
-        my_entry = prov.get(section_id)
-        if not isinstance(my_entry, dict):
-            out[section_id] = SectionStatus.UNKNOWN
-            continue
-        my_run_at = _read_run_at(my_entry)
+        my_run_at = _resolve_run_at(
+            prov, section_id, spec, project_root,
+        )
         if my_run_at is None:
             out[section_id] = SectionStatus.UNKNOWN
             continue
 
         status = SectionStatus.CURRENT
         for dep_id in spec.depends_on:
-            dep_entry = prov.get(dep_id)
-            if not isinstance(dep_entry, dict):
+            dep_spec = SECTIONS.get(dep_id)
+            if dep_spec is None:
                 continue
-            dep_run_at = _read_run_at(dep_entry)
+            dep_run_at = _resolve_run_at(
+                prov, dep_id, dep_spec, project_root,
+            )
             if dep_run_at is None:
                 continue
             if dep_run_at > my_run_at:
