@@ -237,7 +237,9 @@ def main() -> int:
         "kalman_v2":      ("Preprocessing", "Kalman v2 smoothing"),
         "features_roi":   ("ROI",           "Features"),
         "annotation":     ("Annotation",    "Frame labelling"),
-        "classifier_run": ("Classifier",    "Run inference"),
+        # Patch 122ey — Classifier page split; classifier_run now
+        # lives on its own "Run inference" page.
+        "classifier_run": ("Run inference", "Run inference"),
     }
     for sid, (exp_page, exp_title) in fixes.items():
         spec = SECTIONS.get(sid)
