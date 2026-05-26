@@ -299,6 +299,27 @@ def get_fn_ext(filepath: Union[os.PathLike, str],
 
     check_instance(source=f'{get_fn_ext} filepath', accepted_types=(str, os.PathLike), instance=filepath)
     file_extension = Path(filepath).suffix
+    # Patch 122eu-hotfix — when file_extension is "" (files with
+    # no extension at all — e.g. a stray marker file named
+    # ``SKIPPED`` left in a derived/ run directory), the
+    # ``filepath.rsplit("", 1)`` call below raises ``ValueError:
+    # empty separator``. The except branch then raised
+    # ``InvalidFilepathError`` for the file. Symptom: any caller
+    # iterating a directory and calling ``get_fn_ext`` on each
+    # file crashes on the first extension-less file, even when
+    # the caller would later filter it out by extension.
+    #
+    # User report (May 25, 2026) hit this in the Egocentric
+    # Alignment form: the user's outlier_corrected run dir had
+    # a ``SKIPPED`` sentinel file (origin unknown — manual?
+    # third-party? old code?). ``find_files_of_filetypes_in_
+    # directory`` enumerates ALL files in the dir and calls
+    # ``get_fn_ext`` on each before filtering by extension; the
+    # SKIPPED call raised before the filter ran. Fix:
+    # short-circuit when there's no extension, return the full
+    # basename as the file_name.
+    if not file_extension:
+        return os.path.dirname(filepath), os.path.basename(filepath), ""
     try:
         file_name = os.path.basename(filepath.rsplit(file_extension, 1)[0])
     except ValueError:
