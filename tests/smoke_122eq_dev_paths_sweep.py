@@ -71,7 +71,7 @@ Coverage
 Cross-patch invariants:
 6.  122eg state preserved: no ``project_config.ini``
     references outside legacy_layout.py.
-7.  122ep + 122es state preserved: 11 of 12 ui_bound sections have
+7.  122ep + 122es state preserved: 11 of 13 ui_bound sections have
     detect_path.
 8.  122en state preserved: v1_project_paths canonical helper.
 9.  122do baseline.
@@ -202,9 +202,9 @@ def main() -> int:
     ui_bound = [s for s in SECTIONS.values() if s.ui_bound]
     with_detect = [s for s in ui_bound if s.detect_path is not None]
     check(
-        "122ep + 122es state preserved: 11 of 12 ui_bound sections have "
+        "122ep + 122es state preserved: 11 of 13 ui_bound sections have "
         "detect_path",
-        len(with_detect) == 11 and len(ui_bound) == 12,
+        len(with_detect) == 11 and len(ui_bound) == 13,
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 

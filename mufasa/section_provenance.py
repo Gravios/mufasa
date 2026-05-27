@@ -481,6 +481,32 @@ SECTIONS: dict[str, SectionSpec] = {
         # section. Aspirational; mark unbound.
         ui_bound=False,
     ),
+    "features_compute_subset": SectionSpec(
+        section_id="features_compute_subset",
+        # Patch 122fj — new section for the "Compute feature
+        # subsets" form on the Features page. User request
+        # (May 26, 2026):
+        #
+        #   > Features: Compute feature subset, ensure that a
+        #   > second run overwrites the appropriate columns and
+        #   > rows. Also needs a badge system. white/green.
+        #
+        # The "second run overwrites" piece was already
+        # implemented in the form's on_run override (preflight_
+        # check + user-confirmed overwrite_existing=True). The
+        # badge is added here.
+        #
+        # detect_path is None because the form writes into
+        # derived/features/ alongside subject features and ROI
+        # features. We can't distinguish "user ran compute
+        # feature subset" from "user ran subject feature
+        # extraction" from filesystem evidence alone. record_run
+        # via the form's section_id wiring is the reliable
+        # signal (same pattern as features_roi below).
+        page="Features",
+        section_title="Compute feature subsets",
+        depends_on=("outlier_correction",),
+    ),
     "features_roi": SectionSpec(
         section_id="features_roi",
         # Patch 122el — ROI features form is on the ROI page,
@@ -493,9 +519,14 @@ SECTIONS: dict[str, SectionSpec] = {
         # No detect_path — ROI features land in
         # ``derived/features/`` mixed with subject features;
         # filesystem evidence can't distinguish "ROI features
-        # appended" from "subject features computed." Skip the
-        # implicit detection; rely on explicit ``record_run``
-        # if/when this section gets wired to a form's section_id.
+        # appended" from "subject features computed."
+        #
+        # Patch 122fj — section_id wired on ROIFeaturesForm so
+        # record_run fires on successful runs. The badge
+        # transitions UNKNOWN → CURRENT via provenance recording.
+        # STALE math via existing deps tuple if the user re-runs
+        # outlier_correction or edits ROI definitions after
+        # appending ROI features.
     ),
     "annotation": SectionSpec(
         section_id="annotation",

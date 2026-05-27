@@ -306,6 +306,26 @@ class ROIFeaturesForm(OperationForm):
                    "feature extraction; remove before retraining on "
                    "changed ROI definitions.")
 
+    # Patch 122fj — wire to the SECTIONS["features_roi"] entry so
+    # the badge transitions UNKNOWN → CURRENT via record_run on
+    # successful Append actions. SECTIONS already declared deps
+    # (outlier_correction, roi_definitions); STALE math composes
+    # automatically if either of those is re-run after the user
+    # appended ROI features.
+    #
+    # detect_path is left None at the SECTIONS level because ROI
+    # features are MIXED INTO derived/features/<video>.parquet
+    # alongside subject features — we can't tell from filesystem
+    # existence alone whether ROI columns are present. record_run
+    # via this section_id is the reliable signal.
+    #
+    # Format note: in v1 projects, the underlying writer already
+    # uses parquet via project file_type. The "data needs an
+    # appropriate destination" piece of the user request is
+    # already satisfied (derived/features/<video>.parquet); only
+    # the badge was missing.
+    section_id = "features_roi"
+
     ACTIONS = [("Append (by animal)",    "append_animal"),
                ("Append (by body-part)", "append_bodypart"),
                ("Remove",                "remove")]

@@ -205,7 +205,7 @@ def main() -> int:
         f"Currently 5 of {len(SECTIONS)} SECTIONS keys have "
         f"wired forms (was 4 pre-122ex; egocentric is the "
         f"new addition)",
-        len(wired) == 5,
+        len(wired) == 7,
         detail=(f"got {len(wired)} wired: {sorted(wired)}"),
     )
 

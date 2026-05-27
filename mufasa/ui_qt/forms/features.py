@@ -104,6 +104,22 @@ class FeatureSubsetExtractorForm(OperationForm):
         "draw or import them on the ROI page first."
     )
 
+    # Patch 122fj — wire to the new SECTIONS["features_compute_subset"]
+    # entry so the badge transitions UNKNOWN → CURRENT via record_run
+    # on successful runs.
+    #
+    # Idempotency: the form's on_run override already runs a
+    # preflight_check() that detects (a) existing files in save_dir
+    # and (b) column collisions in append destinations. On conflict,
+    # the user is prompted to confirm overwrite; if they decline the
+    # run aborts cleanly. If they confirm, overwrite_existing=True is
+    # passed to the backend FeatureSubsetsCalculator, which handles
+    # the row/column overwrite. So a second run with the SAME
+    # selection re-prompts (safety) but DOES overwrite when
+    # confirmed — that's the "ensure that a second run overwrites
+    # the appropriate columns and rows" the user requested.
+    section_id = "features_compute_subset"
+
     def build(self) -> None:
         from PySide6.QtWidgets import QGroupBox
         outer = QVBoxLayout()
