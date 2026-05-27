@@ -180,6 +180,94 @@ class SectionSpec:
 
 
 # ---------------------------------------------------------------------------
+# Helpers for sections whose detect_path depends on cross-directory
+# consistency. Defined before SECTIONS so SectionSpec lambdas can
+# reference them.
+# ---------------------------------------------------------------------------
+
+# Patch 122fc — Data Import detect_path helpers. The Import pose data
+# and Import video sections must BOTH be green if and only if each
+# pose file has a matching video file (by basename) and vice versa.
+# User request (May 26, 2026):
+#
+#   > In Data import : import data and video should both have badges
+#   > and be green if their files' bases are the same, such that each
+#   > parquet file has an associated mp4 file.
+#
+# Implementation: detect_path returns the relevant data dir only when
+# bases match. Otherwise returns a sentinel non-existent path so
+# ``_path_mtime_if_has_content`` returns None and the badge falls
+# through to UNKNOWN — flagging the inconsistency.
+
+_POSE_DATA_EXTS = (".csv", ".parquet")
+_VIDEO_DATA_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm")
+
+
+def _data_import_bases(
+    dir_: Path, exts: tuple[str, ...],
+) -> set[str]:
+    """Return the set of file-name stems in ``dir_`` whose suffixes
+    are in ``exts``. Hidden entries (dotfiles) are skipped. Returns
+    an empty set if the directory doesn't exist."""
+    if not dir_.is_dir():
+        return set()
+    out: set[str] = set()
+    try:
+        for f in dir_.iterdir():
+            if (f.is_file()
+                    and not f.name.startswith(".")
+                    and f.suffix.lower() in exts):
+                out.add(f.stem)
+    except (OSError, PermissionError):
+        return set()
+    return out
+
+
+def _data_import_bases_match(root: Path) -> bool:
+    """Return True iff pose-data and video file BASENAMES form the
+    same set under ``sources/pose/`` and ``sources/videos/``. Both
+    sets must be non-empty (an empty project doesn't satisfy
+    "bases match" — the badge should stay UNKNOWN until import
+    happens)."""
+    pose_bases = _data_import_bases(
+        root / "sources" / "pose", _POSE_DATA_EXTS,
+    )
+    video_bases = _data_import_bases(
+        root / "sources" / "videos", _VIDEO_DATA_EXTS,
+    )
+    return bool(pose_bases) and pose_bases == video_bases
+
+
+# Sentinel sub-path that is statistically guaranteed not to exist.
+# Returned by the import_pose / import_video detect_path lambdas
+# when ``_data_import_bases_match`` is False; treated by
+# ``_path_mtime_if_has_content`` as "no evidence" → badge UNKNOWN.
+_BASES_MISMATCH_SENTINEL = ".__bases_mismatch_sentinel__"
+
+
+def _data_import_pose_path(root: Path) -> Path:
+    """detect_path for the import_pose section.
+
+    Returns ``sources/pose/`` if pose and video bases match,
+    else a sentinel non-existent path so the badge reads UNKNOWN.
+    """
+    if _data_import_bases_match(root):
+        return root / "sources" / "pose"
+    return root / _BASES_MISMATCH_SENTINEL
+
+
+def _data_import_video_path(root: Path) -> Path:
+    """detect_path for the import_video section.
+
+    Symmetric with :func:`_data_import_pose_path` but returns the
+    videos directory when bases match.
+    """
+    if _data_import_bases_match(root):
+        return root / "sources" / "videos"
+    return root / _BASES_MISMATCH_SENTINEL
+
+
+# ---------------------------------------------------------------------------
 # The DAG.
 # ---------------------------------------------------------------------------
 #
@@ -210,7 +298,29 @@ SECTIONS: dict[str, SectionSpec] = {
         # sources/pose/ counts as "import has happened"; mtime of
         # the most recently-modified file is used as the implicit
         # last_run_at.
-        detect_path=lambda root: root / "sources" / "pose",
+        # Patch 122fc — extended to require base-name parity with
+        # sources/videos/. Both sources/pose/<base>.{csv,parquet}
+        # and sources/videos/<base>.{mp4,avi,mov,mkv,webm} must
+        # exist for the same set of bases. When parity is broken
+        # (e.g., pose files were imported but videos weren't, or
+        # filenames don't match), the badge stays UNKNOWN to flag
+        # the inconsistency to the user. Same detect_path used
+        # by import_video below.
+        detect_path=lambda root: _data_import_pose_path(root),
+    ),
+    "import_video": SectionSpec(
+        section_id="import_video",
+        page="Data Import",
+        section_title="Import video",
+        depends_on=(),
+        # Patch 122fc — symmetric with import_pose. Returns
+        # sources/videos/ if file bases match across pose/ and
+        # videos/, else a sentinel non-existent path (badge =
+        # UNKNOWN). User request (May 26, 2026): "import data
+        # and video should both have badges and be green if their
+        # files' bases are the same, such that each parquet file
+        # has an associated mp4 file."
+        detect_path=lambda root: _data_import_video_path(root),
     ),
     "pixels_per_mm": SectionSpec(
         section_id="pixels_per_mm",

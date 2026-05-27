@@ -300,11 +300,11 @@ def main() -> int:
     ui_bound = [s for s in SECTIONS.values() if s.ui_bound]
     with_detect = [s for s in ui_bound if s.detect_path is not None]
     check(
-        "10 of 11 ui_bound sections have detect_path "
+        "11 of 12 ui_bound sections have detect_path "
         "(122ep added 4 producer-style sections; 122es flipped "
         "pixels_per_mm from None → sources/video_info.csv; "
         "122ez added egocentric → <root>/rotated)",
-        len(with_detect) == 10 and len(ui_bound) == 11,
+        len(with_detect) == 11 and len(ui_bound) == 12,
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 

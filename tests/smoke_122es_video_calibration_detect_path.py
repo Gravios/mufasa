@@ -214,11 +214,12 @@ def main() -> int:
                / "smoke_122ep_detect_path_coverage.py")
     ep_src = ep_path.read_text()
     check(
-        "smoke_122ep was flipped post-122ez: coverage count "
-        "is 10 of 11 (was 9 of 11 pre-122ez; 122ez wired "
-        "egocentric.detect_path)",
-        ("len(with_detect) == 10" in ep_src
-         and "10 of 11" in ep_src),
+        "smoke_122ep was flipped post-122fc: coverage count "
+        "is 11 of 12 (was 10 of 11 pre-122fc; 122fc added "
+        "import_video as a 12th ui_bound section with "
+        "detect_path)",
+        ("len(with_detect) == 11" in ep_src
+         and "11 of 12" in ep_src),
     )
 
     # -----------------------------------------------------------------
