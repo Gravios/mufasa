@@ -224,6 +224,14 @@ class ROICanvas(QWidget):
     shape_edited = Signal(int, dict)
     shape_deleted = Signal(int)
 
+    # Patch 122fd — emitted when the user clicks an ROI in select
+    # mode (or clicks empty space to deselect). The panel uses
+    # this to highlight the corresponding row in the ROI table.
+    # idx = -1 means "deselected" (clicked empty space). User
+    # request (May 26, 2026): "Clicking an ROI should also
+    # select/highlight it in the table."
+    shape_selected = Signal(int)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._frame_bgr: np.ndarray | None = None
@@ -802,10 +810,17 @@ class ROICanvas(QWidget):
                 # Click on empty space → deselect.
                 self._selected_idx = None
                 self._selected_handle = None
+                # Patch 122fd — notify listeners (panel) of the
+                # deselection so the table's row-highlight clears.
+                self.shape_selected.emit(-1)
                 self.update()
                 return
             self._selected_idx = idx
             self._selected_handle = handle
+            # Patch 122fd — notify listeners (panel) of the new
+            # selection so the corresponding table row gets
+            # highlighted.
+            self.shape_selected.emit(idx)
             # Save pre-drag geometry for potential undo later.
             geom = self._existing_rois[idx].get("geometry", {})
             self._pre_drag_geom = dict(geom)
@@ -872,9 +887,24 @@ class ROICanvas(QWidget):
         # Skip the coordinate transform entirely when not drawing.
         # mouseMoveEvent fires on every mouse motion (setMouseTracking
         # is on); the panel doesn't care about IDLE motion.
+        #
+        # Patch 122fd-hotfix — the allowlist below was missing
+        # SHAPE_MOVING and HANDLE_DRAGGING, which were added in
+        # 122dm. The dispatch code below at lines 902+ was
+        # therefore DEAD — every time the user pressed + dragged
+        # an ROI in edit mode, mouseMoveEvent returned at this
+        # guard before reaching the SHAPE_MOVING translation
+        # branch. Symptom: "I can select objects in the edit
+        # mode but I cannot move them" (reported in three
+        # consecutive user messages over four days).
+        #
+        # The fix: include the two missing modes. Now the
+        # translation and resize handlers below actually fire.
         if self._mode not in (_DrawMode.RECT_DRAGGING,
                               _DrawMode.CIRCLE_DRAGGING,
-                              _DrawMode.POLY_VERTEXING):
+                              _DrawMode.POLY_VERTEXING,
+                              _DrawMode.SHAPE_MOVING,
+                              _DrawMode.HANDLE_DRAGGING):
             return
         frame_pt = self._mapping.widget_to_frame(ev.position().x(),
                                                   ev.position().y())
