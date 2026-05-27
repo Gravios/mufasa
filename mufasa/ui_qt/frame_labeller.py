@@ -118,15 +118,44 @@ class FrameLabellerWidget(QWidget):
         self.video_name = Path(video_path).stem
 
         self._classifier_names: list[str] = []
+        # Patch 122ff — keyboard-hotkey map for classifiers, read
+        # from project.toml's [classifiers.keys] table (written by
+        # the 122fe Manage classifiers redesign). Each classifier
+        # name → single-character key. Missing entries → "" (no key
+        # assigned).
+        self._classifier_keys: dict[str, str] = {}
         self._clf_cbs: dict[str, QCheckBox] = {}
         self._labels: dict[str, np.ndarray] = {}
         self._dirty: bool = False
+
+        # Patch 122ff — continuous-mode state. ``_active_label`` is
+        # the classifier name currently being written to as the
+        # video plays (or None when idle). ``_active_mode`` is
+        # "label" (write 1s) or "delete" (write 0s).
+        #
+        # User-facing semantic (May 26, 2026 request):
+        #   "Pressing a label toggles a continuous label state.
+        #    Del should be reserved for toggling continuous
+        #    deletion of the currently toggled label (all other
+        #    labels should be left untouched)."
+        #
+        # Pressing a classifier key toggles _active_label: same
+        # name → idle; different name → activate that label in
+        # "label" mode. Pressing Del with an active label flips
+        # _active_mode between "label" and "delete".
+        self._active_label: str | None = None
+        self._active_mode: str = "label"  # "label" or "delete"
+
         # Set by host containers (dialog/dock) — when True, hide UI
         # elements that the host renders itself (close button,
         # window title management).
         self._in_dock: bool = False
 
         self._load_project_metadata()
+        # Patch 122ff — load the [classifiers.keys] map after
+        # _load_project_metadata populates _classifier_names so the
+        # keys' presence is verified against actual classifiers.
+        self._load_classifier_keys()
         self._build_ui()
         self._setup_shortcuts()
         self.scrubber.load(video_path)
@@ -216,18 +245,19 @@ class FrameLabellerWidget(QWidget):
         self.scrubber = FrameScrubberWidget(self)
         outer.addWidget(self.scrubber, 1)
 
-        # Per-classifier checkbox bar
+        # Patch 122ff — per-classifier checkbox bar shows the
+        # classifier's keyboard hotkey alongside the name (read
+        # from project.toml's [classifiers.keys] table, written
+        # by the 122fe Manage classifiers redesign). Replaces
+        # the legacy 1-9 numeric binding.
         clf_bar = QHBoxLayout()
-        clf_bar.addWidget(QLabel("<b>Behaviours at this frame:</b>", self))
-        for i, name in enumerate(self._classifier_names[:9]):
-            cb = QCheckBox(f"{i + 1}. {name}", self)
-            cb.toggled.connect(lambda checked, n=name:
-                               self._on_clf_toggled(n, checked))
-            self._clf_cbs[name] = cb
-            clf_bar.addWidget(cb)
-        # Overflow (10+ classifiers) — no keystroke binding
-        for name in self._classifier_names[9:]:
-            cb = QCheckBox(name, self)
+        clf_bar.addWidget(
+            QLabel("<b>Behaviours at this frame:</b>", self),
+        )
+        for name in self._classifier_names:
+            key = self._classifier_keys.get(name, "")
+            label_text = f"{name} ({key})" if key else f"{name} (—)"
+            cb = QCheckBox(label_text, self)
             cb.toggled.connect(lambda checked, n=name:
                                self._on_clf_toggled(n, checked))
             self._clf_cbs[name] = cb
@@ -235,15 +265,36 @@ class FrameLabellerWidget(QWidget):
         clf_bar.addStretch()
         outer.addLayout(clf_bar)
 
-        # Keystroke hint + status line
+        # Keystroke hint + status line.
+        # Patch 122ff — updated hints to reflect the new
+        # playback-direction + continuous-label semantics.
         hint = QLabel(
-            "<i>Keys: 1–9 toggle behaviours · ← / → jog 1 frame · "
-            "Shift+← / Shift+→ jog 10 · Space = next frame · "
-            "Ctrl+S save</i>",
+            "<i>Keys: &lt;classifier-key&gt; = toggle continuous "
+            "label mode for that behaviour · "
+            "Del = toggle continuous deletion of active label · "
+            "← / → = play backward / forward · "
+            "Space = pause · "
+            "Shift+← / Shift+→ = jog 10 frames · "
+            "Ctrl+S = save</i>",
             self,
         )
+        hint.setWordWrap(True)
         hint.setStyleSheet("color: palette(placeholder-text);")
         outer.addWidget(hint)
+
+        # Patch 122ff — active-mode status line: shows which label
+        # is currently being continuously written to (if any) and
+        # whether the mode is "label" or "delete." Green when
+        # actively labelling, red when actively deleting, neutral
+        # otherwise.
+        self.active_mode_label = QLabel(
+            "<i>Active continuous mode: (none)</i>", self,
+        )
+        self.active_mode_label.setStyleSheet(
+            "padding: 4px; border-radius: 4px; "
+            "background-color: palette(alternate-base);",
+        )
+        outer.addWidget(self.active_mode_label)
 
         self.status = QLabel("Ready.", self)
         outer.addWidget(self.status)
@@ -260,16 +311,61 @@ class FrameLabellerWidget(QWidget):
         outer.addWidget(btns)
 
     def _setup_shortcuts(self) -> None:
-        for i, name in enumerate(self._classifier_names[:9]):
-            sc = QShortcut(QKeySequence(str(i + 1)), self)
-            sc.activated.connect(lambda n=name: self._toggle_clf(n))
-        for key, delta in [(Qt.Key_Left, -1), (Qt.Key_Right, 1)]:
-            sc = QShortcut(QKeySequence(key), self)
+        """Patch 122ff — rewired keyboard shortcuts to match the
+        user-requested playback + continuous-label semantics:
+
+        * Each classifier's hotkey (from [classifiers.keys]) →
+          toggles continuous "label" mode for that classifier.
+          Press once to enter; press again to exit.
+        * **Del** → toggles continuous "delete" mode for the
+          currently-active label (no-op if no label is active).
+        * **Left / Right arrows** → enter continuous PLAY mode in
+          that direction (calls scrubber._toggle_play). Was
+          single-frame jog; the jog is now Shift+arrow.
+        * **Space** → toggle play/pause. Was "advance one frame."
+        * **Shift+Left / Shift+Right** → jog 10 frames. Unchanged.
+        * **Ctrl+S** → save. Unchanged.
+        """
+        # Per-classifier key bindings.
+        for name in self._classifier_names:
+            key = self._classifier_keys.get(name, "")
+            if not key:
+                continue
+            try:
+                sc = QShortcut(QKeySequence(key), self)
+            except (ValueError, TypeError):
+                # Unparseable key — skip; user will see "—" next to
+                # the name in the UI as a visual cue.
+                continue
             sc.activated.connect(
-                lambda d=delta: self.scrubber.seek(
-                    self.scrubber.current_frame + d
-                )
+                lambda n=name: self._toggle_active_label(n),
             )
+
+        # Del key → toggle delete mode for the active label.
+        del_sc = QShortcut(QKeySequence(Qt.Key_Delete), self)
+        del_sc.activated.connect(self._toggle_active_delete_mode)
+
+        # Left / Right arrows → start playing backward / forward.
+        # The scrubber's _toggle_play handles the toggle semantic
+        # (press again same direction → pause; press other
+        # direction → switch direction).
+        sc_left = QShortcut(QKeySequence(Qt.Key_Left), self)
+        sc_left.activated.connect(
+            lambda: self.scrubber._toggle_play(direction=-1),
+        )
+        sc_right = QShortcut(QKeySequence(Qt.Key_Right), self)
+        sc_right.activated.connect(
+            lambda: self.scrubber._toggle_play(direction=+1),
+        )
+
+        # Space → pause (if playing) or resume in last direction
+        # (if paused). Implemented via _toggle_play with the last
+        # known direction, defaulting to forward.
+        sp = QShortcut(QKeySequence(Qt.Key_Space), self)
+        sp.activated.connect(self._toggle_play_pause)
+
+        # Shift+Left / Shift+Right → jog by 10 frames. Useful for
+        # quick scrubbing without entering play mode.
         for combo, delta in [
             (QKeySequence(Qt.ShiftModifier | Qt.Key_Left), -10),
             (QKeySequence(Qt.ShiftModifier | Qt.Key_Right), 10),
@@ -280,11 +376,122 @@ class FrameLabellerWidget(QWidget):
                     self.scrubber.current_frame + d
                 )
             )
-        sp = QShortcut(QKeySequence(Qt.Key_Space), self)
-        sp.activated.connect(lambda: self.scrubber.seek(
-            self.scrubber.current_frame + 1))
+
+        # Ctrl+S → save (unchanged).
         ss = QShortcut(QKeySequence.Save, self)
         ss.activated.connect(self._save)
+
+    def _toggle_play_pause(self) -> None:
+        """Space-bar handler. If currently playing, pause. If
+        paused, resume in the last play direction (defaulting to
+        forward on first press). Patch 122ff."""
+        scrubber = self.scrubber
+        cur_dir = getattr(scrubber, "_play_direction", 0)
+        if cur_dir != 0:
+            # Pause: pressing the same-direction toggle pauses.
+            scrubber._toggle_play(direction=cur_dir)
+        else:
+            # Resume: default to forward on the first space press.
+            last = getattr(self, "_last_play_direction", +1) or +1
+            scrubber._toggle_play(direction=last)
+        # Remember the direction for next pause/resume cycle.
+        new_dir = getattr(scrubber, "_play_direction", 0)
+        if new_dir != 0:
+            self._last_play_direction = new_dir
+
+    def _toggle_active_label(self, name: str) -> None:
+        """Toggle continuous-label mode for ``name``. Patch 122ff.
+
+        Semantic:
+        - If ``name`` is already the active label in "label" mode:
+          deactivate (return to idle).
+        - Else: set ``name`` as the active label in "label" mode
+          (overrides any previous active label).
+        """
+        if (self._active_label == name
+                and self._active_mode == "label"):
+            self._active_label = None
+            self._active_mode = "label"
+        else:
+            self._active_label = name
+            self._active_mode = "label"
+        self._refresh_active_mode_indicator()
+
+    def _toggle_active_delete_mode(self) -> None:
+        """Del-key handler. Flips _active_mode between "label" and
+        "delete" for the currently-active label. No-op if no label
+        is active. Patch 122ff.
+
+        User request: "Del should be reserved for toggling
+        continuous deletion of the currently toggled label (all
+        other labels should be left untouched)."
+        """
+        if self._active_label is None:
+            self.status.setText(
+                "Del pressed but no label is active — press a "
+                "classifier key first to choose which label to "
+                "toggle deletion on."
+            )
+            return
+        self._active_mode = (
+            "delete" if self._active_mode == "label" else "label"
+        )
+        self._refresh_active_mode_indicator()
+
+    def _refresh_active_mode_indicator(self) -> None:
+        """Update the active-mode status label's text + color.
+        Patch 122ff."""
+        if self._active_label is None:
+            self.active_mode_label.setText(
+                "<i>Active continuous mode: (none)</i>",
+            )
+            self.active_mode_label.setStyleSheet(
+                "padding: 4px; border-radius: 4px; "
+                "background-color: palette(alternate-base);",
+            )
+            return
+        if self._active_mode == "label":
+            self.active_mode_label.setText(
+                f"<b>Active: writing 1s to '{self._active_label}'</b> "
+                f"(press its key again to stop; press Del to switch "
+                f"to deletion mode)",
+            )
+            self.active_mode_label.setStyleSheet(
+                "padding: 4px; border-radius: 4px; "
+                "background-color: #2a8a2a; color: white;",
+            )
+        else:  # delete
+            self.active_mode_label.setText(
+                f"<b>Active: erasing '{self._active_label}'</b> "
+                f"(press Del again to switch back to labeling; "
+                f"press the classifier's key to stop)",
+            )
+            self.active_mode_label.setStyleSheet(
+                "padding: 4px; border-radius: 4px; "
+                "background-color: #b34141; color: white;",
+            )
+
+    def _load_classifier_keys(self) -> None:
+        """Read [classifiers.keys] from project.toml. Patch 122ff.
+
+        Falls back to an empty dict on any error — labels just
+        won't have keys and will show "—" in the UI.
+        """
+        try:
+            from mufasa.ui_qt.forms.classifier import (
+                _read_classifier_keys,
+            )
+            all_keys = _read_classifier_keys(self.config_path)
+            # Filter to only keys defined for the project's actual
+            # classifiers (so a stale [classifiers.keys] entry for
+            # a deleted classifier doesn't bind anything).
+            self._classifier_keys = {
+                n: all_keys[n]
+                for n in self._classifier_names
+                if n in all_keys
+            }
+        except Exception:
+            self._classifier_keys = {}
 
     # ------------------------------------------------------------------ #
     # Label-state management
@@ -387,6 +594,19 @@ class FrameLabellerWidget(QWidget):
         )
 
     def _on_frame_changed(self, frame_idx: int) -> None:
+        # Patch 122ff — if continuous label/delete mode is active,
+        # write the appropriate value to the current frame's label
+        # BEFORE refreshing the checkboxes. The write is per-frame
+        # so playback at video FPS produces a contiguous span of
+        # 1s (label mode) or 0s (delete mode) over the played
+        # frames.
+        if self._active_label is not None:
+            arr = self._labels.get(self._active_label)
+            if arr is not None and 0 <= frame_idx < arr.shape[0]:
+                new_val = 1 if self._active_mode == "label" else 0
+                if arr[frame_idx] != new_val:
+                    arr[frame_idx] = new_val
+                    self._dirty = True
         for name, cb in self._clf_cbs.items():
             cb.blockSignals(True)
             cb.setChecked(bool(self._labels[name][frame_idx]))
