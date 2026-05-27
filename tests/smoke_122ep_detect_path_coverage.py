@@ -196,12 +196,17 @@ def main() -> int:
     # -----------------------------------------------------------------
     # Deliberate non-coverage
     # -----------------------------------------------------------------
-    for sid in ("egocentric", "features_roi"):
+    # Patch 122ez removed egocentric from this list — its detect_path
+    # was added defensively pointing at <project>/rotated/ (the
+    # form's default save_dir). features_roi remains the lone
+    # deliberately-not-wired ui_bound section.
+    for sid in ("features_roi",):
         spec = SECTIONS.get(sid)
         check(
             f"SECTIONS[{sid!r}].detect_path is None "
-            f"(deliberately not wired — see 122ep docstring "
-            f"for rationale)",
+            f"(deliberately not wired — writes into shared "
+            f"derived/features/, can't separate from subject "
+            f"features)",
             spec is not None and spec.detect_path is None,
             detail=(f"got {getattr(spec, 'detect_path', None)!r}"),
         )
@@ -295,10 +300,11 @@ def main() -> int:
     ui_bound = [s for s in SECTIONS.values() if s.ui_bound]
     with_detect = [s for s in ui_bound if s.detect_path is not None]
     check(
-        "9 of 11 ui_bound sections have detect_path "
+        "10 of 11 ui_bound sections have detect_path "
         "(122ep added 4 producer-style sections; 122es flipped "
-        "pixels_per_mm from None → sources/video_info.csv)",
-        len(with_detect) == 9 and len(ui_bound) == 11,
+        "pixels_per_mm from None → sources/video_info.csv; "
+        "122ez added egocentric → <root>/rotated)",
+        len(with_detect) == 10 and len(ui_bound) == 11,
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 

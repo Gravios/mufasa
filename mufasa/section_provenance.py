@@ -313,6 +313,29 @@ SECTIONS: dict[str, SectionSpec] = {
         page="Preprocessing",
         section_title="Egocentric alignment",
         depends_on=("outlier_correction",),
+        # Patch 122ez — defensive detect_path. The form's save_dir
+        # is user-picked, but the DEFAULT is ``<project>/rotated/``
+        # (see EgocentricAlignmentForm.build at line 928 of
+        # pose_cleanup.py). 122ep deliberately omitted detect_path
+        # here because of the user-picked-dir uncertainty, but the
+        # default IS predictable enough that the common case should
+        # be detected.
+        #
+        # User report (May 26, 2026, follow-up to 122ex):
+        #   > saved to /data/testing/mufasa/test-20260427/rotated
+        #   > and contains the mp4 and parquet files but the badge
+        #   > is still white.
+        # The user's save dir matches the default. With this
+        # detect_path, the badge will go CURRENT via filesystem
+        # evidence regardless of whether record_run was called
+        # (defends against the running-process-has-cached-old-
+        # class-definition failure mode of 122ex).
+        #
+        # If a user picks a NON-default save_dir, detect_path won't
+        # find their output and the badge will rely on record_run
+        # via 122ex's section_id wiring. That's the worst case;
+        # not strictly worse than no detect_path.
+        detect_path=lambda root: root / "rotated",
     ),
     "drop_body_parts": SectionSpec(
         section_id="drop_body_parts",
