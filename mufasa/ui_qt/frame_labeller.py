@@ -601,8 +601,24 @@ def launch_frame_labeller(parent: QWidget,
             "before labelling.",
         )
         return
+    # Patch 122fa — start the file picker in the project's video
+    # directory rather than the OS-default last-used dir. User
+    # request (May 26, 2026): "clicking Label should take me to
+    # the appropriate video folder."
+    start_dir = ""
+    try:
+        from mufasa.project_layout import v1_project_paths
+        paths = v1_project_paths(Path(config_path).parent)
+        candidate = paths.get("video_dir")
+        if candidate and Path(candidate).is_dir():
+            start_dir = candidate
+    except Exception:
+        # Fall back to the empty string (OS default) if the
+        # project layout helper can't resolve a video dir for
+        # any reason. Better to open SOMEWHERE than nowhere.
+        start_dir = ""
     path, _ = QFileDialog.getOpenFileName(
-        parent, "Select video to annotate", "",
+        parent, "Select video to annotate", start_dir,
         "Videos (*.mp4 *.avi *.mov *.mkv *.webm)",
     )
     if not path:

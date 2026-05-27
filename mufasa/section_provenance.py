@@ -401,10 +401,9 @@ SECTIONS: dict[str, SectionSpec] = {
     ),
     "classifier_train": SectionSpec(
         section_id="classifier_train",
-        # Patch 122ey — was page="Classifier"; the Classifier page
-        # was split into 6 standalone sidebar pages, one per former
-        # section. The page name now matches the section title.
-        page="Train classifier",
+        # Patch 122fa — was page="Train classifier" (from 122ey);
+        # user renamed to "Train" for the short-verb tab name.
+        page="Train",
         section_title="Train classifier",
         depends_on=("features_subject", "annotation"),
         # Patch 122ep — trained classifier .sav files land in
@@ -418,9 +417,9 @@ SECTIONS: dict[str, SectionSpec] = {
     ),
     "classifier_run": SectionSpec(
         section_id="classifier_run",
-        # Patch 122ey — was page="Classifier"; split into 6
-        # standalone pages. Page name now matches section title.
-        page="Run inference",
+        # Patch 122fa — was page="Run inference" (from 122ey);
+        # user renamed to "Inference" for the short tab name.
+        page="Inference",
         # Patch 122el — was "Run classifier"; workbench section
         # is "Run inference". Same shape of typo as 122ej.
         section_title="Run inference",

@@ -84,8 +84,7 @@ def build_workbench(project_config_path: str | None = None
         build_run_inference_page,
         build_train_classifier_page,
         build_validate_classifier_page,
-        build_yolo_inference_page,
-        build_yolo_train_page,
+        build_yolo_pose_page,
     )
     build_manage_classifiers_page(wb, config_path=project_config_path)
 
@@ -95,8 +94,9 @@ def build_workbench(project_config_path: str | None = None
     build_train_classifier_page(wb, config_path=project_config_path)
     build_validate_classifier_page(wb, config_path=project_config_path)
     build_run_inference_page(wb, config_path=project_config_path)
-    build_yolo_train_page(wb, config_path=project_config_path)
-    build_yolo_inference_page(wb, config_path=project_config_path)
+    # Patch 122fa — YOLO pose train + inference merged into one
+    # tab per user request (was two separate pages in 122ey).
+    build_yolo_pose_page(wb, config_path=project_config_path)
 
     from mufasa.ui_qt.pages.analysis_page import build_analysis_page
     build_analysis_page(wb, config_path=project_config_path)
