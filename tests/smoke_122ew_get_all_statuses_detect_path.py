@@ -268,6 +268,9 @@ def main() -> int:
         # Create the import_pose detect_path evidence FIRST (older).
         (root / "sources" / "pose").mkdir(parents=True)
         (root / "sources" / "pose" / "v1.csv").write_text("p")
+        # Patch 122fc — bases-match validation needs matching video.
+        (root / "sources" / "videos").mkdir(parents=True)
+        (root / "sources" / "videos" / "v1.mp4").write_text("v")
 
         # Tiny sleep to ensure the explicit provenance timestamp
         # below is strictly LATER than the file mtime above.
@@ -306,6 +309,9 @@ def main() -> int:
         # NO project.toml. detect_path evidence only.
         (root / "sources" / "pose").mkdir(parents=True)
         (root / "sources" / "pose" / "v1.csv").write_text("p")
+        # Patch 122fc — bases-match needs matching video.
+        (root / "sources" / "videos").mkdir(parents=True)
+        (root / "sources" / "videos" / "v1.mp4").write_text("v")
         cfg = root / "project.toml"  # doesn't exist
         s = get_all_statuses(str(cfg))["import_pose"]
         check(

@@ -221,6 +221,11 @@ def main() -> int:
         cfg = _make_v1_project(root)
         pose_dir = root / "sources" / "pose"
         pose_dir.mkdir(parents=True)
+        # Patch 122fc — bases-match validation requires matching
+        # video files. Set up the videos dir up front and create
+        # parallel video files for each pose file in the tests below.
+        videos_dir = root / "sources" / "videos"
+        videos_dir.mkdir(parents=True)
 
         # 9. empty sources/pose/ → UNKNOWN
         s = get_status(str(cfg), "import_pose")
@@ -234,17 +239,23 @@ def main() -> int:
 
         # 10. pose files present → CURRENT
         (pose_dir / "video1.csv").write_text("dummy")
+        # Patch 122fc — matching video required for the bases-
+        # match check to return True.
+        (videos_dir / "video1.mp4").write_text("v")
         s = get_status(str(cfg), "import_pose")
         check(
-            "import_pose with sources/pose/video1.csv reads CURRENT "
-            "(the user's reported case — old project, pose data "
-            "on disk, no provenance entry → badge should be green)",
+            "import_pose with sources/pose/video1.csv AND matching "
+            "sources/videos/video1.mp4 reads CURRENT (the user's "
+            "reported case — old project, pose data on disk, no "
+            "provenance entry → badge should be green; 122fc made "
+            "this contingent on bases matching across pose/video)",
             s == SectionStatus.CURRENT,
             detail=f"got {s.value!r}",
         )
 
         # 11. only dotfiles → UNKNOWN
         (pose_dir / "video1.csv").unlink()
+        (videos_dir / "video1.mp4").unlink()
         (pose_dir / ".DS_Store").write_text("hidden")
         s = get_status(str(cfg), "import_pose")
         check(
@@ -259,6 +270,10 @@ def main() -> int:
         # 12. interpolate with run dir → CURRENT
         (pose_dir / ".DS_Store").unlink()
         (pose_dir / "video1.csv").write_text("dummy")
+        # Patch 122fc — re-add the matching video for downstream
+        # tests in this block that also exercise import_pose
+        # implicitly (via the dependency DAG).
+        (videos_dir / "video1.mp4").write_text("v")
         run_dir = root / "derived" / "interpolated" / "20260520-123000"
         run_dir.mkdir(parents=True)
         (run_dir / "video1.csv").write_text("interpolated")
