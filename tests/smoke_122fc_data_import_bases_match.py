@@ -129,8 +129,6 @@ def main() -> int:
         get_status, get_all_statuses,
         _data_import_bases,
         _data_import_bases_match,
-        _data_import_pose_path,
-        _data_import_video_path,
         _POSE_DATA_EXTS,
         _VIDEO_DATA_EXTS,
     )
@@ -170,33 +168,24 @@ def main() -> int:
             detail=(f"got {matched!r}"),
         )
 
-    # 3. _data_import_*_path
-    with tempfile.TemporaryDirectory() as td:
-        root = Path(td)
-        # No files yet → not matched
-        unmatched_pose = _data_import_pose_path(root)
-        unmatched_video = _data_import_video_path(root)
-        # Add matching files
-        (root / "sources" / "pose").mkdir(parents=True)
-        (root / "sources" / "videos").mkdir(parents=True)
-        (root / "sources" / "pose" / "v1.parquet").write_text("p")
-        (root / "sources" / "videos" / "v1.mp4").write_text("v")
-        matched_pose = _data_import_pose_path(root)
-        matched_video = _data_import_video_path(root)
-        check(
-            "_data_import_*_path returns the data dir when bases "
-            "match, sentinel-name path when they don't",
-            (Path(matched_pose) == root / "sources" / "pose"
-             and Path(matched_video) == root / "sources" / "videos"
-             and Path(unmatched_pose) != root / "sources" / "pose"
-             and Path(unmatched_video) != root / "sources" / "videos"),
-            detail=(
-                f"matched_pose={matched_pose}, "
-                f"matched_video={matched_video}, "
-                f"unmatched_pose={unmatched_pose}, "
-                f"unmatched_video={unmatched_video}"
-            ),
-        )
+    # 3. Patch 122fk migrated import_pose/import_video off the
+    # sentinel-non-existent-path workaround onto the new
+    # content_predicate field. The removed helpers
+    # (_data_import_pose_path, _data_import_video_path,
+    # _BASES_MISMATCH_SENTINEL) are no longer in the module.
+    import mufasa.section_provenance as _sp
+    legacy_helpers_gone = (
+        not hasattr(_sp, "_data_import_pose_path")
+        and not hasattr(_sp, "_data_import_video_path")
+        and not hasattr(_sp, "_BASES_MISMATCH_SENTINEL")
+    )
+    check(
+        "Patch 122fk removed the sentinel-path helpers and "
+        "constant (_data_import_pose_path, _data_import_video_path, "
+        "_BASES_MISMATCH_SENTINEL). The bases-match check is now "
+        "expressed via SectionSpec.content_predicate instead.",
+        legacy_helpers_gone,
+    )
 
     # -----------------------------------------------------------------
     # SECTIONS contract

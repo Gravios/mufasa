@@ -151,6 +151,28 @@ class SectionSpec:
           sections like Pixels-per-mm calibration that don't produce
           a file) skip the fallback and remain UNKNOWN until
           explicit provenance lands.
+    content_predicate
+        Patch 122fk — optional callable
+        ``project_root: Path -> bool`` that gates whether the
+        ``detect_path`` evidence COUNTS as a valid implicit run.
+        Called AFTER ``_path_mtime_if_has_content`` confirms the
+        path exists with content; if the predicate returns False,
+        the section reads as if no fallback existed
+        (UNKNOWN). Lets sections express semantic constraints
+        beyond simple existence — e.g., "files in dir A match by
+        basename to files in dir B" (Data Import bases-match),
+        or "directory contains files with the .parquet extension"
+        (future v1-format checks).
+
+        Pre-122fk projects encoded such constraints by returning
+        a sentinel non-existent path from ``detect_path``;
+        cleaner now to keep ``detect_path`` semantic (returns the
+        canonical location) and put the constraint in
+        ``content_predicate``.
+
+        Errors in the predicate are swallowed the same way as
+        ``detect_path`` errors — return False ≡ "no evidence,"
+        the soft-fail to UNKNOWN.
     ui_bound
         Patch 122el — when False, the section is declared in the DAG
         (for dependency tracking and future planning) but no
@@ -176,6 +198,9 @@ class SectionSpec:
     section_title: str
     depends_on: tuple[str, ...] = field(default_factory=tuple)
     detect_path: Callable[[Path], Path] | None = None
+    # Patch 122fk — optional content predicate. See class
+    # docstring for semantics.
+    content_predicate: Callable[[Path], bool] | None = None
     ui_bound: bool = True
 
 
@@ -194,10 +219,18 @@ class SectionSpec:
 #   > and be green if their files' bases are the same, such that each
 #   > parquet file has an associated mp4 file.
 #
-# Implementation: detect_path returns the relevant data dir only when
-# bases match. Otherwise returns a sentinel non-existent path so
-# ``_path_mtime_if_has_content`` returns None and the badge falls
-# through to UNKNOWN — flagging the inconsistency.
+# Patch 122fk — original 122fc encoded the bases-match check by
+# returning a sentinel non-existent path from detect_path when
+# bases didn't match. That workaround predated the
+# ``content_predicate`` field on SectionSpec; it works but
+# conflates "where to look" with "does the lookup count." The
+# 122fk refactor cleans this up: detect_path returns the
+# canonical location (the real data dir, always), and the
+# content_predicate ``_data_import_bases_match`` gates whether
+# the evidence counts. The sentinel-path helpers + constant
+# (_data_import_pose_path, _data_import_video_path,
+# _BASES_MISMATCH_SENTINEL) are removed — directly referenced
+# in the SECTIONS entries below.
 
 _POSE_DATA_EXTS = (".csv", ".parquet")
 _VIDEO_DATA_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm")
@@ -228,7 +261,12 @@ def _data_import_bases_match(root: Path) -> bool:
     same set under ``sources/pose/`` and ``sources/videos/``. Both
     sets must be non-empty (an empty project doesn't satisfy
     "bases match" — the badge should stay UNKNOWN until import
-    happens)."""
+    happens).
+
+    Patch 122fk — also used as a ``content_predicate`` on the
+    import_pose / import_video SectionSpecs, signature
+    ``(root: Path) -> bool``.
+    """
     pose_bases = _data_import_bases(
         root / "sources" / "pose", _POSE_DATA_EXTS,
     )
@@ -236,35 +274,6 @@ def _data_import_bases_match(root: Path) -> bool:
         root / "sources" / "videos", _VIDEO_DATA_EXTS,
     )
     return bool(pose_bases) and pose_bases == video_bases
-
-
-# Sentinel sub-path that is statistically guaranteed not to exist.
-# Returned by the import_pose / import_video detect_path lambdas
-# when ``_data_import_bases_match`` is False; treated by
-# ``_path_mtime_if_has_content`` as "no evidence" → badge UNKNOWN.
-_BASES_MISMATCH_SENTINEL = ".__bases_mismatch_sentinel__"
-
-
-def _data_import_pose_path(root: Path) -> Path:
-    """detect_path for the import_pose section.
-
-    Returns ``sources/pose/`` if pose and video bases match,
-    else a sentinel non-existent path so the badge reads UNKNOWN.
-    """
-    if _data_import_bases_match(root):
-        return root / "sources" / "pose"
-    return root / _BASES_MISMATCH_SENTINEL
-
-
-def _data_import_video_path(root: Path) -> Path:
-    """detect_path for the import_video section.
-
-    Symmetric with :func:`_data_import_pose_path` but returns the
-    videos directory when bases match.
-    """
-    if _data_import_bases_match(root):
-        return root / "sources" / "videos"
-    return root / _BASES_MISMATCH_SENTINEL
 
 
 # ---------------------------------------------------------------------------
@@ -299,28 +308,28 @@ SECTIONS: dict[str, SectionSpec] = {
         # the most recently-modified file is used as the implicit
         # last_run_at.
         # Patch 122fc — extended to require base-name parity with
-        # sources/videos/. Both sources/pose/<base>.{csv,parquet}
-        # and sources/videos/<base>.{mp4,avi,mov,mkv,webm} must
-        # exist for the same set of bases. When parity is broken
-        # (e.g., pose files were imported but videos weren't, or
-        # filenames don't match), the badge stays UNKNOWN to flag
-        # the inconsistency to the user. Same detect_path used
-        # by import_video below.
-        detect_path=lambda root: _data_import_pose_path(root),
+        # sources/videos/.
+        # Patch 122fk — refactored to use the new content_predicate
+        # field. detect_path returns the canonical location
+        # unconditionally; the bases-match check is now expressed
+        # cleanly via content_predicate, replacing the sentinel-
+        # non-existent-path workaround from 122fc.
+        detect_path=lambda root: root / "sources" / "pose",
+        content_predicate=_data_import_bases_match,
     ),
     "import_video": SectionSpec(
         section_id="import_video",
         page="Data Import",
         section_title="Import video",
         depends_on=(),
-        # Patch 122fc — symmetric with import_pose. Returns
-        # sources/videos/ if file bases match across pose/ and
-        # videos/, else a sentinel non-existent path (badge =
-        # UNKNOWN). User request (May 26, 2026): "import data
-        # and video should both have badges and be green if their
-        # files' bases are the same, such that each parquet file
-        # has an associated mp4 file."
-        detect_path=lambda root: _data_import_video_path(root),
+        # Patch 122fc — symmetric with import_pose. User request
+        # (May 26, 2026): "import data and video should both have
+        # badges and be green if their files' bases are the same,
+        # such that each parquet file has an associated mp4 file."
+        # Patch 122fk — refactored to use content_predicate
+        # (see import_pose for the rationale).
+        detect_path=lambda root: root / "sources" / "videos",
+        content_predicate=_data_import_bases_match,
     ),
     "pixels_per_mm": SectionSpec(
         section_id="pixels_per_mm",
@@ -785,14 +794,24 @@ def _resolve_run_at(
        it (explicit wins over implicit — the user / backend
        explicitly recorded a run, that's authoritative).
     2. Else if the section declares a ``detect_path`` AND the
-       returned path exists with content, return the mtime of the
-       most recently-modified file under that path.
+       returned path exists with content AND (122fk) the optional
+       ``content_predicate`` accepts the project state, return
+       the mtime of the most recently-modified file under that
+       path.
     3. Else return None (UNKNOWN).
+
+    Patch 122fk — added the optional ``content_predicate`` gate.
+    Sections that need a content-aware check beyond simple
+    "path exists with content" (e.g. cross-directory consistency,
+    column-presence) put the check in ``content_predicate``; the
+    detect_path stays semantic (returns the canonical location).
+    Predicate False ≡ "no evidence."
 
     Errors during the filesystem check (permission denied,
     transient races) are swallowed — returns None as if no fallback
     existed. UI code can't afford to crash because of a flaky
-    filesystem.
+    filesystem. Errors in the content predicate are likewise
+    swallowed and treated as False.
     """
     entry = prov.get(section_id)
     if isinstance(entry, dict):
@@ -805,9 +824,22 @@ def _resolve_run_at(
         return None
     try:
         path = spec.detect_path(project_root)
-        return _path_mtime_if_has_content(path)
+        mtime = _path_mtime_if_has_content(path)
     except Exception:
         return None
+    if mtime is None:
+        return None
+    # Patch 122fk — apply content_predicate gate if declared.
+    # Predicate is called with the project root (not the detect_path
+    # output) so it can cross-reference other locations without
+    # walking back up from a per-section subdir.
+    if spec.content_predicate is not None:
+        try:
+            if not spec.content_predicate(project_root):
+                return None
+        except Exception:
+            return None
+    return mtime
 
 
 def _path_mtime_if_has_content(path: Path) -> datetime | None:
