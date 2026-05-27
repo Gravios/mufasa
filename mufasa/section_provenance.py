@@ -502,7 +502,9 @@ SECTIONS: dict[str, SectionSpec] = {
         page="Annotation",
         # Patch 122el — was "Annotate"; the workbench section
         # that hosts the labelling activity is "Frame labelling".
-        section_title="Frame labelling",
+        # Patch 122fh — user requested American spelling + title
+        # case: "Frame labelling" → "Frame Labeling".
+        section_title="Frame Labeling",
         depends_on=("features_subject",),
         # Patch 122ep — per-video annotation labels land at
         # derived/labels/<video>.parquet. Any non-hidden entry

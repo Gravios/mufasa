@@ -418,7 +418,7 @@ class ClassifierManageForm(OperationForm):
     description = (
         "Define behavior classifiers for the project. Each classifier "
         "needs a unique name and (optionally) a single-character "
-        "keyboard hotkey used by Frame labelling."
+        "keyboard hotkey used by Frame Labeling."
     )
 
     # Class attributes used by OperationForm but no-op for this form.

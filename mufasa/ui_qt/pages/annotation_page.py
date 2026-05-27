@@ -52,7 +52,7 @@ from mufasa.ui_qt.workbench import WorkflowPage
 def build_annotation_page(workbench,
                           config_path: str | None = None) -> WorkflowPage:
     page = workbench.add_page("Annotation", icon_name="label")
-    page.add_section("Frame labelling",          [(FrameLabellingLauncher, {})])
+    page.add_section("Frame Labeling",          [(FrameLabellingLauncher, {})])
     page.add_section("Targeted annotation clips",
                      [(TargetedAnnotationClipsLauncher, {})])
     page.add_section("Third-party annotation import",
