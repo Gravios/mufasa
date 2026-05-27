@@ -143,10 +143,20 @@ class FrameLabellingLauncher(OperationForm):
         # expect on action buttons; the verbose original was
         # carry-over from the legacy popup which had no other
         # surrounding context.
+        # Patch 122fa — wrap in QHBoxLayout with addStretch so the
+        # button stays at its natural size instead of stretching
+        # full-width across the form (user request: "the Label
+        # button should be an appropriate size"). Matches the
+        # OperationForm.run_btn placement convention (right-aligned,
+        # ~140px minimum width).
         launch = QPushButton("  Label", self)
         launch.setStyleSheet("padding: 8px 16px; font-size: 11pt;")
+        launch.setMinimumWidth(140)
         launch.clicked.connect(self._launch)
-        self.body_layout.addWidget(launch)
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_row.addWidget(launch)
+        self.body_layout.addLayout(btn_row)
 
         # Labellers are long-running interactive sessions; the base
         # class's Run button doesn't fit this flow.

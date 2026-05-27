@@ -80,8 +80,13 @@ def build_manage_classifiers_page(workbench,
 def build_train_classifier_page(workbench,
                                 config_path: str | None = None
                                 ) -> WorkflowPage:
-    """Standalone page for training classifiers from labelled data."""
-    page = workbench.add_page("Train classifier", icon_name="clf")
+    """Standalone page for training classifiers from labelled data.
+
+    Patch 122fa — tab renamed from 'Train classifier' to 'Train'
+    per user request (May 26, 2026). Short verb-form matches the
+    short-action UX style used elsewhere (Label, Run).
+    """
+    page = workbench.add_page("Train", icon_name="clf")
     page.add_section("Train classifier", [(TrainClassifierForm, {})])
     return page
 
@@ -89,8 +94,11 @@ def build_train_classifier_page(workbench,
 def build_validate_classifier_page(workbench,
                                    config_path: str | None = None
                                    ) -> WorkflowPage:
-    """Standalone page for out-of-sample validation videos."""
-    page = workbench.add_page("Validate classifier", icon_name="clf")
+    """Standalone page for out-of-sample validation videos.
+
+    Patch 122fa — tab renamed 'Validate classifier' → 'Validate'.
+    """
+    page = workbench.add_page("Validate", icon_name="clf")
     page.add_section("Validate classifier",
                      [(ValidateClassifierForm, {})])
     return page
@@ -99,27 +107,27 @@ def build_validate_classifier_page(workbench,
 def build_run_inference_page(workbench,
                              config_path: str | None = None
                              ) -> WorkflowPage:
-    """Standalone page for running trained classifiers on data."""
-    page = workbench.add_page("Run inference", icon_name="clf")
+    """Standalone page for running trained classifiers on data.
+
+    Patch 122fa — tab renamed 'Run inference' → 'Inference'.
+    """
+    page = workbench.add_page("Inference", icon_name="clf")
     page.add_section("Run inference", [(RunInferenceForm, {})])
     return page
 
 
-def build_yolo_train_page(workbench,
-                          config_path: str | None = None
-                          ) -> WorkflowPage:
-    """Standalone page for YOLO pose-model training (independent of
-    behavior-classifier workflow)."""
-    page = workbench.add_page("YOLO pose — train", icon_name="clf")
+def build_yolo_pose_page(workbench,
+                        config_path: str | None = None
+                        ) -> WorkflowPage:
+    """Standalone page combining YOLO pose train + inference.
+
+    Patch 122fa — was two separate pages (build_yolo_train_page +
+    build_yolo_inference_page); user requested they be merged
+    under a single 'YOLO pose' tab. The two sections inside cover
+    training and inference respectively.
+    """
+    page = workbench.add_page("YOLO pose", icon_name="clf")
     page.add_section("YOLO pose — train", [(YOLOPoseTrainForm, {})])
-    return page
-
-
-def build_yolo_inference_page(workbench,
-                              config_path: str | None = None
-                              ) -> WorkflowPage:
-    """Standalone page for YOLO pose-model inference."""
-    page = workbench.add_page("YOLO pose — inference", icon_name="clf")
     page.add_section("YOLO pose — inference",
                      [(YOLOPoseInferenceForm, {})])
     return page
@@ -130,6 +138,5 @@ __all__ = [
     "build_train_classifier_page",
     "build_validate_classifier_page",
     "build_run_inference_page",
-    "build_yolo_train_page",
-    "build_yolo_inference_page",
+    "build_yolo_pose_page",
 ]

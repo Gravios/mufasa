@@ -113,8 +113,10 @@ def main() -> int:
         "build_train_classifier_page",
         "build_validate_classifier_page",
         "build_run_inference_page",
-        "build_yolo_train_page",
-        "build_yolo_inference_page",
+        # Patch 122fa — was build_yolo_train_page + build_yolo_inference_page
+        # (two pages); user requested they be merged into one "YOLO pose"
+        # tab with two sections inside.
+        "build_yolo_pose_page",
     }
     actual_builders = {
         node.name for node in ast.walk(cp_tree)
@@ -123,9 +125,9 @@ def main() -> int:
     legacy_present = "build_classifier_page" in actual_builders
     new_present = expected_builders.issubset(actual_builders)
     check(
-        "classifier_page.py exposes all 6 new build_*_page "
-        "functions AND no longer defines the legacy "
-        "build_classifier_page (clean rename)",
+        "classifier_page.py exposes 5 build_*_page functions "
+        "(post-122fa YOLO merge) AND no longer defines the "
+        "legacy build_classifier_page (clean structure)",
         new_present and not legacy_present,
         detail=(
             f"new_present={new_present} "
@@ -134,14 +136,15 @@ def main() -> int:
         ),
     )
 
-    # 2. Each builder registers one section with the matching title.
+    # 2. Each builder registers sections with the matching titles.
+    # Most pages have one section; YOLO pose has two after 122fa.
     expected_sections = {
-        "build_manage_classifiers_page": "Manage classifiers",
-        "build_train_classifier_page":   "Train classifier",
-        "build_validate_classifier_page": "Validate classifier",
-        "build_run_inference_page":      "Run inference",
-        "build_yolo_train_page":         "YOLO pose — train",
-        "build_yolo_inference_page":     "YOLO pose — inference",
+        "build_manage_classifiers_page": ["Manage classifiers"],
+        "build_train_classifier_page":   ["Train classifier"],
+        "build_validate_classifier_page": ["Validate classifier"],
+        "build_run_inference_page":      ["Run inference"],
+        "build_yolo_pose_page":          ["YOLO pose — train",
+                                          "YOLO pose — inference"],
     }
     one_section_each = True
     mismatches = []
@@ -150,7 +153,7 @@ def main() -> int:
             continue
         if fn.name not in expected_sections:
             continue
-        expected_title = expected_sections[fn.name]
+        expected_titles = expected_sections[fn.name]
         section_calls = []
         for node in ast.walk(fn):
             if (isinstance(node, ast.Call)
@@ -161,25 +164,20 @@ def main() -> int:
                 if (node.args
                         and isinstance(node.args[0], ast.Constant)):
                     section_calls.append(node.args[0].value)
-        if len(section_calls) != 1:
-            one_section_each = False
-            mismatches.append(f"{fn.name}: {len(section_calls)} sections")
-            continue
-        if section_calls[0] != expected_title:
+        if section_calls != expected_titles:
             one_section_each = False
             mismatches.append(
-                f"{fn.name}: title {section_calls[0]!r} "
-                f"≠ expected {expected_title!r}"
+                f"{fn.name}: titles {section_calls!r} ≠ expected "
+                f"{expected_titles!r}"
             )
     check(
-        "Each new build_*_page function registers exactly ONE "
-        "section with the matching title (clean 1-to-1 split — "
-        "no leftover multi-section pages)",
+        "Each build_*_page function registers the expected sections "
+        "(most one each; YOLO pose has two post-122fa merge)",
         one_section_each,
         detail=("; ".join(mismatches[:3])),
     )
 
-    # 3. workbench_app.py calls all 6 builders.
+    # 3. workbench_app.py calls all 5 builders.
     wba_src = (REPO_ROOT / "mufasa" / "ui_qt"
                / "workbench_app.py").read_text()
     wba_tree = ast.parse(wba_src)
@@ -190,8 +188,8 @@ def main() -> int:
                 and node.func.id in expected_builders):
             called_builders.add(node.func.id)
     check(
-        "workbench_app.py invokes all 6 new build_*_page "
-        "functions",
+        "workbench_app.py invokes all 5 build_*_page functions "
+        "(post-122fa YOLO merge reduced the count from 6 to 5)",
         expected_builders == called_builders,
         detail=(
             f"missing: {sorted(expected_builders - called_builders)}; "
@@ -205,17 +203,17 @@ def main() -> int:
     from mufasa.section_provenance import SECTIONS
     ct = SECTIONS["classifier_train"]
     check(
-        "SECTIONS['classifier_train'].page == 'Train classifier' "
-        "(was 'Classifier' pre-122ey)",
-        ct.page == "Train classifier",
+        "SECTIONS['classifier_train'].page == 'Train' "
+        "(post-122fa rename from 'Train classifier')",
+        ct.page == "Train",
         detail=(f"got {ct.page!r}"),
     )
 
     cr = SECTIONS["classifier_run"]
     check(
-        "SECTIONS['classifier_run'].page == 'Run inference' "
-        "(was 'Classifier' pre-122ey)",
-        cr.page == "Run inference",
+        "SECTIONS['classifier_run'].page == 'Inference' "
+        "(post-122fa rename from 'Run inference')",
+        cr.page == "Inference",
         detail=(f"got {cr.page!r}"),
     )
 
