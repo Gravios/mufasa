@@ -161,6 +161,17 @@ class FrameLabellerWidget(QWidget):
         self.scrubber.load(video_path)
         self._initialize_labels()
         self.scrubber.frame_changed.connect(self._on_frame_changed)
+        # Patch 122fg — feed the timeseries plot its initial data
+        # (after _initialize_labels has populated _labels) and
+        # initial fps (after scrubber.load has read it from the
+        # video). set_current_frame happens inside _on_frame_changed
+        # below for every playhead movement.
+        self.timeseries_plot.set_labels(
+            self._labels,
+            classifier_names=self._classifier_names,
+            classifier_keys=self._classifier_keys,
+        )
+        self.timeseries_plot.set_fps(self.scrubber.fps)
         self._on_frame_changed(0)
 
     # ------------------------------------------------------------------ #
@@ -244,6 +255,18 @@ class FrameLabellerWidget(QWidget):
         # Scrubber takes the lion's share of vertical space
         self.scrubber = FrameScrubberWidget(self)
         outer.addWidget(self.scrubber, 1)
+
+        # Patch 122fg — active label-timeseries plot. Shows a
+        # ±2-second window of the label state around the current
+        # frame. Repaints on frame_changed via _on_frame_changed
+        # below; receives a one-shot set_labels after
+        # _initialize_labels in __init__, and a one-shot set_fps
+        # after scrubber.load.
+        from mufasa.ui_qt.label_timeseries_plot import (
+            LabelTimeseriesPlot,
+        )
+        self.timeseries_plot = LabelTimeseriesPlot(self)
+        outer.addWidget(self.timeseries_plot)
 
         # Patch 122ff — per-classifier checkbox bar shows the
         # classifier's keyboard hotkey alongside the name (read
@@ -611,6 +634,16 @@ class FrameLabellerWidget(QWidget):
             cb.blockSignals(True)
             cb.setChecked(bool(self._labels[name][frame_idx]))
             cb.blockSignals(False)
+        # Patch 122fg — drive the timeseries plot. The widget owns
+        # its own paint state; we just feed it the new playhead
+        # position and it repaints. Guard for early-init paths
+        # where the plot might not exist yet (the very first
+        # _on_frame_changed call in __init__ happens AFTER
+        # _build_ui constructs self.timeseries_plot, so this is
+        # safe in practice — defensive anyway).
+        plot = getattr(self, "timeseries_plot", None)
+        if plot is not None:
+            plot.set_current_frame(frame_idx)
 
     def _toggle_clf(self, name: str) -> None:
         cb = self._clf_cbs.get(name)
