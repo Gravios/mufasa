@@ -396,6 +396,28 @@ class ROIDefineWidget(QWidget):
         self.edit_btn.setStyleSheet("padding: 4px 10px;")
         self.edit_btn.clicked.connect(self._on_edit_toggled)
         tool_row.addWidget(self.edit_btn)
+
+        # Patch 122fb — "Import / standardize…" launcher. Opens the
+        # ROIManageForm in a modal popup. Replaces the standalone
+        # "Maintenance" section that was removed in this same patch
+        # (option (b) of the three options discussed in 122ex's
+        # commit thread; the user picked it). The popup hosts the
+        # form's CSV-import and size-standardize actions. The
+        # form's third action ("Draw ROIs (interactive)") is
+        # redundant with the Definitions panel's own Draw button
+        # but is left in place; deferred clean-up.
+        self.maintenance_btn = QPushButton("Import / standardize…", self)
+        self.maintenance_btn.setToolTip(
+            "Bulk operations on ROIs: import definitions from CSV "
+            "or standardize all ROIs to a reference video's "
+            "pixels-per-mm calibration."
+        )
+        self.maintenance_btn.setStyleSheet("padding: 4px 10px;")
+        self.maintenance_btn.clicked.connect(
+            self._on_maintenance_clicked,
+        )
+        tool_row.addWidget(self.maintenance_btn)
+
         outer.addLayout(tool_row)
 
         # ---- Splitter: video list (left) | preview/table (right) ---- #
@@ -886,6 +908,59 @@ class ROIDefineWidget(QWidget):
             self.preview.stop_select()
             self.draw_btn.setEnabled(True)
             self._flash_status("Edit mode off.")
+
+    # ------------------------------------------------------------------ #
+    # Patch 122fb — Import / standardize popup launcher
+    # ------------------------------------------------------------------ #
+    def _on_maintenance_clicked(self) -> None:
+        """Open the ROIManageForm in a modal popup. Replaces the
+        standalone "Maintenance" section that was removed in
+        122fb. The popup hosts CSV-import and size-standardize
+        actions (the form's "Draw ROIs (interactive)" action is
+        redundant with the Definitions panel's own Draw button
+        but is left in place; deferred clean-up).
+        """
+        from PySide6.QtWidgets import QDialog, QVBoxLayout
+
+        from mufasa.ui_qt.forms.roi import ROIManageForm
+
+        # ROIManageForm requires a config_path; if we don't have
+        # one yet (rare — the panel is usually shown only after
+        # a project is loaded), bail with a status message.
+        cfg = (getattr(self.logic, "config_path", None)
+               if self.logic is not None else None)
+        if not cfg:
+            self._flash_status(
+                "No project loaded — open a project before "
+                "importing or standardizing ROIs.",
+                error=True,
+            )
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Import ROIs / Standardize sizes")
+        dlg.setMinimumSize(640, 420)
+        layout = QVBoxLayout(dlg)
+        layout.setContentsMargins(8, 8, 8, 8)
+        form = ROIManageForm(parent=dlg, config_path=cfg)
+        # When the form completes, close the dialog and refresh
+        # the panel so any newly-imported ROIs appear immediately.
+        try:
+            form.completed.connect(dlg.accept)
+        except Exception:
+            # If completed signal isn't wired the user can close
+            # via the title bar — not catastrophic.
+            pass
+        layout.addWidget(form)
+        dlg.exec()
+        # After the dialog closes, resync so any new ROIs the user
+        # imported show up in the preview / table immediately.
+        try:
+            self._sync_preview_and_slider()
+        except Exception:
+            # Don't fail the click handler if resync fails — the
+            # user can navigate to another video and back to refresh.
+            pass
 
     def _on_shape_edited(self, idx: int, geom: dict) -> None:
         """Slot for ROICanvas.shape_edited. Pushes the new geometry

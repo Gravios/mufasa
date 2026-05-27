@@ -30,8 +30,12 @@ panel.
 """
 from __future__ import annotations
 
+# Patch 122fb — ROIManageForm dropped from this file's imports; the
+# form moved to a popup launched from the Definitions panel (see
+# ROIDefineWidget._on_maintenance_clicked in roi_define_panel.py
+# for the new entry point).
 from mufasa.ui_qt.dialogs.roi_define_panel import ROIDefineWidget
-from mufasa.ui_qt.forms.roi import ROIAnalysisForm, ROIFeaturesForm, ROIManageForm, ROIVisualizeForm
+from mufasa.ui_qt.forms.roi import ROIAnalysisForm, ROIFeaturesForm, ROIVisualizeForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
 
@@ -60,7 +64,16 @@ def build_roi_page(workbench, config_path: str | None = None
 
     page.add_section_widget("Definitions",
                              _make_define_widget)
-    page.add_section("Maintenance",    [(ROIManageForm, {})])
+    # Patch 122fb — "Maintenance" section removed. Its actions
+    # (CSV import + size standardize) are now launched from a
+    # popup button on the Definitions panel itself (see
+    # ROIDefineWidget._on_maintenance_clicked in
+    # mufasa/ui_qt/dialogs/roi_define_panel.py). The standalone
+    # section was redundant — the Definitions panel is already
+    # the user's primary ROI surface and now subsumes Maintenance's
+    # bulk operations. ``ROIManageForm`` is unchanged; only its
+    # placement moved (inline section → popup dialog).
+    #     page.add_section("Maintenance",    [(ROIManageForm, {})])
     page.add_section("Analyze",        [(ROIAnalysisForm, {})])
     page.add_section("Visualize",      [(ROIVisualizeForm, {})])
     page.add_section("Features",       [(ROIFeaturesForm, {})])
