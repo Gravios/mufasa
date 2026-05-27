@@ -292,6 +292,7 @@ class FrameLabellerWidget(QWidget):
         # Patch 122ff — updated hints to reflect the new
         # playback-direction + continuous-label semantics.
         # Patch 122fh — added Up/Down arrows for playback rate.
+        # Patch 122fi — added PgUp/PgDn for label-transition jump.
         hint = QLabel(
             "<i>Keys: &lt;classifier-key&gt; = toggle continuous "
             "label mode for that behaviour · "
@@ -299,6 +300,7 @@ class FrameLabellerWidget(QWidget):
             "← / → = play backward / forward · "
             "Space = pause · "
             "↑ / ↓ = playback rate ×1.25 / ÷1.25 · "
+            "PgUp / PgDn = jump to prev / next label transition · "
             "Shift+← / Shift+→ = jog 10 frames · "
             "Ctrl+S = save</i>",
             self,
@@ -416,6 +418,21 @@ class FrameLabellerWidget(QWidget):
             lambda: self._adjust_playback_fps(factor=1.0 / 1.25),
         )
 
+        # Patch 122fi — Page Up / Page Down jump to the previous /
+        # next label transition in the currently active label
+        # (selected via classifier hotkey). A "transition" is any
+        # frame where arr[i] != arr[i-1] — start of a span (0→1)
+        # OR end of a span (1→0). No-op with status if no active
+        # label is set.
+        sc_pgdown = QShortcut(QKeySequence(Qt.Key_PageDown), self)
+        sc_pgdown.activated.connect(
+            lambda: self._jump_to_label_transition(direction=+1),
+        )
+        sc_pgup = QShortcut(QKeySequence(Qt.Key_PageUp), self)
+        sc_pgup.activated.connect(
+            lambda: self._jump_to_label_transition(direction=-1),
+        )
+
         # Ctrl+S → save (unchanged).
         ss = QShortcut(QKeySequence.Save, self)
         ss.activated.connect(self._save)
@@ -438,6 +455,71 @@ class FrameLabellerWidget(QWidget):
         self.status.setText(
             f"Playback rate: {actual:.1f} fps "
             f"({pct:.0f}% of native {native:.1f} fps)"
+        )
+
+    def _jump_to_label_transition(self, direction: int) -> None:
+        """Page Up/Down handler. Patch 122fi.
+
+        Jumps to the previous (``direction=-1``) or next
+        (``direction=+1``) transition in the currently-active
+        label's array. A "transition" is any frame where
+        ``arr[i] != arr[i-1]`` — i.e. the START of a labeled span
+        (0→1) OR the END of a span (1→0). The user can press
+        twice to skip a complete span.
+
+        Bails with a status message if no label is active (the
+        user must press a classifier key first to choose one)
+        or if no transition exists in the requested direction.
+        """
+        if self._active_label is None:
+            self.status.setText(
+                "Page Up/Down jump to label transitions in the "
+                "active label — press a classifier key first to "
+                "choose one."
+            )
+            return
+        arr = self._labels.get(self._active_label)
+        if arr is None or arr.size < 2:
+            return
+        # Vectorised transition lookup: i is a transition iff
+        # arr[i] != arr[i-1] for i in [1, n). np.flatnonzero gives
+        # the indices where the diff mask is True; +1 maps from
+        # the diff index back to the post-transition frame.
+        diff_mask = arr[1:] != arr[:-1]
+        transition_idxs = np.flatnonzero(diff_mask) + 1
+        if transition_idxs.size == 0:
+            self.status.setText(
+                f"No label transitions in '{self._active_label}'."
+            )
+            return
+        cur = self.scrubber.current_frame
+        if direction > 0:
+            after = transition_idxs[transition_idxs > cur]
+            if after.size == 0:
+                self.status.setText(
+                    f"No further transitions in "
+                    f"'{self._active_label}' after frame {cur}."
+                )
+                return
+            target = int(after[0])
+        else:
+            before = transition_idxs[transition_idxs < cur]
+            if before.size == 0:
+                self.status.setText(
+                    f"No earlier transitions in "
+                    f"'{self._active_label}' before frame {cur}."
+                )
+                return
+            target = int(before[-1])
+        self.scrubber.seek(target)
+        # Tell the user what the value AT the target frame is so
+        # they know whether they landed on the start (0→1) or end
+        # (1→0) of a span.
+        landed_value = int(arr[target])
+        edge = "start of span" if landed_value == 1 else "end of span"
+        self.status.setText(
+            f"Jumped to frame {target} — {edge} for "
+            f"'{self._active_label}'."
         )
 
     def _toggle_play_pause(self) -> None:
