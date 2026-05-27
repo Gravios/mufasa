@@ -495,6 +495,9 @@ class ROIDefineWidget(QWidget):
         # Patch 122dm — edit signals (drag-to-adjust + delete).
         self.preview.shape_edited.connect(self._on_shape_edited)
         self.preview.shape_deleted.connect(self._on_shape_deleted)
+        # Patch 122fd — clicking an ROI in select mode highlights
+        # the corresponding row in the table below.
+        self.preview.shape_selected.connect(self._on_shape_selected)
         right_layout.addWidget(self.preview, 1)
 
         # Shape table
@@ -1027,6 +1030,34 @@ class ROIDefineWidget(QWidget):
             self._sync_preview()
             self._sync_table()
             self._flash_status(f"Deleted {name}.")
+
+    def _on_shape_selected(self, idx: int) -> None:
+        """Slot for ROICanvas.shape_selected. Highlights the
+        corresponding row in the shape table. ``idx == -1`` means
+        the user clicked empty space (deselect → clear table
+        selection). Patch 122fd.
+
+        The overlay index from the canvas matches the table row
+        because ``_sync_table`` and ``_sync_preview`` iterate
+        ``self.logic.defs`` in the same order and both populate
+        their indexes in lockstep (see line 723 ``_sync_table``
+        and line 700 ``_sync_preview``).
+        """
+        if idx < 0:
+            self.shape_table.clearSelection()
+            return
+        if 0 <= idx < self.shape_table.rowCount():
+            self.shape_table.selectRow(idx)
+            # Scroll the row into view if necessary so the user
+            # always sees the highlighted row even on small tables.
+            try:
+                item = self.shape_table.item(idx, 0)
+                if item is not None:
+                    self.shape_table.scrollToItem(item)
+            except Exception:
+                # Scrolling failure is non-fatal — selection is
+                # what matters.
+                pass
 
     def _on_delete_roi(self, name: str) -> None:
         if self.logic is None:
