@@ -204,7 +204,7 @@ def main() -> int:
     check(
         "122ep + 122es state preserved: 9 of 11 ui_bound sections have "
         "detect_path",
-        len(with_detect) == 9 and len(ui_bound) == 11,
+        len(with_detect) == 10 and len(ui_bound) == 11,
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 

@@ -214,10 +214,11 @@ def main() -> int:
                / "smoke_122ep_detect_path_coverage.py")
     ep_src = ep_path.read_text()
     check(
-        "smoke_122ep was flipped post-122es: coverage count "
-        "is 9 of 11 (was 8 of 11)",
-        ("len(with_detect) == 9" in ep_src
-         and "9 of 11" in ep_src),
+        "smoke_122ep was flipped post-122ez: coverage count "
+        "is 10 of 11 (was 9 of 11 pre-122ez; 122ez wired "
+        "egocentric.detect_path)",
+        ("len(with_detect) == 10" in ep_src
+         and "10 of 11" in ep_src),
     )
 
     # -----------------------------------------------------------------
