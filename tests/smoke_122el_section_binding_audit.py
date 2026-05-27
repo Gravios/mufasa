@@ -236,7 +236,9 @@ def main() -> int:
         "pixels_per_mm":  ("Preprocessing", "Video Calibration"),
         "kalman_v2":      ("Preprocessing", "Kalman v2 smoothing"),
         "features_roi":   ("ROI",           "Features"),
-        "annotation":     ("Annotation",    "Frame labelling"),
+        # Patch 122fh — user requested American spelling + title
+        # case: "Frame labelling" → "Frame Labeling".
+        "annotation":     ("Annotation",    "Frame Labeling"),
         # Patch 122ey — Classifier page split; classifier_run now
         # lives on its own page.
         # Patch 122fa — page renamed "Run inference" → "Inference".

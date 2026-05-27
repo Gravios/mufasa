@@ -223,7 +223,7 @@ class FrameLabellerWidget(QWidget):
             raise RuntimeError(
                 "No classifiers defined in the project. Add at "
                 "least one via the Classifier → Manage page before "
-                "labelling."
+                "labeling."
             )
         from mufasa.project_layout import project_metadata_from_config, project_paths_from_config
         paths = project_paths_from_config(self.config_path)
@@ -291,12 +291,14 @@ class FrameLabellerWidget(QWidget):
         # Keystroke hint + status line.
         # Patch 122ff — updated hints to reflect the new
         # playback-direction + continuous-label semantics.
+        # Patch 122fh — added Up/Down arrows for playback rate.
         hint = QLabel(
             "<i>Keys: &lt;classifier-key&gt; = toggle continuous "
             "label mode for that behaviour · "
             "Del = toggle continuous deletion of active label · "
             "← / → = play backward / forward · "
             "Space = pause · "
+            "↑ / ↓ = playback rate ×1.25 / ÷1.25 · "
             "Shift+← / Shift+→ = jog 10 frames · "
             "Ctrl+S = save</i>",
             self,
@@ -400,9 +402,43 @@ class FrameLabellerWidget(QWidget):
                 )
             )
 
+        # Patch 122fh — Up / Down arrows adjust playback rate by
+        # ±1/4 of the current rate. Multiplicative (×1.25 up,
+        # ÷1.25 down) so the operation is reversible: an Up
+        # followed by a Down returns to the original rate. Clamped
+        # by the scrubber to [1.0, 240.0] fps.
+        sc_up = QShortcut(QKeySequence(Qt.Key_Up), self)
+        sc_up.activated.connect(
+            lambda: self._adjust_playback_fps(factor=1.25),
+        )
+        sc_down = QShortcut(QKeySequence(Qt.Key_Down), self)
+        sc_down.activated.connect(
+            lambda: self._adjust_playback_fps(factor=1.0 / 1.25),
+        )
+
         # Ctrl+S → save (unchanged).
         ss = QShortcut(QKeySequence.Save, self)
         ss.activated.connect(self._save)
+
+    def _adjust_playback_fps(self, factor: float) -> None:
+        """Multiply the scrubber's playback FPS by ``factor`` (1.25
+        for Up, 1/1.25 ≈ 0.8 for Down). Patch 122fh.
+
+        Updates the status label so the user sees the new rate.
+        Native video FPS is unchanged (and the timeseries plot
+        keeps using it for its window math).
+        """
+        old_fps = self.scrubber.get_playback_fps()
+        new_fps = old_fps * factor
+        self.scrubber.set_playback_fps(new_fps)
+        # Re-read after clamp so the status shows the actual value.
+        actual = self.scrubber.get_playback_fps()
+        native = self.scrubber.fps
+        pct = (actual / native) * 100 if native > 0 else 0
+        self.status.setText(
+            f"Playback rate: {actual:.1f} fps "
+            f"({pct:.0f}% of native {native:.1f} fps)"
+        )
 
     def _toggle_play_pause(self) -> None:
         """Space-bar handler. If currently playing, pause. If
@@ -851,7 +887,7 @@ def launch_frame_labeller(parent: QWidget,
         QMessageBox.warning(
             parent, "No project",
             "Load a project (project.toml or project.toml) "
-            "before labelling.",
+            "before labeling.",
         )
         return
     # Patch 122fa — start the file picker in the project's video

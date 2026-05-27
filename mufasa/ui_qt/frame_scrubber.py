@@ -57,7 +57,17 @@ class FrameScrubberWidget(QWidget):
         super().__init__(parent)
         self._cap: cv2.VideoCapture | None = None
         self._total_frames: int = 0
+        # Patch 122fh — _fps is the video's NATIVE frame rate (read
+        # from the file via CAP_PROP_FPS in load). Used for time-
+        # label math (frame_idx / fps → seconds) and as the default
+        # for _playback_fps. Should not be changed after load.
         self._fps: float = 30.0
+        # Patch 122fh — _playback_fps is the rate at which
+        # _on_play_tick fires (independent of the video's native
+        # rate). User-adjustable via set_playback_fps / Up/Down
+        # arrow keys in FrameLabellerWidget. Starts equal to _fps
+        # on each load.
+        self._playback_fps: float = 30.0
         self._current_frame: int = 0
         self._last_pixmap: QPixmap | None = None
         # Playback state. _play_direction is +1 (forward), -1
@@ -85,13 +95,43 @@ class FrameScrubberWidget(QWidget):
         self._total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = cap.get(cv2.CAP_PROP_FPS)
         self._fps = fps if fps and fps > 0 else 30.0
-        # Set timer interval based on actual video FPS so playback
-        # speed matches the recorded rate. 1000/fps ms per frame.
-        self._play_timer.setInterval(int(1000.0 / self._fps))
+        # Patch 122fh — playback rate starts at native rate; the
+        # user can adjust independently via set_playback_fps.
+        self._playback_fps = self._fps
+        # Set timer interval based on the playback FPS (initially =
+        # native). 1000/fps ms per frame.
+        self._play_timer.setInterval(int(1000.0 / self._playback_fps))
         self._slider.setRange(0, max(0, self._total_frames - 1))
         self._frame_box.setRange(0, max(0, self._total_frames - 1))
         self._total_lbl.setText(f"/ {self._total_frames - 1}")
         self.seek(0)
+
+    # ------------------------------------------------------------------ #
+    # Patch 122fh — playback-rate API
+    # ------------------------------------------------------------------ #
+    def get_playback_fps(self) -> float:
+        """Current playback frame rate. Distinct from ``fps`` (the
+        video's native rate read at load time)."""
+        return self._playback_fps
+
+    def set_playback_fps(self, new_fps: float) -> None:
+        """Update the playback frame rate. Clamped to [1.0, 240.0]
+        to keep timer math sane (1 FPS = 1s per frame; 240 FPS =
+        ~4ms per frame, near Qt's timer resolution). If playback
+        is currently running, the timer is restarted at the new
+        interval so the change takes effect immediately.
+        """
+        clamped = max(1.0, min(240.0, float(new_fps)))
+        if abs(clamped - self._playback_fps) < 1e-6:
+            return
+        self._playback_fps = clamped
+        self._play_timer.setInterval(int(1000.0 / clamped))
+        # If currently playing, the new interval applies on the
+        # next tick automatically — but restart so the first tick
+        # at the new rate doesn't wait out the old interval.
+        if self._play_timer.isActive():
+            self._play_timer.stop()
+            self._play_timer.start()
 
     def close_video(self) -> None:
         self._stop_playback()

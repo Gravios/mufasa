@@ -108,7 +108,7 @@ class FrameLabellingLauncher(OperationForm):
     returned by the layout helper).
     """
 
-    title = "Frame labelling"
+    title = "Frame Labeling"
     description = (
         "Frame-by-frame behavioural annotation. Opens a "
         "scrubber + per-classifier checkboxes dialog. Use "
@@ -125,9 +125,9 @@ class FrameLabellingLauncher(OperationForm):
         "(<code>project.toml</code>) layouts."
     )
 
-    MODES = [("New labelling",        "new"),
-             ("Continue labelling",   "continue"),
-             ("Pseudo-labelling (seed from machine_results)", "pseudo")]
+    MODES = [("New labeling",        "new"),
+             ("Continue labeling",   "continue"),
+             ("Pseudo-labeling (seed from machine_results)", "pseudo")]
 
     def build(self) -> None:
         form = QFormLayout()
@@ -167,7 +167,7 @@ class FrameLabellingLauncher(OperationForm):
             QMessageBox.warning(
                 self.window(), "No project",
                 "Load a project (project.toml for v1 or "
-                "project.toml for legacy) before labelling.",
+                "project.toml for legacy) before labeling.",
             )
             return
         mode = self.MODES[self.mode_cb.currentIndex()][1]
