@@ -210,9 +210,20 @@ class OperationForm(QWidget):
             # Provenance write happens BEFORE the completed signal so
             # any UI listener observing the signal can immediately
             # re-query SectionStatus and find the new entry.
-            self._record_provenance()
+            #
+            # Patch 122fl — _record_provenance now returns an error
+            # string if a declared section_id failed to record. We
+            # append it to the "Done." dialog so the user learns WHY
+            # the status badge didn't update, instead of being left
+            # to wonder why a successful run left a white badge.
+            prov_error = self._record_provenance()
             self.completed.emit()
-            QMessageBox.information(self, self.title, "Done.")
+            if prov_error:
+                QMessageBox.information(
+                    self, self.title, "Done.\n\n" + prov_error,
+                )
+            else:
+                QMessageBox.information(self, self.title, "Done.")
 
         run_with_progress(
             parent=self.window(),
@@ -221,26 +232,35 @@ class OperationForm(QWidget):
             on_success=_on_success,
         )
 
-    def _record_provenance(self) -> None:
+    def _record_provenance(self) -> str | None:
         """Patch 122dt — write [provenance.<section_id>] and (if
         configured) publish a symlink into ``publish_target_stage``.
 
-        Silently skips if any precondition isn't met (no section_id
-        declared, no config_path, no run_id captured by target).
-        Errors during recording are swallowed with a print — they
-        shouldn't crash the UI or block the "Done." dialog the user
-        just earned by running a successful operation.
+        Skips if any precondition isn't met (no section_id declared,
+        no config_path, no run_id captured by target).
+
+        Patch 122fl — return value. Returns ``None`` on success or
+        when there's nothing to record (no section_id / no
+        config_path — those aren't failures). Returns a human-
+        readable error string when a section_id WAS declared but
+        recording failed, so the caller can surface the reason to
+        the user. Previously these failures were swallowed with a
+        bare ``print`` to stdout — invisible in a packaged app —
+        leaving the user staring at a badge that stayed white after
+        a successful run with no explanation. This was the silent-
+        failure gap behind "I ran it but the badge didn't change."
         """
         if self.section_id is None:
-            return
+            return None
         if self.config_path is None:
-            return
+            return None
         run_id = self._last_run_id  # may be None for settings sections
 
         # Import here so the workbench module's import tree doesn't
         # depend on the provenance module at startup. (The module is
         # cheap, but localizing imports keeps the workbench bootstrap
         # path obvious.)
+        prov_error: str | None = None
         try:
             from mufasa.section_provenance import record_run
             record_run(self.config_path, self.section_id, run_id)
@@ -266,6 +286,9 @@ class OperationForm(QWidget):
             # and disrupt the user) nor show a QMessageBox
             # (heavy-handed for a dev-time bug). logging.error
             # is the right balance.
+            #
+            # Patch 122fl — also return an error string so the
+            # success path can note the badge won't update.
             import logging
             logging.error(
                 "[provenance] section_id=%r is not declared in "
@@ -275,16 +298,42 @@ class OperationForm(QWidget):
                 "mufasa.section_provenance.SECTIONS. Error: %s",
                 self.section_id, exc,
             )
+            prov_error = (
+                "The operation succeeded and your data was "
+                "written correctly, but the status badge could "
+                "not be updated because this section is not "
+                "registered (an internal configuration error). "
+                "The green/white indicator may stay stale; the "
+                "underlying output is unaffected."
+            )
             # Don't return — still attempt the publish below;
             # the symbols are independent concerns.
         except Exception as exc:
             # Transient runtime issues (IO error, file lock,
-            # malformed project.toml). Console-print is
-            # sufficient — the user shouldn't be blocked by a
-            # transient problem; next run will record correctly.
-            print(
-                f"[provenance] record_run failed for "
-                f"{self.section_id!r}: {type(exc).__name__}: {exc}"
+            # malformed project.toml, read-only project dir).
+            #
+            # Patch 122fl — upgraded from a bare ``print`` to
+            # ``logging.warning`` (print goes to stdout, invisible
+            # in packaged apps) AND return an error string so the
+            # success path surfaces a non-blocking note. The
+            # operation itself succeeded — we only failed to record
+            # the provenance marker that drives the status badge.
+            # If the cause is genuinely transient, a re-run records
+            # correctly; if it's persistent (read-only project.toml,
+            # full disk), the user now has a thread to pull instead
+            # of a silently-white badge.
+            import logging
+            logging.warning(
+                "[provenance] record_run failed for %r: %s: %s",
+                self.section_id, type(exc).__name__, exc,
+            )
+            prov_error = (
+                f"The operation succeeded and your data was "
+                f"written correctly, but the status badge could "
+                f"not be updated ({type(exc).__name__}). This is "
+                f"often transient — re-running will retry. If it "
+                f"persists, check that the project folder is "
+                f"writable and project.toml is not corrupted."
             )
             # Don't return — still attempt the publish below, since
             # they're independent concerns.
@@ -310,11 +359,22 @@ class OperationForm(QWidget):
                     source_flavor=self.publish_source_flavor,
                 )
             except Exception as exc:
-                print(
-                    f"[provenance] publish_to_stage failed for "
-                    f"{self.section_id!r}: {type(exc).__name__}: "
-                    f"{exc}"
+                # Patch 122fl — upgraded print → logging.warning
+                # (same packaged-app-visibility rationale as the
+                # provenance branch above). Publish failures aren't
+                # surfaced to the user via the return value: the
+                # symlink-into-stage is a secondary convenience, not
+                # the primary output, and a publish failure doesn't
+                # make the badge lie the way a provenance failure
+                # does.
+                import logging
+                logging.warning(
+                    "[provenance] publish_to_stage failed for %r: "
+                    "%s: %s",
+                    self.section_id, type(exc).__name__, exc,
                 )
+
+        return prov_error
 
 
 # --------------------------------------------------------------------------- #
