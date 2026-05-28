@@ -83,8 +83,8 @@ Coverage
     SECTIONS declaration (helps developers find the fix).
 6.  The KeyError handler does NOT raise — control flow
     continues to the publish_to_stage attempt below.
-7.  The Exception handler retains its prior print-based
-    behavior (no regression for transient failures).
+7.  The Exception handler uses logging.warning + a returned
+    error string (122fl upgrade from the bare print).
 
 Cross-patch invariants:
 8.  smoke_122em audit still in place (the commit-time
@@ -210,16 +210,23 @@ def main() -> int:
         not has_raise,
     )
 
-    # 7. Exception handler retains print behavior.
+    # 7. Exception handler — Patch 122fl upgraded the bare
+    # print to logging.warning (visible in packaged apps) and
+    # added a returned error string surfaced to the user.
     if len(handlers) > 1:
         h1_src = ast.unparse(handlers[1])
     else:
         h1_src = ""
     check(
-        "Exception handler retains its prior `print(...)` "
-        "behavior (no regression for transient runtime "
-        "failures)",
-        "print(" in h1_src,
+        "Exception handler uses logging.warning + sets a "
+        "prov_error string (122fl upgrade from the bare "
+        "print(...) — print is invisible in packaged apps, and "
+        "the returned string lets the success dialog tell the "
+        "user why the badge didn't update)",
+        ("logging.warning" in h1_src
+         and "prov_error" in h1_src),
+        detail=("print-only" if "print(" in h1_src
+                and "logging.warning" not in h1_src else ""),
     )
 
     # -----------------------------------------------------------------
