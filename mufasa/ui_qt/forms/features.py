@@ -41,6 +41,7 @@ Patch 122ae-3 supersedes the 122z destination notes
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
     QFormLayout,
@@ -134,6 +135,15 @@ class FeatureSubsetExtractorForm(OperationForm):
                             if not _is_roi_family(f)]
         roi_families = [f for f in families if _is_roi_family(f)]
 
+        # Patch 122fo — per-family "already computed" badge. Scan
+        # derived/features/ once up front; each family whose slug
+        # has parquet output gets a ✓ prefix + green text + a
+        # tooltip, so the user sees which feature sets already
+        # exist without leaving the form. The clean family name is
+        # preserved in Qt.UserRole, so collect_args (which reads
+        # UserRole, not the display text) is unaffected.
+        computed_slugs = self._computed_family_slugs()
+
         # Subject frame
         subj_box = QGroupBox("Subject features", self)
         subj_layout = QVBoxLayout(subj_box)
@@ -144,9 +154,9 @@ class FeatureSubsetExtractorForm(OperationForm):
         )
         self.subject_families.setMinimumHeight(140)
         for fam in subject_families:
-            item = QListWidgetItem(fam)
-            item.setData(Qt.UserRole, fam)
-            self.subject_families.addItem(item)
+            self.subject_families.addItem(
+                self._make_family_item(fam, computed_slugs),
+            )
         subj_layout.addWidget(self.subject_families)
         subj_hint = QLabel(
             "<i>Within-animal geometry: distances, angles, "
@@ -169,9 +179,9 @@ class FeatureSubsetExtractorForm(OperationForm):
         )
         self.roi_families.setMinimumHeight(90)
         for fam in roi_families:
-            item = QListWidgetItem(fam)
-            item.setData(Qt.UserRole, fam)
-            self.roi_families.addItem(item)
+            self.roi_families.addItem(
+                self._make_family_item(fam, computed_slugs),
+            )
         roi_layout.addWidget(self.roi_families)
         roi_hint = QLabel(
             "<i>Require ROI definitions in the current project. "
@@ -333,6 +343,91 @@ class FeatureSubsetExtractorForm(OperationForm):
         except Exception:
             pass
         return list(_DEFAULT_FAMILIES)
+
+    def _computed_family_slugs(self) -> set[str]:
+        """Return the set of family slugs that already have computed
+        output on disk. Patch 122fo.
+
+        A family counts as "computed" if its slug subdirectory
+        under ``derived/features/`` exists and contains at least
+        one non-hidden ``.parquet`` file (a per-family output for
+        at least one video). Used to badge already-computed
+        families in the selector lists so the user can see at a
+        glance which feature sets exist without leaving the form.
+
+        Soft-fails to an empty set on any error (no project, no
+        features dir, permission issue) — a missing badge is
+        strictly better than a crash in form construction. The
+        ``.parquet`` filter mirrors the 122fm audit rule: never
+        assume every file in a data dir is a data file.
+        """
+        if not self.config_path:
+            return set()
+        try:
+            from pathlib import Path
+
+            from mufasa.project_layout import (
+                project_paths_from_config,
+            )
+            paths = project_paths_from_config(self.config_path)
+            feat_dir = Path(paths["derived_features_dir"])
+        except Exception:
+            return set()
+        if not feat_dir.is_dir():
+            return set()
+        computed: set[str] = set()
+        try:
+            for sub in feat_dir.iterdir():
+                if not sub.is_dir() or sub.name.startswith("."):
+                    continue
+                try:
+                    has_parquet = any(
+                        p.is_file()
+                        and not p.name.startswith(".")
+                        and p.suffix.lower() == ".parquet"
+                        for p in sub.iterdir()
+                    )
+                except OSError:
+                    continue
+                if has_parquet:
+                    computed.add(sub.name)
+        except OSError:
+            return set()
+        return computed
+
+    @staticmethod
+    def _make_family_item(
+        fam: str, computed_slugs: set[str],
+    ) -> QListWidgetItem:
+        """Build a QListWidgetItem for a feature family, badged if
+        already computed. Patch 122fo.
+
+        The clean family name goes in Qt.UserRole (read by
+        collect_args). The DISPLAY text gets a ``✓`` prefix when
+        the family's slug is in ``computed_slugs``, plus green
+        foreground and an explanatory tooltip. Uncomputed families
+        render plain.
+        """
+        from mufasa.utils.feature_io import family_slug
+
+        slug = family_slug(fam)
+        is_computed = slug in computed_slugs
+        label = f"\u2713  {fam}" if is_computed else fam
+        item = QListWidgetItem(label)
+        # Clean name in UserRole — selection logic reads this, not
+        # the badged display text.
+        item.setData(Qt.UserRole, fam)
+        if is_computed:
+            item.setToolTip(
+                f"Already computed — output exists in "
+                f"derived/features/{slug}/. Re-selecting and "
+                f"running will overwrite it."
+            )
+            # A muted green that reads on both light and dark
+            # palettes. Not palette(highlight) — we want a
+            # status colour, not a selection colour.
+            item.setForeground(QColor(46, 139, 87))  # sea green
+        return item
 
     def collect_args(self) -> dict:
         if not self.config_path:
