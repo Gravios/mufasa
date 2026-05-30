@@ -265,8 +265,8 @@ class PoseImporterMixin(object):
                 closest_animal_dict["Y_bps"],
                 closest_animal_dict["P_bps"],
             )
-            for x_col, y_col, p_cols in zip(x_cols, y_cols, p_cols):
-                df = self.data_df[[x_col, y_col, p_cols]]
+            for x_col, y_col, p_col in zip(x_cols, y_cols, p_cols):
+                df = self.data_df[[x_col, y_col, p_col]]
                 self.out_df = pd.concat([self.out_df, df], axis=1)
 
     def reinsert_multi_idx_columns(self):
