@@ -266,8 +266,7 @@ class TrainRandomForestClassifier(ConfigReader, TrainModelMixin):
         """
 
         self.timer.stop_timer()
-        if not os.listdir(self.model_dir_out):
-            os.makedirs(self.model_dir_out)
+        os.makedirs(self.model_dir_out, exist_ok=True)
         self.save_rf_model(self.rf_clf, self.clf_name, self.model_dir_out)
         stdout_success(msg=f"Classifier {self.clf_name} saved in {self.model_dir_out} directory", elapsed_time=self.timer.elapsed_time_str, source=self.__class__.__name__)
         stdout_success(msg=f"Evaluation files are in {self.eval_out_path} folders", source=self.__class__.__name__)

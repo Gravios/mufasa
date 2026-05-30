@@ -34,17 +34,18 @@ Patch 122aj — what changed vs the pre-refactor module
   :func:`mufasa.utils.label_io.load_labels_for_video`. That helper
   was added in 122ae-3.5 specifically to return ``just the
   behavior label collection`` (Int64-nullable per-classifier
-  columns), reading first from ``derived/labels/<video>.parquet``
-  (the 122ae-5c sidecar) and falling back to legacy
-  ``csv/targets_inserted/`` automatically.
+  columns), reading from ``derived/labels/<video>.parquet``.
+  The legacy ``csv/targets_inserted/`` fallback was removed in
+  122ak — ``derived/labels/`` is now the only source.
 * Removes the pre-existing copy-paste bug in
   ``_load_existing_labels`` where the per-classifier loop ran
   twice (same result both times, just wasted CPU).
-* Save-side dual-write — the legacy
-  ``targets_inserted/<video>.<ext>`` write stays (primary
-  contract; classifier training reads from there), plus a new
-  sidecar via :func:`save_labels_for_video` to keep parity with
-  the 122ae-5c label-writes story.
+* Save side writes labels-only to
+  ``derived/labels/<video>.parquet`` via
+  :func:`save_labels_for_video`. The legacy dual-write to
+  ``csv/targets_inserted/`` was removed in 122ak; classifier
+  training now reads ``derived/labels/`` through
+  :func:`load_labels_for_video`, so the two sides agree.
 * In dock mode, the redundant Close button is hidden — the dock
   has its own close X in its title bar, so the dialog-style
   button bar is just UX noise.
@@ -646,15 +647,16 @@ class FrameLabellerWidget(QWidget):
             # label collection — labels only, not features.
             self._load_continue_labels()
         elif self.mode == "pseudo":
-            # Pseudo-mode reads machine_results which doesn't have
-            # a v1 location yet — keep the legacy CSV reader.
+            # Pseudo-mode reads predictions via classification_io,
+            # which resolves derived/classifications/ (v1) first and
+            # falls back to the legacy machine_results CSV.
             self._load_pseudo_labels()
 
     def _load_continue_labels(self) -> None:
         """Continue-mode loader. Routes through
         :func:`mufasa.utils.label_io.load_labels_for_video` so labels
-        in either derived/labels/ (v1) or csv/targets_inserted/
-        (legacy) both resolve."""
+        in derived/labels/ (v1) resolve. The legacy
+        csv/targets_inserted/ source was removed in 122ak."""
         try:
             from mufasa.utils.label_io import load_labels_for_video
             df = load_labels_for_video(self.video_name, self.config_path)
