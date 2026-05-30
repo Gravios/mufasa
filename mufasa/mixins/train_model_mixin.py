@@ -171,7 +171,7 @@ class TrainModelMixin(object):
                         raise InvalidInputError(msg=f"The annotation column for a classifier should contain only 0 or 1 values. However, in file {file} the {clf_name} field contains additional value(s): {list(set(df[clf_name].unique()) - {0, 1})}.", source=self.__class__.__name__)
             dfs.append(df)
 
-        check_all_dfs_in_list_has_same_cols(dfs=dfs, source='/project_folder/csv/targets_inserted', raise_error=True)
+        check_all_dfs_in_list_has_same_cols(dfs=dfs, source='derived/features + derived/labels', raise_error=True)
         col_headers = [list(x.columns) for x in dfs]
         dfs = [x[col_headers[0]] for x in dfs]
         dfs = pd.concat(dfs, axis=0)
@@ -1369,15 +1369,15 @@ class TrainModelMixin(object):
         if len(x_nan_cnt) > 0:
             if len(x_nan_cnt) < 10:
                 raise FaultyTrainingSetError(
-                    msg=f"{str(len(x_nan_cnt))} feature column(s) exist in some files within the project_folder/csv/targets_inserted directory, but missing in others. "
-                        f"Mufasa expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the "
+                    msg=f"{str(len(x_nan_cnt))} feature column(s) exist in some files within the project_folder/derived/features directory, but missing in others. "
+                        f"Mufasa expects all files within the project_folder/derived/features directory to have the same number of features: the "
                         f"column names with mismatches are: {list(x_nan_cnt.index)}",
                     source=self.__class__.__name__,
                 )
             else:
                 raise FaultyTrainingSetError(
-                    msg=f"{str(len(x_nan_cnt))} feature columns exist in some files, but missing in others. The feature files are found in the project_folder/csv/targets_inserted directory. "
-                        f"Mufasa expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the first 10 "
+                    msg=f"{str(len(x_nan_cnt))} feature columns exist in some files, but missing in others. The feature files are found in the project_folder/derived/features directory. "
+                        f"Mufasa expects all files within the project_folder/derived/features directory to have the same number of features: the first 10 "
                         f"column names with mismatches are: {list(x_nan_cnt.index)[0:9]}",
                     source=self.__class__.__name__,
                 )
@@ -1496,7 +1496,7 @@ class TrainModelMixin(object):
             raise InvalidInputError(msg=f"Could not determine the number of classes in the classifier {model_name}", source=self.__class__.__name__)
 
         if not multiclass and clf_n_classes != 2:
-            raise ClassifierInferenceError(msg=f"The classifier {model_name} (data path {data_path}) has not been created properly. See The SimBA GitHub FAQ page or Gitter for more information and suggested fixes. The classifier is not a binary classifier and does not predict two targets (absence and presence of behavior). One or more files inside the project_folder/csv/targets_inserted directory has an annotation column with a value other than 0 or 1", source=self.__class__.__name__,)
+            raise ClassifierInferenceError(msg=f"The classifier {model_name} (data path {data_path}) has not been created properly. See The SimBA GitHub FAQ page or Gitter for more information and suggested fixes. The classifier is not a binary classifier and does not predict two targets (absence and presence of behavior). One or more files inside the project_folder/derived/labels directory has an annotation column with a value other than 0 or 1", source=self.__class__.__name__,)
         if isinstance(x_df, pd.DataFrame):
             x_df = x_df.values
         if x_df.shape[1] != clf_n_features:
@@ -1603,9 +1603,9 @@ class TrainModelMixin(object):
         nan_target = y_df.loc[pd.to_numeric(y_df).isna()]
         using_cuda = True if CUML in str(clf.__class__.__module__).lower() else False
         if len(nan_features) > 0:
-            raise FaultyTrainingSetError(msg=f"{len(nan_features)} frame(s) in your project_folder/csv/targets_inserted directory contains FEATURES with non-numerical values", source=self.__class__.__name__)
+            raise FaultyTrainingSetError(msg=f"{len(nan_features)} frame(s) in your project_folder/derived/features directory contains FEATURES with non-numerical values", source=self.__class__.__name__)
         if len(nan_target) > 0:
-            raise FaultyTrainingSetError(msg=f"{len(nan_target)} frame(s) in your project_folder/csv/targets_inserted directory contains ANNOTATIONS with non-numerical values", source=self.__class__.__name__)
+            raise FaultyTrainingSetError(msg=f"{len(nan_target)} frame(s) in your project_folder/derived/labels directory contains ANNOTATIONS with non-numerical values", source=self.__class__.__name__)
         if verbose: stdout_information(msg=f'Fitting classifier for {len(x_df)} observations (cuda: {"True" if using_cuda else "False"})...')
         if using_cuda:
             x_data = x_df.values if isinstance(x_df, pd.DataFrame) else x_df
@@ -1691,7 +1691,7 @@ class TrainModelMixin(object):
                 df_concat = df_concat.drop(["scorer"], axis=1)
             if len(df_concat) == 0:
                 raise NoDataError(
-                    msg="Mufasa found 0 observations (frames) in the project_folder/csv/targets_inserted directory",
+                    msg="Mufasa found 0 observations (frames) in the project_folder/derived/labels directory",
                     source=TrainModelMixin.read_all_files_in_folder_mp.__name__,
                 )
             df_concat = df_concat.loc[
@@ -1814,7 +1814,7 @@ class TrainModelMixin(object):
                     frm_number_list.extend((result.result()[-1]))
                     stdout_information(msg=f"Reading complete {result.result()[1]} (elapsed time: {result.result()[2]}s)...")
 
-            check_all_dfs_in_list_has_same_cols(dfs=dfs, source='/project_folder/csv/targets_inserted', raise_error=True)
+            check_all_dfs_in_list_has_same_cols(dfs=dfs, source='derived/features + derived/labels', raise_error=True)
             col_headers = [list(x.columns) for x in dfs]
             dfs = [x[col_headers[0]] for x in dfs]
             dfs = pd.concat(dfs, axis=0).round(4)
@@ -1867,8 +1867,8 @@ class TrainModelMixin(object):
             results = pd.DataFrame.from_dict(data=results, orient="index")
             results.to_csv(save_log_path)
             raise FaultyTrainingSetError(
-                msg=f"{len(nan_cols)} feature columns exist in some files, but missing in others. The feature files are found in the project_folder/csv/targets_inserted directory. "
-                    f"Mufasa expects all files within the project_folder/csv/targets_inserted directory to have the same number of features: the first 10 "
+                msg=f"{len(nan_cols)} feature columns exist in some files, but missing in others. The feature files are found in the project_folder/derived/features directory. "
+                    f"Mufasa expects all files within the project_folder/derived/features directory to have the same number of features: the first 10 "
                     f"column names with mismatches are: {nan_cols[0:9]}. For a log of the files that contain, and not contain, the mis-matched columns, see {save_log_path}",
                 source=self.__class__.__name__,
             )

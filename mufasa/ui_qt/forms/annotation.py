@@ -103,9 +103,10 @@ class FrameLabellingLauncher(OperationForm):
     directly. v1 ``project.toml`` projects work end-to-end —
     previously the labeller would crash on the missing INI
     section. For both layouts, labels save under
-    ``<root>/csv/targets_inserted/`` and pseudo-labels seed
-    from ``<root>/derived/classifications/`` post-122ax (paths
-    returned by the layout helper).
+    ``<root>/derived/labels/<video>.parquet`` and pseudo-labels
+    seed from ``<root>/derived/classifications/`` post-122ax
+    (paths returned by the layout helper). The legacy
+    ``csv/targets_inserted/`` write was dropped in 122ak.
     """
 
     title = "Frame Labeling"
@@ -118,7 +119,7 @@ class FrameLabellingLauncher(OperationForm):
         "<br><br>"
         "<b>Path note:</b> features come from "
         "<code>derived/features/</code>, labels save to "
-        "<code>csv/targets_inserted/</code>, pseudo-labels seed "
+        "<code>derived/labels/</code>, pseudo-labels seed "
         "from <code>derived/classifications/</code>, all under "
         "the active project root. Works for both v1 "
         "(<code>project.toml</code>) and legacy "
@@ -127,7 +128,7 @@ class FrameLabellingLauncher(OperationForm):
 
     MODES = [("New labeling",        "new"),
              ("Continue labeling",   "continue"),
-             ("Pseudo-labeling (seed from machine_results)", "pseudo")]
+             ("Pseudo-labeling (seed from classifications)", "pseudo")]
 
     def build(self) -> None:
         form = QFormLayout()
