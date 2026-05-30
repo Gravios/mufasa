@@ -23,7 +23,8 @@ from mufasa.feature_extractors.feature_extractor_user_defined import \
     UserDefinedFeatureExtractor
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_that_column_exist)
+                                check_that_column_exist,
+                                check_that_two_dfs_are_equal_len)
 from mufasa.utils.read_write import (get_all_clf_names, get_fn_ext,
                                     read_config_entry, read_df, write_df)
 
@@ -96,9 +97,15 @@ class Reverse2AnimalTracking(ConfigReader):
         elif self.pose_estimation_setting == "14":
             ExtractFeaturesFrom14bps(self.config_path)
         elif self.pose_estimation_setting == "987":
+            # NOTE (122fr): `extract_features_wotarget_14_from_16` is
+            # undefined and "987" is not a key in the canonical
+            # pose->extractor table (mufasa.utils.lookups). Left as-is:
+            # no in-repo target exists and the correct semantics are
+            # unknown. Reaching this branch raises NameError by design
+            # until the intended extractor is restored.
             extract_features_wotarget_14_from_16(self.config_path)
         elif self.pose_estimation_setting == "9":
-            extract_features_wotarget_9(self.config_path)
+            ExtractFeaturesFrom9bps(self.config_path)
         elif self.pose_estimation_setting == "8":
             ExtractFeaturesFrom8bps(self.config_path)
         elif self.pose_estimation_setting == "7":
