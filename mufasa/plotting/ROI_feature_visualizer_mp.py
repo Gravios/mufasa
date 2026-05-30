@@ -66,8 +66,8 @@ def _roi_feature_visualizer_mp(frm_range: Tuple[int, np.ndarray],
                                show_animal_names: bool,
                                direction: Union[None, str]):
     def __insert_texts(shape_info: dict, img: np.ndarray):
-        for shape_name, shape_info in shape_info.items():
-            shape_color = shape_info["Color BGR"]
+        for shape_name, shape_data in shape_info.items():
+            shape_color = shape_data["Color BGR"]
             for cnt, animal_data in bp_lk.items():
                 animal, animal_bp, _ = animal_data
                 animal_name = f"{animal} {animal_bp}"
