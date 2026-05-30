@@ -488,6 +488,43 @@ def check_that_column_exist(df: pd.DataFrame,
     return True
 
 
+def check_that_two_dfs_are_equal_len(df_1: pd.DataFrame,
+                                     df_2: pd.DataFrame,
+                                     file_path_1: str,
+                                     file_path_2: str,
+                                     col_name: Optional[str] = None,
+                                     raise_error: bool = True) -> Union[None, bool]:
+    """
+    Check that two dataframes (or series) contain the same number of rows.
+
+    Used when re-aligning per-frame data with its annotation/target
+    counterpart (e.g. :meth:`mufasa.pose_processors.reverse_pose` when
+    re-appending targets to feature files).
+
+    :param pd.DataFrame df_1: First dataframe/series.
+    :param pd.DataFrame df_2: Second dataframe/series.
+    :param str file_path_1: Path of ``df_1`` on disk (used for error messages).
+    :param str file_path_2: Path of ``df_2`` on disk (used for error messages).
+    :param Optional[str] col_name: Optional field name the comparison relates to (used for error messages).
+    :param bool raise_error: If True, raises CountError on a length mismatch. If False, returns False instead.
+    :return: True if equal length, False if not (when raise_error=False).
+    :rtype: Union[None, bool]
+    :raises CountError: The two inputs differ in length.
+
+    :example:
+    >>> check_that_two_dfs_are_equal_len(df_1=pd.Series([0, 1]), df_2=pd.Series([1, 0]), file_path_1='a.csv', file_path_2='b.csv')
+    True
+    """
+
+    if len(df_1) != len(df_2):
+        if raise_error:
+            field = f" for field {col_name}" if col_name is not None else ""
+            raise CountError(msg=f"The data in {file_path_1} ({len(df_1)} rows) and {file_path_2} ({len(df_2)} rows) are not of equal length{field}.", source=check_that_two_dfs_are_equal_len.__name__)
+        else:
+            return False
+    return True
+
+
 def check_if_valid_input(
     name: str, input: str, options: List[str], raise_error: bool = True
 ) -> (bool, str):
