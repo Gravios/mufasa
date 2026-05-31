@@ -1,12 +1,11 @@
 import json
 import os
 import random
-from typing import Union
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import cv2
 

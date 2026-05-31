@@ -1,17 +1,13 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
-import argparse
 import functools
-import multiprocessing
 import os
-import sys
 from copy import deepcopy
-from typing import List, Optional, Union
 
 try:
     from typing import Literal
 except ImportError:
-    from typing_extensions import Literal
+    pass
 
 import pandas as pd
 
@@ -23,7 +19,7 @@ from mufasa.utils.checks import (
 from mufasa.utils.data import detect_bouts, get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import NoChoosenMeasurementError
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
+from mufasa.utils.printing import (log_event, stdout_information,
                                   stdout_success)
 from mufasa.utils.read_write import (find_core_cnt,
                                     find_files_of_filetypes_in_directory,

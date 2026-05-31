@@ -45,7 +45,7 @@ import platform
 import tomllib
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any
 
 
 def _stringify(value: Any) -> str:

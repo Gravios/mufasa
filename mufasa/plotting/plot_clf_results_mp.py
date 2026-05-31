@@ -1,11 +1,8 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import functools
-import multiprocessing
 import os
-import platform
 from copy import deepcopy
-from typing import Dict, List, Optional, Tuple, Union
 
 try:
     from typing import Literal
@@ -39,8 +36,7 @@ from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     create_directory,
                                     find_all_videos_in_project, find_core_cnt,
                                     get_fn_ext, get_video_meta_data,
-                                    read_config_entry, read_df,
-                                    seconds_to_timestamp)
+                                    read_config_entry, seconds_to_timestamp)
 from mufasa.utils.warnings import FileExistWarning, FrameRangeWarning
 
 START_TIME, END_TIME = 'start_time', 'end_time'

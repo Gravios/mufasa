@@ -1,5 +1,4 @@
 import io
-from typing import Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -8,9 +7,9 @@ import plotly.express as px
 
 from mufasa.utils.checks import (check_float, check_instance, check_int,
                                 check_valid_dataframe)
-from mufasa.utils.data import create_color_palettes, detect_bouts
+from mufasa.utils.data import create_color_palettes
 from mufasa.utils.errors import InvalidInputError
-from mufasa.utils.read_write import read_df, seconds_to_timestamp
+from mufasa.utils.read_write import seconds_to_timestamp
 
 
 def gantt_plotly(bouts_df: pd.DataFrame,

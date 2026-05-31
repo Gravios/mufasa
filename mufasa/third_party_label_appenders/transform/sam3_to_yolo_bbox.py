@@ -13,14 +13,13 @@ To merge this project with others that share the same class names and task type,
 import os
 import random
 import time
-from typing import List, Optional, Tuple, Union
 
 import cv2
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 try:
@@ -28,7 +27,6 @@ try:
 except:
     SAM3SemanticPredictor = None
 
-import numpy as np
 
 from mufasa.third_party_label_appenders.converters import create_yolo_yaml
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,

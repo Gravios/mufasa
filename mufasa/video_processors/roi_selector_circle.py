@@ -1,5 +1,4 @@
 import os
-from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -10,7 +9,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable,
 from mufasa.utils.enums import Options
 from mufasa.utils.errors import InvalidFileTypeError
 from mufasa.utils.read_write import get_fn_ext, read_frm_of_video
-from mufasa.utils.warnings import CropWarning, ROIWarning
+from mufasa.utils.warnings import ROIWarning
 
 
 class ROISelectorCircle:

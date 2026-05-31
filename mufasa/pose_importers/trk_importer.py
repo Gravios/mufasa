@@ -1,10 +1,7 @@
 import glob
-import os
 
-import cv2
 import h5py
 import numpy as np
-import pandas as pd
 import scipy.io as sio
 
 from mufasa.mixins.config_reader import ConfigReader
@@ -12,9 +9,7 @@ from mufasa.utils.checks import (check_if_dir_exists,
                                 check_if_filepath_list_is_empty)
 from mufasa.utils.errors import CountError, NoFilesFoundError
 from mufasa.utils.read_write import (find_video_of_file, get_fn_ext,
-                                    get_video_meta_data, read_config_entry,
-                                    read_config_file)
-from mufasa.utils.warnings import InvalidValueWarning
+                                    read_config_entry)
 
 
 class TRKImporter(ConfigReader):

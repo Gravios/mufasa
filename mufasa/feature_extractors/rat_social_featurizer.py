@@ -12,7 +12,7 @@ from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.plotting.geometry_plotter import GeometryPlotter
 from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import find_core_cnt, get_fn_ext, read_df, write_df
+from mufasa.utils.read_write import get_fn_ext, read_df, write_df
 
 WHITE = 'white'
 BLACK = 'black'

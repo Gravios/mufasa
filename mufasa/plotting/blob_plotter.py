@@ -1,14 +1,13 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
-from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import functools
 import multiprocessing

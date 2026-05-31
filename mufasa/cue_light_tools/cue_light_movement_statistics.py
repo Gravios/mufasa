@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
-from typing import List, Optional, Union
 
 import pandas as pd
 
@@ -15,7 +14,7 @@ from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df)
+                                    read_df)
 
 
 class CueLightMovementAnalyzer(ConfigReader):

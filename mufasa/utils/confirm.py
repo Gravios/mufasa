@@ -76,7 +76,6 @@ Default behaviour (post-Stage-C)
 from __future__ import annotations
 
 import sys
-from typing import Optional
 
 
 def _default_confirm(question: str,

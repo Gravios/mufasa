@@ -1,14 +1,12 @@
 import os
 import re
 import shutil
-from typing import Union
 
 import pandas as pd
 
 from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.errors import InvalidFileTypeError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import read_df, write_df
 
 
 def convert_dlc_annotation_format(input_dir: str | os.PathLike,

@@ -3,7 +3,6 @@ import functools
 import multiprocessing
 import os
 from copy import copy
-from typing import Tuple, Union
 
 import cv2
 import numpy as np

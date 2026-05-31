@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 from tkinter import *
-from typing import Tuple
 
 import cv2
 from PIL import Image, ImageTk

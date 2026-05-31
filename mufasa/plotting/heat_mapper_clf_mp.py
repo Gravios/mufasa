@@ -1,11 +1,8 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import functools
-import multiprocessing
 import os
-import platform
 from copy import deepcopy
-from typing import Dict, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -30,8 +27,7 @@ from mufasa.utils.lookups import get_named_colors
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     find_core_cnt, find_video_of_file,
-                                    get_fn_ext, get_video_meta_data, read_df,
-                                    read_frm_of_video, remove_a_folder,
+                                    get_fn_ext, get_video_meta_data, read_frm_of_video, remove_a_folder,
                                     seconds_to_timestamp)
 
 START_TIME = 'start_time'

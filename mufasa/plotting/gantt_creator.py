@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import os
 import shutil
 from copy import deepcopy
-from typing import List, Optional, Union
 
 import cv2
 import numpy as np
@@ -19,7 +18,7 @@ from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import NoSpecifiedOutputError
 from mufasa.utils.lookups import get_fonts, get_named_colors
 from mufasa.utils.printing import stdout_information, stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df, seconds_to_timestamp
+from mufasa.utils.read_write import get_fn_ext, seconds_to_timestamp
 
 STYLE_WIDTH = 'width'
 STYLE_HEIGHT = 'height'

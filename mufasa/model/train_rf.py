@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import ast
 import os
-from typing import Optional, Union
 
 import pandas as pd
 from sklearn.model_selection import train_test_split

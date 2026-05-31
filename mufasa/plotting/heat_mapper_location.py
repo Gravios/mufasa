@@ -2,12 +2,10 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 import shutil
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import cv2
 import numpy as np
-import pandas as pd
-from numba import jit, prange
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
@@ -15,7 +13,7 @@ from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
     check_file_exist_and_readable, check_float, check_if_keys_exist_in_dict,
-    check_int, check_that_column_exist, check_valid_lst)
+    check_that_column_exist, check_valid_lst)
 from mufasa.utils.enums import Formats, TagNames
 from mufasa.utils.errors import NoSpecifiedOutputError
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success

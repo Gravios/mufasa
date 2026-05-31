@@ -1,25 +1,19 @@
 __author__ = "Simon Nilsson / Florian Duclot"
 
-import glob
 import os
 from copy import deepcopy
-from typing import Union
 
-import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.third_party_label_appenders.tools import (
-    is_new_boris_version, read_boris_annotation_files)
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_filepath_list_is_empty)
+    read_boris_annotation_files)
+from mufasa.utils.checks import (check_if_dir_exists)
 from mufasa.utils.errors import (NoDataError,
-                                ThirdPartyAnnotationEventCountError,
                                 ThirdPartyAnnotationOverlapError)
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, write_df)
+                                    get_fn_ext, read_df)
 from mufasa.utils.warnings import (
-    ThirdPartyAnnotationsInvalidFileFormatWarning,
     ThirdPartyAnnotationsOutsidePoseEstimationDataWarning)
 
 BEHAVIOR = 'BEHAVIOR'

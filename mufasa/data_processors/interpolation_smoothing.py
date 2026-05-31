@@ -3,7 +3,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import glob
 import os
 import shutil
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd

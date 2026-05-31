@@ -4,7 +4,7 @@ import itertools
 import json
 import os
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import h5py
 import numpy as np

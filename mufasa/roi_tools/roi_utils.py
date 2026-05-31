@@ -5,7 +5,7 @@ import os
 import warnings
 from copy import copy, deepcopy
 from tkinter import *
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from mufasa.roi_tools.interactive_roi_bufferer import InteractiveROIBufferer
@@ -21,8 +21,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_int,
                                 check_str, check_valid_array,
                                 check_valid_dataframe, check_valid_tuple,
                                 check_video_and_data_frm_count_align)
-from mufasa.utils.enums import (ROI_SETTINGS, ConfigKey, Formats, Keys, Options,
-                               Paths)
+from mufasa.utils.enums import (ROI_SETTINGS, ConfigKey, Formats, Keys, Options)
 from mufasa.utils.errors import (InvalidInputError, NoROIDataError,
                                 NotDirectoryError)
 from mufasa.utils.printing import stdout_success, stdout_trash

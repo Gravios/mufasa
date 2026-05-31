@@ -4,12 +4,10 @@ import math
 import os
 from collections import defaultdict
 from copy import deepcopy
-from typing import Union
 
 import numpy as np
 import pandas as pd
 import scipy
-from scipy.spatial import ConvexHull
 
 from mufasa.feature_extractors.perimeter_jit import jitted_hull
 from mufasa.mixins.config_reader import ConfigReader

@@ -1,7 +1,6 @@
 import argparse
 import os
 from itertools import groupby
-from typing import Optional, Union
 
 import numpy as np
 import pandas as pd

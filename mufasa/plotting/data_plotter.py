@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np

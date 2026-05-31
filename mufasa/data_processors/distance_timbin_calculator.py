@@ -1,6 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import os
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,7 @@ from mufasa.utils.checks import (
     check_instance, check_str, check_that_column_exist, check_valid_boolean,
     check_valid_lst, check_valid_tuple)
 from mufasa.utils.errors import FrameRangeError, InvalidInputError, NoDataError
-from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
+from mufasa.utils.printing import stdout_information, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     find_time_stamp_from_frame_numbers,
                                     get_fn_ext, read_df)

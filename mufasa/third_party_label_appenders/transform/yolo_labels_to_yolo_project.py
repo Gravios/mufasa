@@ -1,13 +1,12 @@
 import os
 import random
-from typing import Tuple, Union
 
 from mufasa.third_party_label_appenders.converters import create_yolo_yaml
 from mufasa.utils.checks import (check_float, check_if_dir_exists,
                                 check_valid_boolean, check_valid_tuple)
 from mufasa.utils.enums import Options
 from mufasa.utils.errors import InvalidInputError
-from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
+from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (copy_files_to_directory, create_directory,
                                     find_files_of_filetypes_in_directory,
                                     recursive_file_search)

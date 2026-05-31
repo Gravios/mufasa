@@ -7,7 +7,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import os
 import warnings
 from copy import deepcopy
-from typing import Optional, Union
 
 import cv2
 import matplotlib.pyplot as plt

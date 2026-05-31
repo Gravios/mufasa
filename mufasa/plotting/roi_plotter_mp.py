@@ -2,11 +2,8 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import functools
 import itertools
-import multiprocessing
 import os
-import platform
 import shutil
-from typing import Dict, List, Optional, Tuple, Union
 
 try:
     from typing import Literal
@@ -39,8 +36,7 @@ from mufasa.utils.errors import (BodypartColumnNotFoundError, DuplicationError,
                                 ROICoordinatesNotFoundError)
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt, get_current_time,
-                                    get_video_meta_data, read_df,
+                                    find_core_cnt, get_video_meta_data, read_df,
                                     seconds_to_timestamp)
 from mufasa.utils.warnings import (DuplicateNamesWarning, FrameRangeWarning,
                                   GPUToolsWarning)

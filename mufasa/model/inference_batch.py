@@ -4,7 +4,6 @@ import argparse
 import os
 import sys
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
 
 import numpy as np
 
@@ -20,7 +19,7 @@ from mufasa.utils.errors import InvalidInputError, NoFilesFoundError
 from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
                                   stdout_success)
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, write_df)
+                                    get_fn_ext)
 from mufasa.utils.warnings import NoFileFoundWarning
 # Patch 122ae-5b: layout-aware discovery + read so v1
 # projects (where features live under derived/features/)

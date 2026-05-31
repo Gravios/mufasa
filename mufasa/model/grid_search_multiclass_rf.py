@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import ast
 import os
 from itertools import product
-from typing import Union
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier

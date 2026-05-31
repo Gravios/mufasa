@@ -1,14 +1,12 @@
 import os
-from typing import Optional, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.pyplot import cm, figure
+from matplotlib.pyplot import figure
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import read_df
 
 
 class CircularPlotting(PlottingMixin):

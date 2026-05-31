@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import itertools
 import os
 from datetime import datetime
-from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np

@@ -1,11 +1,7 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import functools
-import multiprocessing
 import os
-import platform
-from copy import deepcopy
-from typing import Dict, List, Optional, Tuple, Union
 
 try:
     from typing import Literal

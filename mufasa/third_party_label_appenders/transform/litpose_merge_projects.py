@@ -2,7 +2,7 @@ import datetime
 import glob
 import os
 import shutil
-from typing import Dict, List, Literal, Tuple, Union
+from typing import Literal
 
 import cv2
 import pandas as pd

@@ -1,10 +1,7 @@
 #### MODIFIED FROM @Toshea111 - https://github.com/Toshea111/sleap/blob/develop/docs/notebooks/Convert_HDF5_to_CSV_updated.ipynb
-import io
 import os
-from typing import Any, Dict, List, Union
+from typing import Any
 
-import h5py
-import pandas as pd
 
 from mufasa.data_processors.interpolate import Interpolate
 from mufasa.data_processors.smoothing import Smoothing
@@ -16,8 +13,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_str, check_valid_lst)
 from mufasa.utils.enums import Methods, TagNames
 from mufasa.utils.errors import BodypartColumnNotFoundError
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_success,
-                                  stdout_warning)
+from mufasa.utils.printing import (SimbaTimer, log_event, stdout_success)
 from mufasa.utils.read_write import (clean_sleap_file_name,
                                     find_all_videos_in_project, get_fn_ext,
                                     get_video_meta_data, read_sleap_h5,

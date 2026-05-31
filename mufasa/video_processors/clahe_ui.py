@@ -1,7 +1,6 @@
 import os
 import threading
 import time
-from typing import Tuple, Union
 
 import cv2
 import numpy as np

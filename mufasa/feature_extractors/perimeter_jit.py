@@ -1,5 +1,4 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
-from typing import Optional
 
 import numpy as np
 from numba import jit, njit, prange

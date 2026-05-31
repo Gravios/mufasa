@@ -2,7 +2,6 @@ import functools
 import multiprocessing
 import os
 import shutil
-from typing import Dict, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -20,7 +19,7 @@ from mufasa.utils.errors import AnimalNumberError, InvalidInputError
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     find_core_cnt, find_video_of_file,
-                                    get_video_meta_data, read_frm_of_video)
+                                    get_video_meta_data)
 
 ALTERNATION_COLOR = (0, 255, 0)
 ERROR_COLOR = (0, 0, 255)

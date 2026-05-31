@@ -5,7 +5,6 @@ from contextlib import redirect_stderr, redirect_stdout
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 import argparse
-from typing import Optional, Union
 
 try:
     from typing import Literal

@@ -1,15 +1,12 @@
-import argparse
 import multiprocessing
 import os
-import sys
-from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
 
 from mufasa.data_processors.find_animal_blob_location import (
     get_blob_vertices_from_video, get_left_right_points,
-    get_nose_tail_from_vertices, stabilize_body_parts)
+    get_nose_tail_from_vertices)
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.utils.checks import (check_if_dir_exists, check_instance, check_int,
                                 check_nvidea_gpu_available, check_valid_dict)

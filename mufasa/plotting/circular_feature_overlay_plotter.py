@@ -1,5 +1,4 @@
 import os
-from typing import Union
 
 import cv2
 import numpy as np
@@ -12,7 +11,6 @@ from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_int)
 from mufasa.utils.enums import Formats, TextOptions
-from mufasa.utils.lookups import integer_to_cardinality_lookup
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import (find_video_of_file, get_fn_ext,
                                     get_video_meta_data, read_df)

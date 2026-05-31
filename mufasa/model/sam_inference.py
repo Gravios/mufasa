@@ -3,7 +3,6 @@ import os
 import pandas as pd
 
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
-from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -22,7 +21,7 @@ from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import (InvalidInputError, MufasaGPUError,
                                 MufasaPackageVersionError)
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data, write_df)
+                                    get_fn_ext, get_video_meta_data)
 
 
 class SamInference:

@@ -1,13 +1,8 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import functools
-import glob
-import itertools
 import multiprocessing
 import os
-import platform
-import time
-from typing import Dict, List, Optional, Union
 
 import cv2
 import numpy as np
@@ -17,8 +12,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.statistics_mixin import Statistics
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log, check_if_dir_exists,
-    check_if_valid_img, check_int, check_nvidea_gpu_available,
-    check_valid_boolean, check_valid_lst)
+    check_if_valid_img, check_int, check_valid_boolean, check_valid_lst)
 from mufasa.utils.data import detect_bouts, slice_roi_dict_from_attribute
 from mufasa.utils.enums import Defaults, Keys
 from mufasa.utils.errors import NoROIDataError

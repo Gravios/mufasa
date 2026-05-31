@@ -8,7 +8,6 @@ except:
 import logging
 import time
 from datetime import datetime
-from typing import Optional
 
 from mufasa.utils.enums import Defaults, TagNames
 

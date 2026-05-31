@@ -1,7 +1,4 @@
 import os
-import time
-from copy import deepcopy
-from typing import Dict, Optional, Union
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -13,7 +10,6 @@ try:
 except:
     from sklearn.ensemble import RandomForestClassifier as cuRF
 
-from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists, check_int,
                                 check_valid_array, check_valid_boolean,

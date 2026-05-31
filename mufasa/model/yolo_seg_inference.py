@@ -6,7 +6,6 @@ try:
 except:
     from typing_extensions import Literal
 
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd

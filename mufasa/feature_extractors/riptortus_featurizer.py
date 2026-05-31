@@ -6,11 +6,10 @@ import math
 import os
 import sys
 from itertools import combinations
-from typing import Union
 
 import numpy as np
 import pandas as pd
-from numba import cuda, jit, prange
+from numba import jit, prange
 from numba.typed import List
 from scipy import stats
 from scipy.signal import find_peaks

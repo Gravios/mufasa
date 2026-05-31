@@ -4,7 +4,7 @@ import functools
 import os
 import warnings
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 warnings.filterwarnings("ignore", message=".*global colormaps dictionary.*")
 import cv2
@@ -31,7 +31,7 @@ from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     create_directory, find_core_cnt,
                                     find_video_of_file, get_current_time,
-                                    get_fn_ext, read_df, read_frm_of_video)
+                                    get_fn_ext, read_frm_of_video)
 from mufasa.utils.warnings import ROIWarning
 
 STYLE_WIDTH = "width"

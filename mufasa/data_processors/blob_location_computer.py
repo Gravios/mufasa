@@ -1,27 +1,22 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
-from copy import copy, deepcopy
-from typing import Dict, Optional, Union
+from copy import deepcopy
 
-import cv2
 import numpy as np
-from shapely.affinity import scale
-from shapely.geometry import MultiPolygon, Polygon
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import pandas as pd
 
-from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.image_mixin import ImageMixin
-from mufasa.utils.checks import (check_float, check_if_dir_exists,
-                                check_instance, check_int,
+from mufasa.utils.checks import (check_if_dir_exists,
+                                check_int,
                                 check_nvidea_gpu_available, check_str,
-                                check_valid_boolean, is_img_bw)
+                                check_valid_boolean)
 from mufasa.utils.data import df_smoother, savgol_smoother
 from mufasa.utils.enums import Formats, Methods, Options
 from mufasa.utils.errors import FFMPEGCodecGPUError, InvalidInputError

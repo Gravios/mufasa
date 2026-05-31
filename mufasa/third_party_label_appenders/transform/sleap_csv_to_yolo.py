@@ -1,14 +1,13 @@
 import os
 import random
-from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import cv2
 

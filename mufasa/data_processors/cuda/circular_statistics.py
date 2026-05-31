@@ -1,12 +1,11 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
-from typing import Optional, Tuple
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import numpy as np
 from numba import cuda, int32

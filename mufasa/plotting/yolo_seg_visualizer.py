@@ -1,7 +1,5 @@
 import functools
-import multiprocessing
 import os
-from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -10,12 +8,11 @@ import pandas as pd
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_if_dir_exists, check_if_valid_rgb_tuple,
                                 check_int, check_str, check_valid_boolean,
-                                check_valid_dataframe, check_valid_lst,
-                                check_valid_tuple)
-from mufasa.utils.data import (create_color_palette, get_cpu_pool,
+                                check_valid_dataframe)
+from mufasa.utils.data import (get_cpu_pool,
                               terminate_cpu_pool)
-from mufasa.utils.enums import Defaults, Options
-from mufasa.utils.errors import CountError, DataHeaderError, FrameRangeError
+from mufasa.utils.enums import Options
+from mufasa.utils.errors import CountError, FrameRangeError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     create_directory, find_core_cnt,

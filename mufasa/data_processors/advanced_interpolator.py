@@ -2,7 +2,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_str, check_that_column_exist,
                                 check_valid_boolean)
 from mufasa.utils.data import detect_bouts
-from mufasa.utils.enums import Formats, Options
+from mufasa.utils.enums import Formats
 from mufasa.utils.errors import DataHeaderError, InvalidInputError
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (copy_files_to_directory,

@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import platform
-from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -16,7 +15,6 @@ import os
 from collections import ChainMap
 
 import cv2
-import pandas as pd
 from numba import float64, int64, jit, njit, prange, uint8
 from PIL import Image, ImageDraw, ImageFont
 from shapely.geometry import Polygon

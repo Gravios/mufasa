@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import itertools
 import os
-from typing import Optional
 
 import numpy as np
 import shapely.wkt

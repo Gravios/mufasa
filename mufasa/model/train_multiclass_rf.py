@@ -1,8 +1,6 @@
 import ast
-import json
 import os
 from itertools import product
-from typing import Dict, Union
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -11,8 +9,7 @@ from sklearn.model_selection import train_test_split
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.utils.checks import (check_if_filepath_list_is_empty,
-                                check_if_list_contains_values,
-                                check_if_valid_input)
+                                check_if_list_contains_values)
 from mufasa.utils.enums import (ConfigKey, Dtypes, Formats, Methods,
                                MLParamKeys, Options, TagNames)
 from mufasa.utils.errors import SamplingError

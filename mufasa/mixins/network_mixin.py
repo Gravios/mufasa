@@ -1,6 +1,5 @@
 import itertools
 import os
-from typing import Dict, List, Optional, Tuple, Union
 
 try:
     from typing import Literal
@@ -17,7 +16,7 @@ from mufasa.utils.checks import (check_float, check_if_dir_exists,
                                 check_iterable_length, check_str,
                                 check_valid_array, check_valid_hex_color,
                                 check_valid_lst, check_valid_tuple)
-from mufasa.utils.data import create_color_palette, find_ranked_colors, get_mode
+from mufasa.utils.data import create_color_palette, get_mode
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import CountError, InvalidInputError
 

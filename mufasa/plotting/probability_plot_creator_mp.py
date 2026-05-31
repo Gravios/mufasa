@@ -3,10 +3,8 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import functools
 import multiprocessing
 import os
-import platform
 import shutil
 from copy import deepcopy
-from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -23,7 +21,7 @@ from mufasa.utils.errors import NoSpecifiedOutputError
 from mufasa.utils.lookups import get_color_dict
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt, get_fn_ext, read_df)
+                                    find_core_cnt, get_fn_ext)
 
 STYLE_WIDTH = 'width'
 STYLE_HEIGHT = 'height'

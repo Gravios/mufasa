@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -15,9 +14,7 @@ from mufasa.utils.errors import (DataHeaderError, DuplicationError,
                                 InvalidFileTypeError, InvalidInputError)
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (get_fn_ext,
-                                    get_number_of_header_columns_in_df,
-                                    get_video_meta_data, read_config_file,
-                                    read_df)
+                                    get_video_meta_data)
 
 H5 = ".h5"
 CSV = ".csv"

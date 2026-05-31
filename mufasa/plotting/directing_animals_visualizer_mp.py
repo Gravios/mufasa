@@ -1,10 +1,8 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import functools
-import multiprocessing
 import os
-import platform
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 
 import cv2
 import numpy as np
@@ -24,7 +22,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
 from mufasa.utils.data import (create_color_palettes,
                               find_frame_numbers_from_time_stamp, get_cpu_pool,
                               terminate_cpu_pool)
-from mufasa.utils.enums import OS, Formats, Keys, TextOptions
+from mufasa.utils.enums import Formats, Keys, TextOptions
 from mufasa.utils.errors import (AnimalNumberError, InvalidInputError,
                                 NoFilesFoundError)
 from mufasa.utils.printing import stdout_information, stdout_success

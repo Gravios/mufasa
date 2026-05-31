@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -20,7 +19,7 @@ from mufasa.utils.errors import (BodypartColumnNotFoundError, CountError,
                                 NoFilesFoundError, ROICoordinatesNotFoundError)
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_data_paths, read_df,
+                                    get_fn_ext, read_df,
                                     write_df)
 from mufasa.utils.warnings import DuplicateNamesWarning, ROIWarning
 # Patch 122ae-5b: layout-aware feature reader for the append

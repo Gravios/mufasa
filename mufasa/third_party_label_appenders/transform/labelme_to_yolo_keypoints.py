@@ -1,6 +1,5 @@
 import os
 import random
-from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np

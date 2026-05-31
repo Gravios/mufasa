@@ -1,15 +1,13 @@
 import itertools
-import json
 import os
 from datetime import datetime
-from typing import Optional, Union
 
 import pandas as pd
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import cv2
 

@@ -1,6 +1,5 @@
 import os
 from copy import deepcopy
-from typing import Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -13,7 +12,7 @@ from mufasa.utils.checks import (
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import NoDataError
-from mufasa.utils.printing import SimbaTimer, stdout_success
+from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_fn_ext, read_df, read_video_info,
                                     str_2_bool)

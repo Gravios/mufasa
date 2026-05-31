@@ -1,5 +1,4 @@
 import os
-from typing import List, Optional, Tuple, Union
 
 try:
     from typing import Literal
@@ -27,7 +26,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
 from mufasa.utils.enums import Options
 from mufasa.utils.errors import (CountError, InvalidFilepathError,
                                 InvalidFileTypeError, MufasaGPUError)
-from mufasa.utils.printing import SimbaTimer, stdout_success
+from mufasa.utils.printing import SimbaTimer
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_pkg_version, get_video_meta_data,
                                     recursive_file_search)

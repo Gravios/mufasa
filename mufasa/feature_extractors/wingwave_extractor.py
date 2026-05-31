@@ -2,7 +2,6 @@ import argparse
 import os
 import sys
 from copy import deepcopy
-from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -14,9 +13,7 @@ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.mixins.statistics_mixin import Statistics
 from mufasa.mixins.timeseries_features_mixin import TimeseriesFeatureMixin
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_instance,
-    check_valid_array, check_valid_dataframe)
-from mufasa.utils.enums import Formats
+    check_all_file_names_are_represented_in_video_log)
 from mufasa.utils.printing import stdout_information, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     read_df, read_video_info, write_df)

@@ -1,6 +1,4 @@
 import math
-import time
-from typing import Tuple
 
 import numpy as np
 from numba import cuda
@@ -11,7 +9,6 @@ from mufasa.data_processors.cuda.utils import (_cuda_2d_transpose, _cuda_add_2d,
 from mufasa.utils.checks import check_int, check_valid_array
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import InvalidInputError
-from mufasa.utils.read_write import read_df
 
 THREADS_PER_BLOCK = 1024
 

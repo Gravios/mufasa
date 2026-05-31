@@ -1,22 +1,19 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
-import glob
 import os
-from typing import List, Optional, Union
 
 import pandas as pd
 
-from mufasa.cue_light_tools.cue_light_tools import find_frames_when_cue_light_on
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log, check_if_dir_exists,
-    check_int, check_that_column_exist, check_valid_dataframe, check_valid_lst)
+    check_int, check_valid_dataframe, check_valid_lst)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats
-from mufasa.utils.errors import NoDataError, NoFilesFoundError
+from mufasa.utils.errors import NoDataError
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_config_entry, read_df)
+                                    read_df)
 
 
 class CueLightClfAnalyzer(ConfigReader):

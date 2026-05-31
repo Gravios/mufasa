@@ -3,15 +3,14 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import os
 from collections import defaultdict
 from copy import deepcopy
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (
@@ -23,7 +22,7 @@ from mufasa.utils.errors import NoDataError
 from mufasa.utils.printing import stdout_information, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     find_time_stamp_from_frame_numbers,
-                                    get_fn_ext, read_df)
+                                    get_fn_ext)
 
 FIRST_OCCURRENCE = "First occurrence (s)"
 EVENT_COUNT = "Event count"

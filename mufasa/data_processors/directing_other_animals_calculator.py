@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import itertools
 import os
 from copy import deepcopy
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd

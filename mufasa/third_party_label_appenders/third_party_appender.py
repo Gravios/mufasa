@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import Dict, Optional, Union
 
 try:
     from typing import Literal
@@ -27,7 +26,7 @@ from mufasa.utils.errors import (
     ThirdPartyAnnotationsOutsidePoseEstimationDataError)
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, write_df)
+                                    get_fn_ext, read_df)
 from mufasa.utils.warnings import (
     ThirdPartyAnnotationEventCountWarning,
     ThirdPartyAnnotationFileNotFoundWarning,

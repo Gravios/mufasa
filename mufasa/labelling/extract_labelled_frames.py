@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os.path
-from typing import Dict, List, Optional, Union
 
 try:
     from typing import Literal
@@ -11,12 +10,10 @@ except:
 import cv2
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_if_df_field_is_boolean, check_str,
-                                check_that_column_exist, check_valid_boolean,
+                                check_valid_boolean,
                                 check_valid_lst)
-from mufasa.utils.data import detect_bouts
 from mufasa.utils.printing import stdout_information, stdout_success
 from mufasa.utils.read_write import (check_valid_dataframe, create_directory,
                                     find_video_of_file, get_fn_ext,

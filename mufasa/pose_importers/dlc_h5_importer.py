@@ -36,7 +36,7 @@ from __future__ import annotations
 __author__ = "Gravio"
 
 import os
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -49,7 +49,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable,
                                  check_if_dir_exists,
                                  check_if_keys_exist_in_dict, check_int,
                                  check_str)
-from mufasa.utils.enums import Formats, Methods
+from mufasa.utils.enums import Methods
 from mufasa.utils.errors import BodypartColumnNotFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (find_all_videos_in_project, get_fn_ext,

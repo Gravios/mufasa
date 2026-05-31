@@ -1,10 +1,7 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
-import glob
 import os
-import shutil
 from copy import deepcopy
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -12,7 +9,7 @@ import pandas as pd
 from mufasa.data_processors.pybursts_calculator import kleinberg_burst_detection
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (check_float, check_if_dir_exists,
-                                check_if_filepath_list_is_empty, check_int,
+                                check_int,
                                 check_that_column_exist, check_valid_boolean,
                                 check_valid_lst)
 from mufasa.utils.enums import Paths, TagNames

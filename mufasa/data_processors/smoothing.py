@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import List, Optional, Union
 
 import pandas as pd
 

@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import Dict, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -23,8 +22,7 @@ from mufasa.utils.errors import (InvalidInputError, NoDataError,
                                 NoSpecifiedOutputError)
 from mufasa.utils.printing import log_event, stdout_success
 from mufasa.utils.read_write import (find_all_videos_in_project, get_fn_ext,
-                                    get_video_meta_data, read_config_entry,
-                                    read_df)
+                                    get_video_meta_data, read_config_entry)
 from mufasa.utils.warnings import FrameRangeWarning
 
 CIRCLE_SCALE = 'circle_scale'

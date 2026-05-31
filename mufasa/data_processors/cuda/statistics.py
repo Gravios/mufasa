@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
 from itertools import combinations
-from typing import Optional, Tuple, Union
 
 from mufasa.utils.printing import SimbaTimer
 
@@ -16,7 +15,7 @@ import numpy as np
 from numba import cuda
 from scipy.spatial import ConvexHull
 
-from mufasa.utils.read_write import get_unique_values_in_iterable, read_df
+from mufasa.utils.read_write import get_unique_values_in_iterable
 from mufasa.utils.warnings import GPUToolsWarning
 
 try:

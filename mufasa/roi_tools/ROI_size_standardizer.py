@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
 import os
-from typing import Union
 
 import numpy as np
 import pandas as pd

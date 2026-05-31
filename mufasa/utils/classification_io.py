@@ -61,15 +61,11 @@ Classification migration:
 """
 from __future__ import annotations
 
-import os
-import warnings
 from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 
-from mufasa.project_layout import (project_metadata_from_config,
-                                   project_paths_from_config)
+from mufasa.project_layout import (project_paths_from_config)
 
 
 __all__ = [

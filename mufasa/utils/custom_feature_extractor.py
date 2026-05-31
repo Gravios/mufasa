@@ -5,7 +5,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional, Union
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (check_file_exist_and_readable,

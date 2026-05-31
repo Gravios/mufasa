@@ -5,7 +5,6 @@ import shutil
 import tempfile
 import time
 from multiprocessing import current_process
-from typing import List, Optional, Tuple, Union
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 

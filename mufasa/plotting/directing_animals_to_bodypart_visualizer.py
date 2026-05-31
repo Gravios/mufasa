@@ -16,7 +16,6 @@ from mufasa.utils.enums import Formats
 from mufasa.utils.lookups import get_color_dict
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext, get_video_meta_data, read_df
-from mufasa.utils.warnings import NoDataFoundWarning
 
 
 class DirectingAnimalsToBodyPartVisualizer(ConfigReader, PlottingMixin):

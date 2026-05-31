@@ -1,7 +1,6 @@
 import os
 import random
 from copy import copy
-from typing import Optional, Union
 
 import cv2
 import numpy as np

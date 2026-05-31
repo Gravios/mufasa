@@ -2,10 +2,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 
 import math
-import multiprocessing as mp
 import os
-import time
-from typing import Optional, Tuple, Union
 
 try:
     from typing import Literal
@@ -18,7 +15,6 @@ except:
     import numpy as cp
     from scipy.ndimage import rotate
 
-import platform
 import warnings
 from copy import deepcopy
 
@@ -42,7 +38,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 is_video_color)
 from mufasa.utils.data import (create_color_palette,
                               find_frame_numbers_from_time_stamp)
-from mufasa.utils.enums import OS, Formats
+from mufasa.utils.enums import Formats
 from mufasa.utils.errors import (FFMPEGCodecGPUError, FrameRangeError,
                                 InvalidInputError, MufasaGPUError)
 from mufasa.utils.lookups import get_current_time
@@ -50,8 +46,8 @@ from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (
     check_if_hhmmss_timestamp_is_valid_part_of_video,
     concatenate_videos_in_folder, create_directory, get_fn_ext,
-    get_memory_usage_array, get_video_meta_data, read_df, read_img,
-    read_img_batch_from_video, read_img_batch_from_video_gpu)
+    get_video_meta_data, read_df, read_img,
+    read_img_batch_from_video_gpu)
 from mufasa.video_processors.async_frame_reader import (AsyncVideoFrameReader,
                                                        get_async_frame_batch)
 

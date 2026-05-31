@@ -1,6 +1,5 @@
 import glob
 import os
-from typing import Tuple, Union
 
 import pandas as pd
 

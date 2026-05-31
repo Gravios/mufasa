@@ -55,7 +55,7 @@ from sklearn import tree
 
 import functools
 import multiprocessing
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import matplotlib.pyplot as plt
 
@@ -70,7 +70,7 @@ from mufasa.plotting.shap_agg_stats_visualizer import \
 from mufasa.utils.confirm import confirm_two_option
 from mufasa.utils.checks import (check_all_dfs_in_list_has_same_cols,
                                 check_file_exist_and_readable,
-                                check_filepaths_in_iterable_exist, check_float,
+                                check_float,
                                 check_if_dir_exists, check_if_valid_input,
                                 check_instance, check_int, check_str,
                                 check_that_column_exist, check_valid_array,
@@ -87,8 +87,7 @@ from mufasa.utils.errors import (ClassifierInferenceError, CorruptedFileError,
                                 SamplingError, MufasaModuleNotFoundError)
 from mufasa.utils.lookups import get_meta_data_file_headers, get_table
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (find_core_cnt, get_current_time,
-                                    get_fn_ext, get_memory_usage_of_df,
+from mufasa.utils.read_write import (find_core_cnt, get_fn_ext, get_memory_usage_of_df,
                                     get_pkg_version, read_config_entry,
                                     read_df, read_meta_file, str_2_bool)
 from mufasa.utils.warnings import (GPUToolsWarning, MissingUserInputWarning,

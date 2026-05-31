@@ -1,14 +1,13 @@
 import itertools
 import os
 from copy import deepcopy
-from typing import Optional, Union
 
 from shapely.ops import linemerge
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import numpy as np
 import pandas as pd

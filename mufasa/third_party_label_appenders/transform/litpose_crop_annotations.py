@@ -2,7 +2,6 @@ import glob
 import os
 import random
 import shutil
-from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -123,7 +122,6 @@ class CropLPAnnotations:
         return p
 
     def _update_config_paths(self, lp_project_dir: str, save_dir: str):
-        import re
         yaml_files = glob.glob(os.path.join(save_dir, "**", "*.yaml"), recursive=True)
         yaml_files += glob.glob(os.path.join(save_dir, "**", "*.yml"), recursive=True)
         if len(yaml_files) == 0:

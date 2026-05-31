@@ -7,7 +7,7 @@ import multiprocessing
 import os
 import platform
 from copy import deepcopy
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Iterable
 
 import cv2
 import imutils
@@ -47,8 +47,7 @@ from mufasa.utils.enums import Defaults, Formats, GeometryEnum, Options
 from mufasa.utils.errors import CountError, InvalidInputError
 from mufasa.utils.printing import stdout_information
 from mufasa.utils.read_write import (SimbaTimer, find_core_cnt,
-                                    find_max_vertices_coordinates, read_df,
-                                    read_frm_of_video, read_sleap_csv,
+                                    find_max_vertices_coordinates, read_frm_of_video, read_sleap_csv,
                                     stdout_success, write_pickle)
 
 

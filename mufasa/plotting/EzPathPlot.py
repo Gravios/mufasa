@@ -2,7 +2,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
-from typing import List, Optional, Tuple, Union
 
 try:
     from typing import Literal

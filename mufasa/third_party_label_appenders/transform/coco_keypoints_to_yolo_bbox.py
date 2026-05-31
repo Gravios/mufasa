@@ -3,30 +3,25 @@ import os
 import random
 import sys
 from copy import copy
-from typing import Optional, Tuple, Union
 
-import yaml
 from shapely.geometry import Polygon
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import cv2
 import numpy as np
 
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.third_party_label_appenders.converters import create_yolo_yaml
-from mufasa.third_party_label_appenders.transform.utils import \
-    create_yolo_keypoint_yaml
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_if_dir_exists,
                                 check_if_keys_exist_in_dict,
-                                check_valid_boolean, check_valid_tuple)
+                                check_valid_boolean)
 from mufasa.utils.enums import Options
-from mufasa.utils.errors import (FaultyTrainingSetError, InvalidInputError,
-                                NoFilesFoundError)
+from mufasa.utils.errors import (FaultyTrainingSetError, NoFilesFoundError)
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (create_directory, get_fn_ext, read_img,
                                     read_json, recursive_file_search)

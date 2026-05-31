@@ -22,8 +22,7 @@ try:
 except:
     from typing_extensions import Literal
 
-import typing
-from typing import Optional, Tuple, Union, get_type_hints
+from typing import get_type_hints
 
 from mufasa.mixins.statistics_mixin import Statistics
 from mufasa.utils.checks import (check_float, check_instance, check_int,
