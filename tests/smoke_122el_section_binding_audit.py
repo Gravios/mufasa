@@ -43,7 +43,7 @@ mufasa/ui_qt/pages/, with 5 binding-fixes and 3 unbound markers:
    (not ``add_section``) for the ROI definitions panel →
    smoke test now recognizes BOTH call shapes.
 6. ``features_subject``: no form exists; Features page only
-   has "Compute feature subsets" → MARKED unbound.
+   has "Compute Features" → MARKED unbound.
 7. ``features_roi``: ROI features form is on the ROI page
    (not Features), registered as "Features" → page +
    title FIXED.

@@ -19,7 +19,7 @@ from mufasa.ui_qt.workbench import WorkflowPage
 def build_features_page(workbench,
                         config_path: str | None = None) -> WorkflowPage:
     page = workbench.add_page("Features", icon_name="features")
-    page.add_section("Compute feature subsets",
+    page.add_section("Compute Features",
                      [(FeatureSubsetExtractorForm, {})])
     return page
 
