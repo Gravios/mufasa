@@ -345,7 +345,7 @@ class TrainMultiClassRandomForestClassifier(ConfigReader, TrainModelMixin):
             source=self.__class__.__name__,
         )
         stdout_success(
-            msg=f"Evaluation files are in models/generated_models/model_evaluations folders",
+            msg="Evaluation files are in models/generated_models/model_evaluations folders",
             source=self.__class__.__name__,
         )
 

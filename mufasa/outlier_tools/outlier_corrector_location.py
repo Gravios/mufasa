@@ -78,8 +78,8 @@ class OutlierCorrecterLocation(ConfigReader, FeatureExtractionMixin):
 
             for animal_name in self.animal_bp_dict.keys():
                 self.outlier_bp_dict[animal_name] = {}
-                self.outlier_bp_dict[animal_name]["bp_1"] = read_config_entry(self.config, ConfigKey.OUTLIER_SETTINGS.value, "location_bodypart1_{}".format(animal_name.lower()),"str")
-                self.outlier_bp_dict[animal_name]["bp_2"] = read_config_entry(self.config, ConfigKey.OUTLIER_SETTINGS.value, "location_bodypart2_{}".format(animal_name.lower()),"str")
+                self.outlier_bp_dict[animal_name]["bp_1"] = read_config_entry(self.config, ConfigKey.OUTLIER_SETTINGS.value, f"location_bodypart1_{animal_name.lower()}","str")
+                self.outlier_bp_dict[animal_name]["bp_2"] = read_config_entry(self.config, ConfigKey.OUTLIER_SETTINGS.value, f"location_bodypart2_{animal_name.lower()}","str")
         else:
             self.outlier_bp_dict = animal_dict
 

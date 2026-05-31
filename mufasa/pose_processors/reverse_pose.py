@@ -62,7 +62,7 @@ class Reverse2AnimalTracking(ConfigReader):
         )
 
         self.files_found = glob.glob(self.in_dir + "/*." + self.file_type)
-        print("Processing {} video(s)...".format(str(len(self.files_found))))
+        print(f"Processing {str(len(self.files_found))} video(s)...")
 
     def reverse_tracking(self):
         for file_cnt, file_path in enumerate(self.files_found):

@@ -116,7 +116,7 @@ class LabelmeKeypoints2YoloSeg:
                     bp_arr[bp_cnt] = np.array(np.array([point[0][0][0], point[0][0][1]]))
                 else:
                     continue
-            instance_str = f'0 '
+            instance_str = '0 '
             seg_arr = GeometryMixin().bodyparts_to_polygon(data=bp_arr.reshape(-1, len(bp_arr), 2), parallel_offset=self.padding)[0]
             seg_arr = np.array(seg_arr.exterior.coords).astype(np.int32)
             pts = np.unique(seg_arr, axis=0)

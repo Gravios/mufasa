@@ -338,7 +338,7 @@ def merge_coco_keypoints_files(data_dir: Union[str, os.PathLike],
     timer = SimbaTimer(start=True)
     data_files = find_files_of_filetypes_in_directory(directory=data_dir, extensions=['.json'], raise_error=True, raise_warning=False, as_dict=True)
     if os.path.isdir(save_path):
-        raise InvalidInputError(msg=f'save_path has to be a filepath, not a directory.', source=f'{merge_coco_keypoints_files.__name__} save_path')
+        raise InvalidInputError(msg='save_path has to be a filepath, not a directory.', source=f'{merge_coco_keypoints_files.__name__} save_path')
     check_if_dir_exists(in_dir=os.path.dirname(save_path))
     if max_width is not None:
         check_int(name=f'{merge_coco_keypoints_files.__name__} max_width', value=max_width, min_value=1, raise_error=True)

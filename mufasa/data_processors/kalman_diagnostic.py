@@ -1078,7 +1078,7 @@ def _plot_likelihood_histograms(
     for j in range(n, len(axes)):
         axes[j].set_visible(False)
     fig.suptitle(
-        f"Likelihood histograms (red dashed: 0.95 threshold)",
+        "Likelihood histograms (red dashed: 0.95 threshold)",
         fontsize=11,
     )
     fig.tight_layout()

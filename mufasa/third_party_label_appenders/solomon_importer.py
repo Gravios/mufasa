@@ -58,9 +58,7 @@ class SolomonImporter(ConfigReader):
             _, _, fps = self.read_video_info(video_name=file_name)
             if not os.path.isfile(feature_file_path):
                 print(
-                    "Data for video {} does not exist in the features directory. SimBA will SKIP appending annotations for video {}".format(
-                        file_name, file_name
-                    )
+                    f"Data for video {file_name} does not exist in the features directory. SimBA will SKIP appending annotations for video {file_name}"
                 )
                 continue
             save_path = os.path.join(
@@ -78,9 +76,7 @@ class SolomonImporter(ConfigReader):
                 target_col = list(solomon_df.columns[solomon_df.isin([clf_name]).any()])
                 if len(target_col) == 0:
                     print(
-                        "No SOLOMON frames annotated as containing behavior {} in video {}. Mufasa will set all frames in video {} as behavior-absent for behavior {}".format(
-                            clf_name, file_name, file_name, clf_name
-                        )
+                        f"No SOLOMON frames annotated as containing behavior {clf_name} in video {file_name}. Mufasa will set all frames in video {file_name} as behavior-absent for behavior {clf_name}"
                     )
                     continue
                 target_frm_list = list(
@@ -104,7 +100,7 @@ class SolomonImporter(ConfigReader):
                 out_df.loc[target_frm_list, clf_name] = 1
 
             write_df(out_df, self.file_type, save_path)
-            print("Solomon annotations appended for video {}...".format(file_name))
+            print(f"Solomon annotations appended for video {file_name}...")
         stdout_success(
             msg="All SOLOMON annotations imported. Data saved in the project_folder/csv/targets_inserted directory of the Mufasa project"
         )

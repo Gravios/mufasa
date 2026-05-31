@@ -85,8 +85,8 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
             self.y_cols_shifted.append(y_name + "_shifted")
 
         self.roll_windows_values = [75, 50, 25, 20, 15, 10, 4, 2]
-        self.files_found = glob.glob(self.input_file_dir + "/*.{}".format(self.file_type) )
-        check_if_filepath_list_is_empty(filepaths=self.files_found, error_msg="No file in {} directory".format(self.input_file_dir))
+        self.files_found = glob.glob(self.input_file_dir + f"/*.{self.file_type}" )
+        check_if_filepath_list_is_empty(filepaths=self.files_found, error_msg=f"No file in {self.input_file_dir} directory")
         print("Extracting features from {} {}...".format(str(len(self.files_found)), "file(s)"))
 
 
@@ -371,7 +371,7 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
                 self.csv_df_combined[curr_y_col]
                 - self.csv_df_combined[curr_y_shifted_col]
             )
-            temp_df["Movement_{}_X_relative_2_Y".format(bp)] = (
+            temp_df[f"Movement_{bp}_X_relative_2_Y"] = (
                 temp_df["x"] - temp_df["y"]
             )
             temp_df.drop(["x", "y"], axis=1, inplace=True)

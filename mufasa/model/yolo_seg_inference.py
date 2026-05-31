@@ -163,7 +163,7 @@ class YOLOSegmentationInference:
 
         timer.stop_timer()
         if not self.save_dir:
-            if self.verbose: stdout_success(f'YOLO results created', timer.elapsed_time_str)
+            if self.verbose: stdout_success('YOLO results created', timer.elapsed_time_str)
             return results
         else:
             if self.verbose:

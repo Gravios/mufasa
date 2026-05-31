@@ -616,7 +616,7 @@ class ConfigReader:
 
         model_names = []
         for i in range(self.clf_cnt):
-            entry_name = "target_name_{}".format(str(i + 1))
+            entry_name = f"target_name_{str(i + 1)}"
             model_names.append(
                 self.read_config_entry(
                     self.config,
@@ -1136,7 +1136,7 @@ class ConfigReader:
                 multi_animal_status = True
             else:
                 for animal in range(self.animal_cnt):
-                    multi_animal_id_lst.append("Animal_{}".format(str(animal + 1)))
+                    multi_animal_id_lst.append(f"Animal_{str(animal + 1)}")
                 multi_animal_status = False
 
         self.multi_animal_status = multi_animal_status

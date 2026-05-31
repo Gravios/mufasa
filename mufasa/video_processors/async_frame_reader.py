@@ -72,7 +72,7 @@ class AsyncVideoFrameReader:
         self.batch_size, self.video_path, self.gpu, self.clahe = batch_size, video_path, gpu, clahe
         self.verbose, self.greyscale, self.black_and_white, self.img_size = verbose, greyscale, black_and_white, img_size
         if self.gpu and not check_nvidea_gpu_available():
-            raise MufasaGPUError(msg=f'GPU passed but no GPU device detected on machine', source=self.__class__.__name__)
+            raise MufasaGPUError(msg='GPU passed but no GPU device detected on machine', source=self.__class__.__name__)
         self.batches = [(i, min(i + batch_size, self.end_idx)) for i in range(self.start_idx, self.end_idx, batch_size)]
         self.batch_cnt = len(self.batches)
         self._stop, self._thread = False, None

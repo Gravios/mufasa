@@ -228,7 +228,7 @@ class ROIfeatureVisualizerMultiprocess(ConfigReader):
             check_valid_dict(x=time_slice, valid_key_dtypes=(str,), valid_values_dtypes=(str,), valid_keys=(START_TIME, END_TIME), required_keys=(START_TIME, END_TIME),)
             check_if_string_value_is_valid_video_timestamp(value=time_slice[START_TIME], name='START TIME', raise_error=True)
             check_if_string_value_is_valid_video_timestamp(value=time_slice[END_TIME], name='END TIME', raise_error=True)
-            check_that_hhmmss_start_is_before_end(start_time=time_slice[START_TIME], end_time=time_slice[END_TIME], name=f'TIME SLICE', raise_error=True)
+            check_that_hhmmss_start_is_before_end(start_time=time_slice[START_TIME], end_time=time_slice[END_TIME], name='TIME SLICE', raise_error=True)
 
 
         self.gpu, self.show_roi_centers, self.show_roi_eartags, self.show_animal_names = gpu, show_roi_centers, show_roi_eartags, show_animal_names

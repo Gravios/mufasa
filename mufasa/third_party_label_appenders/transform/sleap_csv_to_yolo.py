@@ -153,7 +153,7 @@ class Sleap2Yolo:
                 track_id, keypoints = unique_tracks_lk[track_data['track']], track_data.drop(['track', 'frame_idx', 'instance.score', 'video', 'id']),
                 keypoints = keypoints.values.reshape(-1, 3).astype(np.float32)
                 keypoints[keypoints[:, 2] != 0.0, 2] = 2
-                instance_str = f'{track_id} ' if self.single_id is None else f'0 '
+                instance_str = f'{track_id} ' if self.single_id is None else '0 '
                 instance_str += keypoint_array_to_yolo_annotation_str(x=keypoints, img_h=img_h, img_w=img_w, padding=self.padding)
                 img_lbl += instance_str
             with open(lbl_save_path, mode='w', encoding='utf-8') as f:

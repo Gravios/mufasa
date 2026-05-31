@@ -147,14 +147,14 @@ class AgressionFeatureExtractor(ConfigReader, AbstractFeatureExtraction):
                 for i in range(x.shape[0]):
                     v = pd.DataFrame(x[i], columns=[f'BP_CONFIDENCE_VARIANCE_{animal_name}_100', f'BP_CONFIDENCE_VARIANCE_{animal_name}_250', f'BP_CONFIDENCE_VARIANCE_{animal_name}_500', f'BP_CONFIDENCE_VARIANCE_{animal_name}_1000'])
                     self.results = pd.concat([self.results, v], axis=1)
-            self.results[f'ANIMALS_FRAME_MEAN_BP_CONFIDENCE'] = np.mean(bp_data, axis=1)
-            x = TimeseriesFeatureMixin.sliding_descriptive_statistics(data=self.results[f'ANIMALS_FRAME_MEAN_BP_CONFIDENCE'].values.astype(np.float32), window_sizes=TIME_WINDOWS, sample_rate=int(fps), statistics=List(['mean']))
+            self.results['ANIMALS_FRAME_MEAN_BP_CONFIDENCE'] = np.mean(bp_data, axis=1)
+            x = TimeseriesFeatureMixin.sliding_descriptive_statistics(data=self.results['ANIMALS_FRAME_MEAN_BP_CONFIDENCE'].values.astype(np.float32), window_sizes=TIME_WINDOWS, sample_rate=int(fps), statistics=List(['mean']))
             for i in range(x.shape[0]):
-                v = pd.DataFrame(x[i], columns=['ANIMALS_FRAME_MEAN_BP_CONFIDENCE_MEAN_100', 'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_MEAN_250', f'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_MEAN_500', f'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_MEAN_1000'])
+                v = pd.DataFrame(x[i], columns=['ANIMALS_FRAME_MEAN_BP_CONFIDENCE_MEAN_100', 'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_MEAN_250', 'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_MEAN_500', 'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_MEAN_1000'])
                 self.results = pd.concat([self.results, v], axis=1)
-            x = TimeseriesFeatureMixin.sliding_descriptive_statistics(data=self.results[f'ANIMALS_FRAME_MEAN_BP_CONFIDENCE'].values.astype(np.float32), window_sizes=TIME_WINDOWS, sample_rate=int(fps), statistics=List(['var']))
+            x = TimeseriesFeatureMixin.sliding_descriptive_statistics(data=self.results['ANIMALS_FRAME_MEAN_BP_CONFIDENCE'].values.astype(np.float32), window_sizes=TIME_WINDOWS, sample_rate=int(fps), statistics=List(['var']))
             for i in range(x.shape[0]):
-                v = pd.DataFrame(x[i], columns=['ANIMALS_FRAME_MEAN_BP_CONFIDENCE_VARIANCE_100', 'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_VARIANCE_250', f'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_VARIANCE_500', f'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_VARIANCE_1000'])
+                v = pd.DataFrame(x[i], columns=['ANIMALS_FRAME_MEAN_BP_CONFIDENCE_VARIANCE_100', 'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_VARIANCE_250', 'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_VARIANCE_500', 'ANIMALS_FRAME_MEAN_BP_CONFIDENCE_VARIANCE_1000'])
                 self.results = pd.concat([self.results, v], axis=1)
             self.save(data=self.results, save_path=self.save_path)
             video_timer.stop_timer()

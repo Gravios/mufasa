@@ -178,7 +178,7 @@ class FSTTCCalculator(ConfigReader, PlottingMixin):
                 self.bouts_df = self.__join_bouts()
             for first_clf, second_clf in self.clf_permutations:
                 self.vide_df_sequence_lst = []
-                sequence_name = "FSTTC {} {}".format(first_clf, second_clf)
+                sequence_name = f"FSTTC {first_clf} {second_clf}"
                 first_clf_df = (
                     self.bouts_df[self.bouts_df["Event"] == first_clf]
                     .sort_values(by=["Start_frame"])
@@ -411,7 +411,7 @@ class FSTTCCalculator(ConfigReader, PlottingMixin):
                         fsttc,
                     ]
         self.file_save_path = os.path.join(
-            self.logs_path, "FSTTC_{}.csv".format(str(self.datetime))
+            self.logs_path, f"FSTTC_{str(self.datetime)}.csv"
         )
         self.out_df.to_csv(self.file_save_path)
         self.timer.stop_timer()

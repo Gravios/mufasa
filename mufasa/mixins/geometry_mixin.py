@@ -1130,7 +1130,7 @@ class GeometryMixin:
         if save_path is not None:
             msg = f"Video complete and saved at {save_path}!"
         else:
-            msg = f"Video complete!"
+            msg = "Video complete!"
         stdout_success(msg=msg, elapsed_time=timer.elapsed_time_str, source=GeometryMixin.geometry_video.__name__)
 
     @staticmethod

@@ -92,7 +92,7 @@ class MultiCropper:
             txt_pos = (10, 20)
             img = PlottingMixin().put_text(img=img, text=video_name, pos=txt_pos, font_size=font_size, font_thickness=2, font=self.font, text_color=TextOptions.COLOR.value, text_color_bg=(0, 0, 0))
             img = PlottingMixin().put_text(img=img, text=f"Define the ROI boundaries of {self.crop_cnt} cropped videos", pos=(txt_pos[0], txt_pos[1] + (y_space*1)), font_size=font_size, font_thickness=2, font=self.font, text_color=TextOptions.COLOR.value, text_color_bg=(0, 0, 0))
-            img = PlottingMixin().put_text(img=img, text=f"Press ESC to continue", pos=(txt_pos[0], txt_pos[1] + (y_space*2)), font_size=font_size, font_thickness=2, font=self.font, text_color=(0, 0, 255), text_color_bg=(0, 0, 0), text_bg_alpha=1.0)
+            img = PlottingMixin().put_text(img=img, text="Press ESC to continue", pos=(txt_pos[0], txt_pos[1] + (y_space*2)), font_size=font_size, font_thickness=2, font=self.font, text_color=(0, 0, 255), text_color_bg=(0, 0, 0), text_bg_alpha=1.0)
             cv2.namedWindow("VIDEO IMAGE", cv2.WINDOW_NORMAL)
             cv2.imshow("VIDEO IMAGE", img)
             while True:
@@ -105,7 +105,7 @@ class MultiCropper:
             for box_cnt in range(self.crop_cnt):
                 img = PlottingMixin().put_text(img=original_img, text=video_name, pos=txt_pos, font_size=font_size, font_thickness=2, font=self.font, text_color=(144, 238, 144), text_color_bg=(0, 0, 0))
                 img = PlottingMixin().put_text(img=img, text=f"Draw crop box #{box_cnt+1} boundaries and press ESC", pos=(txt_pos[0], txt_pos[1] + (y_space * 1)), font_size=font_size, font_thickness=2, font=self.font, text_color=(144, 238, 144), text_color_bg=(0, 0, 0))
-                roi_selector = ROISelector(path=img, title=f"VIDEO IMAGE")
+                roi_selector = ROISelector(path=img, title="VIDEO IMAGE")
                 roi_selector.run()
                 cv2.destroyAllWindows()
                 if roi_selector.complete:

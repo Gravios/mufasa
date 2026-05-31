@@ -177,7 +177,7 @@ class ROIRuler:
                 line1 = f'Real world: {self.length_mm} mm  |  Video: {self.length_px} px  |  On-screen: {self.length_px_display} px'
             else:
                 line1 = f'Video: {self.length_px} px  |  On-screen: {self.length_px_display} px'
-            line2_parts = [f'ROI sizes and positions use full-frame coordinates (the Video value above)', f'Image at {scale_pct}% of video size']
+            line2_parts = ['ROI sizes and positions use full-frame coordinates (the Video value above)', f'Image at {scale_pct}% of video size']
             if self.px_per_mm is not None:
                 line2_parts.append(f'px/mm = {self.px_per_mm}')
             else:

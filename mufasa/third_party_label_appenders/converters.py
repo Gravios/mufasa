@@ -123,7 +123,7 @@ def geometries_to_coco(geometries: Dict[str, np.ndarray],
             annotations.append(annotation)
     results['images'] = images
     results['annotations'] = annotations
-    with open(os.path.join(save_dir, f"annotations.json"), "w") as final:
+    with open(os.path.join(save_dir, "annotations.json"), "w") as final:
         json.dump(results, final)
 
 
@@ -1858,7 +1858,7 @@ def simba_to_yolo_keypoints(config_path: Union[str, os.PathLike],
         keypoints[mask] = np.nan
         if np.all(np.isnan(keypoints)) or np.all(keypoints == 0.0) or np.all(np.isnan(keypoints) | (keypoints == 0.0)):
             continue
-        img_lbl = ''; instance_str = f'0 '
+        img_lbl = ''; instance_str = '0 '
         if verbose:
             print(f'Processing image {cnt+1}/{len(annotations)}...')
         file_name = f'{video_meta["video_name"]}.{frm_idx}'

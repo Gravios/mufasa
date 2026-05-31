@@ -596,7 +596,7 @@ def get_video_info_ffmpeg(video_path: Union[str, os.PathLike]) -> Dict[str, Any]
     """
 
     if not check_ffmpeg_available(raise_error=False):
-        raise FFMPEGNotFoundError(msg=f'Cannot get video meta data from video using FFMPEG: FFMPEG not found on computer.', source=get_video_info_ffmpeg.__name__)
+        raise FFMPEGNotFoundError(msg='Cannot get video meta data from video using FFMPEG: FFMPEG not found on computer.', source=get_video_info_ffmpeg.__name__)
     check_file_exist_and_readable(file_path=video_path)
     video_name = get_fn_ext(filepath=video_path)[1]
     cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames", "-show_entries", "stream=width,height,r_frame_rate,nb_read_frames,duration,pix_fmt", "-of", "json", video_path]
@@ -689,7 +689,7 @@ def concatenate_videos_in_folder(in_folder: Union[str, os.PathLike, bytes],
         raise FFMPEGCodecGPUError(msg="No FFMpeg GPU codec found.", source=concatenate_videos_in_folder.__name__)
     timer = SimbaTimer(start=True)
     if file_paths is None:
-        files = glob.glob(in_folder + "/*.{}".format(video_format))
+        files = glob.glob(in_folder + f"/*.{video_format}")
     else:
         for file_path in file_paths:
             check_file_exist_and_readable(file_path=file_path)
@@ -721,7 +721,7 @@ def concatenate_videos_in_folder(in_folder: Union[str, os.PathLike, bytes],
         elif isinstance(fps, (int, float)):
             out_fps = fps
         else:
-            raise InvalidInputError(msg=f'FPS of the output video has to be None, or a string index, or a float, or an integer',source=concatenate_videos_in_folder.__name__)
+            raise InvalidInputError(msg='FPS of the output video has to be None, or a string index, or a float, or an integer',source=concatenate_videos_in_folder.__name__)
 
     if check_nvidea_gpu_available() and gpu:
         if fps is None:
@@ -1209,25 +1209,23 @@ def convert_parquet_to_csv(directory: str) -> None:
 
     if not os.path.isdir(directory):
         raise NotDirectoryError(
-            msg="{} is not a valid directory".format(directory),
+            msg=f"{directory} is not a valid directory",
             source=convert_parquet_to_csv.__name__,
         )
     files_found = glob.glob(directory + "/*.parquet")
     if len(files_found) < 1:
         raise NoFilesFoundError(
-            "No parquet files (with .parquet file ending) found in the {} directory".format(
-                directory
-            ),
+            f"No parquet files (with .parquet file ending) found in the {directory} directory",
             source=convert_parquet_to_csv.__name__,
         )
     for file_cnt, file_path in enumerate(files_found):
-        print("Reading in {} ...".format(os.path.basename(file_path)))
+        print(f"Reading in {os.path.basename(file_path)} ...")
         df = pd.read_parquet(file_path)
         new_file_path = os.path.join(directory, os.path.basename(file_path).replace(".parquet", ".csv"))
         if "scorer" in df.columns:
             df = df.set_index("scorer")
         df.to_csv(new_file_path)
-        print("Saved {}...".format(new_file_path))
+        print(f"Saved {new_file_path}...")
     stdout_success(msg=f"{str(len(files_found))} parquet files in {directory} converted to csv", source=convert_parquet_to_csv.__name__)
 
 
@@ -1243,26 +1241,24 @@ def convert_csv_to_parquet(directory: Union[str, os.PathLike]) -> None:
     """
     if not os.path.isdir(directory):
         raise NotDirectoryError(
-            msg="{} is not a valid directory".format(directory),
+            msg=f"{directory} is not a valid directory",
             source=convert_csv_to_parquet.__name__,
         )
     files_found = glob.glob(directory + "/*.csv")
     if len(files_found) < 1:
         raise NoFilesFoundError(
-            msg="No parquet files (with .csv file ending) found in the {} directory".format(
-                directory
-            ),
+            msg=f"No parquet files (with .csv file ending) found in the {directory} directory",
             source=convert_csv_to_parquet.__name__,
         )
-    print("Converting {} files...".format(str(len(files_found))))
+    print(f"Converting {str(len(files_found))} files...")
     for file_cnt, file_path in enumerate(files_found):
-        print("Reading in {} ...".format(os.path.basename(file_path)))
+        print(f"Reading in {os.path.basename(file_path)} ...")
         df = pd.read_csv(file_path)
         new_file_path = os.path.join(
             directory, os.path.basename(file_path).replace(".csv", ".parquet")
         )
         df.to_parquet(new_file_path)
-        print("Saved {}...".format(new_file_path))
+        print(f"Saved {new_file_path}...")
     stdout_success(
         msg=f"{str(len(files_found))} csv files in {directory} converted to parquet",
         source=convert_csv_to_parquet.__name__,
@@ -1529,7 +1525,7 @@ def copy_single_video_to_project(
     timer = SimbaTimer(start=True)
     _, file_name, file_ext = get_fn_ext(source_path)
     check_file_exist_and_readable(file_path=source_path)
-    print("Copying video {} file...".format(file_name))
+    print(f"Copying video {file_name} file...")
     if file_ext[1:].lower().strip() not in allowed_video_formats:
         raise InvalidFileTypeError(
             msg="SimBA works best with avi and mp4 video-files. Or please convert your videos to mp4 or avi to continue before importing it.",
@@ -1756,9 +1752,7 @@ def find_time_stamp_from_frame_numbers(start_frame: int, end_frame: int, fps: fl
         total_seconds //= 60
         minutes = total_seconds % 60
         hours = total_seconds // 60
-        return "{:02d}:{:02d}:{:02d}.{:03d}".format(
-            hours, minutes, seconds, milliseconds
-        )
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
 
     check_int(name="start_frame", value=start_frame, min_value=0)
     check_int(name="end_frame", value=end_frame, min_value=0)
@@ -2051,7 +2045,7 @@ def copy_files_in_directory(in_dir: Union[str, os.PathLike],
     if filetype is not None:
         file_paths = glob.glob(in_dir + f"/*.{filetype}")
     else:
-        file_paths = glob.glob(in_dir + f"/*.")
+        file_paths = glob.glob(in_dir + "/*.")
     if len(file_paths) == 0 and raise_error:
         raise NoFilesFoundError(msg=f"No files found in {in_dir}", source=copy_files_in_directory.__name__)
     elif len(file_paths) == 0:
@@ -2420,9 +2414,9 @@ def seconds_to_timestamp(seconds: Union[int, float, List[Union[int, float]]],
         minutes, remainder = divmod(remainder, 60_000)
         secs, milliseconds = divmod(remainder, 1_000)
         if hh_mm_ss_sss:
-            results.append("{:02d}:{:02d}:{:02d}.{:03d}".format(hours, minutes, secs, milliseconds))
+            results.append(f"{hours:02d}:{minutes:02d}:{secs:02d}.{milliseconds:03d}")
         else:
-            results.append("{:02d}:{:02d}:{:02d}".format(hours, minutes, secs))
+            results.append(f"{hours:02d}:{minutes:02d}:{secs:02d}")
     return results[0] if len(data) == 1 else results
 
 
@@ -2783,7 +2777,7 @@ def bento_file_reader(file_path: Union[str, os.PathLike],
                     fps_str = df.iloc[list(fps_idx.index[fps_idx])][0].values[0]
                     fps = float(fps_str.split(':')[1])
                 except:
-                    raise FrameRangeError(f'The annotations are in seconds and FPS was not passed. FPS could also not be read from the BENTO file', source=bento_file_reader.__name__)
+                    raise FrameRangeError('The annotations are in seconds and FPS was not passed. FPS could also not be read from the BENTO file', source=bento_file_reader.__name__)
             out_clf_df["START"] = out_clf_df["START"].astype(float) * fps
             out_clf_df["STOP"] = out_clf_df["STOP"].astype(float) * fps
             if orient == 'index':
@@ -2893,9 +2887,9 @@ def read_boris_file(file_path: Union[str, os.PathLike],
         FPS = _find_cap_insensitive_name(target=FPS, values=list(df.columns))
         if not FPS in df.columns:
             if raise_error:
-                raise FrameRangeError(f'The annotations are in seconds and FPS was not passed. FPS could also not be read from the BORIS file', source=read_boris_file.__name__)
+                raise FrameRangeError('The annotations are in seconds and FPS was not passed. FPS could also not be read from the BORIS file', source=read_boris_file.__name__)
             else:
-                FrameRangeWarning(msg=f'The annotations are in seconds and FPS was not passed. FPS could also not be read from the BORIS file', source=read_boris_file.__name__)
+                FrameRangeWarning(msg='The annotations are in seconds and FPS was not passed. FPS could also not be read from the BORIS file', source=read_boris_file.__name__)
                 ThirdPartyAnnotationsInvalidFileFormatWarning(annotation_app="BORIS", file_path=file_path, source=read_boris_file.__name__, log_status=log_setting)
                 return {}
         if len(media_file_names_in_file) == 1:

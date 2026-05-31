@@ -18,7 +18,7 @@ class CalculatePixelDistanceTool:
         self.known_mm_distance = known_mm_distance
         self.video_dir, self.video_name, self.video_ext = get_fn_ext(video_path)
         if not os.access(video_path, os.R_OK):
-            print("{} is not readable.".format(video_path))
+            print(f"{video_path} is not readable.")
             raise FileNotFoundError
 
         self.video_meta_data = get_video_meta_data(self.video_path)
@@ -112,7 +112,7 @@ class CalculatePixelDistanceTool:
         )
         cv2.putText(
             self.side_img,
-            "Current pixels per millimeter: {}.".format(str(self.ppm)),
+            f"Current pixels per millimeter: {str(self.ppm)}.",
             (10, int(self.spacing_scale + 50 * (self.add_spacer * 5))),
             cv2.FONT_HERSHEY_SIMPLEX,
             self.font_scale,

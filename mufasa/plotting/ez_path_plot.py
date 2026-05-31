@@ -124,10 +124,10 @@ class EzPathPlot:
             headers = []
             if len(self.data.columns[0]) == 4:
                 for c in self.data.columns:
-                    headers.append("{}_{}_{}".format(c[1], c[2], c[3]))
+                    headers.append(f"{c[1]}_{c[2]}_{c[3]}")
             elif len(self.data.columns[0]) == 3:
                 for c in self.data.columns:
-                    headers.append("{}_{}".format(c[2], c[3]))
+                    headers.append(f"{c[2]}_{c[3]}")
             self.data.columns = headers
         elif ext.lower() == CSV:
             self.data = pd.read_csv(data_path)

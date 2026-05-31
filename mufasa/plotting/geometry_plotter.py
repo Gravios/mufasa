@@ -214,7 +214,7 @@ class GeometryPlotter(ConfigReader, PlottingMixin):
             self.video_path = video_name
         else:
             if config_path is None:
-                raise InvalidInputError(msg=f'When providing a non-path video name, pass config_path')
+                raise InvalidInputError(msg='When providing a non-path video name, pass config_path')
             self.video_path = find_video_of_file(video_dir=self.video_dir, filename=video_name, raise_error=True)
         if intersection_clr is not None:
             check_if_valid_rgb_tuple(data=intersection_clr, raise_error=True, source=f'{self.__class__.__name__} intersection_clr')
@@ -252,7 +252,7 @@ class GeometryPlotter(ConfigReader, PlottingMixin):
             check_valid_dict(x=time_slice, valid_key_dtypes=(str,), valid_values_dtypes=(str,), valid_keys=(START_TIME, END_TIME), required_keys=(START_TIME, END_TIME),)
             check_if_string_value_is_valid_video_timestamp(value=time_slice[START_TIME], name='START TIME', raise_error=True)
             check_if_string_value_is_valid_video_timestamp(value=time_slice[END_TIME], name='END TIME', raise_error=True)
-            check_that_hhmmss_start_is_before_end(start_time=time_slice[START_TIME], end_time=time_slice[END_TIME], name=f'TIME SLICE', raise_error=True)
+            check_that_hhmmss_start_is_before_end(start_time=time_slice[START_TIME], end_time=time_slice[END_TIME], name='TIME SLICE', raise_error=True)
             check_if_hhmmss_timestamp_is_valid_part_of_video(timestamp=time_slice[START_TIME], video_path=self.video_path)
             check_if_hhmmss_timestamp_is_valid_part_of_video(timestamp=time_slice[END_TIME], video_path=self.video_path)
             frm_ids = find_frame_numbers_from_time_stamp(start_time=time_slice[START_TIME], end_time=time_slice[END_TIME], fps=int(self.video_meta_data['fps']))

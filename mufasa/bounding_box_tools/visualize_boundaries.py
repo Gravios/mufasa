@@ -134,9 +134,7 @@ class BoundaryVisualizer(ConfigReader, PlottingMixin):
                 self.intersection_path = p
         if self.intersection_path is None:
             print(
-                "No ROI intersection data found for video {} in directory {}. Skipping intersection visualizations".format(
-                    self.video_name, self.intersection_data_folder
-                )
+                f"No ROI intersection data found for video {self.video_name} in directory {self.intersection_data_folder}. Skipping intersection visualizations"
             )
             self.show_intersections = False
             self.intersections_df = None
@@ -162,7 +160,7 @@ class BoundaryVisualizer(ConfigReader, PlottingMixin):
             )
         else:
             self.data_df = None
-        print("Creating visualization for video {}...".format(self.video_name))
+        print(f"Creating visualization for video {self.video_name}...")
         video_path = self.find_video_of_file(
             video_dir=self.video_dir, filename=self.video_name
         )

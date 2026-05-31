@@ -78,9 +78,7 @@ class TRKImporter(ConfigReader):
                     track_cnt = 1
 
         print(
-            "Number of animals detected in TRK {}: {}".format(
-                str(file_path), str(track_cnt)
-            )
+            f"Number of animals detected in TRK {str(file_path)}: {str(track_cnt)}"
         )
         if track_cnt != self.animal_cnt:
             raise CountError(

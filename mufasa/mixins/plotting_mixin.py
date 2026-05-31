@@ -552,7 +552,7 @@ class PlottingMixin:
         cb = plt.colorbar(pad=0.0, fraction=0.023 * im_ratio)
         cb.ax.tick_params(size=0)
         cb.outline.set_visible(False)
-        cb.set_label("{} (seconds)".format(clf_name), rotation=270, labelpad=10)
+        cb.set_label(f"{clf_name} (seconds)", rotation=270, labelpad=10)
         plt.tight_layout()
         # plt.gca().set_aspect(aspect_ratio)
         buffer_ = io.BytesIO()
@@ -810,11 +810,7 @@ class PlottingMixin:
                 current_frame += 1
             else:
                 print(
-                    "Mufasa tried to grab frame number {} from video {}, but could not find it. The video has {} frames.".format(
-                        str(current_frame),
-                        video_path,
-                        str(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
-                    )
+                    f"Mufasa tried to grab frame number {str(current_frame)} from video {video_path}, but could not find it. The video has {str(cap.get(cv2.CAP_PROP_FRAME_COUNT))} frames."
                 )
         return img_lst
 
@@ -840,7 +836,7 @@ class PlottingMixin:
         color_dict = get_color_dict()
         if video_setting:
             fourcc = cv2.VideoWriter_fourcc(*Formats.MP4_CODEC.value)
-            video_save_path = os.path.join(video_save_dir, "{}.mp4".format(str(group)))
+            video_save_path = os.path.join(video_save_dir, f"{str(group)}.mp4")
             video_writer = cv2.VideoWriter(
                 video_save_path,
                 fourcc,
@@ -928,9 +924,7 @@ class PlottingMixin:
                 cv2.imwrite(frm_name, np.uint8(img))
 
             print(
-                "Path frame created: {}, Video: {}, Processing core: {}".format(
-                    str(frame_id + 1), video_name, str(group + 1)
-                )
+                f"Path frame created: {str(frame_id + 1)}, Video: {video_name}, Processing core: {str(group + 1)}"
             )
         if video_setting:
             video_writer.release()
@@ -2324,7 +2318,7 @@ class PlottingMixin:
         y_name = f'{clf} TIME (FRAMES)'
         if seconds:
             check_all_file_names_are_represented_in_video_log(video_info_df=config.video_info_df, data_paths=data_paths)
-            x_name = f'VIDEO TIME (S)'
+            x_name = 'VIDEO TIME (S)'
         if bouts:
             y_name = f'{clf} (BOUT COUNT)'
 

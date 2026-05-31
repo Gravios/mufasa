@@ -323,7 +323,7 @@ class PoseImporterMixin:
         for animal_name in self.animal_bp_dict.keys():
             for bp in self.animal_bp_dict[animal_name]["X_bps"]:
                 if animal_name not in bp:
-                    new_headers.append("{}_{}".format(animal_name, bp[:-2]))
+                    new_headers.append(f"{animal_name}_{bp[:-2]}")
                 else:
                     new_headers.append(bp[:-2])
         new_bp_df = pd.DataFrame(new_headers)
