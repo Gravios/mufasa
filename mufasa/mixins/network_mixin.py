@@ -286,7 +286,7 @@ class NetworkMixin:
         )
         if levels > graph.number_of_nodes():
             raise CountError(
-                msg=f"Number of nodes ({G.number_of_nodes()}) is less than numer of girvan newman levels ({levels}).",
+                msg=f"Number of nodes ({graph.number_of_nodes()}) is less than numer of girvan newman levels ({levels}).",
                 source=NetworkMixin.__class__.__name__,
             )
 

@@ -36,7 +36,7 @@ def fit_xgb(x: pd.DataFrame,
     """
     check_valid_dataframe(df=x, source=f'{fit_xgb.__name__} x', valid_dtypes=Formats.NUMERIC_DTYPES.value)
     check_valid_array(data=y, source=f'{fit_xgb.__name__} y', accepted_ndims=(1,), accepted_axis_0_shape=[x.shape[0]], accepted_dtypes=Formats.NUMERIC_DTYPES.value)
-    check_instance(source=f'{fit_xgb.__name__} fit_xgb', instance=xgb_reg, accepted_types=(xgb.XGBRegressor,))
+    check_instance(source=f'{fit_xgb.__name__} fit_xgb', instance=mdl, accepted_types=(xgb.XGBRegressor,))
     return mdl.fit(X=x, y=y)
 
 def transform_xgb(x: pd.DataFrame,

@@ -83,7 +83,7 @@ def _clf_by_roi_helper(data: tuple,
         input_video_rois = get_roi_dict_from_dfs(rectangle_df=video_rois[Keys.ROI_RECTANGLES.value], circle_df=video_rois[Keys.ROI_CIRCLES.value], polygon_df=video_rois[Keys.ROI_POLYGONS.value])
         video_rois = {k: v for k, v in input_video_rois.items() if k in video_roi_names}
         if len(list(video_rois.keys())) == 0:
-            ROIWarning(msg=f'Skipping video {video_name}: No ROIs found for video {video_name}. The video has the ROIs {list(input_video_rois.keys())} but analysis is to be performed on ROIs {video_roi_names}', source=self.__class__.__name__)
+            ROIWarning(msg=f'Skipping video {video_name}: No ROIs found for video {video_name}. The video has the ROIs {list(input_video_rois.keys())} but analysis is to be performed on ROIs {video_roi_names}', source=_clf_by_roi_helper.__name__)
             continue
         # Patch 122ay: dual-read via classification_io helper.
         if config_path is not None:

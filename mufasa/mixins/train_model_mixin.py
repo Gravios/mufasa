@@ -1702,7 +1702,7 @@ class TrainModelMixin:
 
             return df_concat, frame_numbers_lst
 
-        except BrokenProcessPool or AttributeError:
+        except (BrokenProcessPool, AttributeError):
             MultiProcessingFailedWarning(msg="Multi-processing file read failed, reverting to single core (increased run-time).")
             return TrainModelMixin().read_all_files_in_folder(
                 file_paths=file_paths,
@@ -2241,7 +2241,7 @@ class TrainModelMixin:
             )
             try:
                 self.shap_save_n = int(self.shap_save_n)
-            except ValueError or TypeError:
+            except (ValueError, TypeError):
                 self.shap_save_n = (
                         self.shap_target_present_cnt + self.shap_target_absent_cnt
                 )

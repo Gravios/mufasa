@@ -2467,7 +2467,7 @@ class PlottingMixin:
             if bg_clr.shape[2] == 3:
                 bg_clr_rgb = cv2.cvtColor(bg_clr, cv2.COLOR_BGR2RGB)
             else:
-                bg_clr_rgb = bg_img
+                bg_clr_rgb = bg_clr
             ax.imshow(bg_clr_rgb, extent=[0, size[1], size[0], 0], origin='upper')
         else:
             bg_clr_normalized = (bg_clr[0] / 255.0, bg_clr[1] / 255.0, bg_clr[2] / 255.0)
