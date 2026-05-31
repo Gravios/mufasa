@@ -49,8 +49,8 @@ class MarsImporter:
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
-        data_path: Union[str, os.PathLike],
+        config_path: str | os.PathLike,
+        data_path: str | os.PathLike,
         interpolation_method: str,
         smoothing_method: dict,
     ):

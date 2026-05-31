@@ -142,7 +142,7 @@ SHAPE_TYPE = "Shape_type"
 # ---------------------------------------------------------------------- #
 # Helpers
 # ---------------------------------------------------------------------- #
-def _bp_xy_columns(bp: str) -> Tuple[str, str]:
+def _bp_xy_columns(bp: str) -> tuple[str, str]:
     """Return the (x_col, y_col) names for a body-part."""
     return f"{bp}_x", f"{bp}_y"
 
@@ -168,7 +168,7 @@ def compute_two_point_distances(
     df: pd.DataFrame,
     two_point_combs: np.ndarray,
     px_per_mm: float,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Per-frame Euclidean distance between every pair of body-parts.
 
     :param df: pose DataFrame with columns ``{bp}_x`` / ``{bp}_y`` for
@@ -180,7 +180,7 @@ def compute_two_point_distances(
         column names match the legacy
         ``"Distance (mm) {bp_a}-{bp_b}"`` format.
     """
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     for c in two_point_combs:
         bp_a, bp_b = c[0], c[1]
         x_a, y_a = _bp_xy_columns(bp_a)
@@ -204,7 +204,7 @@ def compute_two_point_distances(
 def compute_three_point_angles(
     df: pd.DataFrame,
     within_animal_three_point_combs: Mapping[str, np.ndarray],
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Per-frame angles for every 3-body-part combination per animal.
 
     :param df: pose DataFrame.
@@ -214,7 +214,7 @@ def compute_three_point_angles(
         format does NOT include the animal name, only the three
         body-part names.
     """
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     for animal, points in within_animal_three_point_combs.items():
         for point in points:
             col_names = _flat_xy_column_names(point)
@@ -248,9 +248,9 @@ def compute_three_point_hulls(
     df: pd.DataFrame,
     within_animal_three_point_combs: Mapping[str, np.ndarray],
     px_per_mm: float,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Convex hull perimeter (mm) for every 3-body-part combination."""
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     for animal, points in within_animal_three_point_combs.items():
         for point in points:
             arr = _reshape_for_hull(df, point)
@@ -272,9 +272,9 @@ def compute_four_point_hulls(
     df: pd.DataFrame,
     within_animal_four_point_combs: Mapping[str, np.ndarray],
     px_per_mm: float,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Convex hull perimeter (mm) for every 4-body-part combination."""
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     for animal, points in within_animal_four_point_combs.items():
         for point in points:
             arr = _reshape_for_hull(df, point)
@@ -297,7 +297,7 @@ def compute_animal_convex_hulls(
     animal_bps: Mapping[str, list],
     px_per_mm: float,
     method: str,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Convex hull perimeter or area (mm or mm²) for the full body-part
     set per animal.
 
@@ -306,7 +306,7 @@ def compute_animal_convex_hulls(
         ``if method == 'perimeter': ... else: ...`` so any non-perimeter
         string falls into the area branch).
     """
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     for animal, bps in animal_bps.items():
         arr = _reshape_for_hull(df, bps)
         if method == "perimeter":
@@ -330,9 +330,9 @@ def compute_framewise_movement(
     animal_bps: Mapping[str, list],
     px_per_mm: float,
     source: str = "compute_framewise_movement",
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Frame-to-frame movement distance for each body-part."""
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     for animal, bps in animal_bps.items():
         for bp in bps:
             x_col, y_col = _bp_xy_columns(bp)
@@ -364,14 +364,14 @@ def compute_roi_center_distances(
     px_per_mm: float,
     video_roi_dict: Mapping[str, dict],
     source: str = "compute_roi_center_distances",
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Per-frame distance from each body-part to each ROI's center.
 
     :param video_roi_dict: ``{roi_name: roi_data_dict}`` for the
         current video. The roi_data_dict must have ``'Center_X'``
         and ``'Center_Y'`` keys.
     """
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     for animal, bps in animal_bps.items():
         for bp in bps:
             x_col, y_col = _bp_xy_columns(bp)
@@ -404,10 +404,10 @@ def compute_distances_to_frame_edge(
     video_width: int,
     video_height: int,
     source: str = "compute_distances_to_frame_edge",
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Per-frame distance from each body-part to each of the four
     frame edges (left, right, top, bottom)."""
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     img_resolution = np.array(
         [video_width, video_height], dtype=np.int32,
     )
@@ -448,13 +448,13 @@ def compute_inside_roi(
     animal_bps: Mapping[str, list],
     video_roi_dict: Mapping[str, dict],
     source: str = "compute_inside_roi",
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Per-frame boolean: is the body-part inside each ROI?
 
     Handles rectangle, circle, and polygon ROIs. Output column names
     include the shape type (matching the legacy class behavior).
     """
-    out: Dict[str, np.ndarray] = {}
+    out: dict[str, np.ndarray] = {}
     for animal, bps in animal_bps.items():
         for bp in bps:
             x_col, y_col = _bp_xy_columns(bp)

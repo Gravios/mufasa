@@ -20,7 +20,7 @@ from mufasa.utils.read_write import (find_core_cnt, get_fn_ext,
 
 JPEG, PNG, WEBP = 'jpeg', 'png', 'webp'
 
-def _video_to_frms_helper(img_batch: Tuple[int, List[int]],
+def _video_to_frms_helper(img_batch: tuple[int, list[int]],
                           verbose: bool,
                           img_format: str,
                           quality: int,
@@ -50,14 +50,14 @@ def _video_to_frms_helper(img_batch: Tuple[int, List[int]],
             cv2.imwrite(save_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 3])
     return batch_cnt
 
-def video_to_frames(video_path: Union[str, os.PathLike],
-                    save_dir: Optional[Union[str, os.PathLike]] = None,
-                    quality: Optional[int] = 95,
+def video_to_frames(video_path: str | os.PathLike,
+                    save_dir: str | os.PathLike | None = None,
+                    quality: int | None = 95,
                     img_format: Literal['png', 'webp'] = 'png',
                     verbose: bool = True,
                     clahe: bool = False,
                     greyscale: bool = False,
-                    core_cnt: Optional[int] = -1,
+                    core_cnt: int | None = -1,
                     black_and_white: bool = False,
                     include_video_name_in_filename: bool = True):
 

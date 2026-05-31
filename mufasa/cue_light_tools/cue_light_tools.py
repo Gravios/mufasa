@@ -9,7 +9,7 @@ from mufasa.utils.data import detect_bouts
 
 def find_frames_when_cue_light_on(
     data_df: pd.DataFrame,
-    cue_light_names: List[str],
+    cue_light_names: list[str],
     fps: int,
     prior_window_frames_cnt: int,
     post_window_frames_cnt: int,

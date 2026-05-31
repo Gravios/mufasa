@@ -86,15 +86,15 @@ PARSE_OPTIONS = csv.ParseOptions(delimiter=",")
 READ_OPTIONS = csv.ReadOptions(encoding="utf8")
 ImageFile.LOAD_TRUNCATED_IMAGES = False
 
-def read_df(file_path: Union[str, os.PathLike],
-            file_type: Union[str, os.PathLike] = 'csv',
-            has_index: Optional[bool] = True,
-            remove_columns: Optional[List[str]] = None,
-            usecols: Optional[List[str]] = None,
-            anipose_data: Optional[bool] = False,
-            check_multiindex: Optional[bool] = False,
-            multi_index_headers_to_keep: Optional[int] = None,
-            verbose: Optional[bool] = False) -> Union[pd.DataFrame, dict]:
+def read_df(file_path: str | os.PathLike,
+            file_type: str | os.PathLike = 'csv',
+            has_index: bool | None = True,
+            remove_columns: list[str] | None = None,
+            usecols: list[str] | None = None,
+            anipose_data: bool | None = False,
+            check_multiindex: bool | None = False,
+            multi_index_headers_to_keep: int | None = None,
+            verbose: bool | None = False) -> pd.DataFrame | dict:
     """
     Read single tabular data file or pickle
 
@@ -215,7 +215,7 @@ def read_df(file_path: Union[str, os.PathLike],
 
 def write_df(df: pd.DataFrame,
              file_type: str,
-             save_path: Union[str, os.PathLike],
+             save_path: str | os.PathLike,
              multi_idx_header: bool = False,
              verbose: bool = False) -> None:
     """
@@ -281,8 +281,8 @@ def write_df(df: pd.DataFrame,
         print(f'Saved file {save_path} (elapsed time: {timer.elapsed_time_str}s)')
 
 
-def get_fn_ext(filepath: Union[os.PathLike, str],
-               raise_error: bool = True) -> Union[Tuple[str, str, str], Tuple[None, None, None]]:
+def get_fn_ext(filepath: os.PathLike | str,
+               raise_error: bool = True) -> tuple[str, str, str] | tuple[None, None, None]:
     """
     Split file path into three components: (i) directory, (ii) file name, and (iii) file extension.
 
@@ -336,8 +336,8 @@ def read_config_entry(config: configparser.ConfigParser,
                       section: str,
                       option: str,
                       data_type: str,
-                      default_value: Optional[Any] = None,
-                      options: Optional[List] = None) -> Union[float, int, str]:
+                      default_value: Any | None = None,
+                      options: list | None = None) -> float | int | str:
     """
     Helper to read entry in SimBA project.toml parsed by configparser.ConfigParser.
 
@@ -394,7 +394,7 @@ def read_config_entry(config: configparser.ConfigParser,
             )
 
 
-def read_project_path_and_file_type(config: configparser.ConfigParser) -> Tuple[str, str]:
+def read_project_path_and_file_type(config: configparser.ConfigParser) -> tuple[str, str]:
     """
     Helper to read the path and file type of the SimBA project from the project.toml.
 
@@ -425,7 +425,7 @@ def read_project_path_and_file_type(config: configparser.ConfigParser) -> Tuple[
     return project_path, file_type
 
 
-def bgr_to_rgb_tuple(value: Tuple[int, int, int]) -> Tuple[int, int, int]:
+def bgr_to_rgb_tuple(value: tuple[int, int, int]) -> tuple[int, int, int]:
     """ convert bgr tuple to rgb tuple"""
     check_if_valid_rgb_tuple(data=value)
     return (value[2], value[1], value[0])
@@ -433,7 +433,7 @@ def bgr_to_rgb_tuple(value: Tuple[int, int, int]) -> Tuple[int, int, int]:
 
 
 
-def read_video_info_csv(file_path: Union[str, os.PathLike], raise_error: bool = True) -> pd.DataFrame:
+def read_video_info_csv(file_path: str | os.PathLike, raise_error: bool = True) -> pd.DataFrame:
     """
     Helper to read the project_folder/logs/video_info.csv of the SimBA project in as a pd.DataFrame
 
@@ -472,7 +472,7 @@ def read_video_info_csv(file_path: Union[str, os.PathLike], raise_error: bool = 
     return info_df
 
 
-def read_config_file(config_path: Union[str, os.PathLike]) -> configparser.ConfigParser:
+def read_config_file(config_path: str | os.PathLike) -> configparser.ConfigParser:
     """
     Helper to parse a Mufasa project config file.
 
@@ -524,9 +524,9 @@ def read_config_file(config_path: Union[str, os.PathLike]) -> configparser.Confi
     return config
 
 
-def get_video_meta_data(video_path: Union[str, os.PathLike, cv2.VideoCapture],
+def get_video_meta_data(video_path: str | os.PathLike | cv2.VideoCapture,
                         fps_as_int: bool = True,
-                        raise_error: bool = True) -> Union[Dict[str, Any], None]:
+                        raise_error: bool = True) -> dict[str, Any] | None:
     """
     Read video metadata (fps, resolution, frame cnt etc.) from video file (e.g., mp4).
 
@@ -580,7 +580,7 @@ def get_video_meta_data(video_path: Union[str, os.PathLike, cv2.VideoCapture],
     return video_data
 
 
-def get_video_info_ffmpeg(video_path: Union[str, os.PathLike]) -> Dict[str, Any]:
+def get_video_info_ffmpeg(video_path: str | os.PathLike) -> dict[str, Any]:
     """
     Extracts metadata information from a video file using FFmpeg's ffprobe.
 
@@ -630,8 +630,8 @@ def get_video_info_ffmpeg(video_path: Union[str, os.PathLike]) -> Dict[str, Any]
         print(e.args)
         raise InvalidVideoFileError(msg=f'Cannot use FFMPEG to extract video meta data for video {video_name}, try OpenCV?', source=get_video_info_ffmpeg.__name__)
 
-def remove_a_folder(folder_dir: Union[str, os.PathLike],
-                    ignore_errors: Optional[bool] = True,
+def remove_a_folder(folder_dir: str | os.PathLike,
+                    ignore_errors: bool | None = True,
                     verbose: bool = False) -> None:
 
     """Helper to remove a directory. """
@@ -657,14 +657,14 @@ def remove_a_folder(folder_dir: Union[str, os.PathLike],
         raise PermissionError(msg=f'Could not delete directory: {folder_dir}. is the directory or its content beeing used by anothe process?', source=remove_a_folder.__name__)
 
 
-def concatenate_videos_in_folder(in_folder: Union[str, os.PathLike, bytes],
-                                 save_path: Union[str, os.PathLike],
-                                 file_paths: Optional[List[Union[str, os.PathLike]]] = None,
-                                 video_format: Optional[str] = "mp4",
-                                 substring: Optional[str] = None,
-                                 remove_splits: Optional[bool] = True,
-                                 gpu: Optional[bool] = False,
-                                 fps: Optional[Union[int, str]] = None,
+def concatenate_videos_in_folder(in_folder: str | os.PathLike | bytes,
+                                 save_path: str | os.PathLike,
+                                 file_paths: list[str | os.PathLike] | None = None,
+                                 video_format: str | None = "mp4",
+                                 substring: str | None = None,
+                                 remove_splits: bool | None = True,
+                                 gpu: bool | None = False,
+                                 fps: int | str | None = None,
                                  verbose: bool = True) -> None:
     """
     Concatenate (temporally) all video files in a folder into a single video.
@@ -755,7 +755,7 @@ def concatenate_videos_in_folder(in_folder: Union[str, os.PathLike, bytes],
         stdout_success(msg="Video concatenated", elapsed_time=timer.elapsed_time_str, source=concatenate_videos_in_folder.__name__)
 
 
-def get_bp_headers(body_parts_lst: List[str]) -> list:
+def get_bp_headers(body_parts_lst: list[str]) -> list:
     """
     Helper to create ordered list of all column header fields from body-part names for SimBA project dataframes.
 
@@ -776,9 +776,9 @@ def get_bp_headers(body_parts_lst: List[str]) -> list:
 
 
 def read_video_info(video_name: str,
-                    video_info_df: Union[pd.DataFrame, None] = None,
-                    vid_info_df: Union[pd.DataFrame, None] = None,
-                    raise_error: Optional[bool] = True) -> Union[Tuple[pd.DataFrame, float, float], Tuple[None, None, None]]:
+                    video_info_df: pd.DataFrame | None = None,
+                    vid_info_df: pd.DataFrame | None = None,
+                    raise_error: bool | None = True) -> tuple[pd.DataFrame, float, float] | tuple[None, None, None]:
 
     """
     Helper to read the metadata (pixels per mm, resolution, fps etc) from the video_info.csv for a single input file/video
@@ -835,11 +835,11 @@ def read_video_info(video_name: str,
             InvalidValueWarning(msg=f"Video {video_name} an FPS of 1 or less.  It is recommended to use videos with more than one frame per second. If inaccurate, correct the FPS values inside the `project_folder/logs/video_info.csv` file", source='')
         return video_settings, px_per_mm, fps
 
-def find_all_videos_in_directory(directory: Union[str, os.PathLike],
+def find_all_videos_in_directory(directory: str | os.PathLike,
                                  as_dict: bool = False,
                                  raise_error: bool = False,
-                                 video_formats: Tuple[str] = (".avi", ".mp4", ".mov", ".flv", ".m4v", '.webm'),
-                                 sort_alphabetically: bool = False) -> Union[dict, list]:
+                                 video_formats: tuple[str] = (".avi", ".mp4", ".mov", ".flv", ".m4v", '.webm'),
+                                 sort_alphabetically: bool = False) -> dict | list:
     """
     Get all video file paths within a provided directory
 
@@ -882,16 +882,16 @@ def find_all_videos_in_directory(directory: Union[str, os.PathLike],
     return video_lst
 
 
-def read_frm_of_video(video_path: Union[str, os.PathLike, cv2.VideoCapture],
-                      frame_index: Optional[int] = 0,
-                      opacity: Optional[float] = None,
-                      size: Optional[Tuple[int, int]] = None,
+def read_frm_of_video(video_path: str | os.PathLike | cv2.VideoCapture,
+                      frame_index: int | None = 0,
+                      opacity: float | None = None,
+                      size: tuple[int, int] | None = None,
                       keep_aspect_ratio: bool = False,
-                      greyscale: Optional[bool] = False,
-                      black_and_white: Optional[bool] = False,
-                      clahe: Optional[Union[Tuple[int, int, int], bool]] = False,
-                      use_ffmpeg: Optional[bool] = False,
-                      raise_error: Optional[bool] = True) -> Union[np.ndarray, None]:
+                      greyscale: bool | None = False,
+                      black_and_white: bool | None = False,
+                      clahe: tuple[int, int, int] | bool | None = False,
+                      use_ffmpeg: bool | None = False,
+                      raise_error: bool | None = True) -> np.ndarray | None:
 
     """
     Reads a single frame from a video file.
@@ -1013,10 +1013,10 @@ def read_frm_of_video(video_path: Union[str, os.PathLike, cv2.VideoCapture],
     return img
 
 
-def read_img(img_path: Union[str, os.PathLike],
+def read_img(img_path: str | os.PathLike,
              greyscale: bool = False,
              clahe: bool = False,
-             opacity: Optional[float] = None) -> np.ndarray:
+             opacity: float | None = None) -> np.ndarray:
 
     file_ext = get_fn_ext(filepath=img_path)[2].lower()
     if file_ext not in Options.ALL_IMAGE_FORMAT_OPTIONS.value:
@@ -1043,11 +1043,11 @@ def read_img(img_path: Union[str, os.PathLike],
     return img.astype(np.uint8)
 
 
-def find_video_of_file(video_dir: Union[str, os.PathLike],
+def find_video_of_file(video_dir: str | os.PathLike,
                        filename: str,
-                       raise_error: Optional[bool] = False,
-                       warning: Optional[bool] = True,
-                       recursive: bool = False) -> Union[str, os.PathLike, None]:
+                       raise_error: bool | None = False,
+                       warning: bool | None = True,
+                       recursive: bool = False) -> str | os.PathLike | None:
     """
     Helper to find the video file with the SimBA project that represents a known data file path.
 
@@ -1127,12 +1127,12 @@ def find_video_of_file(video_dir: Union[str, os.PathLike],
     return return_path
 
 
-def find_files_of_filetypes_in_directory(directory: Union[str, os.PathLike],
-                                         extensions: Union[List[str], Tuple[str], str],
+def find_files_of_filetypes_in_directory(directory: str | os.PathLike,
+                                         extensions: list[str] | tuple[str] | str,
                                          raise_warning: bool = True,
                                          as_dict: bool = False,
                                          raise_error: bool = False,
-                                         sort_alphabetically: bool = False) -> Union[List[str], Dict[str, str]]:
+                                         sort_alphabetically: bool = False) -> list[str] | dict[str, str]:
     """
     Find all files in a directory of specified extensions/types.
 
@@ -1229,7 +1229,7 @@ def convert_parquet_to_csv(directory: str) -> None:
     stdout_success(msg=f"{str(len(files_found))} parquet files in {directory} converted to csv", source=convert_parquet_to_csv.__name__)
 
 
-def convert_csv_to_parquet(directory: Union[str, os.PathLike]) -> None:
+def convert_csv_to_parquet(directory: str | os.PathLike) -> None:
     """
     Convert all csv files in a folder to parquet format.
 
@@ -1265,7 +1265,7 @@ def convert_csv_to_parquet(directory: Union[str, os.PathLike]) -> None:
     )
 
 
-def get_file_name_info_in_directory(directory: Union[str, os.PathLike], file_type: str) -> Dict[str, str]:
+def get_file_name_info_in_directory(directory: str | os.PathLike, file_type: str) -> dict[str, str]:
     """
     Get dict of all file paths in a directory with specified extension as values and file base names as keys.
 
@@ -1302,7 +1302,7 @@ def str_2_bool(input_str: str) -> bool:
         return input_str.lower() in ("yes", "true", "1")
 
 
-def tabulate_clf_info(clf_path: Union[str, os.PathLike]) -> None:
+def tabulate_clf_info(clf_path: str | os.PathLike) -> None:
     """
     Print the hyperparameters and creation date of a pickled classifier.
 
@@ -1372,7 +1372,7 @@ def tabulate_clf_info(clf_path: Union[str, os.PathLike]) -> None:
         print(name + ": " + str(val))
 
 
-def get_all_clf_names(config: configparser.ConfigParser, target_cnt: int) -> List[str]:
+def get_all_clf_names(config: configparser.ConfigParser, target_cnt: int) -> list[str]:
     """
     Get all classifier names in a SimBA project.
 
@@ -1393,7 +1393,7 @@ def get_all_clf_names(config: configparser.ConfigParser, target_cnt: int) -> Lis
     return model_names
 
 
-def read_meta_file(meta_file_path: Union[str, os.PathLike]) -> dict:
+def read_meta_file(meta_file_path: str | os.PathLike) -> dict:
     """
     Read in single SimBA modelconfig meta file CSV to python dictionary.
 
@@ -1408,7 +1408,7 @@ def read_meta_file(meta_file_path: Union[str, os.PathLike]) -> dict:
     return pd.read_csv(meta_file_path, index_col=False).to_dict(orient="records")[0]
 
 
-def read_simba_meta_files(folder_path: str, raise_error: bool = False) -> List[str]:
+def read_simba_meta_files(folder_path: str, raise_error: bool = False) -> list[str]:
     """
     Read in paths of SimBA model config files directory (`project_folder/configs'). Consider files that have `meta` suffix only.
 
@@ -1443,7 +1443,7 @@ def read_simba_meta_files(folder_path: str, raise_error: bool = False) -> List[s
     return meta_file_lst
 
 
-def find_core_cnt() -> Tuple[int, int]:
+def find_core_cnt() -> tuple[int, int]:
     """
     Find the local cpu count and quarter of the cpu counts.
 
@@ -1484,7 +1484,7 @@ def get_number_of_header_columns_in_df(df: pd.DataFrame) -> int:
     )
 
 
-def get_memory_usage_of_df(df: pd.DataFrame) -> Dict[str, float]:
+def get_memory_usage_of_df(df: pd.DataFrame) -> dict[str, float]:
     """
     Get the RAM memory usage of a dataframe.
 
@@ -1506,11 +1506,11 @@ def get_memory_usage_of_df(df: pd.DataFrame) -> Dict[str, float]:
 
 
 def copy_single_video_to_project(
-    mufasa_ini_path: Union[str, os.PathLike],
-    source_path: Union[str, os.PathLike],
+    mufasa_ini_path: str | os.PathLike,
+    source_path: str | os.PathLike,
     symlink: bool = False,
-    allowed_video_formats: Optional[Tuple[str]] = ("avi", "mp4"),
-    overwrite: Optional[bool] = False,
+    allowed_video_formats: tuple[str] | None = ("avi", "mp4"),
+    overwrite: bool | None = False,
 ) -> None:
     """
     Import single video file to a Mufasa project (legacy INI format).
@@ -1575,12 +1575,12 @@ def copy_single_video_to_project(
             )
 
 
-def copy_multiple_videos_to_project(config_path: Union[str, os.PathLike],
-                                    source: Union[str, os.PathLike],
+def copy_multiple_videos_to_project(config_path: str | os.PathLike,
+                                    source: str | os.PathLike,
                                     file_type: str,
-                                    symlink: Optional[bool] = False,
-                                    recursive_search: Optional[bool] = False,
-                                    allowed_video_formats: Optional[Tuple[str]] = ("avi", "mp4")) -> None:
+                                    symlink: bool | None = False,
+                                    recursive_search: bool | None = False,
+                                    allowed_video_formats: tuple[str] | None = ("avi", "mp4")) -> None:
     """
     Import directory of videos to SimBA project.
 
@@ -1643,9 +1643,9 @@ def copy_multiple_videos_to_project(config_path: Union[str, os.PathLike],
     )
 
 
-def find_all_videos_in_project(videos_dir: Union[str, os.PathLike],
-                               basename: Optional[bool] = False,
-                               raise_error: bool = True) -> List[str]:
+def find_all_videos_in_project(videos_dir: str | os.PathLike,
+                               basename: bool | None = False,
+                               raise_error: bool = True) -> list[str]:
     """
     Get filenames of .avi and .mp4 files within a directory
 
@@ -1682,7 +1682,7 @@ def find_all_videos_in_project(videos_dir: Union[str, os.PathLike],
         return video_paths
 
 
-def check_if_hhmmss_timestamp_is_valid_part_of_video(timestamp: str, video_path: Union[str, os.PathLike]) -> None:
+def check_if_hhmmss_timestamp_is_valid_part_of_video(timestamp: str, video_path: str | os.PathLike) -> None:
     """
     Helper to check that a timestamp in HH:MM:SS format is a valid timestamp in a video file.
 
@@ -1728,7 +1728,7 @@ def timestamp_to_seconds(timestamp: str) -> int:
 
 
 
-def find_time_stamp_from_frame_numbers(start_frame: int, end_frame: int, fps: float) -> List[str]:
+def find_time_stamp_from_frame_numbers(start_frame: int, end_frame: int, fps: float) -> list[str]:
     """
     Given start and end frame numbers and frames per second (fps), return a list of formatted time stamps
     corresponding to the frame range start and end time.
@@ -1765,7 +1765,7 @@ def find_time_stamp_from_frame_numbers(start_frame: int, end_frame: int, fps: fl
     return [get_time(start_frame, fps), get_time(end_frame, fps)]
 
 
-def read_roi_data(roi_path: Union[str, os.PathLike]) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def read_roi_data(roi_path: str | os.PathLike) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Method to read in ROI definitions from SimBA project.
 
@@ -1809,7 +1809,7 @@ def read_roi_data(roi_path: Union[str, os.PathLike]) -> Tuple[pd.DataFrame, pd.D
 
 
 
-def create_directory(paths: Union[str, os.PathLike, bytes, List[str], Tuple[str]],
+def create_directory(paths: str | os.PathLike | bytes | list[str] | tuple[str],
                      overwrite: bool = False,
                      verbose: bool = False) -> None:
 
@@ -1844,7 +1844,7 @@ def create_directory(paths: Union[str, os.PathLike, bytes, List[str], Tuple[str]
                 raise PermissionError(f'Mufasa is not allowed to overwrite the directory {path} ({e}). Is a file in this directory open in another process?')
 
 
-def find_max_vertices_coordinates(shapes: List[Union[Polygon, LineString, MultiPolygon, Point]], buffer: Optional[int] = None) -> Tuple[int, int]:
+def find_max_vertices_coordinates(shapes: list[Polygon | LineString | MultiPolygon | Point], buffer: int | None = None) -> tuple[int, int]:
     """
     Find the maximum x and y coordinates among the vertices of a list of geometries.
 
@@ -1944,7 +1944,7 @@ def clean_superanimal_topview_filename(file_name: str):
         return file_name
 
 
-def read_dlc_superanimal_h5(path: Union[str, os.PathLike], col_names: List[str]) -> pd.DataFrame:
+def read_dlc_superanimal_h5(path: str | os.PathLike, col_names: list[str]) -> pd.DataFrame:
     """
     Read and parse DeepLabCut SuperAnimal-TopView pose estimation data from H5 format.
 
@@ -1989,7 +1989,7 @@ def read_dlc_superanimal_h5(path: Union[str, os.PathLike], col_names: List[str])
     return data
 
 
-def clean_sleap_filenames_in_directory(dir: Union[str, os.PathLike],
+def clean_sleap_filenames_in_directory(dir: str | os.PathLike,
                                        verbose: bool = False) -> None:
     """
     Clean up SLEAP input filenames in the specified directory by removing a prefix
@@ -2016,13 +2016,13 @@ def clean_sleap_filenames_in_directory(dir: Union[str, os.PathLike],
         else:
             pass
 
-def copy_files_in_directory(in_dir: Union[str, os.PathLike],
-                            out_dir: Union[str, os.PathLike],
+def copy_files_in_directory(in_dir: str | os.PathLike,
+                            out_dir: str | os.PathLike,
                             raise_error: bool = True,
-                            filetype: Optional[str] = None,
-                            prefix: Optional[str] = None,
-                            verbose: Optional[bool] = False,
-                            skip_truncated_img: Optional[bool] = False) -> None:
+                            filetype: str | None = None,
+                            prefix: str | None = None,
+                            verbose: bool | None = False,
+                            skip_truncated_img: bool | None = False) -> None:
     """
     Copy files from the specified input directory to the output directory.
 
@@ -2072,7 +2072,7 @@ def copy_files_in_directory(in_dir: Union[str, os.PathLike],
             shutil.copy(file_path, dst)
 
 
-def remove_multiple_folders(folders: List[Union[os.PathLike, str]], raise_error: Optional[bool] = False) -> None:
+def remove_multiple_folders(folders: list[os.PathLike | str], raise_error: bool | None = False) -> None:
 
     """
     Helper to remove multiple directories.
@@ -2097,7 +2097,7 @@ def remove_multiple_folders(folders: List[Union[os.PathLike, str]], raise_error:
 
 
 
-def remove_files(file_paths: List[Union[str, os.PathLike]], raise_error: Optional[bool] = False) -> None:
+def remove_files(file_paths: list[str | os.PathLike], raise_error: bool | None = False) -> None:
     """
     Delete (remove) the files specified within a list of filepaths.
 
@@ -2133,7 +2133,7 @@ def web_callback(url: str) -> None:
         raise InvalidInputError(msg="Invalid URL: {url}", source=web_callback.__name__)
 
 
-def get_pkg_version(pkg: str, raise_error: Optional[bool] = False):
+def get_pkg_version(pkg: str, raise_error: bool | None = False):
     """
     Helper to get the version of a package in the current python environment.
 
@@ -2155,7 +2155,7 @@ def get_pkg_version(pkg: str, raise_error: Optional[bool] = False):
             return None
 
 def fetch_pip_data(pip_url: str = Links.MUFASA_PIP_URL.value,
-                   time_out: int = 2) -> Union[Tuple[Dict[str, Any], str], Tuple[None, None]]:
+                   time_out: int = 2) -> tuple[dict[str, Any], str] | tuple[None, None]:
     """
     Fetch PyPI package metadata from a PyPI JSON API URL.
 
@@ -2190,7 +2190,7 @@ def fetch_pip_data(pip_url: str = Links.MUFASA_PIP_URL.value,
         return None, None
 
 
-def write_pickle(data: Dict[Any, Any], save_path: Union[str, os.PathLike]) -> None:
+def write_pickle(data: dict[Any, Any], save_path: str | os.PathLike) -> None:
     """
     Write a single object as pickle.
 
@@ -2212,7 +2212,7 @@ def write_pickle(data: Dict[Any, Any], save_path: Union[str, os.PathLike]) -> No
         )
 
 
-def read_pickle(data_path: Union[str, os.PathLike], verbose: Optional[bool] = False) -> Dict[Any, Any]:
+def read_pickle(data_path: str | os.PathLike, verbose: bool | None = False) -> dict[Any, Any]:
     """
     Read a single or directory of pickled objects. If directory, returns dict with numerical sequential integer keys for
     each object.
@@ -2268,7 +2268,7 @@ def read_pickle(data_path: Union[str, os.PathLike], verbose: Optional[bool] = Fa
     return data
 
 
-def drop_df_fields(data: pd.DataFrame, fields: List[str], raise_error: Optional[bool] = False) -> pd.DataFrame:
+def drop_df_fields(data: pd.DataFrame, fields: list[str], raise_error: bool | None = False) -> pd.DataFrame:
     """
     Drops specified fields in dataframe.
 
@@ -2287,9 +2287,9 @@ def drop_df_fields(data: pd.DataFrame, fields: List[str], raise_error: Optional[
 
 def get_unique_values_in_iterable(
     data: Iterable,
-    name: Optional[str] = "",
-    min: Optional[int] = 1,
-    max: Optional[int] = None,
+    name: str | None = "",
+    min: int | None = 1,
+    max: int | None = None,
 ) -> int:
     """
     Helper to get and check the number of unique variables in iterable. E.g., check the number of unique identified clusters.
@@ -2343,12 +2343,12 @@ def get_unique_values_in_iterable(
     return cnt
 
 
-def copy_files_to_directory(file_paths: Union[List[Union[str, os.PathLike]], Union[str, os.PathLike]],
-                            dir: Union[str, os.PathLike],
-                            verbose: Optional[bool] = True,
+def copy_files_to_directory(file_paths: list[str | os.PathLike] | str | os.PathLike,
+                            dir: str | os.PathLike,
+                            verbose: bool | None = True,
                             overwrite: bool = True,
                             check_validity: bool = True,
-                            integer_save_names: Optional[bool] = False) -> List[Union[str, os.PathLike]]:
+                            integer_save_names: bool | None = False) -> list[str | os.PathLike]:
     """
     Copy a list of files to a specified directory.
 
@@ -2390,8 +2390,8 @@ def copy_files_to_directory(file_paths: Union[List[Union[str, os.PathLike]], Uni
     return destinations
 
 
-def seconds_to_timestamp(seconds: Union[int, float, List[Union[int, float]]],
-                         hh_mm_ss_sss: bool = False) -> Union[str, List[str]]:
+def seconds_to_timestamp(seconds: int | float | list[int | float],
+                         hh_mm_ss_sss: bool = False) -> str | list[str]:
     """
     Convert an integer/float number of seconds, or a list of seconds, to a timestamp string.
 
@@ -2420,10 +2420,10 @@ def seconds_to_timestamp(seconds: Union[int, float, List[Union[int, float]]],
     return results[0] if len(data) == 1 else results
 
 
-def read_data_paths(path: Union[str, os.PathLike, None],
-                    default: List[Union[str, os.PathLike]],
-                    default_name: Optional[str] = "",
-                    file_type: Optional[str] = "csv") -> List[str]:
+def read_data_paths(path: str | os.PathLike | None,
+                    default: list[str | os.PathLike],
+                    default_name: str | None = "",
+                    file_type: str | None = "csv") -> list[str]:
     """
     Helper to flexibly read in a set of file-paths.
 
@@ -2531,13 +2531,13 @@ def img_to_bw(img: np.ndarray) -> np.ndarray:
                 result[i, j] = 255 if val > 127 else 0
     return result
 
-def read_img_batch_from_video_gpu(video_path: Union[str, os.PathLike],
-                                  start_frm: Optional[int] = None,
-                                  end_frm: Optional[int] = None,
+def read_img_batch_from_video_gpu(video_path: str | os.PathLike,
+                                  start_frm: int | None = None,
+                                  end_frm: int | None = None,
                                   verbose: bool = False,
                                   greyscale: bool = False,
                                   black_and_white: bool = False,
-                                  out_format: Literal['dict', 'array'] = 'dict') -> Union[Dict[int, np.ndarray], np.ndarray]:
+                                  out_format: Literal['dict', 'array'] = 'dict') -> dict[int, np.ndarray] | np.ndarray:
 
     """
     Reads a batch of frames from a video file using GPU acceleration.
@@ -2648,10 +2648,10 @@ def read_img_batch_from_video_gpu(video_path: Union[str, os.PathLike],
     return frames
 
 
-def find_largest_blob_location(imgs: Dict[int, np.ndarray],
+def find_largest_blob_location(imgs: dict[int, np.ndarray],
                                verbose: bool = False,
-                               video_name: Optional[str] = None,
-                               inclusion_zone: Optional[Union[Polygon, MultiPolygon,]] = None) -> Dict[int, np.ndarray]:
+                               video_name: str | None = None,
+                               inclusion_zone: Polygon | MultiPolygon | None = None) -> dict[int, np.ndarray]:
     """
     Helper to find the largest connected component in binary image. E.g., Use to find a "blob" (i.e., animal) within a background subtracted image.
 
@@ -2691,12 +2691,12 @@ def find_largest_blob_location(imgs: Dict[int, np.ndarray],
     return results
 
 
-def bento_file_reader(file_path: Union[str, os.PathLike],
-                      fps: Optional[float] = None,
-                      orient: Optional[Literal['index', 'columns']] = 'index',
-                      save_path: Optional[Union[str, os.PathLike]] = None,
-                      raise_error: Optional[bool] = False,
-                      log_setting: Optional[bool] = False) -> Union[None, Dict[str, pd.DataFrame]]:
+def bento_file_reader(file_path: str | os.PathLike,
+                      fps: float | None = None,
+                      orient: Literal['index', 'columns'] | None = 'index',
+                      save_path: str | os.PathLike | None = None,
+                      raise_error: bool | None = False,
+                      log_setting: bool | None = False) -> None | dict[str, pd.DataFrame]:
 
     """
     Reads a BENTO annotation file and processes it into a dictionary of DataFrames, each representing a classified behavior.
@@ -2801,7 +2801,7 @@ def _is_new_boris_version(pd_df: pd.DataFrame):
     """
     return "Media file name" in list(pd_df.columns)
 
-def _find_cap_insensitive_name(target: str, values: List[str]) -> Union[None, str]:
+def _find_cap_insensitive_name(target: str, values: list[str]) -> None | str:
     check_str(name=f'{_find_cap_insensitive_name.__name__} target', value=target)
     check_valid_lst(data=values, source=f'{_find_cap_insensitive_name.__name__} values', valid_dtypes=(str,), min_len=1)
     target_lower, values_lower = target.lower(), [x.lower() for x in values]
@@ -2809,12 +2809,12 @@ def _find_cap_insensitive_name(target: str, values: List[str]) -> Union[None, st
         return None
     else:
         return values[values_lower.index(target_lower)]
-def read_boris_file(file_path: Union[str, os.PathLike],
-                    fps: Optional[Union[int, float]] = None,
-                    orient: Optional[Literal['index', 'columns']] = 'index',
-                    save_path: Optional[Union[str, os.PathLike]] = None,
-                    raise_error: Optional[bool] = False,
-                    log_setting: Optional[bool] = False) -> Union[None, Dict[str, Dict[str, pd.DataFrame]]]:
+def read_boris_file(file_path: str | os.PathLike,
+                    fps: int | float | None = None,
+                    orient: Literal['index', 'columns'] | None = 'index',
+                    save_path: str | os.PathLike | None = None,
+                    raise_error: bool | None = False,
+                    log_setting: bool | None = False) -> None | dict[str, dict[str, pd.DataFrame]]:
     """
     Reads a BORIS behavioral annotation file, processes the data, and optionally saves the results to a file.
 
@@ -2952,10 +2952,10 @@ def read_boris_file(file_path: Union[str, os.PathLike],
 #     read_boris_file(file_path=file)
 
 def img_stack_to_video(x: np.ndarray,
-                       save_path: Union[str, os.PathLike],
+                       save_path: str | os.PathLike,
                        fps: float,
-                       gpu: Optional[bool] = False,
-                       bitrate: Optional[int] = 5000) -> None:
+                       gpu: bool | None = False,
+                       bitrate: int | None = 5000) -> None:
 
     """
     Converts a NumPy image stack to a video file, with optional GPU acceleration and configurable bitrate.
@@ -3023,9 +3023,9 @@ def _b64_to_arr(img_b64) -> np.ndarray:
     return img_arr
 
 
-def labelme_to_dlc(labelme_dir: Union[str, os.PathLike],
-                   scorer: Optional[str] = 'SN',
-                   save_dir: Optional[Union[str, os.PathLike]] = None) -> None:
+def labelme_to_dlc(labelme_dir: str | os.PathLike,
+                   scorer: str | None = 'SN',
+                   save_dir: str | os.PathLike | None = None) -> None:
     """
     Convert labels from labelme format to DLC format.
 
@@ -3082,7 +3082,7 @@ def labelme_to_dlc(labelme_dir: Union[str, os.PathLike],
     results.to_csv(save_path)
 
 
-def read_shap_feature_categories_csv() -> Tuple[pd.DataFrame, List[str], List[str], List[str]]:
+def read_shap_feature_categories_csv() -> tuple[pd.DataFrame, list[str], list[str], list[str]]:
     """ Helper to read feature names and their categories used for binning and visualizing shapely values"""
     feature_categories_csv_path = os.path.join(MUFASA_DIR, Paths.SIMBA_SHAP_CATEGORIES_PATH.value)
     check_file_exist_and_readable(file_path=feature_categories_csv_path)
@@ -3114,7 +3114,7 @@ def read_shap_img_paths():
 
     return scale_img_paths, category_img_paths
 
-def get_memory_usage_array(x: np.ndarray) -> Dict[str, float]:
+def get_memory_usage_array(x: np.ndarray) -> dict[str, float]:
     """
     Calculates the memory usage of a NumPy array in bytes, megabytes, and gigabytes.
 
@@ -3130,7 +3130,7 @@ def get_memory_usage_array(x: np.ndarray) -> Dict[str, float]:
     results["gigabytes"] = int(mb / 1000)
     return results
 
-def read_json(x: Union[Union[str, os.PathLike], List[Union[str, os.PathLike]]], encoding: str = 'utf-8', raise_error: bool = True) -> dict:
+def read_json(x: str | os.PathLike | list[str | os.PathLike], encoding: str = 'utf-8', raise_error: bool = True) -> dict:
     """
     Reads one or multiple JSON files from disk and returns their contents as a dictionary.
 
@@ -3165,7 +3165,7 @@ def read_json(x: Union[Union[str, os.PathLike], List[Union[str, os.PathLike]]], 
 
 
 
-def save_json(data: dict, filepath: Union[str, os.PathLike], encoding: str = 'utf-8') -> None:
+def save_json(data: dict, filepath: str | os.PathLike, encoding: str = 'utf-8') -> None:
     """
     Saves a dictionary as a JSON file to the specified filepath.
 
@@ -3179,7 +3179,7 @@ def save_json(data: dict, filepath: Union[str, os.PathLike], encoding: str = 'ut
         raise IOError(f"Error saving JSON file to {filepath}: {e}")
 
 
-def df_to_xlsx_sheet(xlsx_path: Union[str, os.PathLike],
+def df_to_xlsx_sheet(xlsx_path: str | os.PathLike,
                      df: pd.DataFrame,
                      sheet_name: str,
                      create_file: bool = True) -> None:
@@ -3223,7 +3223,7 @@ def df_to_xlsx_sheet(xlsx_path: Union[str, os.PathLike],
     with pd.ExcelWriter(xlsx_path, mode='a') as writer:
         df.to_excel(writer, sheet_name=sheet_name)
 
-def create_empty_xlsx_file(xlsx_path: Union[str, os.PathLike]):
+def create_empty_xlsx_file(xlsx_path: str | os.PathLike):
     """
     Create an empty MS Excel file.
     :param Union[str, os.PathLike] xlsx_path: Path where to save MS Excel file on disk.
@@ -3259,12 +3259,12 @@ def get_downloads_path(raise_error: bool = False):
 
 
 def _read_img_batch_from_video_helper(frm_idx: np.ndarray,
-                                      video_path: Union[str, os.PathLike],
+                                      video_path: str | os.PathLike,
                                       greyscale: bool,
                                       verbose: bool,
                                       black_and_white: bool,
                                       clahe: bool,
-                                      size: Optional[Tuple[int, int]] = None):
+                                      size: tuple[int, int] | None = None):
 
     """Multiprocess helper used by read_img_batch_from_video to read in images from video file."""
 
@@ -3298,16 +3298,16 @@ def _read_img_batch_from_video_helper(frm_idx: np.ndarray,
         current_frm += 1
     return results
 
-def read_img_batch_from_video(video_path: Union[str, os.PathLike],
-                              start_frm: Optional[int] = None,
-                              end_frm: Optional[int] = None,
+def read_img_batch_from_video(video_path: str | os.PathLike,
+                              start_frm: int | None = None,
+                              end_frm: int | None = None,
                               greyscale: bool = False,
                               black_and_white: bool = False,
                               clahe: bool = False,
                               core_cnt: int = -1,
-                              size: Optional[Tuple[int, int]] = None,
-                              pool: Optional[multiprocessing.Pool] = None,
-                              verbose: bool = False) -> Dict[int, np.ndarray]:
+                              size: tuple[int, int] | None = None,
+                              pool: multiprocessing.Pool | None = None,
+                              verbose: bool = False) -> dict[int, np.ndarray]:
     """
     Read a batch of frames from a video file. This method reads frames from a specified range of frames within a video file using multiprocessing.
 
@@ -3384,7 +3384,7 @@ def read_img_batch_from_video(video_path: Union[str, os.PathLike],
         stdout_information(msg=f'[{get_current_time()}] Read frames {start_frm}-{end_frm} (video: {video_meta_data["video_name"]}, elapsed time: {timer.elapsed_time_str}s)')
     return results
 
-def read_yolo_bp_names_file(file_path: Union[str, os.PathLike]) -> Tuple[str]:
+def read_yolo_bp_names_file(file_path: str | os.PathLike) -> tuple[str]:
     """
     Helper to read CSV with single column listing body-part names. 
     """
@@ -3432,7 +3432,7 @@ def read_df_array(df: pd.DataFrame, column: str):
     df[column] = df[column].apply(_col_to_arrays)  # Convert in-place
     return df
 
-def read_sleap_csv(file_path: Union[str, os.PathLike]) -> Tuple[pd.DataFrame, list, list]:
+def read_sleap_csv(file_path: str | os.PathLike) -> tuple[pd.DataFrame, list, list]:
     """
     Reads and validates a SLEAP-exported CSV file containing tracking data.
 
@@ -3462,13 +3462,13 @@ def read_sleap_csv(file_path: Union[str, os.PathLike]) -> Tuple[pd.DataFrame, li
 
 
 
-def recursive_file_search(directory: Union[str, os.PathLike],
-                          extensions: Union[str, List[str]],
+def recursive_file_search(directory: str | os.PathLike,
+                          extensions: str | list[str],
                           case_sensitive: bool = False,
-                          substrings: Optional[Union[str, List[str]]] = None,
-                          skip_substrings: Optional[Union[str, List[str]]] = None,
+                          substrings: str | list[str] | None = None,
+                          skip_substrings: str | list[str] | None = None,
                           raise_error: bool = True,
-                          as_dict: bool = False) -> Union[List[str], Dict[str, str]]:
+                          as_dict: bool = False) -> list[str] | dict[str, str]:
     """
     Recursively search for files in a directory and all subdirectories that:
     - Contain any of the given substrings in their filename
@@ -3533,7 +3533,7 @@ def recursive_file_search(directory: Union[str, os.PathLike],
     return results
 
 
-def read_sleap_h5(file_path: Union[str, os.PathLike]) -> pd.DataFrame:
+def read_sleap_h5(file_path: str | os.PathLike) -> pd.DataFrame:
     """
      Helper to read in SLEAP H5 file in format expected by SimBA
      """
@@ -3569,7 +3569,7 @@ def read_sleap_h5(file_path: Union[str, os.PathLike]) -> pd.DataFrame:
 
 def img_array_to_clahe(img: np.ndarray,
                        clip_limit: int = 2,
-                       tile_grid_size: Tuple[int, int] = (16, 16)) -> np.ndarray:
+                       tile_grid_size: tuple[int, int] = (16, 16)) -> np.ndarray:
     check_if_valid_img(data=img, source=img_array_to_clahe.__name__, raise_error=True)
     if len(img.shape) > 2:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -3585,7 +3585,7 @@ def read_sys_env():
     return env
 
 
-def get_recent_projects_paths(max: int = 15, sort_alphabetically: bool = True) -> List[str]:
+def get_recent_projects_paths(max: int = 15, sort_alphabetically: bool = True) -> list[str]:
     file_path = os.path.join(MUFASA_DIR, Paths.RECENT_PROJECTS_PATHS.value)
     if not os.path.isfile(file_path):
         Path(file_path).touch(); return []
@@ -3604,7 +3604,7 @@ def get_recent_projects_paths(max: int = 15, sort_alphabetically: bool = True) -
 
 
 
-def write_to_recent_project_paths(config_path: Union[str, os.PathLike]):
+def write_to_recent_project_paths(config_path: str | os.PathLike):
     file_path = os.path.join(MUFASA_DIR, Paths.RECENT_PROJECTS_PATHS.value)
     existing_paths = get_recent_projects_paths()
     print(existing_paths)
@@ -3620,7 +3620,7 @@ def write_to_recent_project_paths(config_path: Union[str, os.PathLike]):
         pass
 
 
-def read_facemap_h5(file_path: Union[str, os.PathLike]) -> pd.DataFrame:
+def read_facemap_h5(file_path: str | os.PathLike) -> pd.DataFrame:
     """
     Convert FaceMap pose-estimation data to pandas Dataframe format.
 
@@ -3664,7 +3664,7 @@ def read_facemap_h5(file_path: Union[str, os.PathLike]) -> pd.DataFrame:
     return results
 
 
-def get_site_packages_path(raise_error: Optional[bool] = True) -> Union[None, os.PathLike, str]:
+def get_site_packages_path(raise_error: bool | None = True) -> None | os.PathLike | str:
     """
     Retrieve the path to the current Python environment's `site-packages` directory.
     """
@@ -3680,7 +3680,7 @@ def get_site_packages_path(raise_error: Optional[bool] = True) -> Union[None, os
             return None
 
 
-def get_env_pose_config_dir(raise_error: Optional[bool] = True):
+def get_env_pose_config_dir(raise_error: bool | None = True):
     """
     Locate and validate the `pose_configurations` directory in the active SimBA installation.
     """
@@ -3704,7 +3704,7 @@ def get_env_pose_config_dir(raise_error: Optional[bool] = True):
         return None
 
 
-def osf_download(project_id: str, save_dir: Union[str, os.PathLike], storage: str = 'osfstorage', overwrite: bool = False):
+def osf_download(project_id: str, save_dir: str | os.PathLike, storage: str = 'osfstorage', overwrite: bool = False):
     """
     Download all files from an OSF (Open Science Framework) project to a local directory.
 
@@ -3744,7 +3744,7 @@ def osf_download(project_id: str, save_dir: Union[str, os.PathLike], storage: st
     print(f'Download completed (elapsed time: {timer.elapsed_time_str}s)')
 
 
-def get_audio_duration(audio_path: Union[str, os.PathLike]) -> float:
+def get_audio_duration(audio_path: str | os.PathLike) -> float:
     """
     Get duration of audio file in seconds using ffprobe.
 
@@ -3764,8 +3764,8 @@ def get_audio_duration(audio_path: Union[str, os.PathLike]) -> float:
         raise FFMPEGCodecGPUError(msg=f'Error getting audio duration: {str(e)}', source='get_audio_duration')
 
 
-def extract_audio_from_video(video_path: Union[str, os.PathLike],
-                             save_path: Union[str, os.PathLike],
+def extract_audio_from_video(video_path: str | os.PathLike,
+                             save_path: str | os.PathLike,
                              bitrate: str = '192k',
                              sample_rate: int = 44100) -> None:
     """
@@ -3819,9 +3819,9 @@ def extract_audio_from_video(video_path: Union[str, os.PathLike],
     stdout_success(msg=f'Audio track saved at {save_path}', elapsed_time=timer.elapsed_time_str)
 
 
-def find_closest_readable_frame(video_path: Union[str, os.PathLike],
+def find_closest_readable_frame(video_path: str | os.PathLike,
                                 target_frame: int,
-                                max_search_range: int = 50) -> Tuple[Optional[np.ndarray], Optional[int]]:
+                                max_search_range: int = 50) -> tuple[np.ndarray | None, int | None]:
     """
     Finds the closest readable frame to a target frame index.
 
@@ -3871,7 +3871,7 @@ def find_closest_readable_frame(video_path: Union[str, os.PathLike],
 def terminate_cpu_pool(pool: multiprocessing.Pool,
                        force: bool = False,
                        verbose: bool = True,
-                       source: Optional[str] = None) -> None:
+                       source: str | None = None) -> None:
     """
     Safely terminates a multiprocessing.Pool instance with optional graceful shutdown.
 
@@ -3909,7 +3909,7 @@ def get_cpu_pool(core_cnt: int = -1,
                  maxtasksperchild: int = Defaults.MAXIMUM_MAX_TASK_PER_CHILD.value,
                  context: Literal['fork', 'spawn', 'forkserver'] = None,
                  verbose: bool = True,
-                 source: Optional[str] = None) -> multiprocessing.Pool:
+                 source: str | None = None) -> multiprocessing.Pool:
     """
     Creates and returns a multiprocessing.Pool instance with platform-appropriate defaults and validation.
 

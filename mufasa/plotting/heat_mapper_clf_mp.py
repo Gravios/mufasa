@@ -46,18 +46,18 @@ def _heatmap_multiprocessor(data: np.array,
                             frame_dir: str,
                             fps: int,
                             verbose: bool,
-                            heatmap_opacity: Union[float, None],
-                            kp_data: Union[pd.DataFrame, None],
+                            heatmap_opacity: float | None,
+                            kp_data: pd.DataFrame | None,
                             style_attr: dict,
-                            bg_img: Union[int, None],
-                            video_path: Union[str, os.PathLike, None],
-                            min_seconds: Optional[int],
-                            line_clr: Union[str, None],
+                            bg_img: int | None,
+                            video_path: str | os.PathLike | None,
+                            min_seconds: int | None,
+                            line_clr: str | None,
                             max_scale: float,
                             clf_name: str,
                             show_legend: bool,
                             aspect_ratio: float,
-                            size: Tuple[int, int]):
+                            size: tuple[int, int]):
 
     batch, frm_ids, data = data[0], data[1], data[2]
     video_writer = None
@@ -146,22 +146,22 @@ class HeatMapperClfMultiprocess(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
                  bodypart: str,
                  clf_name: str,
-                 data_paths: List[str],
+                 data_paths: list[str],
                  style_attr: dict,
                  show_legend: bool = True,
                  final_img_setting: bool = True,
-                 bg_img: Optional[int] = None,
-                 heatmap_opacity: Optional[float] = None,
+                 bg_img: int | None = None,
+                 heatmap_opacity: float | None = None,
                  video_setting: bool = False,
                  verbose: bool = True,
-                 line_clr: Optional[str] = None,
+                 line_clr: str | None = None,
                  show_keypoint: bool = False,
-                 min_seconds: Optional[int] = None,
+                 min_seconds: int | None = None,
                  frame_setting: bool = False,
-                 time_slice: Optional[Dict[str, str]] = None,
+                 time_slice: dict[str, str] | None = None,
                  core_cnt: int = -1):
 
         ConfigReader.__init__(self, config_path=config_path, create_logger=False)

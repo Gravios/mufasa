@@ -47,10 +47,10 @@ class CueLightMovementAnalyzer(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 cue_light_names: List[str],
+                 config_path: str | os.PathLike,
+                 cue_light_names: list[str],
                  bp_name: str,
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
+                 data_dir: str | os.PathLike | None = None,
                  pre_window: int = 0,
                  post_window: int = 0,
                  verbose: bool = True):

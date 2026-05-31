@@ -34,7 +34,7 @@ class TrainRandomForestClassifier(ConfigReader, TrainModelMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike]):
+                 config_path: str | os.PathLike):
 
         ConfigReader.__init__(self, config_path=config_path, create_logger=False)
         TrainModelMixin.__init__(self)

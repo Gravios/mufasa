@@ -37,15 +37,15 @@ from mufasa.utils.read_write import (create_directory, find_core_cnt,
 
 YOLO_EXTENSIONS = ('.engine', '.pt', '.onnx', '.torchscript', '.xml', '.pb', '.tflite', '.edgetpu', '.paddle', '.ncnn', '.mnn', '.imx', '.rknn')
 
-def fit_yolo(weights_path: Union[str, os.PathLike],
-             model_yaml: Union[str, os.PathLike],
-             save_path: Union[str, os.PathLike],
+def fit_yolo(weights_path: str | os.PathLike,
+             model_yaml: str | os.PathLike,
+             save_path: str | os.PathLike,
              epochs: int = 25,
-             batch: Union[int, float] = 16,
+             batch: int | float = 16,
              plots: bool = True,
              imgsz: int = 640,
-             format: Optional[str] = None,
-             device:  Union[Literal['cpu'], int] = 0,
+             format: str | None = None,
+             device:  Literal['cpu'] | int = 0,
              verbose: bool = True,
              workers: int = 8):
     """
@@ -86,10 +86,10 @@ def fit_yolo(weights_path: Union[str, os.PathLike],
     model.train(data=model_yaml, epochs=epochs, project=save_path, batch=batch, plots=plots, imgsz=imgsz, workers=workers)
 
 
-def load_yolo_model(weights_path: Union[str, os.PathLike],
+def load_yolo_model(weights_path: str | os.PathLike,
                     verbose: bool = True,
-                    format: Optional[str] = None,
-                    device: Union[Literal['cpu'], int] = 0):
+                    format: str | None = None,
+                    device: Literal['cpu'] | int = 0):
 
     """
     Load a YOLO model.
@@ -134,10 +134,10 @@ def _get_undetected_obs(frm_id: int, class_id: int, class_name: str, value_cnt: 
 
 def filter_yolo_keypoint_data(bbox_data: np.ndarray,
                               keypoint_data: np.ndarray,
-                              class_id: Optional[int] = None,
-                              confidence: Optional[float] = None,
-                              class_idx: Optional[int] = None,
-                              confidence_idx: Optional[int] = None):
+                              class_id: int | None = None,
+                              confidence: float | None = None,
+                              class_idx: int | None = None,
+                              confidence_idx: int | None = None):
     """
     Helper to filters YOLO bounding box and keypoint data based on class ID and/or confidence threshold.
 
@@ -170,17 +170,17 @@ def filter_yolo_keypoint_data(bbox_data: np.ndarray,
 
 
 def yolo_predict(model: YOLO,
-                 source: Union[str, os.PathLike, np.ndarray],
+                 source: str | os.PathLike | np.ndarray,
                  half: bool = False,
-                 batch_size: Optional[int] = 4,
+                 batch_size: int | None = 4,
                  stream: bool = False,
                  imgsz: int = 640,
                  iou: float = 0.75,
-                 device:  Union[Literal['cpu'], int] = 0,
+                 device:  Literal['cpu'] | int = 0,
                  threshold: float = 0.25,
                  max_detections: int = 300,
                  verbose: bool = True,
-                 retina_msk: Optional[bool] = False):
+                 retina_msk: bool | None = False):
 
     """
     Produce YOLO predictions.
@@ -237,7 +237,7 @@ def yolo_predict(model: YOLO,
 def keypoint_array_to_yolo_annotation_str(x: np.ndarray,
                                           img_h: int,
                                           img_w: int,
-                                          padding: Optional[float] = None) -> str:
+                                          padding: float | None = None) -> str:
     """
     Convert a set of keypoints into a YOLO-format annotation string that includes the normalized bounding box and keypoints.
 
@@ -298,7 +298,7 @@ def apply_fixed_bbox_size(data: pd.DataFrame,
                           video_name: str,
                           img_w: int,
                           img_h: int,
-                          bbox_size: Tuple[int, int]) -> pd.DataFrame:
+                          bbox_size: tuple[int, int]) -> pd.DataFrame:
     """
     Apply a fixed axis-aligned bounding-box size to detected rows in a results table.
 
@@ -393,9 +393,9 @@ def detect_yolo_project_type(label_path: str) -> str:
     return 'bbox'
 
 
-def create_yolo_sample_visualizations(samples: List[Tuple[str, np.ndarray, str]],
-                                      save_dir: Union[str, os.PathLike],
-                                      names: Optional[Tuple[str, ...]] = None,
+def create_yolo_sample_visualizations(samples: list[tuple[str, np.ndarray, str]],
+                                      save_dir: str | os.PathLike,
+                                      names: tuple[str, ...] | None = None,
                                       palette: str = 'Set1',
                                       seg_opacity: float = 0.5,
                                       draw_labels: bool = True,
@@ -484,18 +484,18 @@ def create_yolo_sample_visualizations(samples: List[Tuple[str, np.ndarray, str]]
     if verbose:
         stdout_information(msg=f'{len(samples)} visualizations saved in {save_dir}', source=source)
 
-def export_yolo_model(model_path: Union[str, os.PathLike],
+def export_yolo_model(model_path: str | os.PathLike,
                       export_format: Literal["onnx", "engine", "torchscript", "onnxsimplify", "coreml", "openvino", "pb", "tf", "tflite", "torch"],
                       imgsz: int = 256,
-                      device: Union[Literal['cpu'], int] = 0,
+                      device: Literal['cpu'] | int = 0,
                       int8: bool = False,
                       batch: int = 1,
-                      workspace: Optional[int] = 8,
-                      data: Optional[Union[str, os.PathLike]] = None,
-                      task: Optional[Literal["detect", "segment", "classify", "pose", "obb"]] = None,
+                      workspace: int | None = 8,
+                      data: str | os.PathLike | None = None,
+                      task: Literal["detect", "segment", "classify", "pose", "obb"] | None = None,
                       dynamic: bool = False,
                       simplify: bool = True,
-                      half: bool = False) -> Union[str, os.PathLike]:
+                      half: bool = False) -> str | os.PathLike:
     """
     Export a YOLO model using Ultralytics ``model.export``.
 
@@ -564,7 +564,7 @@ def export_yolo_model(model_path: Union[str, os.PathLike],
     return out
 
 
-def read_yolo_metadata(model: Union[str, os.PathLike, YOLO]) -> dict:
+def read_yolo_metadata(model: str | os.PathLike | YOLO) -> dict:
     """
     Read metadata from a YOLO model file or loaded YOLO instance.
 

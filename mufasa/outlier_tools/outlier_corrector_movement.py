@@ -39,9 +39,9 @@ class OutlierCorrecterMovement(ConfigReader, FeatureExtractionMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
-                 save_dir: Optional[Union[str, os.PathLike]] = None):
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike | None = None,
+                 save_dir: str | os.PathLike | None = None):
 
         ConfigReader.__init__(self, config_path=config_path)
         FeatureExtractionMixin.__init__(self)

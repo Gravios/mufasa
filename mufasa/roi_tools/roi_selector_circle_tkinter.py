@@ -38,7 +38,7 @@ class ROISelectorCircle:
     def __init__(self,
                  img_window: Toplevel,
                  thickness: int = 10,
-                 clr: Tuple[int, int, int] = (147, 20, 255)):
+                 clr: tuple[int, int, int] = (147, 20, 255)):
 
         check_instance(source=self.__class__.__name__, instance=img_window, accepted_types=(Toplevel,))
         check_int(name=f'{self.__class__.__name__} thickness', value=thickness, min_value=1)

@@ -41,10 +41,10 @@ def pose_plotter_mp(data: pd.DataFrame,
                     bp_dict: dict,
                     colors_dict: dict,
                     circle_size: int,
-                    center_of_mass: Optional[dict],
+                    center_of_mass: dict | None,
                     center_of_mass_clr: tuple,
                     bbox: bool,
-                    video_save_dir: Union[str, os.PathLike],):
+                    video_save_dir: str | os.PathLike,):
 
     fourcc = cv2.VideoWriter_fourcc(*Formats.MP4_CODEC.value)
     group_cnt = int(data.iloc[0]["group"])
@@ -112,15 +112,15 @@ class PosePlotterMultiProcess:
     """
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 out_dir: Optional[Union[str, os.PathLike]] = None,
-                 palettes: Optional[Dict[str, str]] = None,
-                 circle_size: Optional[int] = None,
-                 core_cnt: Optional[int] = -1,
-                 gpu: Optional[bool] = False,
-                 bbox: Optional[Literal['axis-aligned', 'animal-aligned']] = None,
-                 center_of_mass: Optional[Tuple[int, int, int]] = None,
-                 sample_time: Optional[int] = None,
+                 data_path: str | os.PathLike,
+                 out_dir: str | os.PathLike | None = None,
+                 palettes: dict[str, str] | None = None,
+                 circle_size: int | None = None,
+                 core_cnt: int | None = -1,
+                 gpu: bool | None = False,
+                 bbox: Literal['axis-aligned', 'animal-aligned'] | None = None,
+                 center_of_mass: tuple[int, int, int] | None = None,
+                 sample_time: int | None = None,
                  verbose: bool = True) -> None:
 
         if os.path.isdir(data_path):

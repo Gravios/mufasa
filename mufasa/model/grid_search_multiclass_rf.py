@@ -23,7 +23,7 @@ from mufasa.utils.read_write import (read_config_entry, read_simba_meta_files,
 
 class GridSearchMulticlassRandomForestClassifier(ConfigReader, TrainModelMixin):
 
-    def __init__(self, config_path: Union[str, os.PathLike]):
+    def __init__(self, config_path: str | os.PathLike):
 
         ConfigReader.__init__(self, config_path=config_path)
         log_event(logger_name=str(self.__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=self.create_log_msg_from_init_args(locals=locals()))

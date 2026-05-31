@@ -26,8 +26,8 @@ EXPECTED_COLS = [FRAME, CLASS_ID, CLASS_NAME, CONFIDENCE, TRACK, 'X1', 'Y1', 'X2
 
 class YoloTrackCleaner:
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 data_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  bp_loc: str = 'CENTER',
                  max_frame_gap: int = 50,
                  max_pixel_gap: int = 250,

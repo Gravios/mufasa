@@ -51,13 +51,13 @@ def _heatmap_location(data: np.array,
                       fps: int,
                       show_legend: bool,
                       heatmap_opacity: float,
-                      kp_data: Union[pd.DataFrame, None],
+                      kp_data: pd.DataFrame | None,
                       video_path: str,
-                      min_seconds: Union[int, None],
-                      bg_img: Union[int, None],
+                      min_seconds: int | None,
+                      bg_img: int | None,
                       style_attr: dict,
                       aspect_ratio: float,
-                      size: Tuple[int, int]):
+                      size: tuple[int, int]):
 
     group = int(data[0][0][1])
     video_writer = None
@@ -158,21 +158,21 @@ class HeatMapperLocationMultiprocess(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_paths: Union[List[Union[str, os.PathLike]], str, os.PathLike],
+                 config_path: str | os.PathLike,
+                 data_paths: list[str | os.PathLike] | str | os.PathLike,
                  bodypart: str,
-                 style_attr: Dict[str, Any],
-                 bg_img: Optional[int] = None,
-                 time_slice: Optional[Dict[str, str]] = None,
+                 style_attr: dict[str, Any],
+                 bg_img: int | None = None,
+                 time_slice: dict[str, str] | None = None,
                  show_keypoint: bool = False,
                  show_legend: bool = True,
-                 heatmap_opacity: Optional[float] = None,
-                 min_seconds: Optional[int] = None,
-                 line_clr: Optional[str] = None,
-                 final_img_setting: Optional[bool] = True,
-                 video_setting: Optional[bool] = False,
-                 frame_setting: Optional[bool] = False,
-                 core_cnt: Optional[int] = -1,
+                 heatmap_opacity: float | None = None,
+                 min_seconds: int | None = None,
+                 line_clr: str | None = None,
+                 final_img_setting: bool | None = True,
+                 video_setting: bool | None = False,
+                 frame_setting: bool | None = False,
+                 core_cnt: int | None = -1,
                  verbose: bool = True):
 
         if (not frame_setting) and (not video_setting) and (not final_img_setting):

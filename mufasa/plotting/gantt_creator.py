@@ -65,20 +65,20 @@ class GanttCreatorSingleProcess(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_paths: Optional[Union[Union[str, os.PathLike], List[Union[str, os.PathLike]]]] = None,
+                 config_path: str | os.PathLike,
+                 data_paths: str | os.PathLike | list[str | os.PathLike] | None = None,
                  width: int = 640,
                  height: int = 480,
                  font_size: int = 8,
                  font_rotation: int = 45,
-                 font: Optional[str] = None,
+                 font: str | None = None,
                  palette: str = 'Set1',
                  frame_setting: bool = False,
                  video_setting: bool = False,
                  last_frm_setting: bool = True,
                  last_frame_as_svg: bool = False,
                  hhmmss: bool = True,
-                 clf_names: Optional[List[str]] = None):
+                 clf_names: list[str] | None = None):
 
         if ((frame_setting != True) and (video_setting != True) and (last_frm_setting != True)):
             raise NoSpecifiedOutputError(msg="Please select gantt videos, frames, and/or last frame.")

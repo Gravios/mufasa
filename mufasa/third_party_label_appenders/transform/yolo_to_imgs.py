@@ -15,10 +15,10 @@ class Yolo2Imgs:
 
 
     def __init__(self,
-                 yolo_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 palette: Optional[str] = None,
-                 circle_size: Optional[Union[float, int]] = None):
+                 yolo_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 palette: str | None = None,
+                 circle_size: float | int | None = None):
 
         check_if_dir_exists(in_dir=yolo_dir, source=f'{self.__class__.__name__} yolo_dir', raise_error=True)
         check_if_dir_exists(in_dir=save_dir, source=f'{self.__class__.__name__} save_dir', raise_error=True)

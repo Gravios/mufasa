@@ -127,10 +127,10 @@ class CueLightVisualizer(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 cue_light_names: List[str],
-                 video_path: Union[str, os.PathLike],
-                 data_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
+                 cue_light_names: list[str],
+                 video_path: str | os.PathLike,
+                 data_path: str | os.PathLike,
                  frame_setting: bool = False,
                  video_setting: bool = True,
                  core_cnt: int = -1,

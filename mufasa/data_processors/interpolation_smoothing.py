@@ -50,8 +50,8 @@ class Interpolate(ConfigReader):
 
     def __init__(
         self,
-        input_path: Union[str, os.PathLike],
-        config_path: Union[str, os.PathLike],
+        input_path: str | os.PathLike,
+        config_path: str | os.PathLike,
         method: Literal[
             "Animal(s): Nearest",
             "Animal(s): Linear",
@@ -447,12 +447,12 @@ class AdvancedInterpolator(ConfigReader):
 
     def __init__(
         self,
-        data_dir: Union[str, os.PathLike],
-        config_path: Union[str, os.PathLike],
+        data_dir: str | os.PathLike,
+        config_path: str | os.PathLike,
         type: Literal["animal", "body-part"],
-        settings: Dict[str, Any],
-        initial_import_multi_index: Optional[bool] = False,
-        overwrite: Optional[bool] = True,
+        settings: dict[str, Any],
+        initial_import_multi_index: bool | None = False,
+        overwrite: bool | None = True,
     ):
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         log_event(
@@ -591,12 +591,12 @@ class AdvancedSmoother(ConfigReader):
 
     def __init__(
         self,
-        data_dir: Union[str, os.PathLike],
-        config_path: Union[str, os.PathLike],
+        data_dir: str | os.PathLike,
+        config_path: str | os.PathLike,
         type: Literal["animal", "body-part"],
-        settings: Dict[str, Any],
-        initial_import_multi_index: Optional[bool] = False,
-        overwrite: Optional[bool] = True,
+        settings: dict[str, Any],
+        initial_import_multi_index: bool | None = False,
+        overwrite: bool | None = True,
     ):
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         log_event(

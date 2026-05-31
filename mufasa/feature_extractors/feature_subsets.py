@@ -163,14 +163,12 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 feature_families: List[str],
+                 config_path: str | os.PathLike,
+                 feature_families: list[str],
                  file_checks: bool = False,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
-                 derived_features_dir: Optional[
-                     Union[str, os.PathLike]
-                 ] = None,
+                 save_dir: str | os.PathLike | None = None,
+                 data_dir: str | os.PathLike | None = None,
+                 derived_features_dir: str | os.PathLike | None = None,
                  n_workers: int = 1,
                  raise_on_error: bool = False,
                  overwrite_existing: bool = False):
@@ -425,7 +423,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         # (column-name duplicates in concat result) are clearer when
         # the drop is explicit at the call site.
 
-    def __append_to_data_in_dir(self, dir: Union[str, os.PathLike]):
+    def __append_to_data_in_dir(self, dir: str | os.PathLike):
         temp_files = find_files_of_filetypes_in_directory(directory=self.temp_dir, extensions=[f'.{self.file_type}'], as_dict=True)
         self.temp_append_dir = os.path.join(dir, f'temp_{self.datetime}')
         os.makedirs(self.temp_append_dir)
@@ -454,7 +452,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         copy_files_in_directory(in_dir=self.temp_append_dir, out_dir=dir, filetype=self.file_type, raise_error=True)
         remove_a_folder(folder_dir=self.temp_append_dir, ignore_errors=False)
 
-    def __append_to_targets_inserted(self, dir: Union[str, os.PathLike]):
+    def __append_to_targets_inserted(self, dir: str | os.PathLike):
         temp_files = find_files_of_filetypes_in_directory(directory=self.temp_dir, extensions=[f'.{self.file_type}'], as_dict=True)
         self.temp_append_dir = os.path.join(dir, f'temp_{self.datetime}')
         os.makedirs(self.temp_append_dir)
@@ -512,7 +510,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             derived_features_dir=self.derived_features_dir,
         )
 
-    def preflight_check(self) -> Dict[str, List[str]]:
+    def preflight_check(self) -> dict[str, list[str]]:
         """Discover whether the planned run would clobber existing
         output. Returns a dict mapping
         ``destination/filename → [reason_strings]``
@@ -538,7 +536,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         the user before deciding whether to set
         ``overwrite_existing=True`` and re-run.
         """
-        conflicts: Dict[str, List[str]] = {}
+        conflicts: dict[str, list[str]] = {}
 
         # Diagnostic: emits a single line on stderr/stdout when
         # preflight is actually invoked. Distinguishes "preflight

@@ -36,7 +36,7 @@ class GibbSampler:
 
     def __init__(self,
                  data: np.ndarray,
-                 save_path: Union[str, os.PathLike],
+                 save_path: str | os.PathLike,
                  sequence_length: int = 4,
                  iterations: int = 1500,
                  epochs: int = 2,
@@ -86,7 +86,7 @@ class GibbSampler:
             out_df.loc[len(out_df)] = np.append(sequence, prob_tot)
         return out_df
 
-    def __sum_results(self, full_sequence_set, summary_df) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def __sum_results(self, full_sequence_set, summary_df) -> tuple[pd.DataFrame, pd.DataFrame]:
         full_sequence_set = pd.DataFrame(full_sequence_set, columns=self.out_cols)
         summary_df = pd.concat([summary_df, full_sequence_set], axis=0).reset_index(drop=True)
         output = (summary_df.groupby(summary_df.columns.tolist()).size().reset_index().rename(columns={0: "records"}).sort_values(by=["records"], ascending=False))

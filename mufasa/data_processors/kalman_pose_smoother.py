@@ -86,7 +86,7 @@ class StateLayout:
     For n markers, the state has dimension 4n with each marker
     occupying a contiguous 4-slot block: [x, y, vx, vy].
     """
-    markers: Tuple[str, ...]
+    markers: tuple[str, ...]
 
     @property
     def n_markers(self) -> int:
@@ -96,12 +96,12 @@ class StateLayout:
     def state_dim(self) -> int:
         return 4 * len(self.markers)
 
-    def position_indices(self, marker: str) -> Tuple[int, int]:
+    def position_indices(self, marker: str) -> tuple[int, int]:
         """Return (x_idx, y_idx) in the joint state for ``marker``."""
         i = self.markers.index(marker)
         return (4 * i, 4 * i + 1)
 
-    def velocity_indices(self, marker: str) -> Tuple[int, int]:
+    def velocity_indices(self, marker: str) -> tuple[int, int]:
         """Return (vx_idx, vy_idx) in the joint state for ``marker``."""
         i = self.markers.index(marker)
         return (4 * i + 2, 4 * i + 3)
@@ -143,11 +143,11 @@ class NoiseParams:
         Velocity-noise drive per marker (pixels²/s⁴).
         Independent velocity-component drift added to Q.
     """
-    sigma_base: Dict[str, float]
-    q_pos: Dict[str, float]
-    q_vel: Dict[str, float]
+    sigma_base: dict[str, float]
+    q_pos: dict[str, float]
+    q_vel: dict[str, float]
 
-    def for_layout(self, layout: StateLayout) -> Tuple[
+    def for_layout(self, layout: StateLayout) -> tuple[
         np.ndarray, np.ndarray, np.ndarray
     ]:
         """Return (sigma_base, q_pos, q_vel) as 1D np.ndarrays
@@ -214,7 +214,7 @@ class TripletPrior:
         position slots [x_a, y_a, x_b, y_b, x_c, y_c]. Used
         to construct the 6×(4n) observation matrix H_triplet.
     """
-    markers: Tuple[str, str, str]
+    markers: tuple[str, str, str]
     mean_config: np.ndarray
     cov: np.ndarray
     n_samples: int
@@ -224,12 +224,12 @@ class TripletPrior:
 def fit_triplet_prior(
     positions: np.ndarray,    # (T, n_markers, 2)
     likelihoods: np.ndarray,  # (T, n_markers)
-    triplet: Tuple[str, str, str],
+    triplet: tuple[str, str, str],
     layout: StateLayout,
     likelihood_threshold: float,
     min_samples: int = 200,
     ridge: float = _TRIPLET_RIDGE,
-) -> Optional[TripletPrior]:
+) -> TripletPrior | None:
     """Fit one TripletPrior from data.
 
     Selects frames where all three markers in ``triplet``
@@ -327,12 +327,12 @@ def fit_triplet_prior(
 def fit_triplet_priors(
     positions: np.ndarray,
     likelihoods: np.ndarray,
-    triplets: List[Tuple[str, str, str]],
+    triplets: list[tuple[str, str, str]],
     layout: StateLayout,
     likelihood_threshold: float,
     min_samples: int = 200,
     ridge: float = _TRIPLET_RIDGE,
-) -> List[TripletPrior]:
+) -> list[TripletPrior]:
     """Fit a TripletPrior for each requested triplet.
 
     Triplets with insufficient joint-high-confidence samples
@@ -343,7 +343,7 @@ def fit_triplet_priors(
     input triplets, EXCLUDING those that returned None from
     the per-triplet fit.
     """
-    out: List[TripletPrior] = []
+    out: list[TripletPrior] = []
     for triplet in triplets:
         prior = fit_triplet_prior(
             positions, likelihoods, triplet, layout,
@@ -356,7 +356,7 @@ def fit_triplet_priors(
 
 def build_triplet_observation(
     prior: TripletPrior, layout: StateLayout,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Build the (z, H, R) pseudo-measurement triple for one
     triplet at one frame.
 
@@ -524,7 +524,7 @@ def build_observation(
     likelihoods: np.ndarray,  # (n_markers,)
     sigma_base_arr: np.ndarray,
     likelihood_threshold: float,
-    triplet_priors: Optional[List[TripletPrior]] = None,
+    triplet_priors: list[TripletPrior] | None = None,
 ) -> FrameObservation:
     """Build (z, H, R) for the markers above ``likelihood_threshold``,
     plus optional triplet pseudo-measurements stacked on top.
@@ -672,9 +672,9 @@ def forward_filter(
     params: NoiseParams,
     dt: float,
     likelihood_threshold: float,
-    initial_state: Optional[np.ndarray] = None,
-    initial_cov: Optional[np.ndarray] = None,
-    triplet_priors: Optional[List[TripletPrior]] = None,
+    initial_state: np.ndarray | None = None,
+    initial_cov: np.ndarray | None = None,
+    triplet_priors: list[TripletPrior] | None = None,
 ) -> FilterResult:
     """Run the joint-state Kalman forward filter.
 
@@ -1057,7 +1057,7 @@ class EMResult:
     params: NoiseParams
     n_iter: int
     converged: bool
-    history: List[Dict[str, float]] = field(default_factory=list)
+    history: list[dict[str, float]] = field(default_factory=list)
 
 
 def initial_noise_params(
@@ -1121,9 +1121,9 @@ def initial_noise_params(
     window_frames = min(int(round(fps)), max(T // 4, 5))
     T_w = window_frames * dt
 
-    sigma_base: Dict[str, float] = {}
-    q_pos: Dict[str, float] = {}
-    q_vel: Dict[str, float] = {}
+    sigma_base: dict[str, float] = {}
+    q_pos: dict[str, float] = {}
+    q_vel: dict[str, float] = {}
 
     for i, marker in enumerate(layout.markers):
         p = likelihoods[:, i]
@@ -1224,9 +1224,9 @@ def _compute_velocity_strata(
     fps: float,
     n_bins: int = _EM_DEFAULT_N_STRATA,
     lpf_window_sec: float = _EM_DEFAULT_VELOCITY_LPF_SEC,
-    body_markers: Optional[List[str]] = None,
+    body_markers: list[str] | None = None,
     likelihood_threshold: float = 0.5,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Compute body-velocity strata for the M-step's stratified
     sampling.
 
@@ -1507,7 +1507,7 @@ def _accumulate_m_step_stats(
     layout: StateLayout,
     likelihood_threshold: float,
     stats: _MStepStats,
-    weights: Optional[np.ndarray] = None,
+    weights: np.ndarray | None = None,
 ) -> None:
     """Accumulate one session's contribution to the
     Shumway-Stoffer sufficient statistics.
@@ -1663,8 +1663,8 @@ def _finalize_m_step(
     layout: StateLayout,
     dt: float,
     prev_params: NoiseParams,
-    sigma_ceilings: Optional[Dict[str, float]] = None,
-    q_pos_floors: Optional[Dict[str, float]] = None,
+    sigma_ceilings: dict[str, float] | None = None,
+    q_pos_floors: dict[str, float] | None = None,
 ) -> NoiseParams:
     """Convert accumulated sufficient statistics into a final
     NoiseParams via the Shumway-Stoffer ML formulas.
@@ -1713,9 +1713,9 @@ def _finalize_m_step(
     -------
     NoiseParams
     """
-    sigma_base: Dict[str, float] = {}
-    q_pos: Dict[str, float] = {}
-    q_vel: Dict[str, float] = {}
+    sigma_base: dict[str, float] = {}
+    q_pos: dict[str, float] = {}
+    q_vel: dict[str, float] = {}
 
     # Compute Q-hat once (same matrix is used for all marker
     # decompositions). Falls back to previous params if no
@@ -1809,12 +1809,12 @@ def _em_validation_check(
     smoothed: SmootherResult,
     layout: StateLayout,
     likelihood_threshold: float,
-    initial_sigma: Dict[str, float],
-    sigma_base: Dict[str, float],
-    q_pos: Dict[str, float],
+    initial_sigma: dict[str, float],
+    sigma_base: dict[str, float],
+    q_pos: dict[str, float],
     sample_size: int = 1000,
     verbose: bool = False,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Sanity-check a single session's smoother output for
     signs of EM degeneracy.
 
@@ -1872,7 +1872,7 @@ def _em_validation_check(
 
     # Phase 1: compute per-marker statistics for all checks.
     # Stored so we can print a unified report below.
-    per_marker_stats: List[Dict[str, object]] = []
+    per_marker_stats: list[dict[str, object]] = []
     for i, marker in enumerate(layout.markers):
         x_obs = pos_sample[:, i, 0]
         y_obs = pos_sample[:, i, 1]
@@ -2014,12 +2014,12 @@ def fit_noise_params_em(
     layout: StateLayout,
     fps: float,
     likelihood_threshold: float,
-    triplet_priors: Optional[List[TripletPrior]] = None,
-    initial_params: Optional[NoiseParams] = None,
+    triplet_priors: list[TripletPrior] | None = None,
+    initial_params: NoiseParams | None = None,
     max_iter: int = _EM_DEFAULT_MAX_ITER,
     tol: float = _EM_DEFAULT_TOL,
     verbose: bool = False,
-    sessions: Optional[List[Tuple[str, int, int]]] = None,
+    sessions: list[tuple[str, int, int]] | None = None,
     stratify: bool = True,
     n_strata: int = _EM_DEFAULT_N_STRATA,
 ) -> EMResult:
@@ -2221,7 +2221,7 @@ def fit_noise_params_em(
         if verbose:
             print("[em] stratification OFF — uniform M-step weights")
 
-    history: List[Dict[str, float]] = []
+    history: list[dict[str, float]] = []
     converged = False
     n_iter = 0
 
@@ -2234,9 +2234,9 @@ def fit_noise_params_em(
         # validation hook (cheap, and that session is
         # representative of the rest if anything's going wrong).
         stats = _MStepStats.zeros(layout.n_markers, layout.state_dim)
-        validation_smoothed: Optional[SmootherResult] = None
-        validation_pos: Optional[np.ndarray] = None
-        validation_likes: Optional[np.ndarray] = None
+        validation_smoothed: SmootherResult | None = None
+        validation_pos: np.ndarray | None = None
+        validation_likes: np.ndarray | None = None
 
         for sess_idx, (sess_name, start, end) in enumerate(sessions):
             sub_pos = positions[start:end]
@@ -2415,8 +2415,8 @@ SMOOTHER_MODEL_VERSION = "1.0"
 
 
 def _df_to_arrays(
-    df: pd.DataFrame, markers: List[str],
-) -> Tuple[np.ndarray, np.ndarray]:
+    df: pd.DataFrame, markers: list[str],
+) -> tuple[np.ndarray, np.ndarray]:
     """Convert a flat-column pose DataFrame into (positions,
     likelihoods) arrays of shape (T, n_markers, 2) and
     (T, n_markers) respectively.
@@ -2439,7 +2439,7 @@ def _arrays_to_df(
     positions: np.ndarray,
     variances: np.ndarray,
     likelihoods: np.ndarray,
-    markers: List[str],
+    markers: list[str],
 ) -> pd.DataFrame:
     """Convert smoothed (T, n, 2) positions + variances + raw
     likelihoods into a flat-column DataFrame for output.
@@ -2453,7 +2453,7 @@ def _arrays_to_df(
         m_var_y    — smoothed y variance
     """
     T = positions.shape[0]
-    cols: Dict[str, np.ndarray] = {}
+    cols: dict[str, np.ndarray] = {}
     for i, m in enumerate(markers):
         cols[f"{m}_x"] = positions[:, i, 0]
         cols[f"{m}_y"] = positions[:, i, 1]
@@ -2491,11 +2491,11 @@ def save_model(
     path: str,
     layout: StateLayout,
     params: NoiseParams,
-    triplet_priors: List[TripletPrior],
+    triplet_priors: list[TripletPrior],
     likelihood_threshold: float,
     fps: float,
     data_hash: str,
-    em_history: Optional[List[Dict[str, float]]] = None,
+    em_history: list[dict[str, float]] | None = None,
 ) -> None:
     """Save a fit smoother model to a .npz file.
 
@@ -2539,9 +2539,9 @@ def save_model(
 
 def load_model(
     path: str,
-) -> Tuple[
-    StateLayout, NoiseParams, List[TripletPrior],
-    float, float, str, Optional[List[Dict[str, float]]],
+) -> tuple[
+    StateLayout, NoiseParams, list[TripletPrior],
+    float, float, str, list[dict[str, float]] | None,
 ]:
     """Load a fit smoother model from a .npz file.
 
@@ -2569,7 +2569,7 @@ def load_model(
         q_vel={m: float(qv_arr[i]) for i, m in enumerate(markers)},
     )
     n_triplets = int(data["triplet_count"])
-    triplet_priors: List[TripletPrior] = []
+    triplet_priors: list[TripletPrior] = []
     for i in range(n_triplets):
         tp_markers = tuple(
             str(m) for m in data[f"triplet_{i}_markers"]
@@ -2602,11 +2602,11 @@ def smooth_multi_session(
     likelihoods: np.ndarray,
     layout: StateLayout,
     params: NoiseParams,
-    triplet_priors: List[TripletPrior],
-    sessions: List[Tuple[str, int, int]],
+    triplet_priors: list[TripletPrior],
+    sessions: list[tuple[str, int, int]],
     fps: float,
     likelihood_threshold: float,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run forward+RTS smoothing per session with boundary resets.
 
     Each session is filtered + smoothed independently; the
@@ -2668,14 +2668,14 @@ def smooth_pose(
     output_dir: str,
     fps: float = 30.0,
     likelihood_threshold: float = 0.7,
-    head_markers: Optional[List[str]] = None,
-    candidate_triplets: Optional[List[Tuple[str, str, str]]] = None,
+    head_markers: list[str] | None = None,
+    candidate_triplets: list[tuple[str, str, str]] | None = None,
     rigid_cv_threshold: float = 0.20,
     rigid_max_pairs: int = 8,
     em_max_iter: int = 10,
     em_tol: float = 1e-3,
-    load_model_path: Optional[str] = None,
-    save_model_path: Optional[str] = None,
+    load_model_path: str | None = None,
+    save_model_path: str | None = None,
     use_triplets: bool = False,
     stratify: bool = True,
     n_strata: int = _EM_DEFAULT_N_STRATA,
@@ -2812,7 +2812,7 @@ def smooth_pose(
             head_markers = [m for m in default_head if m in markers]
         head_set = set(head_markers)
 
-        triplet_priors: List[TripletPrior] = []
+        triplet_priors: list[TripletPrior] = []
         if use_triplets:
             # Triplet path (patch 87-90 behavior). Off by default
             # since patch 91 — see smooth_pose docstring for
@@ -2911,7 +2911,7 @@ def smooth_pose(
     )
 
     # Write one parquet per session, plus a session_summary.json
-    output_files: List[str] = []
+    output_files: list[str] = []
     session_summary = []
     # Track whether we've already warned about parquet
     # unavailability — avoids one warning per session in
@@ -2989,11 +2989,11 @@ def smooth_pose(
 # CLI
 # -------------------------------------------------------------------- #
 
-def _parse_triplets(s: str) -> Optional[List[Tuple[str, str, str]]]:
+def _parse_triplets(s: str) -> list[tuple[str, str, str]] | None:
     """Parse semicolon-separated triplets, e.g. 'a,b,c;d,e,f'."""
     if not s:
         return None
-    out: List[Tuple[str, str, str]] = []
+    out: list[tuple[str, str, str]] = []
     for chunk in s.split(";"):
         parts = [p.strip().lower() for p in chunk.split(",") if p.strip()]
         if len(parts) != 3:

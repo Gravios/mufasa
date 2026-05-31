@@ -407,10 +407,10 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
 
     @staticmethod
     def velocity_aggregator(
-        config_path: Union[str, os.PathLike],
-        data_dir: Union[str, os.PathLike],
+        config_path: str | os.PathLike,
+        data_dir: str | os.PathLike,
         body_part: str,
-        ts_plot: Optional[bool] = True,
+        ts_plot: bool | None = True,
     ):
         """
         Aggregate and plot velocity data from multiple pose-estimation files.
@@ -496,7 +496,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         )
 
     @staticmethod
-    def spontaneous_alternations(data: pd.DataFrame, arm_names: List[str], center_name: str) -> Tuple[Dict[Union[str, Tuple[int]], int]]:
+    def spontaneous_alternations(data: pd.DataFrame, arm_names: list[str], center_name: str) -> tuple[dict[str | tuple[int], int]]:
         """
         Detects spontaneous alternations between a set of user-defined ROIs.
 
@@ -530,10 +530,8 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
 
         def get_sliding_alternation(
             data: np.ndarray,
-        ) -> Tuple[
-            Union[
-                Dict[int, List[int]], Dict[int, List[int]], Dict[Tuple[int], List[int]]
-            ]
+        ) -> tuple[
+            dict[int, list[int]] | dict[int, list[int]] | dict[tuple[int], list[int]]
         ]:
             stride, same_arm_return_cnt, alternate_arm_return_cnt = (
                 len(arm_names) - 1,
@@ -605,7 +603,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         }
 
     @staticmethod
-    def find_path_loops(data: np.ndarray) -> Dict[Tuple[int], List[int]]:
+    def find_path_loops(data: np.ndarray) -> dict[tuple[int], list[int]]:
         """
         Compute the loops detected within a 2-dimensional path.
 
@@ -742,7 +740,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
     def distance_and_velocity(x: np.ndarray,
                               fps: float,
                               pixels_per_mm: float,
-                              centimeters: Optional[bool] = True) -> Tuple[float, float]:
+                              centimeters: bool | None = True) -> tuple[float, float]:
         """
         Calculate total movement and mean velocity from a sequence of position data.
 
@@ -785,7 +783,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
     @staticmethod
     def movement_stats_from_bouts_df(bp_data: np.ndarray,
                                      event_name: str,
-                                     bout_df: pd.DataFrame, fps: float, px_per_mm: float) -> Tuple[float, Union[None, float]]:
+                                     bout_df: pd.DataFrame, fps: float, px_per_mm: float) -> tuple[float, None | float]:
 
         """
         Compute the sum distance moved and the mean velocity during a defined event.

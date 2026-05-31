@@ -39,7 +39,7 @@ class SeverityFrameCalculator(ConfigReader, FeatureExtractionMixin):
     >>> processor.save()
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike], settings: Dict):
+    def __init__(self, config_path: str | os.PathLike, settings: dict):
         ConfigReader.__init__(self, config_path=config_path)
         self.settings = settings
         check_if_filepath_list_is_empty(

@@ -38,8 +38,8 @@ class AggBoundaryStatisticsCalculator(ConfigReader):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
-        measures: List[
+        config_path: str | os.PathLike,
+        measures: list[
             Literal[
                 "INTERACTION TIME (s)",
                 "INTERACTION BOUT COUNT",

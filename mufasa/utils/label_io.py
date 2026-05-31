@@ -75,7 +75,7 @@ def load_labels_for_video(
     video_name: str,
     config_path: str,
     *,
-    targets: Optional[List[str]] = None,
+    targets: list[str] | None = None,
 ) -> pd.DataFrame:
     """Load classifier labels for one video.
 
@@ -149,7 +149,7 @@ def load_labels_for_video(
 
 
 def _project_to_targets(df: pd.DataFrame,
-                        targets: List[str]) -> pd.DataFrame:
+                        targets: list[str]) -> pd.DataFrame:
     """Slice the input DataFrame to just the requested target
     columns. Missing targets land as all-NA Int64 columns so the
     output schema is stable regardless of which targets the

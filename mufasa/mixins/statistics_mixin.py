@@ -82,7 +82,7 @@ class Statistics(FeatureExtractionMixin):
     def _hist_1d(data: np.ndarray,
                   bin_count: int,
                   range: np.ndarray,
-                  normalize: Optional[bool] = False) -> np.ndarray:
+                  normalize: bool | None = False) -> np.ndarray:
         """
         Jitted helper to compute 1D histograms with counts or rations (if normalize is True)
 
@@ -157,8 +157,8 @@ class Statistics(FeatureExtractionMixin):
     def independent_samples_t(
         sample_1: np.ndarray,
         sample_2: np.ndarray,
-        critical_values: Optional[np.ndarray] = None,
-    ) -> Tuple[float, Union[None, bool]]:
+        critical_values: np.ndarray | None = None,
+    ) -> tuple[float, None | bool]:
 
         r"""
         Jitted compute independent-samples t-test statistic and boolean significance between two distributions.
@@ -349,8 +349,8 @@ class Statistics(FeatureExtractionMixin):
     def two_sample_ks(
         sample_1: np.ndarray,
         sample_2: np.ndarray,
-        critical_values: Optional[float64[:, :]] = None,
-    ) -> Tuple[float, Union[bool, None]]:
+        critical_values: float64[:, :] | None = None,
+    ) -> tuple[float, bool | None]:
         """
         Jitted compute the two-sample Kolmogorov-Smirnov (KS) test statistic and, optionally, test for statistical significance.
 
@@ -403,7 +403,7 @@ class Statistics(FeatureExtractionMixin):
     def one_way_anova(
         sample_1: np.ndarray,
         sample_2: np.ndarray,
-        critical_values: Optional[np.ndarray] = None) -> Tuple[float, float]:
+        critical_values: np.ndarray | None = None) -> tuple[float, float]:
 
         r"""
         Compute the one-way ANOVA F-statistic and associated p-value for two distributions.
@@ -537,7 +537,7 @@ class Statistics(FeatureExtractionMixin):
         self,
         sample_1: np.ndarray,
         sample_2: np.ndarray,
-        fill_value: Optional[int] = 1,
+        fill_value: int | None = 1,
         bucket_method: Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"] = "auto",
         verbose: bool = False) -> float:
 
@@ -908,9 +908,7 @@ class Statistics(FeatureExtractionMixin):
     def total_variation_distance(
         x: np.ndarray,
         y: np.ndarray,
-        bucket_method: Optional[
-            Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"]
-        ] = "auto",
+        bucket_method: Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"] | None = "auto",
     ):
         r"""
         Calculate the total variation distance between two probability distributions.
@@ -959,10 +957,8 @@ class Statistics(FeatureExtractionMixin):
         self,
         sample_1: np.ndarray,
         sample_2: np.ndarray,
-        fill_value: Optional[int] = 1,
-        bucket_method: Optional[
-            Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"]
-        ] = "auto",
+        fill_value: int | None = 1,
+        bucket_method: Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"] | None = "auto",
     ) -> float:
 
         r"""
@@ -1206,8 +1202,8 @@ class Statistics(FeatureExtractionMixin):
     def levenes(
         sample_1: np.ndarray,
         sample_2: np.ndarray,
-        critical_values: Optional[np.ndarray] = None,
-    ) -> Tuple[float, Union[bool, None]]:
+        critical_values: np.ndarray | None = None,
+    ) -> tuple[float, bool | None]:
         """
         Compute Levene's W statistic, a test for the equality of variances between two samples.
 
@@ -1587,8 +1583,8 @@ class Statistics(FeatureExtractionMixin):
     def chi_square(
         sample_1: np.ndarray,
         sample_2: np.ndarray,
-        critical_values: Optional[np.ndarray] = None,
-        type: Optional[Literal["goodness_of_fit", "independence"]] = "goodness_of_fit") -> Tuple[float, Union[bool, None]]:
+        critical_values: np.ndarray | None = None,
+        type: Literal["goodness_of_fit", "independence"] | None = "goodness_of_fit") -> tuple[float, bool | None]:
         """
         Jitted compute of chi square between two categorical distributions.
 
@@ -1936,7 +1932,7 @@ class Statistics(FeatureExtractionMixin):
     @dynamic_numba_decorator(dtypes="(float32[:], float32[:])", cache=True, fastmath=False)
 
 
-    def kendall_tau(sample_1: np.ndarray, sample_2: np.ndarray) -> Tuple[float, float]:
+    def kendall_tau(sample_1: np.ndarray, sample_2: np.ndarray) -> tuple[float, float]:
         """
         Jitted compute of Kendall Tau (rank correlation coefficient). Non-parametric method for computing correlation
         between two time-series features. Returns tau and associated z-score.
@@ -2043,8 +2039,8 @@ class Statistics(FeatureExtractionMixin):
     @staticmethod
     def find_collinear_features(df: pd.DataFrame,
                                 threshold: float,
-                                method: Optional[Literal["pearson", "spearman", "kendall"]] = "pearson",
-                                verbose: Optional[bool] = False) -> List[str]:
+                                method: Literal["pearson", "spearman", "kendall"] | None = "pearson",
+                                verbose: bool | None = False) -> list[str]:
 
         """
         Identify collinear features in the dataframe based on the specified correlation method and threshold.
@@ -2104,10 +2100,10 @@ class Statistics(FeatureExtractionMixin):
     @staticmethod
     def local_outlier_factor(
         data: np.ndarray,
-        k: Union[int, float] = 5,
-        contamination: Optional[float] = 1e-10,
-        normalize: Optional[bool] = False,
-        groupby_idx: Optional[int] = None,
+        k: int | float = 5,
+        contamination: float | None = 1e-10,
+        normalize: bool | None = False,
+        groupby_idx: int | None = None,
     ) -> np.ndarray:
         """
         Compute the local outlier factor of each observation.
@@ -2214,9 +2210,9 @@ class Statistics(FeatureExtractionMixin):
     @staticmethod
     def elliptic_envelope(
         data: np.ndarray,
-        contamination: Optional[float] = 1e-1,
-        normalize: Optional[bool] = False,
-        groupby_idx: Optional[int] = None,
+        contamination: float | None = 1e-1,
+        normalize: bool | None = False,
+        groupby_idx: int | None = None,
     ) -> np.ndarray:
         """
         Compute the Mahalanobis distances of each observation in the input array using Elliptic Envelope method.
@@ -2309,9 +2305,9 @@ class Statistics(FeatureExtractionMixin):
     @staticmethod
     def isolation_forest(
         x: np.ndarray,
-        estimators: Union[int, float] = 0.2,
-        groupby_idx: Optional[int] = None,
-        normalize: Optional[bool] = False,
+        estimators: int | float = 0.2,
+        groupby_idx: int | None = None,
+        normalize: bool | None = False,
     ) -> np.ndarray:
         """
         An implementation of the Isolation Forest algorithm for outlier detection.
@@ -2930,7 +2926,7 @@ class Statistics(FeatureExtractionMixin):
 
     @staticmethod
     @jit(nopython=True, cache=True)
-    def kmeans_1d(data: np.ndarray, k: int, max_iters: int, calc_medians: bool) -> Tuple[np.ndarray, np.ndarray, Union[None, types.DictType]]:
+    def kmeans_1d(data: np.ndarray, k: int, max_iters: int, calc_medians: bool) -> tuple[np.ndarray, np.ndarray, None | types.DictType]:
         """
         Perform k-means clustering on a 1-dimensional dataset.
 
@@ -3021,8 +3017,8 @@ class Statistics(FeatureExtractionMixin):
 
     def hamming_distance(x: np.ndarray,
                          y: np.ndarray,
-                         sort: Optional[bool] = False,
-                         w: Optional[np.ndarray] = None) -> float:
+                         sort: bool | None = False,
+                         w: np.ndarray | None = None) -> float:
         """
         Jitted compute of the Hamming similarity between two vectors.
 
@@ -3073,7 +3069,7 @@ class Statistics(FeatureExtractionMixin):
     # @jit(nopython=True, cache=True)
     @dynamic_numba_decorator(dtypes=[(int8[:], int8[:], float32[:]), (int8[:], int8[:], types.misc.Omitted(None))], cache=True, fastmath=False)
     def yule_coef(
-        x: np.ndarray, y: np.ndarray, w: Optional[np.ndarray] = None
+        x: np.ndarray, y: np.ndarray, w: np.ndarray | None = None
     ) -> float64:
         r"""
         Jitted calculate of the yule coefficient between two binary vectors (e.g., to classified behaviors). 0 represent independence, 2 represents
@@ -3127,7 +3123,7 @@ class Statistics(FeatureExtractionMixin):
     # @jit(nopython=True, cache=True)
     @dynamic_numba_decorator(dtypes=[(int8[:], int8[:], types.misc.Omitted(None)), (int8[:], int8[:], float32[:])], cache=True, fastmath=False)
 
-    def sokal_sneath(x: np.ndarray, y: np.ndarray, w: Optional[np.ndarray] = None) -> float64:
+    def sokal_sneath(x: np.ndarray, y: np.ndarray, w: np.ndarray | None = None) -> float64:
         r"""
         Jitted calculate of the sokal sneath coefficient between two binary vectors (e.g., to classified behaviors). 0 represent independence, 1 represents complete interdependence.
 
@@ -3174,7 +3170,7 @@ class Statistics(FeatureExtractionMixin):
     # # @njit([(float32[:, :], float32[:, :]), (float32[:, :], types.misc.Omitted(None))])
     # @jit(nopython=True, cache=True)
     @dynamic_numba_decorator(dtypes=[(float32[:, :], float32[:, :]), (float32[:, :], types.misc.Omitted(None))], cache=True, fastmath=False)
-    def bray_curtis_dissimilarity(x: np.ndarray, w: Optional[np.ndarray] = None) -> np.ndarray:
+    def bray_curtis_dissimilarity(x: np.ndarray, w: np.ndarray | None = None) -> np.ndarray:
         """
         Jitted compute of the Bray-Curtis dissimilarity matrix between samples based on feature values.
 
@@ -3232,7 +3228,7 @@ class Statistics(FeatureExtractionMixin):
         else:
             return np.sqrt(1 - result / np.sqrt(norm_x * norm_y))
 
-    def hellinger_distance(self, x: np.ndarray, y: np.ndarray, bucket_method: Optional[Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"]] = "auto") -> float:
+    def hellinger_distance(self, x: np.ndarray, y: np.ndarray, bucket_method: Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"] | None = "auto") -> float:
 
         r"""
         Compute the Hellinger distance between two vector distributions.
@@ -3507,8 +3503,8 @@ class Statistics(FeatureExtractionMixin):
     def d_prime(
         x: np.ndarray,
         y: np.ndarray,
-        lower_limit: Optional[float] = 0.0001,
-        upper_limit: Optional[float] = 0.9999,
+        lower_limit: float | None = 0.0001,
+        upper_limit: float | None = 0.9999,
     ) -> float:
         """
         Computes d-prime from two Boolean 1d arrays, e.g., between classifications and ground truth.
@@ -3580,8 +3576,8 @@ class Statistics(FeatureExtractionMixin):
         x: np.ndarray,
         y: np.ndarray,
         ground_truth: np.ndarray,
-        continuity_corrected: Optional[bool] = True,
-    ) -> Tuple[float, float]:
+        continuity_corrected: bool | None = True,
+    ) -> tuple[float, float]:
         """
         Perform McNemar's test to compare the predictive accuracy of two models. This test is used
         to evaluate if the accuracies of two classifiers are significantly different when tested on the same data.
@@ -3660,7 +3656,7 @@ class Statistics(FeatureExtractionMixin):
         return x, p
 
     @staticmethod
-    def cochrans_q(data: np.ndarray) -> Tuple[float, float]:
+    def cochrans_q(data: np.ndarray) -> tuple[float, float]:
 
         r"""
 
@@ -3761,7 +3757,7 @@ class Statistics(FeatureExtractionMixin):
         return max_var / min_var
 
     @staticmethod
-    def grubbs_test(x: np.ndarray, left_tail: Optional[bool] = False) -> float:
+    def grubbs_test(x: np.ndarray, left_tail: bool | None = False) -> float:
 
         r"""
         Perform Grubbs' test to detect outliers if the minimum or maximum value in a feature series is an outlier.
@@ -3800,7 +3796,7 @@ class Statistics(FeatureExtractionMixin):
             return (np.max(x) - np.mean(x)) / np.std(x)
 
     @staticmethod
-    def wilcoxon(x: np.ndarray, y: np.ndarray) -> Tuple[float, float]:
+    def wilcoxon(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
         """
         Perform the Wilcoxon signed-rank test for paired samples.
 
@@ -3947,7 +3943,7 @@ class Statistics(FeatureExtractionMixin):
         return results
 
     @staticmethod
-    def dunn_index(x: np.ndarray, y: np.ndarray, sample: Optional[float] = None) -> float:
+    def dunn_index(x: np.ndarray, y: np.ndarray, sample: float | None = None) -> float:
 
         r"""
         Calculate the Dunn index to evaluate the quality of clustered labels.
@@ -5066,7 +5062,7 @@ class Statistics(FeatureExtractionMixin):
     #        "(int64[:, :], int64[:, :], float64[:])", "(int64[:, :], int64[:, :], types.misc.Omitted(None))"])
     # @jit(nopython=True, cache=True)
     @dynamic_numba_decorator(dtypes=["(int64[:], int64[:], float64[:])", "(int64[:], int64[:], types.misc.Omitted(None))", "(int64[:, :], int64[:, :], float64[:])", "(int64[:, :], int64[:, :], types.misc.Omitted(None))"], cache=True, fastmath=False)
-    def sokal_michener(x: np.ndarray, y: np.ndarray, w: Optional[np.ndarray] = None) -> float:
+    def sokal_michener(x: np.ndarray, y: np.ndarray, w: np.ndarray | None = None) -> float:
 
         r"""
         Jitted compute of the Sokal-Michener dissimilarity between two binary vectors or matrices.
@@ -5320,7 +5316,7 @@ class Statistics(FeatureExtractionMixin):
     @staticmethod
     def one_way_anova_scipy(x: np.ndarray,
                             y: np.ndarray,
-                            variable_names: List[str],
+                            variable_names: list[str],
                             x_name: str = '',
                             y_name: str = '') -> pd.DataFrame:
         """
@@ -5358,7 +5354,7 @@ class Statistics(FeatureExtractionMixin):
     @staticmethod
     def kruskal_scipy(x: np.ndarray,
                       y: np.ndarray,
-                      variable_names: List[str],
+                      variable_names: list[str],
                       x_name: str = '',
                       y_name: str = '') -> pd.DataFrame:
         """
@@ -5395,7 +5391,7 @@ class Statistics(FeatureExtractionMixin):
     @staticmethod
     def pairwise_tukeyhsd_scipy(data: np.ndarray,
                                 group: np.ndarray,
-                                variable_names: List[str],
+                                variable_names: list[str],
                                 verbose: bool = False) -> pd.DataFrame:
 
         """

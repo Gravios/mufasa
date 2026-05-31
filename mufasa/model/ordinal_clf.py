@@ -71,11 +71,11 @@ class OrdinalClassifier:
     @staticmethod
     def fit(X: np.ndarray,
             y: np.ndarray,
-            clf: Union[ACCEPTED_MODELS],
+            clf: ACCEPTED_MODELS,
             core_cnt: int = -1,
-            parallel: Optional[bool] = True) -> Dict[int, Union[ACCEPTED_MODELS]]:
+            parallel: bool | None = True) -> dict[int, ACCEPTED_MODELS]:
 
-        def _fit_binary_estimator(clf: Union[RandomForestClassifier, cuRF],
+        def _fit_binary_estimator(clf: RandomForestClassifier | cuRF,
                                   X: np.ndarray,
                                   y: np.ndarray,
                                   y_label: int):
@@ -107,7 +107,7 @@ class OrdinalClassifier:
 
 
     @staticmethod
-    def predict_proba(X: np.ndarray, mdl: Dict[int, Union[ACCEPTED_MODELS]]) -> np.ndarray:
+    def predict_proba(X: np.ndarray, mdl: dict[int, ACCEPTED_MODELS]) -> np.ndarray:
         OrdinalClassifier._check_valid_mdl_dict(mdls=mdl)
         check_valid_array(data=X, source=f'{__class__.__name__} x', accepted_ndims=(2,), accepted_dtypes=Formats.NUMERIC_DTYPES.value)
         n_features = mdl[list(mdl.keys())[0]].n_features_ if hasattr(mdl, 'n_features_') else mdl[list(mdl.keys())[0]].n_features_in_
@@ -120,7 +120,7 @@ class OrdinalClassifier:
 
 
     @staticmethod
-    def predict(X: np.ndarray, mdl: Dict[int, Union[ACCEPTED_MODELS]]) -> np.ndarray:
+    def predict(X: np.ndarray, mdl: dict[int, ACCEPTED_MODELS]) -> np.ndarray:
         OrdinalClassifier._check_valid_mdl_dict(mdls=mdl)
         check_valid_array(data=X, source=f'{__class__.__name__} x', accepted_ndims=(2,), accepted_dtypes=Formats.NUMERIC_DTYPES.value)
         n_features = mdl[list(mdl.keys())[0]].n_features_ if hasattr(mdl, 'n_features_') else mdl[list(mdl.keys())[0]].n_features_in_
@@ -130,20 +130,20 @@ class OrdinalClassifier:
         return np.argmax(OrdinalClassifier.predict_proba(X, mdl=mdl), axis=1)
 
     @staticmethod
-    def save(mdl: Dict[int, Union[ACCEPTED_MODELS]], save_path: Union[str, os.PathLike]):
+    def save(mdl: dict[int, ACCEPTED_MODELS], save_path: str | os.PathLike):
         OrdinalClassifier._check_valid_mdl_dict(mdls=mdl)
         check_if_dir_exists(in_dir=os.path.dirname(save_path), source=f'{OrdinalClassifier.__name__} save')
         write_pickle(data=mdl, save_path=save_path)
 
 
     @staticmethod
-    def load(file_path: Union[str, os.PathLike]) -> Dict[int, Union[ACCEPTED_MODELS]]:
+    def load(file_path: str | os.PathLike) -> dict[int, ACCEPTED_MODELS]:
         check_file_exist_and_readable(file_path=file_path)
         return read_pickle(data_path=file_path)
 
 
     @staticmethod
-    def _check_valid_mdl_dict(mdls: Dict[int, Union[ACCEPTED_MODELS]]) -> None:
+    def _check_valid_mdl_dict(mdls: dict[int, ACCEPTED_MODELS]) -> None:
         check_valid_dict(x=mdls, valid_keys=list(range(0, 5000)), min_len_keys=2, valid_key_dtypes=Formats.INTEGER_DTYPES.value, valid_values_dtypes=ACCEPTED_MODELS)
         features_in_cnt = []
         for mdl in mdls.values():

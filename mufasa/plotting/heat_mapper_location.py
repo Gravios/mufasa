@@ -57,13 +57,13 @@ class HeatmapperLocationSingleCore(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_paths: List[Union[str, os.PathLike]],
+                 config_path: str | os.PathLike,
+                 data_paths: list[str | os.PathLike],
                  bodypart: str,
-                 style_attr: Dict[str, Any],
-                 final_img_setting: Optional[bool] = True,
-                 video_setting: Optional[bool] = False,
-                 frame_setting: Optional[bool] = False):
+                 style_attr: dict[str, Any],
+                 final_img_setting: bool | None = True,
+                 video_setting: bool | None = False,
+                 frame_setting: bool | None = False):
 
 
         log_event(logger_name=str(__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=self.create_log_msg_from_init_args(locals=locals()))

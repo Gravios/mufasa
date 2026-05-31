@@ -69,10 +69,10 @@ class TimeBinsClfCalculator(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
                  bin_length: int,
-                 classifiers: List[str],
-                 data_path: Optional[Union[str, os.PathLike]] = None,
+                 classifiers: list[str],
+                 data_path: str | os.PathLike | None = None,
                  first_occurrence: bool = False,
                  event_count: bool = False,
                  total_event_duration: bool = True,

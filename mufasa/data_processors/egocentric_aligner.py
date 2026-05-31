@@ -61,17 +61,17 @@ class EgocentricalAligner:
     """
 
     def __init__(self,
-                 data_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 data_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  anchor_1: str = 'tail_base',
                  anchor_2: str = 'nose',
                  direction: int = 0,
                  core_cnt: int = -1,
-                 fill_clr: Tuple[int, int, int] = (250, 250, 255),
+                 fill_clr: tuple[int, int, int] = (250, 250, 255),
                  verbose: bool = True,
                  gpu: bool = False,
-                 videos_dir: Optional[Union[str, os.PathLike]] = None,
-                 anchor_location: Optional[Union[Tuple[int, int], str]] = (250, 250)):
+                 videos_dir: str | os.PathLike | None = None,
+                 anchor_location: tuple[int, int] | str | None = (250, 250)):
 
         # Patch 122ev-hotfix — was extensions=['.csv'] (v0 layout
         # only). v1 outlier correction writes ``.parquet`` to

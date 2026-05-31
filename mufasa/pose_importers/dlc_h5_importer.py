@@ -81,10 +81,10 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
-        data_folder: Union[str, os.PathLike],
-        interpolation_settings: Optional[Dict[str, str]] = None,
-        smoothing_settings: Optional[Dict[str, Any]] = None,
+        config_path: str | os.PathLike,
+        data_folder: str | os.PathLike,
+        interpolation_settings: dict[str, str] | None = None,
+        smoothing_settings: dict[str, Any] | None = None,
         p_threshold: float = 0.0,
     ) -> None:
         check_file_exist_and_readable(file_path=config_path)
@@ -164,7 +164,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
     # Internal helpers
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _find_h5_files(directory: Union[str, os.PathLike]) -> list:
+    def _find_h5_files(directory: str | os.PathLike) -> list:
         """Return sorted list of ``*.h5`` paths in *directory* (non-
         recursive). Skips hidden files."""
         out = []
@@ -201,7 +201,7 @@ class DLCSingleAnimalH5Importer(ConfigReader, PoseImporterMixin):
     def run(self) -> None:
         """Import every ``.h5`` found in ``self.data_folder``."""
         import_log_rows = []
-        mask_totals: Dict[str, Dict[str, int]] = {}
+        mask_totals: dict[str, dict[str, int]] = {}
         for cnt, h5_path in enumerate(self.input_data_paths):
             video_timer = SimbaTimer(start=True)
             raw_stem = get_fn_ext(filepath=h5_path)[1]

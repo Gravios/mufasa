@@ -18,10 +18,10 @@ class CircularPlotting(PlottingMixin):
     def diffusion_plot(self,
                        data: np.ndarray,
                        fps: int,
-                       degree_width: Optional[int] = 5,
-                       palette: Optional[str] = 'jet',
-                       title: Optional[str] = None,
-                       save_path: Optional[Union[str, os.PathLike]] = None) -> plt.figure:
+                       degree_width: int | None = 5,
+                       palette: str | None = 'jet',
+                       title: str | None = None,
+                       save_path: str | os.PathLike | None = None) -> plt.figure:
         """
         Create polar plot representing the within a video.
 
@@ -79,7 +79,7 @@ class CircularPlotting(PlottingMixin):
                                 time_bin: int,
                                 degree_width: int,
                                 palette: str,
-                                save_path: Union[str, os.PathLike]):
+                                save_path: str | os.PathLike):
         """
         Create polar plots representing angular diffusion within each N second time-bin of the video.
 

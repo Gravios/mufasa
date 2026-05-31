@@ -711,7 +711,7 @@ class RiptortusFeaturizer(ConfigReader, FeatureExtractionMixin, AbstractFeatureE
             .fillna(0)
         )
 
-    def save(self, data: pd.DataFrame, save_path: Union[str, os.PathLike]):
+    def save(self, data: pd.DataFrame, save_path: str | os.PathLike):
         self.csv_df_combined = self.csv_df_combined.drop(self.col_headers_shifted, axis=1)
         self.csv_df_combined = self.csv_df_combined.drop(
             [

@@ -46,7 +46,7 @@ class PupRetrieverCalculator(ConfigReader):
 
 
 
-    def __init__(self, config_path: str, settings: Dict[str, Union[float, str, bool]]):
+    def __init__(self, config_path: str, settings: dict[str, float | str | bool]):
         ConfigReader.__init__(config_path=config_path)
         self.config = read_config_file(config_path=config_path)
         self.project_path, self.file_type = read_project_path_and_file_type(

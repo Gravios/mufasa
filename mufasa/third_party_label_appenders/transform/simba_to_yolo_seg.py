@@ -61,17 +61,17 @@ class SimBA2YoloSegmentation(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
+                 config_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 data_dir: str | os.PathLike | None = None,
                  train_size: float = 0.7,
                  verbose: bool = False,
                  greyscale: bool = False,
                  clahe: bool = False,
                  padding: int = 0,
                  threshold: float = 0.00,
-                 sample_size: Optional[int] = None,
-                 single_id: Optional[str] = None) -> None:
+                 sample_size: int | None = None,
+                 single_id: str | None = None) -> None:
 
 
         check_valid_boolean(value=verbose, source=f'{self.__class__.__name__} verbose')

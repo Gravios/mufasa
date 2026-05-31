@@ -26,9 +26,9 @@ def _light_dark_box_visualizer(pose_data: pd.DataFrame,
                                light_data: pd.DataFrame,
                                video_temp_dir: str,
                                video_path: str,
-                               circle_size: Union[int, float],
-                               txt_shift: Tuple[int, int],
-                               font_size: Union[int, float],
+                               circle_size: int | float,
+                               txt_shift: tuple[int, int],
+                               font_size: int | float,
                                body_part: str,
                                threshold: float):
 
@@ -104,11 +104,11 @@ class LightDarkBoxPlotter:
     """
 
     def __init__(self,
-                 video_dir: Union[str, os.PathLike],
-                 data_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 video_dir: str | os.PathLike,
+                 data_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  body_part: str,
-                 fps: Union[int, float],
+                 fps: int | float,
                  threshold: float = 0.01,
                  minimum_episode_duration: float = 10e-16,
                  core_cnt: int = -1):

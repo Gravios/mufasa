@@ -54,13 +54,13 @@ class NvDecReader:
     """
 
     def __init__(self,
-                 video_path: Union[str, os.PathLike],
+                 video_path: str | os.PathLike,
                  gpu_id: int = 0,
                  batch_size: int = 32,
                  max_batches_pending: int = 3,
                  n_decoders: int = 1,
                  use_device_memory: bool = False,
-                 output_color_type: Optional[nvc.OutputColorType] = None,
+                 output_color_type: nvc.OutputColorType | None = None,
                  bgr: bool = True):
 
         if nvc is None:

@@ -41,7 +41,7 @@ from typing import Any, Dict, List, Optional, Tuple
 #
 # Entries marked with destination == None denote inputs that go
 # elsewhere (into project.toml, or get dropped entirely).
-LEGACY_TO_V1_MAPPING: List[Tuple[str, Optional[str], str]] = [
+LEGACY_TO_V1_MAPPING: list[tuple[str, str | None, str]] = [
     # source data (irreplaceable)
     ("csv/input_csv",                       "sources/pose",                   "raw tracker output"),
     ("videos",                              "sources/videos",                 "source videos"),
@@ -113,7 +113,7 @@ class LegacyProjectPaths:
         return self.project_folder / relative
 
 
-def parse_legacy_config(path: Path) -> Dict[str, Any]:
+def parse_legacy_config(path: Path) -> dict[str, Any]:
     """Parse an old-style ``project_config.ini`` into the
     dict-of-dicts shape the v1 ``project.toml`` writer expects.
 
@@ -135,10 +135,10 @@ def parse_legacy_config(path: Path) -> Dict[str, Any]:
     """
     cp = configparser.ConfigParser()
     cp.read(path)
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
 
     # ---- [General settings] → [project] ----
-    proj: Dict[str, Any] = {}
+    proj: dict[str, Any] = {}
     if cp.has_section("General settings"):
         gs = cp["General settings"]
         # The fields with stable semantics:
@@ -166,7 +166,7 @@ def parse_legacy_config(path: Path) -> Dict[str, Any]:
     # ---- [Outlier settings] → [stages.outlier_correction] ----
     if cp.has_section("Outlier settings"):
         stages = out.setdefault("stages", {})
-        oc: Dict[str, Any] = {}
+        oc: dict[str, Any] = {}
         for key in cp["Outlier settings"]:
             try:
                 oc[key] = float(cp["Outlier settings"][key])
@@ -176,7 +176,7 @@ def parse_legacy_config(path: Path) -> Dict[str, Any]:
 
     # ---- [SML settings] → [classification] ----
     if cp.has_section("SML settings"):
-        cls_: Dict[str, Any] = {}
+        cls_: dict[str, Any] = {}
         for key in cp["SML settings"]:
             cls_[key] = cp["SML settings"][key]
         out["classification"] = cls_
@@ -186,7 +186,7 @@ def parse_legacy_config(path: Path) -> Dict[str, Any]:
         "General settings", "Outlier settings",
         "SML settings",
     }
-    legacy: Dict[str, Any] = {}
+    legacy: dict[str, Any] = {}
     for sec in cp.sections():
         if sec in known:
             continue
@@ -199,7 +199,7 @@ def parse_legacy_config(path: Path) -> Dict[str, Any]:
     return out
 
 
-def parse_legacy_body_part_names(paths: LegacyProjectPaths) -> List[str]:
+def parse_legacy_body_part_names(paths: LegacyProjectPaths) -> list[str]:
     """Read the body-part-name files from
     ``logs/measures/pose_configs/bp_names/`` if present.
 
@@ -217,7 +217,7 @@ def parse_legacy_body_part_names(paths: LegacyProjectPaths) -> List[str]:
         return []
     # SimBA writes one .csv file per configured layout. Take
     # the first one we can read — there's usually only one.
-    names: List[str] = []
+    names: list[str] = []
     for f in sorted(bp_dir.glob("*.csv")):
         try:
             text = f.read_text(encoding="utf-8")

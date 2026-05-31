@@ -52,7 +52,7 @@ LINE_TYPE = 'LINE_TYPE'
 def _plot_roi(roi_dict: dict,
               img: np.ndarray,
               show_tags: bool = False,
-              omitted_roi: Optional[str] = None):
+              omitted_roi: str | None = None):
 
     rectangles_df, circles_df, polygon_df = pd.DataFrame(columns=get_rectangle_df_headers()), pd.DataFrame(
         columns=get_circle_df_headers()), pd.DataFrame(columns=get_polygon_df_headers())
@@ -161,9 +161,9 @@ class InteractiveROIModifier:
                  img_window: Toplevel,
                  original_img: np.ndarray,
                  roi_dict: dict,
-                 settings: Optional[dict] = None,
-                 hex_grid: Optional[List[Polygon]] = None,
-                 rectangle_grid: Optional[List[Polygon]] = None):
+                 settings: dict | None = None,
+                 hex_grid: list[Polygon] | None = None,
+                 rectangle_grid: list[Polygon] | None = None):
 
         check_instance(source=self.__class__.__name__, instance=img_window, accepted_types=(Toplevel,))
         if settings is None: settings = {item.name: item.value for item in ROI_SETTINGS}
@@ -198,7 +198,7 @@ class InteractiveROIModifier:
         self.img_window.unbind(TkBinds.LEFT.value)
         self.img_window.unbind(TkBinds.RIGHT.value)
 
-    def find_closest_tag(self, roi_dict: dict, click_coordinate: Tuple[int, int]):
+    def find_closest_tag(self, roi_dict: dict, click_coordinate: tuple[int, int]):
         clicked_roi, clicked_tag = None, None
         for roi_name, roi_data in roi_dict.items():
             ear_tag_size = roi_data['Ear_tag_size']
@@ -436,7 +436,7 @@ class InteractiveROIModifier:
             self.bind_kbd_keys(kbd_sensitivity=self.settings[KEYBOARD_SENSITIVITY])
             self.edge_selected = True
 
-    def left_mouse_drag(self, event: Event, x_correction: Optional[int] = None, y_correction: Optional[int] = None):
+    def left_mouse_drag(self, event: Event, x_correction: int | None = None, y_correction: int | None = None):
         if self.edge_selected:
             if x_correction is not None and y_correction is not None:
                 self.interactive_loc = (self.interactive_loc[0] + x_correction, self.interactive_loc[1] + y_correction)

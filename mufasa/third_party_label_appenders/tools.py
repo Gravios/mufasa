@@ -26,10 +26,10 @@ from mufasa.utils.warnings import ThirdPartyAnnotationsInvalidFileFormatWarning
 BENTO = "Bento"
 
 
-def read_bento_files(data_paths: Union[List[str], str, os.PathLike],
-                     video_info_df: Union[str, os.PathLike, pd.DataFrame],
-                     error_setting: Literal[Union[None, Methods.ERROR.value, Methods.WARNING.value]] = None,
-                     log_setting: Optional[bool] = False) -> Dict[str, pd.DataFrame]:
+def read_bento_files(data_paths: list[str] | str | os.PathLike,
+                     video_info_df: str | os.PathLike | pd.DataFrame,
+                     error_setting: Literal[None | Methods.ERROR.value | Methods.WARNING.value] = None,
+                     log_setting: bool | None = False) -> dict[str, pd.DataFrame]:
 
     r"""
     Reads multiple BENTO annotation files and processes them into a dictionary of DataFrames, each representing the
@@ -72,7 +72,7 @@ def read_bento_files(data_paths: Union[List[str], str, os.PathLike],
 
     return dfs
 
-def observer_timestamp_corrector(timestamps: List[str]) -> List[str]:
+def observer_timestamp_corrector(timestamps: list[str]) -> list[str]:
     corrected_ts = []
     for timestamp in timestamps:
         h, m, s = timestamp.split(":", 3)
@@ -97,11 +97,11 @@ def is_new_boris_version(pd_df: pd.DataFrame):
     return "Media file name" in list(pd_df.columns)
 
 
-def read_boris_annotation_files(data_paths: Union[List[str], str, os.PathLike],
-                                video_info_df: Union[str, os.PathLike, pd.DataFrame],
-                                error_setting: Literal[Union[None, Methods.ERROR.value, Methods.WARNING.value]] = None,
+def read_boris_annotation_files(data_paths: list[str] | str | os.PathLike,
+                                video_info_df: str | os.PathLike | pd.DataFrame,
+                                error_setting: Literal[None | Methods.ERROR.value | Methods.WARNING.value] = None,
                                 orient: Literal['index', 'columns'] = 'columns',
-                                log_setting: Optional[bool] = False) -> Dict[str, pd.DataFrame]:
+                                log_setting: bool | None = False) -> dict[str, pd.DataFrame]:
     r"""
     Reads multiple BORIS behavioral annotation files and compiles the data into a dictionary of dataframes.
 
@@ -141,11 +141,11 @@ def read_boris_annotation_files(data_paths: Union[List[str], str, os.PathLike],
 
 
 def read_ethovision_files(
-    data_paths: List[str],
+    data_paths: list[str],
     error_setting: str,
     video_info_df: pd.DataFrame,
     log_setting: bool = False,
-) -> Dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     VIDEO_FILE = "Video file"
     HEADER_LINES = "Number of header lines:"
     RECORDING_TIME = "Recording time"
@@ -215,11 +215,11 @@ def read_ethovision_files(
 
 
 def read_observer_files(
-    data_paths: List[str],
+    data_paths: list[str],
     error_setting: str,
     video_info_df: pd.DataFrame,
     log_setting: bool = False,
-) -> Dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     TIME_FIELD = "Time_Relative_hmsf"
     VIDEO_NAME_FIELD = "Observation"
     BEHAVIOR_FIELD = "Behavior"
@@ -292,11 +292,11 @@ def read_observer_files(
 
 
 def read_solomon_files(
-    data_paths: List[str],
+    data_paths: list[str],
     error_setting: str,
     video_info_df: pd.DataFrame,
     log_setting: bool = False,
-) -> Dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     BEHAVIOR = "Behaviour"
     TIME = "Time"
     EXPECTED_COLUMNS = [TIME, BEHAVIOR]
@@ -366,8 +366,8 @@ def read_solomon_files(
 
 
 def read_deepethogram_files(
-    data_paths: List[str], error_setting: str, log_setting: bool = False
-) -> Dict[str, pd.DataFrame]:
+    data_paths: list[str], error_setting: str, log_setting: bool = False
+) -> dict[str, pd.DataFrame]:
     BACKGROUND = "background"
     dfs = {}
     for file_cnt, file_path in enumerate(data_paths):
@@ -428,7 +428,7 @@ def fix_uneven_start_stop_count(data: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame({"START": starts, "STOP": stops})
 
 
-def check_stop_events_prior_to_start_events(df: pd.DataFrame) -> List[int]:
+def check_stop_events_prior_to_start_events(df: pd.DataFrame) -> list[int]:
     overlaps_idx = []
     for obs_cnt, obs in enumerate(df.values):
         if obs[0] > obs[1]:

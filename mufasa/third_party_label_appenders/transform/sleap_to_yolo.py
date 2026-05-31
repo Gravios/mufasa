@@ -43,15 +43,15 @@ class SleapAnnotations2Yolo:
 
 
     def __init__(self,
-                 sleap_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 video_dir: Optional[Union[str, os.PathLike]] = None,
-                 padding: Optional[float] = None,
+                 sleap_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 video_dir: str | os.PathLike | None = None,
+                 padding: float | None = None,
                  train_size: float = 0.8,
                  verbose: bool = True,
                  greyscale: bool = False,
                  clahe: bool = False,
-                 single_id: Optional[str] = None):
+                 single_id: str | None = None):
 
         check_if_dir_exists(in_dir=os.path.dirname(save_dir), source=f'{self.__class__.__name__} save_path')
         check_if_dir_exists(in_dir=os.path.dirname(sleap_dir), source=f'{self.__class__.__name__} sleap_dir')

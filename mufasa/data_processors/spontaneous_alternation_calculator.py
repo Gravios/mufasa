@@ -57,15 +57,15 @@ class SpontaneousAlternationCalculator(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 arm_names: List[str],
+                 config_path: str | os.PathLike,
+                 arm_names: list[str],
                  center_name: str,
-                 animal_area: Optional[int] = 80,
-                 threshold: Optional[float] = 0.0,
-                 buffer: Optional[int] = 2,
-                 verbose: Optional[bool] = False,
-                 detailed_data: Optional[bool] = False,
-                 data_path: Optional[Union[str, os.PathLike]] = None):
+                 animal_area: int | None = 80,
+                 threshold: float | None = 0.0,
+                 buffer: int | None = 2,
+                 verbose: bool | None = False,
+                 detailed_data: bool | None = False,
+                 data_path: str | os.PathLike | None = None):
 
         ConfigReader.__init__(self, config_path=config_path)
         if self.animal_cnt != 1:

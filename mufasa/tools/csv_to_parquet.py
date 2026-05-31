@@ -99,7 +99,7 @@ POSE_DATA_DIRS = (
 )
 
 
-def discover_files(project_folder: str) -> List[str]:
+def discover_files(project_folder: str) -> list[str]:
     """Return list of CSV files in pose-data directories that
     should be converted. Skips temp directories and hidden files."""
     project_folder = Path(project_folder)
@@ -110,7 +110,7 @@ def discover_files(project_folder: str) -> List[str]:
             f"(is this really a Mufasa project_folder?)"
         )
 
-    found: List[str] = []
+    found: list[str] = []
     for sub in POSE_DATA_DIRS:
         sub_path = csv_root / sub
         if not sub_path.is_dir():
@@ -173,9 +173,9 @@ def _detect_header_rows(csv_path: str, max_probe_lines: int = 10) -> int:
 
 
 def convert_csv_to_parquet(
-    csv_path: str, parquet_path: Optional[str] = None,
+    csv_path: str, parquet_path: str | None = None,
     has_index: bool = True,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Convert a single CSV to parquet.
 
     Auto-detects whether the CSV has a single-row header (the
@@ -349,7 +349,7 @@ def find_project_folder(config_path: str) -> str:
     return os.path.dirname(os.path.abspath(config_path))
 
 
-def _convert_one(args: Tuple[str, str, bool]) -> Tuple[str, str, Optional[str], int, int]:
+def _convert_one(args: tuple[str, str, bool]) -> tuple[str, str, str | None, int, int]:
     """Worker: convert one CSV to parquet and verify.
 
     Returns (csv_path, parquet_path, error_or_None, n_rows, n_cols).
@@ -374,7 +374,7 @@ def _convert_one(args: Tuple[str, str, bool]) -> Tuple[str, str, Optional[str], 
         )
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="mufasa-csv-to-parquet",
         description=(
@@ -478,8 +478,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         f"\nConverting {len(files)} CSV(s) to parquet "
         f"(n_workers={n_workers})..."
     )
-    failures: List[Tuple[str, str]] = []
-    converted: List[Tuple[str, str]] = []  # (csv_path, parquet_path)
+    failures: list[tuple[str, str]] = []
+    converted: list[tuple[str, str]] = []  # (csv_path, parquet_path)
 
     work_items = [
         (csv_path, str(Path(csv_path).with_suffix(".parquet")), has_index)

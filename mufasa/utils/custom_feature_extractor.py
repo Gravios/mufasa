@@ -63,8 +63,8 @@ class CustomFeatureExtractor(ConfigReader):
     """
 
     def __init__(self,
-                 extractor_file_path: Union[str, os.PathLike],
-                 config_path: Union[str, os.PathLike]):
+                 extractor_file_path: str | os.PathLike,
+                 config_path: str | os.PathLike):
         check_file_exist_and_readable(file_path=config_path)
         check_file_exist_and_readable(file_path=extractor_file_path)
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
@@ -113,7 +113,7 @@ class CustomFeatureExtractor(ConfigReader):
         functions = [n for n in parsed_py.body if isinstance(n, ast.FunctionDef)]
         return [x.name for x in functions]
 
-    def _check_inheritance(self, class_: ast.ClassDef, inheritance: Optional[str] = ABSTRACT_CLASS_NAME) -> bool:
+    def _check_inheritance(self, class_: ast.ClassDef, inheritance: str | None = ABSTRACT_CLASS_NAME) -> bool:
         """
         Check if a class inherits from a specified class.
 
@@ -129,7 +129,7 @@ class CustomFeatureExtractor(ConfigReader):
         else:
             return False
 
-    def has_block(self, file_path: Union[str, os.PathLike], target: str) -> bool:
+    def has_block(self, file_path: str | os.PathLike, target: str) -> bool:
         """
         Check if a specified block of text exists in a file.
 
@@ -147,7 +147,7 @@ class CustomFeatureExtractor(ConfigReader):
                     return True
         return False
 
-    def has_argparser_argument(self, file_path: Union[str, os.PathLike], target_argument: str) -> bool:
+    def has_argparser_argument(self, file_path: str | os.PathLike, target_argument: str) -> bool:
         """
         Check if a Python script, using argparse, has a specific command-line argument.
 

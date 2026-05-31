@@ -70,13 +70,13 @@ class YOLOSegmentationInference:
     """
 
     def __init__(self,
-                 weights_path: Union[str, os.PathLike],
-                 video_path: Union[Union[str, os.PathLike], List[Union[str, os.PathLike]]],
-                 verbose: Optional[bool] = True,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 device: Union[Literal['cpu'], int] = 0,
-                 format: Optional[str] = None,
-                 batch_size: Optional[int] = 4,
+                 weights_path: str | os.PathLike,
+                 video_path: str | os.PathLike | list[str | os.PathLike],
+                 verbose: bool | None = True,
+                 save_dir: str | os.PathLike | None = None,
+                 device: Literal['cpu'] | int = 0,
+                 format: str | None = None,
+                 batch_size: int | None = 4,
                  torch_threads: int = 8,
                  half_precision: bool = True,
                  stream: bool = False,
@@ -85,7 +85,7 @@ class YOLOSegmentationInference:
                  interpolate: bool = False,
                  imgsz: int = 640,
                  iou: float = 0.5,
-                 retina_msk: Optional[bool] = False,
+                 retina_msk: bool | None = False,
                  vertice_cnt: int = 30):
 
         if isinstance(video_path, list):

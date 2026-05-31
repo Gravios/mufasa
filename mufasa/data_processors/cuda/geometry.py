@@ -294,8 +294,8 @@ def get_convex_hull(pts: np.ndarray) -> np.ndarray:
 
 
 def poly_area(data: np.ndarray,
-              pixels_per_mm: Optional[float] = 1.0,
-              batch_size: Optional[int] = int(0.5e+7)) -> np.ndarray:
+              pixels_per_mm: float | None = 1.0,
+              batch_size: int | None = int(0.5e+7)) -> np.ndarray:
 
     """
     Compute the area of a polygon using GPU acceleration.
@@ -339,8 +339,8 @@ def poly_area(data: np.ndarray,
 
 def find_midpoints(x: np.ndarray,
                    y: np.ndarray,
-                   percentile: Optional[float] = 0.5,
-                   batch_size: Optional[int] = int(1.5e+7)) -> np.ndarray:
+                   percentile: float | None = 0.5,
+                   batch_size: int | None = int(1.5e+7)) -> np.ndarray:
 
     """
     Calculate the midpoints between corresponding points in arrays `x` and `y`

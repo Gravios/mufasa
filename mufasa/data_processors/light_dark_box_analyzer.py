@@ -59,12 +59,12 @@ class LightDarkBoxAnalyzer:
 
 
     def __init__(self,
-                 data_dir: Union[str, os.PathLike],
+                 data_dir: str | os.PathLike,
                  body_part: str,
-                 fps: Union[int, float],
+                 fps: int | float,
                  threshold: float = 0.01,
                  minimum_episode_duration: float = 10e-16,
-                 save_path: Optional[Union[str, os.PathLike]] = None):
+                 save_path: str | os.PathLike | None = None):
 
         self.data_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=['.csv'], raise_error=True, as_dict=True)
         if save_path is not None:

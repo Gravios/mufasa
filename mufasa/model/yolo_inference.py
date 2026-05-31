@@ -110,22 +110,22 @@ class YoloInference:
     >>> i.run()
     """
     def __init__(self,
-                 weights: Union[str, os.PathLike, YOLO],
-                 video_path: Union[Union[str, os.PathLike], List[Union[str, os.PathLike]]],
-                 verbose: Optional[bool] = False,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 half_precision: Optional[bool] = True,
-                 device: Union[Literal['cpu'], int] = 0,
-                 batch_size: Optional[int] = 400,
+                 weights: str | os.PathLike | YOLO,
+                 video_path: str | os.PathLike | list[str | os.PathLike],
+                 verbose: bool | None = False,
+                 save_dir: str | os.PathLike | None = None,
+                 half_precision: bool | None = True,
+                 device: Literal['cpu'] | int = 0,
+                 batch_size: int | None = 400,
                  core_cnt: int = 8,
                  threshold: float = 0.25,
                  max_detections: int = 300,
-                 smoothing_method: Optional[Literal['savitzky-golay', 'bartlett', 'blackman', 'boxcar', 'cosine', 'gaussian', 'hamming', 'exponential']] = None,
-                 smoothing_time_window: Optional[int] = None,
+                 smoothing_method: Literal['savitzky-golay', 'bartlett', 'blackman', 'boxcar', 'cosine', 'gaussian', 'hamming', 'exponential'] | None = None,
+                 smoothing_time_window: int | None = None,
                  interpolate: bool = False,
                  imgsz: int = 320,
-                 bbox_size: Optional[Tuple[int, int]] = None,
-                 stream: Optional[bool] = True) -> Union[None, Dict[str, pd.DataFrame]]:
+                 bbox_size: tuple[int, int] | None = None,
+                 stream: bool | None = True) -> None | dict[str, pd.DataFrame]:
 
         if not _is_cuda_available()[0]:
             raise MufasaGPUError(msg='No GPU detected.', source=self.__class__.__name__)

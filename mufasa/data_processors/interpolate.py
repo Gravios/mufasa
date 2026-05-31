@@ -53,11 +53,11 @@ class Interpolate(ConfigReader):
 
     """
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
-                 type: Optional[Literal['body-parts', 'animals']] = 'body-parts',
-                 method: Optional[Literal['nearest', 'linear', 'quadratic']] = 'nearest',
-                 multi_index_df_headers: Optional[bool] = None) -> None:
+                 config_path: str | os.PathLike,
+                 data_path: str | os.PathLike | list[str | os.PathLike],
+                 type: Literal['body-parts', 'animals'] | None = 'body-parts',
+                 method: Literal['nearest', 'linear', 'quadratic'] | None = 'nearest',
+                 multi_index_df_headers: bool | None = None) -> None:
         """
         Patch 122ed — backend refactor to write-to-run-dir.
 

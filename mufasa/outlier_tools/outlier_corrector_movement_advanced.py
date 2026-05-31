@@ -53,8 +53,8 @@ class OutlierCorrecterMovementAdvanced(ConfigReader, FeatureExtractionMixin):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
-        input_dir: Union[str, os.PathLike],
+        config_path: str | os.PathLike,
+        input_dir: str | os.PathLike,
         criterion_body_parts: dict,
         type: Literal["animal", "body-part"],
         agg_method: Literal["mean", "median"],

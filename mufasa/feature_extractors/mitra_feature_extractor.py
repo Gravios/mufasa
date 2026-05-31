@@ -85,7 +85,7 @@ class MitraFeatureExtractor(ConfigReader,
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike]):
+                 config_path: str | os.PathLike):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=True, create_logger=False)
         check_if_filepath_list_is_empty(filepaths=self.outlier_corrected_paths, error_msg=f'No data files found in {self.outlier_corrected_dir} directory.')

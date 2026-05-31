@@ -62,17 +62,17 @@ class EzPathPlot:
 
     def __init__(
         self,
-        data_path: Union[str, os.PathLike],
+        data_path: str | os.PathLike,
         body_part: str,
-        bg_color: Optional[Tuple[int, int, int]] = (255, 255, 255),
-        line_color: Optional[Tuple[int, int, int]] = (147, 20, 255),
-        video_path: Optional[Union[str, os.PathLike]] = None,
-        size: Optional[Tuple[int, int]] = None,
-        fps: Optional[int] = None,
-        line_thickness: Optional[int] = 10,
-        circle_size: Optional[int] = 5,
-        last_frm_only: Optional[bool] = False,
-        save_path: Optional[Union[str, os.PathLike]] = None,
+        bg_color: tuple[int, int, int] | None = (255, 255, 255),
+        line_color: tuple[int, int, int] | None = (147, 20, 255),
+        video_path: str | os.PathLike | None = None,
+        size: tuple[int, int] | None = None,
+        fps: int | None = None,
+        line_thickness: int | None = 10,
+        circle_size: int | None = 5,
+        last_frm_only: bool | None = False,
+        save_path: str | os.PathLike | None = None,
     ):
 
         check_file_exist_and_readable(file_path=data_path)

@@ -22,7 +22,7 @@ from mufasa.utils.read_write import get_fn_ext, read_df, write_df
     ]
 , cache=True)
 def calculate_weighted_avg(
-    bp: np.ndarray, p: Union[np.ndarray, None], threshold: float
+    bp: np.ndarray, p: np.ndarray | None, threshold: float
 ):
     results = np.full((bp.shape[0]), np.nan)
     n = bp.shape[0]

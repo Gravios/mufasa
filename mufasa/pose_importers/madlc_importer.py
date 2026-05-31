@@ -52,12 +52,12 @@ class MADLCImporterH5(ConfigReader, PoseImporterMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_folder: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
+                 data_folder: str | os.PathLike,
                  file_type: Literal['skeleton', 'box', 'ellipse'],
-                 id_lst: List[str],
-                 interpolation_settings: Optional[Dict[str, str]] = None,
-                 smoothing_settings: Optional[Dict[str, Any]] = None):
+                 id_lst: list[str],
+                 interpolation_settings: dict[str, str] | None = None,
+                 smoothing_settings: dict[str, Any] | None = None):
 
         check_file_exist_and_readable(file_path=config_path)
         check_if_dir_exists(in_dir=data_folder)

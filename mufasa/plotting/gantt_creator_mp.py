@@ -162,22 +162,22 @@ class GanttCreatorMultiprocess(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_paths: Optional[Union[Union[str, os.PathLike], List[Union[str, os.PathLike]]]] = None,
-                 frame_setting: Optional[bool] = False,
-                 video_setting: Optional[bool] = False,
-                 last_frm_setting: Optional[bool] = True,
+                 config_path: str | os.PathLike,
+                 data_paths: str | os.PathLike | list[str | os.PathLike] | None = None,
+                 frame_setting: bool | None = False,
+                 video_setting: bool | None = False,
+                 last_frm_setting: bool | None = True,
                  last_frame_as_svg: bool = False,
                  width: int = 640,
                  height: int = 480,
                  font_size: int = 8,
                  font_rotation: int = 45,
-                 font: Optional[str] = None,
+                 font: str | None = None,
                  bar_opacity: float = 0.85,
                  palette: str = 'Set1',
                  core_cnt: int = -1,
                  hhmmss: bool = False,
-                 clf_names: Optional[List[str]] = None):
+                 clf_names: list[str] | None = None):
 
         check_file_exist_and_readable(file_path=config_path)
         if (not frame_setting) and (not video_setting) and (not last_frm_setting):

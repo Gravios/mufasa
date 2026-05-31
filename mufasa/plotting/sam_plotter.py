@@ -30,11 +30,11 @@ class SamVisualizer:
     """
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 data_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  core_cnt: int = -1,
-                 color: Optional[Union[Tuple[int, int, int], List[Tuple[int, int, int]]]] = (178, 102, 255),
+                 color: tuple[int, int, int] | list[tuple[int, int, int]] | None = (178, 102, 255),
                  shape_opacity: float = 0.5,
                  bg_opacity: float = 1.0):
 

@@ -115,9 +115,9 @@ class BodySegment:
         in this segment's distal-end frame.
     """
     name: str
-    parent: Optional[str]
+    parent: str | None
     rest_angle: float = 0.0
-    markers: Dict[str, Tuple[float, float]] = field(default_factory=dict)
+    markers: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -204,7 +204,7 @@ class BodyLayout:
     body state, so dropouts on any individual marker don't
     cause that marker's state to drift away from the others.
     """
-    segments: List[BodySegment]
+    segments: list[BodySegment]
     # Patch 120a: opt-in latent drift state. When True, the
     # state vector is extended by a 2-dim block per marker
     # with mean-reverting random-walk dynamics. See class
@@ -232,7 +232,7 @@ class BodyLayout:
     # ``segments`` (validated in __post_init__). The order
     # of names determines the order of dims in the
     # orientation-drift block.
-    orientation_drift_segments: List[str] = field(default_factory=list)
+    orientation_drift_segments: list[str] = field(default_factory=list)
 
     # Patch 121d: per-segment constant-acceleration extension.
     # When a segment name appears here, its kinematic state
@@ -248,7 +248,7 @@ class BodyLayout:
     # (v_new = v + a*dt; x_new = x + v*dt + a*dt²/2) and the
     # diagonal jerk-noise entries on the new accel slots.
     # Empty list (default) preserves patch-121b/121c behavior.
-    const_accel_segments: List[str] = field(default_factory=list)
+    const_accel_segments: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # Validate exactly one root
@@ -318,7 +318,7 @@ class BodyLayout:
             )
 
         # Validate no duplicate marker attachments
-        seen_markers: Dict[str, str] = {}
+        seen_markers: dict[str, str] = {}
         for s in self.segments:
             for m in s.markers:
                 if m in seen_markers:
@@ -329,14 +329,14 @@ class BodyLayout:
                     )
                 seen_markers[m] = s.name
 
-    def _compute_topo_order(self) -> List[str]:
+    def _compute_topo_order(self) -> list[str]:
         """Topological sort: root first, children after parents.
 
         Used by forward kinematics (compute root → children) and
         by state-packing index conventions.
         """
-        result: List[str] = []
-        children_of: Dict[Optional[str], List[str]] = {}
+        result: list[str] = []
+        children_of: dict[str | None, list[str]] = {}
         for s in self.segments:
             children_of.setdefault(s.parent, []).append(s.name)
 
@@ -370,24 +370,24 @@ class BodyLayout:
         raise RuntimeError("No root segment (validated in __post_init__)")
 
     @property
-    def topo_order(self) -> List[str]:
+    def topo_order(self) -> list[str]:
         """Segment names in topological order (root first)."""
         return list(self._topo_order)
 
     @property
-    def non_root_topo_order(self) -> List[str]:
+    def non_root_topo_order(self) -> list[str]:
         """Non-root segments in topological order. The
         canonical order for state-packing.
         """
         return [n for n in self._topo_order if n != self.root_segment.name]
 
     @property
-    def marker_names(self) -> List[str]:
+    def marker_names(self) -> list[str]:
         """Markers in topological order of their attached
         segments (stable; used for observation vector
         packing).
         """
-        names: List[str] = []
+        names: list[str] = []
         for seg_name in self._topo_order:
             seg = self.segment_by_name(seg_name)
             names.extend(seg.markers.keys())
@@ -399,7 +399,7 @@ class BodyLayout:
                 return s
         raise KeyError(f"No segment named {name!r}")
 
-    def marker_attachment(self, marker: str) -> Tuple[str, Tuple[float, float]]:
+    def marker_attachment(self, marker: str) -> tuple[str, tuple[float, float]]:
         """Returns (segment_name, (length, angle)) for a marker."""
         for s in self.segments:
             if marker in s.markers:
@@ -663,11 +663,11 @@ def standard_rat_layout(
     -------
     BodyLayout
     """
-    segments: List[BodySegment] = []
+    segments: list[BodySegment] = []
 
     # Root: 'body' segment, with back2 as the canonical position
     # marker. Other trunk markers attach as fixed offsets.
-    body_markers: Dict[str, Tuple[float, float]] = {
+    body_markers: dict[str, tuple[float, float]] = {
         "back2": (0.0, 0.0),  # root; body's distal-end IS back2
     }
     # Other trunk markers will get their offsets fit from data
@@ -783,14 +783,14 @@ class FittedLengths:
     valid-frame threshold are absent from the dict (callers
     treat absence as "no drift for this marker").
     """
-    segment_lengths: Dict[str, float]
-    segment_length_iqr: Dict[str, float]
-    marker_offsets: Dict[str, Tuple[float, float]]
-    marker_r_drift: Optional[Dict[str, float]] = None
-    marker_q_drift: Optional[Dict[str, float]] = None
+    segment_lengths: dict[str, float]
+    segment_length_iqr: dict[str, float]
+    marker_offsets: dict[str, tuple[float, float]]
+    marker_r_drift: dict[str, float] | None = None
+    marker_q_drift: dict[str, float] | None = None
 
 
-def _segment_distal_marker(layout: BodyLayout, segment_name: str) -> Optional[str]:
+def _segment_distal_marker(layout: BodyLayout, segment_name: str) -> str | None:
     """Return the marker attached at the segment's distal end
     (i.e., offset (0, 0) in segment frame), or None if no
     marker is at the distal end. There can be at most one such
@@ -808,7 +808,7 @@ def fit_body_lengths(
     positions: np.ndarray,
     likelihoods: np.ndarray,
     layout: BodyLayout,
-    marker_names: List[str],
+    marker_names: list[str],
     likelihood_threshold: float = _LENGTH_FIT_THRESHOLD,
     dt: float = 1.0 / 30.0,
 ) -> FittedLengths:
@@ -866,9 +866,9 @@ def fit_body_lengths(
     """
     name_to_idx = {n: i for i, n in enumerate(marker_names)}
 
-    segment_lengths: Dict[str, float] = {}
-    segment_length_iqr: Dict[str, float] = {}
-    marker_offsets: Dict[str, Tuple[float, float]] = {}
+    segment_lengths: dict[str, float] = {}
+    segment_length_iqr: dict[str, float] = {}
+    marker_offsets: dict[str, tuple[float, float]] = {}
 
     # Per non-root segment: fit length from distal-marker pair
     for seg_name in layout.non_root_topo_order:
@@ -911,8 +911,8 @@ def fit_body_lengths(
     # is what δ_m needs to absorb. Populated alongside
     # marker_offsets; remains empty for distal markers and
     # markers that didn't have enough valid frames.
-    marker_r_drift: Dict[str, float] = {}
-    marker_q_drift: Dict[str, float] = {}
+    marker_r_drift: dict[str, float] = {}
+    marker_q_drift: dict[str, float] = {}
 
     # Per non-distal-end marker: fit offset (length, angle) in
     # the attached segment's distal-end frame. The "frame" here
@@ -1208,7 +1208,7 @@ def _R(cos_a: float, sin_a: float) -> np.ndarray:
 _J90 = np.array([[0.0, -1.0], [1.0, 0.0]])
 
 
-def _pack_state_layout_indices(layout: BodyLayout) -> Dict[str, Dict[str, int]]:
+def _pack_state_layout_indices(layout: BodyLayout) -> dict[str, dict[str, int]]:
     """Convenience: pre-compute named indices into the state
     vector for fast access during forward kinematics.
 
@@ -1219,7 +1219,7 @@ def _pack_state_layout_indices(layout: BodyLayout) -> Dict[str, Dict[str, int]]:
                      'length_dot'} (root has no length;
                      non-root has all)
     """
-    indices: Dict[str, Dict[str, int]] = {}
+    indices: dict[str, dict[str, int]] = {}
     rs = layout.slice_root_pose()
     indices["__root__"] = {
         "x": rs.start + 0,
@@ -1260,8 +1260,8 @@ class ForwardKinematicsResult:
     These are the inputs to marker-position and Jacobian
     computation.
     """
-    P_distal: Dict[str, np.ndarray]   # segment name -> (2,) array
-    R_world: Dict[str, np.ndarray]    # segment name -> (2, 2) array
+    P_distal: dict[str, np.ndarray]   # segment name -> (2,) array
+    R_world: dict[str, np.ndarray]    # segment name -> (2, 2) array
 
 
 def forward_kinematics(
@@ -1306,8 +1306,8 @@ def forward_kinematics(
         )
 
     idx = _pack_state_layout_indices(layout)
-    P_distal: Dict[str, np.ndarray] = {}
-    R_world: Dict[str, np.ndarray] = {}
+    P_distal: dict[str, np.ndarray] = {}
+    R_world: dict[str, np.ndarray] = {}
 
     # Patch 121b: pre-compute the set of drift-enabled segments
     # for fast membership tests. orientation_drift_segments is
@@ -1389,8 +1389,8 @@ def forward_kinematics(
 def state_to_marker_positions(
     state: np.ndarray,
     layout: BodyLayout,
-    fk: Optional[ForwardKinematicsResult] = None,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    fk: ForwardKinematicsResult | None = None,
+    perspective: "PerspectiveModelV2" | None = None,
 ) -> np.ndarray:
     """Compute predicted 2D positions for all markers.
 
@@ -1464,9 +1464,9 @@ def state_to_marker_positions(
 def state_to_marker_jacobian(
     state: np.ndarray,
     layout: BodyLayout,
-    fk: Optional[ForwardKinematicsResult] = None,
-    perspective: Optional["PerspectiveModelV2"] = None,
-    marker_mask: Optional[np.ndarray] = None,
+    fk: ForwardKinematicsResult | None = None,
+    perspective: "PerspectiveModelV2" | None = None,
+    marker_mask: np.ndarray | None = None,
 ) -> np.ndarray:
     """Compute the Jacobian of marker positions w.r.t. state.
 
@@ -1530,16 +1530,16 @@ def state_to_marker_jacobian(
     # Pre-compute segment ancestor chains (root → marker's
     # segment, in topo order). Used to know which a's affect
     # which marker.
-    parent_of: Dict[str, Optional[str]] = {
+    parent_of: dict[str, str | None] = {
         s.name: s.parent for s in layout.segments
     }
 
-    def chain_to_root(seg_name: str) -> List[str]:
+    def chain_to_root(seg_name: str) -> list[str]:
         """List of segments from root to seg_name (inclusive),
         in proximal-to-distal order.
         """
-        chain: List[str] = []
-        cur: Optional[str] = seg_name
+        chain: list[str] = []
+        cur: str | None = seg_name
         while cur is not None:
             chain.append(cur)
             cur = parent_of[cur]
@@ -1781,7 +1781,7 @@ def _resolve_device(device: str, T: int) -> str:
 def _state_to_world_transforms_batch_np(
     states: np.ndarray,  # (T, D)
     layout: BodyLayout,
-) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
     """Vectorized forward kinematics across T frames using
     NumPy. Returns:
       P_distal: dict seg_name -> (T, 2)
@@ -1793,8 +1793,8 @@ def _state_to_world_transforms_batch_np(
     """
     idx = _pack_state_layout_indices(layout)
     T = states.shape[0]
-    P_distal: Dict[str, np.ndarray] = {}
-    R_world: Dict[str, np.ndarray] = {}
+    P_distal: dict[str, np.ndarray] = {}
+    R_world: dict[str, np.ndarray] = {}
 
     drift_set = set(layout.orientation_drift_segments)
 
@@ -1893,8 +1893,8 @@ def _state_to_world_transforms_batch_torch(
     T = states.shape[0]
     device = states.device
     dtype = states.dtype
-    P_distal: Dict[str, "torch.Tensor"] = {}
-    R_world: Dict[str, "torch.Tensor"] = {}
+    P_distal: dict[str, "torch.Tensor"] = {}
+    R_world: dict[str, "torch.Tensor"] = {}
 
     drift_set = set(layout.orientation_drift_segments)
 
@@ -1969,7 +1969,7 @@ def _state_to_world_transforms_batch_torch(
 def state_to_marker_positions_batch(
     states: np.ndarray,  # (T, D)
     layout: BodyLayout,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    perspective: "PerspectiveModelV2" | None = None,
     device: str = "cpu",
 ) -> np.ndarray:
     """Vectorized state_to_marker_positions across T frames.
@@ -2077,7 +2077,7 @@ def _perspective_scales_batch_np(
     perspective: "PerspectiveModelV2",
     root_x: np.ndarray,  # (T,)
     root_y: np.ndarray,  # (T,)
-    marker_names: List[str],
+    marker_names: list[str],
 ) -> np.ndarray:
     """Compute scale factor per (frame, marker). Returns
     (T, K) array.
@@ -2101,7 +2101,7 @@ def _perspective_scales_batch_torch(
     perspective: "PerspectiveModelV2",
     root_x,  # torch tensor (T,)
     root_y,
-    marker_names: List[str],
+    marker_names: list[str],
 ):
     torch = _try_import_torch()
     x_n = (root_x - perspective.arena_x_mean) / max(
@@ -2124,7 +2124,7 @@ def _perspective_scales_batch_torch(
 def state_to_marker_jacobian_batch(
     states: np.ndarray,  # (T, D)
     layout: BodyLayout,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    perspective: "PerspectiveModelV2" | None = None,
     device: str = "cpu",
 ) -> np.ndarray:
     """Vectorized state_to_marker_jacobian across T frames.
@@ -2163,20 +2163,20 @@ def state_to_marker_jacobian_batch(
 
     H = np.zeros((T, 2 * K, D))
 
-    parent_of: Dict[str, Optional[str]] = {
+    parent_of: dict[str, str | None] = {
         s.name: s.parent for s in layout.segments
     }
 
-    def chain_to_root(seg_name: str) -> List[str]:
-        chain: List[str] = []
-        cur: Optional[str] = seg_name
+    def chain_to_root(seg_name: str) -> list[str]:
+        chain: list[str] = []
+        cur: str | None = seg_name
         while cur is not None:
             chain.append(cur)
             cur = parent_of[cur]
         return list(reversed(chain))
 
     # Cache chain per segment to avoid recomputing per frame
-    chain_per_seg: Dict[str, List[str]] = {
+    chain_per_seg: dict[str, list[str]] = {
         s.name: chain_to_root(s.name) for s in layout.segments
     }
 
@@ -2342,7 +2342,7 @@ def initial_state_from_data(
     positions: np.ndarray,
     likelihoods: np.ndarray,
     layout: BodyLayout,
-    marker_names: List[str],
+    marker_names: list[str],
     fitted: FittedLengths,
     likelihood_threshold: float = 0.5,
 ) -> np.ndarray:
@@ -2422,11 +2422,11 @@ def initial_state_from_data(
     # in topo order, we know parent's world pose; compute s's
     # local angle from observed (P_s_distal - P_parent_distal)
     # in parent's frame.
-    P_world: Dict[str, np.ndarray] = {root.name: np.array([
+    P_world: dict[str, np.ndarray] = {root.name: np.array([
         state[indices["__root__"]["x"]],
         state[indices["__root__"]["y"]],
     ])}
-    R_world: Dict[str, np.ndarray] = {root.name: _R(root_cos, root_sin)}
+    R_world: dict[str, np.ndarray] = {root.name: _R(root_cos, root_sin)}
 
     for seg_name in layout.non_root_topo_order:
         seg = layout.segment_by_name(seg_name)
@@ -2573,22 +2573,22 @@ class NoiseParamsV2:
         covariance. Typical value 0.1 rad (~5.7°) — small
         enough to be a "drift" not a "rotation".
     """
-    sigma_marker: Dict[str, float]
+    sigma_marker: dict[str, float]
     q_root_pos: float
     q_root_ori: float
-    q_seg_ori: Dict[str, float]
-    q_length: Dict[str, float]
+    q_seg_ori: dict[str, float]
+    q_length: dict[str, float]
     constraint_sigma: float = _DEFAULT_CONSTRAINT_SIGMA
     # Patch 120a: per-marker latent drift parameters. None
     # when the layout doesn't have drift enabled.
-    q_drift: Optional[Dict[str, float]] = None
-    alpha_drift: Optional[Dict[str, float]] = None
-    r_drift: Optional[Dict[str, float]] = None
+    q_drift: dict[str, float] | None = None
+    alpha_drift: dict[str, float] | None = None
+    r_drift: dict[str, float] | None = None
     # Patch 121a: per-segment orientation drift parameters.
     # None when the layout has no orientation_drift_segments.
-    q_theta_drift: Optional[Dict[str, float]] = None
-    alpha_theta_drift: Optional[Dict[str, float]] = None
-    r_theta_drift: Optional[Dict[str, float]] = None
+    q_theta_drift: dict[str, float] | None = None
+    alpha_theta_drift: dict[str, float] | None = None
+    r_theta_drift: dict[str, float] | None = None
     # Patch 121d: const-accel jerk noise. None when the layout
     # has no const_accel_segments. q_jerk_root_pos and
     # q_jerk_root_ori are scalars (only meaningful when the
@@ -2597,9 +2597,9 @@ class NoiseParamsV2:
     # px²/s⁵ (translation) or (cos/sin units)²/s⁵ (orientation).
     # In 121d these are FIXED at the initial fitted/default
     # values; M-step learning is deferred to a later patch.
-    q_jerk_root_pos: Optional[float] = None
-    q_jerk_root_ori: Optional[float] = None
-    q_jerk_seg_ori: Optional[Dict[str, float]] = None
+    q_jerk_root_pos: float | None = None
+    q_jerk_root_ori: float | None = None
+    q_jerk_seg_ori: dict[str, float] | None = None
 
     @classmethod
     def default(
@@ -2625,8 +2625,8 @@ class NoiseParamsV2:
         # whose body-frame scatter genuinely is large) from
         # producing drift radii that effectively disable the
         # bound. None means no cap.
-        fitted_lengths: Optional["FittedLengths"] = None,
-        r_drift_cap: Optional[float] = 20.0,
+        fitted_lengths: "FittedLengths" | None = None,
+        r_drift_cap: float | None = 20.0,
         # Patch 121a orientation-drift defaults. Used only
         # when ``layout.orientation_drift_segments`` is
         # non-empty.
@@ -2669,9 +2669,9 @@ class NoiseParamsV2:
         the dataclass constructor if more control is needed.
         """
         if layout.with_drift:
-            r_drift_d: Optional[Dict[str, float]] = {}
-            q_drift_d: Optional[Dict[str, float]] = {}
-            alpha_drift_d: Optional[Dict[str, float]] = {
+            r_drift_d: dict[str, float] | None = {}
+            q_drift_d: dict[str, float] | None = {}
+            alpha_drift_d: dict[str, float] | None = {
                 m: alpha_drift for m in layout.marker_names
             }
             for m in layout.marker_names:
@@ -2708,15 +2708,15 @@ class NoiseParamsV2:
         # drift. Same heuristic shape as marker drift: q from r
         # via (r/5)²/dt.
         if layout.orientation_drift_segments:
-            r_theta_drift_d: Optional[Dict[str, float]] = {
+            r_theta_drift_d: dict[str, float] | None = {
                 s: r_theta_drift
                 for s in layout.orientation_drift_segments
             }
-            alpha_theta_drift_d: Optional[Dict[str, float]] = {
+            alpha_theta_drift_d: dict[str, float] | None = {
                 s: alpha_theta_drift
                 for s in layout.orientation_drift_segments
             }
-            q_theta_drift_d: Optional[Dict[str, float]] = {
+            q_theta_drift_d: dict[str, float] | None = {
                 s: (r_theta_drift / 5.0) ** 2 / dt
                 for s in layout.orientation_drift_segments
             }
@@ -2736,9 +2736,9 @@ class NoiseParamsV2:
         # similar ratio to q_seg_ori. These are fixed in 121d
         # (not learned by M-step); a later patch can fit them.
         if layout.const_accel_segments:
-            q_jerk_root_pos_d: Optional[float] = q_root_pos * 10.0
-            q_jerk_root_ori_d: Optional[float] = q_root_ori * 10.0
-            q_jerk_seg_ori_d: Optional[Dict[str, float]] = {
+            q_jerk_root_pos_d: float | None = q_root_pos * 10.0
+            q_jerk_root_ori_d: float | None = q_root_ori * 10.0
+            q_jerk_seg_ori_d: dict[str, float] | None = {
                 s: q_seg_ori * 10.0
                 for s in layout.non_root_topo_order
             }
@@ -2769,7 +2769,7 @@ class NoiseParamsV2:
 def build_F_v2(
     layout: BodyLayout,
     dt: float,
-    params: Optional["NoiseParamsV2"] = None,
+    params: "NoiseParamsV2" | None = None,
 ) -> np.ndarray:
     """Build the state transition matrix F.
 
@@ -3143,7 +3143,7 @@ def _build_constraint_observations(
     state: np.ndarray,
     layout: BodyLayout,
     constraint_sigma: float,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Build the unit-norm constraint pseudo-observations.
 
     For each (cos, sin) pair in the state, the constraint is
@@ -3162,8 +3162,8 @@ def _build_constraint_observations(
     H : (n_constraints, state_dim) — Jacobian
     """
     indices = _pack_state_layout_indices(layout)
-    rows: List[np.ndarray] = []
-    h_vals: List[float] = []
+    rows: list[np.ndarray] = []
+    h_vals: list[float] = []
 
     # Root constraint
     c = state[indices["__root__"]["cos"]]
@@ -3198,8 +3198,8 @@ def _build_marker_observations(
     layout: BodyLayout,
     params: NoiseParamsV2,
     likelihood_threshold: float,
-    perspective: Optional["PerspectiveModelV2"] = None,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+    perspective: "PerspectiveModelV2" | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     """Build the observation vector, predicted observation,
     Jacobian, and observation noise R for one frame's marker
     observations.
@@ -3242,10 +3242,10 @@ def _build_marker_observations(
     )
     marker_names = layout.marker_names
 
-    z_list: List[np.ndarray] = []
-    h_list: List[np.ndarray] = []
-    H_list: List[np.ndarray] = []
-    R_list: List[float] = []
+    z_list: list[np.ndarray] = []
+    h_list: list[np.ndarray] = []
+    H_list: list[np.ndarray] = []
+    R_list: list[float] = []
     n_obs = 0
 
     for k, m in enumerate(marker_names):
@@ -3287,10 +3287,10 @@ def forward_filter_v2(
     params: NoiseParamsV2,
     dt: float,
     initial_state: np.ndarray,
-    initial_cov: Optional[np.ndarray] = None,
+    initial_cov: np.ndarray | None = None,
     likelihood_threshold: float = 0.5,
     apply_constraints: bool = True,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    perspective: "PerspectiveModelV2" | None = None,
 ) -> FilterResultV2:
     """EKF forward pass on the v2 body-state representation.
 
@@ -3926,8 +3926,8 @@ class _MStepStatsV2:
     S11: np.ndarray
     S10: np.ndarray
     n_pairs: int
-    sigma_sum_sq: Dict[str, float]
-    sigma_n_obs: Dict[str, int]
+    sigma_sum_sq: dict[str, float]
+    sigma_n_obs: dict[str, int]
 
     @classmethod
     def empty(cls, layout: BodyLayout) -> "_MStepStatsV2":
@@ -3975,11 +3975,11 @@ class _PerSessionFitV2:
     """
     q_root_pos: float        # raw q from session's S00/S11/S10
     q_root_ori: float
-    q_seg_ori: Dict[str, float]
-    q_length: Dict[str, float]
-    sigma_marker: Dict[str, float]   # sqrt(sum_sq[m] / n_obs[m])
+    q_seg_ori: dict[str, float]
+    q_length: dict[str, float]
+    sigma_marker: dict[str, float]   # sqrt(sum_sq[m] / n_obs[m])
     n_pairs: int             # for weighting if desired
-    n_obs_per_marker: Dict[str, int]   # observation count per m
+    n_obs_per_marker: dict[str, int]   # observation count per m
 
     @classmethod
     def empty(cls, layout: BodyLayout) -> "_PerSessionFitV2":
@@ -4000,7 +4000,7 @@ def accumulate_m_step_stats_v2(
     likelihoods: np.ndarray,
     layout: BodyLayout,
     likelihood_threshold: float = 0.5,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    perspective: "PerspectiveModelV2" | None = None,
     device: str = "cpu",
 ) -> _MStepStatsV2:
     """Accumulate sufficient statistics for the M-step from
@@ -4198,8 +4198,8 @@ def finalize_m_step_v2(
     layout: BodyLayout,
     dt: float,
     prev_params: NoiseParamsV2,
-    initial_params: Optional[NoiseParamsV2] = None,
-    damping: Optional[float] = None,
+    initial_params: NoiseParamsV2 | None = None,
+    damping: float | None = None,
 ) -> NoiseParamsV2:
     """Convert accumulated sufficient statistics into refined
     NoiseParamsV2.
@@ -4311,7 +4311,7 @@ def finalize_m_step_v2(
     q_root_ori = _damp(prev_params.q_root_ori, q_root_ori_clipped)
 
     # Per-segment orientation
-    q_seg_ori: Dict[str, float] = {}
+    q_seg_ori: dict[str, float] = {}
     for seg_name in layout.non_root_topo_order:
         sl = layout.slice_segment_orientation(seg_name)
         block = Q_hat[sl, sl]
@@ -4328,7 +4328,7 @@ def finalize_m_step_v2(
         q_seg_ori[seg_name] = _damp(q_prev, q_clipped)
 
     # Per-segment length
-    q_length: Dict[str, float] = {}
+    q_length: dict[str, float] = {}
     for seg_name in layout.non_root_topo_order:
         sl = layout.slice_segment_length(seg_name)
         block = Q_hat[sl, sl]
@@ -4346,7 +4346,7 @@ def finalize_m_step_v2(
 
     # ---------- σ components ----------
 
-    sigma_marker: Dict[str, float] = {}
+    sigma_marker: dict[str, float] = {}
     for m in layout.marker_names:
         n_obs = stats.sigma_n_obs.get(m, 0)
         if n_obs < 4:
@@ -4373,9 +4373,9 @@ def finalize_m_step_v2(
     # / dt. For the root, average over (ax, ay) for translation
     # and (root_cos_ddot, root_sin_ddot) for orientation. For
     # non-root, average over (cos_ddot, sin_ddot).
-    q_jerk_root_pos: Optional[float] = None
-    q_jerk_root_ori: Optional[float] = None
-    q_jerk_seg_ori: Optional[Dict[str, float]] = None
+    q_jerk_root_pos: float | None = None
+    q_jerk_root_ori: float | None = None
+    q_jerk_seg_ori: dict[str, float] | None = None
     if layout.const_accel_segments:
         q_jerk_seg_ori = {}
         for sname in layout.const_accel_segments:
@@ -4538,8 +4538,8 @@ _INIT_DEFAULT_Q_LENGTH = 0.01
 
 
 def _aggregate_scalar(
-    values: List[float],
-    weights: Optional[List[float]] = None,
+    values: list[float],
+    weights: list[float] | None = None,
     method: str = "median",
 ) -> float:
     """Aggregate per-session scalar estimates into a single
@@ -4578,11 +4578,11 @@ def _aggregate_scalar(
 
 
 def finalize_m_step_v2_from_per_session(
-    per_session_fits: List[_PerSessionFitV2],
+    per_session_fits: list[_PerSessionFitV2],
     layout: BodyLayout,
     prev_params: NoiseParamsV2,
-    initial_params: Optional[NoiseParamsV2] = None,
-    damping: Optional[float] = None,
+    initial_params: NoiseParamsV2 | None = None,
+    damping: float | None = None,
     aggregation: str = "median",
 ) -> NoiseParamsV2:
     """Aggregate per-session q + σ estimates into refined
@@ -4684,7 +4684,7 @@ def finalize_m_step_v2_from_per_session(
     q_root_ori = _damp(prev_params.q_root_ori, q_root_ori_clipped)
 
     # ---------- per-segment q_seg_ori ----------
-    q_seg_ori: Dict[str, float] = {}
+    q_seg_ori: dict[str, float] = {}
     for seg_name in layout.non_root_topo_order:
         vals = [
             f.q_seg_ori.get(seg_name, 0.0) for f in valid_fits
@@ -4704,7 +4704,7 @@ def finalize_m_step_v2_from_per_session(
         q_seg_ori[seg_name] = _damp(q_prev, q_clipped)
 
     # ---------- per-segment q_length ----------
-    q_length: Dict[str, float] = {}
+    q_length: dict[str, float] = {}
     for seg_name in layout.non_root_topo_order:
         vals = [
             f.q_length.get(seg_name, 0.0) for f in valid_fits
@@ -4729,10 +4729,10 @@ def finalize_m_step_v2_from_per_session(
     # observations (n_obs check at per_session_fit_from_stats
     # set σ to 0 for under-observed markers; treat 0 as
     # missing here).
-    sigma_marker: Dict[str, float] = {}
+    sigma_marker: dict[str, float] = {}
     for m in layout.marker_names:
-        vals: List[float] = []
-        weights: List[float] = []
+        vals: list[float] = []
+        weights: list[float] = []
         for f in valid_fits:
             n = f.n_obs_per_marker.get(m, 0)
             if n >= 4:
@@ -4805,7 +4805,7 @@ def fit_initial_params_v2(
     positions: np.ndarray,
     likelihoods: np.ndarray,
     layout: BodyLayout,
-    marker_names: List[str],
+    marker_names: list[str],
     fitted_lengths: FittedLengths,
     fps: float,
     likelihood_threshold: float = 0.5,
@@ -4877,7 +4877,7 @@ def fit_initial_params_v2(
     T_w = window_frames * dt
 
     # ---------- σ_marker ----------
-    sigma_marker: Dict[str, float] = {}
+    sigma_marker: dict[str, float] = {}
     for m in layout.marker_names:
         if m not in name_to_idx:
             sigma_marker[m] = 2.0
@@ -4922,7 +4922,7 @@ def fit_initial_params_v2(
         )
         if mask.sum() >= 20:
             n_windows = T // window_frames
-            window_vars: List[float] = []
+            window_vars: list[float] = []
             for w in range(n_windows):
                 start = w * window_frames
                 end = start + window_frames
@@ -4970,7 +4970,7 @@ def fit_initial_params_v2(
             # approximation: d/dt(cos) ≈ -sin * ω, so for
             # tracking purposes the ambient q ≈ angular q.
             n_w = len(theta_unwrapped) // window_frames
-            wv: List[float] = []
+            wv: list[float] = []
             for w in range(n_w):
                 start = w * window_frames
                 end = start + window_frames
@@ -4986,8 +4986,8 @@ def fit_initial_params_v2(
                 q_root_ori = max(q_est, _FLOOR_Q_ROOT_ORI)
 
     # ---------- q_seg_ori, q_length ----------
-    q_seg_ori: Dict[str, float] = {}
-    q_length: Dict[str, float] = {}
+    q_seg_ori: dict[str, float] = {}
+    q_length: dict[str, float] = {}
     for seg_name in layout.non_root_topo_order:
         # Default per category — head/tail are more mobile
         if seg_name in ("head", "neck"):
@@ -5021,11 +5021,11 @@ def fit_initial_params_v2(
         # drift dicts per-marker manually rather than using
         # default().
         dt = 1.0 / fps
-        alpha_drift_d: Optional[Dict[str, float]] = {
+        alpha_drift_d: dict[str, float] | None = {
             m: 0.05 for m in layout.marker_names
         }
-        r_drift_d: Optional[Dict[str, float]] = {}
-        q_drift_d: Optional[Dict[str, float]] = {}
+        r_drift_d: dict[str, float] | None = {}
+        q_drift_d: dict[str, float] | None = {}
         r_cap = 20.0
         for m in layout.marker_names:
             used_empirical = (
@@ -5065,15 +5065,15 @@ def fit_initial_params_v2(
     if layout.orientation_drift_segments:
         r_theta_default = 0.1
         alpha_theta_default = 0.05
-        q_theta_drift_d: Optional[Dict[str, float]] = {
+        q_theta_drift_d: dict[str, float] | None = {
             s: (r_theta_default / 5.0) ** 2 / dt
             for s in layout.orientation_drift_segments
         }
-        alpha_theta_drift_d: Optional[Dict[str, float]] = {
+        alpha_theta_drift_d: dict[str, float] | None = {
             s: alpha_theta_default
             for s in layout.orientation_drift_segments
         }
-        r_theta_drift_d: Optional[Dict[str, float]] = {
+        r_theta_drift_d: dict[str, float] | None = {
             s: r_theta_default
             for s in layout.orientation_drift_segments
         }
@@ -5087,9 +5087,9 @@ def fit_initial_params_v2(
     # default(). Fixed at this initial value through EM (not
     # learned by M-step in 121d).
     if layout.const_accel_segments:
-        q_jerk_root_pos_d: Optional[float] = q_root_pos * 10.0
-        q_jerk_root_ori_d: Optional[float] = q_root_ori * 10.0
-        q_jerk_seg_ori_d: Optional[Dict[str, float]] = {
+        q_jerk_root_pos_d: float | None = q_root_pos * 10.0
+        q_jerk_root_ori_d: float | None = q_root_ori * 10.0
+        q_jerk_seg_ori_d: dict[str, float] | None = {
             s: q_seg_ori.get(s, 0.5) * 10.0
             for s in layout.non_root_topo_order
         }
@@ -5117,21 +5117,21 @@ def fit_initial_params_v2(
 
 
 def fit_warm_start_sigma_v2(
-    sessions: List[Tuple[np.ndarray, np.ndarray]],
+    sessions: list[tuple[np.ndarray, np.ndarray]],
     layout: BodyLayout,
-    marker_names: List[str],
+    marker_names: list[str],
     fitted_lengths: FittedLengths,
     params: NoiseParamsV2,
     fps: float,
     likelihood_threshold: float = 0.5,
     sigma_inflation_cap: float = 20.0,
     apply_constraints: bool = True,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    perspective: "PerspectiveModelV2" | None = None,
     verbose: bool = False,
-    session_names: Optional[List[str]] = None,
+    session_names: list[str] | None = None,
     device: str = "cpu",
-    pool: Optional[object] = None,
-) -> Dict[str, float]:
+    pool: object | None = None,
+) -> dict[str, float]:
     """Warm-start σ_marker estimation: run filter+smoother
     once with current params, measure mean |smoothed - raw|
     per marker, use that as a *lower bound* for σ_marker.
@@ -5189,13 +5189,13 @@ def fit_warm_start_sigma_v2(
     """
     dt = 1.0 / fps
     # Per-marker accumulators across all sessions
-    sum_abs_diff: Dict[str, float] = {m: 0.0 for m in layout.marker_names}
-    n_obs: Dict[str, int] = {m: 0 for m in layout.marker_names}
+    sum_abs_diff: dict[str, float] = {m: 0.0 for m in layout.marker_names}
+    n_obs: dict[str, int] = {m: 0 for m in layout.marker_names}
 
     n_sess = len(sessions)
     import time as _time
     t_start_total = _time.time()
-    times_per_session: List[float] = []
+    times_per_session: list[float] = []
 
     if pool is not None:
         # Parallel path: scatter per-session work, gather sums.
@@ -5208,7 +5208,7 @@ def fit_warm_start_sigma_v2(
         # Collect by sess_idx for deterministic accumulation
         # (FP + isn't associative; completion-order accumulation
         # produces different bits run-to-run).
-        results_by_idx: Dict[int, Tuple[np.ndarray, np.ndarray]] = {}
+        results_by_idx: dict[int, tuple[np.ndarray, np.ndarray]] = {}
         completed = 0
         for sess_idx, sums, counts, sess_dt in (
             pool.imap_unordered(_pool_warm_start_pass, task_args)
@@ -5318,7 +5318,7 @@ def fit_warm_start_sigma_v2(
             flush=True,
         )
 
-    sigma_warm: Dict[str, float] = {}
+    sigma_warm: dict[str, float] = {}
     for m in layout.marker_names:
         sigma_init = params.sigma_marker.get(m, 3.0)
         if n_obs[m] < 50:
@@ -5377,7 +5377,7 @@ def _validate_trajectory_v2(
     strict: bool = False,
     session_idx: int = 0,
     session_name: str = "",
-) -> List["_ValidationViolation"]:
+) -> list["_ValidationViolation"]:
     """Validation hook: catches degenerate trajectories.
 
     Two checks per marker (port from v1 patch 91-93):
@@ -5452,7 +5452,7 @@ def _validate_trajectory_v2(
             f"mean_diff<{mean_diff_sigma_factor:.0f}σ ok):"
         )
 
-    violations: List[_ValidationViolation] = []
+    violations: list[_ValidationViolation] = []
 
     # Global NaN check — if any predicted positions are NaN,
     # the EKF has gone pathological. Raise with a clear
@@ -5625,11 +5625,11 @@ class EMResultV2:
         Used by the orchestrator to print a final summary.
     """
     params: NoiseParamsV2
-    history: List[Dict[str, float]]
+    history: list[dict[str, float]]
     initial_params: NoiseParamsV2
     converged: bool
-    perspective: Optional["PerspectiveModelV2"] = None
-    validation_violations: List["_ValidationViolation"] = (
+    perspective: "PerspectiveModelV2" | None = None
+    validation_violations: list["_ValidationViolation"] = (
         field(default_factory=list)
     )
 
@@ -5638,7 +5638,7 @@ def _max_param_change(
     new: NoiseParamsV2, old: NoiseParamsV2,
 ) -> float:
     """Compute max relative change in any parameter."""
-    rels: List[float] = []
+    rels: list[float] = []
     for m, sigma_new in new.sigma_marker.items():
         sigma_old = old.sigma_marker.get(m, sigma_new)
         if sigma_old > 1e-9:
@@ -5704,14 +5704,14 @@ def _max_param_change(
 
 
 # Module-level worker state — populated by _pool_init
-_POOL_WORKER_STATE: Dict[str, object] = {}
+_POOL_WORKER_STATE: dict[str, object] = {}
 
 
 def _pool_init(
-    sessions_arr: List[Tuple[np.ndarray, np.ndarray]],
+    sessions_arr: list[tuple[np.ndarray, np.ndarray]],
     layout: BodyLayout,
     fitted_lengths: FittedLengths,
-    marker_names: List[str],
+    marker_names: list[str],
     fps: float,
     likelihood_threshold: float,
     apply_constraints: bool,
@@ -5745,13 +5745,13 @@ def _pool_init(
 
 
 def _pool_em_e_step(
-    args: Tuple[
-        int, NoiseParamsV2, Optional["PerspectiveModelV2"],
+    args: tuple[
+        int, NoiseParamsV2, "PerspectiveModelV2" | None,
         int, bool, bool, str, str,
     ],
-) -> Tuple[
+) -> tuple[
     int, "_MStepStatsV2", "_PerSessionFitV2",
-    List["_ValidationViolation"], float,
+    list["_ValidationViolation"], float,
 ]:
     """Per-session E-step in a worker process.
 
@@ -5811,7 +5811,7 @@ def _pool_em_e_step(
     smooth = rts_smooth_v2(filt, layout, dt)
 
     # Validation hook
-    violations: List[_ValidationViolation] = []
+    violations: list[_ValidationViolation] = []
     if enable_validation:
         violations = _validate_trajectory_v2(
             smooth, pos, likes, layout, params,
@@ -5842,10 +5842,10 @@ def _pool_em_e_step(
 
 
 def _pool_warm_start_pass(
-    args: Tuple[
-        int, NoiseParamsV2, Optional["PerspectiveModelV2"], str,
+    args: tuple[
+        int, NoiseParamsV2, "PerspectiveModelV2" | None, str,
     ],
-) -> Tuple[int, np.ndarray, np.ndarray, float]:
+) -> tuple[int, np.ndarray, np.ndarray, float]:
     """Per-session warm-start σ pass in a worker.
 
     Returns (sess_idx, sums_per_marker, counts_per_marker,
@@ -5906,13 +5906,13 @@ def _pool_warm_start_pass(
 
 
 def _pool_perspective_pass(
-    args: Tuple[
+    args: tuple[
         int, NoiseParamsV2, float, float, float, float,
-        Dict[str, int], float,
+        dict[str, int], float,
     ],
-) -> Tuple[
-    int, Dict[str, np.ndarray], Dict[str, np.ndarray],
-    Dict[str, int], float,
+) -> tuple[
+    int, dict[str, np.ndarray], dict[str, np.ndarray],
+    dict[str, int], float,
 ]:
     """Per-session perspective fit accumulation in a worker.
 
@@ -5960,13 +5960,13 @@ def _pool_perspective_pass(
     x_n_t = (root_x_t - arena_x_mean) / max(arena_x_range / 2.0, 1.0)
     y_n_t = (root_y_t - arena_y_mean) / max(arena_y_range / 2.0, 1.0)
 
-    XtX: Dict[str, np.ndarray] = {
+    XtX: dict[str, np.ndarray] = {
         m: np.zeros((3, 3)) for m in layout.marker_names
     }
-    Xty: Dict[str, np.ndarray] = {
+    Xty: dict[str, np.ndarray] = {
         m: np.zeros(3) for m in layout.marker_names
     }
-    n_obs: Dict[str, int] = {
+    n_obs: dict[str, int] = {
         m: 0 for m in layout.marker_names
     }
 
@@ -6018,10 +6018,10 @@ def _pool_perspective_pass(
 
 
 def _pool_final_smooth(
-    args: Tuple[
-        int, NoiseParamsV2, Optional["PerspectiveModelV2"], str,
+    args: tuple[
+        int, NoiseParamsV2, "PerspectiveModelV2" | None, str,
     ],
-) -> Tuple[int, Optional[np.ndarray], Optional[np.ndarray], float, Optional[str]]:
+) -> tuple[int, np.ndarray | None, np.ndarray | None, float, str | None]:
     """Per-session final smoother pass in a worker.
 
     Returns (sess_idx, smoothed_positions, smoothed_variances,
@@ -6069,24 +6069,24 @@ def _pool_final_smooth(
 
 
 def fit_noise_params_em_v2(
-    sessions: List[Tuple[np.ndarray, np.ndarray]],
+    sessions: list[tuple[np.ndarray, np.ndarray]],
     layout: BodyLayout,
-    marker_names: List[str],
+    marker_names: list[str],
     fitted_lengths: FittedLengths,
     fps: float,
     likelihood_threshold: float = 0.5,
     max_iter: int = 10,
     tol: float = 1e-3,
-    initial_params: Optional[NoiseParamsV2] = None,
+    initial_params: NoiseParamsV2 | None = None,
     apply_constraints: bool = True,
     enable_validation: bool = True,
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
     enable_strict_validation: bool = False,
     verbose: bool = False,
-    session_names: Optional[List[str]] = None,
+    session_names: list[str] | None = None,
     device: str = "cpu",
-    pool: Optional[object] = None,
+    pool: object | None = None,
     damping: float = 0.0,
     aggregation: str = "pooled",
 ) -> EMResultV2:
@@ -6229,7 +6229,7 @@ def fit_noise_params_em_v2(
     # location in the arena. Fit ONCE before EM iterations
     # begin; not refit during EM (would be expensive and
     # interacts badly with σ EM step).
-    perspective: Optional[PerspectiveModelV2] = None
+    perspective: PerspectiveModelV2 | None = None
     if enable_perspective:
         if verbose:
             print(
@@ -6263,21 +6263,21 @@ def fit_noise_params_em_v2(
             )
 
     params = initial_params
-    history: List[Dict[str, float]] = []
+    history: list[dict[str, float]] = []
     converged = False
     n_sess_em = len(sessions)
     import time as _time_em
     # Accumulate validation violations across all iterations.
     # Soft-mode validation returns lists; we collect everything
     # for end-of-EM summary.
-    all_violations: List[_ValidationViolation] = []
+    all_violations: list[_ValidationViolation] = []
 
     for iteration in range(max_iter):
         # E-step + stat accumulation across sessions
         combined_stats = _MStepStatsV2.empty(layout)
         t_iter_start = _time_em.time()
-        sess_times: List[float] = []
-        iter_violations: List[_ValidationViolation] = []
+        sess_times: list[float] = []
+        iter_violations: list[_ValidationViolation] = []
 
         if pool is not None:
             # Parallel path
@@ -6299,7 +6299,7 @@ def fit_noise_params_em_v2(
             # happens in deterministic order. Floating-point + is
             # not associative; accumulating in completion order
             # would yield different bits run-to-run.
-            results_by_idx: Dict[int, Tuple] = {}
+            results_by_idx: dict[int, tuple] = {}
             completed = 0
             for (
                 sess_idx, sess_stats, sess_per_session_fit,
@@ -6339,7 +6339,7 @@ def fit_noise_params_em_v2(
             # Both the pooled stats and the per-session fit list
             # are built in sess_idx order. The orchestrator
             # selects pooled vs median based on `aggregation`.
-            per_session_fits: List[_PerSessionFitV2] = []
+            per_session_fits: list[_PerSessionFitV2] = []
             for sess_idx in range(n_sess_em):
                 (
                     sess_stats, sess_per_session_fit,
@@ -6350,7 +6350,7 @@ def fit_noise_params_em_v2(
                 iter_violations.extend(sess_violations)
         else:
             # Serial path
-            per_session_fits: List[_PerSessionFitV2] = []
+            per_session_fits: list[_PerSessionFitV2] = []
             for sess_idx, (pos, likes) in enumerate(sessions):
                 t_sess_start = _time_em.time()
                 sess_label = (
@@ -6529,8 +6529,8 @@ def fit_noise_params_em_v2(
         else:
             # Group violations: marker -> set of iterations affected
             from collections import defaultdict
-            marker_iters: Dict[str, set] = defaultdict(set)
-            marker_sessions: Dict[str, Dict[str, int]] = (
+            marker_iters: dict[str, set] = defaultdict(set)
+            marker_sessions: dict[str, dict[str, int]] = (
                 defaultdict(lambda: defaultdict(int))
             )
             for v in all_violations:
@@ -6540,8 +6540,8 @@ def fit_noise_params_em_v2(
             n_iters_run = len(history)
             persistent_threshold = max(1, n_iters_run // 2)
 
-            persistent: List[Tuple[str, int, Dict[str, int]]] = []
-            sporadic: List[Tuple[str, int, Dict[str, int]]] = []
+            persistent: list[tuple[str, int, dict[str, int]]] = []
+            sporadic: list[tuple[str, int, dict[str, int]]] = []
             for m, iters in marker_iters.items():
                 n_iters_affected = len(iters)
                 rec = (m, n_iters_affected, dict(marker_sessions[m]))
@@ -6659,7 +6659,7 @@ def _arrays_to_df_v2(
     positions: np.ndarray,    # (T, K, 2)
     variances: np.ndarray,    # (T, K, 2) — diagonal of marker covariance
     likelihoods: np.ndarray,  # (T, K) — original raw likelihoods
-    marker_names: List[str],
+    marker_names: list[str],
 ):
     """Convert smoothed (T, K, 2) marker positions + variances
     + raw likelihoods into a flat-column DataFrame.
@@ -6676,7 +6676,7 @@ def _arrays_to_df_v2(
     io = _import_io_helpers()
     pd = io["pd"]
     T = positions.shape[0]
-    cols: Dict[str, np.ndarray] = {}
+    cols: dict[str, np.ndarray] = {}
     for i, m in enumerate(marker_names):
         cols[f"{m}_x"] = positions[:, i, 0]
         cols[f"{m}_y"] = positions[:, i, 1]
@@ -6687,12 +6687,12 @@ def _arrays_to_df_v2(
 
 
 def _build_and_write_session_output(
-    s: Dict,
+    s: dict,
     smooth_pos: np.ndarray,
     smooth_var: np.ndarray,
-    data_to_layout: Dict[str, int],
-    output_dir_path: Optional[Path],
-) -> Tuple[Optional[Path], bool, str]:
+    data_to_layout: dict[str, int],
+    output_dir_path: Path | None,
+) -> tuple[Path | None, bool, str]:
     """Build the per-session output DataFrame in data marker
     order, write to parquet (with CSV fallback), and return
     (out_path, was_csv_fallback, csv_fallback_reason).
@@ -6715,7 +6715,7 @@ def _build_and_write_session_output(
         out_pos, out_var, out_likes, list(s["markers"]),
     )
 
-    out_path: Optional[Path] = None
+    out_path: Path | None = None
     was_csv_fallback = False
     csv_fallback_reason = ""
     if output_dir_path is not None:
@@ -6740,9 +6740,9 @@ def state_to_marker_variances(
     x_smooth: np.ndarray,   # (T, D)
     P_smooth: np.ndarray,   # (T, D, D)
     layout: BodyLayout,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    perspective: "PerspectiveModelV2" | None = None,
     device: str = "cpu",
-    H_batch: Optional[np.ndarray] = None,
+    H_batch: np.ndarray | None = None,
 ) -> np.ndarray:
     """Compute per-marker per-frame variance from the smoothed
     state covariance.
@@ -6798,15 +6798,15 @@ def smooth_session_v2(
     positions: np.ndarray,
     likelihoods: np.ndarray,
     layout: BodyLayout,
-    marker_names: List[str],
+    marker_names: list[str],
     fitted_lengths: FittedLengths,
     params: NoiseParamsV2,
     fps: float,
     likelihood_threshold: float = 0.7,
     apply_constraints: bool = True,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    perspective: "PerspectiveModelV2" | None = None,
     device: str = "cpu",
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Run forward filter + RTS smoother on one session, return
     smoothed marker positions and variances.
 
@@ -6871,7 +6871,7 @@ def save_model_v2(
     params: NoiseParamsV2,
     fps: float,
     likelihood_threshold: float,
-    perspective: Optional["PerspectiveModelV2"] = None,
+    perspective: "PerspectiveModelV2" | None = None,
 ) -> None:
     """Serialize a fitted v2 model to .npz.
 
@@ -7040,9 +7040,9 @@ def save_model_v2(
 
 def load_model_v2(
     path,
-) -> Tuple[
+) -> tuple[
     BodyLayout, FittedLengths, NoiseParamsV2, float, float,
-    Optional["PerspectiveModelV2"],
+    "PerspectiveModelV2" | None,
 ]:
     """Load a v2 model from .npz.
 
@@ -7085,14 +7085,14 @@ def load_model_v2(
     # Patch 121a: orientation_drift_segments must be passed at
     # BodyLayout construction time (validated in __post_init__).
     # Pre-121a models don't have this field; load empty list.
-    odd_segments: List[str] = []
+    odd_segments: list[str] = []
     if "layout_orientation_drift_segments" in data.files:
         odd_segments = [
             str(s) for s in
             data["layout_orientation_drift_segments"]
         ]
     # Patch 121d: const_accel_segments. Same pattern.
-    ca_segments: List[str] = []
+    ca_segments: list[str] = []
     if "layout_const_accel_segments" in data.files:
         ca_segments = [
             str(s) for s in data["layout_const_accel_segments"]
@@ -7108,7 +7108,7 @@ def load_model_v2(
         layout.with_drift = bool(data["layout_with_drift"])
 
     # FittedLengths
-    fitted_lengths_kwargs: Dict = dict(
+    fitted_lengths_kwargs: dict = dict(
         segment_lengths={
             k: float(v) for k, v in data["fitted_segment_lengths"]
         },
@@ -7137,7 +7137,7 @@ def load_model_v2(
     fitted_lengths = FittedLengths(**fitted_lengths_kwargs)
 
     # NoiseParamsV2
-    params_kwargs: Dict = dict(
+    params_kwargs: dict = dict(
         sigma_marker={
             k: float(v) for k, v in data["params_sigma_marker"]
         },
@@ -7205,7 +7205,7 @@ def load_model_v2(
 
     # Perspective model (optional, only present in patch-109+
     # saved models)
-    perspective: Optional["PerspectiveModelV2"] = None
+    perspective: "PerspectiveModelV2" | None = None
     has_perspective = (
         "has_perspective" in data.files
         and bool(data["has_perspective"])
@@ -7243,13 +7243,13 @@ def load_model_v2(
 def smooth_pose_v2(
     pose_input,
     output_dir=None,
-    layout: Optional[BodyLayout] = None,
+    layout: BodyLayout | None = None,
     fps: float = 30.0,
     likelihood_threshold: float = 0.7,
     em_max_iter: int = 10,
     em_tol: float = 1e-3,
-    save_model: Optional[str] = None,
-    load_model: Optional[str] = None,
+    save_model: str | None = None,
+    load_model: str | None = None,
     apply_constraints: bool = True,
     enable_validation: bool = True,
     enable_warm_start_sigma: bool = True,
@@ -7260,7 +7260,7 @@ def smooth_pose_v2(
     em_damping: float = 0.0,
     em_aggregation: str = "pooled",
     verbose: bool = False,
-) -> Dict:
+) -> dict:
     """Top-level user-facing function for v2 pose smoothing.
 
     Discovers input files, loads each as a session, fits body
@@ -7317,7 +7317,7 @@ def smooth_pose_v2(
     # ---------- Discover input files ----------
     if isinstance(pose_input, (str, type(Path()))):
         pose_input = [pose_input]
-    paths: List = []
+    paths: list = []
     for p in pose_input:
         path_obj = Path(p)
         if path_obj.is_dir():
@@ -7348,7 +7348,7 @@ def smooth_pose_v2(
     # diagnostic loader for DLC multi-row headers. Same
     # logic as mufasa.tools.pose_viewer._load_pose_file but
     # without the PySide6 dependency.
-    raw_sessions: List[Dict] = []
+    raw_sessions: list[dict] = []
     n_paths = len(paths)
     for path_idx, path in enumerate(paths):
         if verbose:
@@ -7484,13 +7484,13 @@ def smooth_pose_v2(
     # Build session arrays in layout marker order — that's what
     # the EM/filter expect. We keep a mapping data_idx → layout_idx.
     layout_marker_names = layout.marker_names
-    data_to_layout: Dict[str, int] = {
+    data_to_layout: dict[str, int] = {
         m: layout_marker_names.index(m)
         for m in marker_names_data
         if m in layout_marker_names
     }
 
-    sessions_arr: List[Tuple[np.ndarray, np.ndarray]] = []
+    sessions_arr: list[tuple[np.ndarray, np.ndarray]] = []
     for s in raw_sessions:
         K_layout = layout.n_markers
         T = s["n_frames"]
@@ -7505,14 +7505,14 @@ def smooth_pose_v2(
 
     # ---------- Get fitted_lengths (load or fit) ----------
     # We need fitted_lengths up front to build the worker pool.
-    perspective: Optional[PerspectiveModelV2] = None
+    perspective: PerspectiveModelV2 | None = None
     if load_model is not None:
         if verbose:
             print(f"[smoother-v2] Loading model from {load_model}")
         (
             layout, fitted_lengths, params, _, _, perspective
         ) = load_model_v2(load_model)
-        em_history: List[Dict] = []
+        em_history: list[dict] = []
         converged = True
     else:
         # Fit lengths from first session
@@ -7634,7 +7634,7 @@ def smooth_pose_v2(
             )
 
         # ---------- Final smoother pass per session ----------
-        output_sessions: List[Dict] = []
+        output_sessions: list[dict] = []
         if verbose:
             print(
                 f"[smoother-v2] Smoothing {len(sessions_arr)} "
@@ -7648,7 +7648,7 @@ def smooth_pose_v2(
         import time as _time_smooth
         n_sess_final = len(sessions_arr)
         t_smooth_start_total = _time_smooth.time()
-        smooth_times: List[float] = []
+        smooth_times: list[float] = []
 
         if _pool is not None:
             # Parallel path: scatter smoothing across workers,
@@ -7666,7 +7666,7 @@ def smooth_pose_v2(
             ]
             completed = 0
             n_failed = 0
-            failed_sessions: List[Tuple[str, str]] = []
+            failed_sessions: list[tuple[str, str]] = []
             for sess_idx, smooth_pos, smooth_var, sess_dt, err in (
                 _pool.imap_unordered(_pool_final_smooth, task_args)
             ):
@@ -7745,7 +7745,7 @@ def smooth_pose_v2(
         else:
             # Serial path
             n_failed_serial = 0
-            failed_sessions_serial: List[Tuple[str, str]] = []
+            failed_sessions_serial: list[tuple[str, str]] = []
             for sess_idx, (s, (pos, likes)) in enumerate(
                 zip(raw_sessions, sessions_arr)
             ):
@@ -8230,7 +8230,7 @@ class PerspectiveModelV2:
         (arena_x_range / 2). At arena center, x_n = 0.
     arena_y_mean, arena_y_range : float
     """
-    coeffs: Dict[str, np.ndarray]
+    coeffs: dict[str, np.ndarray]
     arena_x_mean: float
     arena_x_range: float
     arena_y_mean: float
@@ -8250,7 +8250,7 @@ class PerspectiveModelV2:
             arena_y_mean=0.0, arena_y_range=2.0,
         )
 
-    def _normalize(self, x: float, y: float) -> Tuple[float, float]:
+    def _normalize(self, x: float, y: float) -> tuple[float, float]:
         """Convert root_x, root_y to arena-normalized x_n, y_n
         in roughly [-1, 1].
         """
@@ -8284,7 +8284,7 @@ class PerspectiveModelV2:
 
     def scale_partials(
         self, root_x: float, root_y: float,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """∂scale/∂root_x and ∂scale/∂root_y per marker.
         Used in the observation Jacobian.
 
@@ -8305,9 +8305,9 @@ class PerspectiveModelV2:
 
 
 def fit_perspective_model_v2(
-    sessions: List[Tuple[np.ndarray, np.ndarray]],
+    sessions: list[tuple[np.ndarray, np.ndarray]],
     layout: BodyLayout,
-    marker_names: List[str],
+    marker_names: list[str],
     fitted_lengths: FittedLengths,
     params: NoiseParamsV2,
     fps: float,
@@ -8316,8 +8316,8 @@ def fit_perspective_model_v2(
     min_offset_magnitude: float = 1.0,
     max_abs_coeff: float = 0.4,
     verbose: bool = False,
-    session_names: Optional[List[str]] = None,
-    pool: Optional[object] = None,
+    session_names: list[str] | None = None,
+    pool: object | None = None,
 ) -> PerspectiveModelV2:
     """Fit a per-marker bilinear perspective correction.
 
@@ -8376,8 +8376,8 @@ def fit_perspective_model_v2(
     # Collect root x/y across all sessions for arena bounds.
     # Use list-of-arrays + np.concatenate instead of
     # extend(.tolist()), which is ~5× slower for large arrays.
-    all_root_x_arrs: List[np.ndarray] = []
-    all_root_y_arrs: List[np.ndarray] = []
+    all_root_x_arrs: list[np.ndarray] = []
+    all_root_y_arrs: list[np.ndarray] = []
     for pos, likes in sessions:
         m_x = pos[:, root_idx, 0]
         m_y = pos[:, root_idx, 1]
@@ -8414,18 +8414,18 @@ def fit_perspective_model_v2(
     # scale_m(x, y) - 1 = a*x_n + b*y_n + c*x_n*y_n
     # → for each marker, accumulate design matrix X^T X and X^T y
     # and solve at the end.
-    XtX_per_marker: Dict[str, np.ndarray] = {
+    XtX_per_marker: dict[str, np.ndarray] = {
         m: np.zeros((3, 3)) for m in layout.marker_names
     }
-    Xty_per_marker: Dict[str, np.ndarray] = {
+    Xty_per_marker: dict[str, np.ndarray] = {
         m: np.zeros(3) for m in layout.marker_names
     }
-    n_obs_per_marker: Dict[str, int] = {
+    n_obs_per_marker: dict[str, int] = {
         m: 0 for m in layout.marker_names
     }
 
     # Pre-compute layout marker → data marker mapping
-    layout_to_data: Dict[str, int] = {}
+    layout_to_data: dict[str, int] = {}
     for m in layout.marker_names:
         if m in name_to_idx:
             layout_to_data[m] = name_to_idx[m]
@@ -8433,7 +8433,7 @@ def fit_perspective_model_v2(
     n_sess_p = len(sessions)
     import time as _time_p
     t_start_p = _time_p.time()
-    times_p: List[float] = []
+    times_p: list[float] = []
 
     if pool is not None:
         # Parallel path
@@ -8447,9 +8447,9 @@ def fit_perspective_model_v2(
             for sess_idx in range(n_sess_p)
         ]
         # Collect by sess_idx for deterministic accumulation
-        results_by_idx: Dict[int, Tuple[
-            Dict[str, np.ndarray], Dict[str, np.ndarray],
-            Dict[str, int],
+        results_by_idx: dict[int, tuple[
+            dict[str, np.ndarray], dict[str, np.ndarray],
+            dict[str, int],
         ]] = {}
         completed = 0
         for sess_idx, sess_XtX, sess_Xty, sess_n, sess_dt in (
@@ -8612,7 +8612,7 @@ def fit_perspective_model_v2(
         )
 
     # Solve OLS per marker
-    coeffs: Dict[str, np.ndarray] = {}
+    coeffs: dict[str, np.ndarray] = {}
     for m in layout.marker_names:
         if n_obs_per_marker[m] < 50:
             # Insufficient observations

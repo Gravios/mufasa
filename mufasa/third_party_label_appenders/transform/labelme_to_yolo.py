@@ -53,8 +53,8 @@ class LabelmeBoundingBoxes2YoloBoundingBoxes:
 
 
     def __init__(self,
-                 labelme_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 labelme_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  obb: bool = False,
                  verbose: bool = True,
                  clahe: bool = False,

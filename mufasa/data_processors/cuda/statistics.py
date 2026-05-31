@@ -226,7 +226,7 @@ def get_euclidean_distance_cuda(x: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 def get_euclidean_distance_cupy(x: np.ndarray,
                                 y: np.ndarray,
-                                batch_size: Optional[int] = int(3.5e10+7)) -> np.ndarray:
+                                batch_size: int | None = int(3.5e10+7)) -> np.ndarray:
     """
     Computes the Euclidean distance between corresponding pairs of points in two 2D arrays
     using CuPy for GPU acceleration. The computation is performed in batches to handle large
@@ -384,9 +384,9 @@ def sliding_min(x: np.ndarray, time_window: float, sample_rate: int) -> np.ndarr
 
 def sliding_spearmans_rank(x: np.ndarray,
                            y: np.ndarray,
-                           time_window: Union[float, int],
-                           sample_rate: Union[float, int],
-                           batch_size: Optional[int] = int(1.6e+7),
+                           time_window: float | int,
+                           sample_rate: float | int,
+                           batch_size: int | None = int(1.6e+7),
                            verbose: bool = False) -> np.ndarray:
     r"""
     Computes the Spearman's rank correlation coefficient between two 1D arrays `x` and `y`
@@ -546,10 +546,10 @@ def sliding_sum(x: np.ndarray, time_window: float, sample_rate: int) -> np.ndarr
 
 
 def euclidean_distance_to_static_point(data: np.ndarray,
-                                       point: Tuple[int, int],
-                                       pixels_per_millimeter: Optional[int] = 1,
-                                       centimeter: Optional[bool] = False,
-                                       batch_size: Optional[int] = int(6.5e+7)) -> np.ndarray:
+                                       point: tuple[int, int],
+                                       pixels_per_millimeter: int | None = 1,
+                                       centimeter: bool | None = False,
+                                       batch_size: int | None = int(6.5e+7)) -> np.ndarray:
     """
     Computes the Euclidean distance between each point in a given 2D array `data` and a static point using GPU acceleration.
 
@@ -742,8 +742,8 @@ def davis_bouldin(x: np.ndarray,
 def kmeans_cuml(data: np.ndarray,
                 k: int = 2,
                 max_iter: int = 300,
-                output_type: Optional[str] = None,
-                sample_n: Optional[int] = None) -> Tuple[np.ndarray, np.ndarray]:
+                output_type: str | None = None,
+                sample_n: int | None = None) -> tuple[np.ndarray, np.ndarray]:
     """CRAP, SLOWER THAN SCIKIT"""
 
     check_valid_array(data=data, source=f'{kmeans_cuml.__name__} data', accepted_dtypes=Formats.NUMERIC_DTYPES.value)
@@ -928,7 +928,7 @@ def _hamming_kernel(x, y, w, r):
 
 def hamming_distance_gpu(x: np.ndarray,
                          y: np.ndarray,
-                         w: Optional[np.ndarray] = None) -> float:
+                         w: np.ndarray | None = None) -> float:
     """
     Computes the weighted Hamming distance between two arrays using GPU acceleration.
 
@@ -982,7 +982,7 @@ def _sokal_sneath_kernel(x, y, w, c):
         cuda.atomic.add(c, 2, 1 * w[idx])
 
 
-def sokal_sneath_gpu(x: np.ndarray, y: np.ndarray, w: Optional[np.ndarray] = None) -> float:
+def sokal_sneath_gpu(x: np.ndarray, y: np.ndarray, w: np.ndarray | None = None) -> float:
     """
     Compute the Sokal–Sneath similarity coefficient between two binary vectors using CUDA acceleration.
 

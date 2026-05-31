@@ -102,7 +102,7 @@ except ImportError:
 
 # Default skeleton edges. Drawn only between markers that are
 # both present in the loaded data.
-DEFAULT_SKELETON_EDGES: List[Tuple[str, str]] = [
+DEFAULT_SKELETON_EDGES: list[tuple[str, str]] = [
     # Spine
     ("back1", "back2"),
     ("back2", "back3"),
@@ -130,7 +130,7 @@ DEFAULT_SKELETON_EDGES: List[Tuple[str, str]] = [
 # Color palette for markers — distinct hues, decent contrast on
 # dark background. 18 colors covers any plausible mufasa marker
 # layout. Cycles if exceeded.
-MARKER_PALETTE: List[Tuple[int, int, int]] = [
+MARKER_PALETTE: list[tuple[int, int, int]] = [
     (255, 100, 100),  # red
     (100, 200, 255),  # cyan
     (255, 200, 100),  # orange
@@ -162,12 +162,12 @@ class PoseFrame:
     """
     positions: np.ndarray   # (T, n_markers, 2)
     likelihoods: np.ndarray  # (T, n_markers)
-    variances: Optional[np.ndarray]  # (T, n_markers, 2) or None
-    markers: List[str]
+    variances: np.ndarray | None  # (T, n_markers, 2) or None
+    markers: list[str]
     n_frames: int
 
 
-def _detect_markers(df: pd.DataFrame) -> List[str]:
+def _detect_markers(df: pd.DataFrame) -> list[str]:
     """Detect marker names from column suffixes.
 
     Looks for ``<marker>_x`` columns that have a matching
@@ -215,7 +215,7 @@ def _load_pose_file(path) -> PoseFrame:
     path = Path(path)
     suffix = path.suffix.lower()
 
-    df: Optional[pd.DataFrame] = None
+    df: pd.DataFrame | None = None
 
     # Direct read attempt
     try:
@@ -379,9 +379,9 @@ class PoseScene(QGraphicsScene):
 
     def __init__(
         self,
-        smoothed: Optional[PoseFrame],
-        raw: Optional[PoseFrame],
-        skeleton_edges: List[Tuple[str, str]],
+        smoothed: PoseFrame | None,
+        raw: PoseFrame | None,
+        skeleton_edges: list[tuple[str, str]],
         likelihood_threshold: float = 0.0,
         parent=None,
     ):
@@ -405,14 +405,14 @@ class PoseScene(QGraphicsScene):
         # Build per-marker color map. If both smoothed and raw
         # share marker names, use the same color in both — easy
         # visual matching of "where did this marker move from."
-        all_markers: List[str] = []
+        all_markers: list[str] = []
         if smoothed is not None:
             all_markers.extend(smoothed.markers)
         if raw is not None:
             for m in raw.markers:
                 if m not in all_markers:
                     all_markers.append(m)
-        self.marker_colors: Dict[str, QColor] = {}
+        self.marker_colors: dict[str, QColor] = {}
         for i, m in enumerate(all_markers):
             r, g, b = MARKER_PALETTE[i % len(MARKER_PALETTE)]
             self.marker_colors[m] = QColor(r, g, b)
@@ -423,22 +423,22 @@ class PoseScene(QGraphicsScene):
         # Pre-create scene items (one per visual element).
         # Updating their positions per frame is much faster than
         # adding/removing items.
-        self._smoothed_dots: Dict[str, QGraphicsEllipseItem] = {}
-        self._smoothed_ellipses: Dict[str, QGraphicsEllipseItem] = {}
-        self._raw_dots: Dict[str, QGraphicsEllipseItem] = {}
-        self._skeleton_lines: List[
-            Tuple[str, str, QGraphicsLineItem]
+        self._smoothed_dots: dict[str, QGraphicsEllipseItem] = {}
+        self._smoothed_ellipses: dict[str, QGraphicsEllipseItem] = {}
+        self._raw_dots: dict[str, QGraphicsEllipseItem] = {}
+        self._skeleton_lines: list[
+            tuple[str, str, QGraphicsLineItem]
         ] = []
         # Trail: list of (frame_offset, dict[marker -> dot]).
         # Items recreated each frame because trail length can change.
-        self._trail_items: List[QGraphicsEllipseItem] = []
+        self._trail_items: list[QGraphicsEllipseItem] = []
 
         self._build_items()
 
     def _compute_bounds(self) -> None:
         """Compute scene rect from data extent + padding."""
-        all_x: List[np.ndarray] = []
-        all_y: List[np.ndarray] = []
+        all_x: list[np.ndarray] = []
+        all_y: list[np.ndarray] = []
         for src in (self.smoothed, self.raw):
             if src is None:
                 continue
@@ -518,7 +518,7 @@ class PoseScene(QGraphicsScene):
                     self.addItem(line)
                     self._skeleton_lines.append((a, b, line))
 
-    def update_frame(self, frame_idx: int, trail_offsets: List[int]) -> None:
+    def update_frame(self, frame_idx: int, trail_offsets: list[int]) -> None:
         """Update scene items to display ``frame_idx``.
 
         ``trail_offsets`` is a list of negative offsets (e.g.,
@@ -661,11 +661,11 @@ class PoseViewer(QMainWindow):
 
     def __init__(
         self,
-        smoothed: Optional[PoseFrame],
-        raw: Optional[PoseFrame],
+        smoothed: PoseFrame | None,
+        raw: PoseFrame | None,
         fps: float = 30.0,
         likelihood_threshold: float = 0.0,
-        skeleton_edges: Optional[List[Tuple[str, str]]] = None,
+        skeleton_edges: list[tuple[str, str]] | None = None,
         trail_length: int = 0,
         show_skeleton: bool = True,
         show_ellipses: bool = True,
@@ -948,7 +948,7 @@ class PoseViewer(QMainWindow):
 
     # ----- Event handlers -----
 
-    def _trail_offsets(self) -> List[int]:
+    def _trail_offsets(self) -> list[int]:
         if self.scene.trail_length <= 0:
             return []
         return [-i for i in range(1, self.scene.trail_length + 1)]
@@ -1030,7 +1030,7 @@ class PoseViewer(QMainWindow):
         )
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "mufasa pose viewer — playback a smoothed (and "

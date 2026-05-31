@@ -53,14 +53,14 @@ class DistancePlotterSingleCore(ConfigReader):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
-        data_paths: List[Union[str, os.PathLike]],
-        style_attr: Dict[str, int],
-        line_attr: List[List[str]],
-        frame_setting: Optional[bool] = False,
-        video_setting: Optional[bool] = False,
+        config_path: str | os.PathLike,
+        data_paths: list[str | os.PathLike],
+        style_attr: dict[str, int],
+        line_attr: list[list[str]],
+        frame_setting: bool | None = False,
+        video_setting: bool | None = False,
         last_frame_as_svg: bool = False,
-        final_img: Optional[bool] = False,
+        final_img: bool | None = False,
     ):
 
         if (not frame_setting) and (not video_setting) and (not final_img):

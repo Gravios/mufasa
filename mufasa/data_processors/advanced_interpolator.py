@@ -103,15 +103,15 @@ class AdvancedInterpolator(ConfigReader):
     """
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 settings: Dict[str, Any],
-                 type: Optional[Literal["animal", "body-part"]] = 'body-part',
-                 verbose: Optional[bool] = True,
-                 config_path: Optional[Union[str, os.PathLike]] = None,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 multi_index_data: Optional[bool] = False,
-                 save_copy: Optional[bool] = True,
-                 max_interpolation_length: Optional[int] = None):
+                 data_path: str | os.PathLike,
+                 settings: dict[str, Any],
+                 type: Literal["animal", "body-part"] | None = 'body-part',
+                 verbose: bool | None = True,
+                 config_path: str | os.PathLike | None = None,
+                 save_dir: str | os.PathLike | None = None,
+                 multi_index_data: bool | None = False,
+                 save_copy: bool | None = True,
+                 max_interpolation_length: int | None = None):
 
 
 

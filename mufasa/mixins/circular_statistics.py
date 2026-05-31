@@ -346,7 +346,7 @@ class CircularStatisticsMixin:
 
     @staticmethod
     @njit("(float32[:],)", cache=True)
-    def degrees_to_cardinal(data: np.ndarray) -> List[str]:
+    def degrees_to_cardinal(data: np.ndarray) -> list[str]:
         """
         Convert degree angles to cardinal direction bucket e.g., 0 -> "N", 180 -> "S"
 
@@ -582,7 +582,7 @@ class CircularStatisticsMixin:
 
     @staticmethod
     @njit("(float32[:],)", cache=True)
-    def rayleigh(data: np.ndarray) -> Tuple[float, float]:
+    def rayleigh(data: np.ndarray) -> tuple[float, float]:
 
         r"""
         Jitted compute of Rayleigh Z (test of non-uniformity) of single sample of circular data in degrees.
@@ -626,7 +626,7 @@ class CircularStatisticsMixin:
 
     @staticmethod
     @njit("(float32[:], float64[:], float64)", parallel=True, cache=True)
-    def sliding_rayleigh_z(data: np.ndarray, time_windows: np.ndarray, fps: int) -> Tuple[np.ndarray, np.ndarray]:
+    def sliding_rayleigh_z(data: np.ndarray, time_windows: np.ndarray, fps: int) -> tuple[np.ndarray, np.ndarray]:
         """
         Jitted compute of Rayleigh Z (test of non-uniformity) of circular data within sliding time-window.
 
@@ -1374,7 +1374,7 @@ class CircularStatisticsMixin:
     @njit(
         [(float64[:, :, :], int64), (float64[:, :, :], types.misc.Omitted(value=400))]
     , cache=True)
-    def fit_circle(data: np.ndarray, max_iterations: Optional[int] = 400) -> np.ndarray:
+    def fit_circle(data: np.ndarray, max_iterations: int | None = 400) -> np.ndarray:
         """
         Fit a circle to a dataset using the least squares method.
 

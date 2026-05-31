@@ -82,16 +82,16 @@ class YOLOVisualizer:
     """
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 palette: Optional[str] = 'Set1',
-                 core_cnt: Optional[int] = -1,
+                 data_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 palette: str | None = 'Set1',
+                 core_cnt: int | None = -1,
                  threshold: float = 0.0,
-                 padding: Optional[int] = 20,
-                 thickness: Optional[int] = None,
+                 padding: int | None = 20,
+                 thickness: int | None = None,
                  opacity: float = 0.6,
-                 outline_color: Optional[Tuple[int, int, int]] = None,
+                 outline_color: tuple[int, int, int] | None = None,
                  verbose: bool = True):
 
         check_file_exist_and_readable(file_path=data_path)

@@ -96,13 +96,13 @@ def _classifications_dir(config_path: str) -> Path:
 
 
 def _prediction_columns(df: pd.DataFrame,
-                        classifier_targets: List[str]) -> List[str]:
+                        classifier_targets: list[str]) -> list[str]:
     """Return the subset of ``df.columns`` that represent
     predictions for the given classifier targets (probability +
     boolean columns). Used by the dual-write site to extract
     just the v1-relevant subset from the combined CSV that the
     Tk-era pipeline produces."""
-    cols: List[str] = []
+    cols: list[str] = []
     for clf in classifier_targets:
         prob = f"Probability_{clf}"
         if prob in df.columns:
@@ -158,7 +158,7 @@ def load_classifications_for_video(
     video_name: str,
     config_path: str,
     *,
-    targets: Optional[List[str]] = None,
+    targets: list[str] | None = None,
 ) -> pd.DataFrame:
     """Load classifier predictions for one video.
 
@@ -186,7 +186,7 @@ def load_classifications_for_video(
         )
     df = pd.read_parquet(path)
     if targets is not None:
-        wanted: List[str] = []
+        wanted: list[str] = []
         for t in targets:
             wanted.append(f"Probability_{t}")
             wanted.append(t)
@@ -200,7 +200,7 @@ def load_classifications_for_video(
 
 def list_video_stems_with_classifications(
     config_path: str,
-) -> List[str]:
+) -> list[str]:
     """List the video stems that have classifier predictions on
     disk under ``derived/classifications/``. Returns a sorted
     list — stable ordering across runs."""

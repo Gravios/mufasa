@@ -41,11 +41,11 @@ from mufasa.utils.warnings import DuplicateNamesWarning
 
 START_TIME, END_TIME = 'start_time', 'end_time'
 
-def _roi_feature_visualizer_mp(frm_range: Tuple[int, np.ndarray],
+def _roi_feature_visualizer_mp(frm_range: tuple[int, np.ndarray],
                                data_df: pd.DataFrame,
                                text_locations: dict,
                                font_size: float,
-                               circle_size: Union[float, int],
+                               circle_size: float | int,
                                save_temp_dir: str,
                                video_meta_data: dict,
                                shape_info: dict,
@@ -54,17 +54,17 @@ def _roi_feature_visualizer_mp(frm_range: Tuple[int, np.ndarray],
                                animal_names: list,
                                roi_dict: dict,
                                bp_lk: dict,
-                               bbox: Optional[str],
-                               animal_bp_names: List[str],
+                               bbox: str | None,
+                               animal_bp_names: list[str],
                                animal_bp_dict: dict,
                                roi_features_df: pd.DataFrame,
-                               directing_data: Union[pd.DataFrame, None],
+                               directing_data: pd.DataFrame | None,
                                border_bg_color: tuple,
                                show_pose: bool,
                                show_roi_ear_tags: bool,
                                show_roi_centers: bool,
                                show_animal_names: bool,
-                               direction: Union[None, str]):
+                               direction: None | str):
     def __insert_texts(shape_info: dict, img: np.ndarray):
         for shape_name, shape_data in shape_info.items():
             shape_color = shape_data["Color BGR"]
@@ -194,17 +194,17 @@ class ROIfeatureVisualizerMultiprocess(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 body_parts: List[str],
+                 config_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 body_parts: list[str],
                  show_roi_centers: bool = True,
                  show_roi_eartags: bool = False,
                  show_animal_names: bool = False,
-                 border_bg_clr: Tuple[int, int, int] = (0, 0, 0),
-                 direction: Optional[Literal['funnel', 'lines']] = None,
-                 time_slice: Optional[Dict[str, str]] = None,
-                 bbox: Optional[Literal['axis-aligned', 'animal-aligned']] = None,
-                 roi_coordinates_path: Optional[Union[str, os.PathLike]] = None,
+                 border_bg_clr: tuple[int, int, int] = (0, 0, 0),
+                 direction: Literal['funnel', 'lines'] | None = None,
+                 time_slice: dict[str, str] | None = None,
+                 bbox: Literal['axis-aligned', 'animal-aligned'] | None = None,
+                 roi_coordinates_path: str | os.PathLike | None = None,
                  show_pose: bool = True,
                  core_cnt: int = -1,
                  gpu: bool = False):
@@ -309,7 +309,7 @@ class ROIfeatureVisualizerMultiprocess(ConfigReader):
                     self.loc_dict[animal][shape]["directing_data_loc"] = (int(self.video_meta_data["width"] + x_spacer + TextOptions.BORDER_BUFFER_X.value), (self.video_meta_data["height"] - (self.video_meta_data["height"] + 10) + y_spacer * add_spacer))
                     add_spacer += 1
 
-    def __get_border_img_size(self, video_path: Union[str, os.PathLike]):
+    def __get_border_img_size(self, video_path: str | os.PathLike):
         cap = cv2.VideoCapture(video_path)
         cap.set(1, 1)
         _, img = self.cap.read()

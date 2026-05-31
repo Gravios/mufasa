@@ -16,7 +16,7 @@ from mufasa.utils.read_write import read_config_entry
 
 
 class TrainMultiLabelRandomForestClassifier(ConfigReader, TrainModelMixin):
-    def __init__(self, config_path: Union[str, os.PathLike]):
+    def __init__(self, config_path: str | os.PathLike):
         ConfigReader.__init__(self, config_path=config_path)
         TrainModelMixin.__init__(self)
 

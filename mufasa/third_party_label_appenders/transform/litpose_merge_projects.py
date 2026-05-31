@@ -38,8 +38,8 @@ class LitPoseMergeProjects:
     """
 
     def __init__(self,
-                 master_dir: Union[str, os.PathLike],
-                 other_dirs: List[Union[str, os.PathLike]],
+                 master_dir: str | os.PathLike,
+                 other_dirs: list[str | os.PathLike],
                  duplicate_method: Literal['skip', 'raise'] = 'skip',
                  skip_videos: bool = True,
                  verbose: bool = True):
@@ -59,7 +59,7 @@ class LitPoseMergeProjects:
         self._validate_schemas()
 
     @staticmethod
-    def _read_project_yaml(project_dir: str) -> Dict:
+    def _read_project_yaml(project_dir: str) -> dict:
         yaml_path = os.path.join(project_dir, PROJECT_YAML)
         if not os.path.isfile(yaml_path):
             raise FileNotFoundError(f'project.yaml not found: {yaml_path}')
@@ -67,7 +67,7 @@ class LitPoseMergeProjects:
             return yaml.safe_load(f)
 
     @staticmethod
-    def _get_csv_bodyparts(csv_path: str) -> List[str]:
+    def _get_csv_bodyparts(csv_path: str) -> list[str]:
         df = pd.read_csv(csv_path, header=[0, 1, 2], nrows=0)
         body_parts = []
         for col in df.columns[1:]:
@@ -88,12 +88,12 @@ class LitPoseMergeProjects:
         return ', '.join(sorted(scorers))
 
     @staticmethod
-    def _get_csv_image_paths(csv_path: str) -> List[str]:
+    def _get_csv_image_paths(csv_path: str) -> list[str]:
         df = pd.read_csv(csv_path, header=[0, 1, 2])
         return df.iloc[:, 0].values.tolist()
 
     @staticmethod
-    def _check_images_exist(project_dir: str, img_paths: List[str]) -> List[str]:
+    def _check_images_exist(project_dir: str, img_paths: list[str]) -> list[str]:
         missing = []
         for img_path in img_paths:
             full_path = os.path.join(project_dir, img_path)
@@ -102,14 +102,14 @@ class LitPoseMergeProjects:
         return missing
 
     @staticmethod
-    def _get_image_resolution(img_path: str) -> Tuple[int, int]:
+    def _get_image_resolution(img_path: str) -> tuple[int, int]:
         img = cv2.imread(img_path)
         if img is None:
             return (-1, -1)
         return (img.shape[1], img.shape[0])
 
     @staticmethod
-    def _find_collected_data_csvs(directory: str) -> Dict[str, str]:
+    def _find_collected_data_csvs(directory: str) -> dict[str, str]:
         """Return dict keyed by camera suffix -> file path. E.g. 'cam1' -> '/.../CollectedData_cam1.csv'.
 
         Only looks at the project root — copies inside ``models/`` or ``outputs/`` are ignored

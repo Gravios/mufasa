@@ -20,15 +20,15 @@ from mufasa.utils.read_write import write_df
 from mufasa.utils.warnings import NotEnoughDataWarning
 
 
-def create_shap_log(rf_clf: Union[str, os.PathLike, RandomForestClassifier],
-                    x: Union[pd.DataFrame, np.ndarray],
-                    y: Union[pd.DataFrame, pd.Series, np.ndarray],
+def create_shap_log(rf_clf: str | os.PathLike | RandomForestClassifier,
+                    x: pd.DataFrame | np.ndarray,
+                    y: pd.DataFrame | pd.Series | np.ndarray,
                     cnt_present: int,
                     cnt_absent: int,
-                    x_names: Optional[List[str]] = None,
-                    clf_name: Optional[str] = None,
-                    save_dir: Optional[Union[str, os.PathLike]] = None,
-                    verbose: Optional[bool] = True) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, int]]:
+                    x_names: list[str] | None = None,
+                    clf_name: str | None = None,
+                    save_dir: str | os.PathLike | None = None,
+                    verbose: bool | None = True) -> None | tuple[pd.DataFrame, pd.DataFrame, int]:
     """
     Computes SHAP (SHapley Additive exPlanations) values using a GPU for a RandomForestClassifier,
     based on specified counts of positive and negative samples, and optionally saves the results.

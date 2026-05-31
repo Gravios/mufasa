@@ -35,7 +35,7 @@ class KeypointReorganizer:
     """
 
     def __init__(
-        self, data_folder: str, pose_tool: str, file_format: Optional[str] = None
+        self, data_folder: str, pose_tool: str, file_format: str | None = None
     ):
         check_if_dir_exists(in_dir=data_folder)
         self.data_folder, self.pose_tool = data_folder, pose_tool

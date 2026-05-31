@@ -359,7 +359,7 @@ def publish_to_stage(
 # project.toml read/write
 # ---------------------------------------------------------------------------
 
-def read_project_toml(path: Path) -> Dict[str, Any]:
+def read_project_toml(path: Path) -> dict[str, Any]:
     """Parse ``project.toml`` into a dict.
 
     Raises FileNotFoundError if the file is missing, and
@@ -383,7 +383,7 @@ def read_project_toml(path: Path) -> Dict[str, Any]:
     return data
 
 
-def write_project_toml(path: Path, data: Dict[str, Any]) -> None:
+def write_project_toml(path: Path, data: dict[str, Any]) -> None:
     """Write ``data`` to ``project.toml`` using a focused TOML
     writer (avoids a third-party tomli_w dependency).
 
@@ -400,8 +400,8 @@ def write_project_toml(path: Path, data: Dict[str, Any]) -> None:
         f.write("\n".join(lines) + "\n")
 
 
-def _format_toml(data: Dict[str, Any]) -> List[str]:
-    out: List[str] = []
+def _format_toml(data: dict[str, Any]) -> list[str]:
+    out: list[str] = []
     # Bare keys (no section) come first
     bare = {k: v for k, v in data.items() if not isinstance(v, dict)}
     sectioned = {k: v for k, v in data.items() if isinstance(v, dict)}
@@ -602,8 +602,8 @@ class ProjectPaths:
     def stage_run_dir(
         self,
         stage: str,
-        run_id: Optional[str] = None,
-        flavor: Optional[str] = None,
+        run_id: str | None = None,
+        flavor: str | None = None,
     ) -> Path:
         """Return ``derived/<stage>[/<flavor>]/<run_id>/``,
         creating it if missing.
@@ -614,7 +614,7 @@ class ProjectPaths:
         """
         if run_id is None:
             run_id = generate_run_id()
-        parts: List[Path] = [self.derived_dir, Path(stage)]
+        parts: list[Path] = [self.derived_dir, Path(stage)]
         if flavor:
             parts.append(Path(flavor))
         parts.append(Path(run_id))
@@ -625,7 +625,7 @@ class ProjectPaths:
     def smoothed_run_dir(
         self,
         flavor: str,
-        run_id: Optional[str] = None,
+        run_id: str | None = None,
     ) -> Path:
         """Convenience for ``derived/smoothed/<flavor>/<run_id>/``."""
         return self.stage_run_dir(
@@ -636,8 +636,8 @@ class ProjectPaths:
     def list_runs(
         self,
         stage: str,
-        flavor: Optional[str] = None,
-    ) -> List[Path]:
+        flavor: str | None = None,
+    ) -> list[Path]:
         """Return all run directories under ``stage[/flavor]``,
         sorted lexically (= chronologically by run-id format).
 
@@ -660,8 +660,8 @@ class ProjectPaths:
     def latest_run(
         self,
         stage: str,
-        flavor: Optional[str] = None,
-    ) -> Optional[Path]:
+        flavor: str | None = None,
+    ) -> Path | None:
         runs = self.list_runs(stage, flavor=flavor)
         return runs[-1] if runs else None
 
@@ -703,11 +703,11 @@ def write_run_toml(
     *,
     stage: str,
     run_id: str,
-    inputs: Optional[List[str]] = None,
-    params: Optional[Dict[str, Any]] = None,
-    results: Optional[Dict[str, Any]] = None,
-    mufasa_version: Optional[str] = None,
-    extra: Optional[Dict[str, Any]] = None,
+    inputs: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+    results: dict[str, Any] | None = None,
+    mufasa_version: str | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> None:
     """Write a run-provenance file at ``path``.
 
@@ -725,7 +725,7 @@ def write_run_toml(
             mufasa_version = getattr(mufasa, "__version__", "unknown")
         except Exception:
             mufasa_version = "unknown"
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "run_id": run_id,
         "stage": stage,
         "created": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -742,7 +742,7 @@ def write_run_toml(
     write_project_toml(path, data)
 
 
-def read_run_toml(path: Path) -> Dict[str, Any]:
+def read_run_toml(path: Path) -> dict[str, Any]:
     """Parse a run-provenance file.
 
     Reuses ``tomllib`` directly (no schema enforcement beyond
@@ -837,7 +837,7 @@ def import_model_into_project(
     src_path: Path,
     project_root: Path,
     *,
-    model_name: Optional[str] = None,
+    model_name: str | None = None,
     overwrite: bool = False,
 ) -> Path:
     """Copy ``src_path`` into ``<project>/models/<model_name>/model.npz``
@@ -904,8 +904,8 @@ def import_model_into_project(
 def mirror_model_to_global_cache(
     src_path: Path,
     *,
-    model_name: Optional[str] = None,
-) -> Optional[Path]:
+    model_name: str | None = None,
+) -> Path | None:
     """Copy ``src_path`` to ``~/.config/mufasa/models/<name>.npz``.
 
     Returns the cache path on success, ``None`` if the cache dir
@@ -942,8 +942,8 @@ def mirror_model_to_global_cache(
 
 
 def resolve_v1_project_root(
-    config_path: Optional[str],
-) -> Optional[Path]:
+    config_path: str | None,
+) -> Path | None:
     """Best-effort: locate the v1 project root reachable from
     ``config_path``, or ``None``.
 
@@ -963,7 +963,7 @@ def resolve_v1_project_root(
     if not config_path:
         return None
     cp = Path(config_path)
-    candidates: List[Path] = []
+    candidates: list[Path] = []
     if cp.name == PROJECT_CONFIG_FILENAME:
         candidates.append(cp.parent)
     elif cp.name == "project.toml":
@@ -1082,7 +1082,7 @@ def v1_project_paths(root: Path) -> dict[str, str]:
 
 def project_paths_from_config(
     config_path: Union[str, Path],
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """Return a dict of conventional project paths, working for
     both v1 ``project.toml`` and legacy ``project.toml``.
 
@@ -1222,7 +1222,7 @@ def project_paths_from_config(
 
 def project_metadata_from_config(
     config_path: Union[str, Path],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return the project's metadata (animal count, body parts,
     file type, classifier targets, animal IDs) for either layout.
 
@@ -1312,7 +1312,7 @@ def project_metadata_from_config(
     project_path = parser.get(
         "General settings", "project_path", fallback="",
     )
-    body_parts: List[str] = []
+    body_parts: list[str] = []
     if project_path:
         bp_csv = (
             Path(project_path)
@@ -1419,7 +1419,7 @@ _INFERENCE_INI_MAP = {
 
 def read_classifier_inference_settings(
     config_path,
-) -> Dict[str, Dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Return per-classifier inference settings (model path,
     discrimination threshold, minimum bout length in ms).
 
@@ -1435,7 +1435,7 @@ def read_classifier_inference_settings(
     projects.
     """
     cp = Path(config_path)
-    out: Dict[str, Dict[str, Any]] = {}
+    out: dict[str, dict[str, Any]] = {}
     if _is_toml_config(cp):
         try:
             data = read_project_toml(cp)
@@ -1447,7 +1447,7 @@ def read_classifier_inference_settings(
         for clf_name, settings in section.items():
             if not isinstance(settings, dict):
                 continue
-            row: Dict[str, Any] = {}
+            row: dict[str, Any] = {}
             mp = settings.get("model_path")
             if isinstance(mp, str) and mp:
                 row["model_path"] = mp
@@ -1475,7 +1475,7 @@ def read_classifier_inference_settings(
         ).strip()
         if not name:
             continue
-        row: Dict[str, Any] = {}
+        row: dict[str, Any] = {}
         mp = parser.get(
             "SML settings", f"model_path_{idx}", fallback="",
         ).strip()
@@ -1504,7 +1504,7 @@ def read_classifier_inference_settings(
 
 def write_classifier_inference_settings(
     config_path,
-    settings: Dict[str, Dict[str, Any]],
+    settings: dict[str, dict[str, Any]],
 ) -> None:
     """Persist per-classifier inference settings.
 
@@ -1545,7 +1545,7 @@ def write_classifier_inference_settings(
         "SML settings", "no_targets", fallback=0,
     )
     # Build name → ordinal map from the existing INI
-    name_to_idx: Dict[str, int] = {}
+    name_to_idx: dict[str, int] = {}
     for idx in range(1, n_targets + 1):
         name = parser.get(
             "SML settings", f"target_name_{idx}", fallback="",
@@ -1585,7 +1585,7 @@ def write_classifier_inference_settings(
 
 def read_classifier_training_settings(
     config_path,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return classifier-training hyperparameters + evaluation
     toggles as a flat dict. Keys match the canonical names the
     trainer's legacy reader expects (``rf_n_estimators``,
@@ -1602,7 +1602,7 @@ def read_classifier_training_settings(
     from 122aq for the TOML case.
     """
     cp = Path(config_path)
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
     if _is_toml_config(cp):
         try:
             data = read_project_toml(cp)
@@ -1637,7 +1637,7 @@ def read_classifier_training_settings(
 
 def write_classifier_training_settings(
     config_path,
-    settings: Dict[str, Any],
+    settings: dict[str, Any],
 ) -> None:
     """Persist classifier-training settings.
 

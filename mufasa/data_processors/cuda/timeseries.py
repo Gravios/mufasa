@@ -40,7 +40,7 @@ def _sliding_crossings_kernal(data, time, threshold, inverse, results):
         sample = data[l:r]
         results[r-1] = _count_at_threshold(sample, inverse, threshold)
 
-def sliding_threshold(data: np.ndarray, time_window: float, sample_rate: float, value: float, inverse: Optional[bool] = False) -> np.ndarray:
+def sliding_threshold(data: np.ndarray, time_window: float, sample_rate: float, value: float, inverse: bool | None = False) -> np.ndarray:
     """
     Compute the count of observations above or below threshold crossings over a sliding window using GPU acceleration.
 

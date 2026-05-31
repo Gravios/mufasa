@@ -63,11 +63,11 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 features_dir: Optional[Union[str, os.PathLike]] = None,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 minimum_bout_length: Optional[int] = None,
-                 feature_subsets_by_clf: Optional[Dict[str, Dict[str, List[str]]]] = None,
+                 config_path: str | os.PathLike,
+                 features_dir: str | os.PathLike | None = None,
+                 save_dir: str | os.PathLike | None = None,
+                 minimum_bout_length: int | None = None,
+                 feature_subsets_by_clf: dict[str, dict[str, list[str]]] | None = None,
                  verbose: bool = True):
 
         ConfigReader.__init__(self, config_path=config_path)

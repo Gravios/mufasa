@@ -28,8 +28,8 @@ WINDOW_SIZES = np.array([0.5, 1.0, 2.0, 3.0, 6.0])
 class WingWaveFeatureExtractor(ConfigReader, FeatureExtractionMixin, AbstractFeatureExtraction):
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Optional[Union[str, os.PathLike]] = None):
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike | None = None):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=True, create_logger=True)
         self.data_dir = self.outlier_corrected_dir if data_dir is None else data_dir
@@ -164,7 +164,7 @@ class WingWaveFeatureExtractor(ConfigReader, FeatureExtractionMixin, AbstractFea
             self.save(data=out_df, save_path=save_path)
         stdout_success(f'Feature extraction complete. Data saved in {self.features_dir}.')
 
-    def save(self, data: pd.DataFrame, save_path: Union[str, os.PathLike]):
+    def save(self, data: pd.DataFrame, save_path: str | os.PathLike):
         write_df(df=data, file_type='csv', save_path=save_path)
 
 

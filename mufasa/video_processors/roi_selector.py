@@ -35,10 +35,10 @@ class ROISelector:
     """
 
     def __init__(self,
-                 path: Union[str, os.PathLike, np.ndarray],
+                 path: str | os.PathLike | np.ndarray,
                  thickness: int = 10,
-                 clr: Tuple[int, int, int] = (147, 20, 255),
-                 title: Optional[str] = None,
+                 clr: tuple[int, int, int] = (147, 20, 255),
+                 title: str | None = None,
                  destroy: bool = True,
                  greyscale: bool = False,
                  clahe: bool = False) -> None:

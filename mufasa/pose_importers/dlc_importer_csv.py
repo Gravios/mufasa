@@ -21,7 +21,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 DLC_ = 'DLC_'
 DeepCut = 'DeepCut'
 
-def import_dlc_csv(config_path: Union[str, os.PathLike], source: str) -> List[str]:
+def import_dlc_csv(config_path: str | os.PathLike, source: str) -> list[str]:
     """
     Import file or folder of  DLC pose-estimation CSV files to SimBA project.
     Returns list of file paths that has been imported.
@@ -83,10 +83,10 @@ def import_dlc_csv(config_path: Union[str, os.PathLike], source: str) -> List[st
         print(f"Pose-estimation data for video {video_name} imported to Mufasa project (elapsed time: {video_timer.elapsed_time_str}s)...")
     return imported_file_paths
 
-def import_dlc_csv_data(config_path: Union[str, os.PathLike],
-                        data_path: Union[str, os.PathLike],
-                        interpolation_settings: Optional[Dict[str, Any]] = None,
-                        smoothing_settings: Optional[Dict[str, Any]] = None) -> None:
+def import_dlc_csv_data(config_path: str | os.PathLike,
+                        data_path: str | os.PathLike,
+                        interpolation_settings: dict[str, Any] | None = None,
+                        smoothing_settings: dict[str, Any] | None = None) -> None:
 
     """
     Import multiple DLC CSV tracking files to SimBA project and apply specified interpolation and smoothing

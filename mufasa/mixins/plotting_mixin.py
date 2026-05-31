@@ -114,7 +114,7 @@ class PlottingMixin:
         increments: int,
         as_rgb_ratio: bool = False,
         as_hex: bool = False,
-    ) -> List[Union[str, int, float]]:
+    ) -> list[str | int | float]:
         """
         Helper to create a color palette of bgr colors in a list.
 
@@ -151,7 +151,7 @@ class PlottingMixin:
                            df: pd.DataFrame,
                            splits: int,
                            include_row_index: bool = False,
-                           include_split_order: bool = True) -> (List[pd.DataFrame], int):
+                           include_split_order: bool = True) -> (list[pd.DataFrame], int):
 
         """
         Helper to split a dataframe for multiprocessing. If include_split_order, then include the group number
@@ -173,11 +173,11 @@ class PlottingMixin:
     def make_distance_plot(
         self,
         data: np.array,
-        line_attr: Dict[int, str],
-        style_attr: Dict[str, Any],
+        line_attr: dict[int, str],
+        style_attr: dict[str, Any],
         fps: int,
         save_img: bool = False,
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
     ) -> np.ndarray:
         """
         Helper to make a single line plot .png image with N lines.
@@ -337,8 +337,8 @@ class PlottingMixin:
 
     def make_gantt_plot(self,
                         bouts_df: pd.DataFrame,
-                        clf_names: List[str],
-                        palette: List[Tuple[int, int, int]],
+                        clf_names: list[str],
+                        palette: list[tuple[int, int, int]],
                         fps: int,
                         x_length: int,
                         video_name: str,
@@ -348,13 +348,13 @@ class PlottingMixin:
                         bar_opacity: float = 0.85,
                         font_rotation: int = 45,
                         x_tick_lbl_rotation: int = 45,
-                        font: Optional[str] = None,
-                        title: Optional[str] = None,
+                        font: str | None = None,
+                        title: str | None = None,
                         title_font_size: int = 24,
-                        save_path: Optional[str] = None,
-                        edge_clr: Optional[str] = 'black',
+                        save_path: str | None = None,
+                        edge_clr: str | None = 'black',
                         hhmmss: bool = False,
-                        as_svg: bool = False) -> Union[None, np.ndarray, str]:
+                        as_svg: bool = False) -> None | np.ndarray | str:
         """
         Create a Gantt chart visualization of behavioral bouts over time.
 
@@ -500,8 +500,8 @@ class PlottingMixin:
         aspect_ratio: float,
         shading: Literal["gouraud", "flat"],
         clf_name: str,
-        img_size: Tuple[int, int],
-        file_name: Optional[str] = None,
+        img_size: tuple[int, int],
+        file_name: str | None = None,
         final_img: bool = False,
     ):
 
@@ -578,15 +578,15 @@ class PlottingMixin:
                                    palette: Literal[Options.PALETTE_OPTIONS],
                                    aspect_ratio: float,
                                    shading: str,
-                                   img_size: Tuple[int, int],
-                                   file_name: Optional[Union[str, os.PathLike]] = None,
-                                   line_clr: Optional[str] = None,
-                                   min_seconds: Optional[float] = None,
-                                   bg_img: Optional[np.ndarray] = None,
+                                   img_size: tuple[int, int],
+                                   file_name: str | os.PathLike | None = None,
+                                   line_clr: str | None = None,
+                                   min_seconds: float | None = None,
+                                   bg_img: np.ndarray | None = None,
                                    legend_lbl: str = "location (seconds)",
-                                   heatmap_opacity: Optional[float] = 0.99,
+                                   heatmap_opacity: float | None = 0.99,
                                    color_legend: bool = True,
-                                   leg_width: Optional[int] = None) -> Union[np.ndarray, None]:
+                                   leg_width: int | None = None) -> np.ndarray | None:
 
         cum_df = pd.DataFrame(frm_data).reset_index()
         cum_df = cum_df.melt(id_vars="index", value_vars=None, var_name=None, value_name="seconds", col_level=None).rename(columns={"index": "vertical_idx", "variable": "horizontal_idx"})
@@ -746,8 +746,8 @@ class PlottingMixin:
         frm_range: list,
         polygon_data: dict,
         animal_bp_dict: dict,
-        data_df: Optional[pd.DataFrame],
-        intersection_data_df: Optional[pd.DataFrame],
+        data_df: pd.DataFrame | None,
+        intersection_data_df: pd.DataFrame | None,
         roi_attributes: dict,
         video_path: str,
         key_points: bool,
@@ -829,7 +829,7 @@ class PlottingMixin:
         video_info: pd.DataFrame,
         clf_attr: dict,
         input_style_attr: dict,
-        video_path: Optional[Union[str, os.PathLike]] = None,
+        video_path: str | os.PathLike | None = None,
     ):
 
         group = int(data[0][0])
@@ -935,12 +935,12 @@ class PlottingMixin:
         data: pd.DataFrame,
         x: str,
         y: str,
-        save_path: Union[str, os.PathLike],
-        font_rotation: Optional[int] = 45,
-        font_size: Optional[int] = 10,
-        img_size: Optional[tuple] = (13.7, 8.27),
-        cut: Optional[int] = 0,
-        scale: Optional[Literal["area", "count", "width"]] = "area",
+        save_path: str | os.PathLike,
+        font_rotation: int | None = 45,
+        font_size: int | None = 10,
+        img_size: tuple | None = (13.7, 8.27),
+        cut: int | None = 0,
+        scale: Literal["area", "count", "width"] | None = "area",
     ):
         named_colors = get_named_colors()
         palette = {}
@@ -987,14 +987,14 @@ class PlottingMixin:
 
     @staticmethod
     def continuous_scatter(
-        data: Union[np.ndarray, pd.DataFrame],
-        columns: Optional[List[str]] = ("X", "Y", "Cluster"),
-        palette: Optional[str] = "magma",
-        show_box: Optional[bool] = False,
-        size: Optional[int] = 10,
-        title: Optional[str] = None,
-        bg_clr: Optional[str] = None,
-        save_path: Optional[Union[str, os.PathLike]] = None,
+        data: np.ndarray | pd.DataFrame,
+        columns: list[str] | None = ("X", "Y", "Cluster"),
+        palette: str | None = "magma",
+        show_box: bool | None = False,
+        size: int | None = 10,
+        title: str | None = None,
+        bg_clr: str | None = None,
+        save_path: str | os.PathLike | None = None,
     ):
         """Create a 2D scatterplot with a continuous legend"""
 
@@ -1053,13 +1053,13 @@ class PlottingMixin:
 
     @staticmethod
     def categorical_scatter(
-        data: Union[np.ndarray, pd.DataFrame],
-        columns: Optional[List[str]] = ("X", "Y", "Cluster"),
-        palette: Optional[str] = "Set1",
-        show_box: Optional[bool] = False,
-        size: Optional[int] = 10,
-        title: Optional[str] = None,
-        save_path: Optional[Union[str, os.PathLike]] = None,
+        data: np.ndarray | pd.DataFrame,
+        columns: list[str] | None = ("X", "Y", "Cluster"),
+        palette: str | None = "Set1",
+        show_box: bool | None = False,
+        size: int | None = 10,
+        title: str | None = None,
+        save_path: str | os.PathLike | None = None,
     ):
         """
         Create a 2D scatterplot with a categorical legend.
@@ -1136,13 +1136,13 @@ class PlottingMixin:
 
     @staticmethod
     def joint_plot(
-        data: Union[np.ndarray, pd.DataFrame],
-        columns: Optional[List[str]] = ("X", "Y", "Cluster"),
-        palette: Optional[str] = "Set1",
-        kind: Optional[str] = "scatter",
-        size: Optional[int] = 10,
-        title: Optional[str] = None,
-        save_path: Optional[Union[str, os.PathLike]] = None,
+        data: np.ndarray | pd.DataFrame,
+        columns: list[str] | None = ("X", "Y", "Cluster"),
+        palette: str | None = "Set1",
+        kind: str | None = "scatter",
+        size: int | None = 10,
+        title: str | None = None,
+        save_path: str | os.PathLike | None = None,
     ):
         """
         Generate a joint plot.
@@ -1234,30 +1234,30 @@ class PlottingMixin:
     @staticmethod
     def line_plot(df: pd.DataFrame,
                   x: str,
-                  y: Union[str, List[str]],
-                  error: Optional[Union[str, List[str]]] = None,
-                  x_label: Optional[str] = None,
-                  y_label: Optional[str] = None,
-                  title: Optional[str] = None,
-                  fig_size: Tuple[int] = (10, 6),
+                  y: str | list[str],
+                  error: str | list[str] | None = None,
+                  x_label: str | None = None,
+                  y_label: str | None = None,
+                  title: str | None = None,
+                  fig_size: tuple[int] = (10, 6),
                   error_opacity: float = 0.2,
                   palette: str = 'Set1',
                   grid: bool = True,
                   bg_clr: str = 'white',
                   line_width: float = 1.5,
-                  save_path: Optional[Union[str, os.PathLike]] = None,
-                  dpi: Optional[int] = None,
+                  save_path: str | os.PathLike | None = None,
+                  dpi: int | None = None,
                   tight_layout: bool = True,
                   show_legend: bool = True,
-                  legend_loc: Optional[str] = 'best',
-                  font_size: Optional[int] = None,
-                  title_font_size: Optional[int] = None,
-                  x_lim: Optional[Tuple[float, float]] = None,
-                  y_lim: Optional[Tuple[float, float]] = None,
-                  marker: Optional[str] = None,
-                  markersize: Optional[float] = None,
-                  linestyle: Optional[Union[str, List[str]]] = None,
-                  save_kwargs: Optional[Dict[str, Any]] = None,
+                  legend_loc: str | None = 'best',
+                  font_size: int | None = None,
+                  title_font_size: int | None = None,
+                  x_lim: tuple[float, float] | None = None,
+                  y_lim: tuple[float, float] | None = None,
+                  marker: str | None = None,
+                  markersize: float | None = None,
+                  linestyle: str | list[str] | None = None,
+                  save_kwargs: dict[str, Any] | None = None,
                   svg: bool = False):
         """
         Line plot from DataFrame with optional error bands.
@@ -1388,26 +1388,26 @@ class PlottingMixin:
             return fig
 
     @staticmethod
-    def make_line_plot(data: List[np.ndarray],
-                       colors: List[str],
-                       show_box: Optional[bool] = True,
-                       width: Optional[int] = 640,
-                       height: Optional[int] = 480,
-                       line_width: Optional[int] = 6,
-                       font_size: Optional[int] = 8,
-                       bg_clr: Optional[str] = None,
-                       x_lbl_divisor: Optional[float] = None,
-                       title: Optional[str] = None,
-                       y_lbl: Optional[str] = None,
-                       x_lbl: Optional[str] = None,
+    def make_line_plot(data: list[np.ndarray],
+                       colors: list[str],
+                       show_box: bool | None = True,
+                       width: int | None = 640,
+                       height: int | None = 480,
+                       line_width: int | None = 6,
+                       font_size: int | None = 8,
+                       bg_clr: str | None = None,
+                       x_lbl_divisor: float | None = None,
+                       title: str | None = None,
+                       y_lbl: str | None = None,
+                       x_lbl: str | None = None,
                        y_tick_lbls_as_int: bool = False,
                        x_tick_lbls_as_int: bool = False,
                        y_tick_cnt: int = 10,
                        x_tick_cnt: int = 5,
-                       y_max: Optional[Union[int, float]] = -1,
-                       line_opacity: Optional[float] = 1.0,
+                       y_max: int | float | None = -1,
+                       line_opacity: float | None = 1.0,
                        as_svg: bool = False,
-                       save_path: Optional[Union[str, os.PathLike]] = None,
+                       save_path: str | os.PathLike | None = None,
                        show_thresholds: bool = False):
         """
         Create a multi-line plot from NumPy arrays.
@@ -1521,22 +1521,22 @@ class PlottingMixin:
 
     @staticmethod
     def make_line_plot_plotly(
-        data: List[np.ndarray],
-        colors: List[str],
-        show_box: Optional[bool] = True,
-        show_grid: Optional[bool] = False,
-        width: Optional[int] = 640,
-        height: Optional[int] = 480,
-        line_width: Optional[int] = 6,
-        font_size: Optional[int] = 8,
-        bg_clr: Optional[str] = "white",
-        x_lbl_divisor: Optional[float] = None,
-        title: Optional[str] = None,
-        y_lbl: Optional[str] = None,
-        x_lbl: Optional[str] = None,
-        y_max: Optional[int] = -1,
-        line_opacity: Optional[int] = 0.5,
-        save_path: Optional[Union[str, os.PathLike]] = None,
+        data: list[np.ndarray],
+        colors: list[str],
+        show_box: bool | None = True,
+        show_grid: bool | None = False,
+        width: int | None = 640,
+        height: int | None = 480,
+        line_width: int | None = 6,
+        font_size: int | None = 8,
+        bg_clr: str | None = "white",
+        x_lbl_divisor: float | None = None,
+        title: str | None = None,
+        y_lbl: str | None = None,
+        x_lbl: str | None = None,
+        y_max: int | None = -1,
+        line_opacity: int | None = 0.5,
+        save_path: str | os.PathLike | None = None,
     ):
         """
         Create a line plot using Plotly.
@@ -1655,20 +1655,20 @@ class PlottingMixin:
 
     @staticmethod
     def make_path_plot(
-        data: List[np.ndarray],
-        colors: List[Union[Tuple[int, int, int], str]],
-        width: Optional[int] = 640,
-        height: Optional[int] = 480,
-        max_lines: Optional[int] = None,
-        bg_clr: Optional[Union[Tuple[int, int, int], np.ndarray]] = (255, 255, 255),
-        circle_size: Optional[Union[int, None]] = 3,
-        font_size: Optional[float] = 2.0,
-        font_thickness: Optional[int] = 2,
-        line_width: Optional[int] = 2,
-        animal_names: Optional[List[str]] = None,
-        clf_attr: Optional[Dict[str, Any]] = None,
-        save_path: Optional[Union[str, os.PathLike]] = None,
-    ) -> Union[None, np.ndarray]:
+        data: list[np.ndarray],
+        colors: list[tuple[int, int, int] | str],
+        width: int | None = 640,
+        height: int | None = 480,
+        max_lines: int | None = None,
+        bg_clr: tuple[int, int, int] | np.ndarray | None = (255, 255, 255),
+        circle_size: int | None | None = 3,
+        font_size: float | None = 2.0,
+        font_thickness: int | None = 2,
+        line_width: int | None = 2,
+        animal_names: list[str] | None = None,
+        clf_attr: dict[str, Any] | None = None,
+        save_path: str | os.PathLike | None = None,
+    ) -> None | np.ndarray:
         """
         Creates a path plot visualization from the given data.
 
@@ -1785,14 +1785,14 @@ class PlottingMixin:
     @staticmethod
     def rectangles_onto_image(img: np.ndarray,
                               rectangles: pd.DataFrame,
-                              show_center: Optional[bool] = False,
-                              show_tags: Optional[bool] = False,
-                              circle_size: Optional[int] = 2,
+                              show_center: bool | None = False,
+                              show_tags: bool | None = False,
+                              circle_size: int | None = 2,
                               line_type: int = -1,
                               print_metrics: bool = False,
-                              omitted_rois: Optional[List[str]] = None,
-                              omitted_centers: Optional[List[str]] = None,
-                              txt_size: Optional[Union[float, int]] = None) -> np.ndarray:
+                              omitted_rois: list[str] | None = None,
+                              omitted_centers: list[str] | None = None,
+                              txt_size: float | int | None = None) -> np.ndarray:
 
         check_valid_array(data=img, source=PlottingMixin.rectangles_onto_image.__name__)
         check_valid_dataframe(df=rectangles, source=PlottingMixin.rectangles_onto_image.__name__, required_fields=["topLeftX", "topLeftY", "Bottom_right_X", "Bottom_right_Y", "Color BGR", "Thickness", "Center_X", "Center_Y", "Tags", "Ear_tag_size", 'width', 'height', 'Name'])
@@ -1823,14 +1823,14 @@ class PlottingMixin:
     @staticmethod
     def circles_onto_image(img: np.ndarray,
                            circles: pd.DataFrame,
-                           show_center: Optional[bool] = False,
-                           show_tags: Optional[bool] = False,
-                           circle_size: Optional[int] = 2,
-                           line_type: Optional[int] = -1,
+                           show_center: bool | None = False,
+                           show_tags: bool | None = False,
+                           circle_size: int | None = 2,
+                           line_type: int | None = -1,
                            print_metrics: bool = False,
-                           omitted_rois: Optional[List[str]] = None,
-                           omitted_centers: Optional[List[str]] = None,
-                           txt_size: Optional[Union[float, int]] = None) -> np.ndarray:
+                           omitted_rois: list[str] | None = None,
+                           omitted_centers: list[str] | None = None,
+                           txt_size: float | int | None = None) -> np.ndarray:
 
         check_valid_array(data=img, source=PlottingMixin.circles_onto_image.__name__)
         check_valid_dataframe(df=circles, source=PlottingMixin.circles_onto_image.__name__, required_fields=["centerX", "centerY", "radius", "Color BGR", "Thickness", "Tags", "Ear_tag_size", "Name"])
@@ -1864,14 +1864,14 @@ class PlottingMixin:
     @staticmethod
     def polygons_onto_image(img: np.ndarray,
                             polygons: pd.DataFrame,
-                            show_center: Optional[bool] = False,
-                            show_tags: Optional[bool] = False,
-                            circle_size: Optional[int] = 2,
-                            line_type: Optional[int] = -1,
+                            show_center: bool | None = False,
+                            show_tags: bool | None = False,
+                            circle_size: int | None = 2,
+                            line_type: int | None = -1,
                             print_metrics: bool = False,
-                            omitted_rois: Optional[List[str]] = None,
-                            omitted_centers: Optional[List[str]] = None,
-                            txt_size: Optional[Union[float, int]] = None) -> np.ndarray:
+                            omitted_rois: list[str] | None = None,
+                            omitted_centers: list[str] | None = None,
+                            txt_size: float | int | None = None) -> np.ndarray:
 
         check_valid_array(data=img, source=f"{PlottingMixin.polygons_onto_image.__name__} img")
         check_valid_dataframe(df=polygons, source=f"{PlottingMixin.polygons_onto_image.__name__} polygons", required_fields=["vertices", "Color BGR", "Thickness", "Tags", "Name"])
@@ -1902,11 +1902,11 @@ class PlottingMixin:
 
     @staticmethod
     def roi_dict_onto_img(img: np.ndarray,
-                          roi_dict: Dict[str, pd.DataFrame],
-                          circle_size: Optional[int] = None,
-                          show_center: Optional[bool] = False,
-                          omitted_centers: Optional[List[str]] = None,
-                          show_tags: Optional[bool] = False) -> np.ndarray:
+                          roi_dict: dict[str, pd.DataFrame],
+                          circle_size: int | None = None,
+                          show_center: bool | None = False,
+                          omitted_centers: list[str] | None = None,
+                          show_tags: bool | None = False) -> np.ndarray:
 
         check_valid_array(data=img, source=f"{PlottingMixin.roi_dict_onto_img.__name__} img")
         check_if_keys_exist_in_dict(data=roi_dict, key=[Keys.ROI_POLYGONS.value, Keys.ROI_CIRCLES.value, Keys.ROI_RECTANGLES.value], name=PlottingMixin.roi_dict_onto_img.__name__)
@@ -1922,9 +1922,9 @@ class PlottingMixin:
         shape_name: str,
         animal_name: str,
         frame_id: int,
-        color: Optional[Tuple[int]] = (0, 0, 255),
-        thickness: Optional[int] = 2,
-        style: Optional[str] = "lines",
+        color: tuple[int] | None = (0, 0, 255),
+        thickness: int | None = 2,
+        style: str | None = "lines",
     ) -> np.ndarray:
         """
         Helper to insert lines between the actor 'eye' and the ROI centers.
@@ -1986,11 +1986,11 @@ class PlottingMixin:
     def draw_lines_on_img(img: np.ndarray,
                           start_positions: np.ndarray,
                           end_positions: np.ndarray,
-                          color: Tuple[int, int, int],
-                          opacity: Optional[float] = None,
-                          highlight_endpoint: Optional[bool] = False,
-                          thickness: Optional[int] = 2,
-                          circle_size: Optional[int] = 2) -> np.ndarray:
+                          color: tuple[int, int, int],
+                          opacity: float | None = None,
+                          highlight_endpoint: bool | None = False,
+                          thickness: int | None = 2,
+                          circle_size: int | None = 2) -> np.ndarray:
 
         """
         Helper to draw a set of lines onto an image.
@@ -2027,11 +2027,11 @@ class PlottingMixin:
 
 
     def get_optimal_font_scales(self,
-                                text: Union[str, List[str]],
+                                text: str | list[str],
                                 accepted_px_width: int,
                                 accepted_px_height: int,
-                                text_thickness: Optional[int] = 2,
-                                font: Optional[int] = cv2.FONT_HERSHEY_TRIPLEX) -> Tuple[float, int, int]:
+                                text_thickness: int | None = 2,
+                                font: int | None = cv2.FONT_HERSHEY_TRIPLEX) -> tuple[float, int, int]:
 
         """
         Get the optimal font size, column-wise and row-wise text distance of printed text for printing on images.
@@ -2071,8 +2071,8 @@ class PlottingMixin:
         return (1, 1, 1)
 
     def get_optimal_circle_size(self,
-                                frame_size: Tuple[int, int],
-                                circle_frame_ratio: Optional[int] = 100) -> int:
+                                frame_size: tuple[int, int],
+                                circle_frame_ratio: int | None = 100) -> int:
         """
         Calculate the optimal circle size for fitting within a rectangular frame based on a given ratio.
 
@@ -2096,12 +2096,12 @@ class PlottingMixin:
     def put_text(self,
                   img: np.ndarray,
                   text: str,
-                  pos: Tuple[int, int],
-                  font_size: Union[int, float],
-                  font_thickness: Optional[int] = 2,
-                  font: Optional[int] = cv2.FONT_HERSHEY_DUPLEX,
-                  text_color: Optional[Tuple[int, int, int]] = (255, 255, 255),
-                  text_color_bg: Optional[Tuple[int, int, int]] = (0, 0, 0),
+                  pos: tuple[int, int],
+                  font_size: int | float,
+                  font_thickness: int | None = 2,
+                  font: int | None = cv2.FONT_HERSHEY_DUPLEX,
+                  text_color: tuple[int, int, int] | None = (255, 255, 255),
+                  text_color_bg: tuple[int, int, int] | None = (0, 0, 0),
                   text_bg_alpha: float = 0.8) -> np.ndarray:
 
         """
@@ -2142,19 +2142,19 @@ class PlottingMixin:
     def plot_bar_chart(df: pd.DataFrame,
                        x: str,
                        y: str,
-                       error: Optional[str] = None,
-                       x_label: Optional[str] = None,
-                       y_label: Optional[str] = None,
-                       title: Optional[str] = None,
-                       fig_size: Tuple[int, int] = (10, 8),
+                       error: str | None = None,
+                       x_label: str | None = None,
+                       y_label: str | None = None,
+                       title: str | None = None,
+                       fig_size: tuple[int, int] = (10, 8),
                        palette: str = 'magma',
                        error_clr: str = 'grey',
                        bar_alpha: float = 1.0,
                        dpi: int = 600,
                        orientation: Literal['vertical', 'horizontal'] = 'vertical',
                        y_min: float = 0.0,
-                       y_max: Optional[float] = None,
-                       save_path: Optional[Union[str, os.PathLike]] = None,
+                       y_max: float | None = None,
+                       save_path: str | os.PathLike | None = None,
                        as_svg: bool = False):
         """
         Create a bar chart from DataFrame columns.
@@ -2275,12 +2275,12 @@ class PlottingMixin:
         return group
 
     @staticmethod
-    def plot_clf_cumcount(config_path: Union[str, os.PathLike],
+    def plot_clf_cumcount(config_path: str | os.PathLike,
                           clf: str,
-                          data_dir: Optional[Union[str, os.PathLike]] = None,
-                          save_path: Optional[Union[str, os.PathLike]] = None,
-                          bouts: Optional[bool] = False,
-                          seconds: Optional[bool] = False) -> None:
+                          data_dir: str | os.PathLike | None = None,
+                          save_path: str | os.PathLike | None = None,
+                          bouts: bool | None = False,
+                          seconds: bool | None = False) -> None:
 
         r"""
 
@@ -2357,7 +2357,7 @@ class PlottingMixin:
 
 
     @staticmethod
-    def save_svg_markup(svg_markup: str, save_path: Union[str, os.PathLike]) -> None:
+    def save_svg_markup(svg_markup: str, save_path: str | os.PathLike) -> None:
         check_str(name=f"{PlottingMixin.save_svg_markup.__name__} svg_markup", value=svg_markup, raise_error=True)
         check_str(name=f"{PlottingMixin.save_svg_markup.__name__} save_path", value=str(save_path), raise_error=True)
         check_if_dir_exists(in_dir=os.path.dirname(str(save_path)))
@@ -2367,15 +2367,15 @@ class PlottingMixin:
 
     @staticmethod
     def get_path_img(data: np.ndarray,
-                     size: Optional[Tuple[int, int]] = None,  # HxW
+                     size: tuple[int, int] | None = None,  # HxW
                      line_thickness: float = 2,
-                     line_color: Union[Tuple[int, int, int], Literal['time', 'velocity']] = (147, 20, 255),
-                     bg_clr: Union[Tuple[int, int, int], np.ndarray] = (255, 255, 255),
+                     line_color: tuple[int, int, int] | Literal['time', 'velocity'] = (147, 20, 255),
+                     bg_clr: tuple[int, int, int] | np.ndarray = (255, 255, 255),
                      opacity: int = 1.0,
-                     smoothing_time: Optional[int] = None,
-                     save_path: Optional[Union[str, os.PathLike]] = None,
+                     smoothing_time: int | None = None,
+                     save_path: str | os.PathLike | None = None,
                      svg: bool = False,
-                     dpi: int = 500) -> Optional[matplotlib.figure.Figure]:
+                     dpi: int = 500) -> matplotlib.figure.Figure | None:
         """
         Create a path plot from NumPy array data.
 

@@ -55,8 +55,8 @@ class MultiCropper:
 
     def __init__(self,
                  file_type: Literal["avi", "mp4", "mov", "flv", "m4v"],
-                 input_folder: Union[str, os.PathLike],
-                 output_folder: Union[str, os.PathLike],
+                 input_folder: str | os.PathLike,
+                 output_folder: str | os.PathLike,
                  crop_cnt: int,
                  gpu: bool = False,
                  quality: int = 60):

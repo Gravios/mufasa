@@ -89,12 +89,12 @@ class ThirdPartyLabelAppender(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike,
                  app: Literal["BENTO", "BORIS", "DEEPETHOGRAM", "ETHOVISION", "SOLOMON", "OBSERVER"],
                  file_format: str,
-                 error_settings: Dict[str, str],
-                 log: Optional[bool] = False):
+                 error_settings: dict[str, str],
+                 log: bool | None = False):
 
         ConfigReader.__init__(self, config_path=config_path)
         check_str(name=f'{self.__class__.__name__} app', value=app, options=APP_KEYS)

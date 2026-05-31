@@ -68,12 +68,12 @@ from mufasa.utils.warnings import FrameRangeWarning, NoDataFoundWarning
 #     rle['counts'] = rle['counts'].decode('utf-8')
 #     return rle
 
-def geometries_to_coco(geometries: Dict[str, np.ndarray],
-                       video_path: Union[str, os.PathLike],
-                       save_dir: Union[str, os.PathLike],
-                       version: Optional[int] = 1,
-                       description: Optional[str] = None,
-                       licences: Optional[str] = None):
+def geometries_to_coco(geometries: dict[str, np.ndarray],
+                       video_path: str | os.PathLike,
+                       save_dir: str | os.PathLike,
+                       version: int | None = 1,
+                       description: str | None = None,
+                       licences: str | None = None):
     r"""
     Convert a dictionary of geometries (keypoints or polygons) into COCO format annotations and save images
     extracted from a video to a specified directory.
@@ -127,13 +127,13 @@ def geometries_to_coco(geometries: Dict[str, np.ndarray],
         json.dump(results, final)
 
 
-def geometries_to_yolo(geometries: Dict[Union[str, int], np.ndarray],
-                       video_path: Union[str, os.PathLike],
-                       save_dir: Union[str, os.PathLike],
-                       verbose: Optional[bool] = True,
-                       sample: Optional[int] = None,
-                       obb: Optional[bool] = False,
-                       map: Optional[Dict[int, str]] = None) -> None:
+def geometries_to_yolo(geometries: dict[str | int, np.ndarray],
+                       video_path: str | os.PathLike,
+                       save_dir: str | os.PathLike,
+                       verbose: bool | None = True,
+                       sample: int | None = None,
+                       obb: bool | None = False,
+                       map: dict[int, str] | None = None) -> None:
     r"""
     Converts geometrical shapes (like polygons) into YOLO format annotations and saves them along with corresponding video frames as images.
 
@@ -240,13 +240,13 @@ def arr_to_b64(x: np.ndarray) -> str:
     _, buffer = cv2.imencode('.jpg', x)
     return base64.b64encode(buffer).decode("utf-8")
 
-def create_yolo_yaml(path: Union[str, os.PathLike],
-                     train_path: Union[str, os.PathLike],
-                     val_path: Union[str, os.PathLike],
-                     names: Dict[str, int],
-                     save_path: Optional[Union[str, os.PathLike]] = None,
-                     test_path: Optional[Union[str, os.PathLike]] = None,
-                     reverse_ids: Optional[bool] = True) -> Union[None, dict]:
+def create_yolo_yaml(path: str | os.PathLike,
+                     train_path: str | os.PathLike,
+                     val_path: str | os.PathLike,
+                     names: dict[str, int],
+                     save_path: str | os.PathLike | None = None,
+                     test_path: str | os.PathLike | None = None,
+                     reverse_ids: bool | None = True) -> None | dict:
     r"""
     Given a set of paths to directories, create a model.yaml file for model training though ultralytics wrappers.
 
@@ -294,9 +294,9 @@ def create_yolo_yaml(path: Union[str, os.PathLike],
         return data
 
 
-def labelme_to_dlc(labelme_dir: Union[str, os.PathLike],
-                   scorer: Optional[str] = 'SN',
-                   save_dir: Optional[Union[str, os.PathLike]] = None) -> None:
+def labelme_to_dlc(labelme_dir: str | os.PathLike,
+                   scorer: str | None = 'SN',
+                   save_dir: str | os.PathLike | None = None) -> None:
     """
     Convert labels from labelme format to DLC format.
 
@@ -358,11 +358,11 @@ def labelme_to_dlc(labelme_dir: Union[str, os.PathLike],
 
 
 
-def dlc_to_labelme(dlc_dir: Union[str, os.PathLike],
-                   save_dir: Union[str, os.PathLike],
-                   labelme_version: Optional[str] = '5.3.1',
-                   flags: Optional[Dict[Any, Any]] = None,
-                   verbose: Optional[bool] = True) -> None:
+def dlc_to_labelme(dlc_dir: str | os.PathLike,
+                   save_dir: str | os.PathLike,
+                   labelme_version: str | None = '5.3.1',
+                   flags: dict[Any, Any] | None = None,
+                   verbose: bool | None = True) -> None:
 
     r"""
     Convert a folder of DLC annotations into labelme json format.
@@ -436,7 +436,7 @@ def dlc_to_labelme(dlc_dir: Union[str, os.PathLike],
         stdout_success(f'Labelme data for {filecnt} image(s) saved in {save_dir} directory', elapsed_time=timer.elapsed_time_str)
 
 
-def b64_dict_to_imgs(x: Dict[str, np.ndarray]):
+def b64_dict_to_imgs(x: dict[str, np.ndarray]):
     r"""
     Helper to convert a dictionary of images in byte64 format to a dictionary of images in array format.
 
@@ -451,7 +451,7 @@ def b64_dict_to_imgs(x: Dict[str, np.ndarray]):
     return results
 
 
-def normalize_img_dict(img_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+def normalize_img_dict(img_dict: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     img_ndims = set()
     for img in img_dict.values():
         check_if_valid_img(data=img, source=normalize_img_dict.__name__, raise_error=True)
@@ -488,13 +488,13 @@ def normalize_img_dict(img_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]
 
     return results
 
-def labelme_to_df(labelme_dir: Union[str, os.PathLike],
-                  greyscale: Optional[bool] = False,
-                  pad: Optional[bool] = False,
-                  size: Union[Literal['min', 'max'], Tuple[int, int]] = None,
-                  normalize: Optional[bool] = False,
-                  save_path: Optional[Union[str, os.PathLike]] = None,
-                  verbose: bool = True) -> Union[None, pd.DataFrame]:
+def labelme_to_df(labelme_dir: str | os.PathLike,
+                  greyscale: bool | None = False,
+                  pad: bool | None = False,
+                  size: Literal['min', 'max'] | tuple[int, int] = None,
+                  normalize: bool | None = False,
+                  save_path: str | os.PathLike | None = None,
+                  verbose: bool = True) -> None | pd.DataFrame:
 
     r"""
     Convert a directory of labelme .json files into a pandas dataframe.
@@ -579,9 +579,9 @@ def labelme_to_df(labelme_dir: Union[str, os.PathLike],
             stdout_success(msg=f'Labelme CSV file saved at {save_path}', elapsed_time=timer.elapsed_time_str, source=labelme_to_df.__name__)
 
 def scale_pose_img_sizes(pose_data: np.ndarray,
-                         imgs: Iterable[Union[np.ndarray, str]],
-                         size: Union[Literal['min', 'max'], Tuple[int, int]],
-                         interpolation: Optional[int] = cv2.INTER_CUBIC ) -> Tuple[np.ndarray, Iterable[Union[np.ndarray, str]]]:
+                         imgs: Iterable[np.ndarray | str],
+                         size: Literal['min', 'max'] | tuple[int, int],
+                         interpolation: int | None = cv2.INTER_CUBIC ) -> tuple[np.ndarray, Iterable[np.ndarray | str]]:
 
     r"""
     Resizes images and scales corresponding pose-estimation data to match the new image sizes.
@@ -657,9 +657,9 @@ def scale_pose_img_sizes(pose_data: np.ndarray,
     return (pose_results, img_results)
 
 
-def split_yolo_train_test_val(data_dir: Union[str, os.PathLike],
-                              save_dir: Union[str, os.PathLike],
-                              split: Tuple[float, float, float] = (0.7, 0.2, 0.1),
+def split_yolo_train_test_val(data_dir: str | os.PathLike,
+                              save_dir: str | os.PathLike,
+                              split: tuple[float, float, float] = (0.7, 0.2, 0.1),
                               verbose: bool = False) -> None:
     """
     Split a directory of yolo labels and associated images into training, testing, and validation batches and create a mapping file for downstream model training.
@@ -728,15 +728,15 @@ def split_yolo_train_test_val(data_dir: Union[str, os.PathLike],
         stdout_success(msg=f'YOLO training data saved in {save_dir}', elapsed_time=timer.elapsed_time_str)
 
 
-def simba_rois_to_yolo(config_path: Optional[Union[str, os.PathLike]] = None,
-                       roi_path: Optional[Union[str, os.PathLike]] = None,
-                       video_dir: Optional[Union[str, os.PathLike]] = None,
-                       save_dir: Optional[Union[str, os.PathLike]] = None,
-                       roi_frm_cnt: Optional[int] = 10,
-                       train_size: Optional[float] = 0.7,
-                       obb: Optional[bool] = False,
-                       greyscale: Optional[bool] = True,
-                       verbose: Optional[bool] = False) -> None:
+def simba_rois_to_yolo(config_path: str | os.PathLike | None = None,
+                       roi_path: str | os.PathLike | None = None,
+                       video_dir: str | os.PathLike | None = None,
+                       save_dir: str | os.PathLike | None = None,
+                       roi_frm_cnt: int | None = 10,
+                       train_size: float | None = 0.7,
+                       obb: bool | None = False,
+                       greyscale: bool | None = True,
+                       verbose: bool | None = False) -> None:
     r"""
     Converts SimBA roi definitions into annotations and images for training yolo network.
 
@@ -906,8 +906,8 @@ def yolo_obb_data_to_bounding_box(center_x: float, center_y: float, width: float
     return box.astype(np.int32)
 
 
-def labelme_to_img_dir(labelme_dir: Union[str, os.PathLike],
-                       img_dir: Union[str, os.PathLike],
+def labelme_to_img_dir(labelme_dir: str | os.PathLike,
+                       img_dir: str | os.PathLike,
                        img_format: str = 'png',
                        verbose: bool = True,
                        greyscale: bool = False) -> None:
@@ -948,8 +948,8 @@ def labelme_to_img_dir(labelme_dir: Union[str, os.PathLike],
     stdout_success(msg=f'{len(annotation_paths)} images saved in {img_dir}.', elapsed_time=timer.elapsed_time_str)
 
 
-def labelme_to_yolo(labelme_dir: Union[str, os.PathLike],
-                    save_dir: Union[str, os.PathLike],
+def labelme_to_yolo(labelme_dir: str | os.PathLike,
+                    save_dir: str | os.PathLike,
                     obb: bool = False,
                     verbose: bool = True) -> None:
     """
@@ -1030,14 +1030,14 @@ def labelme_to_yolo(labelme_dir: Union[str, os.PathLike],
     if verbose: stdout_success(msg=f'Labelme to YOLO conversion complete. Data saved in directory {save_dir}.', elapsed_time=timer.elapsed_time_str)
 
 
-def create_yolo_keypoint_yaml(path: Union[str, os.PathLike],
-                              train_path: Union[str, os.PathLike],
-                              val_path: Union[str, os.PathLike],
-                              names: Dict[int, str],
-                              kpt_shape: Optional[Tuple[int, int]] = None,
-                              flip_idx: Optional[Tuple[int, ...]] = None,
-                              save_path: Optional[Union[str, os.PathLike]] = None,
-                              use_wsl_paths: bool = False) -> Union[None, dict]:
+def create_yolo_keypoint_yaml(path: str | os.PathLike,
+                              train_path: str | os.PathLike,
+                              val_path: str | os.PathLike,
+                              names: dict[int, str],
+                              kpt_shape: tuple[int, int] | None = None,
+                              flip_idx: tuple[int, ...] | None = None,
+                              save_path: str | os.PathLike | None = None,
+                              use_wsl_paths: bool = False) -> None | dict:
     r"""
     Given a set of paths to directories, create a model.yaml file for yolo pose model training though ultralytics wrappers.
 
@@ -1097,11 +1097,11 @@ def create_yolo_keypoint_yaml(path: Union[str, os.PathLike],
         return data
 
 
-def coco_keypoints_to_yolo(coco_path: Union[str, os.PathLike],
-                           img_dir: Union[str, os.PathLike],
-                           save_dir: Union[str, os.PathLike],
+def coco_keypoints_to_yolo(coco_path: str | os.PathLike,
+                           img_dir: str | os.PathLike,
+                           save_dir: str | os.PathLike,
                            train_size: float = 0.7,
-                           flip_idx: Tuple[int, ...] = (0, 2, 1, 3, 5, 4, 6),
+                           flip_idx: tuple[int, ...] = (0, 2, 1, 3, 5, 4, 6),
                            verbose: bool = True):
     r"""
     Convert COCO Keypoints version 1.0 data format into a YOLO keypoints training set.
@@ -1219,8 +1219,8 @@ def coco_keypoints_to_yolo(coco_path: Union[str, os.PathLike],
                                elapsed_time=timer.elapsed_time_str)
 
 
-def merge_coco_keypoints_files(data_dir: Union[str, os.PathLike],
-                               save_path: Union[str, os.PathLike]):
+def merge_coco_keypoints_files(data_dir: str | os.PathLike,
+                               save_path: str | os.PathLike):
     """
     Merges multiple annotation COCO-format keypoint JSON files into a single file.
 
@@ -1281,15 +1281,15 @@ def merge_coco_keypoints_files(data_dir: Union[str, os.PathLike],
     save_json(data=results, filepath=save_path)
     stdout_success(msg=f'COCO keypoints file saved at {save_path}', source=merge_coco_keypoints_files.__name__)
 
-def sleap_to_yolo_keypoints(data_dir: Union[str, os.PathLike],
-                            video_dir: Union[str, os.PathLike],
-                            save_dir: Union[str, os.PathLike],
-                            frms_cnt: Optional[int] = None,
+def sleap_to_yolo_keypoints(data_dir: str | os.PathLike,
+                            video_dir: str | os.PathLike,
+                            save_dir: str | os.PathLike,
+                            frms_cnt: int | None = None,
                             verbose: bool = True,
                             instance_threshold: float = 0,
                             train_size: float = 0.7,
-                            flip_idx: Tuple[int, ...] = None,
-                            names: Tuple[str, ...] = None,
+                            flip_idx: tuple[int, ...] = None,
+                            names: tuple[str, ...] = None,
                             greyscale: bool = False,
                             padding: float = 0.00):
 
@@ -1421,7 +1421,7 @@ def sleap_to_yolo_keypoints(data_dir: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f'YOLO formated data saved in {save_dir} directory', source=sleap_to_yolo_keypoints.__name__, elapsed_time=timer.elapsed_time_str)
 
-def get_yolo_keypoint_flip_idx(x: List[str]) -> Tuple[int, ...]:
+def get_yolo_keypoint_flip_idx(x: list[str]) -> tuple[int, ...]:
     """
     Given a list of body-parts, create a ``flip_index`` YOLO yaml entry.
 
@@ -1459,7 +1459,7 @@ def get_yolo_keypoint_flip_idx(x: List[str]) -> Tuple[int, ...]:
     return tuple(results)
 
 
-def get_yolo_keypoint_bp_id_idx(animal_bp_dict: Dict[str, Dict[str, List[str]]]) -> Dict[int, List[int]]:
+def get_yolo_keypoint_bp_id_idx(animal_bp_dict: dict[str, dict[str, list[str]]]) -> dict[int, list[int]]:
     """
     Helper to create a dictionary holding the indexes for each animals body-parts. USed for transforming data for creating a YOLO training set.
 
@@ -1475,15 +1475,15 @@ def get_yolo_keypoint_bp_id_idx(animal_bp_dict: Dict[str, Dict[str, List[str]]])
     return bp_id_idx
 
 
-def dlc_to_yolo_keypoints(dlc_dir: Union[str, os.PathLike],
-                          save_dir: Union[str, os.PathLike],
+def dlc_to_yolo_keypoints(dlc_dir: str | os.PathLike,
+                          save_dir: str | os.PathLike,
                           train_size: float = 0.7,
                           verbose: bool = False,
                           padding: float = 0.00,
-                          flip_idx: Tuple[int, ...] = (1, 0, 2, 3, 5, 4, 6, 7),
-                          map_dict: Dict[int, str] = {0: 'mouse'},
+                          flip_idx: tuple[int, ...] = (1, 0, 2, 3, 5, 4, 6, 7),
+                          map_dict: dict[int, str] = {0: 'mouse'},
                           greyscale: bool = False,
-                          bp_id_idx: Optional[Dict[int, Union[Tuple[int], List[int]]]] = None) -> None:
+                          bp_id_idx: dict[int, tuple[int] | list[int]] | None = None) -> None:
 
     r"""
     Converts DLC annotations into YOLO keypoint format formatted for model training.
@@ -1616,15 +1616,15 @@ def dlc_to_yolo_keypoints(dlc_dir: Union[str, os.PathLike],
 
 
 
-def dlc_multi_animal_h5_to_yolo_keypoints(data_dir: Union[str, os.PathLike],
-                                          video_dir: Union[str, os.PathLike],
-                                          save_dir: Union[str, os.PathLike],
-                                          frms_cnt: Optional[int] = None,
+def dlc_multi_animal_h5_to_yolo_keypoints(data_dir: str | os.PathLike,
+                                          video_dir: str | os.PathLike,
+                                          save_dir: str | os.PathLike,
+                                          frms_cnt: int | None = None,
                                           verbose: bool = True,
                                           threshold: float = 0,
                                           train_size: float = 0.7,
-                                          flip_idx: Tuple[int, ...] = None,
-                                          names: Tuple[str, ...] = None,
+                                          flip_idx: tuple[int, ...] = None,
+                                          names: tuple[str, ...] = None,
                                           greyscale: bool = False,
                                           padding: float = 0.00):
 
@@ -1752,17 +1752,17 @@ def dlc_multi_animal_h5_to_yolo_keypoints(data_dir: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f'YOLO formated data saved in {save_dir} directory', source=dlc_multi_animal_h5_to_yolo_keypoints.__name__, elapsed_time=timer.elapsed_time_str)
 
-def simba_to_yolo_keypoints(config_path: Union[str, os.PathLike],
-                            save_dir: Union[str, os.PathLike],
-                            data_dir: Optional[Union[str, os.PathLike]] = None,
+def simba_to_yolo_keypoints(config_path: str | os.PathLike,
+                            save_dir: str | os.PathLike,
+                            data_dir: str | os.PathLike | None = None,
                             train_size: float = 0.7,
                             verbose: bool = False,
                             greyscale: bool = False,
                             padding: float = 0.00,
-                            flip_idx: Tuple[int, ...] = (1, 0, 2, 4, 3, 5, 6, 7, 8, 9),
-                            map_dict: Dict[int, str] = {0: 'mouse'},
-                            sample_size: Optional[int] = None,
-                            bp_id_idx: Optional[Dict[int, Union[Tuple[int], List[int]]]] = None) -> None:
+                            flip_idx: tuple[int, ...] = (1, 0, 2, 4, 3, 5, 6, 7, 8, 9),
+                            map_dict: dict[int, str] = {0: 'mouse'},
+                            sample_size: int | None = None,
+                            bp_id_idx: dict[int, tuple[int] | list[int]] | None = None) -> None:
 
     r"""
     Convert pose estimation data from a SimBA project into the YOLO keypoint format, including frame sampling,

@@ -58,19 +58,19 @@ class Sleap2Yolo:
 
     """
     def __init__(self,
-                 data_dir: Union[str, os.PathLike],
-                 video_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 frms_cnt: Optional[int] = None,
+                 data_dir: str | os.PathLike,
+                 video_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 frms_cnt: int | None = None,
                  verbose: bool = True,
                  instance_threshold: float = 0,
                  train_size: float = 0.7,
-                 flip_idx: Optional[Tuple[int, ...]] = None,
-                 names: Optional[Tuple[str, ...]] = None,
+                 flip_idx: tuple[int, ...] | None = None,
+                 names: tuple[str, ...] | None = None,
                  greyscale: bool = False,
                  clahe: bool = False,
                  padding: float = 0.00,
-                 single_id: Optional[str] = None):
+                 single_id: str | None = None):
 
         check_if_dir_exists(in_dir=save_dir)
         self.data_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=['.csv'], as_dict=True, raise_error=True)

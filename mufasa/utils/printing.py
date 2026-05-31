@@ -13,7 +13,7 @@ from typing import Optional
 from mufasa.utils.enums import Defaults, TagNames
 
 
-def stdout_success(msg: str, source: Optional[str] = "", elapsed_time: Optional[str] = None) -> None:
+def stdout_success(msg: str, source: str | None = "", elapsed_time: str | None = None) -> None:
     """
     Helper to parse msg of completed operation to SimBA main interface.
 
@@ -30,7 +30,7 @@ def stdout_success(msg: str, source: Optional[str] = "", elapsed_time: Optional[
         print(f"[{datetime.now().strftime('%H:%M:%S')}] SIMBA COMPLETE: {msg} {Defaults.STR_SPLIT_DELIMITER.value}{TagNames.COMPLETE.value}")
 
 
-def stdout_warning(msg: str, elapsed_time: Optional[str] = None) -> None:
+def stdout_warning(msg: str, elapsed_time: str | None = None) -> None:
     """
     Helper to parse warning msg to SimBA main interface.
 
@@ -46,7 +46,7 @@ def stdout_warning(msg: str, elapsed_time: Optional[str] = None) -> None:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] SIMBA WARNING: {msg} {Defaults.STR_SPLIT_DELIMITER.value}{TagNames.WARNING.value}")
 
 
-def stdout_trash(msg: str, source: Optional[str] = "", elapsed_time: Optional[str] = None) -> None:
+def stdout_trash(msg: str, source: str | None = "", elapsed_time: str | None = None) -> None:
     """
     Helper to parse msg of delete operation to SimBA main interface.
 
@@ -63,7 +63,7 @@ def stdout_trash(msg: str, source: Optional[str] = "", elapsed_time: Optional[st
         print(f"[{datetime.now().strftime('%H:%M:%S')}] SIMBA COMPLETE: {msg} {Defaults.STR_SPLIT_DELIMITER.value}{TagNames.TRASH.value}")
 
 
-def stdout_information(msg: str, source: Optional[str] = "", elapsed_time: Optional[str] = None) -> None:
+def stdout_information(msg: str, source: str | None = "", elapsed_time: str | None = None) -> None:
     """
     Helper to parse information msg to SimBA main interface. E.g., how many monitors and their resolutions which is available.
 

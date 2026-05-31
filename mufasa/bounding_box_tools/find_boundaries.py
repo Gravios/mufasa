@@ -43,8 +43,8 @@ class AnimalBoundaryFinder(ConfigReader, FeatureExtractionMixin):
         config_path: str,
         roi_type: str or None,
         force_rectangle: bool,
-        body_parts: Optional[dict] = None,
-        parallel_offset: Optional[int] = None,
+        body_parts: dict | None = None,
+        parallel_offset: int | None = None,
     ):
         ConfigReader.__init__(self, config_path=config_path)
         FeatureExtractionMixin.__init__(self)

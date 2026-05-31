@@ -53,15 +53,15 @@ class SimBAYoloImporter(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike,
                  verbose: bool = False,
-                 px_per_mm: Optional[float] = None,
-                 resolution: Optional[tuple] = None, #WxH
-                 fps: Optional[Union[float]] = None,
-                 add_to_video_info: Optional[bool] = True,
-                 interpolation_settings: Optional[Dict[str, str]] = None,
-                 smoothing_settings: Optional[Dict[str, str]] = None):
+                 px_per_mm: float | None = None,
+                 resolution: tuple | None = None, #WxH
+                 fps: float | None = None,
+                 add_to_video_info: bool | None = True,
+                 interpolation_settings: dict[str, str] | None = None,
+                 smoothing_settings: dict[str, str] | None = None):
 
         if px_per_mm is not None:
             check_float(name=f'{self.__class__.__name__} px_per_mm', value=px_per_mm, allow_negative=False, allow_zero=False)

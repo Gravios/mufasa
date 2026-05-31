@@ -58,9 +58,9 @@ def b64_to_arr(img_b64) -> np.ndarray:
 
 
 def scale_pose_img_sizes(pose_data: np.ndarray,
-                         imgs: Iterable[Union[np.ndarray, str]],
-                         size: Union[Literal['min', 'max'], Tuple[int, int]],
-                         interpolation: Optional[int] = cv2.INTER_CUBIC ) -> Tuple[np.ndarray, Iterable[Union[np.ndarray, str]]]:
+                         imgs: Iterable[np.ndarray | str],
+                         size: Literal['min', 'max'] | tuple[int, int],
+                         interpolation: int | None = cv2.INTER_CUBIC ) -> tuple[np.ndarray, Iterable[np.ndarray | str]]:
 
     r"""
     Resizes images and scales corresponding pose-estimation data to match the new image sizes.
@@ -136,7 +136,7 @@ def scale_pose_img_sizes(pose_data: np.ndarray,
     return (pose_results, img_results)
 
 
-def normalize_img_dict(img_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+def normalize_img_dict(img_dict: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     """
     Normalize a dictionary of grayscale or RGB images by standardizing pixel intensities.
 
@@ -182,14 +182,14 @@ def normalize_img_dict(img_dict: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]
     return results
 
 
-def create_yolo_keypoint_yaml(path: Union[str, os.PathLike],
-                              train_path: Union[str, os.PathLike],
-                              val_path: Union[str, os.PathLike],
-                              names: Dict[int, str],
-                              kpt_shape: Optional[Tuple[int, int]] = None,
-                              flip_idx: Optional[Tuple[int, ...]] = None,
-                              save_path: Optional[Union[str, os.PathLike]] = None,
-                              use_wsl_paths: bool = False) -> Union[None, dict]:
+def create_yolo_keypoint_yaml(path: str | os.PathLike,
+                              train_path: str | os.PathLike,
+                              val_path: str | os.PathLike,
+                              names: dict[int, str],
+                              kpt_shape: tuple[int, int] | None = None,
+                              flip_idx: tuple[int, ...] | None = None,
+                              save_path: str | os.PathLike | None = None,
+                              use_wsl_paths: bool = False) -> None | dict:
     r"""
     Given a set of paths to directories, create a model.yaml file for yolo pose model training though ultralytics wrappers.
 
@@ -248,7 +248,7 @@ def create_yolo_keypoint_yaml(path: Union[str, os.PathLike],
     else:
         return data
 
-def get_yolo_keypoint_flip_idx(x: List[str]) -> Tuple[int, ...]:
+def get_yolo_keypoint_flip_idx(x: list[str]) -> tuple[int, ...]:
     """
     Given a list of body-parts, create a ``flip_index`` YOLO yaml entry.
 
@@ -285,7 +285,7 @@ def get_yolo_keypoint_flip_idx(x: List[str]) -> Tuple[int, ...]:
         results.append(target_idx)
     return tuple(results)
 
-def get_yolo_keypoint_bp_id_idx(animal_bp_dict: Dict[str, Dict[str, List[str]]]) -> Dict[int, List[int]]:
+def get_yolo_keypoint_bp_id_idx(animal_bp_dict: dict[str, dict[str, list[str]]]) -> dict[int, list[int]]:
     """
     Helper to create a dictionary holding the indexes for each animals body-parts. USed for transforming data for creating a YOLO training set.
 
@@ -304,10 +304,10 @@ def get_yolo_keypoint_bp_id_idx(animal_bp_dict: Dict[str, Dict[str, List[str]]])
 
 
 
-def merge_coco_keypoints_files(data_dir: Union[str, os.PathLike],
-                               save_path: Union[str, os.PathLike],
-                               max_width: Optional[int] = None,
-                               max_height: Optional[int] = None):
+def merge_coco_keypoints_files(data_dir: str | os.PathLike,
+                               save_path: str | os.PathLike,
+                               max_width: int | None = None,
+                               max_height: int | None = None):
     r"""
     Merges multiple annotation COCO-format keypoint JSON files into a single file.
 
@@ -407,7 +407,7 @@ def merge_coco_keypoints_files(data_dir: Union[str, os.PathLike],
     stdout_success(msg=f'Merged COCO key-points file (from {data_file_cnt} input files) saved at {save_path}', source=merge_coco_keypoints_files.__name__, elapsed_time=timer.elapsed_time_str)
 
 
-def check_valid_yolo_map(yolo_map: Union[str, os.PathLike]) -> None:
+def check_valid_yolo_map(yolo_map: str | os.PathLike) -> None:
     """
     Helper to do surface check if yaml path leads to a valid yolo map file for pose-estimation.
     """
@@ -433,9 +433,9 @@ def check_valid_yolo_map(yolo_map: Union[str, os.PathLike]) -> None:
     _ = find_files_of_filetypes_in_directory(directory=lbl_train_dir, extensions=['.txt'], raise_error=True)
     _ = find_files_of_filetypes_in_directory(directory=lbl_val_dir, extensions=['.txt'], raise_error=True)
 
-def downsample_coco_dataset(json_path: Union[str, os.PathLike],
-                            img_dir: Union[str, os.PathLike],
-                            save_dir: Union[str, os.PathLike],
+def downsample_coco_dataset(json_path: str | os.PathLike,
+                            img_dir: str | os.PathLike,
+                            save_dir: str | os.PathLike,
                             shrink_factor: int = 4,
                             verbose: bool = True):
 
@@ -503,7 +503,7 @@ def downsample_coco_dataset(json_path: Union[str, os.PathLike],
     timer.stop_timer()
     if verbose: print(f'New COCO data stored in {save_dir} (elapsed time: {timer.elapsed_time_str}s)')
 
-def concatenate_dlc_annotations(data_dir: Union[str, os.PathLike], save_dir: Union[str, os.PathLike], annotator: str = 'SN'):
+def concatenate_dlc_annotations(data_dir: str | os.PathLike, save_dir: str | os.PathLike, annotator: str = 'SN'):
     r"""
     Concatenate DeepLabCut annotation files from multiple directories into a single CSV file.
 

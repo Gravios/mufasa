@@ -56,11 +56,11 @@ class BooleanConditionalCalculator(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 rules: Dict[str, Union[bool, str]],
-                 data_path: Optional[Union[str, os.PathLike, None]] = None,
-                 agg_save_path: Optional[Union[str, os.PathLike]] = None,
-                 detailed_save_path: Optional[Union[str, os.PathLike]] = None,
+                 config_path: str | os.PathLike,
+                 rules: dict[str, bool | str],
+                 data_path: str | os.PathLike | None | None = None,
+                 agg_save_path: str | os.PathLike | None = None,
+                 detailed_save_path: str | os.PathLike | None = None,
                  verbose: bool = True):
 
         ConfigReader.__init__(self, config_path=config_path)

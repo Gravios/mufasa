@@ -59,12 +59,12 @@ class YOLOAnnotationVisualizer:
     """
 
     def __init__(self,
-                 map_yaml_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 split: Optional[Literal['train', 'val', 'all']] = 'all',
-                 n: Optional[int] = None,
-                 circle_size: Optional[int] = None,
-                 thickness: Optional[int] = None,
+                 map_yaml_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 split: Literal['train', 'val', 'all'] | None = 'all',
+                 n: int | None = None,
+                 circle_size: int | None = None,
+                 thickness: int | None = None,
                  palette: str = 'Set1',
                  img_format: str = '.png',
                  seg_opacity: float = 0.5,
@@ -109,7 +109,7 @@ class YOLOAnnotationVisualizer:
         self.show_outline = show_outline
         self.verbose = verbose
 
-    def _find_image_label_pairs(self) -> List[Tuple[str, str]]:
+    def _find_image_label_pairs(self) -> list[tuple[str, str]]:
         splits = []
         if self.split == 'all':
             for key in ('train', 'val', 'test'):
@@ -149,7 +149,7 @@ class YOLOAnnotationVisualizer:
         return pairs
 
     @staticmethod
-    def _parse_bbox_line(parts: List[str], img_w: int, img_h: int) -> Tuple[int, np.ndarray]:
+    def _parse_bbox_line(parts: list[str], img_w: int, img_h: int) -> tuple[int, np.ndarray]:
         class_id = int(parts[0])
         xc, yc, w, h = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
         xc_px, yc_px = xc * img_w, yc * img_h
@@ -161,7 +161,7 @@ class YOLOAnnotationVisualizer:
         return class_id, np.array([x1, y1, x2, y2], dtype=np.int32)
 
     @staticmethod
-    def _parse_keypoint_line(parts: List[str], img_w: int, img_h: int) -> Tuple[int, np.ndarray, np.ndarray]:
+    def _parse_keypoint_line(parts: list[str], img_w: int, img_h: int) -> tuple[int, np.ndarray, np.ndarray]:
         class_id = int(parts[0])
         xc, yc, w, h = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
         xc_px, yc_px = xc * img_w, yc * img_h
@@ -181,7 +181,7 @@ class YOLOAnnotationVisualizer:
         return class_id, bbox, np.array(kps, dtype=np.int32)
 
     @staticmethod
-    def _parse_seg_line(parts: List[str], img_w: int, img_h: int) -> Tuple[int, np.ndarray]:
+    def _parse_seg_line(parts: list[str], img_w: int, img_h: int) -> tuple[int, np.ndarray]:
         class_id = int(parts[0])
         coords = [float(v) for v in parts[1:]]
         points = []

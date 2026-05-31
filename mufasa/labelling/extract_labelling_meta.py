@@ -33,9 +33,9 @@ class AnnotationMetaDataExtractor(ConfigReader):
 
     """
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 split_by_video: Optional[bool] = True,
-                 annotated_bouts: Optional[bool] = True):
+                 config_path: str | os.PathLike,
+                 split_by_video: bool | None = True,
+                 annotated_bouts: bool | None = True):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=True)
         if len(self.clf_names) == 0:

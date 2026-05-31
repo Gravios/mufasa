@@ -146,20 +146,20 @@ class YOLOPoseVisualizer:
 
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 palettes: Optional[Union[str, Tuple[str, ...]]] = 'Set1',
+                 data_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 palettes: str | tuple[str, ...] | None = 'Set1',
                  core_cnt: int = -1,
                  threshold: float = 0.0,
-                 thickness: Optional[int] = None,
-                 circle_size: Optional[int] = None,
+                 thickness: int | None = None,
+                 circle_size: int | None = None,
                  verbose: bool = True,
-                 bbox: Optional[bool] = True,
-                 skeleton: List[Tuple[str, str]] = None,
-                 recursive: Optional[bool] = False,
-                 pool: Optional[multiprocessing.Pool] = None,
-                 sample_n: Optional[int] = None):
+                 bbox: bool | None = True,
+                 skeleton: list[tuple[str, str]] = None,
+                 recursive: bool | None = False,
+                 pool: multiprocessing.Pool | None = None,
+                 sample_n: int | None = None):
 
         check_valid_boolean(value=[recursive], source=f'{self.__class__.__name__} recursive', raise_error=True)
         if os.path.isdir(data_path):

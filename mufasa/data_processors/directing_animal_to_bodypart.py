@@ -40,7 +40,7 @@ class DirectingAnimalsToBodyPartAnalyzer(ConfigReader, FeatureExtractionMixin):
     >>> directing_analyzer.summary_statistics()
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike]):
+    def __init__(self, config_path: str | os.PathLike):
         super().__init__(config_path=config_path)
         if not os.path.exists(self.directionality_df_dir):
             os.makedirs(self.directionality_df_dir)

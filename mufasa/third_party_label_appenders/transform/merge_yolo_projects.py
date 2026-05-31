@@ -45,10 +45,10 @@ class MergeYoloProjects:
     """
 
     def __init__(self,
-                 yaml_paths: List[Union[str, os.PathLike]],
-                 save_dir: Union[str, os.PathLike],
-                 train_val_split: Optional[float] = None,
-                 seed: Optional[int] = None,
+                 yaml_paths: list[str | os.PathLike],
+                 save_dir: str | os.PathLike,
+                 train_val_split: float | None = None,
+                 seed: int | None = None,
                  verbose: bool = True):
 
         check_valid_lst(data=yaml_paths, source=f'{self.__class__.__name__} yaml_paths', min_len=2, valid_dtypes=(str,))
@@ -102,7 +102,7 @@ class MergeYoloProjects:
         timer.stop_timer()
         stdout_success(msg=f'Merged YOLO project created at {self.save_dir}. {train_cnt} train, {val_cnt} val samples from {len(self.yaml_paths)} projects.', source=self.__class__.__name__, elapsed_time=timer.elapsed_time_str)
 
-    def _parse_yamls(self) -> List[Dict]:
+    def _parse_yamls(self) -> list[dict]:
         projects = []
         for yaml_path in self.yaml_paths:
             with open(yaml_path) as f:
@@ -149,7 +149,7 @@ class MergeYoloProjects:
             projects.append(project)
         return projects
 
-    def _validate_projects(self, projects: List[Dict]):
+    def _validate_projects(self, projects: list[dict]):
         task_types = set(p['task_type'] for p in projects)
         if len(task_types) > 1:
             details = {p['yaml_path']: p['task_type'] for p in projects}
@@ -173,7 +173,7 @@ class MergeYoloProjects:
             example_dupes = dict(list(duplicates.items())[:10])
             DuplicateNamesWarning(msg=f'{len(duplicates)} duplicate filenames found across projects. Only the first occurrence will be kept. Examples: {example_dupes}', source=self.__class__.__name__)
 
-    def _copy_pairs(self, pairs: List[Tuple], img_dir: str, lbl_dir: str, split_name: str) -> int:
+    def _copy_pairs(self, pairs: list[tuple], img_dir: str, lbl_dir: str, split_name: str) -> int:
         display_name = 'validation' if split_name == VAL else split_name
         unique_pairs = {}
         for img_path, lbl_path, stem in pairs:

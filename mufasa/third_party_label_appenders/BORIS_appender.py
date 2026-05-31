@@ -50,8 +50,8 @@ class BorisAppender(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Union[str, os.PathLike]):
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike):
 
         super().__init__(config_path=config_path)
         check_if_dir_exists(data_dir)

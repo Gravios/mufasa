@@ -40,10 +40,10 @@ class SingleClfAppenderExcel(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 label_path: Union[str, os.PathLike],
-                 data_dir: Union[str, os.PathLike] = None,
-                 save_dir: Union[str, os.PathLike] = None):
+                 config_path: str | os.PathLike,
+                 label_path: str | os.PathLike,
+                 data_dir: str | os.PathLike = None,
+                 save_dir: str | os.PathLike = None):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=True, create_logger=False)
         data_dir = self.features_dir if data_dir is None else data_dir

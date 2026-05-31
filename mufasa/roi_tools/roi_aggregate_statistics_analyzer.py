@@ -74,10 +74,10 @@ class ROIAggregateStatisticsAnalyzer(ConfigReader, FeatureExtractionMixin):
 
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_path: Optional[Union[str, os.PathLike, List[str]]] = None,
+                 config_path: str | os.PathLike,
+                 data_path: str | os.PathLike | list[str] | None = None,
                  threshold: float = 0.0,
-                 body_parts: Optional[List[str]] = None,
+                 body_parts: list[str] | None = None,
                  detailed_bout_data: bool = False,
                  calculate_distances: bool = False,
                  total_time: bool = True,
@@ -91,8 +91,8 @@ class ROIAggregateStatisticsAnalyzer(ConfigReader, FeatureExtractionMixin):
                  include_video_length: bool = False,
                  include_px_per_mm: bool = False,
                  verbose: bool = True,
-                 detailed_bout_data_save_path: Optional[Union[str, os.PathLike]] = None,
-                 save_path: Optional[Union[str, os.PathLike]] = None):
+                 detailed_bout_data_save_path: str | os.PathLike | None = None,
+                 save_path: str | os.PathLike | None = None):
 
         check_file_exist_and_readable(file_path=config_path)
         ConfigReader.__init__(self, config_path=config_path)

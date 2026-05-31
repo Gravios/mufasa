@@ -72,17 +72,17 @@ class DirectingOtherAnimalsAnalyzer(ConfigReader, FeatureExtractionMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_paths: Optional[Union[str, os.PathLike, None, List[str]]] = None,
+                 config_path: str | os.PathLike,
+                 data_paths: str | os.PathLike | None | list[str] | None = None,
                  bool_tables: bool = True,
                  summary_tables: bool = False,
                  append_bool_tables_to_features: bool = False,
                  aggregate_statistics_tables: bool = False,
                  verbose: bool = True,
-                 left_ear_name: Optional[str] = None,
-                 right_ear_name: Optional[str] = None,
-                 nose_name: Optional[str] = None,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
+                 left_ear_name: str | None = None,
+                 right_ear_name: str | None = None,
+                 nose_name: str | None = None,
+                 save_dir: str | os.PathLike | None = None,
                  ):
 
         check_file_exist_and_readable(file_path=config_path)

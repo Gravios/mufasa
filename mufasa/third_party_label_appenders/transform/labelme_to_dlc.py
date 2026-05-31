@@ -50,12 +50,12 @@ class Labelme2DLC:
     """
 
     def __init__(self,
-                 labelme_dir: Union[str, os.PathLike],
+                 labelme_dir: str | os.PathLike,
                  scorer: str = 'SN',
                  greyscale: bool = False,
                  clahe: bool = False,
                  verbose: bool = True,
-                 save_dir: Optional[Union[str, os.PathLike]] = None) -> None:
+                 save_dir: str | os.PathLike | None = None) -> None:
 
         check_if_dir_exists(in_dir=labelme_dir)
         check_str(name=f'{self.__class__.__name__} scorer', value=scorer)

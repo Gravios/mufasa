@@ -22,7 +22,7 @@ MAX_SIZE = (1080, 650)
 
 class InteractiveVideoPlotterWindow:
     def __init__(self,
-                 video_path: Union[str, os.PathLike],
+                 video_path: str | os.PathLike,
                  p_arr: np.array):
 
         check_file_exist_and_readable(file_path=video_path, raise_error=True)

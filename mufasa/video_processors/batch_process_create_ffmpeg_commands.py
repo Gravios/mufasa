@@ -54,7 +54,7 @@ class FFMPEGCommandCreator:
     """
 
     def __init__(self,
-                 json_path: Union[str, os.PathLike],
+                 json_path: str | os.PathLike,
                  codec: str = 'libx264'):
 
         if not check_ffmpeg_available(raise_error=False):
@@ -185,7 +185,7 @@ class FFMPEGCommandCreator:
         self.replace_files_in_temp()
         stdout_information(msg="Applying frame count complete...")
 
-    def apply_clahe(self, tile_size: Tuple[int, int] = (16, 16), clip_limit: int = 2):
+    def apply_clahe(self, tile_size: tuple[int, int] = (16, 16), clip_limit: int = 2):
         self.videos_to_frm_cnt = self.find_relevant_videos(variable="clahe")
         self.create_process_dir()
         for cnt, (video, video_data) in enumerate(self.videos_to_frm_cnt.items()):

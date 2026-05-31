@@ -108,10 +108,10 @@ class TrainModelMixin:
         pass
 
     def read_all_files_in_folder(self,
-                                 file_paths: List[str],
+                                 file_paths: list[str],
                                  file_type: str,
-                                 classifier_names: Optional[List[str]] = None,
-                                 raise_bool_clf_error: bool = True) -> Tuple[pd.DataFrame, List[int]]:
+                                 classifier_names: list[str] | None = None,
+                                 raise_bool_clf_error: bool = True) -> tuple[pd.DataFrame, list[int]]:
 
         """
         Read in all data files in a folder into a single pd.DataFrame.
@@ -185,7 +185,7 @@ class TrainModelMixin:
 
         return dfs.astype(np.float32), frm_number_lst
 
-    def read_in_all_model_names_to_remove(self, config: configparser.ConfigParser, model_cnt: int, clf_name: str) -> List[str]:
+    def read_in_all_model_names_to_remove(self, config: configparser.ConfigParser, model_cnt: int, clf_name: str) -> list[str]:
         """
         Helper to find all field names that are annotations but are not the target.
 
@@ -208,7 +208,7 @@ class TrainModelMixin:
                 annotation_cols_to_remove.append(model_name)
         return annotation_cols_to_remove
 
-    def delete_other_annotation_columns(self, df: pd.DataFrame, annotations_lst: List[str], raise_error: bool = True) -> pd.DataFrame:
+    def delete_other_annotation_columns(self, df: pd.DataFrame, annotations_lst: list[str], raise_error: bool = True) -> pd.DataFrame:
         """
         Helper to drop fields that contain annotations which are not the target.
 
@@ -233,7 +233,7 @@ class TrainModelMixin:
                 df = df.drop([col_name], axis=1)
         return df
 
-    def split_df_to_x_y(self, df: pd.DataFrame, clf_name: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def split_df_to_x_y(self, df: pd.DataFrame, clf_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Helper to split dataframe into features and target.
 
@@ -250,7 +250,7 @@ class TrainModelMixin:
         y = df.pop(clf_name)
         return df, y
 
-    def random_undersampler(self, x_train: np.ndarray, y_train: np.ndarray, sample_ratio: float) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def random_undersampler(self, x_train: np.ndarray, y_train: np.ndarray, sample_ratio: float) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Perform random under-sampling of behavior-absent frames in a dataframe.
 
@@ -281,7 +281,7 @@ class TrainModelMixin:
         )
         return self.split_df_to_x_y(data_df, y_train.name)
 
-    def smoteen_oversampler(self, x_train: pd.DataFrame, y_train: pd.DataFrame, sample_ratio: float ) -> Tuple[np.ndarray, np.ndarray]:
+    def smoteen_oversampler(self, x_train: pd.DataFrame, y_train: pd.DataFrame, sample_ratio: float ) -> tuple[np.ndarray, np.ndarray]:
         """
         Helper to perform SMOTEEN oversampling of behavior-present annotations.
 
@@ -302,7 +302,7 @@ class TrainModelMixin:
         else:
             return smt.fit_resample(x_train, y_train)
 
-    def smote_oversampler(self, x_train: pd.DataFrame or np.array, y_train: pd.DataFrame or np.array, sample_ratio: float) -> Tuple[np.ndarray, np.ndarray]:
+    def smote_oversampler(self, x_train: pd.DataFrame or np.array, y_train: pd.DataFrame or np.array, sample_ratio: float) -> tuple[np.ndarray, np.ndarray]:
         """
         Helper to perform SMOTE oversampling of behavior-present annotations.
 
@@ -326,12 +326,12 @@ class TrainModelMixin:
                                     x_test: np.ndarray,
                                     y_test: np.ndarray,
                                     clf: RandomForestClassifier,
-                                    feature_names: List[str],
+                                    feature_names: list[str],
                                     clf_name: str,
-                                    save_dir: Optional[Union[str, os.PathLike]] = None,
-                                    save_file_no: Optional[int] = None,
-                                    plot: Optional[bool] = True,
-                                    n_repeats: Optional[int] = 10) -> Union[None, Tuple[pd.DataFrame, Union[None, np.ndarray]]]:
+                                    save_dir: str | os.PathLike | None = None,
+                                    save_file_no: int | None = None,
+                                    plot: bool | None = True,
+                                    n_repeats: int | None = 10) -> None | tuple[pd.DataFrame, None | np.ndarray]:
         """
         Computes feature permutation importance scores.
 
@@ -385,11 +385,11 @@ class TrainModelMixin:
                             dataset_splits: int,
                             tt_size: float,
                             rf_clf: RandomForestClassifier,
-                            save_dir: Union[str, os.PathLike],
-                            save_file_no: Optional[int] = None,
-                            multiclass: Optional[bool] = False,
-                            scoring: Optional[str] = 'f1',
-                            plot: Optional[bool] = True) -> None:
+                            save_dir: str | os.PathLike,
+                            save_file_no: int | None = None,
+                            multiclass: bool | None = False,
+                            scoring: str | None = 'f1',
+                            plot: bool | None = True) -> None:
 
         """
         Helper to compute random forest learning curves with cross-validation.
@@ -466,11 +466,11 @@ class TrainModelMixin:
                       x_df: pd.DataFrame,
                       y_df: pd.DataFrame,
                       clf_name: str,
-                      save_dir: Union[str, os.PathLike],
+                      save_dir: str | os.PathLike,
                       multiclass: bool = False,
-                      plot: Optional[bool] = True,
-                      classifier_map: Dict[int, str] = None,
-                      save_file_no: Optional[int] = None) -> None:
+                      plot: bool | None = True,
+                      classifier_map: dict[int, str] = None,
+                      save_file_no: int | None = None) -> None:
         """
         Compute random forest precision-recall curve.
 
@@ -551,11 +551,11 @@ class TrainModelMixin:
     def create_example_dt(self,
                           rf_clf: RandomForestClassifier,
                           clf_name: str,
-                          feature_names: List[str],
-                          class_names: List[str],
+                          feature_names: list[str],
+                          class_names: list[str],
                           save_dir: str,
-                          tree_id: Optional[int] = 3,
-                          save_file_no: Optional[int] = None) -> None:
+                          tree_id: int | None = 3,
+                          save_file_no: int | None = None) -> None:
         """
         Helper to produce visualization of random forest decision tree using graphviz.
 
@@ -629,18 +629,18 @@ class TrainModelMixin:
         return np.mean(importances, axis=0)
 
     def create_clf_report(self,
-                          rf_clf: Union[RandomForestClassifier, cuRF],
+                          rf_clf: RandomForestClassifier | cuRF,
                           x_df: pd.DataFrame,
                           y_df: pd.DataFrame,
-                          class_names: List[str],
-                          save_dir: Union[str, os.PathLike],
-                          digits: Optional[int] = 4,
-                          clf_name: Optional[str] = None,
+                          class_names: list[str],
+                          save_dir: str | os.PathLike,
+                          digits: int | None = 4,
+                          clf_name: str | None = None,
                           img_size: tuple = (2500, 4500), #width by height
                           cmap: str = "coolwarm",
                           threshold: float = 0.5,
                           svg: bool = False,
-                          save_file_no: Optional[int] = None,
+                          save_file_no: int | None = None,
                           dpi: int = 300) -> None:
 
         """
@@ -710,14 +710,14 @@ class TrainModelMixin:
         stdout_information(msg=f'Classification report saved at {save_path} (elapsed time: {timer.elapsed_time_str}s)')
 
     def create_x_importance_log(self,
-                                rf_clf: Union[RandomForestClassifier, cuRF],
-                                x_names: List[str],
+                                rf_clf: RandomForestClassifier | cuRF,
+                                x_names: list[str],
                                 clf_name: str,
                                 precision: int = 25,
                                 sort_ascending: bool = False,
                                 verbose: bool = True,
-                                save_dir: Optional[str] = None,
-                                save_file_no: Optional[int] = None) -> Union[None, pd.DataFrame]:
+                                save_dir: str | None = None,
+                                save_file_no: int | None = None) -> None | pd.DataFrame:
         """
         Compute gini / entropy based feature importance scores.
 
@@ -771,8 +771,8 @@ class TrainModelMixin:
                                       clf_name: str,
                                       save_dir: str,
                                       n_bars: int,
-                                      palette: Optional[str] = 'hot',
-                                      save_file_no: Optional[int] = None) -> None:
+                                      palette: str | None = 'hot',
+                                      save_file_no: int | None = None) -> None:
         """
         Helper to create a bar chart displaying the top N gini or entropy feature importance scores.
 
@@ -818,7 +818,7 @@ class TrainModelMixin:
             x_train: np.ndarray,
             y_train: np.ndarray,
             clf_name: str,
-            class_names: List[str],
+            class_names: list[str],
             save_dir: str,
     ) -> None:
         """
@@ -859,7 +859,7 @@ class TrainModelMixin:
             )
 
     @staticmethod
-    def split_and_group_df(df: pd.DataFrame, splits: int, include_split_order: bool = True) -> (List[pd.DataFrame], int):
+    def split_and_group_df(df: pd.DataFrame, splits: int, include_split_order: bool = True) -> (list[pd.DataFrame], int):
         """
         Helper to split a dataframe for multiprocessing. If include_split_order, then include the group number
         in split data as a column. Returns split data and approximations of number of observations per split.
@@ -872,18 +872,18 @@ class TrainModelMixin:
         return data_arr, obs_per_split
 
     def create_shap_log(self,
-                        rf_clf: Union[RandomForestClassifier, cuRF],
-                        x: Union[pd.DataFrame, np.ndarray],
-                        y: Union[pd.DataFrame, pd.Series, np.ndarray],
-                        x_names: List[str],
+                        rf_clf: RandomForestClassifier | cuRF,
+                        x: pd.DataFrame | np.ndarray,
+                        y: pd.DataFrame | pd.Series | np.ndarray,
+                        x_names: list[str],
                         clf_name: str,
                         cnt_present: int,
                         cnt_absent: int,
                         verbose: bool = True,
                         plot: bool = True,
-                        save_it: Optional[int] = 100,
-                        save_dir: Optional[Union[str, os.PathLike]] = None,
-                        save_file_suffix: Optional[int] = None) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, Dict[str, pd.DataFrame], np.ndarray]]:
+                        save_it: int | None = 100,
+                        save_dir: str | os.PathLike | None = None,
+                        save_file_suffix: int | None = None) -> None | tuple[pd.DataFrame, pd.DataFrame, dict[str, pd.DataFrame], np.ndarray]:
 
         r"""
         Compute SHAP values for a random forest classifier.
@@ -1041,7 +1041,7 @@ class TrainModelMixin:
         print(f"{table} {Defaults.STR_SPLIT_DELIMITER.value}TABLE")
 
     def create_meta_data_csv_training_one_model(self, meta_data_lst: list, clf_name: str,
-                                                save_dir: Union[str, os.PathLike]) -> None:
+                                                save_dir: str | os.PathLike) -> None:
 
         """
         Helper to save single model meta data (hyperparameters, sampling settings etc.) from list format into SimBA
@@ -1059,7 +1059,7 @@ class TrainModelMixin:
         out_df.to_csv(save_path)
 
     def create_meta_data_csv_training_multiple_models(self, meta_data, clf_name, save_dir,
-                                                      save_file_no: Optional[int] = None) -> None:
+                                                      save_file_no: int | None = None) -> None:
         stdout_information(msg="Saving model meta data file...")
         save_path = os.path.join(save_dir, f"{clf_name}_{str(save_file_no)}_meta.csv")
         out_df = pd.DataFrame.from_dict(meta_data, orient="index").T
@@ -1068,8 +1068,8 @@ class TrainModelMixin:
     def save_rf_model(self,
                       rf_clf: RandomForestClassifier,
                       clf_name: str,
-                      save_dir: Union[str, os.PathLike],
-                      save_file_no: Optional[int] = None) -> None:
+                      save_dir: str | os.PathLike,
+                      save_file_no: int | None = None) -> None:
         """
         Helper to save pickled classifier object to disk.
 
@@ -1090,7 +1090,7 @@ class TrainModelMixin:
             save_path = os.path.join(save_dir, f"{clf_name}.sav")
         pickle.dump(rf_clf, open(save_path, "wb"))
 
-    def get_model_info(self, config: configparser.ConfigParser, model_cnt: int) -> Dict[int, Any]:
+    def get_model_info(self, config: configparser.ConfigParser, model_cnt: int) -> dict[int, Any]:
         """
         Helper to read in N SimBA random forest config meta files to python dict memory.
 
@@ -1143,7 +1143,7 @@ class TrainModelMixin:
         else:
             return model_dict
 
-    def get_all_clf_names(self, config: configparser.ConfigParser, target_cnt: int) -> List[str]:
+    def get_all_clf_names(self, config: configparser.ConfigParser, target_cnt: int) -> list[str]:
         """
         Helper to get all classifier names in a SimBA project.
 
@@ -1170,7 +1170,7 @@ class TrainModelMixin:
             )
         return model_names
 
-    def insert_column_headers_for_outlier_correction( self, data_df: pd.DataFrame, new_headers: List[str], filepath: Union[str, os.PathLike]) -> pd.DataFrame:
+    def insert_column_headers_for_outlier_correction( self, data_df: pd.DataFrame, new_headers: list[str], filepath: str | os.PathLike) -> pd.DataFrame:
         """
         Helper to insert new column headers onto a dataframe following outlier correction.
 
@@ -1196,7 +1196,7 @@ class TrainModelMixin:
             data_df.columns = new_headers
             return data_df
 
-    def read_pickle(self, file_path: Union[str, os.PathLike]) -> RandomForestClassifier:
+    def read_pickle(self, file_path: str | os.PathLike) -> RandomForestClassifier:
         """
         Read pickled RandomForestClassifier object.
 
@@ -1220,7 +1220,7 @@ class TrainModelMixin:
     def bout_train_test_splitter(self,
                                  x_df: pd.DataFrame,
                                  y_df: pd.DataFrame,
-                                 test_size: float ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+                                 test_size: float ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         """
         Helper to split train and test based on annotated `bouts`.
 
@@ -1266,7 +1266,7 @@ class TrainModelMixin:
 
     @staticmethod
     @njit("(float32[:, :], float64, types.ListType(types.unicode_type))", cache=True)
-    def find_highly_correlated_fields(data: np.ndarray,threshold: float, field_names: types.ListType(types.unicode_type)) -> List[str]:
+    def find_highly_correlated_fields(data: np.ndarray,threshold: float, field_names: types.ListType(types.unicode_type)) -> list[str]:
 
         """
         Find highly correlated fields in a dataset using Pearson product-moment correlation coefficient.
@@ -1312,7 +1312,7 @@ class TrainModelMixin:
 
     @staticmethod
     def find_collinear_features(data: pd.DataFrame,
-                                threshold: float) -> List[str]:
+                                threshold: float) -> list[str]:
 
         """
         Identify collinear features in a pandas DataFrame for removal.
@@ -1392,10 +1392,10 @@ class TrainModelMixin:
                                       clf: RandomForestClassifier,
                                       x_df: pd.DataFrame,
                                       clf_name: str,
-                                      save_dir: Union[str, os.PathLike],
-                                      clf_cnt: Optional[int] = None,
-                                      grid_resolution: Optional[int] = 50,
-                                      plot: Optional[bool] = True) -> None:
+                                      save_dir: str | os.PathLike,
+                                      clf_cnt: int | None = None,
+                                      grid_resolution: int | None = 50,
+                                      plot: bool | None = True) -> None:
 
         """
         Compute feature partial dependencies for every feature in training set.
@@ -1445,11 +1445,11 @@ class TrainModelMixin:
         stdout_success(msg=f'Partial dependencies for {len(x_df.columns)} features saved in {save_dir}', elapsed_time=timer.elapsed_time_str)
 
     def clf_predict_proba(self,
-                          clf: Union[RandomForestClassifier, cuRF],
-                          x_df: Union[pd.DataFrame, np.ndarray],
+                          clf: RandomForestClassifier | cuRF,
+                          x_df: pd.DataFrame | np.ndarray,
                           multiclass: bool = False,
-                          model_name: Optional[str] = None,
-                          data_path: Optional[Union[str, os.PathLike]] = None,
+                          model_name: str | None = None,
+                          data_path: str | os.PathLike | None = None,
                           verbose: bool = False) -> np.ndarray:
 
         """
@@ -1519,7 +1519,7 @@ class TrainModelMixin:
 
     def define_tree_explainer(self,
                               clf: RandomForestClassifier,
-                              data: Optional[np.ndarray] = None,
+                              data: np.ndarray | None = None,
                               model_output: str = 'raw',
                               feature_perturbation: str = "tree_path_dependent") -> shap.TreeExplainer:
 
@@ -1527,16 +1527,16 @@ class TrainModelMixin:
         return shap.TreeExplainer(clf, data=data, model_output=model_output, feature_perturbation=feature_perturbation)
 
     def clf_define(self,
-                   n_estimators: Optional[int] = 2000,
-                   max_depth: Optional[int] = None,
-                   max_features: Optional[Union[str, int]] = 'sqrt',
-                   n_jobs: Optional[int] = -1,
-                   criterion: Optional[str] = 'gini',
-                   min_samples_leaf: Optional[int] = 1,
-                   bootstrap: Optional[bool] = True,
-                   verbose: Optional[int] = 1,
-                   class_weight: Optional[dict] = None,
-                   cuda: Optional[bool] = False) -> Union[RandomForestClassifier, cuRF]:
+                   n_estimators: int | None = 2000,
+                   max_depth: int | None = None,
+                   max_features: str | int | None = 'sqrt',
+                   n_jobs: int | None = -1,
+                   criterion: str | None = 'gini',
+                   min_samples_leaf: int | None = 1,
+                   bootstrap: bool | None = True,
+                   verbose: int | None = 1,
+                   class_weight: dict | None = None,
+                   cuda: bool | None = False) -> RandomForestClassifier | cuRF:
 
         if not cuda:
             # NOTE: LOKY ISSUES ON WINDOWS WITH SCIKIT IF THE CORE COUNT EXCEEDS 61.
@@ -1568,11 +1568,11 @@ class TrainModelMixin:
                 raise MufasaModuleNotFoundError(msg='Mufasa could not find the cuml library for GPU machine learning algorithms. Set CUML to False in the SimBA model parameters, or import CUML environment variable using `export CUML=True`', source=self.__class__.__name__)
 
     def clf_fit(self,
-                clf: Union[RandomForestClassifier, cuRF],
+                clf: RandomForestClassifier | cuRF,
                 x_df: pd.DataFrame,
                 y_df: pd.DataFrame,
-                selected_feature_names: Optional[List[str]] = None,
-                verbose: bool = False) -> Union[RandomForestClassifier, cuRF]:
+                selected_feature_names: list[str] | None = None,
+                verbose: bool = False) -> RandomForestClassifier | cuRF:
 
         """
         Helper to fit clf model.
@@ -1621,7 +1621,7 @@ class TrainModelMixin:
     @staticmethod
     def _read_data_file_helper(file_path: str,
                                file_type: str,
-                               clf_names: Optional[List[str]] = None,
+                               clf_names: list[str] | None = None,
                                raise_bool_clf_error: bool = True):
 
         """
@@ -1648,10 +1648,10 @@ class TrainModelMixin:
         return df, frame_numbers
 
     @staticmethod
-    def read_all_files_in_folder_mp(file_paths: List[str],
+    def read_all_files_in_folder_mp(file_paths: list[str],
                                     file_type: Literal["csv", "parquet", "pickle"],
-                                    classifier_names: Optional[List[str]] = None,
-                                    raise_bool_clf_error: bool = True) -> Tuple[pd.DataFrame, List[int]]:
+                                    classifier_names: list[str] | None = None,
+                                    raise_bool_clf_error: bool = True) -> tuple[pd.DataFrame, list[int]]:
         """
 
         Multiprocessing helper function to read in all data files in a folder to a single
@@ -1714,9 +1714,9 @@ class TrainModelMixin:
     @staticmethod
     def _read_data_file_helper_futures(file_path: str,
                                        file_type: str,
-                                       clf_names: Optional[List[str]] = None,
+                                       clf_names: list[str] | None = None,
                                        raise_bool_clf_error: bool = True,
-                                       config_path: Optional[str] = None):
+                                       config_path: str | None = None):
         """Private worker for :meth:`read_all_files_in_folder_mp_futures`.
 
         Patch 122ak: v1-native only. ``config_path`` is now
@@ -1760,10 +1760,10 @@ class TrainModelMixin:
         return df, vid_name, timer.elapsed_time_str, frm_numbers
 
     def read_all_files_in_folder_mp_futures(self,
-                                            annotations_file_paths: List[str],
+                                            annotations_file_paths: list[str],
                                             file_type: Literal["csv", "parquet", "pickle"],
-                                            classifier_names: Optional[List[str]] = None,
-                                            raise_bool_clf_error: bool = True) -> Tuple[pd.DataFrame, List[int]]:
+                                            classifier_names: list[str] | None = None,
+                                            raise_bool_clf_error: bool = True) -> tuple[pd.DataFrame, list[int]]:
 
         """
         Multiprocessing helper function to read in all data files in a folder to a single
@@ -1832,7 +1832,7 @@ class TrainModelMixin:
                 raise_bool_clf_error=raise_bool_clf_error,
             )
 
-    def check_raw_dataset_integrity(self, df: pd.DataFrame, logs_path: Optional[Union[str, os.PathLike]]) -> None:
+    def check_raw_dataset_integrity(self, df: pd.DataFrame, logs_path: str | os.PathLike | None) -> None:
         """
         Helper to check column-wise NaNs in raw input data for fitting model.
 
@@ -1875,10 +1875,10 @@ class TrainModelMixin:
 
 
     @staticmethod
-    def _create_shap_mp_helper(data: Tuple[int, pd.DataFrame],
+    def _create_shap_mp_helper(data: tuple[int, pd.DataFrame],
                                explainer: shap.TreeExplainer,
                                clf_name: str,
-                               verbose: bool) -> Tuple[np.ndarray, int]:
+                               verbose: bool) -> tuple[np.ndarray, int]:
 
         if verbose:
             stdout_information(msg=f'Processing SHAP core batch {data[0] + 1}... ({len(data[1])} observations)')
@@ -1896,18 +1896,18 @@ class TrainModelMixin:
 
     def create_shap_log_mp(self,
                            rf_clf: RandomForestClassifier,
-                           x: Union[pd.DataFrame, np.ndarray],
-                           y: Union[pd.DataFrame, pd.Series, np.ndarray],
-                           x_names: List[str],
+                           x: pd.DataFrame | np.ndarray,
+                           y: pd.DataFrame | pd.Series | np.ndarray,
+                           x_names: list[str],
                            clf_name: str,
                            cnt_present: int,
                            cnt_absent: int,
                            core_cnt: int = -1,
                            chunk_size: int = 100,
                            verbose: bool = True,
-                           save_dir: Optional[Union[str, os.PathLike]] = None,
-                           save_file_suffix: Optional[int] = None,
-                           plot: bool = False) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, Dict[str, pd.DataFrame], np.ndarray]]:
+                           save_dir: str | os.PathLike | None = None,
+                           save_file_suffix: int | None = None,
+                           plot: bool = False) -> None | tuple[pd.DataFrame, pd.DataFrame, dict[str, pd.DataFrame], np.ndarray]:
         """
         Compute SHAP values using multiprocessing.
 
@@ -2032,7 +2032,7 @@ class TrainModelMixin:
         else:
             GPUToolsWarning(msg='Cannot compute SHAP scores using cuml random forest model. To compute SHAP scores, turn off cuda. Alternatively, for GPU solution, see mufasa/data_processors/cuda/create_shap_log.create_shap_log')
 
-    def check_df_dataset_integrity(self, df: pd.DataFrame, file_name: str, logs_path: Union[str, os.PathLike]) -> None:
+    def check_df_dataset_integrity(self, df: pd.DataFrame, file_name: str, logs_path: str | os.PathLike) -> None:
         """
         Helper to check for non-numerical np.inf, -np.inf, NaN, None in a single dataframe.
         :parameter pd.DataFrame x_df: Features
@@ -2256,7 +2256,7 @@ class TrainModelMixin:
 
     def check_validity_of_meta_files(self,
                                      data_df: pd.DataFrame,
-                                     meta_file_paths: List[Union[str, os.PathLike]]):
+                                     meta_file_paths: list[str | os.PathLike]):
 
 
         meta_dicts, errors = {}, []
@@ -2385,7 +2385,7 @@ class TrainModelMixin:
             y_df: pd.DataFrame,
             target_field: str,
             target_var: int,
-            sampling_ratio: Union[float, Dict[int, float]],
+            sampling_ratio: float | dict[int, float],
             raise_error: bool = False,
     ):
         """
@@ -2474,7 +2474,7 @@ class TrainModelMixin:
             y_df: pd.DataFrame,
             target_field: str,
             target_var: int,
-            sampling_ratio: Union[float, Dict[int, float]],
+            sampling_ratio: float | dict[int, float],
             raise_error: bool = False,
     ) -> pd.DataFrame:
         """
@@ -2583,8 +2583,8 @@ class TrainModelMixin:
     @staticmethod
     def scaler_inverse_transform(
             data: pd.DataFrame,
-            scaler: Union[MinMaxScaler, StandardScaler, QuantileTransformer],
-            name: Optional[str] = "",
+            scaler: MinMaxScaler | StandardScaler | QuantileTransformer,
+            name: str | None = "",
     ) -> pd.DataFrame:
         check_instance(
             source=f"{TrainModelMixin.scaler_inverse_transform.__name__} data",
@@ -2608,7 +2608,7 @@ class TrainModelMixin:
         return pd.DataFrame(scaler.inverse_transform(data), columns=data.columns).set_index(data.index)
 
     @staticmethod
-    def define_scaler(scaler_name: Literal["min-max", "standard", "quantile"]) -> Union[MinMaxScaler, StandardScaler, QuantileTransformer]:
+    def define_scaler(scaler_name: Literal["min-max", "standard", "quantile"]) -> MinMaxScaler | StandardScaler | QuantileTransformer:
         """
         Defines a sklearn scaler object. See ``UMLOptions.SCALER_OPTIONS.value`` for accepted scalers.
 
@@ -2626,9 +2626,8 @@ class TrainModelMixin:
             return QuantileTransformer()
 
     @staticmethod
-    def fit_scaler(scaler: Union[MinMaxScaler, QuantileTransformer, StandardScaler],
-                   data: Union[pd.DataFrame, np.ndarray]) -> Union[
-        MinMaxScaler, QuantileTransformer, StandardScaler, object]:
+    def fit_scaler(scaler: MinMaxScaler | QuantileTransformer | StandardScaler,
+                   data: pd.DataFrame | np.ndarray) -> MinMaxScaler | QuantileTransformer | StandardScaler | object:
 
         check_instance(source=f'{TrainModelMixin.fit_scaler} data', instance=data, accepted_types=(pd.DataFrame, np.ndarray))
         check_instance(source=f'{TrainModelMixin.fit_scaler} scaler', instance=scaler, accepted_types=(MinMaxScaler, QuantileTransformer, StandardScaler))
@@ -2639,8 +2638,8 @@ class TrainModelMixin:
     @staticmethod
     def scaler_transform(
             data: pd.DataFrame,
-            scaler: Union[MinMaxScaler, StandardScaler, QuantileTransformer],
-            name: Optional[str] = "",
+            scaler: MinMaxScaler | StandardScaler | QuantileTransformer,
+            name: str | None = "",
     ) -> pd.DataFrame:
         """
         Helper to run transform dataframe using previously fitted scaler.
@@ -2672,7 +2671,7 @@ class TrainModelMixin:
         )
 
     @staticmethod
-    def find_low_variance_fields(data: pd.DataFrame, variance_threshold: float) -> List[str]:
+    def find_low_variance_fields(data: pd.DataFrame, variance_threshold: float) -> list[str]:
         """
         Finds fields with variance below provided threshold.
 
@@ -2691,10 +2690,10 @@ class TrainModelMixin:
         return low_variance_fields
 
     @staticmethod
-    def _create_shap_mp_helper_concurrent(data: Tuple[int, pd.DataFrame],
+    def _create_shap_mp_helper_concurrent(data: tuple[int, pd.DataFrame],
                                           explainer: shap.TreeExplainer,
                                           clf_name: str,
-                                          verbose: bool) -> Tuple[np.ndarray, int]:
+                                          verbose: bool) -> tuple[np.ndarray, int]:
         if verbose:
             stdout_information(msg=f'Processing SHAP core batch {data[0] + 1}... ({len(data[1])} observations)')
         _ = data[1].pop(clf_name).values.reshape(-1, 1)
@@ -2710,19 +2709,19 @@ class TrainModelMixin:
 
 
     def create_shap_log_concurrent_mp(self,
-                                      rf_clf: Union[RandomForestClassifier, str, os.PathLike],
-                                      x: Union[pd.DataFrame, np.ndarray],
-                                      y: Union[pd.DataFrame, pd.Series, np.ndarray],
-                                      x_names: List[str],
+                                      rf_clf: RandomForestClassifier | str | os.PathLike,
+                                      x: pd.DataFrame | np.ndarray,
+                                      y: pd.DataFrame | pd.Series | np.ndarray,
+                                      x_names: list[str],
                                       clf_name: str,
                                       cnt_present: int,
                                       cnt_absent: int,
                                       core_cnt: int = -1,
                                       chunk_size: int = 100,
                                       verbose: bool = True,
-                                      save_dir: Optional[Union[str, os.PathLike]] = None,
-                                      save_file_suffix: Optional[int] = None,
-                                      plot: bool = False) -> Union[None, Tuple[pd.DataFrame, pd.DataFrame, Dict[str, pd.DataFrame], np.ndarray]]:
+                                      save_dir: str | os.PathLike | None = None,
+                                      save_file_suffix: int | None = None,
+                                      plot: bool = False) -> None | tuple[pd.DataFrame, pd.DataFrame, dict[str, pd.DataFrame], np.ndarray]:
         """
         Compute SHAP values using multiprocessing.
 

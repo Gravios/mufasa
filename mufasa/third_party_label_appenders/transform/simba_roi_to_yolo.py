@@ -55,10 +55,10 @@ class SimBAROI2Yolo:
 
 
     def __init__(self,
-                 config_path: Optional[Union[str, os.PathLike]] = None,
-                 roi_path: Optional[Union[str, os.PathLike]] = None,
-                 video_dir: Optional[Union[str, os.PathLike]] = None,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
+                 config_path: str | os.PathLike | None = None,
+                 roi_path: str | os.PathLike | None = None,
+                 video_dir: str | os.PathLike | None = None,
+                 save_dir: str | os.PathLike | None = None,
                  roi_frm_cnt: int = 10,
                  train_size: float = 0.7,
                  obb: bool = False,

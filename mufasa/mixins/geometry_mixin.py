@@ -76,10 +76,10 @@ class GeometryMixin:
     def bodyparts_to_polygon(data: np.ndarray,
                              cap_style: Literal["round", "square", "flat"] = "round",
                              parallel_offset: int = 1,
-                             pixels_per_mm: Union[int, float] = 1,
+                             pixels_per_mm: int | float = 1,
                              simplify_tolerance: float = 2,
                              preserve_topology: bool = True,
-                             convex_hull: bool = True) -> List[Polygon]:
+                             convex_hull: bool = True) -> list[Polygon]:
 
         """
         Converts the body-part points into polygonal representations.
@@ -147,8 +147,8 @@ class GeometryMixin:
 
     @staticmethod
     def bodyparts_to_points(data: np.ndarray,
-                            buffer: Optional[int] = None,
-                            px_per_mm: Optional[int] = None) -> List[Union[Point, Polygon]]:
+                            buffer: int | None = None,
+                            px_per_mm: int | None = None) -> list[Point | Polygon]:
         """
         Convert body-parts coordinate to Point geometries.
 
@@ -213,9 +213,9 @@ class GeometryMixin:
 
     @staticmethod
     def bodyparts_to_circle(data: np.ndarray,
-                            parallel_offset: Optional[float] = 1,
-                            pixels_per_mm: Optional[int] = 1,
-                            verbose: bool = True) -> Union[Polygon, List[Polygon]]:
+                            parallel_offset: float | None = 1,
+                            pixels_per_mm: int | None = 1,
+                            verbose: bool = True) -> Polygon | list[Polygon]:
         """
         Create circle geometries from body-part (x,y) coordinates.
 
@@ -296,7 +296,7 @@ class GeometryMixin:
         return shape_skeleton
 
     @staticmethod
-    def parallel_offset_polygon(polygon: Polygon, size_mm: Union[int, float], pixels_per_mm: float) -> Polygon:
+    def parallel_offset_polygon(polygon: Polygon, size_mm: int | float, pixels_per_mm: float) -> Polygon:
         """
         Offset polygon by scaling from centroid while preserving the exact vertex count.
         
@@ -369,12 +369,12 @@ class GeometryMixin:
             return polygon
 
     @staticmethod
-    def buffer_shape(shape: Union[Polygon, LineString, List[Union[Polygon, LineString]]],
+    def buffer_shape(shape: Polygon | LineString | list[Polygon | LineString],
                      size_mm: int,
                      pixels_per_mm: float,
                      resolution: int = 16,
                      join_style:  int = JOIN_STYLE.round,
-                     cap_style: Literal["round", "square", "flat"] = "round") -> Union[Polygon, List[Polygon]]:
+                     cap_style: Literal["round", "square", "flat"] = "round") -> Polygon | list[Polygon]:
         """
         Create a buffered shape by applying a buffer operation to the input polygon or linestring.
 
@@ -417,7 +417,7 @@ class GeometryMixin:
             return results
 
     @staticmethod
-    def compute_pct_shape_overlap(shapes: np.ndarray, denominator: Optional[Literal["difference", "shape_1", "shape_2"]] = "difference") -> np.ndarray:
+    def compute_pct_shape_overlap(shapes: np.ndarray, denominator: Literal["difference", "shape_1", "shape_2"] | None = "difference") -> np.ndarray:
         """
         Compute the percentage of overlap between two shapes.
 
@@ -477,7 +477,7 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def compute_shape_overlap(shapes: Union[np.ndarray, List[List[Union[Polygon, LineString, None]]]],
+    def compute_shape_overlap(shapes: np.ndarray | list[list[Polygon | LineString | None]],
                               verbose: bool = False) -> np.ndarray:
 
         """
@@ -513,7 +513,7 @@ class GeometryMixin:
 
 
     @staticmethod
-    def crosses(shapes: List[LineString]) -> bool:
+    def crosses(shapes: list[LineString]) -> bool:
         """
         Check if two LineString objects cross each other.
 
@@ -546,7 +546,7 @@ class GeometryMixin:
         return shapes[0].crosses(shapes[1])
 
     @staticmethod
-    def is_shape_covered(shapes: List[Union[LineString, Polygon, MultiPolygon, MultiPoint]]) -> bool:
+    def is_shape_covered(shapes: list[LineString | Polygon | MultiPolygon | MultiPoint]) -> bool:
         """
         Check if one geometry fully covers another.
 
@@ -573,7 +573,7 @@ class GeometryMixin:
         return shapes[1].covers(shapes[0])
 
     @staticmethod
-    def area(shape: Union[MultiPolygon, Polygon], pixels_per_mm: Optional[float]) -> float:
+    def area(shape: MultiPolygon | Polygon, pixels_per_mm: float | None) -> float:
         """
         Calculate the area of a geometry in square millimeters.
 
@@ -604,9 +604,9 @@ class GeometryMixin:
         return shape.area / pixels_per_mm
 
     @staticmethod
-    def shape_distance(shapes: Union[List[List[Union[LineString, Polygon, Point]]], np.ndarray],
+    def shape_distance(shapes: list[list[LineString | Polygon | Point]] | np.ndarray,
                        pixels_per_mm: float,
-                       unit: Literal["mm", "cm", "dm", "m"] = "mm") -> List[float]:
+                       unit: Literal["mm", "cm", "dm", "m"] = "mm") -> list[float]:
         """
         Calculate the distance between two lists of geometries in specified units.
 
@@ -657,8 +657,8 @@ class GeometryMixin:
 
     @staticmethod
     def bodyparts_to_line(data: np.ndarray,
-                          buffer: Optional[int] = None,
-                          px_per_mm: Optional[float] = None) -> Union[Polygon, LineString]:
+                          buffer: int | None = None,
+                          px_per_mm: float | None = None) -> Polygon | LineString:
 
         """
         Convert body-part coordinates to a Linestring.
@@ -714,7 +714,7 @@ class GeometryMixin:
             return LineString(data.tolist()).buffer(distance=area, cap_style=3)
 
     @staticmethod
-    def get_center(shape: Union[LineString, Polygon, MultiPolygon, None, List[Union[LineString, Polygon, MultiPolygon, None]]]) -> np.ndarray:
+    def get_center(shape: LineString | Polygon | MultiPolygon | None | list[LineString | Polygon | MultiPolygon | None]) -> np.ndarray:
         """
         Get the center coordinate of a shape or a list of shapes.
 
@@ -752,7 +752,7 @@ class GeometryMixin:
             return results
 
     @staticmethod
-    def is_touching(shapes=List[Union[LineString, Polygon]]) -> bool:
+    def is_touching(shapes=list[LineString | Polygon]) -> bool:
         """
         Check if two geometries touch each other.
 
@@ -788,7 +788,7 @@ class GeometryMixin:
         return shapes[0].touches(shapes[1])
 
     @staticmethod
-    def is_containing(shapes=Iterable[Union[LineString, Polygon]]) -> bool:
+    def is_containing(shapes=Iterable[LineString | Polygon]) -> bool:
         """
         Check if the first shape in a list contains a second shape in the same list.
 
@@ -808,7 +808,7 @@ class GeometryMixin:
         return shapes[0].contains(shapes[1])
 
     @staticmethod
-    def difference(shapes=List[Union[LineString, Polygon, MultiPolygon]]) -> Polygon:
+    def difference(shapes=list[LineString | Polygon | MultiPolygon]) -> Polygon:
         """
         Calculate the difference between a shape and one or more potentially overlapping shapes.
 
@@ -854,7 +854,7 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def union(shapes: List[Union[LineString, Polygon, MultiPolygon]]) -> Union[MultiPolygon, Polygon, MultiLineString]:
+    def union(shapes: list[LineString | Polygon | MultiPolygon]) -> MultiPolygon | Polygon | MultiLineString:
         """
         Compute the union of multiple geometries.
 
@@ -894,8 +894,8 @@ class GeometryMixin:
         return unary_union(shapes)
 
     @staticmethod
-    def symmetric_difference(shapes: List[Union[LineString, Polygon, MultiPolygon]]) -> List[
-        Union[Polygon, MultiPolygon]]:
+    def symmetric_difference(shapes: list[LineString | Polygon | MultiPolygon]) -> list[
+        Polygon | MultiPolygon]:
         """
         Computes a new geometry consisting of the parts that are exclusive to each input geometry.
 
@@ -930,15 +930,15 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def view_shapes(shapes: List[Union[LineString, Polygon, MultiPolygon, MultiLineString, Point]],
-                    bg_img: Optional[np.ndarray] = None,
-                    bg_clr: Optional[Tuple[int, int, int]] = None,
-                    size: Optional[int] = None,
-                    color_palette: Union[str, List[Tuple[int, ...]]] = 'Set1',
-                    fill_shapes: Optional[bool] = False,
-                    thickness: Optional[int] = 2,
-                    pixel_buffer: Optional[int] = 200,
-                    circle_size: Optional[int] = 2) -> np.ndarray:
+    def view_shapes(shapes: list[LineString | Polygon | MultiPolygon | MultiLineString | Point],
+                    bg_img: np.ndarray | None = None,
+                    bg_clr: tuple[int, int, int] | None = None,
+                    size: int | None = None,
+                    color_palette: str | list[tuple[int, ...]] = 'Set1',
+                    fill_shapes: bool | None = False,
+                    thickness: int | None = 2,
+                    pixel_buffer: int | None = 200,
+                    circle_size: int | None = 2) -> np.ndarray:
 
         """
         Draws geometrical shapes (such as LineString, Polygon, MultiPolygon, and MultiLineString)
@@ -1030,15 +1030,15 @@ class GeometryMixin:
 
     @staticmethod
     def geometry_video(
-            shapes: Iterable[Iterable[Union[LineString, Polygon, MultiPolygon, MultiLineString, MultiPoint, Point]]],
-            size: Optional[Tuple[int, int]],
-            save_path: Optional[Union[str, os.PathLike]] = None,
-            fps: Optional[Union[int, float]] = 10,
-            verbose: Optional[bool] = False,
-            bg_img: Optional[np.ndarray] = None,
-            bg_clr: Optional[Tuple[int, int, int]] = None,
-            circle_size: Optional[int] = None,
-            thickness: Optional[int] = 2) -> None:
+            shapes: Iterable[Iterable[LineString | Polygon | MultiPolygon | MultiLineString | MultiPoint | Point]],
+            size: tuple[int, int] | None,
+            save_path: str | os.PathLike | None = None,
+            fps: int | float | None = 10,
+            verbose: bool | None = False,
+            bg_img: np.ndarray | None = None,
+            bg_clr: tuple[int, int, int] | None = None,
+            circle_size: int | None = None,
+            thickness: int | None = 2) -> None:
         """
         Helper to create a geometry video from a list of shapes.
 
@@ -1134,8 +1134,8 @@ class GeometryMixin:
         stdout_success(msg=msg, elapsed_time=timer.elapsed_time_str, source=GeometryMixin.geometry_video.__name__)
 
     @staticmethod
-    def minimum_rotated_rectangle(shape: Union[Polygon, np.ndarray],
-                                  buffer: Optional[int] = None,
+    def minimum_rotated_rectangle(shape: Polygon | np.ndarray,
+                                  buffer: int | None = None,
                                   return_type: Literal['array', 'geometry'] = 'geometry') -> Polygon:
         """
         Calculate the minimum rotated rectangle that bounds a given polygon or set of points.
@@ -1176,7 +1176,7 @@ class GeometryMixin:
         return rotated_rectangle
 
     @staticmethod
-    def length(shape: Union[LineString, MultiLineString],
+    def length(shape: LineString | MultiLineString,
                pixels_per_mm: float,
                unit: Literal["mm", "cm", "dm", "m"] = "mm") -> float:
         """
@@ -1214,16 +1214,16 @@ class GeometryMixin:
 
     def multiframe_bodyparts_to_polygon(self,
                                         data: np.ndarray,
-                                        video_name: Optional[str] = None,
-                                        animal_name: Optional[str] = None,
+                                        video_name: str | None = None,
+                                        animal_name: str | None = None,
                                         verbose: bool = False,
-                                        cap_style: Optional[Literal["round", "square", "flat"]] = "round",
-                                        parallel_offset: Optional[int] = 1,
-                                        pixels_per_mm: Optional[float] = None,
-                                        simplify_tolerance: Optional[float] = 2,
+                                        cap_style: Literal["round", "square", "flat"] | None = "round",
+                                        parallel_offset: int | None = 1,
+                                        pixels_per_mm: float | None = None,
+                                        simplify_tolerance: float | None = 2,
                                         preserve_topology: bool = True,
                                         core_cnt: int = -1,
-                                        pool: Optional[multiprocessing.Pool] = None) -> List[Polygon]:
+                                        pool: multiprocessing.Pool | None = None) -> list[Polygon]:
         """
         Convert multidimensional NumPy array representing body part coordinates to a list of Polygons.
 
@@ -1307,10 +1307,10 @@ class GeometryMixin:
 
     @staticmethod
     def multiframe_bodypart_to_point(data: np.ndarray,
-                                     core_cnt: Optional[int] = -1,
-                                     buffer: Optional[int] = None,
-                                     px_per_mm: Optional[int] = None,
-                                     pool: Optional[multiprocessing.Pool] = None) -> Union[List[Point], List[List[Point]]]:
+                                     core_cnt: int | None = -1,
+                                     buffer: int | None = None,
+                                     px_per_mm: int | None = None,
+                                     pool: multiprocessing.Pool | None = None) -> list[Point] | list[list[Point]]:
         """
         Process multiple frames of body part data in parallel and convert them to shapely Points.
 
@@ -1358,12 +1358,12 @@ class GeometryMixin:
             return results
 
     @staticmethod
-    def multiframe_buffer_shapes(geometries: List[Union[Polygon, LineString]],
+    def multiframe_buffer_shapes(geometries: list[Polygon | LineString],
                                  size_mm: int,
                                  pixels_per_mm: float,
                                  core_cnt: int = -1,
                                  cap_style: Literal["round", "square", "flat"] = "round",
-                                 pool: Optional[multiprocessing.Pool] = None) -> List[Polygon]:
+                                 pool: multiprocessing.Pool | None = None) -> list[Polygon]:
         """
         Buffer shapes by a specified size using multiprocessing.
 
@@ -1402,7 +1402,7 @@ class GeometryMixin:
                                        core_cnt: int = -1,
                                        verbose: bool = True,
                                        pixels_per_mm: int = 1,
-                                       pool: Optional[multiprocessing.Pool] = None) -> List[Polygon]:
+                                       pool: multiprocessing.Pool | None = None) -> list[Polygon]:
         """
         Convert a set of pose-estimated key-points to circles with specified radius using multiprocessing.
 
@@ -1445,7 +1445,7 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def delaunay_triangulate_keypoints(data: np.ndarray) -> List[Polygon]:
+    def delaunay_triangulate_keypoints(data: np.ndarray) -> list[Polygon]:
         """
         Triangulates a set of 2D keypoints. E.g., use to polygonize animal hull, or triangulate a gridpoint areana.
 
@@ -1492,10 +1492,10 @@ class GeometryMixin:
 
     def multiframe_bodyparts_to_line(self,
                                      data: np.ndarray,
-                                     buffer: Optional[int] = None,
-                                     px_per_mm: Optional[float] = None,
-                                     core_cnt: Optional[int] = -1,
-                                     pool: Optional[multiprocessing.Pool] = None) -> List[LineString]:
+                                     buffer: int | None = None,
+                                     px_per_mm: float | None = None,
+                                     core_cnt: int | None = -1,
+                                     pool: multiprocessing.Pool | None = None) -> list[LineString]:
         """
         Convert multiframe body-parts data to a list of LineString objects using multiprocessing.
 
@@ -1552,14 +1552,14 @@ class GeometryMixin:
         return results
 
     def multiframe_compute_pct_shape_overlap(self,
-                                             shape_1: List[Polygon],
-                                             shape_2: List[Polygon],
-                                             core_cnt: Optional[int] = -1,
-                                             video_name: Optional[str] = None,
-                                             verbose: Optional[bool] = False,
-                                             animal_names: Optional[Tuple[str]] = None,
-                                             denominator: Optional[Literal[ "difference", "shape_1", "shape_2"]] = "difference",
-                                             pool: Optional[multiprocessing.Pool] = None) -> np.ndarray:
+                                             shape_1: list[Polygon],
+                                             shape_2: list[Polygon],
+                                             core_cnt: int | None = -1,
+                                             video_name: str | None = None,
+                                             verbose: bool | None = False,
+                                             animal_names: tuple[str] | None = None,
+                                             denominator: Literal["difference", "shape_1", "shape_2"] | None = "difference",
+                                             pool: multiprocessing.Pool | None = None) -> np.ndarray:
         """
         Compute the percentage overlap between corresponding Polygons in two lists.
 
@@ -1625,12 +1625,12 @@ class GeometryMixin:
         return np.hstack(results).astype(np.float32)
 
     def multiframe_compute_shape_overlap(self,
-                                         shape_1: List[Union[Polygon, LineString, None]],
-                                         shape_2: List[Union[Polygon, LineString, None]],
-                                         core_cnt: Optional[int] = -1,
-                                         verbose: Optional[bool] = False,
-                                         names: Optional[Tuple[str]] = None,
-                                         pool: Optional[multiprocessing.Pool] = None) -> List[int]:
+                                         shape_1: list[Polygon | LineString | None],
+                                         shape_2: list[Polygon | LineString | None],
+                                         core_cnt: int | None = -1,
+                                         verbose: bool | None = False,
+                                         names: tuple[str] | None = None,
+                                         pool: multiprocessing.Pool | None = None) -> list[int]:
         """
         Multiprocess compute overlap between corresponding Polygons in two lists.
 
@@ -1688,15 +1688,15 @@ class GeometryMixin:
         return results
 
     def multiframe_shape_distance(self,
-                                  shapes_a: List[Union[LineString, Polygon]],
-                                  shapes_b: List[Union[LineString, Polygon]],
-                                  pixels_per_mm: Optional[float] = 1,
+                                  shapes_a: list[LineString | Polygon],
+                                  shapes_b: list[LineString | Polygon],
+                                  pixels_per_mm: float | None = 1,
                                   unit: Literal["mm", "cm", "dm", "m"] = "mm",
                                   verbose: bool = False,
                                   core_cnt: int = -1,
                                   maxchildpertask: int = Defaults.MAXIMUM_MAX_TASK_PER_CHILD.value,
-                                  shape_names: Optional[str] = None,
-                                  pool: Optional[multiprocessing.Pool] = None) -> List[float]:
+                                  shape_names: str | None = None,
+                                  pool: multiprocessing.Pool | None = None) -> list[float]:
         """
         Compute shape distances between corresponding shapes in two lists of LineString or Polygon geometries for multiple frames.
 
@@ -1772,12 +1772,12 @@ class GeometryMixin:
         return results
 
     def multiframe_minimum_rotated_rectangle(self,
-                                             shapes: List[Polygon],
-                                             video_name: Optional[str] = None,
-                                             verbose: Optional[bool] = False,
-                                             animal_name: Optional[bool] = None,
+                                             shapes: list[Polygon],
+                                             video_name: str | None = None,
+                                             verbose: bool | None = False,
+                                             animal_name: bool | None = None,
                                              core_cnt: int = -1,
-                                             pool: Optional[multiprocessing.Pool] = None) -> List[Polygon]:
+                                             pool: multiprocessing.Pool | None = None) -> list[Polygon]:
 
         """
         Compute the minimum rotated rectangle for each Polygon in a list using multiprocessing.
@@ -1996,11 +1996,11 @@ class GeometryMixin:
         return split(original_polygon, extended_line)
 
     def multiframe_length(self,
-                          shapes: List[Union[LineString, MultiLineString]],
+                          shapes: list[LineString | MultiLineString],
                           pixels_per_mm: float,
                           core_cnt: int = -1,
                           unit: Literal["mm", "cm", "dm", "m"] = "mm",
-                          pool: Optional[multiprocessing.Pool] = None) -> List[float]:
+                          pool: multiprocessing.Pool | None = None) -> list[float]:
         """
         Calculate the length of LineStrings using multiprocessing.
 
@@ -2044,9 +2044,9 @@ class GeometryMixin:
         return results
 
     def multiframe_union(self,
-                         shapes: Iterable[Union[LineString, MultiLineString, Polygon]],
+                         shapes: Iterable[LineString | MultiLineString | Polygon],
                          core_cnt: int = -1,
-                         pool: Optional[multiprocessing.Pool] = None) -> Iterable[Union[LineString, MultiLineString, Polygon]]:
+                         pool: multiprocessing.Pool | None = None) -> Iterable[LineString | MultiLineString | Polygon]:
         """
         Join multiple shapes frame-wise into a single shape/
         
@@ -2089,9 +2089,9 @@ class GeometryMixin:
         if pool_terminate_flag: terminate_cpu_pool(pool=pool, source=GeometryMixin().multiframe_union.__name__)
         return results
 
-    def multiframe_symmetric_difference(self, shapes: Iterable[Union[LineString, MultiLineString, Polygon]],
+    def multiframe_symmetric_difference(self, shapes: Iterable[LineString | MultiLineString | Polygon],
                                         core_cnt: int = -1,
-                                        pool: Optional[multiprocessing.Pool] = None):
+                                        pool: multiprocessing.Pool | None = None):
         """
         Compute the symmetric differences between corresponding LineString or MultiLineString geometries using multiprocessing.
 
@@ -2137,7 +2137,7 @@ class GeometryMixin:
     def multiframe_delaunay_triangulate_keypoints(self,
                                                   data: np.ndarray,
                                                   core_cnt: int = -1,
-                                                  pool: Optional[multiprocessing.Pool] = None) -> List[List[Polygon]]:
+                                                  pool: multiprocessing.Pool | None = None) -> list[list[Polygon]]:
         """
         Triangulates a set of 2D keypoints. E.g., can be used to polygonize animal hull, or triangulate a gridpoint arena.
 
@@ -2188,12 +2188,12 @@ class GeometryMixin:
 
     def multiframe_difference(
             self,
-            shapes: Iterable[Union[LineString, Polygon, MultiPolygon]],
-            core_cnt: Optional[int] = -1,
-            verbose: Optional[bool] = False,
-            animal_names: Optional[str] = None,
-            video_name: Optional[str] = None,
-            pool: Optional[multiprocessing.Pool] = None) -> List[Union[Polygon, MultiPolygon]]:
+            shapes: Iterable[LineString | Polygon | MultiPolygon],
+            core_cnt: int | None = -1,
+            verbose: bool | None = False,
+            animal_names: str | None = None,
+            video_name: str | None = None,
+            pool: multiprocessing.Pool | None = None) -> list[Polygon | MultiPolygon]:
         """
         Compute the multi-frame difference for a collection of shapes using parallel processing.
 
@@ -2271,13 +2271,13 @@ class GeometryMixin:
         return results
 
     def multiframe_area(self,
-                        shapes: List[Union[MultiPolygon, Polygon]],
-                        pixels_per_mm: Optional[float] = 1.0,
-                        core_cnt: Optional[int] = -1,
-                        verbose: Optional[bool] = False,
-                        video_name: Optional[bool] = False,
-                        animal_names: Optional[bool] = False,
-                        pool: Optional[multiprocessing.Pool] = None) -> List[float]:
+                        shapes: list[MultiPolygon | Polygon],
+                        pixels_per_mm: float | None = 1.0,
+                        core_cnt: int | None = -1,
+                        verbose: bool | None = False,
+                        video_name: bool | None = False,
+                        animal_names: bool | None = False,
+                        pool: multiprocessing.Pool | None = None) -> list[float]:
 
         """
         Calculate the area of geometries in square millimeters using multiprocessing.
@@ -2332,11 +2332,11 @@ class GeometryMixin:
             self,
             data_df: pd.DataFrame,
             skeleton: Iterable[str],
-            core_cnt: Optional[int] = -1,
-            verbose: Optional[bool] = False,
-            video_name: Optional[bool] = False,
-            animal_names: Optional[bool] = False,
-            pool: Optional[multiprocessing.Pool] = None) -> List[Union[LineString, MultiLineString]]:
+            core_cnt: int | None = -1,
+            verbose: bool | None = False,
+            video_name: bool | None = False,
+            animal_names: bool | None = False,
+            pool: multiprocessing.Pool | None = None) -> list[LineString | MultiLineString]:
 
         """
         Convert body parts to LineString skeleton representations in a videos using multiprocessing.
@@ -2431,9 +2431,9 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def get_geometry_brightness_intensity(img: Union[np.ndarray, Tuple[cv2.VideoCapture, int]],
-                                          geometries: List[Union[np.ndarray, Polygon]],
-                                          ignore_black: Optional[bool] = True) -> List[float]:
+    def get_geometry_brightness_intensity(img: np.ndarray | tuple[cv2.VideoCapture, int],
+                                          geometries: list[np.ndarray | Polygon],
+                                          ignore_black: bool | None = True) -> list[float]:
         """
         Calculate the average brightness intensity within a geometry region-of-interest of an image.
 
@@ -2492,20 +2492,10 @@ class GeometryMixin:
 
     @staticmethod
     def geometry_histocomparison(
-            imgs: List[Union[np.ndarray, Tuple[cv2.VideoCapture, int]]],
+            imgs: list[np.ndarray | tuple[cv2.VideoCapture, int]],
             geometry: Polygon = None,
-            method: Optional[
-                Literal[
-                    "chi_square",
-                    "correlation",
-                    "intersection",
-                    "bhattacharyya",
-                    "hellinger",
-                    "chi_square_alternative",
-                    "kl_divergence",
-                ]
-            ] = "correlation",
-            absolute: Optional[bool] = True,
+            method: Literal["chi_square", "correlation", "intersection", "bhattacharyya", "hellinger", "chi_square_alternative", "kl_divergence"] | None = "correlation",
+            absolute: bool | None = True,
     ) -> float:
         """
         Retrieve histogram similarities within a geometry inside two images.
@@ -2610,10 +2600,10 @@ class GeometryMixin:
         )
 
     def multiframe_is_shape_covered(self,
-                                    shape_1: List[Polygon],
-                                    shape_2: List[Polygon],
-                                    core_cnt: Optional[int] = -1,
-                                    pool: Optional[multiprocessing.Pool] = None) -> List[bool]:
+                                    shape_1: list[Polygon],
+                                    shape_2: list[Polygon],
+                                    core_cnt: int | None = -1,
+                                    pool: multiprocessing.Pool | None = None) -> list[bool]:
         """
         For each shape in time-series of shapes, check if another shape in the same time-series fully covers the
         first shape.
@@ -2680,10 +2670,10 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def geometry_contourcomparison(imgs: List[Union[np.ndarray, Tuple[cv2.VideoCapture, int]]],
-                                   geometry: Optional[Polygon] = None,
-                                   method: Optional[Literal["all", "exterior"]] = "all",
-                                   canny: Optional[bool] = True) -> float:
+    def geometry_contourcomparison(imgs: list[np.ndarray | tuple[cv2.VideoCapture, int]],
+                                   geometry: Polygon | None = None,
+                                   method: Literal["all", "exterior"] | None = "all",
+                                   canny: bool | None = True) -> float:
         """
         Compare contours between a geometry in two images using shape matching.
 
@@ -2835,14 +2825,14 @@ class GeometryMixin:
         return results
 
     def multifrm_geometry_histocomparison(self,
-                                          video_path: Union[str, os.PathLike],
+                                          video_path: str | os.PathLike,
                                           data: np.ndarray,
                                           shape_type: Literal["rectangle", "circle", "line"],
-                                          lag: Optional[int] = 2,
-                                          core_cnt: Optional[int] = -1,
+                                          lag: int | None = 2,
+                                          core_cnt: int | None = -1,
                                           pixels_per_mm: int = 1,
                                           parallel_offset: int = 1,
-                                          pool: Optional[multiprocessing.Pool] = None) -> np.ndarray:
+                                          pool: multiprocessing.Pool | None = None) -> np.ndarray:
 
         """
         Perform geometry histocomparison on multiple video frames using multiprocessing.
@@ -2900,7 +2890,7 @@ class GeometryMixin:
 
     @staticmethod
     def rank_shapes(
-            shapes: List[Polygon],
+            shapes: list[Polygon],
             method: Literal[
                 "area",
                 "min_distance",
@@ -2909,9 +2899,9 @@ class GeometryMixin:
                 "left_to_right",
                 "top_to_bottom",
             ],
-            deviation: Optional[bool] = False,
-            descending: Optional[bool] = True,
-    ) -> List[Polygon]:
+            deviation: bool | None = False,
+            descending: bool | None = True,
+    ) -> list[Polygon]:
         """
         Rank a list of polygon geometries based on a specified method. E.g., order the list of geometries according to sizes or distances to each other or from left to right etc.
 
@@ -2991,9 +2981,9 @@ class GeometryMixin:
         return [shapes[idx] for idx in ranked]
 
     @staticmethod
-    def contours_to_geometries(contours: List[np.ndarray],
+    def contours_to_geometries(contours: list[np.ndarray],
                                force_rectangles: bool = True,
-                               convex_hull: bool = False) -> List[Polygon]:
+                               convex_hull: bool = False) -> list[Polygon]:
         """
         Convert a list of contours to a list of geometries.
 
@@ -3028,11 +3018,11 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def adjust_geometry_locations(geometries: List[Polygon],
-                                  shift: Tuple[int, int],
-                                  pixels_per_mm: Optional[float] = None,
-                                  minimum: Optional[Tuple[int, int]] = (0, 0),
-                                  maximum: Optional[Tuple[int, int]] = (np.inf, np.inf)) -> List[Polygon]:
+    def adjust_geometry_locations(geometries: list[Polygon],
+                                  shift: tuple[int, int],
+                                  pixels_per_mm: float | None = None,
+                                  minimum: tuple[int, int] | None = (0, 0),
+                                  maximum: tuple[int, int] | None = (np.inf, np.inf)) -> list[Polygon]:
         """
         Shift a set of geometries specified distance in the x and/or y-axis.
 
@@ -3076,8 +3066,8 @@ class GeometryMixin:
     @staticmethod
     def bucket_img_into_grid_points(point_distance: int,
                                     px_per_mm: float,
-                                    img_size: Tuple[int, int],
-                                    border_sites: Optional[bool] = True) -> Dict[Tuple[int, int], Point]:
+                                    img_size: tuple[int, int],
+                                    border_sites: bool | None = True) -> dict[tuple[int, int], Point]:
 
         """
         Create a grid of evenly spaced points within an image. Use for creating spatial markers within an arena.
@@ -3125,11 +3115,11 @@ class GeometryMixin:
 
     @staticmethod
     def bucket_img_into_grid_square(img_size: Iterable[int],
-                                    bucket_grid_size_mm: Optional[float] = None,
-                                    bucket_grid_size: Optional[Iterable[int]] = None,
-                                    px_per_mm: Optional[float] = None,
-                                    add_correction: Optional[bool] = True,
-                                    verbose: Optional[bool] = False) -> Tuple[Dict[Tuple[int, int], Polygon], float]:
+                                    bucket_grid_size_mm: float | None = None,
+                                    bucket_grid_size: Iterable[int] | None = None,
+                                    px_per_mm: float | None = None,
+                                    add_correction: bool | None = True,
+                                    verbose: bool | None = False) -> tuple[dict[tuple[int, int], Polygon], float]:
         """
         Segment an image into squares and return a dictionary of polygons representing the bucket locations.
 
@@ -3235,8 +3225,8 @@ class GeometryMixin:
             return polygons, round((bucket_grid_size[1] / bucket_grid_size[0]), 3)
 
     @staticmethod
-    def bucket_img_into_grid_hexagon(bucket_size_mm: float, img_size: Tuple[int, int], px_per_mm: float, verbose: bool = True) -> Tuple[
-        Dict[Tuple[int, int], Polygon], float]:
+    def bucket_img_into_grid_hexagon(bucket_size_mm: float, img_size: tuple[int, int], px_per_mm: float, verbose: bool = True) -> tuple[
+        dict[tuple[int, int], Polygon], float]:
         """
         Bucketize an image into hexagons and return a dictionary of polygons representing the hexagon locations.
 
@@ -3306,7 +3296,7 @@ class GeometryMixin:
         return polygons, aspect_ratio
 
     @staticmethod
-    def _cumsum_coord_geometries_helper(data: np.ndarray, geometries: Dict[Tuple[int, int], Polygon], verbose: bool
+    def _cumsum_coord_geometries_helper(data: np.ndarray, geometries: dict[tuple[int, int], Polygon], verbose: bool
                                         ):
         data_point = Point(data[1:3])
         if verbose:
@@ -3319,11 +3309,11 @@ class GeometryMixin:
 
     def cumsum_coord_geometries(self,
                                 data: np.ndarray,
-                                geometries: Dict[Tuple[int, int], Polygon],
-                                fps: Optional[int] = None,
-                                core_cnt: Optional[int] = -1,
-                                verbose: Optional[bool] = True,
-                                pool: Optional[multiprocessing.Pool] = None) -> np.ndarray:
+                                geometries: dict[tuple[int, int], Polygon],
+                                fps: int | None = None,
+                                core_cnt: int | None = -1,
+                                verbose: bool | None = True,
+                                pool: multiprocessing.Pool | None = None) -> np.ndarray:
 
         """
         Compute the cumulative time a body-part has spent inside a grid of geometries using multiprocessing.
@@ -3380,7 +3370,7 @@ class GeometryMixin:
 
     @staticmethod
     def _cumsum_bool_helper(data: np.ndarray,
-                            geometries: Dict[Tuple[int, int], Polygon],
+                            geometries: dict[tuple[int, int], Polygon],
                             verbose: bool = True):
 
         data_point = Point(data[1:3])
@@ -3393,12 +3383,12 @@ class GeometryMixin:
 
     def cumsum_bool_geometries(self,
                                data: np.ndarray,
-                               geometries: Dict[Tuple[int, int], Polygon],
+                               geometries: dict[tuple[int, int], Polygon],
                                bool_data: np.ndarray,
-                               fps: Optional[float] = None,
+                               fps: float | None = None,
                                verbose: bool = True,
-                               core_cnt: Optional[int] = -1,
-                               pool: Optional[multiprocessing.Pool] = None) -> np.ndarray:
+                               core_cnt: int | None = -1,
+                               pool: multiprocessing.Pool | None = None) -> np.ndarray:
         """
         Compute the cumulative sums of boolean events within polygon geometries over time using multiprocessing. For example, compute the cumulative bout count of classified events within spatial locations at all time-points of the video.
 
@@ -3472,8 +3462,8 @@ class GeometryMixin:
     @staticmethod
     def _cumsum_animal_geometries_grid_helper(
             data: np.ndarray,
-            grid: Dict[Tuple[int, int], Polygon],
-            size: Tuple[int],
+            grid: dict[tuple[int, int], Polygon],
+            size: tuple[int],
             verbose: bool,
     ):
 
@@ -3486,12 +3476,12 @@ class GeometryMixin:
         return results
 
     def cumsum_animal_geometries_grid(self,
-                                      data: List[Polygon],
-                                      grid: Dict[Tuple[int, int], Polygon],
-                                      fps: Optional[int] = None,
-                                      core_cnt: Optional[int] = -1,
-                                      verbose: Optional[bool] = True,
-                                      pool: Optional[multiprocessing.Pool] = None) -> np.ndarray:
+                                      data: list[Polygon],
+                                      grid: dict[tuple[int, int], Polygon],
+                                      fps: int | None = None,
+                                      core_cnt: int | None = -1,
+                                      verbose: bool | None = True,
+                                      pool: multiprocessing.Pool | None = None) -> np.ndarray:
         """
         Compute the cumulative time the animal has spent in each geometry.
 
@@ -3546,7 +3536,7 @@ class GeometryMixin:
 
     @staticmethod
     def _compute_framewise_geometry_idx(data: np.ndarray,
-                                        grid: Dict[Tuple[int, int], Polygon],
+                                        grid: dict[tuple[int, int], Polygon],
                                         verbose: bool):
 
         frm_idxs, cords = data[:, 0], data[:, 1:]
@@ -3563,10 +3553,10 @@ class GeometryMixin:
 
     @staticmethod
     def geometry_transition_probabilities(data: np.ndarray,
-                                          grid: Dict[Tuple[int, int], Polygon],
-                                          core_cnt: Optional[int] = -1,
-                                          verbose: Optional[bool] = False,
-                                          pool: Optional[multiprocessing.Pool] = None) -> (Dict[Tuple[int, int], float], Dict[Tuple[int, int], int]):
+                                          grid: dict[tuple[int, int], Polygon],
+                                          core_cnt: int | None = -1,
+                                          verbose: bool | None = False,
+                                          pool: multiprocessing.Pool | None = None) -> (dict[tuple[int, int], float], dict[tuple[int, int], int]):
         """
         Calculate geometry transition probabilities based on spatial transitions between grid cells.
 
@@ -3637,7 +3627,7 @@ class GeometryMixin:
         return (out_transition_probabilities, out_transition_cnts)
 
     @staticmethod
-    def hausdorff_distance(geometries: List[List[Union[Polygon, LineString]]]) -> np.ndarray:
+    def hausdorff_distance(geometries: list[list[Polygon | LineString]]) -> np.ndarray:
         """
         The Hausdorff distance measure of the similarity between time-series sequential geometries. It is defined as the maximum of the distances
         from each point in one set to the nearest point in the other set.
@@ -3680,11 +3670,11 @@ class GeometryMixin:
         return results
 
     def multiframe_hausdorff_distance(self,
-                                      geometries: List[Union[Polygon, LineString]],
-                                      lag: Optional[Union[float, int]] = 1,
-                                      sample_rate: Optional[Union[float, int]] = 1,
-                                      core_cnt: Optional[int] = -1,
-                                      pool: Optional[multiprocessing.Pool] = None) -> List[float]:
+                                      geometries: list[Polygon | LineString],
+                                      lag: float | int | None = 1,
+                                      sample_rate: float | int | None = 1,
+                                      core_cnt: int | None = -1,
+                                      pool: multiprocessing.Pool | None = None) -> list[float]:
         """
         The Hausdorff distance measure of the similarity between sequential time-series  geometries.
 
@@ -3745,13 +3735,13 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def locate_line_point(path: Union[LineString, np.ndarray],
-                          geometry: Union[LineString, Polygon, Point],
-                          px_per_mm: Optional[float] = 1,
-                          fps: Optional[Union[float, int]] = 1,
-                          core_cnt: Optional[int] = -1,
-                          distance_min: Optional[bool] = True,
-                          time_prior: Optional[bool] = True) -> Dict[str, float]:
+    def locate_line_point(path: LineString | np.ndarray,
+                          geometry: LineString | Polygon | Point,
+                          px_per_mm: float | None = 1,
+                          fps: float | int | None = 1,
+                          core_cnt: int | None = -1,
+                          distance_min: bool | None = True,
+                          time_prior: bool | None = True) -> dict[str, float]:
 
         """
         Compute the time and distance travelled along a path to reach the most proximal point in reference to a second geometry.
@@ -3899,10 +3889,10 @@ class GeometryMixin:
         return ca[n_p - 1, n_q - 1]
 
     @staticmethod
-    def simba_roi_to_geometries(rectangles_df: Optional[pd.DataFrame] = None,
-                                circles_df: Optional[pd.DataFrame] = None,
-                                polygons_df: Optional[pd.DataFrame] = None,
-                                color: Optional[bool] = False) -> dict:
+    def simba_roi_to_geometries(rectangles_df: pd.DataFrame | None = None,
+                                circles_df: pd.DataFrame | None = None,
+                                polygons_df: pd.DataFrame | None = None,
+                                color: bool | None = False) -> dict:
 
         """
         Convert SimBA dataframes holding ROI geometries to nested dictionary holding Shapley polygons.
@@ -3991,7 +3981,7 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def get_shape_statistics(shapes: Union[List[Polygon], Polygon, np.ndarray]) -> Dict[str, Any]:
+    def get_shape_statistics(shapes: list[Polygon] | Polygon | np.ndarray) -> dict[str, Any]:
         """
         Calculate the lengths and widths of the minimum bounding rectangles of polygons.
 
@@ -4040,9 +4030,9 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def geometries_to_exterior_keypoints(geometries: List[Polygon],
-                                         core_cnt: Optional[int] = -1,
-                                         pool: Optional[multiprocessing.Pool] = None) -> np.ndarray:
+    def geometries_to_exterior_keypoints(geometries: list[Polygon],
+                                         core_cnt: int | None = -1,
+                                         pool: multiprocessing.Pool | None = None) -> np.ndarray:
         """
         Extract exterior keypoints from a list of Polygon geometries in parallel, with optional core count specification for multiprocessing.
 
@@ -4148,9 +4138,9 @@ class GeometryMixin:
         return results
 
     @staticmethod
-    def smooth_geometry_bspline(data: Union[np.ndarray, Polygon, List[Polygon]],
+    def smooth_geometry_bspline(data: np.ndarray | Polygon | list[Polygon],
                                 smooth_factor: float = 1.0,
-                                points: int = 50) -> List[Polygon]:
+                                points: int = 50) -> list[Polygon]:
         """
         Smooths the geometry of polygons or coordinate arrays using B-spline interpolation.
 
@@ -4208,10 +4198,10 @@ class GeometryMixin:
 
 
     @staticmethod
-    def sleap_csv_to_geometries(data: Union[str, os.PathLike],
+    def sleap_csv_to_geometries(data: str | os.PathLike,
                                 buffer: int = 50,
-                                save_path: Optional[Union[str, os.PathLike]] = None,
-                                by_track: Optional[bool] = True) -> Union[None, Dict[Any, dict]]:
+                                save_path: str | os.PathLike | None = None,
+                                by_track: bool | None = True) -> None | dict[Any, dict]:
 
         """
          Convert SLEAP CSV tracking data to polygon geometries for each track and frame.

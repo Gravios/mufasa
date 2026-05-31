@@ -72,16 +72,16 @@ class KleinbergCalculator(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 classifier_names: Optional[List[str]] = None,
+                 config_path: str | os.PathLike,
+                 classifier_names: list[str] | None = None,
                  sigma: float = 2,
                  gamma: float = 0.3,
-                 hierarchy: Optional[int] = 1,
+                 hierarchy: int | None = 1,
                  verbose: bool = True,
                  save_originals: bool = True,
-                 hierarchical_search: Optional[bool] = False,
-                 input_dir: Optional[Union[str, os.PathLike]] = None,
-                 output_dir: Optional[Union[str, os.PathLike]] = None):
+                 hierarchical_search: bool | None = False,
+                 input_dir: str | os.PathLike | None = None,
+                 output_dir: str | os.PathLike | None = None):
 
         ConfigReader.__init__(self, config_path=config_path)
         log_event(logger_name=str(self.__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=self.create_log_msg_from_init_args(locals=locals()))

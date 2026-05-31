@@ -51,8 +51,8 @@ class BentoAppender(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Union[str, os.PathLike]):
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike):
 
         ConfigReader.__init__(self, config_path=config_path)
         check_if_dir_exists(in_dir=data_dir)

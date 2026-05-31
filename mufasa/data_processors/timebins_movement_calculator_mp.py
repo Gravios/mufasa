@@ -131,10 +131,10 @@ class TimeBinsMovementCalculatorMultiprocess(ConfigReader, FeatureExtractionMixi
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 bin_length: Union[int, float],
-                 body_parts: Union[List[str], Tuple[str]],
-                 data_path: Optional[Union[List[Union[str, os.PathLike]], str, os.PathLike]] = None,
+                 config_path: str | os.PathLike,
+                 bin_length: int | float,
+                 body_parts: list[str] | tuple[str],
+                 data_path: list[str | os.PathLike] | str | os.PathLike | None = None,
                  plots: bool = False,
                  verbose: bool = True,
                  core_cnt: int = -1,

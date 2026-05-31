@@ -14,22 +14,22 @@ from mufasa.utils.read_write import read_df, seconds_to_timestamp
 
 
 def gantt_plotly(bouts_df: pd.DataFrame,
-                 img_size: Optional[Tuple[int, int]] = (640, 480),
-                 bg_clr: Optional[str] = 'white',
-                 title: Optional[str] = None,
-                 font_size: Optional[int] = 12,
-                 y_lbl: Optional[str] = 'Event',
-                 x_lbl: Optional[str] = 'Session time (HH:MM:SS)',
-                 show_grid: Optional[bool] = True,
-                 color_palette: Optional[str] = 'Set1',
-                 x_length: Optional[int] = None,
-                 bar_height: Optional[float] = 0.4,
-                 x_tick_spacing: Optional[Union[int, float]] = 30,
-                 marker_line_color: Optional[str] = 'black',
-                 marker_line_width: Optional[float] = 0.1,
-                 time_format: Optional[str] = 'HH:MM:SS',
-                 tick_angle: Optional[int] = 45,
-                 font: Optional[str] = 'Georgia') -> np.ndarray:
+                 img_size: tuple[int, int] | None = (640, 480),
+                 bg_clr: str | None = 'white',
+                 title: str | None = None,
+                 font_size: int | None = 12,
+                 y_lbl: str | None = 'Event',
+                 x_lbl: str | None = 'Session time (HH:MM:SS)',
+                 show_grid: bool | None = True,
+                 color_palette: str | None = 'Set1',
+                 x_length: int | None = None,
+                 bar_height: float | None = 0.4,
+                 x_tick_spacing: int | float | None = 30,
+                 marker_line_color: str | None = 'black',
+                 marker_line_width: float | None = 0.1,
+                 time_format: str | None = 'HH:MM:SS',
+                 tick_angle: int | None = 45,
+                 font: str | None = 'Georgia') -> np.ndarray:
 
     r"""
     Generates a Gantt chart using Plotly to visualize bout events over time.

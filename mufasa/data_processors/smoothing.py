@@ -63,12 +63,12 @@ class Smoothing(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
+                 config_path: str | os.PathLike,
+                 data_path: str | os.PathLike | list[str | os.PathLike],
                  time_window: int,
-                 method: Optional[Literal["gaussian", "savitzky-golay"]] = 'Savitzky-Golay',
-                 multi_index_df_headers: Optional[bool] = None,
-                 copy_originals: Optional[bool] = False) -> None:
+                 method: Literal["gaussian", "savitzky-golay"] | None = 'Savitzky-Golay',
+                 multi_index_df_headers: bool | None = None,
+                 copy_originals: bool | None = False) -> None:
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         log_event(logger_name=str(self.__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=self.create_log_msg_from_init_args(locals=locals()))

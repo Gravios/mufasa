@@ -43,7 +43,7 @@ class MutualExclusivityCorrector(ConfigReader):
 
     """
 
-    def __init__(self, rules: dict, config_path: Union[str, os.PathLike]):
+    def __init__(self, rules: dict, config_path: str | os.PathLike):
         ConfigReader.__init__(self, config_path=config_path)
         self.rules, self.save_dir = rules, None
         check_if_filepath_list_is_empty(

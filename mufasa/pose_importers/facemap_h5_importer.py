@@ -23,12 +23,12 @@ class FaceMapImporter(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_path: Union[str, os.PathLike],
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 smoothing_settings: Optional[dict] = None,
-                 interpolation_settings: Optional[dict] = None,
-                 verbose: Optional[bool] = True):
+                 config_path: str | os.PathLike,
+                 data_path: str | os.PathLike,
+                 save_dir: str | os.PathLike | None = None,
+                 smoothing_settings: dict | None = None,
+                 interpolation_settings: dict | None = None,
+                 verbose: bool | None = True):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False, create_logger=False)
         pose_config_name = self.read_config_entry(config=self.config, section=ConfigKey.CREATE_ENSEMBLE_SETTINGS.value, option=ConfigKey.POSE_SETTING.value, default_value=None, data_type=Dtypes.STR.value).strip()

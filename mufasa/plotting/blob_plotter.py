@@ -58,15 +58,15 @@ class BlobPlotter(PlottingMixin):
      """
 
     def __init__(self,
-                 data_path: Union[List[str], str, os.PathLike],
-                 gpu: Optional[bool] = False,
-                 batch_size: Optional[int] = 2000,
-                 circle_color: Optional[Tuple[int, int, int]] = (TextOptions.COLOR.value),
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 verbose: Optional[int] = True,
-                 smoothing: Optional[str] = None,
-                 circle_size: Optional[int] = None,
-                 core_cnt: Optional[int] = -1):
+                 data_path: list[str] | str | os.PathLike,
+                 gpu: bool | None = False,
+                 batch_size: int | None = 2000,
+                 circle_color: tuple[int, int, int] | None = (TextOptions.COLOR.value),
+                 save_dir: str | os.PathLike | None = None,
+                 verbose: int | None = True,
+                 smoothing: str | None = None,
+                 circle_size: int | None = None,
+                 core_cnt: int | None = -1):
 
 
 

@@ -72,7 +72,7 @@ def sliding_circular_hotspots(x: np.ndarray,
                               time_window: float,
                               sample_rate: float,
                               bins: np.ndarray,
-                              batch_size: Optional[int] = int(3.5e+7)) -> np.ndarray:
+                              batch_size: int | None = int(3.5e+7)) -> np.ndarray:
     """
     Calculate the proportion of data points falling within specified circular bins over a sliding time window using GPU
 
@@ -128,7 +128,7 @@ def sliding_circular_hotspots(x: np.ndarray,
 def sliding_circular_mean(x: np.ndarray,
                           time_window: float,
                           sample_rate: int,
-                          batch_size: Optional[int] = 3e+7) -> np.ndarray:
+                          batch_size: int | None = 3e+7) -> np.ndarray:
 
     """
     Calculate the sliding circular mean over a time window for a series of angles.
@@ -193,7 +193,7 @@ def sliding_circular_mean(x: np.ndarray,
 def sliding_circular_range(x: np.ndarray,
                           time_window: float,
                           sample_rate: float,
-                          batch_size: Optional[int] = int(5e+7)) -> np.ndarray:
+                          batch_size: int | None = int(5e+7)) -> np.ndarray:
     """
     Computes the sliding circular range of a time series data array using GPU.
 
@@ -253,7 +253,7 @@ def sliding_circular_range(x: np.ndarray,
 def sliding_circular_std(x: np.ndarray,
                          time_window: float,
                          sample_rate: float,
-                         batch_size: Optional[int] = int(5e+7)) -> np.ndarray:
+                         batch_size: int | None = int(5e+7)) -> np.ndarray:
 
     r"""
     Calculate the sliding circular standard deviation of a time series data on GPU.
@@ -312,7 +312,7 @@ def sliding_circular_std(x: np.ndarray,
 def sliding_rayleigh_z(x: np.ndarray,
                        time_window: float,
                        sample_rate: float,
-                       batch_size: Optional[int] = int(5e+7)) -> Tuple[np.ndarray, np.ndarray]:
+                       batch_size: int | None = int(5e+7)) -> tuple[np.ndarray, np.ndarray]:
 
     r"""
     Computes the Rayleigh Z-statistic over a sliding window for a given time series of angles
@@ -388,7 +388,7 @@ def sliding_rayleigh_z(x: np.ndarray,
 def sliding_resultant_vector_length(x: np.ndarray,
                                     time_window: float,
                                     sample_rate: int,
-                                    batch_size: Optional[int] = 3e+7) -> np.ndarray:
+                                    batch_size: int | None = 3e+7) -> np.ndarray:
 
     """
     Calculate the sliding resultant vector length over a time window for a series of angles.
@@ -453,7 +453,7 @@ def sliding_resultant_vector_length(x: np.ndarray,
 def direction_from_three_bps(x: np.ndarray,
                              y: np.ndarray,
                              z: np.ndarray,
-                             batch_size: Optional[int] = int(1.5e+7)) -> np.ndarray:
+                             batch_size: int | None = int(1.5e+7)) -> np.ndarray:
 
     """
     Calculate the direction angle based on the coordinates of three body points using GPU acceleration.
@@ -508,7 +508,7 @@ def _instantaneous_angular_velocity(x, stride, results):
         results[r] = d * (180 / math.pi)
 
 
-def instantaneous_angular_velocity(x: np.ndarray, stride: Optional[int] = 1) -> np.ndarray:
+def instantaneous_angular_velocity(x: np.ndarray, stride: int | None = 1) -> np.ndarray:
     r"""
     Calculate the instantaneous angular velocity between angles in a given array.
 
@@ -576,8 +576,8 @@ def _sliding_bearing(x, stride, results):
 
 
 def sliding_bearing(x: np.ndarray,
-                    stride: Optional[float] = 1,
-                    sample_rate: Optional[float] = 1) -> np.ndarray:
+                    stride: float | None = 1,
+                    sample_rate: float | None = 1) -> np.ndarray:
     """
     Compute the bearing between consecutive points in a 2D coordinate array using a sliding window approach using GPU acceleration.
 
@@ -715,7 +715,7 @@ def _rotational_direction(data, stride, results):
         else:
             results[r] = 2
 
-def rotational_direction(data: np.ndarray, stride: Optional[int] = 1) -> np.ndarray:
+def rotational_direction(data: np.ndarray, stride: int | None = 1) -> np.ndarray:
     """
     Computes the rotational direction between consecutive data points in a circular space, where the angles wrap
     around at 360 degrees. The function uses GPU acceleration via CUDA to process the data in parallel.

@@ -36,8 +36,8 @@ class DirectingROIAnalyzer(ConfigReader, FeatureExtractionMixin):
     >>> test.save()
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike],
-                 data_path: Optional[Union[str, os.PathLike]] = None):
+    def __init__(self, config_path: str | os.PathLike,
+                 data_path: str | os.PathLike | None = None):
 
         check_file_exist_and_readable(file_path=config_path)
         ConfigReader.__init__(self, config_path=config_path)
@@ -183,7 +183,7 @@ class DirectingROIAnalyzer(ConfigReader, FeatureExtractionMixin):
             raise NoDataError(msg=f'No ROI DATA exists for data files {self.data_paths}', source=self.__class__.__name__)
         self.results_df = pd.concat(self.results, axis=0)
 
-    def save(self, path: Optional[Union[str, os.PathLike]] = None):
+    def save(self, path: str | os.PathLike | None = None):
         if not hasattr(self, "results_df"):
             raise InvalidInputError(msg="Run the ROI direction analyzer before saving")
         if path is None:

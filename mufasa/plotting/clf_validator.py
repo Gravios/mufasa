@@ -46,15 +46,15 @@ class ClassifierValidationClips(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
                  window: int,
                  clf_name: str,
-                 data_paths: List[str],
-                 text_clr: Optional[Tuple[int, int, int]] = (255,105,180),
-                 concat_video: Optional[bool] = False,
-                 clips: Optional[bool] = False,
-                 video_speed: Optional[float] = 1.0,
-                 highlight_clr: Optional[Tuple[int, int, int]] = None):
+                 data_paths: list[str],
+                 text_clr: tuple[int, int, int] | None = (255,105,180),
+                 concat_video: bool | None = False,
+                 clips: bool | None = False,
+                 video_speed: float | None = 1.0,
+                 highlight_clr: tuple[int, int, int] | None = None):
 
         ConfigReader.__init__(self, config_path=config_path)
         if (not clips) and (not concat_video):

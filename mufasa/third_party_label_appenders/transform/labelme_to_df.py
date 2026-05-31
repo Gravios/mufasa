@@ -52,13 +52,13 @@ class LabelMe2DataFrame:
     """
 
     def __init__(self,
-                 labelme_dir: Union[str, os.PathLike],
-                 greyscale: Optional[bool] = False,
+                 labelme_dir: str | os.PathLike,
+                 greyscale: bool | None = False,
                  clahe: bool = False,
-                 pad: Optional[bool] = False,
-                 size: Union[Literal['min', 'max'], Tuple[int, int]] = None,
+                 pad: bool | None = False,
+                 size: Literal['min', 'max'] | tuple[int, int] = None,
                  normalize: bool = False,
-                 save_path: Optional[Union[str, os.PathLike]] = None,
+                 save_path: str | os.PathLike | None = None,
                  verbose: bool = True):
 
         if save_path is not None:

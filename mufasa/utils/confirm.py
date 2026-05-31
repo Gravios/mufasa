@@ -82,7 +82,7 @@ from typing import Optional
 def _default_confirm(question: str,
                      option_one: str = "YES",
                      option_two: str = "NO",
-                     title: Optional[str] = None) -> str:
+                     title: str | None = None) -> str:
     """Default confirmation. Stdin if available; auto-yes if not.
 
     Patch 122de simplified this function — the prior lazy
@@ -106,7 +106,7 @@ def _default_confirm(question: str,
 def _stdin_confirm(question: str,
                    option_one: str,
                    option_two: str,
-                   title: Optional[str]) -> str:
+                   title: str | None) -> str:
     """Stdin fallback. Returns ``option_one`` if no input or
     if input is unavailable.
     """

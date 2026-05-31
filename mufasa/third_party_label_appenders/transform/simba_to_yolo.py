@@ -62,20 +62,20 @@ class SimBA2Yolo:
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
+                 config_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 data_dir: str | os.PathLike | None = None,
                  train_size: float = 0.7,
                  verbose: bool = False,
                  greyscale: bool = False,
                  clahe: bool = False,
                  padding: float = 0.00,
                  threshold: float = 0.00,
-                 flip_idx: Optional[Tuple[int, ...]] = None,
-                 names: Tuple[str, ...] = ('animal_1',),
-                 sample_size: Optional[int] = None,
-                 bp_id_idx: Optional[Dict[int, Union[Tuple[int], List[int]]]] = None,
-                 single_id: Optional[str] = None) -> None:
+                 flip_idx: tuple[int, ...] | None = None,
+                 names: tuple[str, ...] = ('animal_1',),
+                 sample_size: int | None = None,
+                 bp_id_idx: dict[int, tuple[int] | list[int]] | None = None,
+                 single_id: str | None = None) -> None:
 
         check_valid_boolean(value=verbose, source=f'{self.__class__.__name__} verbose')
         check_valid_boolean(value=greyscale, source=f'{self.__class__.__name__} greyscale')

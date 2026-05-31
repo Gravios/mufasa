@@ -87,15 +87,15 @@ class FitYolo:
     """
 
     def __init__(self,
-                 model_yaml: Union[str, os.PathLike],
-                 save_path: Union[str, os.PathLike],
-                 weights_path: Optional[Union[str, os.PathLike]] = None,
+                 model_yaml: str | os.PathLike,
+                 save_path: str | os.PathLike,
+                 weights_path: str | os.PathLike | None = None,
                  epochs: int = 200,
-                 batch: Union[int, float] = 16,
+                 batch: int | float = 16,
                  plots: bool = True,
                  imgsz: int = 640,
-                 format: Optional[str] = None,
-                 device:  Union[Literal['cpu'], int] = 0,
+                 format: str | None = None,
+                 device:  Literal['cpu'] | int = 0,
                  verbose: bool = True,
                  workers: int = 8,
                  patience: int = 300):
@@ -125,7 +125,7 @@ class FitYolo:
         self.imgsz, self.device, self.workers, self.format = imgsz, device, workers, format
         self.plots, self.save_path, self.verbose, self.patience = plots, save_path, verbose, patience
 
-    def _download_start_weights(self, url: str = YOLO_M_PATH, save_path: Union[str, os.PathLike] = "yolo11m-pose.pt"):
+    def _download_start_weights(self, url: str = YOLO_M_PATH, save_path: str | os.PathLike = "yolo11m-pose.pt"):
         print(f'No start weights provided, downloading {save_path} from {url}...')
         check_valid_url(url=url, raise_error=True, source=self.__class__.__name__)
         if not os.path.isfile(save_path):

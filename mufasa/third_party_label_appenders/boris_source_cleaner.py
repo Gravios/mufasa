@@ -60,9 +60,9 @@ class BorisSourceCleaner:
 
     def __init__(
         self,
-        data_dir: Union[str, os.PathLike],
-        save_dir: Union[str, os.PathLike],
-        settings: List[Dict[str, str]],
+        data_dir: str | os.PathLike,
+        save_dir: str | os.PathLike,
+        settings: list[dict[str, str]],
     ):
         check_if_dir_exists(in_dir=data_dir)
         check_if_dir_exists(in_dir=save_dir)

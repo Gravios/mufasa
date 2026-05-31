@@ -45,7 +45,7 @@ OVERLAY_GRID_COLOR = 'OVERLAY_GRID_COLOR'
 def _plot_roi(roi_dict: dict, 
               img: np.ndarray,
               show_tags: bool = False,
-              omitted_roi: Optional[str] = None):
+              omitted_roi: str | None = None):
     
     rectangles_df, circles_df, polygon_df = pd.DataFrame(columns=get_rectangle_df_headers()), pd.DataFrame(columns=get_circle_df_headers()), pd.DataFrame(columns=get_polygon_df_headers())
     for roi_name, roi_data in roi_dict.items():
@@ -141,10 +141,10 @@ class InteractiveROIModifier:
                  roi_dict: dict,
                  img: np.ndarray,
                  orginal_img: np.ndarray,
-                 settings: Optional[dict] = None,
+                 settings: dict | None = None,
                  tkinter_window: bool = True,
-                 hex_grid: Optional[List[Polygon]] = None,
-                 rectangle_grid: Optional[List[Polygon]] = None):
+                 hex_grid: list[Polygon] | None = None,
+                 rectangle_grid: list[Polygon] | None = None):
 
         self.window_name = window_name
         self.roi_dict = roi_dict
@@ -180,7 +180,7 @@ class InteractiveROIModifier:
         return gridline_img
 
 
-    def find_closest_tag(self, roi_dict: dict, click_coordinate: Tuple[int, int]):
+    def find_closest_tag(self, roi_dict: dict, click_coordinate: tuple[int, int]):
         clicked_roi, clicked_tag = None, None
         for roi_name, roi_data in roi_dict.items():
             ear_tag_size = roi_data['Ear_tag_size']
