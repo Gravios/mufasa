@@ -9,7 +9,7 @@ from mufasa.utils.checks import (check_float, check_if_dir_exists, check_int,
 from mufasa.utils.printing import SimbaTimer, stdout_success
 
 
-class GibbSampler():
+class GibbSampler:
 
     """
      Gibbs sampling for finding "motifs" in categorical sequences.

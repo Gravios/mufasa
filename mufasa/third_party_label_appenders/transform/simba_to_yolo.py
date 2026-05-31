@@ -176,7 +176,7 @@ class SimBA2Yolo:
                 instance_str = f'{id} ' if self.single_id is None else '0 '
                 instance_str += keypoint_array_to_yolo_annotation_str(x=keypoints, img_w=img_w, img_h=img_h, padding=self.padding)
                 img_lbl += instance_str.strip() + '\n'
-                with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+                with open(lbl_save_path, mode='w', encoding='utf-8') as f:
                     f.write(img_lbl)
                 cv2.imwrite(img_save_path, img)
 

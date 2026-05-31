@@ -51,7 +51,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     seconds_to_timestamp)
 
 
-class PlottingMixin(object):
+class PlottingMixin:
     """
     Methods for visualizations
     """
@@ -134,7 +134,7 @@ class PlottingMixin(object):
         cmap = cm.get_cmap(pallete_name, increments + 1)
         color_lst = []
         for i in range(cmap.N):
-            rgb = list((cmap(i)[:3]))
+            rgb = list(cmap(i)[:3])
             if not as_rgb_ratio:
                 rgb = [i * 255 for i in rgb]
             rgb.reverse()

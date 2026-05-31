@@ -22,7 +22,7 @@ from mufasa.utils.enums import TkBinds
 
 DRAW_FRAME_NAME = "DEFINE SHAPE"
 
-class ROIRuler(object):
+class ROIRuler:
 
     """
     Interactive Tkinter-based ruler tool for measuring distances on ROI images.

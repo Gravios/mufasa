@@ -185,7 +185,7 @@ class SimBAROI2Yolo:
                 # cv2.polylines(img, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
                 # cv2.imshow('sadasdasd', img)
                 x = list(roi_results[video_name].values())
-                with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+                with open(lbl_save_path, mode='w', encoding='utf-8') as f:
                     f.write(''.join(x))
                 cnt += 1
 

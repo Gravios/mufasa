@@ -33,7 +33,7 @@ from mufasa.video_processors.video_processing import (video_bg_subtraction,
                                                      video_bg_subtraction_mp)
 
 
-class BlobLocationComputer(object):
+class BlobLocationComputer:
 
     """
     Detecting and saving blob locations from video files.

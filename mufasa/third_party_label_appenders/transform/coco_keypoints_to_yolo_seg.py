@@ -131,7 +131,7 @@ class COCOKeypoints2YoloSeg:
                 kps = list(np.column_stack((seg_arr_x, seg_arr_y)).flatten())
                 roi_str += ' '.join(str(x) for x in kps) + '\n'
             if roi_str:
-                with open(label_save_path, mode='wt', encoding='utf-8') as f:
+                with open(label_save_path, mode='w', encoding='utf-8') as f:
                     f.write(roi_str)
             cv2.imwrite(img_save_path, img)
         create_yolo_yaml(path=self.save_dir, train_path=self.train_img_dir, val_path=self.val_img_dir, names=self.map_dict, save_path=self.map_path)

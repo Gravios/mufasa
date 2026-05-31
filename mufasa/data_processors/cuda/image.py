@@ -566,7 +566,7 @@ def img_stack_to_grayscale_cupy(imgs: Union[np.ndarray, cp.ndarray],
     if imgs.ndim != 4:
         return imgs
     results = cp.zeros((imgs.shape[0], imgs.shape[1], imgs.shape[2]), dtype=np.uint8)
-    n = int(np.ceil((imgs.shape[0] / batch_size)))
+    n = int(np.ceil(imgs.shape[0] / batch_size))
     imgs = np.array_split(imgs, n)
     start = 0
     for i in range(len(imgs)):

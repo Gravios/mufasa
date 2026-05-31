@@ -43,8 +43,8 @@ def annotation_video_player():
                         video_info: dict) -> np.ndarray:
 
         current_time = round((frame_number / video_info["fps"]), 2)
-        frame = PlottingMixin().put_text(img=frame, text=f"F~ {frame_number}", pos=(TextOptions.BORDER_BUFFER_X.value, int((video_info["height"] - spacing_scale))), font_size=font_size, font_thickness=TextOptions.TEXT_THICKNESS.value + 1, text_bg_alpha=0.6, text_color=(255, 255, 255))
-        frame = PlottingMixin().put_text(img=frame, text=f"T~ {current_time}", pos=(TextOptions.BORDER_BUFFER_X.value, int((video_info["height"] - spacing_scale * 2))), font_size=font_size, font_thickness=TextOptions.TEXT_THICKNESS.value + 1, text_bg_alpha=0.6, text_color=(255, 255, 255))
+        frame = PlottingMixin().put_text(img=frame, text=f"F~ {frame_number}", pos=(TextOptions.BORDER_BUFFER_X.value, int(video_info["height"] - spacing_scale)), font_size=font_size, font_thickness=TextOptions.TEXT_THICKNESS.value + 1, text_bg_alpha=0.6, text_color=(255, 255, 255))
+        frame = PlottingMixin().put_text(img=frame, text=f"T~ {current_time}", pos=(TextOptions.BORDER_BUFFER_X.value, int(video_info["height"] - spacing_scale * 2)), font_size=font_size, font_thickness=TextOptions.TEXT_THICKNESS.value + 1, text_bg_alpha=0.6, text_color=(255, 255, 255))
         return frame
 
 

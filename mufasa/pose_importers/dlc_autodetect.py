@@ -110,7 +110,7 @@ def extract_bodyparts_from_csv(csv_path: Union[str, os.PathLike]) -> List[str]:
     """
     p = Path(csv_path)
     try:
-        with open(p, "r", newline="") as f:
+        with open(p, newline="") as f:
             reader = csv.reader(f)
             rows = [next(reader) for _ in range(3)]
     except StopIteration:

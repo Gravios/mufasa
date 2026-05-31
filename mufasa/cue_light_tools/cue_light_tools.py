@@ -42,10 +42,10 @@ def find_frames_when_cue_light_on(
         pre_window_frames, post_window_frames = [], []
         for i, r in light_bouts.iterrows():
             pre_window_frames.extend(
-                (list(range(r["Start_pre_window"], r["End_pre_window"])))
+                list(range(r["Start_pre_window"], r["End_pre_window"]))
             )
             post_window_frames.extend(
-                (list(range(r["Start_post_window"], r["End_post_window"])))
+                list(range(r["Start_post_window"], r["End_post_window"]))
             )
         light_on_dict[cue_light]["pre_window_frames"] = pre_window_frames
         light_on_dict[cue_light]["post_window_frames"] = post_window_frames

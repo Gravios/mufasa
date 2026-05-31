@@ -29,7 +29,7 @@ from mufasa.utils.read_write import (get_bp_headers, read_config_file,
                                     read_video_info_csv)
 
 
-class FeatureExtractionMixin(object):
+class FeatureExtractionMixin:
     """
     Methods for featurizing pose-estimation data.
 

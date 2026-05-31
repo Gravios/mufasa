@@ -10,7 +10,7 @@ import numpy as np
 from mufasa.utils.read_write import get_fn_ext, get_video_meta_data
 
 
-class CalculatePixelDistanceTool(object):
+class CalculatePixelDistanceTool:
     def __init__(
         self, video_path: Union[str, os.PathLike], known_mm_distance: float
     ) -> None:

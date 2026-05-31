@@ -140,7 +140,7 @@ class CustomFeatureExtractor(ConfigReader):
 
         check_file_exist_and_readable(file_path=file_path)
         check_str(name='target', value=target)
-        with open(file_path, "r") as file:
+        with open(file_path) as file:
             lines = file.readlines()
             for line in lines:
                 if line.strip() == target:

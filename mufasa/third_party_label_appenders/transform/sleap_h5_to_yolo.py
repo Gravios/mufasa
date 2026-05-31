@@ -147,7 +147,7 @@ class SleapH52Yolo:
                 instance_str = f'{track_id} ' if self.single_id is None else f'0 '
                 instance_str += keypoint_array_to_yolo_annotation_str(x=keypoints, img_w=img_w, img_h=img_h, padding=self.padding)
                 img_lbl += instance_str
-            with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+            with open(lbl_save_path, mode='w', encoding='utf-8') as f:
                 f.write(img_lbl)
             cv2.imwrite(img_save_path, img)
         create_yolo_keypoint_yaml(path=self.save_dir, train_path=self.img_train_dir, val_path=self.img_val_dir, names=self.map_dict, save_path=self.map_path, kpt_shape=(len(self.flip_idx), 3), flip_idx=self.flip_idx)

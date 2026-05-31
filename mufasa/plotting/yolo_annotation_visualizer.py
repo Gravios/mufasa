@@ -26,7 +26,7 @@ from mufasa.utils.yolo import detect_yolo_project_type
 BBOX_VALUE_CNT = 4
 KPT_DIM = 3
 
-class YOLOAnnotationVisualizer(object):
+class YOLOAnnotationVisualizer:
     r"""
     Visualize YOLO annotation label files overlaid on their source images.
 
@@ -86,7 +86,7 @@ class YOLOAnnotationVisualizer(object):
             img_format = f'.{img_format}'
         check_str(name=f'{self.__class__.__name__} img_format', value=img_format.lower(), options=('.png', '.jpeg', '.jpg', '.bmp', '.webp'))
 
-        with open(map_yaml_path, 'r') as f:
+        with open(map_yaml_path) as f:
             self.yolo_map = yaml.safe_load(f)
 
         required_keys = ['path', 'names']
@@ -262,7 +262,7 @@ class YOLOAnnotationVisualizer(object):
             else:
                 thickness = self.thickness
 
-            with open(lbl_path, 'r') as f:
+            with open(lbl_path) as f:
                 lines = f.readlines()
 
             for line in lines:

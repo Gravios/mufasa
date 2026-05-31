@@ -16,7 +16,7 @@ from mufasa.utils.printing import SimbaTimer, stdout_success
 warnings.filterwarnings("ignore", category=NaturalNameWarning)
 
 
-class KeypointRemover(object):
+class KeypointRemover:
     """
     Remove pose-estimated keypoints from data in CSV or H5 format.
 

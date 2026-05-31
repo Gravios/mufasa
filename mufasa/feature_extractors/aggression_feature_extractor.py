@@ -107,7 +107,7 @@ class AgressionFeatureExtractor(ConfigReader, AbstractFeatureExtraction):
                 x, y = self.results[col_1].values.astype(np.float32), self.results[col_2].values.astype(np.float32)
                 corr = np.abs(Statistics.sliding_pearsons_r(sample_1=x, sample_2=y, time_windows=TIME_WINDOWS, fps=int(fps)))
                 v = pd.DataFrame(corr, columns=[f'{col_1}_{col_2}_correlation_250', f'{col_1}_{col_2}_correlation_500', f'{col_1}_{col_2}_correlation_1000', f'{col_1}_{col_2}_correlation_2000'])
-                correlation_cols.extend((list(v.columns)))
+                correlation_cols.extend(list(v.columns))
                 self.results = pd.concat([self.results, v], axis=1)
             self.results['MIN_ANIMAL_BP_MOVEMENT_CORRELATION'] = self.results[correlation_cols].min(axis=1).astype(np.int32)
             self.results['MAX_ANIMAL_BP_MOVEMENT_CORRELATION'] = self.results[correlation_cols].max(axis=1).astype(np.int32)

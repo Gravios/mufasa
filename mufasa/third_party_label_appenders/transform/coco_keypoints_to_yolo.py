@@ -169,7 +169,7 @@ class COCOKeypoints2Yolo:
                 kps = list(np.column_stack((x, y, v)).flatten())
                 roi_str += ' '.join(str(x) for x in kps) + '\n'
             if roi_str:
-                with open(label_save_path, mode='wt', encoding='utf-8') as f:
+                with open(label_save_path, mode='w', encoding='utf-8') as f:
                     f.write(roi_str)
                 cv2.imwrite(img_save_path, img)
 

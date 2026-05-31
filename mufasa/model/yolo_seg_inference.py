@@ -26,7 +26,7 @@ from mufasa.utils.yolo import load_yolo_model, yolo_predict
 
 TASK = 'segment'
 
-class YOLOSegmentationInference():
+class YOLOSegmentationInference:
 
     """
      Run inference on video(s) using a trained YOLO segmentation model.

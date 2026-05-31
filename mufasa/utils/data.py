@@ -308,7 +308,7 @@ def create_color_palettes(no_animals: int, map_size: int, cmaps: Optional[List[s
         currColorMap = cm.get_cmap(cmaps[colormap], map_size)
         currColorList = []
         for i in range(currColorMap.N):
-            rgb = list((currColorMap(i)[:3]))
+            rgb = list(currColorMap(i)[:3])
             rgb = [i * 255 for i in rgb]
             rgb.reverse()
             currColorList.append(rgb)
@@ -349,7 +349,7 @@ def create_color_palette(pallete_name: str,
     cmap = cm.get_cmap(pallete_name, increments + 1)
     color_lst = []
     for i in range(cmap.N):
-        rgb = list((cmap(i)[:3]))
+        rgb = list(cmap(i)[:3])
         if not as_rgb_ratio:
             rgb = [i * 255 for i in rgb]
             if as_int:
@@ -543,7 +543,7 @@ def find_bins(
     video_bins_info = {}
     if normalization_method == "ALL VIDEOS":
         m = []
-        [m.extend((d.tolist())) for d in data.values()]
+        [m.extend(d.tolist()) for d in data.values()]
         if bracket_type == "QUANTILE":
             _, bins = pd.qcut(
                 x=m, q=bracket_cnt, labels=list(range(1, bracket_cnt + 1)), retbins=True
@@ -749,7 +749,7 @@ def slice_roi_dict_for_video(data: Dict[str, pd.DataFrame], video_name: str) -> 
             DuplicateNamesWarning(msg=f'The ROI data contains duplicate ROI names for video {video_name} and name(s) {list(duplicate_rois["Name"])} and shape {k}. SimBA is keeping one of them, but consider re-drawing your ROIs', source=slice_roi_dict_for_video.__name__)
             v = v.drop_duplicates(subset=['Video', 'Name'], keep='first').reset_index(drop=True)
         new_data[k] = v.reset_index(drop=True)
-        shape_names.extend((list(v["Name"].unique())))
+        shape_names.extend(list(v["Name"].unique()))
     return new_data, shape_names
 
 
@@ -783,7 +783,7 @@ def slice_roi_dict_from_attribute(data: Dict[str, pd.DataFrame],
         if video_names is not None:
             df = df[df['Video'].isin(video_names)]
         filtered_data[shape_type] = df.reset_index(drop=True)
-        roi_names.extend((list(df["Name"].unique())))
+        roi_names.extend(list(df["Name"].unique()))
     shape_cnt = len(filtered_data[Keys.ROI_RECTANGLES.value]) + len(filtered_data[Keys.ROI_CIRCLES.value]) + len(filtered_data[Keys.ROI_POLYGONS.value])
     return filtered_data, roi_names, shape_cnt
 

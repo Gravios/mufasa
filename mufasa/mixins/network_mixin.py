@@ -50,7 +50,7 @@ from mufasa.utils.errors import CountError, InvalidInputError
 # =========================================================================== #
 
 
-class NetworkMixin(object):
+class NetworkMixin:
     """
     Methods to create and analyze time-dependent graphs from pose-estimation data.
 

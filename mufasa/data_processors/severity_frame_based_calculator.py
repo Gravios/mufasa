@@ -133,7 +133,7 @@ class SeverityFrameCalculator(ConfigReader, FeatureExtractionMixin):
                 df=df, column_name=self.settings["clf"], file_name=file_path
             )
             move_df = pd.DataFrame(self.movements[video_name], columns=["MOVEMENT"])
-            video_bins = np.array((0))
+            video_bins = np.array(0)
             video_bins = np.hstack(
                 (video_bins, self.video_bins_info[video_name][:, -1])
             )

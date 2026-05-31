@@ -148,7 +148,7 @@ class Statistics(FeatureExtractionMixin):
             if num <= 0:
                 results[start:end] = -1
             else:
-                pooled_std = np.sqrt(((num / (denom))))
+                pooled_std = np.sqrt(num / (denom))
                 results[start:end] = (mean_1 - mean_2) / (pooled_std * np.sqrt(1 / len(data[i - 1]) + 1 / len(data[i])))
         return results
 
@@ -1806,7 +1806,7 @@ class Statistics(FeatureExtractionMixin):
         """
         conc_count = 0
         for i in prange(x.shape[0]):
-            unique_cnt = np.unique((x[i])).shape[0]
+            unique_cnt = np.unique(x[i]).shape[0]
             if unique_cnt == 1:
                 conc_count += 1
         if invert:
@@ -4005,10 +4005,10 @@ class Statistics(FeatureExtractionMixin):
         big_deltas = np.zeros([ks.shape[0], 1])
         for i, j in list(permutations(np.arange(0, ks.shape[0]), 2)):
             k, l = ks[i], ks[j]
-            values = distances[np.where((y == k))][:, np.where((y == l))]
+            values = distances[np.where(y == k)][:, np.where(y == l)]
             deltas[i, j] = np.min(values[np.nonzero(values)])
         for m in np.arange(0, ks.shape[0]):
-            values = distances[np.where((y == ks[m]))][:, np.where((y == ks[m]))]
+            values = distances[np.where(y == ks[m])][:, np.where(y == ks[m])]
             big_deltas[m] = np.max(values)
         v = np.min(deltas) / np.max(big_deltas)
         if v == np.inf: return -1

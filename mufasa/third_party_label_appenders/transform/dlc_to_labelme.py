@@ -17,7 +17,7 @@ from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_img, recursive_file_search
 
 
-class DLC2Labelme():
+class DLC2Labelme:
 
     r"""
     Convert a folder of DLC annotations into labelme json format.

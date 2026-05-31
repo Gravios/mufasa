@@ -80,7 +80,7 @@ def stdout_information(msg: str, source: Optional[str] = "", elapsed_time: Optio
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg} {Defaults.STR_SPLIT_DELIMITER.value}{TagNames.INFORMATION.value}")
 
 
-class SimbaTimer(object):
+class SimbaTimer:
     """Timer class for keeping track of start and end-times of calls"""
 
     def __init__(self,

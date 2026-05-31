@@ -15,7 +15,7 @@ from mufasa.utils.read_write import get_fn_ext, read_frm_of_video
 from mufasa.utils.warnings import ROIWarning
 
 
-class ROISelectorPolygon(object):
+class ROISelectorPolygon:
     """
     Class for selecting a polygonal region of interest (ROI) within an image or video frame.
     The selected region vertices are stored in self: polygon_vertices.

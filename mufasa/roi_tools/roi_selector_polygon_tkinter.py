@@ -17,7 +17,7 @@ from mufasa.utils.warnings import ROIWarning
 
 DRAW_FRAME_NAME = "DEFINE SHAPE"
 
-class ROISelectorPolygon(object):
+class ROISelectorPolygon:
 
     """
     Class for selecting a polygonal region of interest (ROI) within an image or video frame.

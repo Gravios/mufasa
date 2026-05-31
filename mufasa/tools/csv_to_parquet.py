@@ -144,7 +144,7 @@ def _detect_header_rows(csv_path: str, max_probe_lines: int = 10) -> int:
     """
     import csv as _csv
     header_count = 0
-    with open(csv_path, "r", newline="") as f:
+    with open(csv_path, newline="") as f:
         reader = _csv.reader(f)
         for i, row in enumerate(reader):
             if i >= max_probe_lines:
@@ -279,7 +279,7 @@ def verify_parquet(
 
     # Get CSV columns (last header row, the data-level names)
     try:
-        with open(csv_path, "r", newline="") as f:
+        with open(csv_path, newline="") as f:
             import csv as _csv
             reader = _csv.reader(f)
             header_lines = []

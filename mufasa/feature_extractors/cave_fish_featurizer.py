@@ -221,7 +221,7 @@ class CaveFishFeaturizer(ConfigReader, FeatureExtractionMixin):
     @staticmethod
     @jit(nopython=True, cache=True)
     def angular_dispersion(cumsum_cos_np, cumsum_sin_np):
-        out_array = np.empty((cumsum_cos_np.shape))
+        out_array = np.empty(cumsum_cos_np.shape)
         for index in range(cumsum_cos_np.shape[0]):
             X, Y = cumsum_cos_np[index] / (index + 1), cumsum_sin_np[index] / (
                 index + 1

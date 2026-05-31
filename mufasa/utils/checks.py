@@ -1516,7 +1516,7 @@ def check_if_df_field_is_boolean(df: pd.DataFrame,
         raise InvalidInputError(msg=f'Field is not of valid type. Accepted list or string got {type(field)}', source=check_if_df_field_is_boolean.__name__)
     for field in fields:
         check_that_column_exist(df=df, column_name=field, file_name=check_if_df_field_is_boolean.__name__)
-        additional = list((set(list(df[field])) - set(bool_values)))
+        additional = list(set(list(df[field])) - set(bool_values))
         if len(additional) > 0:
             if raise_error:
                 raise CountError(msg=f"Field {field} not a boolean in {df_name}. Found values {additional}. Accepted: {bool_values}", source=check_if_df_field_is_boolean.__name__)
@@ -2200,7 +2200,7 @@ def is_wsl() -> bool:
     True   # When running in WSL
     """
     try:
-        with open("/proc/version", "r") as f:
+        with open("/proc/version") as f:
             return "microsoft" in f.read().lower()
     except FileNotFoundError:
         return False

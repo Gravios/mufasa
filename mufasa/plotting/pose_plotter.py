@@ -22,7 +22,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
 from mufasa.utils.warnings import FrameRangeWarning
 
 
-class PosePlotter(object):
+class PosePlotter:
 
     """
     Create pose-estimation visualizations from data within a SimBA project folder.

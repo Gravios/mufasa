@@ -14,7 +14,7 @@ from mufasa.utils.read_write import (get_fn_ext, get_video_meta_data,
 from mufasa.utils.warnings import CropWarning
 
 
-class ROISelector(object):
+class ROISelector:
     """
     A class for selecting and reflecting Regions of Interest (ROI) in an image.
     The selected region variables are stored in self: top_left, bottom_right, width, height etc.

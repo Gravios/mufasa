@@ -77,7 +77,7 @@ def shah_appender(labels_dir: Union[str, os.PathLike],
     for file_cnt, (file_name, file_path) in enumerate(lbls_paths.items()):
         print(f'Processing {file_path}...')
         video_timer = SimbaTimer(start=True)
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             file_data = f.read()
         video_name = get_video_name(data=file_data, file_path=file_path)
         if video_name not in x_paths.keys():

@@ -26,7 +26,7 @@ from mufasa.video_processors.video_processing import (change_single_video_fps,
                                                      video_to_greyscale)
 
 
-class FFMPEGCommandCreator(object):
+class FFMPEGCommandCreator:
     """
     Execute FFmpeg commands from instructions stored in json format.
 
@@ -61,7 +61,7 @@ class FFMPEGCommandCreator(object):
             raise FFMPEGNotFoundError(msg='Cannot perform batch video processing: FFMPEG not found', source=self.__class__.__name__)
 
         check_file_exist_and_readable(json_path)
-        with open(json_path, "r") as fp:
+        with open(json_path) as fp:
             self.video_dict = json.load(fp)
         self.input_dir = self.video_dict["meta_data"]["in_dir"]
         self.out_dir = self.video_dict["meta_data"]["out_dir"]

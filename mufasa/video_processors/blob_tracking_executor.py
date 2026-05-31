@@ -56,7 +56,7 @@ REQUIRED_KEYS = (IN_DIR, OUT_DIR, GPU, CORE_CNT, VIDEO_DATA, VERTICE_CNT, SAVE_B
 
 
 
-class BlobTrackingExecutor():
+class BlobTrackingExecutor:
 
     """
     Perform animal blob tracking from video data using background subtraction, blob location detection,

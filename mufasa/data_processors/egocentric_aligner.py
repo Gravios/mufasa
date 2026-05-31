@@ -20,7 +20,7 @@ from mufasa.video_processors.egocentric_video_rotator import \
     EgocentricVideoRotator
 
 
-class EgocentricalAligner():
+class EgocentricalAligner:
 
     """
     Aligns and rotates movement data and associated video frames based on specified anchor points to produce an egocentric view of the subject. The class aligns frames around a selected anchor point, optionally rotating the subject to a consistent direction and saving the output video.

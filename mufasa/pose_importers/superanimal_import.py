@@ -89,9 +89,9 @@ class SuperAnimalTopViewImporter(PoseImporterMixin, ConfigReader):
                 animal_field_names = [f"{animal_id}_{s}" for s in Formats.SUPERANIMAL_TOPVIEW_BP_NAMES.value]
             else:
                 animal_field_names = Formats.SUPERANIMAL_TOPVIEW_BP_NAMES.value
-            self.bp_names.extend((animal_field_names))
+            self.bp_names.extend(animal_field_names)
             animal_field_names = [f"{s}{suffix}" for s in animal_field_names for suffix in ("_x", "_y", "_p")]
-            self.field_names.extend((animal_field_names))
+            self.field_names.extend(animal_field_names)
         with open(self.body_parts_path, "w") as f:
             for name in self.bp_names:
                 f.write(name + "\n")

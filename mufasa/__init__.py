@@ -16,7 +16,7 @@ def _is_wsl() -> bool:
     top imports ``mufasa.data_processors.cuda.utils`` → ``numba.cuda``.
     """
     try:
-        with open("/proc/version", "r", encoding="utf-8") as fh:
+        with open("/proc/version", encoding="utf-8") as fh:
             return "microsoft" in fh.read().lower()
     except (OSError, FileNotFoundError):
         return False

@@ -69,7 +69,7 @@ def _plot_roi(roi_dict: dict,
     return img
 
 
-class InteractiveROIModifier():
+class InteractiveROIModifier:
     """
     Interactive Tkinter-based GUI tool for modifying ROI (Region of Interest) shapes by clicking, dragging, and keyboard controls.
 

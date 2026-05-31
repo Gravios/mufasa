@@ -114,7 +114,7 @@ class BooleanConditionalCalculator(ConfigReader):
             self.sliced_df = self._slice_df(df=self.df, rules=self.rules)
             time_s = round(len(self.sliced_df) / self.fps, 4)
             if len(self.sliced_df) > 0:
-                bout_df = pd.DataFrame(data=np.zeros((len(self.df))), columns=['behavior'])
+                bout_df = pd.DataFrame(data=np.zeros(len(self.df)), columns=['behavior'])
                 bout_df.iloc[self.sliced_df.index] = 1
                 bout_df = detect_bouts(data_df=bout_df, target_lst=['behavior'], fps=self.fps)
                 bout_df = bout_df.assign(**{k: v for k, v in self.rules.items()})

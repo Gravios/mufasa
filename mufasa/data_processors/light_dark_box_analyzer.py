@@ -19,7 +19,7 @@ pd.options.mode.chained_assignment = None
 COLUMN_NAMES = ['EVENT', 'START TIME (S)', 'END TIME (S)', 'START FRAME', 'END FRAME', 'DURATION (S)']
 OUT_COL_NAMES= ['VIDEO', 'BODY-PART', 'EVENT', 'START TIME (S)', 'END TIME (S)', 'START FRAME', 'END FRAME', 'DURATION (S)']
 
-class LightDarkBoxAnalyzer():
+class LightDarkBoxAnalyzer:
     r"""
     Perform light–dark box analysis using DeepLabCut pose estimation data.
 

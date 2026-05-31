@@ -133,7 +133,7 @@ class CropLPAnnotations:
         VIDEO_KEYS = ("video_dir", "test_videos_directory")
         n_updated = 0
         for yaml_path in yaml_files:
-            with open(yaml_path, "r") as f:
+            with open(yaml_path) as f:
                 lines = f.readlines()
             changed = False
             for i, line in enumerate(lines):

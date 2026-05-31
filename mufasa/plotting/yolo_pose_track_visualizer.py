@@ -77,7 +77,7 @@ def _yolo_keypoint_track_visualizer(frm_ids: np.ndarray,
     return batch_id
 
 
-class YOLOPoseTrackVisualizer():
+class YOLOPoseTrackVisualizer:
     """
     Visualizes YOLO-based keypoint pose estimation tracks on video frames and creates annotated output videos.
 

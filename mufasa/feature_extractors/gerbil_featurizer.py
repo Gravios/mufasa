@@ -17,7 +17,7 @@ warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
 
 WINDOW_SIZES = [5, 10, 20, 40]
 
-class GerbilFeaturizer(object):
+class GerbilFeaturizer:
     """
     Compute features from SLEAP pose-estimation data in NPY format with two animals and a single body-part tracked per animal.
 

@@ -75,7 +75,7 @@ def _light_dark_box_visualizer(pose_data: pd.DataFrame,
 
 
 
-class LightDarkBoxPlotter():
+class LightDarkBoxPlotter:
 
     """
     Generate annotated videos visualizing behavior episodes in a light/dark box setup.

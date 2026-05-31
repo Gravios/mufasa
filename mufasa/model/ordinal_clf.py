@@ -24,7 +24,7 @@ from mufasa.utils.read_write import find_core_cnt, read_pickle, write_pickle
 
 ACCEPTED_MODELS = RandomForestClassifier, cuRF
 
-class OrdinalClassifier():
+class OrdinalClassifier:
     """
     This class implements a strategy for ordinal classification by fitting multiple binary classifiers to predict thresholds between classes.
 

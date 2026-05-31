@@ -11,7 +11,7 @@ from mufasa.utils.enums import Formats, Options
 from mufasa.utils.read_write import read_img, recursive_file_search
 
 
-class Yolo2Imgs():
+class Yolo2Imgs:
 
 
     def __init__(self,
@@ -36,7 +36,7 @@ class Yolo2Imgs():
             img = read_img(img_path=img_paths[lbl_name])
             h, w = img.shape[:2]
             img_circle = self.circle_size if self.circle_size is not None else PlottingMixin().get_optimal_circle_size(frame_size=(w, h), circle_frame_ratio=100)
-            with open(lbl_path, "r") as file: lbls = file.read().strip().split('\n')
+            with open(lbl_path) as file: lbls = file.read().strip().split('\n')
             lbls = [x.strip().split() for x in lbls if x.strip()]
             for obs in lbls:
                 if len(obs) < 5:

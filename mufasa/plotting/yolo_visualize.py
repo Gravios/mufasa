@@ -21,7 +21,7 @@ CONFIDENCE = 'CONFIDENCE'
 CLASS_NAME = 'CLASS_NAME'
 CORD_FIELDS = ['X1', 'Y1', 'X2', 'Y2', 'X3', 'Y3', 'X4', 'Y4']
 
-class YOLOVisualizer():
+class YOLOVisualizer:
 
     """
     Visualize YOLO bounding-box inference results on a source video.
