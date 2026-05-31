@@ -100,7 +100,7 @@ class VideoProcessingConfig:
     on it, so this same config object can be reused across videos.
     """
 
-    feature_families: List[str]
+    feature_families: list[str]
     file_type: str
     temp_dir: str
 
@@ -113,13 +113,13 @@ class VideoProcessingConfig:
 
     # Project-level ROI data. May be None if no ROI features
     # are requested. Keyed by video name → {roi_name: roi_data}.
-    roi_dict: Optional[Mapping[str, dict]] = None
+    roi_dict: Mapping[str, dict] | None = None
 
     # Whole video_info dataframe. Used by process_one_video to look
     # up px_per_mm, fps, resolution per video. We pass the entire
     # frame (rather than a per-video slice) because the lookup is
     # cheap and it keeps the per-video function signature simple.
-    video_info_df: Optional[pd.DataFrame] = None
+    video_info_df: pd.DataFrame | None = None
 
     # Patch 122ae-3: when set, process_one_video also writes per-
     # family parquet files under this directory, organized as:
@@ -129,7 +129,7 @@ class VideoProcessingConfig:
     # unchanged regardless — this is purely additive so downstream
     # legacy-append paths (features_extracted / targets_inserted)
     # keep working during the migration window. None disables it.
-    derived_features_dir: Optional[str] = None
+    derived_features_dir: str | None = None
 
 
 def _read_video_info_for(

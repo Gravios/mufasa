@@ -50,11 +50,11 @@ class SLEAPImporterSLP(ConfigReader, PoseImporterMixin):
     """
 
     def __init__(self,
-                 project_path: Union[str, os.PathLike],
-                 data_folder:  Union[str, os.PathLike],
-                 id_lst: List[str],
-                 interpolation_settings: Optional[Dict[str, str]] = None,
-                 smoothing_settings: Optional[Dict[str, Any]] = None):
+                 project_path: str | os.PathLike,
+                 data_folder:  str | os.PathLike,
+                 id_lst: list[str],
+                 interpolation_settings: dict[str, str] | None = None,
+                 smoothing_settings: dict[str, Any] | None = None):
 
         ConfigReader.__init__(self, config_path=project_path, read_video_info=False)
         PoseImporterMixin.__init__(self)

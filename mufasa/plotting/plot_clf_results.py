@@ -76,25 +76,25 @@ class PlotSklearnResultsSingleCore(ConfigReader, TrainModelMixin, PlottingMixin)
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
                  video_setting: bool = True,
                  frame_setting: bool = False,
-                 video_paths: Optional[Union[List[Union[str, os.PathLike]], Union[str, os.PathLike]]] = None,
+                 video_paths: list[str | os.PathLike] | str | os.PathLike | None = None,
                  rotate: bool = False,
                  animal_names: bool = False,
                  show_pose: bool = True,
                  show_bbox: bool = False,
                  show_confidence: bool = False,
-                 show_gantt: Optional[int] = None,
-                 font_size: Optional[Union[int, float]] = None,
-                 space_size: Optional[Union[int, float]] = None,
-                 text_opacity: Optional[Union[int, float]] = None,
-                 text_thickness: Optional[Union[int, float]] = None,
-                 circle_size: Optional[Union[int, float]] = None,
-                 pose_palette: Optional[str] = 'Set1',
+                 show_gantt: int | None = None,
+                 font_size: int | float | None = None,
+                 space_size: int | float | None = None,
+                 text_opacity: int | float | None = None,
+                 text_thickness: int | float | None = None,
+                 circle_size: int | float | None = None,
+                 pose_palette: str | None = 'Set1',
                  print_timers: bool = True,
-                 text_clr: Tuple[int, int,int] = (255, 255, 255),
-                 text_bg_clr: Tuple[int, int,int] = (0, 0, 0)):
+                 text_clr: tuple[int, int,int] = (255, 255, 255),
+                 text_bg_clr: tuple[int, int,int] = (0, 0, 0)):
 
         ConfigReader.__init__(self, config_path=config_path)
         TrainModelMixin.__init__(self)

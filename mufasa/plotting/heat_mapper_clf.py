@@ -52,10 +52,10 @@ class HeatMapperClfSingleCore(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
                  bodypart: str,
                  clf_name: str,
-                 data_paths: List[str],
+                 data_paths: list[str],
                  style_attr: dict,
                  final_img_setting: bool = True,
                  video_setting: bool = False,

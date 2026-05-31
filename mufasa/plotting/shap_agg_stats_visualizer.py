@@ -27,7 +27,7 @@ MUFASA_DIR = os.path.dirname(mufasa.__file__)
 
 SIMBA_DIR = MUFASA_DIR  # patch 122bp: back-compat alias
 
-def _create_shap_base_plot(baseline_value: int) -> Tuple[np.ndarray, Tuple[int, int], List[Tuple[int, int]]]:
+def _create_shap_base_plot(baseline_value: int) -> tuple[np.ndarray, tuple[int, int], list[tuple[int, int]]]:
 
     shap_img_path = os.path.join(MUFASA_DIR, Paths.SIMBA_SHAP_IMG_PATH.value)
     check_if_dir_exists(in_dir=shap_img_path)
@@ -63,9 +63,9 @@ def _create_shap_base_plot(baseline_value: int) -> Tuple[np.ndarray, Tuple[int, 
     return img, arrow_start, side_scale_y_tick_cords
 
 def _insert_data_in_base_shap_plot(img: np.ndarray,
-                                   arrow_start: Tuple[int, int],
+                                   arrow_start: tuple[int, int],
                                    present_df: pd.DataFrame,
-                                   side_scale_y_tick_cords: List[Tuple[int, int]]) -> np.ndarray:
+                                   side_scale_y_tick_cords: list[tuple[int, int]]) -> np.ndarray:
 
     check_if_valid_img(data=img, source=f'{_insert_data_in_base_shap_plot.__name__} img')
     check_valid_tuple(x=arrow_start, min_integer=0)
@@ -149,8 +149,8 @@ class ShapAggregateStatisticsCalculator:
                  shap_df: pd.DataFrame,
                  classifier_name: str,
                  shap_baseline_value: int,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 filename_suffix: Optional[int] = None,
+                 save_dir: str | os.PathLike | None = None,
+                 filename_suffix: int | None = None,
                  plot: bool = True):
 
         check_instance(source=f"{self.__class__.__name__} shap_df", instance=shap_df, accepted_types=(pd.DataFrame,))

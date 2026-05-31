@@ -85,10 +85,10 @@ class DLCSingleAnimalCSVImporter(ConfigReader, PoseImporterMixin):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
-        data_folder: Union[str, os.PathLike],
-        interpolation_settings: Optional[Dict[str, str]] = None,
-        smoothing_settings: Optional[Dict[str, Any]] = None,
+        config_path: str | os.PathLike,
+        data_folder: str | os.PathLike,
+        interpolation_settings: dict[str, str] | None = None,
+        smoothing_settings: dict[str, Any] | None = None,
         p_threshold: float = 0.0,
     ) -> None:
         check_file_exist_and_readable(file_path=config_path)
@@ -155,7 +155,7 @@ class DLCSingleAnimalCSVImporter(ConfigReader, PoseImporterMixin):
     # Internal helpers
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _find_csv_files(directory: Union[str, os.PathLike]) -> List[str]:
+    def _find_csv_files(directory: str | os.PathLike) -> list[str]:
         """Sorted list of .csv paths in *directory* (non-recursive)."""
         out = []
         for name in sorted(os.listdir(directory)):
@@ -179,7 +179,7 @@ class DLCSingleAnimalCSVImporter(ConfigReader, PoseImporterMixin):
     def run(self) -> None:
         """Import every ``.csv`` found in ``self.data_folder``."""
         import_log_rows = []
-        mask_totals: Dict[str, Dict[str, int]] = {}
+        mask_totals: dict[str, dict[str, int]] = {}
         for cnt, csv_path in enumerate(self.input_data_paths):
             video_timer = SimbaTimer(start=True)
             raw_stem = get_fn_ext(filepath=csv_path)[1]

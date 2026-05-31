@@ -37,7 +37,7 @@ def stabilize_body_parts(bp_1: np.ndarray,
                          bp_2: np.ndarray,
                          center_positions: np.ndarray,
                          max_jump_distance: int = 20,
-                         smoothing_factor: float = 0.8) -> Tuple[np.ndarray, np.ndarray]:
+                         smoothing_factor: float = 0.8) -> tuple[np.ndarray, np.ndarray]:
 
     d1 = np.linalg.norm(bp_1[0] - center_positions[0])
     d2 = np.linalg.norm(bp_2[0] - center_positions[0])
@@ -71,7 +71,7 @@ def stabilize_body_parts(bp_1: np.ndarray,
     return stable_nose, stable_tail
 
 
-def get_hull_from_vertices(vertices: np.ndarray) -> Tuple[bool, np.ndarray]:
+def get_hull_from_vertices(vertices: np.ndarray) -> tuple[bool, np.ndarray]:
 
     vertices = np.unique(vertices, axis=0).astype(int)
     if vertices.shape[0] < 3:
@@ -185,7 +185,7 @@ def get_nose_tail_from_vertices(vertices: np.ndarray,
 def get_left_right_points(hull_vertices: np.ndarray,
                            anterior: np.ndarray,
                            center: np.ndarray,
-                           posterior: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+                           posterior: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Identify the leftmost and rightmost points on an animal's body shape relative to its anterior-posterior axis.
 
@@ -242,14 +242,14 @@ def get_left_right_points(hull_vertices: np.ndarray,
 
 
 
-def get_blob_vertices_from_imgs(frm_idxs: Tuple[int, List[int]],
-                                video_path: Union[str, os.PathLike],
+def get_blob_vertices_from_imgs(frm_idxs: tuple[int, list[int]],
+                                video_path: str | os.PathLike,
                                 verbose: bool = False,
-                                video_name: Optional[str] = None,
-                                inclusion_zone: Optional[Union[Polygon, MultiPolygon,]] = None,
-                                window_size: Optional[int] = None,
+                                video_name: str | None = None,
+                                inclusion_zone: Polygon | MultiPolygon | None = None,
+                                window_size: int | None = None,
                                 convex_hull: bool = False,
-                                vertice_cnt: int = 50) -> Dict[int, Dict[str, Union[int, np.ndarray]]]:
+                                vertice_cnt: int = 50) -> dict[int, dict[str, int | np.ndarray]]:
     r"""
     Helper to find the largest connected component in binary image. E.g., Use to find a "blob" (i.e., animal) within a background subtracted image.
 
@@ -321,14 +321,14 @@ def get_blob_vertices_from_imgs(frm_idxs: Tuple[int, List[int]],
 
     return results
 
-def get_blob_vertices_from_video(video_path: Union[str, os.PathLike],
-                                 pool: Optional[multiprocessing.Pool] = None,
+def get_blob_vertices_from_video(video_path: str | os.PathLike,
+                                 pool: multiprocessing.Pool | None = None,
                                  gpu: bool = False,
                                  core_cnt: int = -1,
                                  verbose: bool = True,
-                                 inclusion_zone: Optional[Union[Polygon, MultiPolygon]] = None,
-                                 window_size: Optional[float] = None,
-                                 batch_size: Optional[int] = None,
+                                 inclusion_zone: Polygon | MultiPolygon | None = None,
+                                 window_size: float | None = None,
+                                 batch_size: int | None = None,
                                  convex_hull: bool = False,
                                  vertice_cnt: int = 50) -> np.ndarray:
 

@@ -39,7 +39,7 @@ class DLCAutodetectError(Exception):
     """Raised when a DLC file can't be parsed for body-part names."""
 
 
-def _dedupe_preserve_order(names: List[str]) -> List[str]:
+def _dedupe_preserve_order(names: list[str]) -> list[str]:
     """Remove duplicates while keeping first-appearance order."""
     seen: dict = {}
     for n in names:
@@ -48,7 +48,7 @@ def _dedupe_preserve_order(names: List[str]) -> List[str]:
     return list(seen.keys())
 
 
-def extract_bodyparts_from_h5(h5_path: Union[str, os.PathLike]) -> List[str]:
+def extract_bodyparts_from_h5(h5_path: str | os.PathLike) -> list[str]:
     """Read body-part names from a DLC single-animal H5 file.
 
     DLC single-animal H5 has a 3-level column ``MultiIndex``:
@@ -97,7 +97,7 @@ def extract_bodyparts_from_h5(h5_path: Union[str, os.PathLike]) -> List[str]:
     return bps
 
 
-def extract_bodyparts_from_csv(csv_path: Union[str, os.PathLike]) -> List[str]:
+def extract_bodyparts_from_csv(csv_path: str | os.PathLike) -> list[str]:
     """Read body-part names from a DLC CSV file.
 
     DLC CSVs store a 3-row multi-header:
@@ -140,7 +140,7 @@ def extract_bodyparts_from_csv(csv_path: Union[str, os.PathLike]) -> List[str]:
     return bps
 
 
-def extract_bodyparts(dlc_path: Union[str, os.PathLike]) -> List[str]:
+def extract_bodyparts(dlc_path: str | os.PathLike) -> list[str]:
     """Extract body-part names from a DLC output file, dispatching on
     extension. Supported: ``.h5``, ``.csv``.
     """

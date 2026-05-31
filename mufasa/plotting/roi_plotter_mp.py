@@ -50,7 +50,7 @@ SECONDS, HHMMSSSSSS = ['seconds', 'hh:mm:ss.ssss']
 
 
 
-def _roi_plotter_mp(data: Tuple[int, pd.DataFrame],
+def _roi_plotter_mp(data: tuple[int, pd.DataFrame],
                     loc_dict: dict,
                     font_size: float,
                     circle_sizes: list,
@@ -58,7 +58,7 @@ def _roi_plotter_mp(data: Tuple[int, pd.DataFrame],
                     video_shape_names: list,
                     input_video_path: str,
                     body_part_dict: dict,
-                    roi_dfs_dict: Dict[str, pd.DataFrame],
+                    roi_dfs_dict: dict[str, pd.DataFrame],
                     roi_dict: dict,
                     bp_colors: list,
                     show_animal_name: bool,
@@ -70,7 +70,7 @@ def _roi_plotter_mp(data: Tuple[int, pd.DataFrame],
                     print_timer: str,
                     border_bg_clr: tuple,
                     animal_bp_dict: dict,
-                    bbox: Optional[str]):
+                    bbox: str | None):
 
     def __insert_texts(roi_dict, img):
         for animal_name in animal_ids:
@@ -196,23 +196,23 @@ class ROIPlotMultiprocess(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 body_parts: List[str],
-                 threshold: Optional[float] = 0.0,
+                 config_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 body_parts: list[str],
+                 threshold: float | None = 0.0,
                  core_cnt: int = -1,
                  verbose: bool = True,
                  outside_roi: bool = False,
                  show_body_part: bool = True,
                  show_animal_name: bool = False,
-                 bbox: Optional[Literal['axis-aligned', 'animal-aligned']] = None,
+                 bbox: Literal['axis-aligned', 'animal-aligned'] | None = None,
                  show_bbox: bool = False,
                  print_timer: Literal['seconds', 'hh:mm:ss.ssss'] = 'seconds',
-                 border_bg_clr: Tuple[int, int, int] = (0, 0, 0),
-                 data_path: Optional[Union[str, os.PathLike]] = None,
-                 save_path: Optional[Union[str, os.PathLike]] = None,
-                 bp_colors: Optional[List[Tuple[int, int, int]]] = None,
-                 bp_sizes: Optional[List[Union[int]]] = None,
+                 border_bg_clr: tuple[int, int, int] = (0, 0, 0),
+                 data_path: str | os.PathLike | None = None,
+                 save_path: str | os.PathLike | None = None,
+                 bp_colors: list[tuple[int, int, int]] | None = None,
+                 bp_sizes: list[int] | None = None,
                  gpu: bool = False):
 
         # Patch 122et-hotfix — ROIPlotter (the single-core sibling)
@@ -379,7 +379,7 @@ class ROIPlotMultiprocess(ConfigReader):
             shape_dicts = {**shape_dicts, **d}
         return shape_dicts
 
-    def __get_bordered_img_size(self) -> Tuple[int, int]:
+    def __get_bordered_img_size(self) -> tuple[int, int]:
         cap = cv2.VideoCapture(self.video_path)
         cap.set(1, 1)
         _, img = self.cap.read()

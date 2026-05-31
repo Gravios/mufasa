@@ -45,15 +45,15 @@ class SamInference:
 
     """
     def __init__(self,
-                 video_path: Union[str, os.PathLike],
-                 weights_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 prompts: Union[np.ndarray, List[List[int]]],
-                 labels: Union[np.ndarray, List[List[int]]],
-                 names: Tuple[str, ...],
-                 imgsz: Optional[int] = 1024,
-                 confidence: Optional[float] = 0.25,
-                 vertice_cnt: Optional[int] = 100):
+                 video_path: str | os.PathLike,
+                 weights_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 prompts: np.ndarray | list[list[int]],
+                 labels: np.ndarray | list[list[int]],
+                 names: tuple[str, ...],
+                 imgsz: int | None = 1024,
+                 confidence: float | None = 0.25,
+                 vertice_cnt: int | None = 100):
 
         if not _is_cuda_available()[0]:
             raise MufasaGPUError(msg='No GPU detected.', source=self.__class__.__name__)

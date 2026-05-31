@@ -49,7 +49,7 @@ def egocentrically_align_pose_cuda(data: np.ndarray,
                                    anchor_2_idx: int,
                                    anchor_location: np.ndarray,
                                    direction: int,
-                                   batch_size: int = int(10e+5)) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                                   batch_size: int = int(10e+5)) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     """
     Aligns a set of 2D points egocentrically based on two anchor points and a target direction using GPU acceleration.

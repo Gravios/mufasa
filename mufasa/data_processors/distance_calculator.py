@@ -54,12 +54,12 @@ class DistanceCalculator(ConfigReader, FeatureExtractionMixin):
     >>> runner.save()
     """
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 body_parts: Iterable[Tuple[str, str]],
+                 config_path: str | os.PathLike,
+                 body_parts: Iterable[tuple[str, str]],
                  bp_threshold: float = 0.00,
-                 distance_threshold: Optional[float] = None,
-                 file_paths: Optional[List[str]] = None,
-                 save_path: Optional[Union[str, os.PathLike]] = None,
+                 distance_threshold: float | None = None,
+                 file_paths: list[str] | None = None,
+                 save_path: str | os.PathLike | None = None,
                  distance_mean: bool = True,
                  distance_median: bool = True,
                  verbose: bool = True,

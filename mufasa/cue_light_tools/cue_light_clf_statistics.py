@@ -41,10 +41,10 @@ class CueLightClfAnalyzer(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 cue_light_names: List[str],
-                 clf_names: List[str],
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
+                 config_path: str | os.PathLike,
+                 cue_light_names: list[str],
+                 clf_names: list[str],
+                 data_dir: str | os.PathLike | None = None,
                  pre_window: int = 0,
                  post_window: int = 0):
 

@@ -36,7 +36,7 @@ class FeatureExtractionMixin:
     :param Optional[configparser.Configparser] config_path: Optional path to SimBA project.toml
     """
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
 
         if config_path:
             self.config_path = config_path
@@ -210,9 +210,9 @@ class FeatureExtractionMixin:
 
 
     @staticmethod
-    def three_point_angle(bp_1: Union[np.ndarray, pd.DataFrame],
-                          bp_2: Union[np.ndarray, pd.DataFrame],
-                          bp_3: Union[np.ndarray, pd.DataFrame]):
+    def three_point_angle(bp_1: np.ndarray | pd.DataFrame,
+                          bp_2: np.ndarray | pd.DataFrame,
+                          bp_3: np.ndarray | pd.DataFrame):
         """
         Compute frame-wise 3-point angles from three body-part trajectories.
 
@@ -685,7 +685,7 @@ class FeatureExtractionMixin:
 
         return shifted_values
 
-    def check_directionality_viable(self) -> Tuple[bool, List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
+    def check_directionality_viable(self) -> tuple[bool, list[np.ndarray], list[np.ndarray], list[np.ndarray]]:
         """
         Check if it is possible to calculate ``directionality`` statistics.
 
@@ -725,7 +725,7 @@ class FeatureExtractionMixin:
 
         return direction_viable, nose_cords, ear_left_cords, ear_right_cords
 
-    def get_feature_extraction_headers(self, pose: str) -> List[str]:
+    def get_feature_extraction_headers(self, pose: str) -> list[str]:
         """
         Helper to return the headers names (body-part location columns) that should be used during feature extraction.
 
@@ -981,7 +981,7 @@ class FeatureExtractionMixin:
         return results
 
     @staticmethod
-    def framewise_bodypart_movement(data: Union[np.ndarray, pd.DataFrame],
+    def framewise_bodypart_movement(data: np.ndarray | pd.DataFrame,
                                     px_per_mm: float = 1,
                                     centimeter: bool = False):
         """
@@ -1075,8 +1075,8 @@ class FeatureExtractionMixin:
     @staticmethod
     def keypoint_distances(a: np.ndarray,
                            b: np.ndarray,
-                           px_per_mm: Optional[float] = 1,
-                           in_centimeters: Optional[bool] = False) -> np.ndarray:
+                           px_per_mm: float | None = 1,
+                           in_centimeters: bool | None = False) -> np.ndarray:
 
         """
         Compute Euclidean distances between corresponding 2D keypoints with unit conversion.
@@ -1257,7 +1257,7 @@ class FeatureExtractionMixin:
         return results
 
     def insert_default_headers_for_feature_extraction(
-        self, df: pd.DataFrame, headers: List[str], pose_config: str, filename: str
+        self, df: pd.DataFrame, headers: list[str], pose_config: str, filename: str
     ) -> pd.DataFrame:
         """
         Helper to insert correct body-part column names prior to defualt feature extraction methods.
@@ -1275,12 +1275,12 @@ class FeatureExtractionMixin:
 
     @staticmethod
     def line_crosses_to_static_targets(
-        p: List[float],
-        q: List[float],
-        n: List[float],
-        M: List[float],
-        coord: List[float],
-    ) -> (bool, List[float]):
+        p: list[float],
+        q: list[float],
+        n: list[float],
+        M: list[float],
+        coord: list[float],
+    ) -> (bool, list[float]):
         """
         **Legacy** non-jitted helper to calculate if an animal is directing towards a static coordinate (e.g., ROI centroid).
 

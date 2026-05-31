@@ -25,7 +25,7 @@ from mufasa.utils.read_write import (find_core_cnt, get_fn_ext,
 from mufasa.video_processors.blob_tracking_executor import BlobTrackingExecutor
 
 
-def feature_extraction_runner(config_path: Union[str, os.PathLike]) -> None:
+def feature_extraction_runner(config_path: str | os.PathLike) -> None:
     """
     Helper to run feature extraction from CLI.
 
@@ -61,10 +61,10 @@ def feature_extraction_runner(config_path: Union[str, os.PathLike]) -> None:
 
 
 def set_video_parameters(
-    config_path: Union[str, os.PathLike],
+    config_path: str | os.PathLike,
     px_per_mm: float,
     fps: float,
-    resolution: Tuple[int, int],
+    resolution: tuple[int, int],
 ) -> None:
     """
     Helper to batch set the video_info.csv from CLI. Requires all videos to have the same pixels per millimeter,
@@ -119,7 +119,7 @@ def set_video_parameters(
 
 
 def set_outlier_correction_criteria_cli(
-    config_path: Union[str, os.PathLike],
+    config_path: str | os.PathLike,
     movement_criterion: float,
     location_criterion: float,
     aggregation: Literal["mean", "median"],
@@ -174,7 +174,7 @@ def set_outlier_correction_criteria_cli(
     )
 
 
-def blob_tracker(config_path: Union[str, os.PathLike]) -> None:
+def blob_tracker(config_path: str | os.PathLike) -> None:
     """
     Method to access blob detection through CLI or notebook
 

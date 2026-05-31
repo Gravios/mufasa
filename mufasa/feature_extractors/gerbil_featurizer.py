@@ -54,7 +54,7 @@ class GerbilFeaturizer:
 
     @staticmethod
     @jit(nopython=True, cache=True)
-    def calc_individual_animal_movements_in_time_windows(input_array=np.ndarray, frm_windows=List[int]) -> (np.ndarray, np.ndarray, np.ndarray):
+    def calc_individual_animal_movements_in_time_windows(input_array=np.ndarray, frm_windows=list[int]) -> (np.ndarray, np.ndarray, np.ndarray):
         '''
         Jitted compute of individual frame-by-frame pixel movement and aggregate movement statistics (mean, sum) in rolling time-windows for each animal.
 
@@ -83,7 +83,7 @@ class GerbilFeaturizer:
 
     @staticmethod
     @jit(nopython=True, cache=True)
-    def calc_animal_distances_in_time_windows(input_array=np.ndarray, frm_windows=List[int]) -> (np.ndarray, np.ndarray, np.ndarray):
+    def calc_animal_distances_in_time_windows(input_array=np.ndarray, frm_windows=list[int]) -> (np.ndarray, np.ndarray, np.ndarray):
 
         """
         Jitted compute of individual frame-by-frame pixel distances and aggregate distance statistics (mean, sum) in rolling time-windows between the two animals.
@@ -113,7 +113,7 @@ class GerbilFeaturizer:
 
     @staticmethod
     @jit(nopython=True, cache=True)
-    def calc_relative_data_in_time_windows(input_array=np.ndarray, frm_windows=List[int]) -> np.ndarray:
+    def calc_relative_data_in_time_windows(input_array=np.ndarray, frm_windows=list[int]) -> np.ndarray:
         """
         Jitted compute of individual frame-by-frame pixel distances and aggregate distance statistics (mean, sum) in rolling time-windows between the two animals.
         E.g., returns the relative distance between the two animals in the current frame vs 5, 10, 20, 40 frames earlier.

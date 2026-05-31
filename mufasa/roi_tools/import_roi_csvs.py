@@ -62,10 +62,10 @@ class ROIDefinitionsCSVImporter(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 rectangles_path: Optional[Union[str, os.PathLike]] = None,
-                 circles_path: Optional[Union[str, os.PathLike]] = None,
-                 polygon_path: Optional[Union[str, os.PathLike]] = None,
+                 config_path: str | os.PathLike,
+                 rectangles_path: str | os.PathLike | None = None,
+                 circles_path: str | os.PathLike | None = None,
+                 polygon_path: str | os.PathLike | None = None,
                  append: bool = False):
 
         if rectangles_path is None and circles_path is None and polygon_path is None:

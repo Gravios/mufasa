@@ -67,18 +67,18 @@ class CirclingDetector(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 nose_name: Optional[str] = 'nose',
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
-                 left_ear_name: Optional[str] = 'left_ear',
-                 right_ear_name: Optional[str] = 'right_ear',
-                 tail_base_name: Optional[str] = 'tail_base',
-                 center_name: Optional[str] = 'center',
-                 time_threshold: Optional[int] = 10,
-                 circular_range_threshold: Optional[int] = 340,
+                 config_path: str | os.PathLike,
+                 nose_name: str | None = 'nose',
+                 data_dir: str | os.PathLike | None = None,
+                 left_ear_name: str | None = 'left_ear',
+                 right_ear_name: str | None = 'right_ear',
+                 tail_base_name: str | None = 'tail_base',
+                 center_name: str | None = 'center',
+                 time_threshold: int | None = 10,
+                 circular_range_threshold: int | None = 340,
                  shortest_bout: int = 100,
-                 movement_threshold: Optional[int] = 60,
-                 save_dir: Optional[Union[str, os.PathLike]] = None):
+                 movement_threshold: int | None = 60,
+                 save_dir: str | os.PathLike | None = None):
 
         for bp_name in [nose_name, left_ear_name, right_ear_name, tail_base_name]: check_str(name='body part name', value=bp_name, allow_blank=False)
         ConfigReader.__init__(self, config_path=config_path, read_video_info=True, create_logger=False)

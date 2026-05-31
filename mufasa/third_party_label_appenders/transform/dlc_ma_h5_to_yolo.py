@@ -56,18 +56,18 @@ class MADLCH52Yolo:
     """
 
     def __init__(self,
-                 data_dir: Union[str, os.PathLike],
-                 video_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 frms_cnt: Optional[Union[int, None]] = None,
+                 data_dir: str | os.PathLike,
+                 video_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 frms_cnt: int | None | None = None,
                  verbose: bool = True,
                  threshold: float = 0,
                  train_size: float = 0.7,
-                 flip_idx: Tuple[int, ...] = None,
+                 flip_idx: tuple[int, ...] = None,
                  greyscale: bool = False,
                  clahe: bool = False,
                  padding: float = 0.00,
-                 single_id: Optional[str] = None):
+                 single_id: str | None = None):
 
 
         data_paths = find_files_of_filetypes_in_directory(directory=data_dir, extensions=H5_EXT, as_dict=True, raise_error=True)

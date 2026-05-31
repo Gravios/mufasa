@@ -80,8 +80,8 @@ def transform_xgb(x: pd.DataFrame,
 
 def evaluate_xgb(y_pred: np.ndarray,
                  y_true: np.ndarray,
-                 metrics: List[str],
-                 stratified: Optional[bool] = False) -> dict:
+                 metrics: list[str],
+                 stratified: bool | None = False) -> dict:
     """
     Evaluates the performance of a regression model (e.g., XGBoost) by calculating selected metrics. Optionally, the evaluation can be stratified by unique
     values in the true target variable (`y_true`), where performance is computed separately for each class/level.
@@ -156,14 +156,14 @@ def xgb_define(objective: str = 'reg:squarederror',
     return xgb.XGBRegressor(objective=objective, max_depth=max_depth, n_estimators=n_estimators, verbosity=verbosity, learning_rate=learning_rate, eta=eta, gamma=gamma, tree_method=tree_method)
 
 
-def xgb_grid_define(objective: Tuple[str] = ('reg:squarederror',),
-                    n_estimators: Tuple[int] = (100,),
-                    max_depth: Tuple[int] =(6,),
-                    verbosity: Tuple[int] = (1,),
-                    learning_rate: Tuple[float] = (0.3,),
-                    eta: Tuple[float] = (0.3,),
-                    gamma: Tuple[float] = (0.0,),
-                    tree_method: Tuple[str] = ('auto',)) -> List[xgb.XGBRegressor]:
+def xgb_grid_define(objective: tuple[str] = ('reg:squarederror',),
+                    n_estimators: tuple[int] = (100,),
+                    max_depth: tuple[int] =(6,),
+                    verbosity: tuple[int] = (1,),
+                    learning_rate: tuple[float] = (0.3,),
+                    eta: tuple[float] = (0.3,),
+                    gamma: tuple[float] = (0.0,),
+                    tree_method: tuple[str] = ('auto',)) -> list[xgb.XGBRegressor]:
 
     grid = list(product(objective, n_estimators, max_depth, verbosity, learning_rate, eta, gamma, tree_method))
     mdls = []
@@ -175,7 +175,7 @@ def xgb_grid_define(objective: Tuple[str] = ('reg:squarederror',),
 
 def xgb_grid_fit(x: pd.DataFrame,
                  y: np.ndarray,
-                 mdls: List[xgb.XGBRegressor]) -> List[xgb.XGBRegressor]:
+                 mdls: list[xgb.XGBRegressor]) -> list[xgb.XGBRegressor]:
 
     check_valid_dataframe(df=x, source=f'{fit_xgb.__name__} x', valid_dtypes=Formats.NUMERIC_DTYPES.value)
     check_valid_array(data=y, source=f'{fit_xgb.__name__} y', accepted_ndims=(1,), accepted_axis_0_shape=[x.shape[0]], accepted_dtypes=Formats.NUMERIC_DTYPES.value)

@@ -57,10 +57,10 @@ class FrameMergererFFmpeg(ConfigReader):
 
     def __init__( self,
                  concat_type: Literal["horizontal", "vertical", "mosaic", "mixed_mosaic"],
-                 video_paths: List[Union[str, os.PathLike]],
-                 video_height: Optional[int] = None,
-                 video_width: Optional[int] = None,
-                 config_path: Optional[str] = None,
+                 video_paths: list[str | os.PathLike],
+                 video_height: int | None = None,
+                 video_width: int | None = None,
+                 config_path: str | None = None,
                  quality: int = 23,
                  gpu: bool = False):
 

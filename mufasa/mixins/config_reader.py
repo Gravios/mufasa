@@ -91,7 +91,7 @@ class ConfigReader:
         # existed; gone now.)
         import tomllib
         with open(config_path, "rb") as _f:
-            self._project_toml_data: Dict[str, Any] = tomllib.load(_f)
+            self._project_toml_data: dict[str, Any] = tomllib.load(_f)
 
         self.config = read_config_file(config_path=config_path)
         self.datetime = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -607,7 +607,7 @@ class ConfigReader:
                 + _col_list(self.polygon_df, "Video")
             )
 
-    def get_all_clf_names(self) -> List[str]:
+    def get_all_clf_names(self) -> list[str]:
         """
         Helper to return all classifier names in SimBA project
 
@@ -628,7 +628,7 @@ class ConfigReader:
         return model_names
 
     def insert_column_headers_for_outlier_correction(
-        self, data_df: pd.DataFrame, new_headers: List[str], filepath: str
+        self, data_df: pd.DataFrame, new_headers: list[str], filepath: str
     ) -> pd.DataFrame:
         """
         Helper to insert new column headers onto a dataframe.
@@ -689,10 +689,10 @@ class ConfigReader:
 
     def find_video_of_file(
         self,
-        video_dir: Union[str, os.PathLike],
+        video_dir: str | os.PathLike,
         filename: str,
         raise_error: bool = False,
-    ) -> Union[str, os.PathLike]:
+    ) -> str | os.PathLike:
         """
         Helper to find the video file representing a known data file basename.
 
@@ -759,7 +759,7 @@ class ConfigReader:
         return shape_df
 
     def remove_a_folder(
-        self, folder_dir: str, raise_error: Optional[bool] = False
+        self, folder_dir: str, raise_error: bool | None = False
     ) -> None:
         """
         Helper to remove single directory.
@@ -774,7 +774,7 @@ class ConfigReader:
         shutil.rmtree(folder_dir, ignore_errors=True)
 
     def remove_multiple_folders(
-        self, folders: List[os.PathLike], raise_error: Optional[bool] = False
+        self, folders: list[os.PathLike], raise_error: bool | None = False
     ) -> None:
         """
         Helper to remove multiple directories.
@@ -821,11 +821,11 @@ class ConfigReader:
         multi_animal_status: bool,
         animal_id_lst: list,
         animal_cnt: int,
-        x_cols: List[str],
-        y_cols: List[str],
-        p_cols: Optional[List[str]] = None,
-        colors: Optional[List[List[Tuple[int, int, int]]]] = None,
-    ) -> Dict[str, Union[List[str], List[Tuple]]]:
+        x_cols: list[str],
+        y_cols: list[str],
+        p_cols: list[str] | None = None,
+        colors: list[list[tuple[int, int, int]]] | None = None,
+    ) -> dict[str, list[str] | list[tuple]]:
         """
         Helper to create dict of dict lookup of body-parts where the keys are animal names, and
         values are the body-part names.
@@ -964,9 +964,9 @@ class ConfigReader:
         section: str,
         option: str,
         data_type: Literal["str", "int", "float", "folder_path"],
-        default_value: Optional[Any] = None,
-        options: Optional[List[Any]] = None,
-    ) -> Union[str, int, float]:
+        default_value: Any | None = None,
+        options: list[Any] | None = None,
+    ) -> str | int | float:
         """
         Helper to read entry from a configparser.ConfigParser object
 
@@ -1028,7 +1028,7 @@ class ConfigReader:
                 )
 
     def read_video_info_csv(self,
-                            file_path: Union[str, os.PathLike]) -> pd.DataFrame:
+                            file_path: str | os.PathLike) -> pd.DataFrame:
         """
         Helper to read the project_folder/logs/video_info.csv of the SimBA project in as a pd.DataFrame
 
@@ -1065,8 +1065,8 @@ class ConfigReader:
 
     def read_video_info(self,
                         video_name: str,
-                        video_info_df_path: Optional[Union[str, os.PathLike]] = None,
-                        raise_error: Optional[bool] = True) -> Union[Tuple[pd.DataFrame, float, float], Tuple[None, None, None]]:
+                        video_info_df_path: str | os.PathLike | None = None,
+                        raise_error: bool | None = True) -> tuple[pd.DataFrame, float, float] | tuple[None, None, None]:
 
         """
         Helper to read the meta-data (pixels per mm, resolution, fps) from the video_info.csv for a single input file.
@@ -1142,7 +1142,7 @@ class ConfigReader:
         self.multi_animal_status = multi_animal_status
         self.multi_animal_id_list = multi_animal_id_lst[: self.animal_cnt]
 
-    def remove_roi_features(self, data_dir: Union[str, os.PathLike]) -> None:
+    def remove_roi_features(self, data_dir: str | os.PathLike) -> None:
         """
         Helper to remove ROI-based features from datasets within a directory. The identified ROI-based fields are move to the
         ``project_folder/logs/ROI_data_{datetime}`` directory.

@@ -104,16 +104,16 @@ class PathPlotterSingleCore(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_paths: List[Union[str, os.PathLike]],
+                 config_path: str | os.PathLike,
+                 data_paths: list[str | os.PathLike],
                  animal_attr: dict,
-                 style_attr: Optional[Union[Dict[str, Any], None]] = None,
-                 clf_attr: Optional[dict] = None,
+                 style_attr: dict[str, Any] | None | None = None,
+                 clf_attr: dict | None = None,
                  frame_setting: bool = False,
                  video_setting: bool = False,
                  last_frame: bool = False,
                  print_animal_names: bool = True,
-                 slicing: Optional[Dict] = None,
+                 slicing: dict | None = None,
                  roi: bool = False):
 
         log_event(logger_name=str(__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=self.create_log_msg_from_init_args(locals=locals()))

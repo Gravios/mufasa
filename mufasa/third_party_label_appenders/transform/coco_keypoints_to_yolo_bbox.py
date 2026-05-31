@@ -71,15 +71,15 @@ class COCOKeypoints2YoloBbox:
     """
 
     def __init__(self,
-                 coco_path: Union[str, os.PathLike],
-                 img_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 coco_path: str | os.PathLike,
+                 img_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  train_size: float = 0.7,
                  verbose: bool = True,
                  greyscale: bool = False,
                  clahe: bool = False,
-                 bbox_pad: Optional[float] = None,
-                 obb: Optional[bool] = False):
+                 bbox_pad: float | None = None,
+                 obb: bool | None = False):
 
         check_file_exist_and_readable(file_path=coco_path)
         check_if_dir_exists(in_dir=save_dir, source=f'{self.__class__.__name__} save_dir')

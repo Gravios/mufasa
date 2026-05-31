@@ -116,7 +116,7 @@ def jitted_centroid(points: np.ndarray) -> np.ndarray:
 
 def get_hull_sizes(points: np.ndarray,
                    target: str = "perimeter",
-                   pixels_per_mm: Optional[float] = None):
+                   pixels_per_mm: float | None = None):
     """
     Convex hull perimeter or area per frame, with validation and optional conversion to mm.
 

@@ -33,9 +33,9 @@ class InferenceValidation(ConfigReader, TrainModelMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 input_file_path: Union[str, os.PathLike],
-                 clf_path: Union[str, os.PathLike]):
+                 config_path: str | os.PathLike,
+                 input_file_path: str | os.PathLike,
+                 clf_path: str | os.PathLike):
 
         stdout_information(msg='Running validation inference ...')
         ConfigReader.__init__(self, config_path=config_path)

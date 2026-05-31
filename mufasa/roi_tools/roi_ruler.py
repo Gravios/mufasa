@@ -46,13 +46,13 @@ class ROIRuler:
 
     def __init__(self,
                  img_window: Toplevel,
-                 thickness: Optional[int] = None,
-                 second_thickness: Optional[int] = None,
-                 clr: Tuple[int, int, int] = None,
-                 second_clr: Tuple[int, int, int] = None,
+                 thickness: int | None = None,
+                 second_thickness: int | None = None,
+                 clr: tuple[int, int, int] = None,
+                 second_clr: tuple[int, int, int] = None,
                  tolerance: int = 10,
-                 px_per_mm: Optional[float] = None,
-                 on_info_text: Optional[Callable[[str], None]] = None,
+                 px_per_mm: float | None = None,
+                 on_info_text: Callable[[str], None] | None = None,
                  img_scale_factor: float = 1.0) -> None:
 
         check_instance(source=self.__class__.__name__, instance=img_window, accepted_types=(Toplevel,))
@@ -94,7 +94,7 @@ class ROIRuler:
         self.img_window.unbind(TkBinds.B1_MOTION.value)
         self.img_window.unbind(TkBinds.B1_RELEASE.value)
 
-    def _find_proximal_tag(self, click_coordinate: Tuple[int, int]):
+    def _find_proximal_tag(self, click_coordinate: tuple[int, int]):
         proximal_loc, proximal_name = None, None
         for loc_name, loc_cord in self.click_locs.items():
             if loc_cord is not None:

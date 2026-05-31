@@ -22,15 +22,15 @@ class LabelmeKeypoints2YoloKeypoints:
 
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 greyscale: Optional[bool] = True,
+                 data_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 greyscale: bool | None = True,
                  train_size: float = 0.7,
                  padding: float = 0.00,
-                 names: Tuple[str, ...] = ('mouse',),
-                 flip_idx: Optional[Tuple[int, ...]] = None,
-                 clahe: Optional[bool] = True,
-                 verbose: Optional[bool] = True):
+                 names: tuple[str, ...] = ('mouse',),
+                 flip_idx: tuple[int, ...] | None = None,
+                 clahe: bool | None = True,
+                 verbose: bool | None = True):
 
         r"""
         Converts LabelMe points into YOLO keypoint format formatted for model training.

@@ -59,7 +59,7 @@ class ImageMixin:
         pass
 
     @staticmethod
-    def brightness_intensity(imgs: Union[List[np.ndarray], np.ndarray], ignore_black: bool = True, verbose: bool = False) -> np.ndarray:
+    def brightness_intensity(imgs: list[np.ndarray] | np.ndarray, ignore_black: bool = True, verbose: bool = False) -> np.ndarray:
         """
         Compute the average brightness intensity within each image within a list.
 
@@ -104,7 +104,7 @@ class ImageMixin:
 
 
     @staticmethod
-    def gaussian_blur(img: np.ndarray, kernel_size: Optional[Tuple] = (9, 9)) -> np.ndarray:
+    def gaussian_blur(img: np.ndarray, kernel_size: tuple | None = (9, 9)) -> np.ndarray:
         """
         Applies a Gaussian blur to an input image using the specified kernel size.
 
@@ -124,8 +124,8 @@ class ImageMixin:
 
     @staticmethod
     def erode(img: np.ndarray,
-              kernel_size: Optional[Tuple[int, int]] = (3, 3),
-              iterations: Optional[int] = 3) -> np.ndarray:
+              kernel_size: tuple[int, int] | None = (3, 3),
+              iterations: int | None = 3) -> np.ndarray:
         """
         Applies morphological erosion to the input image using the specified kernel size and number of iterations.
 
@@ -147,18 +147,8 @@ class ImageMixin:
     def get_histocomparison(
         img_1: np.ndarray,
         img_2: np.ndarray,
-        method: Optional[
-            Literal[
-                "chi_square",
-                "correlation",
-                "intersection",
-                "bhattacharyya",
-                "hellinger",
-                "chi_square_alternative",
-                "kl_divergence",
-            ]
-        ] = "correlation",
-        absolute: Optional[bool] = True,
+        method: Literal["chi_square", "correlation", "intersection", "bhattacharyya", "hellinger", "chi_square_alternative", "kl_divergence"] | None = "correlation",
+        absolute: bool | None = True,
     ):
         """
         Compare histograms of two images using OpenCV's histogram comparison methods.
@@ -209,9 +199,9 @@ class ImageMixin:
     @staticmethod
     def get_contourmatch(img_1: np.ndarray,
                          img_2: np.ndarray,
-                         mode: Optional[Literal["all", "exterior"]] = "all",
-                         method: Optional[Literal["simple", "none", "l2", "kcos"]] = "simple",
-                         canny: Optional[bool] = True) -> float:
+                         mode: Literal["all", "exterior"] | None = "all",
+                         method: Literal["simple", "none", "l2", "kcos"] | None = "simple",
+                         canny: bool | None = True) -> float:
 
         """
         Calculate contour similarity between two images.
@@ -252,7 +242,7 @@ class ImageMixin:
         return cv2.matchShapes(img_1_contours[0], img_2_contours[0], cv2.CONTOURS_MATCH_I1, 0.0)
 
     @staticmethod
-    def slice_shapes_in_img(img: Union[np.ndarray, Tuple[cv2.VideoCapture, int]], geometries: List[Union[Polygon, np.ndarray]]) -> List[np.ndarray]:
+    def slice_shapes_in_img(img: np.ndarray | tuple[cv2.VideoCapture, int], geometries: list[Polygon | np.ndarray]) -> list[np.ndarray]:
         """
         Slice regions of interest (ROIs) from an image based on provided shapes.
 
@@ -339,10 +329,10 @@ class ImageMixin:
 
     @staticmethod
     def canny_edge_detection(img: np.ndarray,
-                             threshold_1: Optional[int] = 30,
-                             threshold_2: Optional[int] = 200,
-                             aperture_size: Optional[int] = 3,
-                             l2_gradient: Optional[bool] = False) -> np.ndarray:
+                             threshold_1: int | None = 30,
+                             threshold_2: int | None = 200,
+                             aperture_size: int | None = 3,
+                             l2_gradient: bool | None = False) -> np.ndarray:
         """
         Applies Canny edge detection to the input image using specified thresholds, aperture size, and L2 gradient option.
 
@@ -389,7 +379,7 @@ class ImageMixin:
         )
 
     @staticmethod
-    def img_moments(img: np.ndarray, hu_moments: Optional[bool] = False) -> np.ndarray:
+    def img_moments(img: np.ndarray, hu_moments: bool | None = False) -> np.ndarray:
 
         """
         Compute image moments or Hu moments from the given image.
@@ -421,8 +411,8 @@ class ImageMixin:
 
     @staticmethod
     def find_contours(img: np.ndarray,
-                      mode: Optional[Literal["all", "exterior"]] = "all",
-                      method: Optional[Literal["simple", "none", "l1", "kcos"]] = "simple") -> np.ndarray:
+                      mode: Literal["all", "exterior"] | None = "all",
+                      method: Literal["simple", "none", "l1", "kcos"] | None = "simple") -> np.ndarray:
 
         """
         Find contours in an image.
@@ -457,8 +447,8 @@ class ImageMixin:
     def orb_matching_similarity_(img_1: np.ndarray,
                                  img_2: np.ndarray,
                                  method: Literal["knn", "match", "radius"] = "knn",
-                                 mask: Optional[np.ndarray] = None,
-                                 threshold: Optional[int] = 0.75) -> int:
+                                 mask: np.ndarray | None = None,
+                                 threshold: int | None = 0.75) -> int:
 
 
         """Perform ORB feature matching between two sets of images.
@@ -485,7 +475,7 @@ class ImageMixin:
 
     @staticmethod
     def _template_matching_cpu_helper(
-        data: np.ndarray, video_path: Union[str, os.PathLike], target_frm: np.ndarray
+        data: np.ndarray, video_path: str | os.PathLike, target_frm: np.ndarray
     ):
         """Helper called from ``mufasa.mixins.image_mixin.ImageMixins.template_matching_cpu()``"""
         cap = cv2.VideoCapture(video_path)
@@ -503,11 +493,11 @@ class ImageMixin:
 
     @staticmethod
     def template_matching_cpu(
-        video_path: Union[str, os.PathLike],
+        video_path: str | os.PathLike,
         img: np.ndarray,
-        core_cnt: Optional[int] = -1,
-        return_img: Optional[bool] = False,
-    ) -> Tuple[int, dict, Union[None, np.ndarray]]:
+        core_cnt: int | None = -1,
+        return_img: bool | None = False,
+    ) -> tuple[int, dict, None | np.ndarray]:
         """
         Perform template matching on CPU using multiprocessing for parallelization.
 
@@ -589,9 +579,9 @@ class ImageMixin:
     @staticmethod
     def img_to_bw(
         img: np.ndarray,
-        lower_thresh: Optional[int] = 20,
-        upper_thresh: Optional[int] = 250,
-        invert: Optional[bool] = True,
+        lower_thresh: int | None = 20,
+        upper_thresh: int | None = 250,
+        invert: bool | None = True,
     ) -> np.ndarray:
         """
         Convert an image to black and white (binary).
@@ -676,8 +666,8 @@ class ImageMixin:
     def segment_img_horizontal(
         img: np.ndarray,
         pct: int,
-        lower: Optional[bool] = True,
-        both: Optional[bool] = False,
+        lower: bool | None = True,
+        both: bool | None = False,
     ) -> np.ndarray:
         """
         Segment a horizontal part of the input image.
@@ -758,8 +748,8 @@ class ImageMixin:
     def segment_img_vertical(
         img: np.ndarray,
         pct: int,
-        left: Optional[bool] = True,
-        both: Optional[bool] = False,
+        left: bool | None = True,
+        both: bool | None = False,
     ) -> np.ndarray:
         """
         Segment a vertical part of the input image.
@@ -799,7 +789,7 @@ class ImageMixin:
 
     @staticmethod
     def add_img_border_and_flood_fill(
-        img: np.array, invert: Optional[bool] = False, size: Optional[int] = 1
+        img: np.array, invert: bool | None = False, size: int | None = 1
     ) -> np.ndarray:
         """
         Add a border to the input image and perform flood fill.
@@ -848,7 +838,7 @@ class ImageMixin:
         return img[size:-size, size:-size]
 
     @staticmethod
-    def _image_reader_helper(img_paths: List[str]):
+    def _image_reader_helper(img_paths: list[str]):
         """Multiprocessing helper for ``ImageMixin().read_all_img_in_dir``"""
         results = {}
         for img_path in img_paths:
@@ -856,7 +846,7 @@ class ImageMixin:
         return results
 
     @staticmethod
-    def read_all_img_in_dir(dir: Union[str, os.PathLike], core_cnt: Optional[int] = -1) -> Dict[str, np.ndarray]:
+    def read_all_img_in_dir(dir: str | os.PathLike, core_cnt: int | None = -1) -> dict[str, np.ndarray]:
         """
         Helper to read in all images within a directory using multiprocessing.
 
@@ -933,8 +923,8 @@ class ImageMixin:
     @staticmethod
     @njit([(uint8[:, :, :, :], float64, float64), (uint8[:, :, :], float64, float64)], cache=True)
     def img_sliding_mse(imgs: np.ndarray,
-                        slide_length: Optional[float] = 1.0,
-                        sample_rate: Optional[float] = 1.0) -> np.ndarray:
+                        slide_length: float | None = 1.0,
+                        sample_rate: float | None = 1.0) -> np.ndarray:
         """
         Jitted compute the mean squared error (MSE) between pairs of images in a sliding window manner.
 
@@ -969,7 +959,7 @@ class ImageMixin:
         return results.astype(int64)
 
     @staticmethod
-    def _read_img_batch_from_video_helper(frm_idx: np.ndarray, video_path: Union[str, os.PathLike], greyscale: bool, verbose: bool, black_and_white: bool):
+    def _read_img_batch_from_video_helper(frm_idx: np.ndarray, video_path: str | os.PathLike, greyscale: bool, verbose: bool, black_and_white: bool):
 
         """Multiprocess helper used by read_img_batch_from_video to read in images from video file."""
         start_idx, end_frm, current_frm = frm_idx[0], frm_idx[-1] + 1, frm_idx[0]
@@ -989,13 +979,13 @@ class ImageMixin:
         return results
 
     @staticmethod
-    def read_img_batch_from_video(video_path: Union[str, os.PathLike],
+    def read_img_batch_from_video(video_path: str | os.PathLike,
                                   start_frm: int,
                                   end_frm: int,
                                   greyscale: bool = False,
                                   black_and_white: bool = False,
                                   core_cnt: int = -1,
-                                  verbose: bool = False) -> Dict[int, np.ndarray]:
+                                  verbose: bool = False) -> dict[int, np.ndarray]:
         """
         Read a batch of frames from a video file. This method reads frames from a specified range of frames within a video file using multiprocessing.
 
@@ -1043,11 +1033,11 @@ class ImageMixin:
         return results
 
     @staticmethod
-    def img_emd(imgs: List[np.ndarray] = None,
-                img_1: Optional[np.ndarray] = None,
-                img_2: Optional[np.ndarray] = None,
-                lower_bound: Optional[float] = 0.5,
-                verbose: Optional[bool] = False):
+    def img_emd(imgs: list[np.ndarray] = None,
+                img_1: np.ndarray | None = None,
+                img_2: np.ndarray | None = None,
+                lower_bound: float | None = 0.5,
+                verbose: bool | None = False):
         r"""
         Compute Wasserstein distance between two images represented as numpy arrays.
 
@@ -1104,9 +1094,9 @@ class ImageMixin:
         return emd
 
     @staticmethod
-    def create_uniform_img(size: Tuple[int, int],
-                           color: Tuple[int, int, int] = (0, 0, 0),
-                           save_path: Optional[Union[str, os.PathLike]] = None) -> Union[None, np.ndarray]:
+    def create_uniform_img(size: tuple[int, int],
+                           color: tuple[int, int, int] = (0, 0, 0),
+                           save_path: str | os.PathLike | None = None) -> None | np.ndarray:
 
         """
         Creates an image of specified size and color, and optionally saves it to a file.
@@ -1275,9 +1265,9 @@ class ImageMixin:
         return results
 
     @staticmethod
-    def _slice_shapes_in_imgs_array_helper(data: Tuple[int, int, np.ndarray, Polygon],
+    def _slice_shapes_in_imgs_array_helper(data: tuple[int, int, np.ndarray, Polygon],
                                            verbose: bool,
-                                           bg_color: Tuple[int, int, int]) -> Dict[int, np.ndarray]:
+                                           bg_color: tuple[int, int, int]) -> dict[int, np.ndarray]:
         """
         Private multiprocess helper called from ``mufasa.mixins.image_mixin.ImageMixins.slice_shapes_in_imgs()`` to slice shapes from
         an array of images.
@@ -1304,7 +1294,7 @@ class ImageMixin:
         return results
 
     @staticmethod
-    def pad_img_stack(image_dict: Dict[int, np.ndarray], pad_value: Optional[int] = 0) -> Dict[int, np.ndarray]:
+    def pad_img_stack(image_dict: dict[int, np.ndarray], pad_value: int | None = 0) -> dict[int, np.ndarray]:
         """
         Pad images in a dictionary stack to have the same dimensions (the same dimension is represented by the largest image in the stack)
 
@@ -1356,10 +1346,10 @@ class ImageMixin:
         return padded_images
 
     @staticmethod
-    def img_stack_to_video(imgs: Dict[int, np.ndarray],
-                           fps: Union[int, float],
-                           save_path: Union[str, os.PathLike],
-                           verbose: Optional[bool] = True) -> None:
+    def img_stack_to_video(imgs: dict[int, np.ndarray],
+                           fps: int | float,
+                           save_path: str | os.PathLike,
+                           verbose: bool | None = True) -> None:
         """
         Convert a dictionary of images into a video file.
 
@@ -1396,9 +1386,9 @@ class ImageMixin:
             stdout_success(msg=f"Video {save_path} complete", elapsed_time=timer.elapsed_time_str)
 
     @staticmethod
-    def _slice_shapes_in_video_file_helper(data: List[Tuple[int, Polygon]],
-                                           video_path: Union[str, os.PathLike],
-                                           bg_color: Tuple[int, int, int],
+    def _slice_shapes_in_video_file_helper(data: list[tuple[int, Polygon]],
+                                           video_path: str | os.PathLike,
+                                           bg_color: tuple[int, int, int],
                                            verbose: bool):
 
         cap = cv2.VideoCapture(video_path)
@@ -1429,11 +1419,11 @@ class ImageMixin:
         return results
 
     def slice_shapes_in_imgs(self,
-                             imgs: Union[np.ndarray, os.PathLike],
-                             shapes: Union[np.ndarray, List[Polygon]],
-                             core_cnt: Optional[int] = -1,
-                             verbose: Optional[bool] = False,
-                             bg_color: Optional[Tuple[int, int, int]] = (255, 255, 255)) -> Dict[int, np.ndarray]:
+                             imgs: np.ndarray | os.PathLike,
+                             shapes: np.ndarray | list[Polygon],
+                             core_cnt: int | None = -1,
+                             verbose: bool | None = False,
+                             bg_color: tuple[int, int, int] | None = (255, 255, 255)) -> dict[int, np.ndarray]:
         """
         Slice regions from a stack of images or a video file, where the regions are based on defined shapes. Uses multiprocessing.
 
@@ -1556,9 +1546,9 @@ class ImageMixin:
         return abs(structural_similarity(im1=img_1.astype(np.uint8), im2=img_2.astype(np.uint8), multichannel=multichannel))
 
     @staticmethod
-    def sliding_structural_similarity_index(imgs: List[np.ndarray],
-                                            stride: Optional[int] = 1,
-                                            verbose: Optional[bool] = False) -> np.ndarray:
+    def sliding_structural_similarity_index(imgs: list[np.ndarray],
+                                            stride: int | None = 1,
+                                            verbose: bool | None = False) -> np.ndarray:
 
         """
         Computes the Structural Similarity Index (SSI) between consecutive images in an array with a specified stride.
@@ -1605,7 +1595,7 @@ class ImageMixin:
         return results
 
     @staticmethod
-    def structural_similarity_matrix(imgs: List[np.array], verbose: Optional[bool] = False) -> np.ndarray:
+    def structural_similarity_matrix(imgs: list[np.array], verbose: bool | None = False) -> np.ndarray:
         """
         Computes a matrix of Structural Similarity Index (SSI) values for a list of images.
 
@@ -1775,9 +1765,9 @@ class ImageMixin:
         return results
 
     @staticmethod
-    def close(x: Union[List[np.ndarray], np.ndarray],
-              kernel: Tuple[int, int],
-              iterations: int = 3) -> Union[List[np.ndarray], np.ndarray]:
+    def close(x: list[np.ndarray] | np.ndarray,
+              kernel: tuple[int, int],
+              iterations: int = 3) -> list[np.ndarray] | np.ndarray:
 
         """
         Performs morphological closing on the provided image(s). Closing is a dilation operation followed by erosion,
@@ -1814,9 +1804,9 @@ class ImageMixin:
             return results
 
     @staticmethod
-    def find_first_non_uniform_clr_frm(video_path: Union[str, os.PathLike, cv2.VideoCapture],
-                                       start_idx: Optional[int] = 0,
-                                       end_idx: Optional[int] = None) -> Tuple[np.ndarray, int]:
+    def find_first_non_uniform_clr_frm(video_path: str | os.PathLike | cv2.VideoCapture,
+                                       start_idx: int | None = 0,
+                                       end_idx: int | None = None) -> tuple[np.ndarray, int]:
         """
         Find the first frame of non-uniform color in a video.
 
@@ -1864,7 +1854,7 @@ class ImageMixin:
         return first_frm, 0
 
     @staticmethod
-    def is_video_color(video: Union[str, os.PathLike, cv2.VideoCapture]):
+    def is_video_color(video: str | os.PathLike | cv2.VideoCapture):
         """
         Determines whether a video is in color or greyscale.
 
@@ -1942,9 +1932,9 @@ class ImageMixin:
 
 
     @staticmethod
-    def resize_img_dict(imgs: Dict[str, np.ndarray],
-                        size: Union[Literal['min', 'max'], Tuple[int, int]],
-                        interpolation: Optional[int] = cv2.INTER_LINEAR) -> Dict[str, np.ndarray]:
+    def resize_img_dict(imgs: dict[str, np.ndarray],
+                        size: Literal['min', 'max'] | tuple[int, int],
+                        interpolation: int | None = cv2.INTER_LINEAR) -> dict[str, np.ndarray]:
 
         """
         Resize a dictionary of images to a specified size.
@@ -2027,7 +2017,7 @@ class ImageMixin:
     @staticmethod
     def non_local_mean_denoising_sequence(imgs: np.ndarray,
                                           sigma: int = 30,
-                                          img_to_denoise_idx: Optional[int] = None) -> np.ndarray:
+                                          img_to_denoise_idx: int | None = None) -> np.ndarray:
 
         """
         Applies Non-Local Means (NLM) denoising to a stack of images or video frames to reduce noise, using a temporal window for multi-frame denoising.
@@ -2068,9 +2058,9 @@ class ImageMixin:
         return denoised_img
 
     @staticmethod
-    def get_timelapse_img(video_path: Union[str, os.PathLike],
+    def get_timelapse_img(video_path: str | os.PathLike,
                           frame_cnt: int = 25,
-                          size: Optional[int] = None,
+                          size: int | None = None,
                           crop_ratio: int = 50) -> np.ndarray:
 
         r"""
@@ -2109,13 +2099,13 @@ class ImageMixin:
 
     @staticmethod
     def create_time_ruler(width: int,
-                          video_path: Union[str, os.PathLike],
+                          video_path: str | os.PathLike,
                           height: int = 60,
                           num_divisions: int = 6,
                           font: str = 'Arial',
-                          bg_color: Tuple[int, int, int] = (255, 255, 255),
-                          line_color: Tuple[int, int, int] = (128, 128, 128),
-                          text_color: Tuple[int, int, int] = (0, 0, 0),
+                          bg_color: tuple[int, int, int] = (255, 255, 255),
+                          line_color: tuple[int, int, int] = (128, 128, 128),
+                          text_color: tuple[int, int, int] = (0, 0, 0),
                           padding: int = 60,
                           show_time: bool = True) -> np.ndarray:
         """

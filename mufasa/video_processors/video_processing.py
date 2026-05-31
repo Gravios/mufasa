@@ -79,10 +79,10 @@ from mufasa.video_processors.roi_selector_polygon import ROISelectorPolygon
 
 MAX_FRM_SIZE = 1080, 650
 
-def change_img_format(directory: Union[str, os.PathLike],
+def change_img_format(directory: str | os.PathLike,
                       file_type_in: str,
                       file_type_out: str,
-                      verbose: Optional[bool] = False) -> None:
+                      verbose: bool | None = False) -> None:
     """
     Convert the file type of all image files within a directory.
 
@@ -113,10 +113,10 @@ def change_img_format(directory: Union[str, os.PathLike],
         source=change_img_format.__name__,
     )
 
-def convert_to_jpeg(path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
-                    quality: Optional[int] = 95,
-                    save_dir: Optional[Union[str, os.PathLike]] = None,
-                    verbose: Optional[bool] = False) -> None:
+def convert_to_jpeg(path: str | os.PathLike | list[str | os.PathLike],
+                    quality: int | None = 95,
+                    save_dir: str | os.PathLike | None = None,
+                    verbose: bool | None = False) -> None:
 
     """
     Convert the file type of all image files within a directory to jpeg format of passed quality.
@@ -177,9 +177,9 @@ def convert_to_jpeg(path: Union[str, os.PathLike, List[Union[str, os.PathLike]]]
     stdout_success(msg=f"SIMBA COMPLETE: {len(file_paths)} image file(s) in {directory} directory converted to JPEG and stored in {save_dir} directory", source=convert_to_jpeg.__name__, elapsed_time=timer.elapsed_time_str)
 
 
-def convert_to_bmp(path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
-                   save_dir: Optional[Union[str, os.PathLike]] = None,
-                   verbose: Optional[bool] = False) -> None:
+def convert_to_bmp(path: str | os.PathLike | list[str | os.PathLike],
+                   save_dir: str | os.PathLike | None = None,
+                   verbose: bool | None = False) -> None:
     """
     Convert images in a directory to BMP format.
 
@@ -231,9 +231,9 @@ def convert_to_bmp(path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
         source=convert_to_bmp.__name__, elapsed_time=timer.elapsed_time_str)
 
 
-def convert_to_png(path: Union[str, os.PathLike],
-                   save_dir: Optional[Union[str, os.PathLike]] = None,
-                   verbose: Optional[bool] = False) -> None:
+def convert_to_png(path: str | os.PathLike,
+                   save_dir: str | os.PathLike | None = None,
+                   verbose: bool | None = False) -> None:
     """
     Convert images to PNG format.
 
@@ -284,10 +284,10 @@ def convert_to_png(path: Union[str, os.PathLike],
         msg=f"SIMBA COMPLETE: {len(file_paths)} image file(s) in {directory} directory converted to PNG and stored in {save_dir} directory",
         source=convert_to_png.__name__, elapsed_time=timer.elapsed_time_str)
 
-def convert_to_tiff(directory: Union[str, os.PathLike],
-                    stack: Optional[bool] = False,
+def convert_to_tiff(directory: str | os.PathLike,
+                    stack: bool | None = False,
                     compression: Literal['raw', 'tiff_deflate', 'tiff_lzw'] = 'raw',
-                    verbose: Optional[bool] = False) -> None:
+                    verbose: bool | None = False) -> None:
     """
     Convert images in a directory to TIFF format.
 
@@ -346,10 +346,10 @@ def convert_to_tiff(directory: Union[str, os.PathLike],
             source=convert_to_tiff.__name__, elapsed_time=timer.elapsed_time_str)
 
 
-def convert_to_webp(path: Union[str, os.PathLike],
-                    quality: Optional[int] = 95,
-                    save_dir: Optional[Union[str, os.PathLike]] = None,
-                    verbose: Optional[bool] = True) -> None:
+def convert_to_webp(path: str | os.PathLike,
+                    quality: int | None = 95,
+                    save_dir: str | os.PathLike | None = None,
+                    verbose: bool | None = True) -> None:
 
     """
     Convert the file type of all image files within a directory to WEBP format of passed quality.
@@ -402,10 +402,10 @@ def convert_to_webp(path: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f"SIMBA COMPLETE: {len(file_paths)} image file(s) in {directory} directory converted to WEBP and stored in {save_dir} directory", source=convert_to_webp.__name__, elapsed_time=timer.elapsed_time_str)
 
-def clahe_enhance_video(file_path: Union[str, os.PathLike],
-                        clip_limit: Optional[int] = 2,
-                        tile_grid_size: Optional[Tuple[int, int]] = (16, 16),
-                        out_path: Optional[Union[str, os.PathLike]] = None,
+def clahe_enhance_video(file_path: str | os.PathLike,
+                        clip_limit: int | None = 2,
+                        tile_grid_size: tuple[int, int] | None = (16, 16),
+                        out_path: str | os.PathLike | None = None,
                         verbose: bool = True) -> None:
 
     """
@@ -506,13 +506,13 @@ def _clahe_enhance_video_mp_helper(data: tuple,
     writer.release()
     return batch_id
 
-def clahe_enhance_video_mp(file_path: Union[str, os.PathLike],
+def clahe_enhance_video_mp(file_path: str | os.PathLike,
                            clip_limit: int = 2,
-                           tile_grid_size: Tuple[int, int] = (16, 16),
-                           out_path: Optional[Union[str, os.PathLike]] = None,
+                           tile_grid_size: tuple[int, int] = (16, 16),
+                           out_path: str | os.PathLike | None = None,
                            gpu: bool = False,
                            verbose: bool = True,
-                           pool: Optional[multiprocessing.Pool] = None,
+                           pool: multiprocessing.Pool | None = None,
                            core_cnt: int = -1) -> None:
 
     """
@@ -590,15 +590,15 @@ def clahe_enhance_video_mp(file_path: Union[str, os.PathLike],
 
 #_ = clahe_enhance_video_mp(file_path= r"D:\EPM_4\original\1.mp4")
 
-def extract_frame_range(file_path: Union[str, os.PathLike],
+def extract_frame_range(file_path: str | os.PathLike,
                         start_frame: int,
                         end_frame: int,
-                        save_dir: Optional[Union[str, os.PathLike]] = None,
+                        save_dir: str | os.PathLike | None = None,
                         img_format: Literal['png', 'webp', 'jpeg'] = 'png',
-                        verbose: Optional[bool] = True,
-                        greyscale: Optional[bool] = False,
-                        clahe: Optional[bool] = False,
-                        include_fn: Optional[bool] = False) -> None:
+                        verbose: bool | None = True,
+                        greyscale: bool | None = False,
+                        clahe: bool | None = False,
+                        include_fn: bool | None = False) -> None:
     """
     Extract a user-defined range of frames from a video file and save them as individual image files.
 
@@ -665,12 +665,12 @@ def extract_frame_range(file_path: Union[str, os.PathLike],
     stdout_success(msg=f"{len(frame_range)-1} frames extracted for video {file_name} saved in {save_dir}", elapsed_time=timer.elapsed_time_str, source=extract_frame_range.__name__)
 
 
-def change_single_video_fps(file_path: Union[str, os.PathLike],
-                            fps: Union[int, float],
+def change_single_video_fps(file_path: str | os.PathLike,
+                            fps: int | float,
                             gpu: bool = False,
-                            codec: Optional[str] = None,
-                            save_path: Optional[Union[str, os.PathLike]] = None,
-                            quality: Optional[int] = 23,
+                            codec: str | None = None,
+                            save_path: str | os.PathLike | None = None,
+                            quality: int | None = 23,
                             verbose: bool = True) -> None:
 
     """
@@ -738,11 +738,11 @@ def change_single_video_fps(file_path: Union[str, os.PathLike],
     if verbose: stdout_success(msg=f'SIMBA COMPLETE: FPS of video {file_name} changed from {str(video_meta_data["fps"])} to {str(fps)} and saved in directory {save_path}', elapsed_time=timer.elapsed_time_str, source=change_single_video_fps.__name__)
 
 
-def change_fps_of_multiple_videos(path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
+def change_fps_of_multiple_videos(path: str | os.PathLike | list[str | os.PathLike],
                                   fps: int,
                                   quality: int = 23,
-                                  save_dir: Optional[Union[str, os.PathLike]] = None,
-                                  gpu: Optional[bool] = False,
+                                  save_dir: str | os.PathLike | None = None,
+                                  gpu: bool | None = False,
                                   verbose: bool = True) -> None:
     """
     Change the fps of all video files in a folder. Results are stored in the same directory as in the input files with
@@ -817,8 +817,8 @@ def change_fps_of_multiple_videos(path: Union[str, os.PathLike, List[Union[str, 
     if verbose: stdout_success(msg=f"SIMBA COMPLETE: FPS of {len(video_paths)} video(s) changed to {fps}", elapsed_time=timer.elapsed_time_str, source=change_fps_of_multiple_videos.__name__,)
 
 
-def convert_video_powerpoint_compatible_format(file_path: Union[str, os.PathLike],
-                                               gpu: Optional[bool] = False) -> None:
+def convert_video_powerpoint_compatible_format(file_path: str | os.PathLike,
+                                               gpu: bool | None = False) -> None:
     """
     Create MS PowerPoint compatible copy of a video file.
 
@@ -863,12 +863,12 @@ def convert_video_powerpoint_compatible_format(file_path: Union[str, os.PathLike
 
 
 
-def video_to_greyscale(file_path: Union[str, os.PathLike],
-                       gpu: Optional[bool] = False,
-                       codec: Optional[str] = None,
+def video_to_greyscale(file_path: str | os.PathLike,
+                       gpu: bool | None = False,
+                       codec: str | None = None,
                        verbose: bool = True,
                        quality: int = 23,
-                       save_path: Optional[Union[str, os.PathLike]] = None) -> None:
+                       save_path: str | os.PathLike | None = None) -> None:
     r"""
     Convert a video file to greyscale mp4 format.
 
@@ -924,10 +924,10 @@ def video_to_greyscale(file_path: Union[str, os.PathLike],
     if verbose: stdout_success(msg=f"SIMBA COMPLETE: Video converted! {save_name} generated!", elapsed_time=timer.elapsed_time_str, source=video_to_greyscale.__name__)
 
 
-def batch_video_to_greyscale(path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
-                             save_dir: Optional[Union[str, os.PathLike]] = None,
-                             quality: Optional[int] = None,
-                             gpu: Optional[bool] = False) -> None:
+def batch_video_to_greyscale(path: str | os.PathLike | list[str | os.PathLike],
+                             save_dir: str | os.PathLike | None = None,
+                             quality: int | None = None,
+                             gpu: bool | None = False) -> None:
     r"""
     Convert a directory of video file to greyscale mp4 format.
 
@@ -991,18 +991,18 @@ def batch_video_to_greyscale(path: Union[str, os.PathLike, List[Union[str, os.Pa
     stdout_success(msg=f"{len(video_paths)} video(s) converted to grayscale!", elapsed_time=timer.elapsed_time_str, source=batch_video_to_greyscale.__name__)
 
 
-def superimpose_frame_count(file_path: Union[str, os.PathLike],
-                            gpu: Optional[bool] = False,
-                            recursive: Optional[bool] = False,
-                            font: Optional[str] = 'Arial',
-                            font_color: Optional[str] = 'black',
-                            bg_color: Optional[str] = 'white',
-                            codec: Optional[str] = None,
-                            quality: Optional[int] = None,
+def superimpose_frame_count(file_path: str | os.PathLike,
+                            gpu: bool | None = False,
+                            recursive: bool | None = False,
+                            font: str | None = 'Arial',
+                            font_color: str | None = 'black',
+                            bg_color: str | None = 'white',
+                            codec: str | None = None,
+                            quality: int | None = None,
                             verbose: bool = True,
-                            save_path: Optional[Union[str, os.PathLike]] = None,
-                            loc: Optional[Literal['top_left', 'top_middle', 'top_right', 'bottom_left', 'bottom_middle', 'bottom_right']] = 'bottom_middle',
-                            fontsize: Optional[int] = 20) -> None:
+                            save_path: str | os.PathLike | None = None,
+                            loc: Literal['top_left', 'top_middle', 'top_right', 'bottom_left', 'bottom_middle', 'bottom_right'] | None = 'bottom_middle',
+                            fontsize: int | None = 20) -> None:
 
     """
     Superimpose frame count on a video file.
@@ -1107,11 +1107,11 @@ def superimpose_frame_count(file_path: Union[str, os.PathLike],
         timer.stop_timer()
         if verbose: stdout_success(msg=f"Superimposed video converted! {save_name} generated!", elapsed_time=timer.elapsed_time_str)
 
-def remove_beginning_of_video(file_path: Union[str, os.PathLike],
+def remove_beginning_of_video(file_path: str | os.PathLike,
                               time: int,
                               quality: int = 60,
-                              save_path: Optional[Union[str, os.PathLike]] = None,
-                              gpu: Optional[bool] = False) -> None:
+                              save_path: str | os.PathLike | None = None,
+                              gpu: bool | None = False) -> None:
 
     """
     Remove N seconds from the beginning of a video file.
@@ -1162,11 +1162,11 @@ def remove_beginning_of_video(file_path: Union[str, os.PathLike],
     stdout_success(msg=f"SIMBA COMPLETE: Video converted! {save_name} generated!", elapsed_time=timer.elapsed_time_str, source=remove_beginning_of_video.__name__)
 
 
-def remove_end_of_video(file_path: Union[str, os.PathLike],
+def remove_end_of_video(file_path: str | os.PathLike,
                         time: int,
                         quality: int = 60,
-                        save_path: Optional[Union[str, os.PathLike]] = None,
-                        gpu: Optional[bool] = False) -> None:
+                        save_path: str | os.PathLike | None = None,
+                        gpu: bool | None = False) -> None:
     """
     Remove N seconds from the end of a video file.
 
@@ -1222,17 +1222,17 @@ def remove_end_of_video(file_path: Union[str, os.PathLike],
     stdout_success(msg=f"SIMBA COMPLETE: Video converted! {save_name} generated!", elapsed_time=timer.elapsed_time_str, source=remove_end_of_video.__name__)
 
 
-def clip_video_in_range(file_path: Union[str, os.PathLike],
+def clip_video_in_range(file_path: str | os.PathLike,
                         start_time: str,
                         end_time: str,
-                        out_dir: Optional[Union[str, os.PathLike]] = None,
-                        save_path: Optional[Union[str, os.PathLike]] = None,
-                        codec: Optional[str] = None,
+                        out_dir: str | os.PathLike | None = None,
+                        save_path: str | os.PathLike | None = None,
+                        codec: str | None = None,
                         quality: int = 60,
                         verbose: bool = True,
-                        overwrite: Optional[bool] = False,
-                        include_clip_time_in_filename: Optional[bool] = False,
-                        gpu: Optional[bool] = False) -> None:
+                        overwrite: bool | None = False,
+                        include_clip_time_in_filename: bool | None = False,
+                        gpu: bool | None = False) -> None:
     """
     Clip video within a specific range.
 
@@ -1293,13 +1293,13 @@ def clip_video_in_range(file_path: Union[str, os.PathLike],
     if verbose: stdout_success(msg=f"Video converted! {save_name} generated!", elapsed_time=timer.elapsed_time_str, source=clip_video_in_range.__name__)
 
 
-def downsample_video(file_path: Union[str, os.PathLike],
+def downsample_video(file_path: str | os.PathLike,
                      video_height: int,
                      video_width: int,
                      gpu: bool = False,
-                     codec: Optional[str] = None,
+                     codec: str | None = None,
                      quality: int = 23,
-                     save_path: Optional[Union[str, os.PathLike]] = None,
+                     save_path: str | os.PathLike | None = None,
                      verbose: bool = True) -> None:
     """
     Down-sample a video file.
@@ -1353,14 +1353,14 @@ def downsample_video(file_path: Union[str, os.PathLike],
 
 
 
-def gif_creator(file_path: Union[str, os.PathLike],
+def gif_creator(file_path: str | os.PathLike,
                 start_time: int,
                 duration: int,
-                width: Optional[int] = None,
-                quality: Optional[int] = 100,
-                save_path: Optional[Union[str, os.PathLike]] = None,
-                fps: Optional[int] = 15,
-                gpu: Optional[bool] = False) -> None:
+                width: int | None = None,
+                quality: int | None = 100,
+                save_path: str | os.PathLike | None = None,
+                fps: int | None = 15,
+                gpu: bool | None = False) -> None:
 
     """
     Create a sample gif from a video file. The result is stored in the same directory as the
@@ -1421,10 +1421,10 @@ def gif_creator(file_path: Union[str, os.PathLike],
     stdout_success(msg=f"SIMBA COMPLETE: Video converted! {save_name} generated!", elapsed_time=timer.elapsed_time_str, source=gif_creator.__name__)
 
 
-def batch_convert_video_format(directory: Union[str, os.PathLike],
+def batch_convert_video_format(directory: str | os.PathLike,
                                input_format: str,
                                output_format: str,
-                               gpu: Optional[bool] = False) -> None:
+                               gpu: bool | None = False) -> None:
     """
     Batch convert all videos in a folder of specific format into a different video format.
 
@@ -1498,7 +1498,7 @@ def batch_convert_video_format(directory: Union[str, os.PathLike],
 # _ = batch_convert_video_format(directory='/path/to/mufasa/troubleshooting/mouse_open_field/project_folder/videos/test_2',input_format='mp4', output_format='avi')
 
 
-def batch_create_frames(directory: Union[str, os.PathLike]) -> None:
+def batch_create_frames(directory: str | os.PathLike) -> None:
     """
     Extract all frames for all videos in a directory.
 
@@ -1541,8 +1541,8 @@ def batch_create_frames(directory: Union[str, os.PathLike]) -> None:
     )
 
 
-def extract_frames_single_video(file_path: Union[str, os.PathLike],
-                                save_dir: Optional[Union[str, os.PathLike]]) -> None:
+def extract_frames_single_video(file_path: str | os.PathLike,
+                                save_dir: str | os.PathLike | None) -> None:
     """
     Extract all frames for a single video.
 
@@ -1576,14 +1576,14 @@ def extract_frames_single_video(file_path: Union[str, os.PathLike],
 #_ = extract_frames_single_video(file_path='/path/to/video_test/Screen Recording 2024-05-06 at 1.23.31 PM_clipped.mp4')
 
 
-def multi_split_video(file_path: Union[str, os.PathLike],
-                      start_times: List[str],
-                      end_times: List[str],
-                      out_dir: Optional[Union[str, os.PathLike]] = None,
-                      quality: Optional[int] = None,
-                      codec: Optional[str] = None,
-                      include_clip_time_in_filename: Optional[bool] = False,
-                      gpu: Optional[bool] = False) -> None:
+def multi_split_video(file_path: str | os.PathLike,
+                      start_times: list[str],
+                      end_times: list[str],
+                      out_dir: str | os.PathLike | None = None,
+                      quality: int | None = None,
+                      codec: str | None = None,
+                      include_clip_time_in_filename: bool | None = False,
+                      gpu: bool | None = False) -> None:
     """
     Divide a video file into multiple video files from specified start and stop times.
 
@@ -1669,8 +1669,8 @@ def multi_split_video(file_path: Union[str, os.PathLike],
 # multi_split_video(file_path=r'/path/to/time_s_converted.mp4', start_times=['00:00:01', '00:00:02'], end_times=['00:00:04', '00:00:05'], gpu=False)
 
 
-def crop_single_video(file_path: Union[str, os.PathLike],
-                      gpu: Optional[bool] = False,
+def crop_single_video(file_path: str | os.PathLike,
+                      gpu: bool | None = False,
                       quality: int = 60) -> None:
     """
     Crop a single video using :func:`~mufasa.video_processors.roi_selector.ROISelector` interface.
@@ -1718,10 +1718,10 @@ def crop_single_video(file_path: Union[str, os.PathLike],
 # crop_single_video(file_path=r'C:\Users\Nape_Computer_2\Desktop\test_videos\Box1_PM2_day_5_20211104T171021.mp4', gpu=False)
 
 
-def crop_multiple_videos(directory_path: Union[str, os.PathLike],
-                         output_path: Union[str, os.PathLike],
-                         gpu: Optional[bool] = False,
-                         codec: Optional[str] = None,
+def crop_multiple_videos(directory_path: str | os.PathLike,
+                         output_path: str | os.PathLike,
+                         gpu: bool | None = False,
+                         codec: str | None = None,
                          quality: int = 60) -> None:
     """
     Crop multiple videos in a folder according to crop-coordinates defined in the **first** video.
@@ -1780,11 +1780,11 @@ def crop_multiple_videos(directory_path: Union[str, os.PathLike],
     stdout_success(msg=f"{str(len(video_paths))} videos cropped and saved in {directory_path} directory", elapsed_time=timer.elapsed_time_str, source=crop_multiple_videos.__name__,)
 
 
-def frames_to_movie(directory: Union[str, os.PathLike],
+def frames_to_movie(directory: str | os.PathLike,
                     fps: int,
                     quality: int = 60,
-                    out_format: Optional[Literal['mp4', 'avi', 'webm']] = 'mp4',
-                    gpu: Optional[bool] = False) -> None:
+                    out_format: Literal['mp4', 'avi', 'webm'] | None = 'mp4',
+                    gpu: bool | None = False) -> None:
     """
     Merge all image files in a folder to a video file. Video is stored in the same directory as the input folder.
 
@@ -1858,12 +1858,12 @@ def frames_to_movie(directory: Union[str, os.PathLike],
     stdout_success(msg=f"Video created at {save_path}", source=frames_to_movie.__name__, elapsed_time=timer.elapsed_time_str)
 
 
-def video_concatenator(video_one_path: Union[str, os.PathLike],
-                       video_two_path: Union[str, os.PathLike],
-                       resolution: Optional[Union[int, str]] = 'video 1',
-                       horizontal: Optional[bool] = True,
-                       quality: Optional[int] = None,
-                       gpu: Optional[bool] = False) -> None:
+def video_concatenator(video_one_path: str | os.PathLike,
+                       video_two_path: str | os.PathLike,
+                       resolution: int | str | None = 'video 1',
+                       horizontal: bool | None = True,
+                       quality: int | None = None,
+                       gpu: bool | None = False) -> None:
     """
     Concatenate two videos to a single video either horizontally or vertically
 
@@ -1978,10 +1978,10 @@ class VideoRotator(ConfigReader):
 
     def __init__(
         self,
-        input_path: Union[str, os.PathLike],
-        output_dir: Union[str, os.PathLike],
-        gpu: Optional[bool] = False,
-        ffmpeg: Optional[bool] = False,
+        input_path: str | os.PathLike,
+        output_dir: str | os.PathLike,
+        gpu: bool | None = False,
+        ffmpeg: bool | None = False,
     ) -> None:
 
         if gpu and not check_nvidea_gpu_available():
@@ -2149,8 +2149,8 @@ class VideoRotator(ConfigReader):
         self.main_frm.mainloop()
 
 
-def extract_frames_from_all_videos_in_directory(config_path: Union[str, os.PathLike],
-                                                directory: Union[str, os.PathLike],
+def extract_frames_from_all_videos_in_directory(config_path: str | os.PathLike,
+                                                directory: str | os.PathLike,
                                                 confirm_popup: bool = False) -> None:
 
     """
@@ -2219,7 +2219,7 @@ def extract_frames_from_all_videos_in_directory(config_path: Union[str, os.PathL
 
 
 def copy_img_folder(
-    config_path: Union[str, os.PathLike], source: Union[str, os.PathLike]
+    config_path: str | os.PathLike, source: str | os.PathLike
 ) -> None:
     """
     Copy directory of png files to the SimBA project. The directory is stored in the project_folder/frames/input folder of the SimBA project
@@ -2268,8 +2268,8 @@ def copy_img_folder(
 
 
 def append_audio(
-    video_path: Union[str, os.PathLike],
-    audio_path: Union[str, os.PathLike],
+    video_path: str | os.PathLike,
+    audio_path: str | os.PathLike,
     audio_src_type: Literal["video", "audio"] = "video",
 ) -> None:
     """
@@ -2339,7 +2339,7 @@ def append_audio(
     )
 
 
-def crop_single_video_circle(file_path: Union[str, os.PathLike]) -> None:
+def crop_single_video_circle(file_path: str | os.PathLike) -> None:
     """
     Crop a video based on circular regions of interest (ROIs) selected by the user.
 
@@ -2377,7 +2377,7 @@ def crop_single_video_circle(file_path: Union[str, os.PathLike]) -> None:
     stdout_success(msg=f"Circle-based cropped saved at to {save_path}", elapsed_time=timer.elapsed_time_str,)
 
 
-def crop_multiple_videos_circles(in_dir: Union[str, os.PathLike], out_dir: Union[str, os.PathLike]) -> None:
+def crop_multiple_videos_circles(in_dir: str | os.PathLike, out_dir: str | os.PathLike) -> None:
     """
     Crop multiple videos based on circular regions of interest (ROIs) selected by the user.
 
@@ -2445,7 +2445,7 @@ def crop_multiple_videos_circles(in_dir: Union[str, os.PathLike], out_dir: Union
     )
 
 
-def crop_single_video_polygon(file_path: Union[str, os.PathLike]) -> None:
+def crop_single_video_polygon(file_path: str | os.PathLike) -> None:
     """
     Crop a video based on polygonal regions of interest (ROIs) selected by the user.
 
@@ -2492,7 +2492,7 @@ def crop_single_video_polygon(file_path: Union[str, os.PathLike]) -> None:
 #crop_single_video_polygon(file_path='/path/to/mufasa/troubleshooting/spontenous_alternation/project_folder/videos/F1 HAB.mp4')
 
 def crop_multiple_videos_polygons(
-    in_dir: Union[str, os.PathLike], out_dir: Union[str, os.PathLike]
+    in_dir: str | os.PathLike, out_dir: str | os.PathLike
 ) -> None:
     """
     Crop multiple videos based on polygonal regions of interest (ROIs) selected by the user.
@@ -2540,15 +2540,15 @@ def crop_multiple_videos_polygons(
     )
 
 
-def resize_videos_by_height(video_paths: List[Union[str, os.PathLike]],
-                            height: Union[int, str],
-                            overwrite: Optional[bool] = False,
-                            save_dir: Optional[Union[str, os.PathLike]] = None,
-                            gpu: Optional[bool] = False,
-                            quality: Optional[int] = None,
-                            suffix: Optional[str] = None,
-                            codec: Optional[str] = None,
-                            verbose: Optional[bool] = True) -> Union[None, List[Union[None, str, os.PathLike]]]:
+def resize_videos_by_height(video_paths: list[str | os.PathLike],
+                            height: int | str,
+                            overwrite: bool | None = False,
+                            save_dir: str | os.PathLike | None = None,
+                            gpu: bool | None = False,
+                            quality: int | None = None,
+                            suffix: str | None = None,
+                            codec: str | None = None,
+                            verbose: bool | None = True) -> None | list[None | str | os.PathLike]:
     """
     Re-size a list of videos to a specified height while retaining their aspect ratios.
 
@@ -2623,15 +2623,15 @@ def resize_videos_by_height(video_paths: List[Union[str, os.PathLike]],
     return new_video_paths
 
 
-def resize_videos_by_width(video_paths: List[Union[str, os.PathLike]],
-                           width: Union[int, str],
-                           overwrite: Optional[bool] = False,
-                           save_dir: Optional[Union[str, os.PathLike]] = None,
-                           gpu: Optional[bool] = False,
-                           codec: Optional[str] = None,
-                           quality: Optional[int] = None,
-                           suffix: Optional[str] = None,
-                           verbose: Optional[bool] = True) -> Union[None, List[Union[None, str, os.PathLike]]]:
+def resize_videos_by_width(video_paths: list[str | os.PathLike],
+                           width: int | str,
+                           overwrite: bool | None = False,
+                           save_dir: str | os.PathLike | None = None,
+                           gpu: bool | None = False,
+                           codec: str | None = None,
+                           quality: int | None = None,
+                           suffix: str | None = None,
+                           verbose: bool | None = True) -> None | list[None | str | os.PathLike]:
     """
     Re-size a list of videos to a specified width while retaining their aspect ratios.
 
@@ -2712,13 +2712,13 @@ def resize_videos_by_width(video_paths: List[Union[str, os.PathLike]],
 
 
 
-def create_blank_video(path: Union[str, os.PathLike],
+def create_blank_video(path: str | os.PathLike,
                        length: int,
                        width: int,
                        height: int,
-                       color: Optional[str] = "black",
-                       gpu: Optional[bool] = False,
-                       verbose: Optional[bool] = False) -> None:
+                       color: str | None = "black",
+                       gpu: bool | None = False,
+                       verbose: bool | None = False) -> None:
     """
     Create a "blank" uni-colored video of specified size and length.
 
@@ -2761,13 +2761,13 @@ def create_blank_video(path: Union[str, os.PathLike],
         )
 
 
-def horizontal_video_concatenator(video_paths: List[Union[str, os.PathLike]],
-                                  save_path: Union[str, os.PathLike],
-                                  height_px: Optional[Union[int, str]] = None,
-                                  height_idx: Optional[Union[int, str]] = None,
+def horizontal_video_concatenator(video_paths: list[str | os.PathLike],
+                                  save_path: str | os.PathLike,
+                                  height_px: int | str | None = None,
+                                  height_idx: int | str | None = None,
                                   gpu: bool = False,
                                   quality: int = 23,
-                                  verbose: Optional[bool] = True) -> None:
+                                  verbose: bool | None = True) -> None:
     """
     Concatenates multiple videos horizontally.
 
@@ -2823,10 +2823,10 @@ def horizontal_video_concatenator(video_paths: List[Union[str, os.PathLike]],
         print(f"Horizontal concatenation complete, saved at {save_path} (elapsed time: {timer.elapsed_time_str}s.)")
 
 
-def vertical_video_concatenator(video_paths: List[Union[str, os.PathLike]],
-                                save_path: Union[str, os.PathLike],
-                                width_px: Optional[int] = None,
-                                width_idx: Optional[int] = None,
+def vertical_video_concatenator(video_paths: list[str | os.PathLike],
+                                save_path: str | os.PathLike,
+                                width_px: int | None = None,
+                                width_idx: int | None = None,
                                 gpu: bool = False,
                                 quality: int = 23,
                                 verbose: bool = True) -> None:
@@ -2910,16 +2910,16 @@ def vertical_video_concatenator(video_paths: List[Union[str, os.PathLike]],
 
 
 def mosaic_concatenator(
-    video_paths: List[Union[str, os.PathLike]],
-    save_path: Union[str, os.PathLike],
-    width_idx: Optional[Union[int, str]] = None,
-    width_px: Optional[Union[int, str]] = None,
-    height_idx: Optional[Union[int, str]] = None,
-    height_px: Optional[Union[int, str]] = None,
+    video_paths: list[str | os.PathLike],
+    save_path: str | os.PathLike,
+    width_idx: int | str | None = None,
+    width_px: int | str | None = None,
+    height_idx: int | str | None = None,
+    height_px: int | str | None = None,
     gpu: bool = False,
     quality: int = 23,
     verbose: bool = True,
-    uneven_fill_color: Optional[str] = "black",
+    uneven_fill_color: str | None = "black",
 ) -> None:
     """
     Concatenates multiple videos into a mosaic layout.
@@ -3009,8 +3009,8 @@ def mosaic_concatenator(
 
 
 def mixed_mosaic_concatenator(
-    video_paths: List[Union[str, os.PathLike]],
-    save_path: Union[str, os.PathLike],
+    video_paths: list[str | os.PathLike],
+    save_path: str | os.PathLike,
     gpu: bool = False,
     quality: int = 23,
     verbose: bool = True,
@@ -3138,12 +3138,12 @@ def mixed_mosaic_concatenator(
         )
 
 
-def clip_videos_by_frame_ids(file_paths: List[Union[str, os.PathLike]],
-                             frm_ids: List[List[int]],
-                             save_dir: Optional[Union[str, os.PathLike]] = None,
-                             gpu: Optional[bool] = False,
-                             codec: Optional[str] = None,
-                             quality: Optional[int] = None):
+def clip_videos_by_frame_ids(file_paths: list[str | os.PathLike],
+                             frm_ids: list[list[int]],
+                             save_dir: str | os.PathLike | None = None,
+                             gpu: bool | None = False,
+                             codec: str | None = None,
+                             quality: int | None = None):
 
     """
     Clip videos specified by frame IDs (numbers).
@@ -3204,11 +3204,11 @@ def clip_videos_by_frame_ids(file_paths: List[Union[str, os.PathLike]],
     else:
         stdout_success(msg=f"{len(file_paths)} video(s) clipped by frame and saved in {save_dir}", elapsed_time=timer.elapsed_time_str)
 
-def convert_to_mp4(path: Union[str, os.PathLike],
+def convert_to_mp4(path: str | os.PathLike,
                    codec: Literal['libx265', 'libx264', 'vp9', 'h264_cuvid', 'powerpoint'] = 'libx265',
-                   save_dir: Optional[Union[str, os.PathLike]] = None,
-                   quality: Optional[int] = 60,
-                   keep_audio: Optional[bool] = False) -> None:
+                   save_dir: str | os.PathLike | None = None,
+                   quality: int | None = 60,
+                   keep_audio: bool | None = False) -> None:
     """
     Convert a directory containing videos, or a single video, to MP4 format using passed quality and codec.
 
@@ -3281,10 +3281,10 @@ def convert_to_mp4(path: Union[str, os.PathLike],
 
 #convert_to_mp4(path=r'D:\water_t_maze\T-Maze\Old Q175 Females\295694f3', quality=60, codec='libx265')
 
-def convert_to_avi(path: Union[str, os.PathLike],
+def convert_to_avi(path: str | os.PathLike,
                    codec: Literal['xvid', 'divx', 'mjpeg'] = 'divx',
-                   save_dir: Optional[Union[str, os.PathLike]] = None,
-                   quality: Optional[int] = 60) -> None:
+                   save_dir: str | os.PathLike | None = None,
+                   quality: int | None = 60) -> None:
 
     """
     Convert a directory containing videos, or a single video, to AVI format using passed quality and codec.
@@ -3347,10 +3347,10 @@ def convert_to_avi(path: Union[str, os.PathLike],
     stdout_success(msg=f"{len(file_paths)} video(s) converted to AVI and saved in {save_dir} directory.", elapsed_time=timer.elapsed_time_str, source=convert_to_avi.__name__,)
 
 
-def convert_to_webm(path: Union[str, os.PathLike],
+def convert_to_webm(path: str | os.PathLike,
                     codec: Literal['vp8', 'vp9', 'av1'] = 'vp9',
-                    save_dir: Optional[Union[str, os.PathLike]] = None,
-                    quality: Optional[int] = 60) -> None:
+                    save_dir: str | os.PathLike | None = None,
+                    quality: int | None = 60) -> None:
 
     """
     Convert a directory containing videos, or a single video, to WEBM format using passed quality and codec.
@@ -3408,10 +3408,10 @@ def convert_to_webm(path: Union[str, os.PathLike],
 #convert_to_webm(path='/path/to/video_test/Screen Recording 2024-05-06 at 5.34.34 PM_converted.mp4', quality=100, codec='vp8')
 
 
-def convert_to_mov(path: Union[str, os.PathLike],
+def convert_to_mov(path: str | os.PathLike,
                     codec: Literal['prores', 'animation', 'dnxhd', 'cineform'] = 'prores',
-                    save_dir: Optional[Union[str, os.PathLike]] = None,
-                    quality: Optional[int] = 60) -> None:
+                    save_dir: str | os.PathLike | None = None,
+                    quality: int | None = 60) -> None:
     """
     Convert a directory containing videos, or a single video, to MOV format using passed quality and codec.
 
@@ -3465,13 +3465,13 @@ def convert_to_mov(path: Union[str, os.PathLike],
 
 #convert_to_mov(path='/path/to/video_test/Screen Recording 2024-05-06 at 5.34.34 PM_converted.mp4', codec='cineform')
 
-def superimpose_video_progressbar(video_path: Union[str, os.PathLike],
-                                  bar_height: Optional[int] = 10,
-                                  color: Optional[str] = 'red',
-                                  codec: Optional[str] = None,
-                                  position: Optional[Literal['top', 'bottom']] = 'bottom',
-                                  save_dir: Optional[Union[str, os.PathLike]] = None,
-                                  gpu: Optional[bool] = False) -> None:
+def superimpose_video_progressbar(video_path: str | os.PathLike,
+                                  bar_height: int | None = 10,
+                                  color: str | None = 'red',
+                                  codec: str | None = None,
+                                  position: Literal['top', 'bottom'] | None = 'bottom',
+                                  save_dir: str | os.PathLike | None = None,
+                                  gpu: bool | None = False) -> None:
 
     """
     Overlay a progress bar on a directory of videos or a single video.
@@ -3539,15 +3539,15 @@ def superimpose_video_progressbar(video_path: Union[str, os.PathLike],
 
 
 
-def crossfade_two_videos(video_path_1: Union[str, os.PathLike],
-                         video_path_2: Union[str, os.PathLike],
-                         crossfade_duration: Optional[int] = 2,
-                         crossfade_method: Optional[str] = 'fade',
-                         crossfade_offset: Optional[int] = 2,
-                         quality: Optional[int] = 60,
-                         out_format: Optional[Literal['mp4', 'avi', 'webm']] = 'mp4',
-                         save_path: Optional[Union[str, os.PathLike]] = None,
-                         gpu: Optional[bool] = False):
+def crossfade_two_videos(video_path_1: str | os.PathLike,
+                         video_path_2: str | os.PathLike,
+                         crossfade_duration: int | None = 2,
+                         crossfade_method: str | None = 'fade',
+                         crossfade_offset: int | None = 2,
+                         quality: int | None = 60,
+                         out_format: Literal['mp4', 'avi', 'webm'] | None = 'mp4',
+                         save_path: str | os.PathLike | None = None,
+                         gpu: bool | None = False):
     """
     Cross-fade two videos.
 
@@ -3609,13 +3609,13 @@ def crossfade_two_videos(video_path_1: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f'Cross-faded video saved at {save_path}', elapsed_time=timer.elapsed_time_str)
 
-def watermark_video(video_path: Union[str, os.PathLike],
-                    watermark_path: Union[str, os.PathLike],
-                    position: Optional[Literal['top_left', 'bottom_right', 'top_right', 'bottom_left', 'center']] = 'top_left',
-                    opacity: Optional[float] = 0.5,
-                    scale: Optional[float] = 0.05,
-                    save_dir: Optional[Union[str, os.PathLike]] = None,
-                    gpu: Optional[bool] = False) -> None:
+def watermark_video(video_path: str | os.PathLike,
+                    watermark_path: str | os.PathLike,
+                    position: Literal['top_left', 'bottom_right', 'top_right', 'bottom_left', 'center'] | None = 'top_left',
+                    opacity: float | None = 0.5,
+                    scale: float | None = 0.05,
+                    save_dir: str | os.PathLike | None = None,
+                    gpu: bool | None = False) -> None:
     """
     Watermark a video file or a directory of video files with specified watermark size, opacity, and location.
 
@@ -3692,13 +3692,13 @@ def watermark_video(video_path: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f'{len(video_paths)} watermarked video(s) saved in {save_dir}', elapsed_time=timer.elapsed_time_str)
 
-def superimpose_overlay_video(video_path: Union[str, os.PathLike],
-                              overlay_video_path: Union[str, os.PathLike],
-                              position: Optional[Literal['top_left', 'bottom_right', 'top_right', 'bottom_left', 'center']] = 'top_left',
-                              opacity: Optional[float] = 0.5,
-                              scale: Optional[float] = 0.05,
-                              save_dir: Optional[Union[str, os.PathLike]] = None,
-                              gpu: Optional[bool] = False) -> None:
+def superimpose_overlay_video(video_path: str | os.PathLike,
+                              overlay_video_path: str | os.PathLike,
+                              position: Literal['top_left', 'bottom_right', 'top_right', 'bottom_left', 'center'] | None = 'top_left',
+                              opacity: float | None = 0.5,
+                              scale: float | None = 0.05,
+                              save_dir: str | os.PathLike | None = None,
+                              gpu: bool | None = False) -> None:
     """
     Inset a video overlay on a second video with specified size, opacity, and location.
 
@@ -3776,10 +3776,10 @@ def superimpose_overlay_video(video_path: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f'{len(video_paths)} overlay video(s) saved in {save_dir}', elapsed_time=timer.elapsed_time_str)
 
-def roi_blurbox(video_path: Union[str, os.PathLike],
-                blur_level: Optional[float] = 0.02,
-                invert: Optional[bool] = False,
-                save_path: Optional[Union[str, os.PathLike]] = None) -> None:
+def roi_blurbox(video_path: str | os.PathLike,
+                blur_level: float | None = 0.02,
+                invert: bool | None = False,
+                save_path: str | os.PathLike | None = None) -> None:
 
     """
     Blurs either the selected or unselected portion of a user-specified region-of-interest according to the passed blur level.
@@ -3825,17 +3825,17 @@ def roi_blurbox(video_path: Union[str, os.PathLike],
     stdout_success(msg=f'Blurred {video_name} video saved in {save_path}', elapsed_time=timer.elapsed_time_str)
 
 
-def superimpose_elapsed_time(video_path: Union[str, os.PathLike],
-                             font: Optional[str] = 'Arial',
-                             font_size: Optional[int] = 30,
-                             font_color: Optional[str] = 'white',
-                             font_border_color: Optional[str] = 'black',
-                             time_format: Optional[Literal['MM:SS', 'HH:MM:SS', 'SS.MMMMMM', 'HH:MM:SS.MMMM']] = 'HH:MM:SS.MMMM',
-                             font_border_width: Optional[int] = 2,
-                             quality: Optional[int] = None,
-                             position: Optional[Literal['top_left', 'top_right', 'bottom_left', 'bottom_right', 'top_middle', 'bottom_middle']] = 'top_left',
-                             save_dir: Optional[Union[str, os.PathLike]] = None,
-                             gpu: Optional[bool] = False) -> None:
+def superimpose_elapsed_time(video_path: str | os.PathLike,
+                             font: str | None = 'Arial',
+                             font_size: int | None = 30,
+                             font_color: str | None = 'white',
+                             font_border_color: str | None = 'black',
+                             time_format: Literal['MM:SS', 'HH:MM:SS', 'SS.MMMMMM', 'HH:MM:SS.MMMM'] | None = 'HH:MM:SS.MMMM',
+                             font_border_width: int | None = 2,
+                             quality: int | None = None,
+                             position: Literal['top_left', 'top_right', 'bottom_left', 'bottom_right', 'top_middle', 'bottom_middle'] | None = 'top_left',
+                             save_dir: str | os.PathLike | None = None,
+                             gpu: bool | None = False) -> None:
     """
     Superimposes elapsed time on the given video file(s) and saves the modified video(s).
 
@@ -3929,11 +3929,11 @@ def superimpose_elapsed_time(video_path: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f'Super-imposed time on {len(video_paths)} video(s), saved in {save_dir}', elapsed_time=timer.elapsed_time_str)
 
-def reverse_videos(path: Union[str, os.PathLike],
-                   save_dir: Optional[Union[str, os.PathLike]] = None,
-                   codec: Optional[str] = None,
-                   quality: Optional[int] = 60,
-                   gpu: Optional[bool] = False) -> None:
+def reverse_videos(path: str | os.PathLike,
+                   save_dir: str | os.PathLike | None = None,
+                   codec: str | None = None,
+                   quality: int | None = 60,
+                   gpu: bool | None = False) -> None:
 
     """
     Reverses one or more video files located at the specified path and saves the reversed videos in the specified
@@ -3994,10 +3994,10 @@ def reverse_videos(path: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f"{len(file_paths)} video(s) reversed and saved in {save_dir} directory.", elapsed_time=timer.elapsed_time_str, source=reverse_videos.__name__)
 
-def video_to_bw(video_path: Union[str, os.PathLike],
-                threshold: Optional[float] = 0.5,
-                save_dir: Optional[Union[str, os.PathLike]] = None,
-                gpu: Optional[bool] = False) -> None:
+def video_to_bw(video_path: str | os.PathLike,
+                threshold: float | None = 0.5,
+                save_dir: str | os.PathLike | None = None,
+                gpu: bool | None = False) -> None:
     """
     Convert video to black and white using passed threshold.
 
@@ -4057,11 +4057,11 @@ def video_to_bw(video_path: Union[str, os.PathLike],
 #video_to_bw(video_path='/path/to/Screen Recording 2024-05-08 at 10.57.59 AM_upsampled_time_superimposed.mov', threshold=0.5)
 
 
-def video_blur(video_path: Union[str, os.PathLike],
+def video_blur(video_path: str | os.PathLike,
                kernel_size: int = 5,
                method: str = "gaussian",
-               save_dir: Optional[Union[str, os.PathLike]] = None,
-               gpu: Optional[bool] = False) -> None:
+               save_dir: str | os.PathLike | None = None,
+               gpu: bool | None = False) -> None:
     """
     Apply a box or Gaussian blur to a video, or every video in a
     directory. Implemented via FFmpeg's ``boxblur`` / ``gblur``
@@ -4132,11 +4132,11 @@ def video_blur(video_path: Union[str, os.PathLike],
 
 
 def video_brightness_contrast(
-        video_path: Union[str, os.PathLike],
+        video_path: str | os.PathLike,
         brightness: float = 0.0,
         contrast: float = 1.0,
-        save_dir: Optional[Union[str, os.PathLike]] = None,
-        gpu: Optional[bool] = False) -> None:
+        save_dir: str | os.PathLike | None = None,
+        gpu: bool | None = False) -> None:
     """
     Adjust brightness and contrast of a video, or every video in a
     directory. Implemented via FFmpeg's ``eq`` filter.
@@ -4201,13 +4201,13 @@ def video_brightness_contrast(
         elapsed_time=timer.elapsed_time_str)
 
 
-def create_average_frm(video_path: Union[str, os.PathLike],
-                       start_frm: Optional[int] = None,
-                       end_frm: Optional[int] = None,
-                       start_time: Optional[str] = None,
-                       end_time: Optional[str] = None,
-                       save_path: Optional[Union[str, os.PathLike]] = None,
-                       verbose: Optional[bool] = False) -> Union[None, np.ndarray]:
+def create_average_frm(video_path: str | os.PathLike,
+                       start_frm: int | None = None,
+                       end_frm: int | None = None,
+                       start_time: str | None = None,
+                       end_time: str | None = None,
+                       save_path: str | os.PathLike | None = None,
+                       verbose: bool | None = False) -> None | np.ndarray:
 
     """
     Create an image representing the average frame of a segment in a video or an entire video.
@@ -4319,22 +4319,22 @@ def create_average_frm(video_path: Union[str, os.PathLike],
         return img
 
 
-def video_bg_subtraction(video_path: Union[str, os.PathLike],
-                         avg_frm: Optional[np.ndarray] = None,
-                         bg_video_path: Optional[Union[str, os.PathLike]] = None,
-                         bg_start_frm: Optional[int] = None,
-                         bg_end_frm: Optional[int] = None,
-                         bg_start_time: Optional[str] = None,
-                         bg_end_time: Optional[str] = None,
-                         threshold: Optional[int] = 50,
-                         bg_color: Optional[Tuple[int, int, int]] = (0, 0, 0),
-                         fg_color: Optional[Tuple[int, int, int]] = None,
-                         save_path: Optional[Union[str, os.PathLike]] = None,
-                         verbose: Optional[bool] = True,
+def video_bg_subtraction(video_path: str | os.PathLike,
+                         avg_frm: np.ndarray | None = None,
+                         bg_video_path: str | os.PathLike | None = None,
+                         bg_start_frm: int | None = None,
+                         bg_end_frm: int | None = None,
+                         bg_start_time: str | None = None,
+                         bg_end_time: str | None = None,
+                         threshold: int | None = 50,
+                         bg_color: tuple[int, int, int] | None = (0, 0, 0),
+                         fg_color: tuple[int, int, int] | None = None,
+                         save_path: str | os.PathLike | None = None,
+                         verbose: bool | None = True,
                          method: str = 'absolute',
-                         closing_kernel_size: Optional[Tuple[int, int]] = None,
+                         closing_kernel_size: tuple[int, int] | None = None,
                          closing_iterations: int = 3,
-                         opening_kernel_size: Optional[Tuple[int, int]] = None,
+                         opening_kernel_size: tuple[int, int] | None = None,
                          opening_iterations: int = 3) -> None:
 
     """
@@ -4459,7 +4459,7 @@ def video_bg_subtraction(video_path: Union[str, os.PathLike],
     if verbose:
         stdout_success(msg=f'Background subtracted from {video_name} and saved at {save_path}', elapsed_time=timer.elapsed_time)
 
-def reencode_mp4_video(file_path: Union[str, os.PathLike],
+def reencode_mp4_video(file_path: str | os.PathLike,
                       codec: str,
                       quality: int) -> None:
     """
@@ -4496,13 +4496,13 @@ def reencode_mp4_video(file_path: Union[str, os.PathLike],
 
 
 
-def _bg_remover_mp(frm_range: Tuple[int, np.ndarray],
-                   video_path: Union[str, os.PathLike],
+def _bg_remover_mp(frm_range: tuple[int, np.ndarray],
+                   video_path: str | os.PathLike,
                    bg_frm: np.ndarray,
-                   bg_clr: Tuple[int, int, int],
-                   fg_clr: Tuple[int, int, int],
-                   video_meta_data: Dict[str, Any],
-                   temp_dir: Union[str, os.PathLike],
+                   bg_clr: tuple[int, int, int],
+                   fg_clr: tuple[int, int, int],
+                   video_meta_data: dict[str, Any],
+                   temp_dir: str | os.PathLike,
                    verbose: bool,
                    threshold: int,
                    method: str,
@@ -4549,25 +4549,25 @@ def _bg_remover_mp(frm_range: Tuple[int, np.ndarray],
     cap.release()
     return batch
 
-def video_bg_subtraction_mp(video_path: Union[str, os.PathLike],
-                            pool: Optional[multiprocessing.Pool] = None,
-                            bg_video_path: Union[str, os.PathLike] = None,
-                            bg_start_frm: Optional[int] = None,
-                            bg_end_frm: Optional[int] = None,
-                            bg_start_time: Optional[str] = None,
-                            bg_end_time: Optional[str] = None,
-                            avg_frm: Optional[Union[np.ndarray, str, os.PathLike]] = None,
-                            bg_color: Tuple[int, int, int] = (0, 0, 0),
-                            fg_color: Optional[Tuple[int, int, int]] = None,
-                            save_path: Optional[Union[str, os.PathLike]] = None,
+def video_bg_subtraction_mp(video_path: str | os.PathLike,
+                            pool: multiprocessing.Pool | None = None,
+                            bg_video_path: str | os.PathLike = None,
+                            bg_start_frm: int | None = None,
+                            bg_end_frm: int | None = None,
+                            bg_start_time: str | None = None,
+                            bg_end_time: str | None = None,
+                            avg_frm: np.ndarray | str | os.PathLike | None = None,
+                            bg_color: tuple[int, int, int] = (0, 0, 0),
+                            fg_color: tuple[int, int, int] | None = None,
+                            save_path: str | os.PathLike | None = None,
                             core_cnt: int = -1,
                             verbose: bool = True,
                             gpu: bool = False,
-                            threshold: Optional[int] = 50,
+                            threshold: int | None = 50,
                             method: str = 'absolute',
-                            closing_kernel_size: Optional[Tuple[int, int]] = None,
+                            closing_kernel_size: tuple[int, int] | None = None,
                             closing_iterations: int = 3,
-                            opening_kernel_size: Optional[Tuple[int, int]] = None,
+                            opening_kernel_size: tuple[int, int] | None = None,
                             opening_iterations: int = 3) -> None:
 
     """
@@ -4718,16 +4718,16 @@ def video_bg_subtraction_mp(video_path: Union[str, os.PathLike],
     stdout_success(msg=f'Video saved at {save_path}', elapsed_time=timer.elapsed_time_str)
 
 
-def superimpose_video_names(video_path: Union[str, os.PathLike],
-                            font: Optional[str] = 'Arial',
-                            font_size: Optional[int] = 30,
-                            font_color: Optional[str] = 'white',
-                            font_border_color: Optional[str] = 'black',
-                            font_border_width: Optional[int] = 2,
-                            quality: Optional[int] = None,
-                            position: Optional[Literal['top_left', 'top_right', 'bottom_left', 'bottom_right', 'middle_top', 'middle_bottom']] = 'top_left',
-                            save_dir: Optional[Union[str, os.PathLike]] = None,
-                            gpu: Optional[bool] = False) -> None:
+def superimpose_video_names(video_path: str | os.PathLike,
+                            font: str | None = 'Arial',
+                            font_size: int | None = 30,
+                            font_color: str | None = 'white',
+                            font_border_color: str | None = 'black',
+                            font_border_width: int | None = 2,
+                            quality: int | None = None,
+                            position: Literal['top_left', 'top_right', 'bottom_left', 'bottom_right', 'middle_top', 'middle_bottom'] | None = 'top_left',
+                            save_dir: str | os.PathLike | None = None,
+                            gpu: bool | None = False) -> None:
     """
     Superimposes the video name on the given video file(s) and saves the modified video(s).
 
@@ -4817,17 +4817,17 @@ def superimpose_video_names(video_path: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f'Super-imposed video name on {len(video_paths)} video(s), saved in {save_dir}', elapsed_time=timer.elapsed_time_str)
 
-def superimpose_freetext(video_path: Union[str, os.PathLike],
+def superimpose_freetext(video_path: str | os.PathLike,
                          text: str,
-                         font: Optional[str] = 'Arial',
-                         font_size: Optional[int] = 30,
-                         font_color: Optional[str] = 'white',
-                         font_border_color: Optional[str] = 'black',
-                         font_border_width: Optional[int] = 2,
-                         quality: Optional[int] = None,
-                         position: Optional[Literal['top_left', 'top_right', 'bottom_left', 'bottom_right', 'middle_top', 'middle_bottom']] = 'top_left',
-                         save_dir: Optional[Union[str, os.PathLike]] = None,
-                         gpu: Optional[bool] = False) -> None:
+                         font: str | None = 'Arial',
+                         font_size: int | None = 30,
+                         font_color: str | None = 'white',
+                         font_border_color: str | None = 'black',
+                         font_border_width: int | None = 2,
+                         quality: int | None = None,
+                         position: Literal['top_left', 'top_right', 'bottom_left', 'bottom_right', 'middle_top', 'middle_bottom'] | None = 'top_left',
+                         save_dir: str | os.PathLike | None = None,
+                         gpu: bool | None = False) -> None:
     """
     Superimposes passed text on the given video file(s) and saves the modified video(s).
 
@@ -4896,12 +4896,12 @@ def superimpose_freetext(video_path: Union[str, os.PathLike],
     stdout_success(msg=f'Super-imposed free-text on {len(video_paths)} video(s), saved in {save_dir}', elapsed_time=timer.elapsed_time_str)
 
 
-def rotate_video(video_path: Union[str, os.PathLike],
+def rotate_video(video_path: str | os.PathLike,
                  degrees: int,
-                 gpu: Optional[bool] = False,
-                 quality: Optional[int] = 60,
-                 fill_color: Optional[str] = 'black',
-                 save_dir: Optional[Union[str, os.PathLike]] = None):
+                 gpu: bool | None = False,
+                 quality: int | None = 60,
+                 fill_color: str | None = 'black',
+                 save_dir: str | os.PathLike | None = None):
 
     """
     Rotate a video or a directory of videos by a specified number of degrees.
@@ -4963,12 +4963,12 @@ def rotate_video(video_path: Union[str, os.PathLike],
 #rotate_video(video_path=r"C:\troubleshooting\mitra\project_folder\videos\clipped\501_MA142_Gi_CNO_0514_clipped.mp4", degrees=20, fill_color='coral')
 
 
-def flip_videos(video_path: Union[str, os.PathLike],
-                horizontal_flip: Optional[bool] = False,
-                vertical_flip: Optional[bool] = False,
-                quality: Optional[int] = 60,
-                save_dir: Optional[Union[str, os.PathLike]] = None,
-                gpu: Optional[bool] = False) -> None:
+def flip_videos(video_path: str | os.PathLike,
+                horizontal_flip: bool | None = False,
+                vertical_flip: bool | None = False,
+                quality: int | None = 60,
+                save_dir: str | os.PathLike | None = None,
+                gpu: bool | None = False) -> None:
     """
     Flip a video or directory of videos horizontally, vertically, or both, and save them to the specified directory.
 
@@ -5030,10 +5030,10 @@ def flip_videos(video_path: Union[str, os.PathLike],
     stdout_success(msg=f"{len(video_paths)} video(s) flipped and saved in {save_dir} directory.", elapsed_time=timer.elapsed_time_str, source=flip_videos.__name__)
 
 
-def upsample_fps(video_path: Union[str, os.PathLike],
+def upsample_fps(video_path: str | os.PathLike,
                  fps: int,
-                 quality: Optional[int] = 60,
-                 save_dir: Optional[Union[str, os.PathLike]] = None) -> None:
+                 quality: int | None = 60,
+                 save_dir: str | os.PathLike | None = None) -> None:
     """
     Upsample the frame rate of a video or all videos in a directory to a specified fps with a given quality.
 
@@ -5081,11 +5081,11 @@ def upsample_fps(video_path: Union[str, os.PathLike],
     timer.stop_timer()
     stdout_success(msg=f"{len(video_paths)} video(s) upsampled to {fps} and saved in {save_dir} directory.", elapsed_time=timer.elapsed_time_str, source=upsample_fps.__name__, )
 
-def temporal_concatenation(video_paths: List[Union[str, os.PathLike]],
-                           save_path: Optional[Union[str, os.PathLike]] = None,
-                           save_format: Optional[Literal['mp4', 'mov', 'avi', 'webm']] = 'mp4',
-                           quality: Optional[int] = 60,
-                           gpu: Optional[bool] = False) -> None:
+def temporal_concatenation(video_paths: list[str | os.PathLike],
+                           save_path: str | os.PathLike | None = None,
+                           save_format: Literal['mp4', 'mov', 'avi', 'webm'] | None = 'mp4',
+                           quality: int | None = 60,
+                           gpu: bool | None = False) -> None:
 
     """
     Concatenates multiple video files temporally into a single video.
@@ -5133,9 +5133,9 @@ def temporal_concatenation(video_paths: List[Union[str, os.PathLike]],
 
 
 def get_img_slic(img: np.ndarray,
-                 n_segments: Optional[int] = 50,
-                 compactness: Optional[int] = 50,
-                 sigma: Optional[float] = 1) -> np.ndarray:
+                 n_segments: int | None = 50,
+                 compactness: int | None = 50,
+                 sigma: float | None = 1) -> np.ndarray:
 
     """
     Simplify an image into superpixels using SLIC (Simple Linear Iterative Clustering).
@@ -5165,8 +5165,8 @@ def _slic_helper(frm_range: np.ndarray,
                  n_segments: int,
                  sigma: float,
                  compactness: int,
-                 save_dir: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike]):
+                 save_dir: str | os.PathLike,
+                 video_path: str | os.PathLike):
 
     """ SLIC multiprocess helper called by slic.get_video_slic"""
 
@@ -5185,12 +5185,12 @@ def _slic_helper(frm_range: np.ndarray,
     return batch
 
 
-def get_video_slic(video_path: Union[str, os.PathLike],
-                   save_path: Union[str, os.PathLike],
-                   n_segments: Optional[int] = 50,
-                   compactness: Optional[int] = 50,
-                   sigma: Optional[int] = 1,
-                   core_cnt: Optional[int] = -1) -> None:
+def get_video_slic(video_path: str | os.PathLike,
+                   save_path: str | os.PathLike,
+                   n_segments: int | None = 50,
+                   compactness: int | None = 50,
+                   sigma: int | None = 1,
+                   core_cnt: int | None = -1) -> None:
 
     r"""
     Apply SLIC superpixel segmentation to all frames of a video and save the output as a new video.
@@ -5245,12 +5245,12 @@ def get_video_slic(video_path: Union[str, os.PathLike],
 
 
 
-def is_video_seekable(data_path: Union[str, os.PathLike],
+def is_video_seekable(data_path: str | os.PathLike,
                       gpu: bool = False,
-                      batch_size: Optional[int] = None,
+                      batch_size: int | None = None,
                       verbose: bool = False,
                       raise_error: bool = True,
-                      save_path: Optional[Union[str, os.PathLike]] = None) -> Union[None, bool, Tuple[Dict[str, List[int]]]]:
+                      save_path: str | os.PathLike | None = None) -> None | bool | tuple[dict[str, list[int]]]:
     """
     Determines if the given video file(s) are seekable and can be processed frame-by-frame without issues.
 
@@ -5322,10 +5322,10 @@ def is_video_seekable(data_path: Union[str, os.PathLike],
             return (False, results)
 
 
-def crop_video(video_path: Union[str, os.PathLike],
-               save_path: Union[str, os.PathLike],
-               size: Tuple[int, int],
-               top_left: Tuple[int, int],
+def crop_video(video_path: str | os.PathLike,
+               save_path: str | os.PathLike,
+               size: tuple[int, int],
+               top_left: tuple[int, int],
                gpu: bool = False,
                codec: str = Formats.BATCH_CODEC.value,
                verbose: bool = True,
@@ -5382,9 +5382,9 @@ def crop_video(video_path: Union[str, os.PathLike],
         stdout_success(msg=f'Cropped video saved at {save_path}', elapsed_time=timer.elapsed_time_str)
 
 
-def split_mosaic(video_path: Union[str, os.PathLike],
-                 tile_size: Tuple[int, int],
-                 save_dir: Union[str, os.PathLike],
+def split_mosaic(video_path: str | os.PathLike,
+                 tile_size: tuple[int, int],
+                 save_dir: str | os.PathLike,
                  verbose: bool = True):
     """
     Helper to split a mosaic video into its constituent parts.
@@ -5419,7 +5419,7 @@ def split_mosaic(video_path: Union[str, os.PathLike],
         stdout_success(msg=f'Tile data saved in {save_dir}', elapsed_time=timer.elapsed_time_str)
 
 
-def get_async_frame_batch(batch_reader: AsyncVideoFrameReader, timeout: int = 10) -> Tuple[int, int, np.ndarray]:
+def get_async_frame_batch(batch_reader: AsyncVideoFrameReader, timeout: int = 10) -> tuple[int, int, np.ndarray]:
     check_int(name=f'{get_async_frame_batch.__name__} timeout', min_value=0, raise_error=True, value=timeout)
     check_instance(source=f'{get_async_frame_batch.__name__} batch_reader', instance=batch_reader, accepted_types=(AsyncVideoFrameReader,), raise_error=True)
     x = batch_reader.frame_queue.get(timeout=timeout)
@@ -5429,13 +5429,13 @@ def get_async_frame_batch(batch_reader: AsyncVideoFrameReader, timeout: int = 10
         return x
 
 
-def change_playback_speed(video_path: Union[str, os.PathLike],
+def change_playback_speed(video_path: str | os.PathLike,
                           speed: float,
-                          save_path: Optional[Union[str, os.PathLike]] = None,
+                          save_path: str | os.PathLike | None = None,
                           quality: int = 60,
                           gpu: bool = False,
                           verbose: bool = True,
-                          codec: Optional[str] = None):
+                          codec: str | None = None):
     """
     Change the playback speed of a video file. Speed > 1.0 makes the video faster, speed < 1.0 makes it slower.
 
@@ -5495,13 +5495,13 @@ def change_playback_speed(video_path: Union[str, os.PathLike],
 
 
 
-def change_playback_speed_dir(data_dir: Union[str, os.PathLike],
+def change_playback_speed_dir(data_dir: str | os.PathLike,
                               speed: float,
-                              save_dir: Optional[Union[str, os.PathLike]] = None,
+                              save_dir: str | os.PathLike | None = None,
                               quality: int = 60,
                               gpu: bool = False,
                               verbose: bool = True,
-                              codec: Optional[str] = None):
+                              codec: str | None = None):
     """
     Change the playback speed of all video files in a directory. Speed > 1.0 makes videos faster, speed < 1.0 makes them slower.
 

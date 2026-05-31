@@ -51,12 +51,12 @@ class FSTTCCalculator(ConfigReader, PlottingMixin):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
+        config_path: str | os.PathLike,
         time_window: int,
-        behavior_lst: List[str],
-        time_delta_at_onset: Optional[bool] = False,
-        join_bouts_within_delta: Optional[bool] = False,
-        create_graphs: Optional[bool] = False,
+        behavior_lst: list[str],
+        time_delta_at_onset: bool | None = False,
+        join_bouts_within_delta: bool | None = False,
+        create_graphs: bool | None = False,
     ):
         ConfigReader.__init__(self, config_path=config_path)
         PlottingMixin.__init__(self)

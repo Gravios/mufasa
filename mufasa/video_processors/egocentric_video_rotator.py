@@ -26,13 +26,13 @@ from mufasa.utils.read_write import (concatenate_videos_in_folder,
 
 
 def egocentric_video_aligner(frm_range: np.ndarray,
-                             video_path: Union[str, os.PathLike],
-                             temp_dir: Union[str, os.PathLike],
+                             video_path: str | os.PathLike,
+                             temp_dir: str | os.PathLike,
                              video_name: str,
                              centers: np.ndarray,
                              rotation_vectors: np.ndarray,
-                             target: Tuple[int, int],
-                             fill_clr: Tuple[int, int, int] = (255, 255, 255),
+                             target: tuple[int, int],
+                             fill_clr: tuple[int, int, int] = (255, 255, 255),
                              verbose: bool = False,
                              gpu: bool = True):
 
@@ -135,15 +135,15 @@ class EgocentricVideoRotator:
     """
 
     def __init__(self,
-                 video_path: Union[str, os.PathLike],
+                 video_path: str | os.PathLike,
                  centers: np.ndarray,
                  rotation_vectors: np.ndarray,
-                 anchor_location: Tuple[int, int],
+                 anchor_location: tuple[int, int],
                  verbose: bool = True,
-                 fill_clr: Tuple[int, int, int] = (0, 0, 0),
+                 fill_clr: tuple[int, int, int] = (0, 0, 0),
                  core_cnt: int = -1,
-                 save_path: Optional[Union[str, os.PathLike]] = None,
-                 gpu: Optional[bool] = True,
+                 save_path: str | os.PathLike | None = None,
+                 gpu: bool | None = True,
                  pool: bool = None):
 
         check_file_exist_and_readable(file_path=video_path)

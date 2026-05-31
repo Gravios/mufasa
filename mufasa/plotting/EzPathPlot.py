@@ -69,17 +69,17 @@ class EzPathPlot:
     """
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike, List[Union[str, os.PathLike]]],
+                 data_path: str | os.PathLike | list[str | os.PathLike],
                  body_part: str,
-                 bg_color: Union[Tuple[int, int, int], int] = (255, 255, 255),
-                 video_dir: Optional[Union[str, os.PathLike]] = None,
-                 line_color: Union[Tuple[int, int, int], Literal['time', 'velocity']] = (147, 20, 255),
+                 bg_color: tuple[int, int, int] | int = (255, 255, 255),
+                 video_dir: str | os.PathLike | None = None,
+                 line_color: tuple[int, int, int] | Literal['time', 'velocity'] = (147, 20, 255),
                  line_thickness: float = 1,
                  svg: bool = False,
-                 size: Optional[Tuple[int, int]] = None,
+                 size: tuple[int, int] | None = None,
                  line_opacity: float = 1.0,
-                 smoothing_time: Optional[int] = None,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
+                 smoothing_time: int | None = None,
+                 save_dir: str | os.PathLike | None = None,
                  dpi: int = 500,
                  verbose: bool = True):
 

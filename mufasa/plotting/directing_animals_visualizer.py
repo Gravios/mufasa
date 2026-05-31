@@ -76,12 +76,12 @@ class DirectingOtherAnimalsVisualizer(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 style_attr: Dict[str, Any],
-                 left_ear_name: Optional[str] = None,
-                 right_ear_name: Optional[str] = None,
-                 nose_name: Optional[str] = None):
+                 config_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 style_attr: dict[str, Any],
+                 left_ear_name: str | None = None,
+                 right_ear_name: str | None = None,
+                 nose_name: str | None = None):
 
         check_file_exist_and_readable(file_path=video_path)
         check_file_exist_and_readable(file_path=config_path)

@@ -31,7 +31,7 @@ class UserDefinedFeatureExtractor(ConfigReader, FeatureExtractionMixin):
     >>> feature_extractor.run()
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike]):
+    def __init__(self, config_path: str | os.PathLike):
         FeatureExtractionMixin.__init__(self, config_path=config_path)
         ConfigReader.__init__(self, config_path=config_path)
         print(f"Extracting features from {len(self.files_found)} file(s)...")

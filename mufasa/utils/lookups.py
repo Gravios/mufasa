@@ -57,7 +57,7 @@ from mufasa.utils.warnings import NoDataFoundWarning
 #     stub docstring on load_simba_fonts for the post-fix behavior.
 
 
-RGBFloat = Tuple[float, float, float]
+RGBFloat = tuple[float, float, float]
 
 class SharedCounter:
     """Counter that can be shared across processes on different cores"""
@@ -75,7 +75,7 @@ class SharedCounter:
             return self.val.value
 
 
-def get_body_part_configurations() -> Dict[str, Union[str, os.PathLike]]:
+def get_body_part_configurations() -> dict[str, str | os.PathLike]:
     """
     Return dict with named body-part schematics of pose-estimation schemas in SimBA installation as keys,
     and paths to the images representing those body-part schematics as values.
@@ -100,7 +100,7 @@ def get_body_part_configurations() -> Dict[str, Union[str, os.PathLike]]:
     return lookup
 
 
-def get_bp_config_codes() -> Dict[str, str]:
+def get_bp_config_codes() -> dict[str, str]:
     """
     Helper to match SimBA project.toml [create ensemble settings][pose_estimation_body_parts] to string names.
 
@@ -126,7 +126,7 @@ def get_bp_config_codes() -> Dict[str, str]:
     }
 
 
-def get_bp_config_code_class_pairs() -> Dict[str, object]:
+def get_bp_config_code_class_pairs() -> dict[str, object]:
     """
     Helper to match SimBA project.toml [create ensemble settings][pose_estimation_body_parts] setting to feature extraction module class.
     """
@@ -163,12 +163,12 @@ def get_bp_config_code_class_pairs() -> Dict[str, object]:
 
 
 
-def rgb_to_hex(color: Tuple[int, int, int]) -> str:
+def rgb_to_hex(color: tuple[int, int, int]) -> str:
     check_if_valid_rgb_tuple(data=color, raise_error=True, source=rgb_to_hex.__name__)
     r, g, b = color
     return rgb2hex((r/255, g/255, b/255), keep_alpha=False)
 
-def get_icons_paths() -> Dict[str, Union[str, os.PathLike]]:
+def get_icons_paths() -> dict[str, str | os.PathLike]:
     """
     Helper to get dictionary with icons with the icon names as keys (grabbed from file-name) and their
     file paths as values.
@@ -218,7 +218,7 @@ def load_simba_fonts() -> None:
     """
     return None
 
-def get_third_party_appender_file_formats() -> Dict[str, str]:
+def get_third_party_appender_file_formats() -> dict[str, str]:
     """
     Helper to get dictionary that maps different third-party annotation tools with different file formats.
     """
@@ -233,7 +233,7 @@ def get_third_party_appender_file_formats() -> Dict[str, str]:
     }
 
 
-def get_emojis() -> Dict[str, str]:
+def get_emojis() -> dict[str, str]:
     """
     Helper to get dictionary of emojis with names as keys and emojis as values. Note, the same emojis are
     represented differently in different python versions.
@@ -296,7 +296,7 @@ def get_emojis() -> Dict[str, str]:
              # 📝 memo
         }
 
-def get_meta_data_file_headers() -> List[str]:
+def get_meta_data_file_headers() -> list[str]:
     """
     Get List of headers for SimBA classifier metadata output.
 
@@ -330,7 +330,7 @@ def get_meta_data_file_headers() -> List[str]:
         'rf_max_depth',
     ]
 
-def get_cmaps() -> List[str]:
+def get_cmaps() -> list[str]:
     """
     Get list of named matplotlib color palettes.
     """
@@ -366,7 +366,7 @@ def get_categorical_palettes():
     ]
 
 
-def get_color_dict() -> Dict[str, Tuple[int, int, int]]:
+def get_color_dict() -> dict[str, tuple[int, int, int]]:
     """
     Get dict of color names as keys and RGB tuples as values
     """
@@ -400,7 +400,7 @@ def get_color_dict() -> Dict[str, Tuple[int, int, int]]:
     }
 
 
-def get_named_colors() -> List[str]:
+def get_named_colors() -> list[str]:
     """
     Get list of named matplotlib colors.
     """
@@ -437,7 +437,7 @@ def get_named_colors() -> List[str]:
     ]
 
 
-def create_color_palettes(no_animals: int, map_size: int) -> List[List[int]]:
+def create_color_palettes(no_animals: int, map_size: int) -> list[list[int]]:
     """
     Create list of lists of bgr colors, one for each animal. Each list is pulled from a different palette
     matplotlib color map.
@@ -493,7 +493,7 @@ def get_random_color_palette(n_colors: int):
     check_int(name=f'{get_random_color_palette.__name__} n_colors', value=n_colors, min_value=1, raise_error=True)
     return [tuple(random.randint(0, 255) for _ in range(3)) for _ in range(n_colors)]
 
-def cardinality_to_integer_lookup() -> Dict[str, int]:
+def cardinality_to_integer_lookup() -> dict[str, int]:
     """
     Create dictionary that maps cardinal compass directions to integers.
 
@@ -513,7 +513,7 @@ def integer_to_cardinality_lookup():
     return {0: "N", 1: "NE", 2: "E", 3: "SE", 4: "S", 5: "SW", 6: "W", 7: "NW"}
 
 
-def percent_to_crf_lookup() -> Dict[str, int]:
+def percent_to_crf_lookup() -> dict[str, int]:
     """
     Create dictionary that matches human-readable percent values to FFmpeg Constant Rate Factor (CRF)
     values that regulates video quality in CPU codecs. Higher CRF values translates to lower video quality and reduced
@@ -613,7 +613,7 @@ def get_ffmpeg_crossfade_methods():
             'revealdown']
 
 
-def video_quality_to_preset_lookup() -> Dict[str, str]:
+def video_quality_to_preset_lookup() -> dict[str, str]:
     """
     Create dictionary that matches human-readable video quality settings to FFmpeg presets for GPU codecs.
     """
@@ -765,7 +765,7 @@ def get_model_names():
     model_names_dir = os.path.join(os.path.dirname(mufasa.__file__), Paths.UNSUPERVISED_MODEL_NAMES.value)
     return list(pd.read_parquet(model_names_dir)[UML.NAMES.value])
 
-def win_to_wsl_path(win_path: Union[str, os.PathLike]) -> str:
+def win_to_wsl_path(win_path: str | os.PathLike) -> str:
     """Helper to convert a windows path name, to a WSL path name"""
     result = subprocess.run(["wsl.exe", "wslpath", win_path], capture_output=True, text=True)
     if result.returncode != 0:
@@ -794,7 +794,7 @@ def get_current_time():
     return datetime.now().strftime("%H:%M:%S")
 
 
-def get_display_resolution() -> Tuple[int, int]:
+def get_display_resolution() -> tuple[int, int]:
     """
     Helper to get main monitor / display resolution.
 
@@ -810,12 +810,12 @@ def get_display_resolution() -> Tuple[int, int]:
     return (width, height)
 
 
-def get_img_resize_info(img_size: Tuple[int ,int],
-                        display_resolution: Optional[Tuple[int, int]] = None,
+def get_img_resize_info(img_size: tuple[int ,int],
+                        display_resolution: tuple[int, int] | None = None,
                         max_height_ratio: float = 0.5,
                         max_width_ratio: float = 0.5,
                         min_height_ratio: float = 0.0,
-                        min_width_ratio: float = 0.0) -> Tuple[int, int, float, float]:
+                        min_width_ratio: float = 0.0) -> tuple[int, int, float, float]:
     """
     Calculates the new dimensions and scaling factors needed to resize an image while preserving its
     aspect ratio so that it fits within a given portion of the display resolution.
@@ -860,7 +860,7 @@ def is_running_in_ide():
     return hasattr(sys, 'ps1') or sys.flags.interactive
 
 
-def get_monitor_info() -> Tuple[Dict[int, Dict[str, Union[int, bool]]], Tuple[int, int]]:
+def get_monitor_info() -> tuple[dict[int, dict[str, int | bool]], tuple[int, int]]:
     """
     Helper to get main monitor / display resolution.
 
@@ -931,8 +931,8 @@ def get_monitor_info() -> Tuple[Dict[int, Dict[str, Union[int, bool]]], Tuple[in
 
 
 
-def get_table(data: Dict[str, Any],
-              headers: Optional[Tuple[str, str]] = ("SETTING", "VALUE"),
+def get_table(data: dict[str, Any],
+              headers: tuple[str, str] | None = ("SETTING", "VALUE"),
               tablefmt: str = "grid") -> str:
     """
      Create a formatted table string from dictionary data using the tabulate library.
@@ -959,7 +959,7 @@ def get_table(data: Dict[str, Any],
 
 
 
-def print_video_meta_data(data_path: Union[str, os.PathLike]) -> None:
+def print_video_meta_data(data_path: str | os.PathLike) -> None:
     """
     Print video metadata as formatted tables to the console.
 
@@ -986,7 +986,7 @@ def print_video_meta_data(data_path: Union[str, os.PathLike]) -> None:
         print(f"{table} {Defaults.STR_SPLIT_DELIMITER.value}TABLE")
 
 
-def get_ffmpeg_encoders(raise_error: bool = True, alphabetically_sorted: bool = False) -> List[str]:
+def get_ffmpeg_encoders(raise_error: bool = True, alphabetically_sorted: bool = False) -> list[str]:
     """
     Get a list of all available FFmpeg encoders.
 
@@ -1024,9 +1024,9 @@ def get_ffmpeg_encoders(raise_error: bool = True, alphabetically_sorted: bool = 
 
 
 def find_closest_string(target: str,
-                        string_list: List[str],
+                        string_list: list[str],
                         case_sensitive: bool = False,
-                        token_based: bool = True) -> Optional[Tuple[str, Union[int, float]]]:
+                        token_based: bool = True) -> tuple[str, int | float] | None:
     """
     Find the closest string in a list to a target string using hybrid similarity matching.
 
@@ -1073,7 +1073,7 @@ def find_closest_string(target: str,
             prev_row = curr_row
         return prev_row[-1]
 
-    def tokenize(s: str) -> List[str]:
+    def tokenize(s: str) -> list[str]:
         """Split string by common delimiters and return sorted tokens"""
         tokens = re.split(r'[_\-\s]+', s)
         return sorted([t for t in tokens if t])
@@ -1182,7 +1182,7 @@ def create_directionality_cords(bp_dict: dict,
                     raise InvalidInputError(msg=f'Could not detect a body-part for animal {animal_name}, body-part {bp_name} and coordinate {cord_key} in Mufasa project. Make sure the body-part configuration file at {Paths.BP_NAMES.value} lists the appropriate body-parts. Passed values: {left_ear_name, nose_name, right_ear_name}', source=create_directionality_cords.__name__)
     return results
 
-def get_tooltips() -> Dict[str, str]:
+def get_tooltips() -> dict[str, str]:
     mufasa_dir = os.path.dirname(mufasa.__file__)
     tool_tips_path = os.path.join(mufasa_dir, Paths.TOOLTIPS.value)
     if not os.path.isfile(tool_tips_path):
@@ -1193,9 +1193,9 @@ def get_tooltips() -> Dict[str, str]:
 def intermittent_palette(n: int = 10,
                          base_light: float = 0.55,
                          contrast_delta: float = 0.18,
-                         seed_hue: Optional[float] = None,
+                         seed_hue: float | None = None,
                          output: Literal["rgb", "rgb255", "hex"] = "rgb",
-                         rng: Optional[random.Random] = None) -> Union[List[RGBFloat], List[Tuple[int, int, int]], List[str]]:
+                         rng: random.Random | None = None) -> list[RGBFloat] | list[tuple[int, int, int]] | list[str]:
     """
     Generate a categorical colour palette with evenly spaced hues and alternating lightness.
 
@@ -1231,7 +1231,7 @@ def intermittent_palette(n: int = 10,
     golden_ratio = 0.618033988749895
     rnd = rng or random.Random()
     hue = seed_hue % 1.0 if seed_hue is not None else rnd.random()
-    colours: List[RGBFloat] = []
+    colours: list[RGBFloat] = []
 
     for idx in range(n):
         hue = (hue + golden_ratio) % 1.0
@@ -1289,7 +1289,7 @@ def check_for_updates(time_out: int = 2):
     stdout_information(msg=msg, source=check_for_updates.__name__)
 
 
-def get_ext_codec_map() -> Dict[str, str]:
+def get_ext_codec_map() -> dict[str, str]:
     """
     Get a dictionary mapping video file extensions to their recommended FFmpeg codecs.
     Automatically falls back to alternative codecs if the preferred codec is not available.
@@ -1332,7 +1332,7 @@ def get_ext_codec_map() -> Dict[str, str]:
         'h264': get_codec(preferred='libx264', alternative='h264'),
     }
 
-def get_ffmpeg_codec(file_name: Union[str, os.PathLike],
+def get_ffmpeg_codec(file_name: str | os.PathLike,
                      fallback: str = 'mpeg4') -> str:
     """
     Get the recommended FFmpeg codec for a video file based on its extension.
@@ -1355,7 +1355,7 @@ def get_ffmpeg_codec(file_name: Union[str, os.PathLike],
         return fallback
 
 
-def get_nvdec_count(gpu_name: Optional[str] = None) -> int:
+def get_nvdec_count(gpu_name: str | None = None) -> int:
     """
     Return the number of concurrent NVDEC (hardware video decode) sessions typical for the GPU model.
 

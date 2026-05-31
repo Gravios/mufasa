@@ -54,13 +54,13 @@ class DLC2Yolo:
     """
 
     def __init__(self,
-                 dlc_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 dlc_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  train_size: float = 0.7,
                  verbose: bool = False,
                  padding: float = 0.15,
-                 flip_idx: Optional[Tuple[int, ...]] = None,
-                 names: Tuple[str, ...] = ('mouse',),
+                 flip_idx: tuple[int, ...] | None = None,
+                 names: tuple[str, ...] = ('mouse',),
                  greyscale: bool = False,
                  clahe: bool = False) -> None:
 

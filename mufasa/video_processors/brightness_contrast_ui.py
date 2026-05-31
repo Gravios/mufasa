@@ -32,7 +32,7 @@ class BrightnessContrastUI:
 
      """
 
-    def __init__(self, data: Union[str, os.PathLike, np.ndarray]):
+    def __init__(self, data: str | os.PathLike | np.ndarray):
         self.WINDOW_NAME = "CONTRAST / BRIGHTNESS: HIT ESC TO CONTINUE"
         self.BRIGHTNESS = 'BRIGHTNESS'
         self.CONTRAST = 'CONTRAST'
@@ -85,7 +85,7 @@ class BrightnessContrastUI:
         cv2.createTrackbar(self.CONTRAST, self.WINDOW_NAME, self.last_values[self.CONTRAST], 254, self._on_trackbar_change)
         self._trackbars_created = True
 
-    def run(self) -> Tuple[float, float]:
+    def run(self) -> tuple[float, float]:
         self._trackbars_created = False
         self._create_window_and_trackbars()
 

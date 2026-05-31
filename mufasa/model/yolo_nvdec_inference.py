@@ -64,7 +64,7 @@ SAVITZKY_GOLAY = 'savitzky-golay'
 YOLO_EXTENSIONS = ('.engine', '.pt', '.onnx', '.torchscript', '.xml', '.pb', '.tflite', '.edgetpu', '.paddle', '.ncnn', '.mnn', '.imx', '.rknn')
 
 
-def read_yolo_metadata(model: Union[str, os.PathLike, YOLO]) -> dict:
+def read_yolo_metadata(model: str | os.PathLike | YOLO) -> dict:
     """
     Read metadata from a YOLO model file or loaded YOLO instance.
 
@@ -430,24 +430,24 @@ class YoloNVDECInference:
     """
 
     def __init__(self,
-                 video_path: Union[str, os.PathLike],
-                 engine_path: Union[str, os.PathLike],
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
+                 video_path: str | os.PathLike,
+                 engine_path: str | os.PathLike,
+                 save_dir: str | os.PathLike | None = None,
                  task: Literal['detect', 'pose', 'segment'] = 'detect',
-                 imsz: Optional[int] = None,
-                 batch_size: Optional[int] = None,
-                 max_workers: Optional[int] = None,
-                 gpu_id: Union[int, Tuple[int, ...]] = 0,
+                 imsz: int | None = None,
+                 batch_size: int | None = None,
+                 max_workers: int | None = None,
+                 gpu_id: int | tuple[int, ...] = 0,
                  conf_threshold: float = 0.05,
                  iou_threshold: float = 0.45,
-                 keypoint_names: Optional[Tuple[str, ...]] = None,
+                 keypoint_names: tuple[str, ...] | None = None,
                  vertice_cnt: int = 60,
-                 max_detections: Optional[int] = None,
-                 segment_smoothing: Optional[int] = None,
+                 max_detections: int | None = None,
+                 segment_smoothing: int | None = None,
                  interpolate: bool = True,
                  recursive: bool = False,
-                 smoothing_method: Optional[Literal['savitzky-golay', 'bartlett', 'blackman', 'boxcar', 'cosine', 'gaussian', 'hamming', 'exponential']] = None,
-                 smoothing_time_window: Optional[int] = None,
+                 smoothing_method: Literal['savitzky-golay', 'bartlett', 'blackman', 'boxcar', 'cosine', 'gaussian', 'hamming', 'exponential'] | None = None,
+                 smoothing_time_window: int | None = None,
                  verbose: bool = True):
 
         get_pkg_version(pkg='PyNvVideoCodec', raise_error=True)

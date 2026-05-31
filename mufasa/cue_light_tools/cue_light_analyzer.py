@@ -48,7 +48,7 @@ def slice_rectangle_from_img(img: np.ndarray,
     return img[tl_y:br_y, tl_x:br_x]
 
 
-def _get_intensity_scores_in_rois(frm_list: List[int],
+def _get_intensity_scores_in_rois(frm_list: list[int],
                                   video_rois: dict,
                                   video_path: str):
     results = {}
@@ -120,10 +120,10 @@ class CueLightAnalyzer(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Union[str, os.PathLike],
-                 cue_light_names: List[str],
-                 save_dir: Union[str, os.PathLike] = None,
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike,
+                 cue_light_names: list[str],
+                 save_dir: str | os.PathLike = None,
                  core_cnt: int = -1,
                  detailed_data: bool = False):
 
@@ -145,7 +145,7 @@ class CueLightAnalyzer(ConfigReader):
         self.video_cnt = len(list(self.data_paths.keys()))
 
     def _get_kmeans(self,
-                    intensities: Dict[str, Dict[int, int]]):
+                    intensities: dict[str, dict[int, int]]):
         results = {}
         for cue_light_name, cue_light_data in intensities.items():
             cue_light_data = dict(sorted(cue_light_data.items()))

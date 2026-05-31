@@ -62,8 +62,8 @@ def _stringify(value: Any) -> str:
 
 
 def project_toml_to_configparser(
-    toml_data: Dict[str, Any],
-    project_root: Union[str, Path],
+    toml_data: dict[str, Any],
+    project_root: str | Path,
 ) -> ConfigParser:
     """Build a :class:`ConfigParser` that mirrors what the legacy
     ``ProjectConfigCreator`` used to write, populated from ``toml_data``.
@@ -298,7 +298,7 @@ def project_toml_to_configparser(
 
 
 def read_project_toml_as_configparser(
-    config_path: Union[str, Path],
+    config_path: str | Path,
 ) -> ConfigParser:
     """Convenience: load ``config_path`` (a ``.toml`` file) and
     return the synthesized :class:`ConfigParser`.

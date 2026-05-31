@@ -44,7 +44,7 @@ class ROISelectorPolygon:
                  img_window: Toplevel,
                  thickness: int = 10,
                  vertice_size: int = 2,
-                 clr: Tuple[int, int, int] = (147, 20, 255),
+                 clr: tuple[int, int, int] = (147, 20, 255),
                  tolerance: int = 2) -> None:
 
         check_instance(source=self.__class__.__name__, instance=img_window, accepted_types=(Toplevel,))

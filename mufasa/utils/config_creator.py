@@ -62,7 +62,7 @@ from mufasa.utils.enums import Paths
 
 def _read_preset_body_parts(
     body_part_config_idx: int,
-) -> List[str]:
+) -> list[str]:
     """Look up the body-part list at row ``body_part_config_idx``
     of the canonical ``pose_configurations/bp_names/bp_names.csv``.
 
@@ -132,12 +132,12 @@ class ProjectConfigCreator:
         self,
         project_path: str,
         project_name: str,
-        target_list: List[str],
+        target_list: list[str],
         pose_estimation_bp_cnt: str,
         body_part_config_idx: int,
         animal_cnt: int,
         file_type: str = "csv",
-        body_parts: Optional[List[str]] = None,
+        body_parts: list[str] | None = None,
     ) -> None:
         if not project_name or any(
             c in project_name for c in r" /\:<>|*?\""

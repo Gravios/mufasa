@@ -9,7 +9,7 @@ from mufasa.utils.enums import Formats
 def mean_absolute_percentage_error(y_true: np.ndarray,
                                    y_pred: np.ndarray,
                                    epsilon=1e-10,
-                                   weights: Optional[np.ndarray] = None) -> float:
+                                   weights: np.ndarray | None = None) -> float:
     """
     Compute the Mean Absolute Percentage Error (MAPE)
 
@@ -40,7 +40,7 @@ def mean_absolute_percentage_error(y_true: np.ndarray,
 
 def mean_squared_error(y_true: np.ndarray,
                        y_pred: np.ndarray,
-                       weights: Optional[np.ndarray] = None) -> float:
+                       weights: np.ndarray | None = None) -> float:
 
     """
     Compute the Mean Squared Error (MSE) between the true and predicted values.
@@ -64,7 +64,7 @@ def mean_squared_error(y_true: np.ndarray,
 
 def mean_absolute_error(y_true: np.ndarray,
                         y_pred: np.ndarray,
-                        weights: Optional[np.ndarray] = None) -> float:
+                        weights: np.ndarray | None = None) -> float:
     """
     Compute the Mean Absolute Error (MAE) between the true and predicted values.
 
@@ -86,7 +86,7 @@ def mean_absolute_error(y_true: np.ndarray,
         return np.mean(absolute_error)
 
 
-def r2_score(y_true: np.ndarray, y_pred: np.ndarray, weights: Optional[np.ndarray] = None) -> float:
+def r2_score(y_true: np.ndarray, y_pred: np.ndarray, weights: np.ndarray | None = None) -> float:
     """
     Compute the R^2 (coefficient of determination) score.
 
@@ -119,7 +119,7 @@ def r2_score(y_true: np.ndarray, y_pred: np.ndarray, weights: Optional[np.ndarra
 
 def root_mean_squared_error(y_true: np.ndarray,
                             y_pred: np.ndarray,
-                            weights: Optional[np.ndarray] = None) -> float:
+                            weights: np.ndarray | None = None) -> float:
 
     """
     Compute the Root Mean Squared Error (RMSE) between the true and predicted values.

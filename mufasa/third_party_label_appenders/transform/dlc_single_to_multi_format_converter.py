@@ -11,8 +11,8 @@ from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import read_df, write_df
 
 
-def convert_dlc_annotation_format(input_dir: Union[str, os.PathLike],
-                                  output_dir: Union[str, os.PathLike]):
+def convert_dlc_annotation_format(input_dir: str | os.PathLike,
+                                  output_dir: str | os.PathLike):
     r"""
     Converts DeepLabCut annotation files from format without individuals row to format with individuals row.
 

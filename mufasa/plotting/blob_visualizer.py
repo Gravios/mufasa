@@ -76,19 +76,19 @@ class BlobVisualizer:
     >>> visualizer.run()
     """
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 data_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  core_cnt: int = -1,
                  shape_opacity: float = 0.5,
                  bg_opacity: float = 1.0,
-                 circle_size: Optional[int] = None,
-                 hull: Optional[Tuple[int, int, int]] = (178, 102, 255),
-                 anterior: Optional[Tuple[int, int, int]] = (0, 0, 255),
-                 posterior: Optional[Tuple[int, int, int]] = (0, 128, 0),
-                 center: Optional[Tuple[int, int, int]] = (0, 165, 255),
-                 left: Optional[Tuple[int, int, int]] = (255, 51, 153),
-                 right: Optional[Tuple[int, int, int]] = (255, 255, 102)):
+                 circle_size: int | None = None,
+                 hull: tuple[int, int, int] | None = (178, 102, 255),
+                 anterior: tuple[int, int, int] | None = (0, 0, 255),
+                 posterior: tuple[int, int, int] | None = (0, 128, 0),
+                 center: tuple[int, int, int] | None = (0, 165, 255),
+                 left: tuple[int, int, int] | None = (255, 51, 153),
+                 right: tuple[int, int, int] | None = (255, 255, 102)):
 
         if os.path.isdir(data_path):
             self.data_paths = find_files_of_filetypes_in_directory(directory=data_path, extensions=['.csv'], raise_error=True, as_dict=True)

@@ -35,9 +35,9 @@ class ReconfigureResult:
     bp_backup: Path
     previous_preset: str
     previous_animal_no: str
-    previous_body_parts: List[str]
-    new_body_parts: List[str]
-    changes: List[str] = field(default_factory=list)
+    previous_body_parts: list[str]
+    new_body_parts: list[str]
+    changes: list[str] = field(default_factory=list)
 
 
 class ProjectReconfigureError(Exception):
@@ -45,7 +45,7 @@ class ProjectReconfigureError(Exception):
     malformed config, etc.)."""
 
 
-def _read_existing_bps(bp_csv: Path) -> List[str]:
+def _read_existing_bps(bp_csv: Path) -> list[str]:
     """Read body parts from the project's existing bp_names.csv.
 
     The file is sometimes written as comma-separated on a single row
@@ -64,8 +64,8 @@ def _read_existing_bps(bp_csv: Path) -> List[str]:
 
 
 def reconfigure_project_user_defined(
-    config_path: Union[str, Path],
-    body_parts: List[str],
+    config_path: str | Path,
+    body_parts: list[str],
     animal_cnt: int = 1,
 ) -> ReconfigureResult:
     """Switch *config_path*'s project to ``user_defined`` with the
@@ -137,7 +137,7 @@ def reconfigure_project_user_defined(
         "General settings", "animal_no", fallback="<unset>",
     )
 
-    changes: List[str] = []
+    changes: list[str] = []
 
     # ------------------ Edit project.toml ---------------------- #
     if prev_preset != "user_defined":

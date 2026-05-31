@@ -66,15 +66,15 @@ THREADS_PER_BLOCK = 2024
 # — this forced spawn on Linux and defeated fork's zero-copy inheritance
 # of already-loaded numba/cupy modules (adds ~1-2s × N workers).
 
-def create_average_frm_cupy(video_path: Union[str, os.PathLike],
-                            start_frm: Optional[int] = None,
-                            end_frm: Optional[int] = None,
-                            start_time: Optional[str] = None,
-                            end_time: Optional[str] = None,
-                            save_path: Optional[Union[str, os.PathLike]] = None,
-                            batch_size: Optional[int] = 3000,
-                            verbose: Optional[bool] = False,
-                            async_frame_read: bool = False) -> Union[None, np.ndarray]:
+def create_average_frm_cupy(video_path: str | os.PathLike,
+                            start_frm: int | None = None,
+                            end_frm: int | None = None,
+                            start_time: str | None = None,
+                            end_time: str | None = None,
+                            save_path: str | os.PathLike | None = None,
+                            batch_size: int | None = 3000,
+                            verbose: bool | None = False,
+                            async_frame_read: bool = False) -> None | np.ndarray:
 
     """
     Computes the average frame using GPU acceleration from a specified range of frames or time interval in a video file.
@@ -216,15 +216,15 @@ def _average_3d_stack_cuda(image_stack: np.ndarray) -> np.ndarray:
     return results
 
 
-def create_average_frm_cuda(video_path: Union[str, os.PathLike],
-                            start_frm: Optional[int] = None,
-                            end_frm: Optional[int] = None,
-                            start_time: Optional[str] = None,
-                            end_time: Optional[str] = None,
-                            save_path: Optional[Union[str, os.PathLike]] = None,
-                            batch_size: Optional[int] = 6000,
-                            verbose: Optional[bool] = False,
-                            async_frame_read: bool = False) -> Union[None, np.ndarray]:
+def create_average_frm_cuda(video_path: str | os.PathLike,
+                            start_frm: int | None = None,
+                            end_frm: int | None = None,
+                            start_time: str | None = None,
+                            end_time: str | None = None,
+                            save_path: str | os.PathLike | None = None,
+                            batch_size: int | None = 6000,
+                            verbose: bool | None = False,
+                            async_frame_read: bool = False) -> None | np.ndarray:
     """
     Computes the average frame using GPU acceleration from a specified range of frames or time interval in a video file.
     This average frame typically used for background substraction.
@@ -333,7 +333,7 @@ def _digital(data, results):
         results[i][x][y] = (0.299 * r) + (0.587 * g) + (0.114 * b)
 
 def img_stack_brightness(x: np.ndarray,
-                         method: Optional[Literal['photometric', 'digital']] = 'digital',
+                         method: Literal['photometric', 'digital'] | None = 'digital',
                          ignore_black: bool = True,
                          verbose: bool = False,
                          batch_size: int = 2500) -> np.ndarray:
@@ -473,8 +473,8 @@ def _rgb_mse(data, ref_img, stride, batch_cnt, mse_arr):
         mse_arr[i][x][y] = r_diff + g_diff + b_diff
 
 def stack_sliding_mse(x: np.ndarray,
-                      stride: Optional[int] = 1,
-                      batch_size: Optional[int] = 1000) -> np.ndarray:
+                      stride: int | None = 1,
+                      batch_size: int | None = 1000) -> np.ndarray:
     r"""
     Computes the Mean Squared Error (MSE) between each image in a stack and a reference image,
     where the reference image is determined by a sliding window approach with a specified stride.
@@ -532,8 +532,8 @@ def stack_sliding_mse(x: np.ndarray,
     return out
 
 
-def img_stack_to_grayscale_cupy(imgs: Union[np.ndarray, cp.ndarray],
-                                batch_size: Optional[int] = 250) -> np.ndarray:
+def img_stack_to_grayscale_cupy(imgs: np.ndarray | cp.ndarray,
+                                batch_size: int | None = 250) -> np.ndarray:
     """
     Converts a stack of color images to grayscale using GPU acceleration with CuPy.
 
@@ -640,10 +640,10 @@ def img_stack_to_grayscale_cuda(x: np.ndarray) -> np.ndarray:
 
 
 def img_stack_to_bw(imgs: np.ndarray,
-                    lower_thresh: Optional[int] = 100,
-                    upper_thresh: Optional[int] = 100,
-                    invert: Optional[bool] = True,
-                    batch_size: Optional[int] = 1000) -> np.ndarray:
+                    lower_thresh: int | None = 100,
+                    upper_thresh: int | None = 100,
+                    invert: bool | None = True,
+                    batch_size: int | None = 1000) -> np.ndarray:
     """
 
     Converts a stack of RGB images to binary (black and white) images based on given threshold values using GPU acceleration.
@@ -733,8 +733,8 @@ def segment_img_stack_vertical(imgs: np.ndarray,
 
 def segment_img_stack_horizontal(imgs: np.ndarray,
                                  pct: float,
-                                 upper: Optional[bool] = False,
-                                 lower: Optional[bool] = False) -> np.ndarray:
+                                 upper: bool | None = False,
+                                 lower: bool | None = False) -> np.ndarray:
 
     """
     Segment a stack of images horizontally based on a given percentage using GPU acceleration. For example, return the top half, bottom half, or center half of each image in the stack.
@@ -906,11 +906,11 @@ def _get_bboxes(shapes):
         bboxes.append([x_min, y_min, x_max, y_max])
     return np.array(bboxes, dtype=np.int32)
 
-def slice_imgs(video_path: Union[str, os.PathLike],
+def slice_imgs(video_path: str | os.PathLike,
                shapes: np.ndarray,
                batch_size: int = 1000,
                verbose: bool = True,
-               save_dir: Optional[Union[str, os.PathLike]] = None):
+               save_dir: str | os.PathLike | None = None):
     """
     Slice frames from a video based on given polygon or circle coordinates, and return or save masked/cropped frame regions using GPU acceleration.
 
@@ -1112,8 +1112,8 @@ def sliding_psnr(data: np.ndarray,
     return results_dev.copy_to_host()
 
 def rotate_img_stack_cupy(imgs: np.ndarray,
-                          rotation_degrees: Optional[float] = 180,
-                          batch_size: Optional[int] = 500,
+                          rotation_degrees: float | None = 180,
+                          batch_size: int | None = 500,
                           verbose: bool = True) -> np.ndarray:
     """
     Rotates a stack of images by a specified number of degrees using GPU acceleration with CuPy.
@@ -1161,11 +1161,11 @@ def rotate_img_stack_cupy(imgs: np.ndarray,
     if verbose: print(f'[{get_current_time()}] Image rotation complete (elapsed time: {timer.elapsed_time_str}s)')
     return final_results
 
-def rotate_video_cupy(video_path: Union[str, os.PathLike],
-                      save_path: Optional[Union[str, os.PathLike]] = None,
-                      rotation_degrees: Optional[float] = 180,
-                      batch_size: Optional[int] = None,
-                      verbose: Optional[bool] = True) -> None:
+def rotate_video_cupy(video_path: str | os.PathLike,
+                      save_path: str | os.PathLike | None = None,
+                      rotation_degrees: float | None = 180,
+                      batch_size: int | None = None,
+                      verbose: bool | None = True) -> None:
     """
     Rotates a video by a specified angle using GPU acceleration and CuPy for image processing.
 
@@ -1246,13 +1246,13 @@ def _bg_subtraction_cuda_kernel(imgs, avg_img, results, is_clr, fg_clr, threshol
         results[n][y][x] = val_out
 
 
-def bg_subtraction_cuda(video_path: Union[str, os.PathLike],
+def bg_subtraction_cuda(video_path: str | os.PathLike,
                         avg_frm: np.ndarray,
-                        save_path: Optional[Union[str, os.PathLike]] = None,
-                        bg_clr: Optional[Tuple[int, int, int]] = (0, 0, 0),
-                        fg_clr: Optional[Tuple[int, int, int]] = None,
-                        batch_size: Optional[int] = 500,
-                        threshold: Optional[int] = 50):
+                        save_path: str | os.PathLike | None = None,
+                        bg_clr: tuple[int, int, int] | None = (0, 0, 0),
+                        fg_clr: tuple[int, int, int] | None = None,
+                        batch_size: int | None = 500,
+                        threshold: int | None = 50):
     """
     Remove background from videos using GPU acceleration.
 
@@ -1344,13 +1344,13 @@ def bg_subtraction_cuda(video_path: Union[str, os.PathLike],
     stdout_success(msg=f'Video saved at {save_path}', elapsed_time=timer.elapsed_time_str)
 
 
-def bg_subtraction_cupy(video_path: Union[str, os.PathLike],
-                        avg_frm: Union[np.ndarray, str, os.PathLike],
-                        save_path: Optional[Union[str, os.PathLike]] = None,
-                        bg_clr: Optional[Tuple[int, int, int]] = (0, 0, 0),
-                        fg_clr: Optional[Tuple[int, int, int]] = None,
-                        batch_size: Optional[int] = 500,
-                        threshold: Optional[int] = 50,
+def bg_subtraction_cupy(video_path: str | os.PathLike,
+                        avg_frm: np.ndarray | str | os.PathLike,
+                        save_path: str | os.PathLike | None = None,
+                        bg_clr: tuple[int, int, int] | None = (0, 0, 0),
+                        fg_clr: tuple[int, int, int] | None = None,
+                        batch_size: int | None = 500,
+                        threshold: int | None = 50,
                         verbose: bool = True,
                         async_frame_read: bool = True):
     """
@@ -1477,11 +1477,11 @@ def _pose_plot_kernel(imgs, data, circle_size, resolution, colors):
                         imgs[img_n][y1][x1][2] = int(color[2])
 
 
-def pose_plotter(data: Union[str, os.PathLike, np.ndarray],
-                 video_path: Union[str, os.PathLike],
-                 save_path: Union[str, os.PathLike],
-                 circle_size: Optional[int] = None,
-                 colors: Optional[str] = 'Set1',
+def pose_plotter(data: str | os.PathLike | np.ndarray,
+                 video_path: str | os.PathLike,
+                 save_path: str | os.PathLike,
+                 circle_size: int | None = None,
+                 colors: str | None = 'Set1',
                  batch_size: int = 750,
                  verbose: bool = True) -> None:
 

@@ -112,16 +112,16 @@ class YOLOPoseTrackVisualizer:
     """
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 palettes: Optional[Union[str, Tuple[str, ...]]] = None,
-                 core_cnt: Optional[int] = -1,
+                 data_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 palettes: str | tuple[str, ...] | None = None,
+                 core_cnt: int | None = -1,
                  threshold: float = 0.0,
-                 thickness: Optional[int] = None,
-                 circle_size: Optional[int] = None,
-                 verbose: Optional[bool] = False,
-                 bbox: Optional[bool] = False,
+                 thickness: int | None = None,
+                 circle_size: int | None = None,
+                 verbose: bool | None = False,
+                 bbox: bool | None = False,
                  overwrite: bool = True):
 
         if not os.path.isdir(data_path) and not os.path.isfile(data_path):

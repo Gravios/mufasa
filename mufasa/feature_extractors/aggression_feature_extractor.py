@@ -47,9 +47,9 @@ class AgressionFeatureExtractor(ConfigReader, AbstractFeatureExtraction):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Union[str, os.PathLike] = None,
-                 save_dir: Union[str, os.PathLike] = None):
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike = None,
+                 save_dir: str | os.PathLike = None):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=True, create_logger=False)
         data_dir = self.outlier_corrected_dir if data_dir is None else data_dir
@@ -163,7 +163,7 @@ class AgressionFeatureExtractor(ConfigReader, AbstractFeatureExtraction):
         self.timer.stop_timer()
         stdout_success(msg=f'Featurized data for {len(list(self.data_paths.keys()))} data file(s) saved in {self.save_dir}', elapsed_time=self.timer.elapsed_time_str)
 
-    def save(self, data: pd.DataFrame, save_path: Union[str, os.PathLike]):
+    def save(self, data: pd.DataFrame, save_path: str | os.PathLike):
         write_df(df=self.results, file_type='csv', save_path=self.save_path)
 
 

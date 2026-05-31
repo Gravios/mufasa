@@ -95,20 +95,20 @@ class ROIPlotter(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 body_parts: List[str],
+                 config_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 body_parts: list[str],
                  outside_roi: bool = False,
                  threshold: float = 0.0,
-                 verbose: Optional[bool] = True,
+                 verbose: bool | None = True,
                  show_animal_name: bool = False,
                  show_body_part: bool = True,
                  show_bbox: bool = False,
-                 data_path: Optional[Union[str, os.PathLike]] = None,
-                 save_path: Optional[Union[str, os.PathLike]] = None,
-                 bp_colors: Optional[List[Tuple[int, int, int]]] = None,
-                 bp_sizes: Optional[List[Union[int]]] = None,
-                 border_bg_clr: Tuple[int, int, int] = (0, 0, 0)):
+                 data_path: str | os.PathLike | None = None,
+                 save_path: str | os.PathLike | None = None,
+                 bp_colors: list[tuple[int, int, int]] | None = None,
+                 bp_sizes: list[int] | None = None,
+                 border_bg_clr: tuple[int, int, int] = (0, 0, 0)):
 
         log_event(logger_name=str(__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=self.create_log_msg_from_init_args(locals=locals()))
         check_float(name=f'{self.__class__.__name__} threshold', value=threshold, min_value=0.0, max_value=1.0)
@@ -195,7 +195,7 @@ class ROIPlotter(ConfigReader):
                 col_name =  f'{entry_dict["ANIMAL"]}_{entry_dict["Event"]}'
                 self.data_df[col_name][self.data_df.index.isin(entry_dict["frame_range"])] = 1
 
-    def __get_bordered_img_size(self) -> Tuple[int, int]:
+    def __get_bordered_img_size(self) -> tuple[int, int]:
         img = read_frm_of_video(video_path=self.video_path, frame_index=0)
         self.base_img = cv2.copyMakeBorder(img, 0, 0, 0, int(self.video_meta["width"]), borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
         return (self.base_img.shape[0], self.base_img.shape[1])

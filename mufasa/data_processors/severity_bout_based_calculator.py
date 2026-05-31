@@ -38,7 +38,7 @@ class SeverityBoutCalculator(ConfigReader, FeatureExtractionMixin):
     >>> processor.save()
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike], settings: Dict):
+    def __init__(self, config_path: str | os.PathLike, settings: dict):
         ConfigReader.__init__(self, config_path=config_path)
         self.settings = settings
         self.movement_animal_bp_dict = {
@@ -63,7 +63,7 @@ class SeverityBoutCalculator(ConfigReader, FeatureExtractionMixin):
             self.logs_path, definitions_save_name
         ), cv2.VideoWriter_fourcc(*"mp4v")
 
-    def __calculate_movements(self, data_paths: List[str]):
+    def __calculate_movements(self, data_paths: list[str]):
         movements = {}
         for file_cnt, file_path in enumerate(data_paths):
             _, video_name, _ = get_fn_ext(file_path)

@@ -39,7 +39,7 @@ FOURCC = cv2.VideoWriter_fourcc(*Formats.MP4_CODEC.value)
 
 STYLE_ATTR = [STYLE_WIDTH, STYLE_HEIGHT, STYLE_FONT_SIZE, STYLE_LINE_WIDTH, STYLE_COLOR, STYLE_YMAX, STYLE_OPACITY]
 
-def _probability_plot_mp(frm_range: Tuple[int, np.ndarray],
+def _probability_plot_mp(frm_range: tuple[int, np.ndarray],
                          clf_data: np.ndarray,
                          clf_name: str,
                          video_setting: bool,
@@ -48,7 +48,7 @@ def _probability_plot_mp(frm_range: Tuple[int, np.ndarray],
                          frame_dir: str,
                          fps: int,
                          video_name: str,
-                         y_max: Union[int, float],
+                         y_max: int | float,
                          size: tuple,
                          line_width: int,
                          font_size: int,
@@ -130,20 +130,20 @@ class TresholdPlotCreatorMultiprocess(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_path: Union[List[Union[str, os.PathLike]], str, os.PathLike],
+                 config_path: str | os.PathLike,
+                 data_path: list[str | os.PathLike] | str | os.PathLike,
                  clf_name: str,
-                 frame_setting: Optional[bool] = False,
-                 video_setting: Optional[bool] = False,
-                 last_frame: Optional[bool] = True,
-                 size: Tuple[int, int] = (640, 480),
+                 frame_setting: bool | None = False,
+                 video_setting: bool | None = False,
+                 last_frame: bool | None = True,
+                 size: tuple[int, int] = (640, 480),
                  font_size: int = 10,
                  line_width: int = 2,
-                 y_max: Optional[Union[int, float]] = None,
+                 y_max: int | float | None = None,
                  line_color: str = 'Red',
                  last_frame_as_svg: bool = False,
                  line_opacity: float = 0.8,
-                 cores: Optional[int] = -1,
+                 cores: int | None = -1,
                  show_thresholds: bool = True):
 
         # [Linux-only] Darwin spawn-force removed.

@@ -82,16 +82,16 @@ class FreezingDetector(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
                  nose_name: str = 'nose',
                  left_ear_name: str = 'left_ear',
                  right_ear_name: str = 'right_ear',
                  tail_base_name: str = 'tail_base',
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
+                 data_dir: str | os.PathLike | None = None,
                  time_window: int = 4,
                  movement_threshold: int = 5,
                  shortest_bout: int = 100,
-                 save_dir: Optional[Union[str, os.PathLike]] = None):
+                 save_dir: str | os.PathLike | None = None):
 
         for bp_name in [nose_name, left_ear_name, right_ear_name, tail_base_name]: check_str(name='body part name', value=bp_name, allow_blank=False)
         ConfigReader.__init__(self, config_path=config_path, read_video_info=True, create_logger=False)

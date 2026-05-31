@@ -49,12 +49,12 @@ class ROITimebinCalculator(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
                  bin_length: float,
-                 body_parts: List[str],
-                 data_path: Optional[Union[str, os.PathLike, List[str]]] = None,
-                 threshold: Optional[float] = 0.0,
-                 movement: Optional[bool] = False):
+                 body_parts: list[str],
+                 data_path: str | os.PathLike | list[str] | None = None,
+                 threshold: float | None = 0.0,
+                 movement: bool | None = False):
 
         ConfigReader.__init__(self, config_path=config_path)
         if not os.path.isfile(self.roi_coordinates_path):

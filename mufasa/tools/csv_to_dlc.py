@@ -66,7 +66,7 @@ import pandas as pd
 _DEFAULT_SCORER = "mufasa_export"
 
 
-def parse_flat_columns(columns: Iterable[str]) -> List[Tuple[str, str]]:
+def parse_flat_columns(columns: Iterable[str]) -> list[tuple[str, str]]:
     """Parse Mufasa's flat column names into (bodypart, coord) pairs.
 
     Mufasa convention: ``{bodypart}_x``, ``{bodypart}_y``, ``{bodypart}_p``.
@@ -129,7 +129,7 @@ def flat_to_dlc(
     return out
 
 
-def discover_scorer(config_path: Optional[str]) -> str:
+def discover_scorer(config_path: str | None) -> str:
     """Look up the scorer string from a Mufasa project config, if
     one is available. Falls back to the default."""
     if config_path is None or not os.path.isfile(config_path):
@@ -184,7 +184,7 @@ def convert_directory(
     scorer: str = _DEFAULT_SCORER,
     has_index: bool = True,
     pattern: str = "*.csv",
-) -> List[str]:
+) -> list[str]:
     """Convert every CSV in a directory. Returns list of output paths.
 
     Skips files whose names start with ``.`` (hidden). Output filename
@@ -215,7 +215,7 @@ def convert_directory(
     return written
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="mufasa-csv-to-dlc",
         description=(

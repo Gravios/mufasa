@@ -168,9 +168,9 @@ class AggregateClfCalculatorMultiprocess(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 classifiers: List[str],
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
+                 config_path: str | os.PathLike,
+                 classifiers: list[str],
+                 data_dir: str | os.PathLike | None = None,
                  detailed_bout_data: bool = False,
                  transpose: bool = False,
                  first_occurrence: bool = True,

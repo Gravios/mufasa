@@ -85,13 +85,13 @@ class AdvancedSmoother(ConfigReader):
     """
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 config_path: Union[str, os.PathLike],
-                 settings: Dict[str, Any],
-                 type: Optional[Literal["animal", "body-part"]] = 'body-part',
-                 verbose: Optional[bool] = True,
-                 multi_index_data: Optional[bool] = False,
-                 overwrite: Optional[bool] = True):
+                 data_path: str | os.PathLike,
+                 config_path: str | os.PathLike,
+                 settings: dict[str, Any],
+                 type: Literal["animal", "body-part"] | None = 'body-part',
+                 verbose: bool | None = True,
+                 multi_index_data: bool | None = False,
+                 overwrite: bool | None = True):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         log_event(logger_name=str(self.__class__.__name__), log_type=TagNames.CLASS_INIT.value, msg=f"data_dir: {data_path}, type: {type}, settings: {settings}, initial_import_multi_index: {multi_index_data}, overwrite: {overwrite}",)

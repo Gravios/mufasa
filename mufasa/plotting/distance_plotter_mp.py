@@ -28,7 +28,7 @@ from mufasa.utils.read_write import (concatenate_videos_in_folder,
 def distance_plotter_mp(
     frm_cnts: np.array,
     distances: np.ndarray,
-    colors: List[str],
+    colors: list[str],
     video_setting: bool,
     frame_setting: bool,
     video_name: str,
@@ -120,14 +120,14 @@ class DistancePlotterMultiCore(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_paths: List[Union[str, os.PathLike]],
+                 config_path: str | os.PathLike,
+                 data_paths: list[str | os.PathLike],
                  frame_setting: bool,
                  video_setting: bool,
                  final_img: bool,
-                 style_attr: Dict[str, int],
-                 line_attr: List[List[str]],
-                 core_cnt: Optional[int] = -1,
+                 style_attr: dict[str, int],
+                 line_attr: list[list[str]],
+                 core_cnt: int | None = -1,
                  last_frame_as_svg: bool = False):
 
         if (not frame_setting) and (not video_setting) and (not final_img):

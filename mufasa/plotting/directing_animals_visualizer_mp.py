@@ -47,7 +47,7 @@ STYLE_ATTR = [DIRECTION_THICKNESS, DIRECTIONALITY_COLOR, CIRCLE_SIZE, HIGHLIGHT_
 FOURCC = cv2.VideoWriter_fourcc(*Formats.AVI_CODEC.value)
 X_BPS, Y_BPS = Keys.X_BPS.value, Keys.Y_BPS.value
 
-def _directing_animals_mp(frm_range: Tuple[int, np.ndarray],
+def _directing_animals_mp(frm_range: tuple[int, np.ndarray],
                           directionality_data: pd.DataFrame,
                           pose_data: pd.DataFrame,
                           style_attr: dict,
@@ -147,15 +147,15 @@ class DirectingOtherAnimalsVisualizerMultiprocess(ConfigReader, PlottingMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 style_attr: Dict[str, Any],
+                 config_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 style_attr: dict[str, Any],
                  core_cnt: int = -1,
-                 time_slice: Optional[Dict[str, str]] = None,
-                 left_ear_name: Optional[str] = None,
+                 time_slice: dict[str, str] | None = None,
+                 left_ear_name: str | None = None,
                  line_opacity: float = 1.0,
-                 right_ear_name: Optional[str] = None,
-                 nose_name: Optional[str] = None):
+                 right_ear_name: str | None = None,
+                 nose_name: str | None = None):
 
         # [Linux-only] macOS spawn-force removed.
         check_file_exist_and_readable(file_path=video_path)

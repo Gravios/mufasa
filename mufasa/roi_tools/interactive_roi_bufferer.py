@@ -61,9 +61,9 @@ class InteractiveROIBufferer:
                  roi_dict: dict,
                  buffer_mm: int,
                  px_per_mm: float,
-                 settings: Optional[dict] = None,
-                 hex_grid: Optional[List[Polygon]] = None,
-                 rectangle_grid: Optional[List[Polygon]] = None):
+                 settings: dict | None = None,
+                 hex_grid: list[Polygon] | None = None,
+                 rectangle_grid: list[Polygon] | None = None):
 
         check_instance(source=self.__class__.__name__, instance=img_window, accepted_types=(Toplevel,))
         if settings is None: settings = {item.name: item.value for item in ROI_SETTINGS}
@@ -76,7 +76,7 @@ class InteractiveROIBufferer:
         self.img_window, self.settings, self.buffer_mm, self.px_per_mm = img_window, settings, buffer_mm, px_per_mm
         self.bind_mouse()
 
-    def _find_closest_tag(self, roi_dict: dict, click_coordinate: Tuple[int, int]):
+    def _find_closest_tag(self, roi_dict: dict, click_coordinate: tuple[int, int]):
         clicked_roi, clicked_tag = None, None
         for roi_name, roi_data in roi_dict.items():
             ear_tag_size = roi_data['Ear_tag_size']

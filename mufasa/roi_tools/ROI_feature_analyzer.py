@@ -58,9 +58,9 @@ class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 body_parts: List[str],
-                 data_path: Optional[Union[str, os.PathLike]] = None,
+                 config_path: str | os.PathLike,
+                 body_parts: list[str],
+                 data_path: str | os.PathLike | None = None,
                  append_data: bool = False):
 
         check_valid_lst(data=body_parts, source=f"{self.__class__.__name__} body-parts", valid_dtypes=(str,), min_len=1)

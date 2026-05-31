@@ -42,11 +42,11 @@ class OutlierCorrecterLocation(ConfigReader, FeatureExtractionMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_dir: Optional[Union[str, os.PathLike]] = None,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 animal_dict: Optional[Dict[str, Dict[str, str]]] = None,
-                 criterion: Optional[float] = None):
+                 config_path: str | os.PathLike,
+                 data_dir: str | os.PathLike | None = None,
+                 save_dir: str | os.PathLike | None = None,
+                 animal_dict: dict[str, dict[str, str]] | None = None,
+                 criterion: float | None = None):
 
         ConfigReader.__init__(self, config_path=config_path, create_logger=False, read_video_info=False)
         FeatureExtractionMixin.__init__(self)

@@ -22,14 +22,14 @@ from mufasa.utils.read_write import (create_directory, get_fn_ext, read_img,
 class COCOKeypoints2YoloSeg:
 
     def __init__(self,
-                 coco_path: Union[str, os.PathLike],
-                 img_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
+                 coco_path: str | os.PathLike,
+                 img_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
                  train_size: float = 0.7,
                  verbose: bool = True,
                  greyscale: bool = False,
                  clahe: bool = False,
-                 bbox_pad: Optional[int] = None):
+                 bbox_pad: int | None = None):
 
         r"""
         Convert COCO keypoint annotations to YOLO segmentation format.

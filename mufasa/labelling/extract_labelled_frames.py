@@ -51,12 +51,12 @@ class AnnotationFrameExtractor(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_paths: List[Union[str, os.PathLike]],
-                 clfs: List[str],
-                 img_downsample_factor: Optional[Union[float, int]] = None,
+                 config_path: str | os.PathLike,
+                 data_paths: list[str | os.PathLike],
+                 clfs: list[str],
+                 img_downsample_factor: float | int | None = None,
                  img_format: Literal['png', 'webp', 'jpg'] = 'png',
-                 img_greyscale: Optional[bool] = False):
+                 img_greyscale: bool | None = False):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         check_valid_lst(data=clfs, valid_dtypes=(str,), valid_values=self.clf_names, min_len=1, source='classifiers')

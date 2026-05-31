@@ -42,8 +42,8 @@ class CircularFeaturePlotter(ConfigReader, PlottingMixin, FeatureExtractionMixin
     """
 
     def __init__(self,
-                  config_path: Union[str, os.PathLike],
-                  data_path: Union[str, os.PathLike],
+                  config_path: str | os.PathLike,
+                  data_path: str | os.PathLike,
                   settings: dict):
 
         PlottingMixin.__init__(self)

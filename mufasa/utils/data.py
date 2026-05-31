@@ -59,7 +59,7 @@ from mufasa.utils.read_write import (find_core_cnt, find_video_of_file,
 from mufasa.utils.warnings import DuplicateNamesWarning
 
 
-def detect_bouts(data_df: pd.DataFrame, target_lst: Union[List[str], str], fps: Union[int, float]) -> pd.DataFrame:
+def detect_bouts(data_df: pd.DataFrame, target_lst: list[str] | str, fps: int | float) -> pd.DataFrame:
     """
     Detect behavior "bouts" (e.g., continous sequence of classified behavior-present frames) for specified classifiers.
 
@@ -131,7 +131,7 @@ def detect_bouts(data_df: pd.DataFrame, target_lst: Union[List[str], str], fps: 
     return results
 
 
-def detect_bouts_multiclass(data: pd.DataFrame, target: str, fps: int = 1, classifier_map: Dict[int, str] = None) -> pd.DataFrame:
+def detect_bouts_multiclass(data: pd.DataFrame, target: str, fps: int = 1, classifier_map: dict[int, str] = None) -> pd.DataFrame:
     """
     Detect bouts in a multiclass time series dataset and return the bout event types, their start times, end times and duration.
 
@@ -262,7 +262,7 @@ def plug_holes_shortest_bout(data_df: pd.DataFrame,
 
     return data_df
 
-def create_color_palettes(no_animals: int, map_size: int, cmaps: Optional[List[str]] = None) -> List[List[int]]:
+def create_color_palettes(no_animals: int, map_size: int, cmaps: list[str] | None = None) -> list[list[int]]:
     """
     Create list of lists of bgr colors, one for each animal. Each list is pulled from a different palette
     matplotlib color map.
@@ -318,9 +318,9 @@ def create_color_palettes(no_animals: int, map_size: int, cmaps: Optional[List[s
 
 def create_color_palette(pallete_name: str,
                          increments: int,
-                         as_rgb_ratio: Optional[bool] = False,
-                         as_hex: Optional[bool] = False,
-                         as_int: Optional[bool] = False) -> List[Union[str, float]]:
+                         as_rgb_ratio: bool | None = False,
+                         as_hex: bool | None = False,
+                         as_int: bool | None = False) -> list[str | float]:
     """
     Create a list of colors in RGB from specified color palette.
 
@@ -361,9 +361,9 @@ def create_color_palette(pallete_name: str,
     return color_lst
 
 
-def interpolate_color_palette(start_color: Tuple[int, int, int],
-                              end_color: Tuple[int, int, int],
-                              n: Optional[int] = 10) -> List[Tuple[int, int, int]]:
+def interpolate_color_palette(start_color: tuple[int, int, int],
+                              end_color: tuple[int, int, int],
+                              n: int | None = 10) -> list[tuple[int, int, int]]:
     """
     Generate a list of colors interpolated between two passed RGB colors.
 
@@ -391,9 +391,9 @@ def interpolate_color_palette(start_color: Tuple[int, int, int],
 
 def smooth_data_savitzky_golay(
     config: configparser.ConfigParser,
-    file_path: Union[str, os.PathLike],
+    file_path: str | os.PathLike,
     time_window_parameter: int,
-    overwrite: Optional[bool] = True,
+    overwrite: bool | None = True,
 ) -> None:
     """
     Perform Savitzky-Golay smoothing of pose-estimation data within a file.
@@ -524,11 +524,11 @@ def add_missing_ROI_cols(shape_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def find_bins(
-    data: Dict[str, List[int]],
+    data: dict[str, list[int]],
     bracket_type: Literal["QUANTILE", "QUANTIZE"],
     bracket_cnt: int,
     normalization_method: Literal["ALL VIDEOS", "BY VIDEO"],
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """
     Helper to find bin cut-off points.
 
@@ -611,7 +611,7 @@ def get_confusion_matrix(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     y = np.bincount(y, minlength=N * N)
     return y.reshape(N, N)
 
-def find_frame_numbers_from_time_stamp(start_time: str, end_time: str, fps: int) -> List[int]:
+def find_frame_numbers_from_time_stamp(start_time: str, end_time: str, fps: int) -> list[int]:
     """
     Given start and end timestamps in HH:MM:SS formats and the fps, return the frame numbers representing
     the time period.
@@ -702,7 +702,7 @@ def find_frame_numbers_from_time_stamp(start_time: str, end_time: str, fps: int)
 
 
 def convert_roi_definitions(
-    roi_definitions_path: Union[str, os.PathLike], save_dir: Union[str, os.PathLike]
+    roi_definitions_path: str | os.PathLike, save_dir: str | os.PathLike
 ) -> None:
     """
     Helper to convert SimBA `ROI_definitions.h5` file into human-readable CSV format.
@@ -727,7 +727,7 @@ def convert_roi_definitions(
             )
 
 
-def slice_roi_dict_for_video(data: Dict[str, pd.DataFrame], video_name: str) -> Tuple[Dict[str, pd.DataFrame], List[str]]:
+def slice_roi_dict_for_video(data: dict[str, pd.DataFrame], video_name: str) -> tuple[dict[str, pd.DataFrame], list[str]]:
     """
     Given a dictionary of dataframes representing different ROIs (created by ``mufasa.mixins.config_reader.ConfigReader.read_roi_data``),
     retain only the ROIs belonging to the specified video.
@@ -753,9 +753,9 @@ def slice_roi_dict_for_video(data: Dict[str, pd.DataFrame], video_name: str) -> 
     return new_data, shape_names
 
 
-def slice_roi_dict_from_attribute(data: Dict[str, pd.DataFrame],
-                                  shape_names: List[str] = None,
-                                  video_names: List[str] = None) -> Tuple[Dict[str, pd.DataFrame], List[str], int]:
+def slice_roi_dict_from_attribute(data: dict[str, pd.DataFrame],
+                                  shape_names: list[str] = None,
+                                  video_names: list[str] = None) -> tuple[dict[str, pd.DataFrame], list[str], int]:
     """
     Filters ROI (Region of Interest) shape data based on provided shape names and/or video names.
 
@@ -790,7 +790,7 @@ def slice_roi_dict_from_attribute(data: Dict[str, pd.DataFrame],
 
 
 
-def freedman_diaconis(data: np.ndarray) -> Tuple[float, int]:
+def freedman_diaconis(data: np.ndarray) -> tuple[float, int]:
     """
     Use Freedman-Diaconis rule to compute optimal count of histogram bins and their width.
 
@@ -817,7 +817,7 @@ def hist_1d(data: np.ndarray, bins: int, range: np.ndarray):
     return np.histogram(data, bins, (range[0], range[1]))[0]
 
 @jit(nopython=True, cache=True)
-def hist_1d_mp(data: np.ndarray, bin_counts: np.ndarray, bin_widths: np.ndarray, normalize: Optional[bool] = False) -> typed.List:
+def hist_1d_mp(data: np.ndarray, bin_counts: np.ndarray, bin_widths: np.ndarray, normalize: bool | None = False) -> typed.List:
     """
     Jitted helper to compute 1D histograms with counts or rations (if normalize is True) for a 2D dataset
 
@@ -854,7 +854,7 @@ def hist_1d_mp(data: np.ndarray, bin_counts: np.ndarray, bin_widths: np.ndarray,
     return results
 
 
-def bucket_data(data: np.ndarray, method: Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"] = "auto",) -> Tuple[float, int]:
+def bucket_data(data: np.ndarray, method: Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"] = "auto",) -> tuple[float, int]:
     """
     Computes the optimal bin count and bin width non-heuristically using specified method.
 
@@ -890,7 +890,7 @@ def _bucket_data_mp_helper(array, bins='auto'):
 
 def bucket_data_mp(data: np.ndarray,
                    method: Literal["fd", "doane", "auto", "scott", "stone", "rice", "sturges", "sqrt"] = "auto",
-                   n_jobs: Optional[int] = -1) -> Tuple[np.ndarray, np.ndarray]:
+                   n_jobs: int | None = -1) -> tuple[np.ndarray, np.ndarray]:
     """
     Compute histogram bin edges for many inputs in parallel using CPU with Joblib.
 
@@ -916,7 +916,7 @@ def bucket_data_mp(data: np.ndarray,
 
 
 @jit(nopython=True, cache=True)
-def fast_minimum_rank(data: np.ndarray, descending: Optional[bool] = True) -> np.ndarray:
+def fast_minimum_rank(data: np.ndarray, descending: bool | None = True) -> np.ndarray:
     """
     Jitted helper to rank values in 1D array using ``minimum`` method.
 
@@ -957,7 +957,7 @@ def fast_minimum_rank(data: np.ndarray, descending: Optional[bool] = True) -> np
 
 
 @jit(nopython=True, cache=True)
-def fast_mean_rank(data: np.ndarray, descending: Optional[bool] = True) -> np.ndarray:
+def fast_mean_rank(data: np.ndarray, descending: bool | None = True) -> np.ndarray:
     """
     Jitted helper to rank values in 1D array using ``mean`` method.
 
@@ -992,11 +992,11 @@ def fast_mean_rank(data: np.ndarray, descending: Optional[bool] = True) -> np.nd
 
 
 def slp_to_df_convert(
-    file_path: Union[str, os.PathLike],
-    headers: List[str],
-    joined_tracks: Optional[bool] = False,
-    multi_index: Optional[bool] = True,
-    drop_body_parts: Optional[List[str]] = None,
+    file_path: str | os.PathLike,
+    headers: list[str],
+    joined_tracks: bool | None = False,
+    multi_index: bool | None = True,
+    drop_body_parts: list[str] | None = None,
 ) -> pd.DataFrame:
     """
     Helper to convert .slp pose-estimation data in h5 format to pandas dataframe.
@@ -1101,11 +1101,11 @@ def slp_to_df_convert(
     return data_df
 
 
-def find_ranked_colors(data: Dict[Any, float],
+def find_ranked_colors(data: dict[Any, float],
                        palette: str,
                        as_hex: bool = False,
                        as_rgb_ratio: bool = False,
-                       reverse: bool = True) -> Dict[str, Union[Tuple[int], str]]:
+                       reverse: bool = True) -> dict[str, tuple[int] | str]:
     """
     Find ranked colors for a given data dictionary values based on a specified color palette.
 
@@ -1173,7 +1173,7 @@ def sample_df_n_by_unique(df: pd.DataFrame, field: str, n: int) -> pd.DataFrame:
     return pd.concat(results, axis=0)
 
 
-def get_mode(x: np.ndarray) -> Union[float, int]:
+def get_mode(x: np.ndarray) -> float | int:
     """
     Get the mode (most frequent value) within an array
 
@@ -1190,7 +1190,7 @@ def get_mode(x: np.ndarray) -> Union[float, int]:
     return counts.argmax()
 
 
-def run_user_defined_feature_extraction_class(file_path: Union[str, os.PathLike], config_path: Union[str, os.PathLike]) -> None:
+def run_user_defined_feature_extraction_class(file_path: str | os.PathLike, config_path: str | os.PathLike) -> None:
     """
     Loads and executes user-defined feature extraction class within .py file.
 
@@ -1268,10 +1268,10 @@ def run_user_defined_feature_extraction_class(file_path: Union[str, os.PathLike]
 
 
 def animal_interpolator(df: pd.DataFrame,
-                        animal_bp_dict: Dict[str, Any],
-                        source: Optional[str] = '',
-                        method: Optional[Literal['nearest', 'linear', 'quadratic']] = 'nearest',
-                        verbose: Optional[bool] = True) -> pd.DataFrame:
+                        animal_bp_dict: dict[str, Any],
+                        source: str | None = '',
+                        method: Literal['nearest', 'linear', 'quadratic'] | None = 'nearest',
+                        verbose: bool | None = True) -> pd.DataFrame:
 
     """
     Interpolate missing values for frames where entire animals are missing.
@@ -1315,10 +1315,10 @@ def animal_interpolator(df: pd.DataFrame,
 
 
 def body_part_interpolator(df: pd.DataFrame,
-                           animal_bp_dict: Dict[str, Any],
-                           source: Optional[str] = '',
-                           method: Optional[Literal['nearest', 'linear', 'quadratic']] = 'nearest',
-                           verbose: Optional[bool] = True) -> pd.DataFrame:
+                           animal_bp_dict: dict[str, Any],
+                           source: str | None = '',
+                           method: Literal['nearest', 'linear', 'quadratic'] | None = 'nearest',
+                           verbose: bool | None = True) -> pd.DataFrame:
     """
     Interpolate missing body-parts in pose-estimation data.
 
@@ -1357,12 +1357,12 @@ def body_part_interpolator(df: pd.DataFrame,
             df.update(bp_df)
     return df.clip(lower=0)
 
-def savgol_smoother(data: Union[pd.DataFrame, np.ndarray],
+def savgol_smoother(data: pd.DataFrame | np.ndarray,
                     fps: float,
                     time_window: int,
-                    source: Optional[str] = '',
-                    mode: Optional[Literal['mirror', 'constant', 'nearest', 'wrap', 'interp']] = 'nearest',
-                    polyorder: Optional[int] = 3) -> Union[pd.DataFrame, np.ndarray]:
+                    source: str | None = '',
+                    mode: Literal['mirror', 'constant', 'nearest', 'wrap', 'interp'] | None = 'nearest',
+                    polyorder: int | None = 3) -> pd.DataFrame | np.ndarray:
     """
     Apply Savitzky-Golay smoothing to the input data pose-estimation data
 
@@ -1418,9 +1418,9 @@ def savgol_smoother(data: Union[pd.DataFrame, np.ndarray],
 def df_smoother(data: pd.DataFrame,
                fps: float,
                time_window: int,
-               source: Optional[str] = '',
-               std: Optional[int] = 5,
-               method: Optional[Literal['bartlett', 'blackman', 'boxcar', 'cosine', 'gaussian', 'hamming', 'exponential']] = 'gaussian') -> pd.DataFrame:
+               source: str | None = '',
+               std: int | None = 5,
+               method: Literal['bartlett', 'blackman', 'boxcar', 'cosine', 'gaussian', 'hamming', 'exponential'] | None = 'gaussian') -> pd.DataFrame:
 
     """
     Smooth the data in a DataFrame using a specified window function.
@@ -1457,7 +1457,7 @@ def df_smoother(data: pd.DataFrame,
 
 
 def get_library_version(library_name: str,
-                        raise_error: bool = False) -> Union[str, bool]:
+                        raise_error: bool = False) -> str | bool:
     """
     Get the version installed package in python environment.
 
@@ -1485,7 +1485,7 @@ def egocentrically_align_pose(data: np.ndarray,
                               anchor_1_idx: int,
                               anchor_2_idx: int,
                               anchor_location: np.ndarray,
-                              direction: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                              direction: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     """
     Aligns a set of 2D points egocentrically based on two anchor points and a target direction.
@@ -1561,7 +1561,7 @@ def egocentrically_align_pose_numba(data: np.ndarray,
                                     anchor_1_idx: int,
                                     anchor_2_idx: int,
                                     direction: int,
-                                    anchor_location: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                                    anchor_location: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     """
     Aligns a set of 2D points egocentrically based on two anchor points and a target direction.
@@ -1687,7 +1687,7 @@ def _bilinear_interpolate(image: np.ndarray, x: int, y: int):
 @jit(nopython=True, cache=True)
 def egocentric_frm_rotator(frames: np.ndarray,
                            rotation_matrices: np.ndarray,
-                           interpolate: Optional[bool] = True) -> np.ndarray:
+                           interpolate: bool | None = True) -> np.ndarray:
     """
     Rotates a sequence of frames using the provided rotation matrices in an egocentric manner using acceleration through numba JIT.
 
@@ -1742,7 +1742,7 @@ def egocentric_frm_rotator(frames: np.ndarray,
     return warped_frames
 
 
-def resample_geometry_vertices(vertices: Union[List[np.ndarray], np.ndarray], vertice_cnt: int) -> np.ndarray:
+def resample_geometry_vertices(vertices: list[np.ndarray] | np.ndarray, vertice_cnt: int) -> np.ndarray:
     """
     Resample geometry vertices to a specified number of vertices in each polygon.
 
@@ -1826,7 +1826,7 @@ def fft_lowpass_filter(data: np.ndarray, cut_off: float = 0.1) -> np.ndarray:
 def terminate_cpu_pool(pool: multiprocessing.pool.Pool,
                        force: bool = False,
                        verbose: bool = True,
-                       source: Optional[str] = None) -> None:
+                       source: str | None = None) -> None:
     """
     Safely terminates a multiprocessing.Pool instance with optional graceful shutdown.
 
@@ -1864,7 +1864,7 @@ def get_cpu_pool(core_cnt: int = -1,
                  maxtasksperchild: int = Defaults.MAXIMUM_MAX_TASK_PER_CHILD.value,
                  context: Literal['fork', 'spawn', 'forkserver'] = None,
                  verbose: bool = True,
-                 source: Optional[str] = None) -> multiprocessing.Pool:
+                 source: str | None = None) -> multiprocessing.Pool:
     """
     Creates and returns a multiprocessing.Pool instance with platform-appropriate defaults and validation.
 
@@ -1924,8 +1924,8 @@ def get_cpu_pool(core_cnt: int = -1,
 
 
 def scale_pose_keypoints(keypoints: np.ndarray,
-                         original_size: Tuple[int, int],
-                         new_size: Tuple[int, int]) -> np.ndarray:
+                         original_size: tuple[int, int],
+                         new_size: tuple[int, int]) -> np.ndarray:
     """
     Scale pose keypoints from original image dimensions to new image dimensions.
 

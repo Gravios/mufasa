@@ -34,12 +34,12 @@ class PosePlotter:
 
     """
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 out_dir: Optional[Union[str, os.PathLike]] = None,
-                 palettes: Optional[Dict[str, str]] = None,
-                 circle_size: Optional[int] = None,
-                 bbox: Optional[bool] = False,
-                 sample_time: Optional[int] = None) -> None:
+                 data_path: str | os.PathLike,
+                 out_dir: str | os.PathLike | None = None,
+                 palettes: dict[str, str] | None = None,
+                 circle_size: int | None = None,
+                 bbox: bool | None = False,
+                 sample_time: int | None = None) -> None:
 
         if os.path.isdir(data_path):
             config_path = os.path.join(Path(data_path).parents[1], 'project.toml')

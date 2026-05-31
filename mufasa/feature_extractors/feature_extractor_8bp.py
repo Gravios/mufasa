@@ -37,7 +37,7 @@ class ExtractFeaturesFrom8bps(ConfigReader, FeatureExtractionMixin):
     >>> feature_extractor.run()
     """
 
-    def __init__(self, config_path: Union[str, os.PathLike]):
+    def __init__(self, config_path: str | os.PathLike):
         FeatureExtractionMixin.__init__(self, config_path=config_path)
         ConfigReader.__init__(self, config_path=config_path)
         self.in_headers = self.get_feature_extraction_headers(

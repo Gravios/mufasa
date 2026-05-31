@@ -38,7 +38,7 @@ class ROISizeStandardizer(ConfigReader, FeatureExtractionMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
                  reference_video: str):
 
         ConfigReader.__init__(self, config_path=config_path)

@@ -17,7 +17,7 @@ CLIP_LIMIT = 'CLIP LIMIT'
 TILE_SIZE = 'TILE SIZE'
 SELECT_VIDEO_FRAME = 'SHOW FRAME'
 
-def interactive_clahe_ui(data: Union[str, os.PathLike]) -> Tuple[float, int]:
+def interactive_clahe_ui(data: str | os.PathLike) -> tuple[float, int]:
     """
     Create a user interface using OpenCV to explore and set appropriate CLAHE settings tile size and clip limit.
 

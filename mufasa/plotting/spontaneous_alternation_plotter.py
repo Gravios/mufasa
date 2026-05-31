@@ -28,13 +28,13 @@ ERROR_COLOR = (0, 0, 255)
 
 def spontaneous_alternator_video_mp(
     frm_index: np.ndarray,
-    video_path: Union[str, os.PathLike],
-    temp_save_dir: Union[str, os.PathLike],
-    event_txt: List[List[str]],
-    alt_dict: Dict[str, List[int]],
-    roi_geometries: Dict[str, Polygon],
-    roi_geometry_clrs: Dict[str, Tuple[int]],
-    animal_geometries: List[Polygon],
+    video_path: str | os.PathLike,
+    temp_save_dir: str | os.PathLike,
+    event_txt: list[list[str]],
+    alt_dict: dict[str, list[int]],
+    roi_geometries: dict[str, Polygon],
+    roi_geometry_clrs: dict[str, tuple[int]],
+    animal_geometries: list[Polygon],
 ):
 
     core, frm_index = frm_index[0], frm_index[1:]
@@ -155,15 +155,15 @@ class SpontaneousAlternationsPlotter(ConfigReader):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
-        arm_names: List[str],
+        config_path: str | os.PathLike,
+        arm_names: list[str],
         center_name: str,
-        animal_area: Optional[int] = 80,
-        threshold: Optional[float] = 0.0,
-        buffer: Optional[int] = 2,
-        core_cnt: Optional[int] = -1,
-        verbose: Optional[bool] = False,
-        data_path: Optional[Union[str, os.PathLike]] = None,
+        animal_area: int | None = 80,
+        threshold: float | None = 0.0,
+        buffer: int | None = 2,
+        core_cnt: int | None = -1,
+        verbose: bool | None = False,
+        data_path: str | os.PathLike | None = None,
     ):
 
         ConfigReader.__init__(self, config_path=config_path)

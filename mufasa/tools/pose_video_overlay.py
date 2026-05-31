@@ -149,7 +149,7 @@ from mufasa.tools.pose_viewer import (
 # ratios used by the keyboard shortcuts so they land on preset
 # values naturally. Exposing this as a module constant lets
 # tests reference it without hard-coding.
-PLAYBACK_SPEED_PRESETS: List[float] = [
+PLAYBACK_SPEED_PRESETS: list[float] = [
     0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0,
 ]
 DEFAULT_PLAYBACK_SPEED: float = 1.0
@@ -195,10 +195,10 @@ class VideoSource:
         self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         # Cache the most-recently-read frame so consecutive reads
         # at the same index don't re-decode.
-        self._cache_idx: Optional[int] = None
-        self._cache_frame: Optional[np.ndarray] = None
+        self._cache_idx: int | None = None
+        self._cache_frame: np.ndarray | None = None
 
-    def read(self, idx: int) -> Optional[np.ndarray]:
+    def read(self, idx: int) -> np.ndarray | None:
         """Return RGB frame at ``idx``, or None if past end."""
         if idx < 0 or idx >= self.n_frames:
             return None
@@ -240,15 +240,15 @@ class OverlayScene(QGraphicsScene):
     def __init__(
         self,
         video: VideoSource,
-        smoothed: Optional[PoseFrame],
-        raw: Optional[PoseFrame],
-        marker_layout: Optional[List[str]] = None,
+        smoothed: PoseFrame | None,
+        raw: PoseFrame | None,
+        marker_layout: list[str] | None = None,
         likelihood_threshold: float = 0.0,
-        skeleton_edges: List[Tuple[str, str]] = DEFAULT_SKELETON_EDGES,
-        raw_color: Tuple[int, int, int] = (255, 80, 80),
-        smoothed_color: Tuple[int, int, int] = (80, 255, 120),
-        skeleton_color: Tuple[int, int, int] = (200, 220, 255),
-        ellipse_color: Tuple[int, int, int] = (255, 255, 100),
+        skeleton_edges: list[tuple[str, str]] = DEFAULT_SKELETON_EDGES,
+        raw_color: tuple[int, int, int] = (255, 80, 80),
+        smoothed_color: tuple[int, int, int] = (80, 255, 120),
+        skeleton_color: tuple[int, int, int] = (200, 220, 255),
+        ellipse_color: tuple[int, int, int] = (255, 255, 100),
         pose_offset: int = 0,
     ):
         super().__init__()
@@ -266,7 +266,7 @@ class OverlayScene(QGraphicsScene):
         # Decide a unified marker list. If both smoothed and raw
         # are loaded with different markers, take the union so
         # everything renders.
-        markers: List[str] = []
+        markers: list[str] = []
         if marker_layout is not None:
             markers = list(marker_layout)
         else:
@@ -365,8 +365,8 @@ class OverlayScene(QGraphicsScene):
         self.show_ellipses = smoothed is not None and smoothed.variances is not None
 
     def _marker_color(
-        self, marker: str, fallback: Tuple[int, int, int],
-    ) -> Tuple[int, int, int]:
+        self, marker: str, fallback: tuple[int, int, int],
+    ) -> tuple[int, int, int]:
         """Per-marker color from the palette, deterministic by
         position in self.markers. Falls back to a uniform color
         when the marker isn't in the unified list (shouldn't
@@ -379,10 +379,10 @@ class OverlayScene(QGraphicsScene):
 
     def set_visibility(
         self,
-        show_smoothed: Optional[bool] = None,
-        show_raw: Optional[bool] = None,
-        show_skeleton: Optional[bool] = None,
-        show_ellipses: Optional[bool] = None,
+        show_smoothed: bool | None = None,
+        show_raw: bool | None = None,
+        show_skeleton: bool | None = None,
+        show_ellipses: bool | None = None,
     ):
         if show_smoothed is not None:
             self.show_smoothed = show_smoothed
@@ -561,8 +561,8 @@ class OverlayViewer(QMainWindow):
     def __init__(
         self,
         video: VideoSource,
-        smoothed: Optional[PoseFrame],
-        raw: Optional[PoseFrame],
+        smoothed: PoseFrame | None,
+        raw: PoseFrame | None,
         likelihood_threshold: float = 0.0,
         pose_offset: int = 0,
         start_frame: int = 0,
@@ -890,7 +890,7 @@ class OverlayViewer(QMainWindow):
 # ============================================================ #
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Overlay mufasa pose markers on a video for visual "
@@ -953,8 +953,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
 
     # Load pose sources
-    smoothed_pose: Optional[PoseFrame] = None
-    raw_pose: Optional[PoseFrame] = None
+    smoothed_pose: PoseFrame | None = None
+    raw_pose: PoseFrame | None = None
     if args.smoothed:
         smoothed_pose = _load_pose_file(args.smoothed)
     if args.raw:

@@ -39,7 +39,7 @@ import copy
 import os
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 import cv2
 import numpy as np
@@ -77,16 +77,16 @@ class ROIDefinition:
     video: str
     name: str
     color_name: str
-    color_bgr: Tuple[int, int, int]
+    color_bgr: tuple[int, int, int]
     thickness: int
     ear_tag_size: int
     # Geometry — meaning depends on shape_type:
     #   rectangle: top-left + bottom-right + width + height
     #   circle:    center + radius
     #   polygon:   list of (x, y) vertices
-    geometry: Dict[str, Any] = field(default_factory=dict)
+    geometry: dict[str, Any] = field(default_factory=dict)
     # Computed at save time
-    px_per_mm: Optional[float] = None
+    px_per_mm: float | None = None
 
 
 class ROILogic:
@@ -181,22 +181,22 @@ class ROILogic:
         # Cache holds decoded BGR frames; oldest evicted first.
         self.frame_idx = 0
         self._frame_cache: "OrderedDict[int, np.ndarray]" = OrderedDict()
-        self._cur_frame: Optional[np.ndarray] = self._read_frame(0)
+        self._cur_frame: np.ndarray | None = self._read_frame(0)
 
         # ROI state — defs[shape_type] = {name: ROIDefinition}
-        self.defs: Dict[str, Dict[str, ROIDefinition]] = {
+        self.defs: dict[str, dict[str, ROIDefinition]] = {
             RECTANGLE: {}, CIRCLE: {}, POLYGON: {},
         }
         # Other-video ROIs (read-only, for the "apply from other video"
         # action). Keys are video names.
-        self.other_video_rois: Dict[str, Dict[str, Any]] = {}
+        self.other_video_rois: dict[str, dict[str, Any]] = {}
 
         self._load_existing_definitions()
 
     # ------------------------------------------------------------------ #
     # Frame buffer
     # ------------------------------------------------------------------ #
-    def _read_frame(self, idx: int) -> Optional[np.ndarray]:
+    def _read_frame(self, idx: int) -> np.ndarray | None:
         if idx in self._frame_cache:
             # Touch — move to end to mark recent
             self._frame_cache.move_to_end(idx)
@@ -234,7 +234,7 @@ class ROILogic:
         self.goto_frame(self.frame_count - 1)
 
     @property
-    def current_frame(self) -> Optional[np.ndarray]:
+    def current_frame(self) -> np.ndarray | None:
         """The currently-displayed frame as a raw BGR ndarray (no
         ROI overlays). Returns None if the frame couldn't be read.
 
@@ -248,7 +248,7 @@ class ROILogic:
     # ROI state
     # ------------------------------------------------------------------ #
     @property
-    def all_roi_names(self) -> List[str]:
+    def all_roi_names(self) -> list[str]:
         out = []
         for d in self.defs.values():
             out.extend(d.keys())
@@ -257,15 +257,15 @@ class ROILogic:
     def has_roi(self, name: str) -> bool:
         return any(name in d for d in self.defs.values())
 
-    def get_roi(self, name: str) -> Optional[ROIDefinition]:
+    def get_roi(self, name: str) -> ROIDefinition | None:
         for d in self.defs.values():
             if name in d:
                 return d[name]
         return None
 
-    def add_rectangle(self, name: str, top_left: Tuple[int, int],
-                      bottom_right: Tuple[int, int],
-                      color_name: str, bgr: Tuple[int, int, int],
+    def add_rectangle(self, name: str, top_left: tuple[int, int],
+                      bottom_right: tuple[int, int],
+                      color_name: str, bgr: tuple[int, int, int],
                       thickness: int, ear_tag_size: int) -> None:
         if self.has_roi(name):
             raise ValueError(f"ROI named {name!r} already exists for this video.")
@@ -285,8 +285,8 @@ class ROILogic:
             px_per_mm=self.px_per_mm,
         )
 
-    def add_circle(self, name: str, center: Tuple[int, int], radius: int,
-                   color_name: str, bgr: Tuple[int, int, int],
+    def add_circle(self, name: str, center: tuple[int, int], radius: int,
+                   color_name: str, bgr: tuple[int, int, int],
                    thickness: int, ear_tag_size: int) -> None:
         if self.has_roi(name):
             raise ValueError(f"ROI named {name!r} already exists for this video.")
@@ -302,8 +302,8 @@ class ROILogic:
             px_per_mm=self.px_per_mm,
         )
 
-    def add_polygon(self, name: str, vertices: List[Tuple[int, int]],
-                    color_name: str, bgr: Tuple[int, int, int],
+    def add_polygon(self, name: str, vertices: list[tuple[int, int]],
+                    color_name: str, bgr: tuple[int, int, int],
                     thickness: int, ear_tag_size: int) -> None:
         if self.has_roi(name):
             raise ValueError(f"ROI named {name!r} already exists for this video.")
@@ -343,8 +343,8 @@ class ROILogic:
     # ------------------------------------------------------------------ #
     def update_rectangle_geometry(
         self, name: str,
-        top_left: Tuple[int, int],
-        bottom_right: Tuple[int, int],
+        top_left: tuple[int, int],
+        bottom_right: tuple[int, int],
     ) -> bool:
         if name not in self.defs[RECTANGLE]:
             return False
@@ -362,7 +362,7 @@ class ROILogic:
 
     def update_circle_geometry(
         self, name: str,
-        center: Tuple[int, int],
+        center: tuple[int, int],
         radius: int,
     ) -> bool:
         if name not in self.defs[CIRCLE]:
@@ -376,7 +376,7 @@ class ROILogic:
 
     def update_polygon_geometry(
         self, name: str,
-        vertices: List[Tuple[int, int]],
+        vertices: list[tuple[int, int]],
     ) -> bool:
         if name not in self.defs[POLYGON]:
             return False
@@ -406,7 +406,7 @@ class ROILogic:
         raise KeyError(f"No ROI named {old!r}.")
 
     def duplicate_roi(self, source_name: str, dest_name: str,
-                      offset: Tuple[int, int] = (20, 20)) -> None:
+                      offset: tuple[int, int] = (20, 20)) -> None:
         """Copy an ROI, shifting its position by ``offset``. The duplicate
         gets the same shape-type, color, and dimensions; just a new name
         and shifted location. Useful for placing several similar ROIs
@@ -442,7 +442,7 @@ class ROILogic:
     # ------------------------------------------------------------------ #
     # Rendering — return current frame with all ROIs drawn on top
     # ------------------------------------------------------------------ #
-    def rendered_frame(self) -> Optional[np.ndarray]:
+    def rendered_frame(self) -> np.ndarray | None:
         """Return a copy of the current frame with every defined ROI
         overlaid, ready for display in either the OpenCV preview or
         a Qt QLabel."""
@@ -502,7 +502,7 @@ class ROILogic:
 
     @staticmethod
     def _row_to_definition(row: pd.Series, shape_type: str
-                           ) -> Optional[ROIDefinition]:
+                           ) -> ROIDefinition | None:
         try:
             common = dict(
                 shape_type=shape_type,
@@ -553,7 +553,7 @@ class ROILogic:
             return None
 
     @staticmethod
-    def _parse_bgr(value: Any) -> Tuple[int, int, int]:
+    def _parse_bgr(value: Any) -> tuple[int, int, int]:
         if isinstance(value, tuple) or isinstance(value, list):
             return (int(value[0]), int(value[1]), int(value[2]))
         if isinstance(value, str):
@@ -645,7 +645,7 @@ class ROILogic:
         os.replace(tmp_path, self.roi_h5_path)
 
     @staticmethod
-    def _rect_row(r: ROIDefinition) -> Dict[str, Any]:
+    def _rect_row(r: ROIDefinition) -> dict[str, Any]:
         g = r.geometry
         # Compute area in cm² (best-effort; uses px_per_mm if known)
         area_cm = 0.0
@@ -674,7 +674,7 @@ class ROILogic:
         }
 
     @staticmethod
-    def _circ_row(r: ROIDefinition) -> Dict[str, Any]:
+    def _circ_row(r: ROIDefinition) -> dict[str, Any]:
         g = r.geometry
         area_cm = 0.0
         if r.px_per_mm and r.px_per_mm > 0:
@@ -695,7 +695,7 @@ class ROILogic:
         }
 
     @staticmethod
-    def _poly_row(r: ROIDefinition) -> Dict[str, Any]:
+    def _poly_row(r: ROIDefinition) -> dict[str, Any]:
         g = r.geometry
         verts = np.asarray(g["vertices"], dtype=np.int32)
         # Polygon area via shoelace

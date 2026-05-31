@@ -42,7 +42,7 @@ from mufasa.utils.warnings import (CorruptedFileWarning, FrameRangeWarning,
                                   InvalidValueWarning, NoDataFoundWarning)
 
 
-def check_file_exist_and_readable(file_path: Union[str, os.PathLike],
+def check_file_exist_and_readable(file_path: str | os.PathLike,
                                   raise_error: bool = True) -> bool:
     """
     Checks if a path points to a readable file.
@@ -73,13 +73,13 @@ def check_file_exist_and_readable(file_path: Union[str, os.PathLike],
 
 def check_int(name: str,
               value: Any,
-              max_value: Optional[int] = None,
-              min_value: Optional[int] = None,
-              unaccepted_vals: Optional[List[int]] = None,
-              accepted_vals: Optional[List[int]] = None,
+              max_value: int | None = None,
+              min_value: int | None = None,
+              unaccepted_vals: list[int] | None = None,
+              accepted_vals: list[int] | None = None,
               allow_negative: bool = True,
               allow_zero: bool = True,
-              raise_error: Optional[bool] = True) -> Tuple[bool, str]:
+              raise_error: bool | None = True) -> tuple[bool, str]:
     """
     Check if variable is a valid integer.
 
@@ -165,11 +165,11 @@ def check_int(name: str,
 
 def check_str(name: str,
               value: Any,
-              options: Optional[Union[Tuple[Any], List[Any], Iterable[Any]]] = (),
+              options: tuple[Any] | list[Any] | Iterable[Any] | None = (),
               allow_blank: bool = False,
-              invalid_options: Optional[Union[List[str], Tuple[str]]] = None,
+              invalid_options: list[str] | tuple[str] | None = None,
               raise_error: bool = True,
-              invalid_substrs: Optional[Union[List[str], Tuple[str]]] = None) -> Tuple[bool, str]:
+              invalid_substrs: list[str] | tuple[str] | None = None) -> tuple[bool, str]:
 
     """
     Check if variable is a valid string.
@@ -238,11 +238,11 @@ def check_str(name: str,
 
 def check_float(name: str,
                 value: Any,
-                max_value: Optional[float] = None,
-                min_value: Optional[float] = None,
+                max_value: float | None = None,
+                min_value: float | None = None,
                 raise_error: bool = True,
                 allow_zero: bool = True,
-                allow_negative: bool = True) -> Tuple[bool, str]:
+                allow_negative: bool = True) -> tuple[bool, str]:
     """
     Check if variable is a valid float.
 
@@ -303,7 +303,7 @@ def check_float(name: str,
     return True, msg
 
 
-def check_iterable_length(source: str, val: int, exact_accepted_length: Optional[int] = None, max: Optional[int] = np.inf, min: int = 1, raise_error: bool = True) -> bool:
+def check_iterable_length(source: str, val: int, exact_accepted_length: int | None = None, max: int | None = np.inf, min: int = 1, raise_error: bool = True) -> bool:
     if (not exact_accepted_length) and (not max) and (not min):
         if raise_error:
             raise InvalidInputError(msg=f"Provide exact_accepted_length or max and min values for {source}", source=check_iterable_length.__name__)
@@ -323,7 +323,7 @@ def check_iterable_length(source: str, val: int, exact_accepted_length: Optional
     return True
 
 
-def check_instance(source: str, instance: object, accepted_types: Union[Tuple[Any], Any], raise_error: bool = True, warning: bool = True) -> bool:
+def check_instance(source: str, instance: object, accepted_types: tuple[Any] | Any, raise_error: bool = True, warning: bool = True) -> bool:
     """
     Check if an instance is an acceptable type.
 
@@ -345,7 +345,7 @@ def check_instance(source: str, instance: object, accepted_types: Union[Tuple[An
     return True
 
 
-def get_fn_ext(filepath: Union[os.PathLike, str]) -> (str, str, str):
+def get_fn_ext(filepath: os.PathLike | str) -> (str, str, str):
     """
     Split file path into three components: (i) directory, (ii) file name, and (iii) file extension.
 
@@ -369,7 +369,7 @@ def get_fn_ext(filepath: Union[os.PathLike, str]) -> (str, str, str):
     return dir_name, file_name, file_extension
 
 
-def check_if_filepath_list_is_empty(filepaths: List[str], error_msg: str) -> None:
+def check_if_filepath_list_is_empty(filepaths: list[str], error_msg: str) -> None:
     """
     Check if a list is empty
 
@@ -386,7 +386,7 @@ def check_if_filepath_list_is_empty(filepaths: List[str], error_msg: str) -> Non
 
 
 def check_all_file_names_are_represented_in_video_log(
-    video_info_df: pd.DataFrame, data_paths: List[Union[str, os.PathLike]]
+    video_info_df: pd.DataFrame, data_paths: list[str | os.PathLike]
 ) -> None:
     """
     Helper to check that all files are represented in a dataframe of the SimBA `project_folder/logs/video_info.csv`
@@ -408,10 +408,10 @@ def check_all_file_names_are_represented_in_video_log(
         )
 
 
-def check_if_dir_exists(in_dir: Union[str, os.PathLike],
-                        source: Optional[str] = None,
-                        create_if_not_exist: Optional[bool] = False,
-                        raise_error: bool = True) -> Union[None, bool]:
+def check_if_dir_exists(in_dir: str | os.PathLike,
+                        source: str | None = None,
+                        create_if_not_exist: bool | None = False,
+                        raise_error: bool = True) -> None | bool:
     """
     Check if a directory path exists.
 
@@ -450,9 +450,9 @@ def check_if_dir_exists(in_dir: Union[str, os.PathLike],
 
 
 def check_that_column_exist(df: pd.DataFrame,
-                            column_name: Union[str, os.PathLike, List[str]],
+                            column_name: str | os.PathLike | list[str],
                             file_name: str,
-                            raise_error: bool = True) -> Union[None, bool]:
+                            raise_error: bool = True) -> None | bool:
     """
     Check if single named field or a list of fields exist within a dataframe.
 
@@ -492,8 +492,8 @@ def check_that_two_dfs_are_equal_len(df_1: pd.DataFrame,
                                      df_2: pd.DataFrame,
                                      file_path_1: str,
                                      file_path_2: str,
-                                     col_name: Optional[str] = None,
-                                     raise_error: bool = True) -> Union[None, bool]:
+                                     col_name: str | None = None,
+                                     raise_error: bool = True) -> None | bool:
     """
     Check that two dataframes (or series) contain the same number of rows.
 
@@ -526,7 +526,7 @@ def check_that_two_dfs_are_equal_len(df_1: pd.DataFrame,
 
 
 def check_if_valid_input(
-    name: str, input: str, options: List[str], raise_error: bool = True
+    name: str, input: str, options: list[str], raise_error: bool = True
 ) -> (bool, str):
     """
     Check if string variable is valid option.
@@ -559,8 +559,8 @@ def check_if_valid_input(
 
 
 def check_minimum_roll_windows(
-    roll_windows_values: List[int], minimum_fps: float
-) -> List[int]:
+    roll_windows_values: list[int], minimum_fps: float
+) -> list[int]:
     """
     Remove any rolling temporal window that are shorter than a single frame in
     any of the videos within the project.
@@ -580,7 +580,7 @@ def check_minimum_roll_windows(
     return roll_windows_values
 
 
-def check_same_number_of_rows_in_dfs(dfs: List[pd.DataFrame]) -> bool:
+def check_same_number_of_rows_in_dfs(dfs: list[pd.DataFrame]) -> bool:
     """
     Helper to check that each dataframe in list contains an equal number of rows
 
@@ -604,7 +604,7 @@ def check_same_number_of_rows_in_dfs(dfs: List[pd.DataFrame]) -> bool:
     return True
 
 
-def check_if_headers_in_dfs_are_unique(dfs: List[pd.DataFrame]) -> List[str]:
+def check_if_headers_in_dfs_are_unique(dfs: list[pd.DataFrame]) -> list[str]:
     """
     Helper to check heaaders in multiple dataframes are unique.
 
@@ -699,7 +699,7 @@ def check_nvidea_gpu_available(raise_error: bool = False) -> bool:
         return False
 
 
-def check_ffmpeg_available(raise_error: Optional[bool] = False) -> Union[bool, None]:
+def check_ffmpeg_available(raise_error: bool | None = False) -> bool | None:
     """
     Helper to check of FFMpeg is available via subprocess ``ffmpeg``.
 
@@ -759,9 +759,9 @@ def check_if_valid_rgb_str(
         return rgb
 
 
-def check_if_valid_rgb_tuple(data: Tuple[int, int, int],
+def check_if_valid_rgb_tuple(data: tuple[int, int, int],
                              raise_error: bool = True,
-                             source: Optional[str] = None) -> bool:
+                             source: str | None = None) -> bool:
 
     valid_tuple = check_instance(source=f'{check_if_valid_rgb_tuple.__name__} {source}', instance=data, accepted_types=tuple, raise_error=False, warning=False)
     if not valid_tuple and raise_error:
@@ -783,8 +783,8 @@ def check_if_valid_rgb_tuple(data: Tuple[int, int, int],
 
 
 def check_if_list_contains_values(
-    data: List[Union[float, int, str]],
-    values: List[Union[float, int, str]],
+    data: list[float | int | str],
+    values: list[float | int | str],
     name: str,
     raise_error: bool = True,
 ) -> None:
@@ -818,7 +818,7 @@ def check_if_list_contains_values(
         )
 
 
-def check_valid_hex_color(color_hex: str, raise_error: Optional[bool] = True) -> bool:
+def check_valid_hex_color(color_hex: str, raise_error: bool | None = True) -> bool:
     """
     Check if given string represents a valid hexadecimal color code.
 
@@ -921,7 +921,7 @@ def check_if_module_has_import(parsed_file: ast.Module, import_name: str) -> boo
 
 
 def check_valid_extension(
-    path: Union[str, os.PathLike], accepted_extensions: Union[List[str], str]
+    path: str | os.PathLike, accepted_extensions: list[str] | str
 ):
     """
     Checks if the file extension of the provided path is in the list of accepted extensions.
@@ -945,8 +945,8 @@ def check_if_valid_img(data: np.ndarray,
                        source: str = "",
                        raise_error: bool = True,
                        greyscale: bool = False,
-                       size: Optional[Tuple[int, int]] = None, # WIDTH x HEIGHT
-                       color: bool = False) -> Union[bool, None]:
+                       size: tuple[int, int] | None = None, # WIDTH x HEIGHT
+                       color: bool = False) -> bool | None:
     """
     Check if a variable is a valid image.
 
@@ -998,9 +998,9 @@ def check_if_valid_img(data: np.ndarray,
 
 
 def check_that_dir_has_list_of_filenames(
-    dir: Union[str, os.PathLike],
-    file_name_lst: List[str],
-    file_type: Optional[str] = "csv",
+    dir: str | os.PathLike,
+    file_name_lst: list[str],
+    file_type: str | None = "csv",
 ):
     """
     Check that all file names in a list has an equivalent file in a specified directory. E.g., check if all files in the outlier corrected folder has an equivalent file in the featurues_extracted directory.
@@ -1018,20 +1018,20 @@ def check_that_dir_has_list_of_filenames(
 
 
 def check_valid_array(data: np.ndarray,
-                      source: Optional[str] = "",
-                      accepted_ndims: Optional[Union[Tuple[int], Any]] = None,
-                      accepted_sizes: Optional[List[int]] = None,
-                      accepted_axis_0_shape: Optional[Union[List[int], Tuple[int]]] = None,
-                      accepted_axis_1_shape: Optional[Union[List[int], Tuple[int]]] = None,
-                      accepted_dtypes: Optional[Union[List[Union[str, Type]], Tuple[Union[str, Type]], Iterable[Any]]] = None,
-                      accepted_values: Optional[List[Any]] = None,
-                      accepted_shapes: Optional[List[Tuple[int]]] = None,
-                      min_axis_0: Optional[int] = None,
-                      max_axis_1: Optional[int] = None,
-                      min_axis_1: Optional[int] = None,
-                      min_value: Optional[Union[float, int]] = None,
-                      max_value: Optional[Union[float, int]] = None,
-                      raise_error: bool = True) -> Union[None, bool]:
+                      source: str | None = "",
+                      accepted_ndims: tuple[int] | Any | None = None,
+                      accepted_sizes: list[int] | None = None,
+                      accepted_axis_0_shape: list[int] | tuple[int] | None = None,
+                      accepted_axis_1_shape: list[int] | tuple[int] | None = None,
+                      accepted_dtypes: list[str | type] | tuple[str | type] | Iterable[Any] | None = None,
+                      accepted_values: list[Any] | None = None,
+                      accepted_shapes: list[tuple[int]] | None = None,
+                      min_axis_0: int | None = None,
+                      max_axis_1: int | None = None,
+                      min_axis_1: int | None = None,
+                      min_value: float | int | None = None,
+                      max_value: float | int | None = None,
+                      raise_error: bool = True) -> None | bool:
     """
     Check if the given array satisfies specified criteria regarding its dimensions, shape, and data type.
 
@@ -1162,14 +1162,14 @@ def check_valid_array(data: np.ndarray,
         return True
 
 def check_valid_lst(data: list,
-                    source: Optional[str] = "",
-                    valid_dtypes: Optional[Union[Tuple[Any], List[Any], Any]] = None,
-                    valid_values: Optional[List[Any]] = None,
-                    min_len: Optional[int] = 1,
-                    max_len: Optional[int] = None,
-                    min_value: Optional[float] = None,
-                    exact_len: Optional[int] = None,
-                    raise_error: Optional[bool] = True) -> bool:
+                    source: str | None = "",
+                    valid_dtypes: tuple[Any] | list[Any] | Any | None = None,
+                    valid_values: list[Any] | None = None,
+                    min_len: int | None = 1,
+                    max_len: int | None = None,
+                    min_value: float | None = None,
+                    exact_len: int | None = None,
+                    raise_error: bool | None = True) -> bool:
     """
     Check the validity of a list based on passed criteria.
 
@@ -1277,9 +1277,9 @@ def check_valid_lst(data: list,
 
 def check_if_keys_exist_in_dict(
     data: dict,
-    key: Union[str, int, tuple, List],
-    name: Optional[str] = "",
-    raise_error: Optional[bool] = True,
+    key: str | int | tuple | list,
+    name: str | None = "",
+    raise_error: bool | None = True,
 ) -> bool:
     """
     Check if one or more keys exist in a dictionary.
@@ -1315,7 +1315,7 @@ def check_if_keys_exist_in_dict(
             str,
             int,
             tuple,
-            List,
+            list,
         ),
     )
     if not isinstance(key, (list, tuple)):
@@ -1332,7 +1332,7 @@ def check_if_keys_exist_in_dict(
     return True
 
 
-def check_that_directory_is_empty(directory: Union[str, os.PathLike], raise_error: Optional[bool] = True) -> None:
+def check_that_directory_is_empty(directory: str | os.PathLike, raise_error: bool | None = True) -> None:
     """
     Checks if a directory is empty. If the directory has content, then returns False or raises ``DirectoryNotEmptyError``.
 
@@ -1360,7 +1360,7 @@ def check_that_directory_is_empty(directory: Union[str, os.PathLike], raise_erro
             return True
 
 
-def check_umap_hyperparameters(hyper_parameters: Dict[str, Any]) -> None:
+def check_umap_hyperparameters(hyper_parameters: dict[str, Any]) -> None:
     """
     Checks if dictionary of paramameters (umap, scaling, etc) are valid for grid-search umap dimensionality reduction .
 
@@ -1408,9 +1408,9 @@ def check_umap_hyperparameters(hyper_parameters: Dict[str, Any]) -> None:
         min_value=0.0,
         max_value=100.0,
     )
-def check_video_has_rois(roi_dict: Dict[str, pd.DataFrame],
-                         roi_names: List[str] = None,
-                         video_names: List[str] = None,
+def check_video_has_rois(roi_dict: dict[str, pd.DataFrame],
+                         roi_names: list[str] = None,
+                         video_names: list[str] = None,
                          source: str = 'roi dict',
                          raise_error: bool = True):
     """
@@ -1474,10 +1474,10 @@ def check_video_has_rois(roi_dict: Dict[str, pd.DataFrame],
 
 
 def check_if_df_field_is_boolean(df: pd.DataFrame,
-                                 field: Union[str, List[str]],
+                                 field: str | list[str],
                                  raise_error: bool = True,
-                                 bool_values: Optional[Tuple[Any]] = (0, 1),
-                                 df_name: Optional[str] = ''):
+                                 bool_values: tuple[Any] | None = (0, 1),
+                                 df_name: str | None = ''):
     """
     Validate that one or more DataFrame columns only contain accepted boolean labels.
 
@@ -1528,15 +1528,15 @@ def check_if_df_field_is_boolean(df: pd.DataFrame,
 
 def check_valid_dataframe(
     df: pd.DataFrame,
-    source: Optional[str] = "",
-    valid_dtypes: Optional[Tuple[Any]] = None,
-    required_fields: Optional[List[str]] = None,
-    min_axis_0: Optional[int] = None,
-    min_axis_1: Optional[int] = None,
-    max_axis_0: Optional[int] = None,
-    max_axis_1: Optional[int] = None,
+    source: str | None = "",
+    valid_dtypes: tuple[Any] | None = None,
+    required_fields: list[str] | None = None,
+    min_axis_0: int | None = None,
+    min_axis_1: int | None = None,
+    max_axis_0: int | None = None,
+    max_axis_1: int | None = None,
     allow_duplicate_col_names = True,
-    accepted_rows: Optional[Union[int, Tuple[int]]] = None
+    accepted_rows: int | tuple[int] | None = None
 ):
     """
     Validate a DataFrame against various criteria.
@@ -1632,7 +1632,7 @@ def check_valid_dataframe(
             raise InvalidInputError(msg=f"The dataframe {source} has {len(df)} rows but only {accepted_rows} rows is eccepted.", source=source,)
 
 
-def check_valid_boolean(value: Union[Any, List[Any]], source: Optional[str] = '', raise_error: Optional[bool] = True):
+def check_valid_boolean(value: Any | list[Any], source: str | None = '', raise_error: bool | None = True):
     """
     Check if a value or list of values contains only valid boolean values.
 
@@ -1669,12 +1669,12 @@ def check_valid_boolean(value: Union[Any, List[Any]], source: Optional[str] = ''
                 return False
 
 def check_valid_tuple(x: tuple,
-                      source: Optional[str] = "",
-                      accepted_lengths: Optional[Tuple[int]] = None,
-                      valid_dtypes: Optional[Tuple[Any]] = None,
-                      minimum_length: Optional[int] = None,
-                      accepted_values: Optional[Iterable[Any]] = None,
-                      min_integer: Optional[int] = None,
+                      source: str | None = "",
+                      accepted_lengths: tuple[int] | None = None,
+                      valid_dtypes: tuple[Any] | None = None,
+                      minimum_length: int | None = None,
+                      accepted_values: Iterable[Any] | None = None,
+                      min_integer: int | None = None,
                       raise_error: bool = True) -> bool:
     """
     Validate a tuple against various criteria.
@@ -1750,10 +1750,10 @@ def check_valid_tuple(x: tuple,
     return True
 
 
-def check_video_and_data_frm_count_align(video: Union[str, os.PathLike, cv2.VideoCapture],
-                                         data: Union[str, os.PathLike, pd.DataFrame],
-                                         name: Optional[str] = "",
-                                         raise_error: Optional[bool] = True) -> Union[None, bool]:
+def check_video_and_data_frm_count_align(video: str | os.PathLike | cv2.VideoCapture,
+                                         data: str | os.PathLike | pd.DataFrame,
+                                         name: str | None = "",
+                                         raise_error: bool | None = True) -> None | bool:
     """
     Check if the frame count of a video matches the row count of a data file.
 
@@ -1809,10 +1809,10 @@ def check_video_and_data_frm_count_align(video: Union[str, os.PathLike, cv2.Vide
             raise FrameRangeError(msg=f"The video {name} has {video_count} frames, but the associated data file for this video has {data_count} rows", source=check_video_and_data_frm_count_align.__name__,)
     return True
 
-def check_if_video_corrupted(video: Union[str, os.PathLike, cv2.VideoCapture],
-                             frame_interval: Optional[int] = None,
-                             frame_n: Optional[int] = 20,
-                             raise_error: Optional[bool] = True) -> None:
+def check_if_video_corrupted(video: str | os.PathLike | cv2.VideoCapture,
+                             frame_interval: int | None = None,
+                             frame_n: int | None = 20,
+                             raise_error: bool | None = True) -> None:
 
     """
     Check if a video file is corrupted by inspecting a set of its frames.
@@ -1858,15 +1858,15 @@ def check_if_video_corrupted(video: Union[str, os.PathLike, cv2.VideoCapture],
 
 
 def check_valid_dict(x: dict,
-                     valid_key_dtypes: Optional[Tuple[Any]] = None,
-                     valid_values_dtypes: Optional[Tuple[Any, ...]] = None,
-                     valid_keys: Optional[Union[Tuple[Any], List[Any]]] = None,
-                     max_len_keys: Optional[int] = None,
-                     min_len_keys: Optional[int] = None,
-                     required_keys: Optional[Tuple[Any, ...]] = None,
-                     max_value: Optional[Union[float, int]] = None,
-                     min_value: Optional[Union[float, int]] = None,
-                     source: Optional[str] = None):
+                     valid_key_dtypes: tuple[Any] | None = None,
+                     valid_values_dtypes: tuple[Any, ...] | None = None,
+                     valid_keys: tuple[Any] | list[Any] | None = None,
+                     max_len_keys: int | None = None,
+                     min_len_keys: int | None = None,
+                     required_keys: tuple[Any, ...] | None = None,
+                     max_value: float | int | None = None,
+                     min_value: float | int | None = None,
+                     source: str | None = None):
     """
     Validate a dictionary against various criteria.
 
@@ -1943,7 +1943,7 @@ def check_valid_dict(x: dict,
 
 
 
-def is_video_color(video: Union[str, os.PathLike, cv2.VideoCapture]) -> bool:
+def is_video_color(video: str | os.PathLike | cv2.VideoCapture) -> bool:
     """
     Determines whether a video is in color or greyscale.
 
@@ -1997,7 +1997,7 @@ def is_video_color(video: Union[str, os.PathLike, cv2.VideoCapture]) -> bool:
 
 
 def check_filepaths_in_iterable_exist(file_paths: Iterable[str],
-                                      name: Optional[str] = None):
+                                      name: str | None = None):
 
     check_instance(source=f'{check_filepaths_in_iterable_exist.__name__} file_paths {name}', instance=file_paths, accepted_types=(list, tuple,))
     if len(file_paths) == 0:
@@ -2007,7 +2007,7 @@ def check_filepaths_in_iterable_exist(file_paths: Iterable[str],
         if not os.path.isfile(file_path):
             raise NoFilesFoundError(msg=f'{name} {file_path} is not a valid file path')
 
-def check_all_dfs_in_list_has_same_cols(dfs: List[pd.DataFrame], raise_error: bool = True, source: str = '') -> bool:
+def check_all_dfs_in_list_has_same_cols(dfs: list[pd.DataFrame], raise_error: bool = True, source: str = '') -> bool:
     """
     Check that all DataFrames in a list have the same column names.
 
@@ -2044,7 +2044,7 @@ def check_all_dfs_in_list_has_same_cols(dfs: List[pd.DataFrame], raise_error: bo
     return True
 
 
-def is_valid_video_file(file_path: Union[str, os.PathLike], raise_error: bool = True):
+def is_valid_video_file(file_path: str | os.PathLike, raise_error: bool = True):
     """
     Check if a file path is a valid video file.
 
@@ -2086,7 +2086,7 @@ def is_valid_video_file(file_path: Union[str, os.PathLike], raise_error: bool = 
                 cap.release()
 
 
-def check_valid_polygon(polygon: Union[np.ndarray, Polygon], raise_error: bool = True, name: Optional[str] = None) -> Union[bool, None]:
+def check_valid_polygon(polygon: np.ndarray | Polygon, raise_error: bool = True, name: str | None = None) -> bool | None:
     """
     Validates whether the given polygon is a valid geometric shape.
 
@@ -2113,7 +2113,7 @@ def check_valid_polygon(polygon: Union[np.ndarray, Polygon], raise_error: bool =
 
 def is_img_bw(img: np.ndarray,
               raise_error: bool = True,
-              source: Optional[str] = '') -> bool:
+              source: str | None = '') -> bool:
     """
     Check if an image is binary black and white.
 
@@ -2149,7 +2149,7 @@ def is_img_bw(img: np.ndarray,
 
 def is_img_greyscale(img: np.ndarray,
                       raise_error: bool = True,
-                      source: Optional[str] = '') -> bool:
+                      source: str | None = '') -> bool:
     """
     Check if an image is greyscale.
 
@@ -2233,7 +2233,7 @@ def is_windows_path(value):
     return isinstance(value, str) and (len(value) > 1 and value[1] == ':' and value[0].isalpha())
 
 
-def check_same_files_exist_in_all_directories(dirs: List[Union[str, os.PathLike]], raise_error: bool = False, file_type: str = "csv") -> bool:
+def check_same_files_exist_in_all_directories(dirs: list[str | os.PathLike], raise_error: bool = False, file_type: str = "csv") -> bool:
     """
     Check if the same files of a given type exist in all specified directories.
 
@@ -2253,7 +2253,7 @@ def check_same_files_exist_in_all_directories(dirs: List[Union[str, os.PathLike]
 
 
 
-def check_valid_img_path(path: Union[str, os.PathLike], raise_error: bool = True):
+def check_valid_img_path(path: str | os.PathLike, raise_error: bool = True):
     """
     Check if a file path is a valid image file.
 
@@ -2289,7 +2289,7 @@ def check_valid_img_path(path: Union[str, os.PathLike], raise_error: bool = True
 
 
 
-def check_valid_device(device: Union[Literal['cpu'], int], raise_error: bool = True) -> bool:
+def check_valid_device(device: Literal['cpu'] | int, raise_error: bool = True) -> bool:
     """
     Validate a compute device specification, ensuring it is either 'cpu' or a valid GPU index.
 
@@ -2389,9 +2389,9 @@ def is_lxc_container() -> bool:
 
 def check_valid_cpu_pool(value: Any,
                          source: str = '',
-                         max_cores: Optional[int] = None,
-                         min_cores: Optional[int] = None,
-                         accepted_cores: Optional[Union[List[int], Tuple[int, ...], int]] = None,
+                         max_cores: int | None = None,
+                         min_cores: int | None = None,
+                         accepted_cores: list[int] | tuple[int, ...] | int | None = None,
                          raise_error: bool = True) -> bool:
 
     """

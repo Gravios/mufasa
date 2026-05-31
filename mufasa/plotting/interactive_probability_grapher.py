@@ -50,12 +50,12 @@ class InteractiveProbabilityGrapher(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 file_path: Union[str, os.PathLike],
-                 model_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
+                 file_path: str | os.PathLike,
+                 model_path: str | os.PathLike,
                  lbl_font_size: int = 16,
-                 data_clr: Tuple[int, int, int] = (0, 0, 255),
-                 line_clr: Tuple[int, int, int] = (255, 0, 0),
+                 data_clr: tuple[int, int, int] = (0, 0, 255),
+                 line_clr: tuple[int, int, int] = (255, 0, 0),
                  show_thresholds: bool = True,
                  show_statistics_legend: bool = True):
 

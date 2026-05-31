@@ -35,7 +35,7 @@ class PoseImporterMixin:
                                    animal_bp_dict: dict,
                                    video_info: dict,
                                    data_df: pd.DataFrame,
-                                   video_path: Union[str, os.PathLike]):
+                                   video_path: str | os.PathLike):
 
         self.video_info, self.data_df, self.frame_no, self.add_spacer = (video_info, data_df, 0, 2)
         self.animal_bp_dict, self.cap = animal_bp_dict, cv2.VideoCapture(video_path)
@@ -48,7 +48,7 @@ class PoseImporterMixin:
         self.scalers["circle"] = PlottingMixin().get_optimal_circle_size(frame_size=(w, h), circle_frame_ratio=100)
         self.scalers["font"], _, self.scalers["space"] = PlottingMixin().get_optimal_font_scales(text="Press 'c' to continue to start assigning identities using this frame", accepted_px_width=w, accepted_px_height=int(h/6))
 
-    def find_data_files(self, dir: Union[str, os.PathLike], extensions: List[str]) -> List[str]:
+    def find_data_files(self, dir: str | os.PathLike, extensions: list[str]) -> list[str]:
         """
         Search for files with specific extensions in a given directory and return their paths.
 
@@ -76,11 +76,11 @@ class PoseImporterMixin:
 
 
     def link_video_paths_to_data_paths(self,
-                                       data_paths: List[str],
-                                       video_paths: List[str],
-                                       str_splits: Optional[List[str]] = None,
-                                       filename_cleaning_func: Optional[object] = None,
-                                       raise_error: bool = True) -> Dict[str, Dict[str, str]]:
+                                       data_paths: list[str],
+                                       video_paths: list[str],
+                                       str_splits: list[str] | None = None,
+                                       filename_cleaning_func: object | None = None,
+                                       raise_error: bool = True) -> dict[str, dict[str, str]]:
         """
         Given a list of paths to video files and a separate list of paths to data files, create a dictionary
         pairing each video file to a datafile based on the file names of the video and data file.
@@ -318,7 +318,7 @@ class PoseImporterMixin:
             self.config.write(f)
         f.close()
 
-    def update_bp_headers_file(self, update_bp_headers: Optional[bool] = False):
+    def update_bp_headers_file(self, update_bp_headers: bool | None = False):
         new_headers = []
         for animal_name in self.animal_bp_dict.keys():
             for bp in self.animal_bp_dict[animal_name]["X_bps"]:

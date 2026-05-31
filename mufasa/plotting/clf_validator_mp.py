@@ -43,12 +43,12 @@ def val_clip_createror_mp(data: np.ndarray,
 
     def _put_text(img: np.ndarray,
                   text: str,
-                  pos: Tuple[int, int],
+                  pos: tuple[int, int],
                   font_size: int,
-                  font_thickness: Optional[int] = 2,
-                  font: Optional[int] = cv2.FONT_HERSHEY_DUPLEX,
-                  text_color: Optional[Tuple[int, int, int]] = (255, 255, 255),
-                  text_color_bg: Optional[Tuple[int, int, int]] = (0, 0, 0),
+                  font_thickness: int | None = 2,
+                  font: int | None = cv2.FONT_HERSHEY_DUPLEX,
+                  text_color: tuple[int, int, int] | None = (255, 255, 255),
+                  text_color_bg: tuple[int, int, int] | None = (0, 0, 0),
                   text_bg_alpha: float = 0.8):
 
         x, y = pos
@@ -62,7 +62,7 @@ def val_clip_createror_mp(data: np.ndarray,
 
 
 
-    def __insert_inter_frms(bg_color: Tuple[int, int, int] = (49, 32, 189), fg_color: Tuple[int, int, int] = (0, 0, 0)):
+    def __insert_inter_frms(bg_color: tuple[int, int, int] = (49, 32, 189), fg_color: tuple[int, int, int] = (0, 0, 0)):
         """
         Helper to create N blank frames separating the classified event bouts with defined BGR colors.
         """
@@ -139,12 +139,12 @@ class ClassifierValidationClipsMultiprocess(ConfigReader):
                  window: int,
                  clf_name: str,
                  clips: bool,
-                 data_paths: List[Union[str, os.PathLike]],
-                 text_clr: Tuple[int, int, int],
+                 data_paths: list[str | os.PathLike],
+                 text_clr: tuple[int, int, int],
                  concat_video: bool = False,
                  video_speed: float = 1.0,
-                 highlight_clr: Optional[Tuple[int, int, int]] = None,
-                 core_cnt: Optional[int] = -1):
+                 highlight_clr: tuple[int, int, int] | None = None,
+                 core_cnt: int | None = -1):
 
 
         ConfigReader.__init__(self, config_path=config_path)

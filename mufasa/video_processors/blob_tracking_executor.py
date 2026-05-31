@@ -95,8 +95,8 @@ class BlobTrackingExecutor:
 
 
     def __init__(self,
-                 data: Union[dict, str, os.PathLike],
-                 batch_size: Optional[int] = None,
+                 data: dict | str | os.PathLike,
+                 batch_size: int | None = None,
                  rostrocaudal : bool = True,
                  mediolateral: bool = True,
                  center: bool = True):

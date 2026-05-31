@@ -49,8 +49,8 @@ class OutlierCorrecterLocationAdvanced(ConfigReader, FeatureExtractionMixin):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
-        input_dir: Union[str, os.PathLike],
+        config_path: str | os.PathLike,
+        input_dir: str | os.PathLike,
         type: str,
         agg_method: str,
         criterion_body_parts: dict,

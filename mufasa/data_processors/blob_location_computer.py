@@ -57,12 +57,12 @@ class BlobLocationComputer:
     >>> x.run()
     """
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 verbose: Optional[bool] = True,
-                 gpu: Optional[bool] = True,
+                 data_path: str | os.PathLike,
+                 verbose: bool | None = True,
+                 gpu: bool | None = True,
                  batch_size: int = 2500,
-                 save_dir: Optional[Union[str, os.PathLike]] = None,
-                 smoothing: Optional[str] = None,
+                 save_dir: str | os.PathLike | None = None,
+                 smoothing: str | None = None,
                  multiprocessing: bool = False):
 
 

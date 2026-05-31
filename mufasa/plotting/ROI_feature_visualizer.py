@@ -73,10 +73,10 @@ class ROIfeatureVisualizer(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 body_parts: List[str],
-                 style_attr: Dict[str, Any]):
+                 config_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 body_parts: list[str],
+                 style_attr: dict[str, Any]):
 
         check_file_exist_and_readable(file_path=config_path)
         check_file_exist_and_readable(file_path=video_path)

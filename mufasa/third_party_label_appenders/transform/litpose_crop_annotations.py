@@ -38,8 +38,8 @@ class CropLPAnnotations:
     def __init__(self,
                  lp_project_dir: str,
                  save_dir: str,
-                 crop_size: Tuple[int, int] = (512, 512),
-                 visualize: Optional[Union[bool, int]] = None):
+                 crop_size: tuple[int, int] = (512, 512),
+                 visualize: bool | int | None = None):
 
         check_if_dir_exists(in_dir=lp_project_dir)
         check_int(name="CropLPAnnotations crop_size width", value=crop_size[0], min_value=1)
@@ -179,7 +179,7 @@ class CropLPAnnotations:
                      csv_path: str,
                      lp_project_dir: str,
                      save_dir: str,
-                     crop_size: Tuple[int, int],
+                     crop_size: tuple[int, int],
                      viz_candidates: list,
                      drop_positions: set):
 

@@ -127,7 +127,7 @@ def _set_qt_platform_default() -> None:
         pass
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Console-script entry. Forwards to ``workbench_app.main``."""
     # Try the import upfront so we can produce a helpful error
     # message instead of a bare ImportError traceback if something

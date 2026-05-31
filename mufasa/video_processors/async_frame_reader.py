@@ -44,14 +44,14 @@ class AsyncVideoFrameReader:
     """
 
     def __init__(self,
-                 video_path: Union[str, os.PathLike],
+                 video_path: str | os.PathLike,
                  batch_size: int = 100,
                  max_que_size: int = 2,
-                 start_idx: Optional[int] = None,
-                 end_idx: Optional[int] = None,
+                 start_idx: int | None = None,
+                 end_idx: int | None = None,
                  gpu: bool = True,
                  verbose: bool = True,
-                 img_size: Optional[Tuple[int, int]] = None,
+                 img_size: tuple[int, int] | None = None,
                  greyscale: bool = False,
                  black_and_white: bool = False,
                  clahe: bool = False):
@@ -126,7 +126,7 @@ class AsyncVideoFrameReader:
         return self._thread is not None and self._thread.is_alive() and not self._stop
 
 def get_async_frame_batch(batch_reader: AsyncVideoFrameReader,
-                          timeout: int = 10) -> Tuple[int, int, np.ndarray]:
+                          timeout: int = 10) -> tuple[int, int, np.ndarray]:
     """
     Retrieve the next batch of video frames from an `AsyncVideoFrameReader` instance.
 

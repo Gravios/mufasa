@@ -89,7 +89,7 @@ def safe_filter_video_neq(
     return df[df["Video"] != video_name]
 
 
-def safe_videos_in(df: pd.DataFrame) -> List[str]:
+def safe_videos_in(df: pd.DataFrame) -> list[str]:
     """Return list of unique videos in ``df["Video"]``, or empty list
     if the column is missing (empty-from-roi_logic case)."""
     if "Video" not in df.columns:
@@ -101,7 +101,7 @@ def create_rectangle_entry(rectangle_selector: Union[ROISelector, "InteractiveRO
                            video_name: str,
                            shape_name: str,
                            clr_name: str,
-                           clr_bgr: Tuple[int, int, int],
+                           clr_bgr: tuple[int, int, int],
                            thickness: int,
                            ear_tag_size: int,
                            px_conversion_factor: float):
@@ -138,7 +138,7 @@ def create_circle_entry(circle_selector: Union[ROISelectorCircle, "InteractiveRO
                         video_name: str,
                         shape_name: str,
                         clr_name: str,
-                        clr_bgr: Tuple[int, int, int],
+                        clr_bgr: tuple[int, int, int],
                         thickness: int,
                         ear_tag_size: int,
                         px_conversion_factor: float):
@@ -163,7 +163,7 @@ def create_polygon_entry(polygon_selector: Union[ROISelectorPolygon, "Interactiv
                          video_name: str,
                          shape_name: str,
                          clr_name: str,
-                         clr_bgr: Tuple[int, int, int],
+                         clr_bgr: tuple[int, int, int],
                          thickness: int,
                          ear_tag_size: int,
                          px_conversion_factor: float) -> dict:
@@ -229,7 +229,7 @@ def get_polygon_df_headers():
     return ['Video', 'Shape_type', 'Name', 'Color name', 'Color BGR', 'Thickness', 'Center_X', 'Center_Y', 'vertices', 'center', 'area', 'max_vertice_distance', 'area_cm', "Tags", 'Ear_tag_size']
 
 
-def set_roi_metric_sizes(roi_dict: dict, px_conversion_factor: Union[int, float]) -> dict:
+def set_roi_metric_sizes(roi_dict: dict, px_conversion_factor: int | float) -> dict:
     """
     Helper to update the metric attributes of a shape dictionary.
     """
@@ -250,7 +250,7 @@ def set_roi_metric_sizes(roi_dict: dict, px_conversion_factor: Union[int, float]
     return out
 
 
-def get_roi_df_from_dict(roi_dict: dict, video_name_nesting: Optional[bool] = False) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def get_roi_df_from_dict(roi_dict: dict, video_name_nesting: bool | None = False) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Helper create DataFrames from a shape dictionary.
 
@@ -281,7 +281,7 @@ def get_roi_df_from_dict(roi_dict: dict, video_name_nesting: Optional[bool] = Fa
 def get_roi_dict_from_dfs(rectangle_df: pd.DataFrame,
                           circle_df: pd.DataFrame,
                           polygon_df: pd.DataFrame,
-                          video_name_nesting: Optional[bool] = False) -> dict:
+                          video_name_nesting: bool | None = False) -> dict:
     """
     Helper create dict from a shape dataframes.
     """
@@ -312,7 +312,7 @@ def get_roi_dict_from_dfs(rectangle_df: pd.DataFrame,
 
 
 
-def get_roi_data(roi_path: Union[str, os.PathLike], video_name: str) -> tuple:
+def get_roi_data(roi_path: str | os.PathLike, video_name: str) -> tuple:
     """ Helper to read in ROI data from disk"""
     rectangles_df, circles_df, polygon_df = pd.DataFrame(columns=get_rectangle_df_headers()), pd.DataFrame(columns=get_circle_df_headers()), pd.DataFrame(columns=get_polygon_df_headers())
     other_roi_dict = {}
@@ -353,7 +353,7 @@ def get_roi_data(roi_path: Union[str, os.PathLike], video_name: str) -> tuple:
     return (rectangles_df, circles_df, polygon_df, roi_dict, roi_names, other_roi_dict, other_video_names_w_rois)
 
 
-def get_roi_data_for_video_name(roi_path: Union[str, os.PathLike], video_name: str):
+def get_roi_data_for_video_name(roi_path: str | os.PathLike, video_name: str):
     in_rectangles_df, in_circles_df, in_polygon_df = read_roi_data(roi_path=roi_path)
     # Patch 122er-hotfix — same defensive pattern as 122ek.
     # The user's reported KeyError 'Video' fired here when
@@ -389,7 +389,7 @@ def change_roi_dict_video_name(roi_dict: dict, video_name: str) -> dict:
 
 
 
-def get_ear_tags_for_rectangle(center: Tuple[int, int], width: int, height: int) -> Dict[str, Union[int, Tuple[int, int]]]:
+def get_ear_tags_for_rectangle(center: tuple[int, int], width: int, height: int) -> dict[str, int | tuple[int, int]]:
     """
     Knowing the center, width, and height of rectangle, return its vertices.
 
@@ -418,8 +418,8 @@ def get_ear_tags_for_rectangle(center: Tuple[int, int], width: int, height: int)
 
 
 
-def get_vertices_hexagon(center: Tuple[int, int],
-                         radius: int) -> Tuple[np.ndarray, Dict[str, Tuple[int, int]]]:
+def get_vertices_hexagon(center: tuple[int, int],
+                         radius: int) -> tuple[np.ndarray, dict[str, tuple[int, int]]]:
     """
     Generates the vertices of a regular hexagon centered at a given point with a specified radius.
 
@@ -445,10 +445,10 @@ def get_vertices_hexagon(center: Tuple[int, int],
     return (np.round(np.array(vertices)).astype(np.int32), vertices_dict)
 
 
-def get_half_circle_vertices(center: Tuple[int, int],
+def get_half_circle_vertices(center: tuple[int, int],
                              radius: int,
                              direction: str,
-                             n_points: Optional[int] = 50) -> Tuple[np.ndarray, Dict[str, Tuple[int, int]]]:
+                             n_points: int | None = 50) -> tuple[np.ndarray, dict[str, tuple[int, int]]]:
 
     """
     Generates vertices for a half-circle with a given radius and direction, centered at a specific point.
@@ -492,7 +492,7 @@ def get_half_circle_vertices(center: Tuple[int, int],
 
 
 
-def get_triangle_vertices(center: Tuple[int, int], side_length: int, direction: int) -> Tuple[np.ndarray, Dict[str, Tuple[int, int]]]:
+def get_triangle_vertices(center: tuple[int, int], side_length: int, direction: int) -> tuple[np.ndarray, dict[str, tuple[int, int]]]:
     """
     Find equilateral triangle vertices knowing the center, direction and length side.
 
@@ -518,10 +518,10 @@ def get_triangle_vertices(center: Tuple[int, int], side_length: int, direction: 
 
 
 
-def multiply_ROIs(filename: Union[str, os.PathLike],
-                  config_path: Optional[Union[str, os.PathLike]] = None,
-                  roi_coordinates_path: Optional[Union[str, os.PathLike]] = None,
-                  videos_dir: Optional[Union[str, os.PathLike]] = None) -> None:
+def multiply_ROIs(filename: str | os.PathLike,
+                  config_path: str | os.PathLike | None = None,
+                  roi_coordinates_path: str | os.PathLike | None = None,
+                  videos_dir: str | os.PathLike | None = None) -> None:
 
     r"""
     Reproduce ROIs in one video to all other videos in SimBA project.
@@ -626,8 +626,8 @@ def multiply_ROIs(filename: Union[str, os.PathLike],
     stdout_success(msg=f"ROIs for {video_name} applied to a further {len(other_video_file_paths)} videos (Duplicated rectangles count: {len(r_df)}, circles: {len(c_df)}, polygons: {len(p_df)}).")
     #print('Next, click on "DRAW" to modify ROI location(s) or click on "RESET" to remove ROI drawing(s)')
 
-def reset_video_ROIs(config_path: Union[str, os.PathLike],
-                     filename: Union[str, os.PathLike]) -> None:
+def reset_video_ROIs(config_path: str | os.PathLike,
+                     filename: str | os.PathLike) -> None:
 
     r"""
     Delete drawn ROIs for a single video in a SimBA project.
@@ -696,8 +696,8 @@ def get_image_from_label(tk_lbl: Label) -> np.ndarray:
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
-def get_pose_for_roi_ui(pose_path: Union[str, os.PathLike],
-                        video_path: Union[str, os.PathLike]) -> Union[None, np.ndarray]:
+def get_pose_for_roi_ui(pose_path: str | os.PathLike,
+                        video_path: str | os.PathLike) -> None | np.ndarray:
     video_meta_data = get_video_meta_data(video_path=video_path, raise_error=False)
     if video_meta_data is None:
         VideoFileWarning(msg=f'Cannot plot pose on ROI as cannot read meta data for video {video_path}.', source=get_pose_for_roi_ui.__name__)
@@ -720,8 +720,8 @@ def get_pose_for_roi_ui(pose_path: Union[str, os.PathLike],
 
 
 def insert_gridlines_on_roi_img(img: np.ndarray,
-                                grid: List[Polygon],
-                                color: Tuple[int, int, int],
+                                grid: list[Polygon],
+                                color: tuple[int, int, int],
                                 thickness: int) -> np.ndarray:
 
     if grid is None or len(grid) == 0:

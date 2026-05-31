@@ -50,7 +50,7 @@ import pandas as pd
 def apply_likelihood_threshold(
     df: pd.DataFrame,
     threshold: float,
-) -> Tuple[pd.DataFrame, Dict[str, int]]:
+) -> tuple[pd.DataFrame, dict[str, int]]:
     """Zero out (x, y) pairs where ``<bp>_likelihood < threshold``.
 
     :param df: DataFrame with DLC bp_header columns
@@ -81,7 +81,7 @@ def apply_likelihood_threshold(
         threshold = 1.0
 
     out = df.copy()
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
 
     # Group columns by body-part stem. A column's body-part stem is
     # its name with the trailing _x / _y / _likelihood / _p removed.
@@ -89,7 +89,7 @@ def apply_likelihood_threshold(
     # columns (<bp>_p, via ConfigReader.bp_headers) are supported —
     # the mask can therefore be applied before OR after the
     # flat-column rename that the DLC H5 importer performs.
-    bps: Dict[str, Dict[str, str]] = {}
+    bps: dict[str, dict[str, str]] = {}
     _suffix_to_role = {
         "_likelihood": "likelihood",
         "_p":          "likelihood",
@@ -124,7 +124,7 @@ def apply_likelihood_threshold(
     return out, counts
 
 
-def summarize_mask_counts(counts: Dict[str, int], n_frames: int) -> str:
+def summarize_mask_counts(counts: dict[str, int], n_frames: int) -> str:
     """Format a per-bp masking summary for stdout logging.
 
     Returns an empty string when ``counts`` is empty (no masking

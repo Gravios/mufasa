@@ -82,7 +82,7 @@ class BoundaryVisualizer(ConfigReader, PlottingMixin):
 
     def __init__(
         self,
-        config_path: Union[str, os.PathLike],
+        config_path: str | os.PathLike,
         video_name: str,
         include_key_points: bool,
         greyscale: bool,

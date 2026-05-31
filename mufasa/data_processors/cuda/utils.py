@@ -166,7 +166,7 @@ def _cuda_mac(x: np.ndarray):
     cuda.syncthreads()
     return val
 
-def _is_cuda_available() -> Tuple[bool, Dict[int, Any]]:
+def _is_cuda_available() -> tuple[bool, dict[int, Any]]:
     """
     Check if GPU available. If True, returns the GPUs, the model, physical slots and compute capabilitie(s).
 
@@ -310,7 +310,7 @@ def _cuda_are_rows_equal(x, y, idx_1, idx_2):
     return True
 
 
-def get_nvc_decoder(video_path: Union[str, os.PathLike],
+def get_nvc_decoder(video_path: str | os.PathLike,
                     output_color_type,
                     gpu_id: int = 0,
                     use_device_memory: bool = False):

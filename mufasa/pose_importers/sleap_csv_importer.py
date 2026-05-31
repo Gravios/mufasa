@@ -51,11 +51,11 @@ class SLEAPImporterCSV(ConfigReader, PoseImporterMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_folder: Union[str, os.PathLike],
-                 id_lst: List[str],
-                 interpolation_settings: Optional[Dict[str, str]] = None,
-                 smoothing_settings: Optional[Dict[str, Union[int, str]]] = None):
+                 config_path: str | os.PathLike,
+                 data_folder: str | os.PathLike,
+                 id_lst: list[str],
+                 interpolation_settings: dict[str, str] | None = None,
+                 smoothing_settings: dict[str, int | str] | None = None):
 
         ConfigReader.__init__(self, config_path=config_path, read_video_info=False)
         PoseImporterMixin.__init__(self)

@@ -81,22 +81,22 @@ class ValidateModelOneVideo(ConfigReader, PlottingMixin, TrainModelMixin):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 feature_path: Union[str, os.PathLike],
-                 model_path: Union[str, os.PathLike],
+                 config_path: str | os.PathLike,
+                 feature_path: str | os.PathLike,
+                 model_path: str | os.PathLike,
                  show_pose: bool = True,
                  show_animal_names: bool = False,
                  show_clf_confidence: bool = False,
-                 font_size: Optional[bool] = None,
-                 circle_size: Optional[int] = None,
-                 bp_palette: Optional[str] = None,
+                 font_size: bool | None = None,
+                 circle_size: int | None = None,
+                 bp_palette: str | None = None,
                  show_animal_bounding_boxes: bool = False,
-                 text_spacing: Optional[int] = None,
-                 text_thickness: Optional[int] = None,
-                 text_opacity: Optional[float] = None,
-                 discrimination_threshold: Optional[float] = 0.0,
-                 shortest_bout: Optional[int] = 0.0,
-                 create_gantt: Optional[Union[None, int]] = None):
+                 text_spacing: int | None = None,
+                 text_thickness: int | None = None,
+                 text_opacity: float | None = None,
+                 discrimination_threshold: float | None = 0.0,
+                 shortest_bout: int | None = 0.0,
+                 create_gantt: None | int | None = None):
 
         ConfigReader.__init__(self, config_path=config_path)
         PlottingMixin.__init__(self)

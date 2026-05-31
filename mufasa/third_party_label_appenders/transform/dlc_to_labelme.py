@@ -38,10 +38,10 @@ class DLC2Labelme:
     """
 
     def __init__(self,
-                 dlc_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 labelme_version: Optional[str] = '5.3.1',
-                 flags: Optional[Dict[Any, Any]] = None,
+                 dlc_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 labelme_version: str | None = '5.3.1',
+                 flags: dict[Any, Any] | None = None,
                  verbose: bool = True,
                  greyscale: bool = False,
                  clahe: bool = False) -> None:

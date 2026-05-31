@@ -13,10 +13,10 @@ VIDEO_FILE_SET, FULL_LOG, BEHAVIOR = 'Video file set', 'FULL LOG', 'BEHAVIOR'
 EVENT, FRAME = 'EVENT', 'FRAME'
 
 
-def shah_appender(labels_dir: Union[str, os.PathLike],
-                  features_dir: Union[str, os.PathLike],
-                  targets_dir: Union[str, os.PathLike],
-                  clf_names: List[str]):
+def shah_appender(labels_dir: str | os.PathLike,
+                  features_dir: str | os.PathLike,
+                  targets_dir: str | os.PathLike,
+                  clf_names: list[str]):
 
     """
     Appends behavioral annotations from Shah-formatted .txt files to featurized pose estimation data.

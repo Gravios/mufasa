@@ -73,7 +73,7 @@ class TimeseriesFeatureMixin:
     @staticmethod
     #@njit("(float32[:],)")
     @dynamic_numba_decorator(dtypes="(float32[:],)", cache=True, fastmath=False)
-    def hjort_parameters(data: np.ndarray) -> Tuple[np.float64, np.float64, np.float64]:
+    def hjort_parameters(data: np.ndarray) -> tuple[np.float64, np.float64, np.float64]:
         r"""
         Jitted compute of Hjorth parameters for a given time series data. Hjorth parameters describe
         mobility, complexity, and activity of a time series.
@@ -155,7 +155,7 @@ class TimeseriesFeatureMixin:
     @staticmethod
     #@njit([(float32[:], boolean), (float32[:], types.misc.Omitted(True))])
     @dynamic_numba_decorator(dtypes=[(float32[:], boolean), (float32[:], types.misc.Omitted(True))], cache=True, fastmath=False)
-    def local_maxima_minima(data: np.ndarray, maxima: Optional[bool] = True) -> np.ndarray:
+    def local_maxima_minima(data: np.ndarray, maxima: bool | None = True) -> np.ndarray:
         """
         Jitted compute of the local maxima or minima defined as values which are higher or lower than immediately preceding and proceeding time-series neighbors, repectively.
         Returns 2D np.ndarray with columns representing idx and values of local maxima.
@@ -677,7 +677,7 @@ class TimeseriesFeatureMixin:
     #@njit("(float32[:], int64)")
     @dynamic_numba_decorator(dtypes="(float32[:], int64)", cache=True, fastmath=False)
 
-    def higuchi_fractal_dimension(data: np.ndarray, kmax: Optional[int] = 10):
+    def higuchi_fractal_dimension(data: np.ndarray, kmax: int | None = 10):
         """
         Jitted compute of the Higuchi Fractal Dimension of a given time series data. The Higuchi Fractal Dimension provides a measure of the fractal
         complexity of a time series.
@@ -1004,7 +1004,7 @@ class TimeseriesFeatureMixin:
         return frequencies[np.argsort(magnitude)[-(k + 1) : -1]]
 
     @staticmethod
-    def sliding_window_stats(data: np.ndarray, window_sizes: Union[List, np.ndarray], sample_rate: float,
+    def sliding_window_stats(data: np.ndarray, window_sizes: List | np.ndarray, sample_rate: float,
                              statistics: List[Literal["var", "max", "min", "std", "median", "mean", "mad", "sum", "mac", "rms", "absenergy"]]) -> np.ndarray:
         """
         Compute descriptive statistics over sliding windows in 1D data array.
@@ -1251,7 +1251,7 @@ class TimeseriesFeatureMixin:
     # )
     @dynamic_numba_decorator(dtypes=[(float32[:], float64, int64, boolean), (float32[:], float64, int64, types.misc.Omitted(True))], cache=True, fastmath=False)
     def time_since_previous_target_value(
-        data: np.ndarray, value: float, fps: int, inverse: Optional[bool] = False
+        data: np.ndarray, value: float, fps: int, inverse: bool | None = False
     ) -> np.ndarray:
         """
         Calculate the time duration (in seconds) since the previous occurrence of a specific value in a data array.
@@ -1631,7 +1631,7 @@ class TimeseriesFeatureMixin:
         time_windows: np.ndarray,
         sample_rate: int,
         test: Literal["ADF", "KPSS", "ZA"] = "adf",
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Perform the Augmented Dickey-Fuller (ADF), Kwiatkowski-Phillips-Schmidt-Shin (KPSS), or Zivot-Andrews test on sliding windows of time series data.
         Parallel processing using all available cores is used to accelerate computation.
@@ -1760,7 +1760,7 @@ class TimeseriesFeatureMixin:
     @staticmethod
     def granger_tests(
         data: pd.DataFrame,
-        variables: typing.List[str],
+        variables: list[str],
         lag: int,
         test: Literal[
             "ssr_ftest", "ssr_chi2test", "lrtest", "params_ftest"

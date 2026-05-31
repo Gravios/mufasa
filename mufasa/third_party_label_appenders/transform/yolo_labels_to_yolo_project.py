@@ -38,10 +38,10 @@ class YoloLabels2YoloProject:
     """
 
     def __init__(self,
-                 lbl_dir: Union[str, os.PathLike],
-                 img_dir: Union[str, os.PathLike],
-                 project_dir: Union[str, os.PathLike],
-                 names: Tuple[str, ...] = ('mouse',),
+                 lbl_dir: str | os.PathLike,
+                 img_dir: str | os.PathLike,
+                 project_dir: str | os.PathLike,
+                 names: tuple[str, ...] = ('mouse',),
                  train_val_split: float = 0.7,
                  recursive: bool = False):
 

@@ -33,10 +33,10 @@ class MitraStyleAnnotationAppender(ConfigReader):
     """
 
     def __init__(self,
-                 config_path: Union[str, os.PathLike],
-                 data_path: Union[str, os.PathLike],
-                 features_dir: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike]):
+                 config_path: str | os.PathLike,
+                 data_path: str | os.PathLike,
+                 features_dir: str | os.PathLike,
+                 save_dir: str | os.PathLike):
 
         ConfigReader.__init__(self, config_path=config_path)
         check_file_exist_and_readable(file_path=data_path)

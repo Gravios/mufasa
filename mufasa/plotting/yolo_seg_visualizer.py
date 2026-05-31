@@ -94,13 +94,13 @@ class YOLOSegmentationVisualizer:
     """
 
     def __init__(self,
-                 data_path: Union[str, os.PathLike],
-                 video_path: Union[str, os.PathLike],
-                 save_dir: Union[str, os.PathLike],
-                 color: Tuple[int, int, int] = (255, 255, 0),
-                 core_cnt: Optional[int] = -1,
+                 data_path: str | os.PathLike,
+                 video_path: str | os.PathLike,
+                 save_dir: str | os.PathLike,
+                 color: tuple[int, int, int] = (255, 255, 0),
+                 core_cnt: int | None = -1,
                  threshold: float = 0.0,
-                 verbose: Optional[bool] = False,
+                 verbose: bool | None = False,
                  shape_opacity: float = 0.5):
 
         check_str(name=f'{self.__class__.__name__} data_path', value=str(data_path))

@@ -86,7 +86,7 @@ class NetworkMixin:
         pass
 
     @staticmethod
-    def create_graph(data: Dict[Tuple[str, str], float]) -> nx.Graph():
+    def create_graph(data: dict[tuple[str, str], float]) -> nx.Graph():
         """
         Create a single undirected graph with single edges from on dictionary.
 
@@ -113,7 +113,7 @@ class NetworkMixin:
         return G
 
     @staticmethod
-    def create_multigraph(data: Dict[Tuple[str, str], List[float]]) -> nx.MultiGraph:
+    def create_multigraph(data: dict[tuple[str, str], list[float]]) -> nx.MultiGraph:
         """
         Create a multi-graph from a dictionary of node pairs and associated edge weights.
 
@@ -162,9 +162,9 @@ class NetworkMixin:
 
     @staticmethod
     def graph_page_rank(graph: nx.Graph,
-                            weights: Optional[str] = "weight",
-                            alpha: Optional[float] = 0.85,
-                            max_iter: Optional[int] = 100) -> Dict[str, float]:
+                            weights: str | None = "weight",
+                            alpha: float | None = 0.85,
+                            max_iter: int | None = 100) -> dict[str, float]:
 
         """
         Calculate the PageRank of nodes in a graph.
@@ -204,7 +204,7 @@ class NetworkMixin:
         return nx.pagerank(graph, alpha=alpha, max_iter=max_iter, weight=weights)
 
     @staticmethod
-    def graph_katz_centrality(graph: nx.Graph, weights: Optional[str] = "weight", alpha: Optional[float] = 0.85,):
+    def graph_katz_centrality(graph: nx.Graph, weights: str | None = "weight", alpha: float | None = 0.85,):
         """
         Katz centrality is an algorithm in NetworkX that measures the relative influence of a node in a network.
 
@@ -233,7 +233,7 @@ class NetworkMixin:
         return nx.katz_centrality_numpy(graph, alpha=alpha, weight=weights)
 
     @staticmethod
-    def graph_current_flow_closeness_centrality(graph: nx.Graph, weights: Optional[str] = "weight"):
+    def graph_current_flow_closeness_centrality(graph: nx.Graph, weights: str | None = "weight"):
 
         """
         :example:
@@ -269,8 +269,8 @@ class NetworkMixin:
     @staticmethod
     def girvan_newman(
         graph: nx.Graph,
-        levels: Optional[int] = 1,
-        most_valuable_edge: Optional[object] = None,
+        levels: int | None = 1,
+        most_valuable_edge: object | None = None,
     ):
         """
         :example:
@@ -300,10 +300,10 @@ class NetworkMixin:
     @staticmethod
     def multigraph_page_rank(
         graph: nx.MultiGraph,
-        weights: Optional[str] = "weight",
-        alpha: Optional[float] = 0.85,
-        max_iter: Optional[int] = 100,
-    ) -> Dict[str, List[float]]:
+        weights: str | None = "weight",
+        alpha: float | None = 0.85,
+        max_iter: int | None = 100,
+    ) -> dict[str, list[float]]:
         """
         Calculate multi-graph PageRank scores for each node in a MultiGraph.
 
@@ -356,14 +356,14 @@ class NetworkMixin:
                 results[k].append(v)
 
     @staticmethod
-    def visualize(graph: Union[nx.Graph, nx.MultiGraph],
-                  save_path: Optional[Union[str, os.PathLike]] = None,
-                  node_size: Optional[Union[float, Dict[str, float]]] = 25.0,
-                  palette: Optional[Union[str, Dict[str, str]]] = "magma",
-                  node_shape: Optional[Literal['dot', 'ellipse', 'circle']] = 'dot',
-                  smooth_type: Optional[Literal['dynamic', 'continuous', 'discrete', 'diagonalCross', 'straightCross', 'horizontal', 'vertical', 'curvedCW', 'curvedCCW', 'cubicBezier']] = 'dynamic',
-                  img_size: Optional[Tuple[int, int]] = (500, 500),
-                  seed: Optional[int] = None) -> Union[None, Network]:
+    def visualize(graph: nx.Graph | nx.MultiGraph,
+                  save_path: str | os.PathLike | None = None,
+                  node_size: float | dict[str, float] | None = 25.0,
+                  palette: str | dict[str, str] | None = "magma",
+                  node_shape: Literal['dot', 'ellipse', 'circle'] | None = 'dot',
+                  smooth_type: Literal['dynamic', 'continuous', 'discrete', 'diagonalCross', 'straightCross', 'horizontal', 'vertical', 'curvedCW', 'curvedCCW', 'cubicBezier'] | None = 'dynamic',
+                  img_size: tuple[int, int] | None = (500, 500),
+                  seed: int | None = None) -> None | Network:
 
         """
         Visualizes a network graph using the vis.js library and saves the result as an HTML file.

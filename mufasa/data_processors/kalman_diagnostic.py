@@ -129,17 +129,17 @@ class DiagnosticReport:
     n_frames: int
     n_markers: int
     likelihood_threshold: float
-    head_markers: List[str]
-    body_markers: List[str]
-    rigid_pairs: List[Tuple[str, str]]
-    per_marker: List[MarkerStats]
-    rigid_pair_stats: List[dict]    # mean, std, cv of inter-marker distance
+    head_markers: list[str]
+    body_markers: list[str]
+    rigid_pairs: list[tuple[str, str]]
+    per_marker: list[MarkerStats]
+    rigid_pair_stats: list[dict]    # mean, std, cv of inter-marker distance
     head_velocity_stats: dict        # mean, std, modality
     body_velocity_stats: dict        # mean, std, modality + sign-disambig info
     velocity_modality: str           # head modality (kept for back-compat)
     head_body_correlation: float     # Pearson r of head_vx vs body_vx
     recommendation: str              # build/static-only/skip/diagnostic-failed
-    per_session_summary: List[dict]  # one entry per session: name +
+    per_session_summary: list[dict]  # one entry per session: name +
                                       # worst_frac_high + worst_longest_run
                                       # + worst_marker_for_each
 
@@ -148,7 +148,7 @@ class DiagnosticReport:
 # Loading
 # -------------------------------------------------------------------- #
 
-def detect_marker_columns(df: pd.DataFrame) -> List[str]:
+def detect_marker_columns(df: pd.DataFrame) -> list[str]:
     """Find marker base names from DLC/Mufasa-style column suffixes.
 
     Returns the list of marker names that have all three of
@@ -224,7 +224,7 @@ def _load_csv_with_header_detection(csv_path: str) -> pd.DataFrame:
     return df_multi
 
 
-def load_pose_file(path: str) -> Tuple[pd.DataFrame, List[str]]:
+def load_pose_file(path: str) -> tuple[pd.DataFrame, list[str]]:
     """Load a single pose file (CSV or parquet) into a flat-column
     DataFrame. Returns (df, list_of_markers).
 
@@ -255,14 +255,14 @@ def load_pose_file(path: str) -> Tuple[pd.DataFrame, List[str]]:
 
 
 # Backward-compatible alias (callers used to call load_pose_csv).
-def load_pose_csv(csv_path: str) -> Tuple[pd.DataFrame, List[str]]:
+def load_pose_csv(csv_path: str) -> tuple[pd.DataFrame, list[str]]:
     """Backward-compatible alias of load_pose_file."""
     return load_pose_file(csv_path)
 
 
 def load_pose_files(
-    paths: List[str],
-) -> Tuple[pd.DataFrame, List[str], List[Tuple[str, int, int]]]:
+    paths: list[str],
+) -> tuple[pd.DataFrame, list[str], list[tuple[str, int, int]]]:
     """Load multiple pose files and concatenate them.
 
     Files are loaded in the order given. Each file becomes one
@@ -290,9 +290,9 @@ def load_pose_files(
     if not paths:
         raise ValueError("load_pose_files requires at least one path")
 
-    dfs: List[pd.DataFrame] = []
-    markers_first: Optional[List[str]] = None
-    sessions: List[Tuple[str, int, int]] = []
+    dfs: list[pd.DataFrame] = []
+    markers_first: list[str] | None = None
+    sessions: list[tuple[str, int, int]] = []
     cursor = 0
     for p in paths:
         df_one, markers_one = load_pose_file(p)
@@ -321,7 +321,7 @@ def load_pose_files(
     return combined, list(markers_first), sessions
 
 
-def discover_pose_files(root: str) -> List[str]:
+def discover_pose_files(root: str) -> list[str]:
     """Find pose-data files (parquet preferred, then csv) under
     ``root`` recursively. Skips files that look like outputs
     (``.pose.<ext>``) or hidden files."""
@@ -356,7 +356,7 @@ def compute_marker_stats(
     df: pd.DataFrame,
     marker: str,
     likelihood_threshold: float,
-    session_ranges: Optional[List[Tuple[str, int, int]]] = None,
+    session_ranges: list[tuple[str, int, int]] | None = None,
 ) -> MarkerStats:
     """Compute per-marker likelihood + dropout statistics.
 
@@ -449,13 +449,13 @@ def compute_rigid_pair_stats(
 
 def auto_detect_rigid_pairs(
     df: pd.DataFrame,
-    markers: List[str],
+    markers: list[str],
     likelihood_threshold: float,
     cv_threshold: float = 0.20,
     max_pairs: int = 8,
     min_samples: int = 200,
-    exclude_markers: Optional[List[str]] = None,
-) -> List[Tuple[str, str]]:
+    exclude_markers: list[str] | None = None,
+) -> list[tuple[str, str]]:
     """Identify empirically-rigid marker pairs from the data.
 
     Iterates over all C(n,2) marker pairs (excluding any pair
@@ -513,13 +513,13 @@ def auto_detect_rigid_pairs(
 
 def auto_detect_candidate_triplets(
     df: pd.DataFrame,
-    markers: List[str],
+    markers: list[str],
     likelihood_threshold: float,
     cv_threshold: float = 0.20,
     max_triplets: int = 8,
     min_samples: int = 200,
-    exclude_markers: Optional[List[str]] = None,
-) -> List[Tuple[Tuple[str, str, str], dict]]:
+    exclude_markers: list[str] | None = None,
+) -> list[tuple[tuple[str, str, str], dict]]:
     """Identify empirically-rigid marker triplets from the data.
 
     A triplet (a, b, c) is a candidate if all three pairwise
@@ -619,9 +619,9 @@ def auto_detect_candidate_triplets(
 
 def compute_behavioral_signal_pairs(
     df: pd.DataFrame,
-    head_markers: List[str],
+    head_markers: list[str],
     likelihood_threshold: float,
-) -> List[dict]:
+) -> list[dict]:
     """Compute distance distributions for head-internal pairs as
     BEHAVIORAL SIGNAL channels (not rigid constraints).
 
@@ -674,11 +674,11 @@ def compute_behavioral_signal_pairs(
 
 def compute_head_velocity(
     df: pd.DataFrame,
-    head_markers: List[str],
+    head_markers: list[str],
     likelihood_threshold: float,
     fps: float,
-    session_ranges: Optional[List[Tuple[str, int, int]]] = None,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    session_ranges: list[tuple[str, int, int]] | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Compute head-frame egocentric velocity for all frames.
 
     When ``session_ranges`` is provided, velocity is computed
@@ -767,9 +767,9 @@ def compute_head_velocity(
 
 def _compute_head_direction(
     df: pd.DataFrame,
-    head_markers: List[str],
+    head_markers: list[str],
     likelihood_threshold: float,
-) -> Optional[np.ndarray]:
+) -> np.ndarray | None:
     """Compute unit head direction vector per frame.
 
     Returns shape (T, 2) with NaN rows where head markers are
@@ -811,9 +811,9 @@ def _compute_head_direction(
 
 def _compute_body_axis_per_frame(
     body_positions: np.ndarray,        # shape (T, n_body, 2)
-    head_directions: Optional[np.ndarray],  # shape (T, 2) or None
+    head_directions: np.ndarray | None,  # shape (T, 2) or None
     valid_body: np.ndarray,            # shape (T,) bool
-) -> Tuple[np.ndarray, np.ndarray, dict]:
+) -> tuple[np.ndarray, np.ndarray, dict]:
     """Compute body major axis + centroid per frame via PCA.
 
     Body major axis: leading eigenvector of the 2×2 covariance of
@@ -904,12 +904,12 @@ def _compute_body_axis_per_frame(
 
 def compute_body_velocity(
     df: pd.DataFrame,
-    body_markers: List[str],
-    head_markers: Optional[List[str]],
+    body_markers: list[str],
+    head_markers: list[str] | None,
     likelihood_threshold: float,
     fps: float,
-    session_ranges: Optional[List[Tuple[str, int, int]]] = None,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+    session_ranges: list[tuple[str, int, int]] | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """Compute body-frame egocentric velocity for all frames.
 
     Body frame: centroid of body markers + PCA major axis on body
@@ -1055,7 +1055,7 @@ def head_body_velocity_correlation(
 
 def _plot_likelihood_histograms(
     df: pd.DataFrame,
-    markers: List[str],
+    markers: list[str],
     output_path: Path,
 ) -> None:
     """Component 1 plot."""
@@ -1087,7 +1087,7 @@ def _plot_likelihood_histograms(
 
 
 def _plot_run_lengths(
-    per_marker: List[MarkerStats],
+    per_marker: list[MarkerStats],
     output_path: Path,
 ) -> None:
     """Component 2 plot."""
@@ -1118,7 +1118,7 @@ def _plot_run_lengths(
 
 
 def _plot_rigid_pairs(
-    rigid_pair_stats: List[dict],
+    rigid_pair_stats: list[dict],
     df: pd.DataFrame,
     likelihood_threshold: float,
     output_path: Path,
@@ -1220,7 +1220,7 @@ def _plot_velocity_distribution(
 
 def _plot_velocity_vs_configuration(
     df: pd.DataFrame,
-    rigid_pair_stats: List[dict],
+    rigid_pair_stats: list[dict],
     vx_h: np.ndarray,
     valid_mask: np.ndarray,
     likelihood_threshold: float,
@@ -1345,7 +1345,7 @@ def _plot_body_velocity_distribution(
 
 def _plot_velocity_vs_configuration_body(
     df: pd.DataFrame,
-    rigid_pair_stats: List[dict],
+    rigid_pair_stats: list[dict],
     vx_b: np.ndarray,
     valid_mask: np.ndarray,
     likelihood_threshold: float,
@@ -1484,10 +1484,10 @@ def _plot_head_body_velocity_correlation(
 
 def compute_per_session_summary(
     df: pd.DataFrame,
-    markers: List[str],
-    sessions: List[Tuple[str, int, int]],
+    markers: list[str],
+    sessions: list[tuple[str, int, int]],
     likelihood_threshold: float,
-) -> List[dict]:
+) -> list[dict]:
     """For each session, compute per-marker frac_high and
     longest_low_run, then summarize the worst marker per session.
 
@@ -1545,7 +1545,7 @@ def compute_per_session_summary(
 
 
 def _plot_per_session_summary(
-    per_session_summary: List[dict],
+    per_session_summary: list[dict],
     likelihood_threshold: float,
     output_path: Path,
 ) -> None:
@@ -1635,10 +1635,10 @@ def _plot_per_session_summary(
 
 
 def make_recommendation(
-    per_marker: List[MarkerStats],
-    rigid_pair_stats: List[dict],
+    per_marker: list[MarkerStats],
+    rigid_pair_stats: list[dict],
     velocity_modality: str,
-    per_session_summary: Optional[List[dict]] = None,
+    per_session_summary: list[dict] | None = None,
 ) -> str:
     """Produce a build/skip/scope recommendation based on stats.
 
@@ -1824,9 +1824,9 @@ def run_diagnostic(
     csv_path,  # str | List[str] | Path  — single file, list, or directory
     output_dir: str,
     likelihood_threshold: float = 0.95,
-    head_markers: Optional[List[str]] = None,
-    body_markers: Optional[List[str]] = None,
-    rigid_pairs: Optional[List[Tuple[str, str]]] = None,
+    head_markers: list[str] | None = None,
+    body_markers: list[str] | None = None,
+    rigid_pairs: list[tuple[str, str]] | None = None,
     fps: float = 30.0,
     rigid_cv_threshold: float = 0.20,
     rigid_max_pairs: int = 8,
@@ -1876,7 +1876,7 @@ def run_diagnostic(
     out.mkdir(parents=True, exist_ok=True)
 
     # Resolve input(s) into a list of file paths
-    paths: List[str]
+    paths: list[str]
     if isinstance(csv_path, (list, tuple)):
         paths = [str(p) for p in csv_path]
     elif isinstance(csv_path, (str, Path)):
@@ -2261,7 +2261,7 @@ def run_diagnostic(
 # CLI
 # -------------------------------------------------------------------- #
 
-def _parse_pairs(s: str) -> List[Tuple[str, str]]:
+def _parse_pairs(s: str) -> list[tuple[str, str]]:
     """Parse 'a,b;c,d;e,f' → [('a','b'),('c','d'),('e','f')]."""
     if not s:
         return []

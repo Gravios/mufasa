@@ -114,7 +114,7 @@ def load_features_for_video(
     video_name: str,
     config_path: str,
     *,
-    families: Optional[List[str]] = None,
+    families: list[str] | None = None,
 ) -> pd.DataFrame:
     """Load features for one video as a wide DataFrame.
 
@@ -157,7 +157,7 @@ def load_features_for_video(
         paths = {}
     derived_root = paths.get("derived_features_dir")
     parquet_frames: list[pd.DataFrame] = []
-    wide_parquet_df: Optional[pd.DataFrame] = None
+    wide_parquet_df: pd.DataFrame | None = None
 
     if derived_root and os.path.isdir(derived_root):
         # Pick the subdirs to scan. If the caller passed an explicit
@@ -281,7 +281,7 @@ def write_wide_features_v1(
     df: pd.DataFrame,
     video_name: str,
     config_path: str,
-) -> Optional[str]:
+) -> str | None:
     """Write a wide-features DataFrame as a v1-native sidecar
     parquet at ``<derived_features_dir>/<video>.parquet``.
 
