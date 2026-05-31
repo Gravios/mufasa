@@ -74,7 +74,7 @@ def transform_xgb(x: pd.DataFrame,
     if len(missing_x_names) > 0:
         raise DataHeaderError(msg=f'The new data are missing {len(missing_x_names)} features expected by the model: {missing_x_names}', source=transform_xgb.__name__)
     if expected_x_names != new_x_names:
-        raise DataHeaderError(msg=f'The new data contains features in the wrong order from the expected features', source=transform_xgb.__name__)
+        raise DataHeaderError(msg='The new data contains features in the wrong order from the expected features', source=transform_xgb.__name__)
     return np.round(mdl.predict(x), 2)
 
 

@@ -170,7 +170,7 @@ class FFMPEGCommandCreator:
             in_path, out_path = video_data["path"], os.path.join(self.process_dir, os.path.basename(video_data["path"]))
             video_to_greyscale(file_path=in_path, gpu=self.gpu, codec=self.batch_codec, verbose=False, quality=self.quality, save_path=out_path)
         self.replace_files_in_temp()
-        stdout_information(msg=f"Grayscale complete...")
+        stdout_information(msg="Grayscale complete...")
 
     def apply_frame_count(self, font_size: int = 25, font: str = 'Arial', loc: Literal['top_left', 'top_middle', 'top_right', 'bottom_left', 'bottom_middle', 'bottom_right'] = 'bottom_middle'):
         self.videos_to_frm_cnt = self.find_relevant_videos(variable="frame_cnt")
@@ -194,7 +194,7 @@ class FFMPEGCommandCreator:
             in_path, out_path = video_data["path"], os.path.join(self.process_dir, os.path.basename(video_data["path"]))
             clahe_enhance_video(file_path=in_path, clip_limit=clip_limit, tile_grid_size=tile_size, out_path=out_path, verbose=False)
         self.replace_files_in_temp()
-        stdout_information(msg=f"Applying CLAHE complete...")
+        stdout_information(msg="Applying CLAHE complete...")
 
     def crop_videos(self):
         self.videos_to_crop = self.find_relevant_videos(variable="crop")

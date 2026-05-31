@@ -44,9 +44,7 @@ class ImportEthovision(ConfigReader):
         self.files_found = [x for x in self.files_found if "~$" not in x]
         check_if_filepath_list_is_empty(
             filepaths=self.files_found,
-            error_msg="No ETHOVISION xlsx or xls files found in {}".format(
-                str(data_dir)
-            ),
+            error_msg=f"No ETHOVISION xlsx or xls files found in {str(data_dir)}",
         )
 
     def __read_files(self):
@@ -63,9 +61,7 @@ class ImportEthovision(ConfigReader):
                 video_path = ethovision_df.loc["Video file"].values[0]
             except KeyError:
                 print(
-                    '"Video file" row does not exist in the sheet named {} in file {}'.format(
-                        manual_scoring_sheet_name, file_path
-                    )
+                    f'"Video file" row does not exist in the sheet named {manual_scoring_sheet_name} in file {file_path}'
                 )
                 raise ValueError(
                     f'"Video file" does not exist in the sheet named {manual_scoring_sheet_name} in file {file_path}'
@@ -73,9 +69,7 @@ class ImportEthovision(ConfigReader):
             try:
                 if np.isnan(video_path):
                     print(
-                        '"Video file" row does not have a value in the sheet named {} in file {}'.format(
-                            manual_scoring_sheet_name, file_path
-                        )
+                        f'"Video file" row does not have a value in the sheet named {manual_scoring_sheet_name} in file {file_path}'
                     )
                     raise ValueError(
                         f'"Video file" row does not have a value in the sheet named {manual_scoring_sheet_name} in file {file_path}'
@@ -164,7 +158,7 @@ class ImportEthovision(ConfigReader):
             self.targets_folder, self.video_name + "." + self.file_type
         )
         write_df(self.features_df, self.file_type, save_file_name)
-        print("Added Ethovision annotations for video {} ... ".format(self.video_name))
+        print(f"Added Ethovision annotations for video {self.video_name} ... ")
 
     def run(self):
         self.processed_videos = []

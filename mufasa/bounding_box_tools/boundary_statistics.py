@@ -83,9 +83,7 @@ class BoundaryStatisticsCalculator(ConfigReader):
                     body_part_cnt
                 ][:-4]
                 results[
-                    "{}:{}:{}".format(
-                        first_animal_name, second_animal_name, body_part_name
-                    )
+                    f"{first_animal_name}:{second_animal_name}:{body_part_name}"
                 ].append(int(body_part))
         return pd.DataFrame(results)
 
@@ -93,7 +91,7 @@ class BoundaryStatisticsCalculator(ConfigReader):
         results = defaultdict(list)
         for animal_one_name, animal_one_data in self.intersecting_rois.items():
             for animal_two_name, animal_two_data in animal_one_data.items():
-                results["{}:{}:ROI_ONLY".format(animal_one_name, animal_two_name)] = [
+                results[f"{animal_one_name}:{animal_two_name}:ROI_ONLY"] = [
                     int(x) for x in animal_two_data
                 ]
         return pd.DataFrame(results)
@@ -102,13 +100,11 @@ class BoundaryStatisticsCalculator(ConfigReader):
         self.intersection_dfs = {}
         self.keypoint_dfs = {}
         for video_cnt, (video_name, video_data) in enumerate(self.polygons.items()):
-            print("Calculating statistics for video {}...".format(video_name))
+            print(f"Calculating statistics for video {video_name}...")
             if self.roi_intersections:
                 self.intersecting_rois = {}
                 print(
-                    "Calculating intersecting anchored ROIs for video {}...".format(
-                        video_name
-                    )
+                    f"Calculating intersecting anchored ROIs for video {video_name}..."
                 )
                 for first_animal in self.animal_bp_dict.keys():
                     first_animal_anchored_rois = [
@@ -143,9 +139,7 @@ class BoundaryStatisticsCalculator(ConfigReader):
                 ).astype(int)
                 keypoints_df_lst = []
                 print(
-                    "Calculate intersecting anchored ROIs and keypoints for video {}...".format(
-                        video_name
-                    )
+                    f"Calculate intersecting anchored ROIs and keypoints for video {video_name}..."
                 )
                 for first_animal in self.animal_bp_dict.keys():
                     first_animal_anchored_rois = [

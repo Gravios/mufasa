@@ -69,9 +69,7 @@ class DeepEthogramImporter(ConfigReader):
                     pass
             else:
                 print(
-                    "Could not find file in project_folder/csv/features_extracted directory representing {}".format(
-                        file_name
-                    )
+                    f"Could not find file in project_folder/csv/features_extracted directory representing {file_name}"
                 )
                 raise FileNotFoundError()
 
@@ -88,10 +86,8 @@ class DeepEthogramImporter(ConfigReader):
             for clf_name in self.clf_names:
                 if clf_name not in self.annotations_df.columns:
                     print(
-                        "No annotations for behavior {} found in DeepEthogram annotation file for video {}"
-                        "Exclude {} from your Mufasa project or add DeepEthogram annotations for {} for video {}.".format(
-                            clf_name, video_name, clf_name, clf_name, video_name
-                        )
+                        f"No annotations for behavior {clf_name} found in DeepEthogram annotation file for video {video_name}"
+                        f"Exclude {clf_name} from your Mufasa project or add DeepEthogram annotations for {clf_name} for video {video_name}."
                     )
                     raise ValueError()
             if len(self.annotations_df) > len(self.features_df):
@@ -129,7 +125,7 @@ class DeepEthogramImporter(ConfigReader):
                 config_path=self.config_path,
                 labels=labels_df,
             )
-            print("DeepEthogram annotation for video {} saved.".format(video_name))
+            print(f"DeepEthogram annotation for video {video_name} saved.")
 
         stdout_success(
             msg=f"Annotations for {str(len(list(self.clf_names)))} behaviors added to {len(self.matches_dict.keys())} videos and saved under derived/labels/."

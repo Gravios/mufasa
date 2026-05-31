@@ -115,7 +115,7 @@ class CircularFeaturePlotter(ConfigReader, PlottingMixin, FeatureExtractionMixin
         self._create_palette()
         self.__calc_text_locs()
         for animal_name, animal_bps in self.animal_bp_dict.items():
-            self.df[f"Compass_cardinal_{animal_name}"] = CircularStatisticsMixin.degrees_to_cardinal(data=self.df[f"Fish_clockwise_angle_degrees"].values.astype(np.float32))
+            self.df[f"Compass_cardinal_{animal_name}"] = CircularStatisticsMixin.degrees_to_cardinal(data=self.df["Fish_clockwise_angle_degrees"].values.astype(np.float32))
         while self.cap.isOpened():
             ret, self.frame = self.cap.read()
             if not ret:
@@ -123,7 +123,7 @@ class CircularFeaturePlotter(ConfigReader, PlottingMixin, FeatureExtractionMixin
             frm_data = self.df.iloc[frm_cnt, :]
             for animal_name, animal_bps in self.animal_bp_dict.items():
                 compass_center = tuple(frm_data[[f'{self.settings["center"][animal_name]}_x', f'{self.settings["center"][animal_name]}_y']].values.astype(int))
-                animal_frm_angle, compass_cardinal = (int(frm_data[f"Fish_clockwise_angle_degrees"]), frm_data[f"Compass_cardinal_{animal_name}"])
+                animal_frm_angle, compass_cardinal = (int(frm_data["Fish_clockwise_angle_degrees"]), frm_data[f"Compass_cardinal_{animal_name}"])
                 frm_compass_clr = self.colors[animal_frm_angle]
                 cv2.circle(self.frame,compass_center,self.animal_sizes[animal_name]["diameter"],frm_compass_clr,self.text_thickness)
 

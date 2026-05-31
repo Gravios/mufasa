@@ -203,7 +203,7 @@ class ROIClfCalculator(ConfigReader):
     def save(self):
         self.timer.stop_timer()
         if self.results_flag and len(self.results_df) == 0:
-            NotEnoughDataWarning(f'No classification results in ROIs detected. No aggregates results saved.', source=self.__class__.__name__)
+            NotEnoughDataWarning('No classification results in ROIs detected. No aggregates results saved.', source=self.__class__.__name__)
         elif self.results_flag:
             self.results_df = self.results_df.sort_values(by=['VIDEO', 'CLASSIFIER', 'ROI', 'BODY-PART', 'MEASURE']).reset_index(drop=True)
             self.results_df['VALUE'] = self.results_df['VALUE'].round(4)
@@ -214,7 +214,7 @@ class ROIClfCalculator(ConfigReader):
             self.results_df.to_csv(self.save_path)
             stdout_success(msg=f"Classification by ROI data for {len(self.data_paths)} video(s) saved in {self.save_path}.", elapsed_time=self.timer.elapsed_time_str)
         if self.bout_table and self.bouts_results is None:
-            NotEnoughDataWarning(f'No ROI classification results detected. No detailed bout data saved.', source=self.__class__.__name__)
+            NotEnoughDataWarning('No ROI classification results detected. No detailed bout data saved.', source=self.__class__.__name__)
         elif self.bout_table:
             self.bouts_results = self.bouts_results.drop(['Event'], axis=1)
             self.bouts_results= self.bouts_results.rename(columns={'Start_time': 'START TIME (S)', 'End Time': 'END TIME (S)', 'Start_frame': 'START FRAME', 'End_frame': 'END FRAME', 'Bout_time': 'DURATION (S)'})

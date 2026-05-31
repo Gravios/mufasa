@@ -94,14 +94,12 @@ class KeypointReorganizer:
 
     def run(self, bp_lst: list, animal_list: list = None):
         save_directory = os.path.join(
-            self.data_folder, "Reorganized_bp_{}".format(self.datetime)
+            self.data_folder, f"Reorganized_bp_{self.datetime}"
         )
         if not os.path.exists(save_directory):
             os.makedirs(save_directory)
         print(
-            "Saving {} new pose-estimation files in {} directory...".format(
-                str(len(self.files_found)), save_directory
-            )
+            f"Saving {str(len(self.files_found))} new pose-estimation files in {save_directory} directory..."
         )
         header_tuples = []
         if self.pose_tool == "maDLC":
@@ -140,11 +138,7 @@ class KeypointReorganizer:
                 df_reorganized = pd.DataFrame(df, columns=new_df_ordered_cols)
                 df_reorganized.to_csv(df_save_path)
             print(
-                "Saved {}, Video {}/{}.".format(
-                    os.path.basename(file_path),
-                    str(file_cnt + 1),
-                    str(len(self.files_found)),
-                )
+                f"Saved {os.path.basename(file_path)}, Video {str(file_cnt + 1)}/{str(len(self.files_found))}."
             )
         stdout_success(
             msg=f"{str(len(self.files_found))} new data files with reorganized body-parts saved in {save_directory} directory"

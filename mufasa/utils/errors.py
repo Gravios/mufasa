@@ -37,13 +37,13 @@ class ROICoordinatesNotFoundError(MufasaError):
 
 class NoChoosenClassifierError(MufasaError):
     def __init__(self, source: str = "", show_window: bool = False):
-        msg = f"Select at least one classifier"
+        msg = "Select at least one classifier"
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
 class NoChoosenROIError(MufasaError):
     def __init__(self, source: str = "", show_window: bool = False):
-        msg = f"Please select at least one ROI."
+        msg = "Please select at least one ROI."
         super().__init__(msg=msg, source=source, show_window=show_window)
 
 
@@ -149,8 +149,8 @@ class AdvancedLabellingError(MufasaError):
         msg = (
             "SIMBA ADVANCED LABELLING ERROR: In advanced labelling of multiple behaviors, any annotated frame cannot have some "
             "behaviors annotated as present/absent, while other behaviors are un-labelled. All behaviors need "
-            "labels for a frame with one or more labels. In frame {}, behaviors {} are labelled, while behaviors "
-            "{} are un-labelled.".format(str(frame), lbl_lst, unlabel_lst)
+            f"labels for a frame with one or more labels. In frame {str(frame)}, behaviors {lbl_lst} are labelled, while behaviors "
+            f"{unlabel_lst} are un-labelled."
         )
         super().__init__(msg=msg, source=source, show_window=show_window)
 

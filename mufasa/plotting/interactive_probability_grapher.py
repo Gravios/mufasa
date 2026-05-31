@@ -78,7 +78,7 @@ class InteractiveProbabilityGrapher(ConfigReader):
         self.data_df = read_df(self.data_path, self.file_type)
         p_col = f"Probability_{self.clf_name}"
         check_valid_dataframe(df=self.data_df, source=f'{self.__class__.__name__} {self.data_path}', valid_dtypes=Formats.NUMERIC_DTYPES.value, required_fields=[p_col])
-        self.p_arr = self.data_df[["Probability_{}".format(self.clf_name)]].to_numpy()
+        self.p_arr = self.data_df[[f"Probability_{self.clf_name}"]].to_numpy()
         current_video_file_path = self.find_video_of_file(video_dir=self.video_dir, filename=video_name, raise_error=True)
         self.video_meta_data = get_video_meta_data(video_path=current_video_file_path)
         self.data_clr, self.line_clr = tuple([x/255 for x in data_clr]), tuple([x/255 for x in line_clr])

@@ -125,12 +125,7 @@ class DirectingAnimalsToBodyPartAnalyzer(ConfigReader, FeatureExtractionMixin):
                 self.results_dict[video_name][result_key][bp_x_name[:-2]] = bp_data
             video_timer.stop_timer()
             print(
-                "Direction analysis complete for video {} ({}/{}, elapsed time: {}s)...".format(
-                    video_name,
-                    str(file_cnt + 1),
-                    str(len(self.outlier_corrected_paths)),
-                    video_timer.elapsed_time_str,
-                )
+                f"Direction analysis complete for video {video_name} ({str(file_cnt + 1)}/{str(len(self.outlier_corrected_paths))}, elapsed time: {video_timer.elapsed_time_str}s)..."
             )
 
     def create_directionality_dfs(self):
@@ -154,9 +149,9 @@ class DirectingAnimalsToBodyPartAnalyzer(ConfigReader, FeatureExtractionMixin):
                         columns={
                             "index": "Frame_#",
                             bp_name
-                            + "_x": "Animal_{}_x".format(self.bodypart_direction),
+                            + "_x": f"Animal_{self.bodypart_direction}_x",
                             bp_name
-                            + "_y": "Animal_{}_y".format(self.bodypart_direction),
+                            + "_y": f"Animal_{self.bodypart_direction}_y",
                         }
                     )
                     directing_df.insert(loc=0, column="Video", value=video_name)
@@ -172,12 +167,7 @@ class DirectingAnimalsToBodyPartAnalyzer(ConfigReader, FeatureExtractionMixin):
             results[file_name] = pd.read_csv(file_path)
             video_timer.stop_timer()
             print(
-                "read body part directionality data completed for video {} ({}/{}, elapsed time: {}s)...".format(
-                    file_name,
-                    str(file_cnt + 1),
-                    str(len(self.outlier_corrected_paths)),
-                    video_timer.elapsed_time_str,
-                )
+                f"read body part directionality data completed for video {file_name} ({str(file_cnt + 1)}/{str(len(self.outlier_corrected_paths))}, elapsed time: {video_timer.elapsed_time_str}s)..."
             )
         stdout_success(msg="reading body part directionality data completed")
         return results
@@ -237,7 +227,7 @@ class DirectingAnimalsToBodyPartAnalyzer(ConfigReader, FeatureExtractionMixin):
         )
         self.save_path = os.path.join(
             self.logs_path,
-            "Body_part_directions_data_{}.csv".format(str(self.datetime)),
+            f"Body_part_directions_data_{str(self.datetime)}.csv",
         )
         self.summary_df.to_csv(self.save_path)
         self.timer.stop_timer()

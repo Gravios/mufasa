@@ -144,7 +144,7 @@ class SleapH52Yolo:
                         raise InvalidInputError(msg=f'The SLEAP data contains data for {keypoints.shape[0]} body-parts, but passed flip_idx suggests {len(self.flip_idx)} body-parts', source=self.__class__.__name__)
                     elif self.flip_idx is None:
                         self.flip_idx = tuple(list(range(0, keypoints.shape[0])))
-                instance_str = f'{track_id} ' if self.single_id is None else f'0 '
+                instance_str = f'{track_id} ' if self.single_id is None else '0 '
                 instance_str += keypoint_array_to_yolo_annotation_str(x=keypoints, img_w=img_w, img_h=img_h, padding=self.padding)
                 img_lbl += instance_str
             with open(lbl_save_path, mode='w', encoding='utf-8') as f:

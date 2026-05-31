@@ -2856,11 +2856,11 @@ def smooth_pose(
         else:
             if verbose:
                 print(
-                    f"[smoother] use_triplets=False (default). "
-                    f"Pure per-marker temporal smoothing — no "
-                    f"spatial pseudo-measurements. Pass "
-                    f"--use-triplets to re-enable the patch-87 "
-                    f"static rigid-body prior."
+                    "[smoother] use_triplets=False (default). "
+                    "Pure per-marker temporal smoothing — no "
+                    "spatial pseudo-measurements. Pass "
+                    "--use-triplets to re-enable the patch-87 "
+                    "static rigid-body prior."
                 )
 
         # Fit noise params via EM

@@ -135,9 +135,9 @@ class SLEAPImporterSLP(ConfigReader, PoseImporterMixin):
 
             for c in itertools.product(self.id_lst, self.analysis_dict["ordered_bps"]):
                 x, y, p = (
-                    str("{}_{}_x".format(c[0], c[1])),
-                    str("{}_{}_y".format(c[0], c[1])),
-                    (str("{}_{}_p".format(c[0], c[1]))),
+                    str(f"{c[0]}_{c[1]}_x"),
+                    str(f"{c[0]}_{c[1]}_y"),
+                    (str(f"{c[0]}_{c[1]}_p")),
                 )
                 self.analysis_dict["xy_headers"].extend((x, y))
                 self.analysis_dict["xyp_headers"].extend((x, y, p))

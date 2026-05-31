@@ -421,8 +421,8 @@ class TrainModelMixin:
         else:
             self.learning_curve_save_path = os.path.join(save_dir, f"{clf_name}_learning_curve.csv")
             self.plot_path = os.path.join(save_dir, f"{clf_name}_learning_curve.png")
-        check_int(name=f'calc_learning_curve shuffle_splits', value=shuffle_splits, min_value=2)
-        check_int(name=f'calc_learning_curve dataset_splits', value=dataset_splits, min_value=2)
+        check_int(name='calc_learning_curve shuffle_splits', value=shuffle_splits, min_value=2)
+        check_int(name='calc_learning_curve dataset_splits', value=dataset_splits, min_value=2)
         cv = ShuffleSplit(n_splits=shuffle_splits, test_size=tt_size)
         if multiclass:
             scoring = None
@@ -964,9 +964,9 @@ class TrainModelMixin:
             del x; del y
             present_df, absent_df = df[df[clf_name] == 1], df[df[clf_name] == 0]
             if len(present_df) == 0:
-                raise NoDataError(msg=f'Cannot calculate SHAP values: no target PRESENT annotations detected.', source=TrainModelMixin.create_shap_log.__name__)
+                raise NoDataError(msg='Cannot calculate SHAP values: no target PRESENT annotations detected.', source=TrainModelMixin.create_shap_log.__name__)
             elif len(absent_df) == 0:
-                raise NoDataError(msg=f'Cannot calculate SHAP values: no target ABSENT annotations detected.', source=TrainModelMixin.create_shap_log.__name__)
+                raise NoDataError(msg='Cannot calculate SHAP values: no target ABSENT annotations detected.', source=TrainModelMixin.create_shap_log.__name__)
             if len(present_df) < cnt_present:
                 NotEnoughDataWarning(msg=f"Train data contains {len(present_df)} behavior-present annotations. This is less the number of frames you specified to calculate shap values for ({str(cnt_present)}). SimBA will calculate shap scores for the {len(present_df)} behavior-present frames available", source=TrainModelMixin.create_shap_log.__name__)
                 cnt_present = len(present_df)
@@ -1028,7 +1028,7 @@ class TrainModelMixin:
             if not save_dir:
                 return shap_df, raw_df, summary_dfs, img
         else:
-            GPUToolsWarning(msg=f'Cannot compute SHAP scores using cuml random forest model. To compute SHAP scores, turn off cuda. Alternatively, for GPU solution, see mufasa/data_processors/cuda/create_shap_log.create_shap_log')
+            GPUToolsWarning(msg='Cannot compute SHAP scores using cuml random forest model. To compute SHAP scores, turn off cuda. Alternatively, for GPU solution, see mufasa/data_processors/cuda/create_shap_log.create_shap_log')
 
     def print_machine_model_information(self, model_dict: dict) -> None:
         """
@@ -1139,7 +1139,7 @@ class TrainModelMixin:
                 MissingUserInputWarning(msg=f'Skipping {str(config.get("SML settings", "target_name_" + str(n + 1)))} classifier analysis: missing information (e.g., no discrimination threshold and/or minimum bout set in the project.toml',source=self.__class__.__name__)
 
         if len(model_dict.keys()) == 0:
-            raise NoDataError(msg=f"There are no models with accurate data specified in the RUN MODELS menu. Specify the model information to SimBA RUN MODELS menu to use them to analyze videos. PLease check the model paths, thresholds, and minimum bout lengths.", source=self.get_model_info.__name__)
+            raise NoDataError(msg="There are no models with accurate data specified in the RUN MODELS menu. Specify the model information to SimBA RUN MODELS menu to use them to analyze videos. PLease check the model paths, thresholds, and minimum bout lengths.", source=self.get_model_info.__name__)
         else:
             return model_dict
 
@@ -1159,7 +1159,7 @@ class TrainModelMixin:
 
         model_names = []
         for i in range(target_cnt):
-            entry_name = "target_name_{}".format(str(i + 1))
+            entry_name = f"target_name_{str(i + 1)}"
             model_names.append(
                 read_config_entry(
                     config,
@@ -1970,9 +1970,9 @@ class TrainModelMixin:
             del x; del y
             present_df, absent_df = df[df[clf_name] == 1], df[df[clf_name] == 0]
             if len(present_df) == 0:
-                raise NoDataError(msg=f'Cannot calculate SHAP values: no target PRESENT annotations detected.', source=TrainModelMixin.create_shap_log_mp.__name__)
+                raise NoDataError(msg='Cannot calculate SHAP values: no target PRESENT annotations detected.', source=TrainModelMixin.create_shap_log_mp.__name__)
             elif len(absent_df) == 0:
-                raise NoDataError(msg=f'Cannot calculate SHAP values: no target ABSENT annotations detected.', source=TrainModelMixin.create_shap_log_mp.__name__)
+                raise NoDataError(msg='Cannot calculate SHAP values: no target ABSENT annotations detected.', source=TrainModelMixin.create_shap_log_mp.__name__)
             if len(present_df) < cnt_present:
                 NotEnoughDataWarning(msg=f"Train data contains {len(present_df)} behavior-present annotations. This is less the number of frames you specified to calculate shap values for ({str(cnt_present)}). SimBA will calculate shap scores for the {len(present_df)} behavior-present frames available", source=TrainModelMixin.create_shap_log_mp.__name__)
                 cnt_present = len(present_df)
@@ -2030,7 +2030,7 @@ class TrainModelMixin:
             if not save_dir:
                 return shap_df, raw_df, summary_dfs, img
         else:
-            GPUToolsWarning(msg=f'Cannot compute SHAP scores using cuml random forest model. To compute SHAP scores, turn off cuda. Alternatively, for GPU solution, see mufasa/data_processors/cuda/create_shap_log.create_shap_log')
+            GPUToolsWarning(msg='Cannot compute SHAP scores using cuml random forest model. To compute SHAP scores, turn off cuda. Alternatively, for GPU solution, see mufasa/data_processors/cuda/create_shap_log.create_shap_log')
 
     def check_df_dataset_integrity(self, df: pd.DataFrame, file_name: str, logs_path: Union[str, os.PathLike]) -> None:
         """
@@ -2856,7 +2856,7 @@ class TrainModelMixin:
             if not save_dir:
                 return shap_df, raw_df, summary_dfs, img
         else:
-            GPUToolsWarning(msg=f'Cannot compute SHAP scores using cuml random forest model. To compute SHAP scores, turn off cuda. Alternatively, for GPU solution, see mufasa.data_processors.cuda.create_shap_log.create_shap_log')
+            GPUToolsWarning(msg='Cannot compute SHAP scores using cuml random forest model. To compute SHAP scores, turn off cuda. Alternatively, for GPU solution, see mufasa.data_processors.cuda.create_shap_log.create_shap_log')
 
 
 # if __name__ == "__main__":

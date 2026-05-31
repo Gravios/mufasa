@@ -142,7 +142,7 @@ class MADLCH52Yolo:
             for track_cnt, animal_name in enumerate(self.animal_names):
                 keypoints = frm_data.T[[idx[0] == animal_name for idx in frm_data.index]].values.reshape(-1, 3)
                 keypoints[keypoints[:, 2] != 0.0, 2] = 2
-                instance_str = f'{id_dict[animal_name]} ' if self.single_id is None else f'0 '
+                instance_str = f'{id_dict[animal_name]} ' if self.single_id is None else '0 '
                 instance_str += keypoint_array_to_yolo_annotation_str(x=keypoints, img_h=img_h, img_w=img_w, padding=self.padding)
                 img_lbl += instance_str
             with open(lbl_save_path, mode='w', encoding='utf-8') as f:

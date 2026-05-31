@@ -65,10 +65,10 @@ class AnnotationMetaDataExtractor(ConfigReader):
             for clf in self.clf_names:
                 check_if_df_field_is_boolean(df=df, field=clf, df_name=file_path)
                 present_df, absent_df = df[df[clf] == 1], df[df[clf] == 0]
-                self.results[video_name][clf] = {f'ANNOTATED PRESENT FRAME COUNT': len(present_df),
-                                                 f'ANNOTATED PRESENT TIME (S)': round((len(present_df) / fps), 4),
-                                                 f'ANNOTATED ABSENT FRAMES COUNT': len(absent_df),
-                                                 f'ANNOTATED ABSENT TIME (S)': round((len(absent_df) / fps), 4)}
+                self.results[video_name][clf] = {'ANNOTATED PRESENT FRAME COUNT': len(present_df),
+                                                 'ANNOTATED PRESENT TIME (S)': round((len(present_df) / fps), 4),
+                                                 'ANNOTATED ABSENT FRAMES COUNT': len(absent_df),
+                                                 'ANNOTATED ABSENT TIME (S)': round((len(absent_df) / fps), 4)}
 
 
     def __aggregates(self):

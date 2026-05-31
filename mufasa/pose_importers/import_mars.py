@@ -139,7 +139,7 @@ class MarsImporter:
 
     def __run_smoothing(self):
         if self.smoothing_method["Method"] == Methods.GAUSSIAN.value:
-            print("Performing Gaussian smoothing on video {}...".format(self.file_name))
+            print(f"Performing Gaussian smoothing on video {self.file_name}...")
             time_window = self.smoothing_method["Parameters"]["Time_window"]
             smooth_data_gaussian(
                 config=self.config,
@@ -149,9 +149,7 @@ class MarsImporter:
 
         if self.smoothing_method["Method"] == Methods.SAVITZKY_GOLAY.value:
             print(
-                "Performing Savitzky Golay smoothing on video {}...".format(
-                    self.file_name
-                )
+                f"Performing Savitzky Golay smoothing on video {self.file_name}..."
             )
             time_window = self.smoothing_method["Parameters"]["Time_window"]
             smooth_data_savitzky_golay(
@@ -163,7 +161,7 @@ class MarsImporter:
     def import_data(self):
         for file_cnt, file_path in enumerate(self.files_found):
             _, self.file_name, _ = get_fn_ext(file_path)
-            print("Importing data for video {}...".format(self.file_name))
+            print(f"Importing data for video {self.file_name}...")
             self.save_path = os.path.join(
                 self.save_dir, self.file_name + "." + self.file_type
             )
@@ -204,7 +202,7 @@ class MarsImporter:
                 )
             if self.smoothing_method["Method"] != Dtypes.NONE.value:
                 self.__run_smoothing()
-            print("Video imported {}.".format(self.file_name))
+            print(f"Video imported {self.file_name}.")
         stdout_success(
             msg=f"{str(len(self.files_found))} data files imported to Mufasa project"
         )

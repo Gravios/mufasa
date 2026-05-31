@@ -60,12 +60,8 @@ class UserDefinedFeatureExtractor(ConfigReader, FeatureExtractionMixin):
                         current_bp_name, other_bp_name = current_animal_bp_x.strip(
                             "_x"
                         ), other_animal_bp_x.strip("_x")
-                        col_name = "Euclidean_distance_{}_{}".format(
-                            current_bp_name, other_bp_name
-                        )
-                        reverse_col_name = "Euclidean_distance_{}_{}".format(
-                            other_bp_name, current_bp_name
-                        )
+                        col_name = f"Euclidean_distance_{current_bp_name}_{other_bp_name}"
+                        reverse_col_name = f"Euclidean_distance_{other_bp_name}_{current_bp_name}"
                         if not reverse_col_name in self.data_df.columns:
                             self.data_df[col_name] = (
                                 np.sqrt(
@@ -121,20 +117,20 @@ class UserDefinedFeatureExtractor(ConfigReader, FeatureExtractionMixin):
     def __rolling_windows_bp_distances(self):
         print("Calculating rolling windows data: distances between body-parts...")
         for i in product(self.roll_windows_values, self.distance_col_names):
-            self.data_df["Mean_{}_{}".format(i[1], i[0])] = (
+            self.data_df[f"Mean_{i[1]}_{i[0]}"] = (
                 self.data_df[i[1]].rolling(int(i[0]), min_periods=1).mean()
             )
-            self.data_df["Sum_{}_{}".format(i[1], i[0])] = (
+            self.data_df[f"Sum_{i[1]}_{i[0]}"] = (
                 self.data_df[i[1]].rolling(int(i[0]), min_periods=1).sum()
             )
 
     def __rolling_windows_movement(self):
         print("Calculating rolling windows data: animal movements...")
         for i in product(self.roll_windows_values, self.mean_movement_cols):
-            self.data_df["Mean_{}_{}".format(i[1], i[0])] = (
+            self.data_df[f"Mean_{i[1]}_{i[0]}"] = (
                 self.data_df[i[1]].rolling(int(i[0]), min_periods=1).mean()
             )
-            self.data_df["Sum_{}_{}".format(i[1], i[0])] = (
+            self.data_df[f"Sum_{i[1]}_{i[0]}"] = (
                 self.data_df[i[1]].rolling(int(i[0]), min_periods=1).sum()
             )
 

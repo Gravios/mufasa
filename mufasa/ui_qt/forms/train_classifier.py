@@ -637,7 +637,7 @@ class TrainClassifierForm(OperationForm):
             return
         QMessageBox.information(
             self, "Saved",
-            f"Training settings saved to project.toml.",
+            "Training settings saved to project.toml.",
         )
 
     # ----------------------------------------------------------- Execute

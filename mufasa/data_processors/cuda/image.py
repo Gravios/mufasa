@@ -125,11 +125,11 @@ def create_average_frm_cupy(video_path: Union[str, os.PathLike],
 
     timer = SimbaTimer(start=True)
     if ((start_frm is not None) or (end_frm is not None)) and ((start_time is not None) or (end_time is not None)):
-        raise InvalidInputError(msg=f'Pass start_frm and end_frm OR start_time and end_time', source=create_average_frm_cupy.__name__)
+        raise InvalidInputError(msg='Pass start_frm and end_frm OR start_time and end_time', source=create_average_frm_cupy.__name__)
     elif type(start_frm) != type(end_frm):
-        raise InvalidInputError(msg=f'Pass start frame and end frame', source=create_average_frm_cupy.__name__)
+        raise InvalidInputError(msg='Pass start frame and end frame', source=create_average_frm_cupy.__name__)
     elif type(start_time) != type(end_time):
-        raise InvalidInputError(msg=f'Pass start time and end time', source=create_average_frm_cupy.__name__)
+        raise InvalidInputError(msg='Pass start time and end time', source=create_average_frm_cupy.__name__)
     if save_path is not None:
         check_if_dir_exists(in_dir=os.path.dirname(save_path), source=create_average_frm_cupy.__name__)
     check_file_exist_and_readable(file_path=video_path)
@@ -176,7 +176,7 @@ def create_average_frm_cupy(video_path: Union[str, os.PathLike],
         if verbose:
             stdout_success(msg=f'Saved average frame at {save_path}', source=create_average_frm_cupy.__name__, elapsed_time=timer.elapsed_time_str)
     else:
-        if verbose: stdout_success(msg=f'Average frame compute complete', source=create_average_frm_cupy.__name__, elapsed_time=timer.elapsed_time_str)
+        if verbose: stdout_success(msg='Average frame compute complete', source=create_average_frm_cupy.__name__, elapsed_time=timer.elapsed_time_str)
         return avg_img
 
 def average_3d_stack_cupy(image_stack: np.ndarray) -> np.ndarray:
@@ -257,11 +257,11 @@ def create_average_frm_cuda(video_path: Union[str, os.PathLike],
         raise FFMPEGCodecGPUError(msg="No GPU found (as evaluated by nvidea-smi returning None)", source=create_average_frm_cuda.__name__)
 
     if ((start_frm is not None) or (end_frm is not None)) and ((start_time is not None) or (end_time is not None)):
-        raise InvalidInputError(msg=f'Pass start_frm and end_frm OR start_time and end_time', source=create_average_frm_cuda.__name__)
+        raise InvalidInputError(msg='Pass start_frm and end_frm OR start_time and end_time', source=create_average_frm_cuda.__name__)
     elif type(start_frm) != type(end_frm):
-        raise InvalidInputError(msg=f'Pass start frame and end frame', source=create_average_frm_cuda.__name__)
+        raise InvalidInputError(msg='Pass start frame and end frame', source=create_average_frm_cuda.__name__)
     elif type(start_time) != type(end_time):
-        raise InvalidInputError(msg=f'Pass start time and end time', source=create_average_frm_cuda.__name__)
+        raise InvalidInputError(msg='Pass start time and end time', source=create_average_frm_cuda.__name__)
     if save_path is not None:
         check_if_dir_exists(in_dir=os.path.dirname(save_path), source=create_average_frm_cuda.__name__)
     check_file_exist_and_readable(file_path=video_path)

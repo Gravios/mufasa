@@ -516,7 +516,7 @@ class Defaults(Enum):
     try:
         WELCOME_MSG = f'Welcome fellow scientists! \n SimBA v.{_metadata.version("mufasa-uw-tf-dev")} \n '
     except _metadata.PackageNotFoundError:
-        WELCOME_MSG = f'Welcome fellow scientists! \n SimBA v. "dev" \n '
+        WELCOME_MSG = 'Welcome fellow scientists! \n SimBA v. "dev" \n '
     BROWSE_FOLDER_BTN_TEXT = "Browse Folder"
     BROWSE_FILE_BTN_TEXT = "Browse File"
     NO_FILE_SELECTED_TEXT = "No file selected"

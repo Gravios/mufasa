@@ -48,7 +48,7 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
         self.mouse_p_headers = [x for x in self.in_headers if x[-2:] == "_p"]
         self.mouse_headers = [x for x in self.in_headers if x[-2:] != "_p"]
         print(
-            "Extracting features from {} file(s)...".format(str(len(self.files_found)))
+            f"Extracting features from {str(len(self.files_found))} file(s)..."
         )
 
     def run(self):
@@ -75,9 +75,7 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                 .reset_index(drop=True)
             )
             print(
-                "Processing {} ({} frames)...".format(
-                    self.video_name, str(len(self.in_data))
-                )
+                f"Processing {self.video_name} ({str(len(self.in_data))} frames)..."
             )
             self.in_data = self.insert_default_headers_for_feature_extraction(
                 df=self.in_data,
@@ -248,19 +246,19 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
 
             print("Calculating rolling windows: medians, medians, and sums...")
             for window in self.roll_windows_values:
-                col_name = "Mouse1_width_median_{}".format(str(window))
+                col_name = f"Mouse1_width_median_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Mouse_width"]
                     .rolling(int(window), min_periods=1)
                     .median()
                 )
-                col_name = "Mouse1_width_mean_{}".format(str(window))
+                col_name = f"Mouse1_width_mean_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Mouse_width"]
                     .rolling(int(window), min_periods=1)
                     .mean()
                 )
-                col_name = "Mouse1_width_sum_{}".format(str(window))
+                col_name = f"Mouse1_width_sum_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Mouse_width"]
                     .rolling(int(window), min_periods=1)
@@ -268,19 +266,19 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_mean_euclid_distances_median_{}".format(str(window))
+                col_name = f"Mouse1_mean_euclid_distances_median_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_mean_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
                     .median()
                 )
-                col_name = "Mouse1_mean_euclid_distances_mean_{}".format(str(window))
+                col_name = f"Mouse1_mean_euclid_distances_mean_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_mean_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
                     .mean()
                 )
-                col_name = "Mouse1_mean_euclid_distances_sum_{}".format(str(window))
+                col_name = f"Mouse1_mean_euclid_distances_sum_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_mean_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
@@ -288,23 +286,19 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_smallest_euclid_distances_median_{}".format(
-                    str(window)
-                )
+                col_name = f"Mouse1_smallest_euclid_distances_median_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_smallest_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
                     .median()
                 )
-                col_name = "Mouse1_smallest_euclid_distances_mean_{}".format(
-                    str(window)
-                )
+                col_name = f"Mouse1_smallest_euclid_distances_mean_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_smallest_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
                     .mean()
                 )
-                col_name = "Mouse1_smallest_euclid_distances_sum_{}".format(str(window))
+                col_name = f"Mouse1_smallest_euclid_distances_sum_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_smallest_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
@@ -312,21 +306,19 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_largest_euclid_distances_median_{}".format(
-                    str(window)
-                )
+                col_name = f"Mouse1_largest_euclid_distances_median_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_largest_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
                     .median()
                 )
-                col_name = "Mouse1_largest_euclid_distances_mean_{}".format(str(window))
+                col_name = f"Mouse1_largest_euclid_distances_mean_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_largest_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
                     .mean()
                 )
-                col_name = "Mouse1_largest_euclid_distances_sum_{}".format(str(window))
+                col_name = f"Mouse1_largest_euclid_distances_sum_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["M1_largest_euclidean_distance_hull"]
                     .rolling(int(window), min_periods=1)
@@ -334,19 +326,19 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Tail_base_movement_M1_median_{}".format(str(window))
+                col_name = f"Tail_base_movement_M1_median_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_tail_base"]
                     .rolling(int(window), min_periods=1)
                     .median()
                 )
-                col_name = "Tail_base_movement_M1_mean_{}".format(str(window))
+                col_name = f"Tail_base_movement_M1_mean_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_tail_base"]
                     .rolling(int(window), min_periods=1)
                     .mean()
                 )
-                col_name = "Tail_base_movement_M1_sum_{}".format(str(window))
+                col_name = f"Tail_base_movement_M1_sum_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_tail_base"]
                     .rolling(int(window), min_periods=1)
@@ -354,19 +346,19 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Centroid_movement_M1_median_{}".format(str(window))
+                col_name = f"Centroid_movement_M1_median_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_centroid"]
                     .rolling(int(window), min_periods=1)
                     .median()
                 )
-                col_name = "Centroid_movement_M1_mean_{}".format(str(window))
+                col_name = f"Centroid_movement_M1_mean_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_centroid"]
                     .rolling(int(window), min_periods=1)
                     .mean()
                 )
-                col_name = "Centroid_movement_M1_sum_{}".format(str(window))
+                col_name = f"Centroid_movement_M1_sum_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_centroid"]
                     .rolling(int(window), min_periods=1)
@@ -374,19 +366,19 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Nose_movement_M1_median_{}".format(str(window))
+                col_name = f"Nose_movement_M1_median_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_nose"]
                     .rolling(int(window), min_periods=1)
                     .median()
                 )
-                col_name = "Nose_movement_M1_mean_{}".format(str(window))
+                col_name = f"Nose_movement_M1_mean_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_nose"]
                     .rolling(int(window), min_periods=1)
                     .mean()
                 )
-                col_name = "Nose_movement_M1_sum_{}".format(str(window))
+                col_name = f"Nose_movement_M1_sum_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Movement_mouse_nose"]
                     .rolling(int(window), min_periods=1)
@@ -394,19 +386,19 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Total_movement_M1_median_{}".format(str(window))
+                col_name = f"Total_movement_M1_median_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Total_movement_all_bodyparts_M1"]
                     .rolling(int(window), min_periods=1)
                     .median()
                 )
-                col_name = "Total_movement_M1_mean_{}".format(str(window))
+                col_name = f"Total_movement_M1_mean_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Total_movement_all_bodyparts_M1"]
                     .rolling(int(window), min_periods=1)
                     .mean()
                 )
-                col_name = "Total_movement_M1_sum_{}".format(str(window))
+                col_name = f"Total_movement_M1_sum_{str(window)}"
                 self.out_data[col_name] = (
                     self.out_data["Total_movement_all_bodyparts_M1"]
                     .rolling(int(window), min_periods=1)
@@ -457,23 +449,21 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
             )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_smallest_euclid_distances_mean_{}".format(
-                    str(window)
-                )
+                col_name = f"Mouse1_smallest_euclid_distances_mean_{str(window)}"
                 deviation_col_name = col_name + "_deviation"
                 self.out_data[deviation_col_name] = (
                     self.out_data[col_name].mean() - self.out_data[col_name]
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_largest_euclid_distances_mean_{}".format(str(window))
+                col_name = f"Mouse1_largest_euclid_distances_mean_{str(window)}"
                 deviation_col_name = col_name + "_deviation"
                 self.out_data[deviation_col_name] = (
                     self.out_data[col_name].mean() - self.out_data[col_name]
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_mean_euclid_distances_mean_{}".format(str(window))
+                col_name = f"Mouse1_mean_euclid_distances_mean_{str(window)}"
                 deviation_col_name = col_name + "_deviation"
                 self.out_data[deviation_col_name] = (
                     self.out_data[col_name].mean() - self.out_data[col_name]
@@ -487,30 +477,28 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
             ].rank(pct=True)
 
             for window in self.roll_windows_values:
-                col_name = "Total_movement_M1_mean_{}".format(str(window))
+                col_name = f"Total_movement_M1_mean_{str(window)}"
                 deviation_col_name = col_name + "_percentile_rank"
                 self.out_data[deviation_col_name] = (
                     self.out_data[col_name].mean() - self.out_data[col_name]
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_mean_euclid_distances_mean_{}".format(str(window))
+                col_name = f"Mouse1_mean_euclid_distances_mean_{str(window)}"
                 deviation_col_name = col_name + "_percentile_rank"
                 self.out_data[deviation_col_name] = (
                     self.out_data[col_name].mean() - self.out_data[col_name]
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_smallest_euclid_distances_mean_{}".format(
-                    str(window)
-                )
+                col_name = f"Mouse1_smallest_euclid_distances_mean_{str(window)}"
                 deviation_col_name = col_name + "_percentile_rank"
                 self.out_data[deviation_col_name] = (
                     self.out_data[col_name].mean() - self.out_data[col_name]
                 )
 
             for window in self.roll_windows_values:
-                col_name = "Mouse1_largest_euclid_distances_mean_{}".format(str(window))
+                col_name = f"Mouse1_largest_euclid_distances_mean_{str(window)}"
                 deviation_col_name = col_name + "_percentile_rank"
                 self.out_data[deviation_col_name] = (
                     self.out_data[col_name].mean() - self.out_data[col_name]
@@ -554,7 +542,7 @@ class ExtractFeaturesFrom7bps(ConfigReader, FeatureExtractionMixin):
                     )
                     start += 1
                     end += 1
-                col_name = "Tortuosity_Mouse1_{}".format(str(window))
+                col_name = f"Tortuosity_Mouse1_{str(window)}"
                 self.out_data[col_name] = tortuosities_results["Animal_1"]
 
             print("Calculating pose probability scores...")

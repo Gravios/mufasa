@@ -138,9 +138,7 @@ class OutlierCorrecterMovementAdvanced(ConfigReader, FeatureExtractionMixin):
             video_timer, video_log = SimbaTimer(start=True), {}
             _, self.video_name, _ = get_fn_ext(file_path)
             print(
-                "Processing video {}. Video {}/{}...".format(
-                    self.video_name, str(file_cnt + 1), str(len(self.data_files))
-                )
+                f"Processing video {self.video_name}. Video {str(file_cnt + 1)}/{str(len(self.data_files))}..."
             )
             self.data_df = read_df(file_path, self.file_type, check_multiindex=True)
             self.data_df = self.insert_column_headers_for_outlier_correction(

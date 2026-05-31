@@ -118,7 +118,7 @@ class LabelmeKeypoints2YoloKeypoints:
                     bp_arr[bp_cnt] = np.array(np.array([point[0][0][0], point[0][0][1], 2]))
                 else:
                     continue
-            instance_str = f'0 '
+            instance_str = '0 '
             instance_str += keypoint_array_to_yolo_annotation_str(x=bp_arr, img_w=img_w, img_h=img_h, padding=self.padding)
             img_yolo_lbl += instance_str
             with open(label_save_path, mode='w', encoding='utf-8') as f:

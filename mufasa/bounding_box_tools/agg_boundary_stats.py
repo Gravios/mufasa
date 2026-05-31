@@ -112,7 +112,7 @@ class AggBoundaryStatisticsCalculator(ConfigReader):
         save_path = os.path.join(
             self.project_path,
             "logs",
-            "aggregate_statistics_anchored_rois_{}.csv".format(self.datetime),
+            f"aggregate_statistics_anchored_rois_{self.datetime}.csv",
         )
         out_df = pd.DataFrame(
             columns=[
@@ -153,9 +153,7 @@ class AggBoundaryStatisticsCalculator(ConfigReader):
             save_path = os.path.join(
                 self.project_path,
                 "logs",
-                "detailed_aggregate_statistics_anchored_rois_{}.csv".format(
-                    self.datetime
-                ),
+                f"detailed_aggregate_statistics_anchored_rois_{self.datetime}.csv",
             )
             out_df = pd.concat(
                 self.detailed_interactions_results.values(), ignore_index=True

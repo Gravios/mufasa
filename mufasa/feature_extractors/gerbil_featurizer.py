@@ -50,7 +50,7 @@ class GerbilFeaturizer:
 
     def check_file_is_readable(self, file_path):
         if not os.access(file_path, os.R_OK):
-            raise FileNotFoundError('{} is not readable.'.format(file_path))
+            raise FileNotFoundError(f'{file_path} is not readable.')
 
     @staticmethod
     @jit(nopython=True, cache=True)

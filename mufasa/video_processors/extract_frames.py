@@ -40,7 +40,7 @@ def extract_frames(
         ):  # if this is a frame we want to write out based on the 'every' argument
             while_safety = 0  # reset the safety count
             save_path = os.path.join(
-                frames_dir, "{:0d}.png".format(frame)
+                frames_dir, f"{frame:0d}.png"
             )  # create the save path
             if (
                 not os.path.exists(save_path) or overwrite

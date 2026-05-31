@@ -82,25 +82,25 @@ def _diagnose_env(exc: BaseException) -> str:
     venv = os.environ.get("VIRTUAL_ENV", "<not set>")
 
     lines = [
-        f"mufasa launcher: failed to import workbench backend.",
+        "mufasa launcher: failed to import workbench backend.",
         f"  Reason: {type(exc).__name__}: {exc}",
-        f"",
-        f"Python in use:",
+        "",
+        "Python in use:",
         f"  sys.executable: {py}",
         f"  sys.prefix:     {prefix}",
-        f"",
-        f"Active environment markers:",
+        "",
+        "Active environment markers:",
         f"  CONDA_PREFIX:        {conda_prefix}",
         f"  CONDA_DEFAULT_ENV:   {conda_env}",
         f"  VIRTUAL_ENV:         {venv}",
-        f"",
-        f"If sys.prefix differs from CONDA_PREFIX, the conda env",
-        f"isn't actually active for this Python. Try:",
-        f"  conda activate <your-mufasa-env>",
-        f"  mufasa",
-        f"",
-        f"If you recently rebuilt the env or moved the repo, reinstall:",
-        f"  pip install -e .",
+        "",
+        "If sys.prefix differs from CONDA_PREFIX, the conda env",
+        "isn't actually active for this Python. Try:",
+        "  conda activate <your-mufasa-env>",
+        "  mufasa",
+        "",
+        "If you recently rebuilt the env or moved the repo, reinstall:",
+        "  pip install -e .",
     ]
     return "\n".join(lines)
 

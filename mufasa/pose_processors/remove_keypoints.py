@@ -36,14 +36,12 @@ class KeypointRemover:
     def __init__(self, data_folder: str, pose_tool: str, file_format: str):
         if not os.path.isdir(data_folder):
             raise NotDirectoryError(
-                msg="{} is not a valid directory.".format(str(data_folder))
+                msg=f"{str(data_folder)} is not a valid directory."
             )
         self.files_found = glob.glob(data_folder + "/*." + file_format)
         check_if_filepath_list_is_empty(
             filepaths=self.files_found,
-            error_msg="Zero files found of type {} in the {} directory".format(
-                file_format, data_folder
-            ),
+            error_msg=f"Zero files found of type {file_format} in the {data_folder} directory",
         )
         self.datetime = str(datetime.now().strftime("%Y%m%d%H%M%S"))
         self.pose_tool, self.data_folder = pose_tool, data_folder
@@ -74,14 +72,12 @@ class KeypointRemover:
         self.timer = SimbaTimer()
         self.timer.start_timer()
         save_directory = os.path.join(
-            self.data_folder, "Reorganized_bp_{}".format(self.datetime)
+            self.data_folder, f"Reorganized_bp_{self.datetime}"
         )
         if not os.path.exists(save_directory):
             os.makedirs(save_directory)
         print(
-            "Saving {} new pose-estimation files in {} directory...".format(
-                str(len(self.files_found)), save_directory
-            )
+            f"Saving {str(len(self.files_found))} new pose-estimation files in {save_directory} directory..."
         )
         if (self.pose_tool == "DLC") or (self.pose_tool == "maDLC"):
             for file_cnt, file_path in enumerate(self.files_found):
@@ -118,11 +114,7 @@ class KeypointRemover:
                         save_path, key="re-organized", format="table", mode="w"
                     )
                 print(
-                    "Saved {}, Video {}/{}.".format(
-                        os.path.basename(file_path),
-                        str(file_cnt + 1),
-                        str(len(self.files_found)),
-                    )
+                    f"Saved {os.path.basename(file_path)}, Video {str(file_cnt + 1)}/{str(len(self.files_found))}."
                 )
             self.timer.stop_timer()
             stdout_success(

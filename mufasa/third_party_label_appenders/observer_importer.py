@@ -196,7 +196,7 @@ class NoldusObserverImporter(ConfigReader):
             )
         self.timer.stop_timer()
         stdout_success(
-            msg=f"Imported annotations saved in project/folder/csv/targets_inserted directory",
+            msg="Imported annotations saved in project/folder/csv/targets_inserted directory",
             elapsed_time=self.timer.elapsed_time_str,
         )
 

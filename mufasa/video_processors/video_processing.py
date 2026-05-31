@@ -845,13 +845,11 @@ def convert_video_powerpoint_compatible_format(file_path: Union[str, os.PathLike
     save_name = os.path.join(dir, file_name + "_powerpointready.mp4")
     if os.path.isfile(save_name):
         raise FileExistError(
-            msg="The outfile file already exist: {}.".format(save_name),
+            msg=f"The outfile file already exist: {save_name}.",
             source=convert_video_powerpoint_compatible_format.__name__,
         )
     if gpu:
-        command = 'ffmpeg -hwaccel auto -c:v h264_cuvid -i "{}" -c:v h264_nvenc -preset slow -profile:v high -level:v 4.0 -pix_fmt yuv420p -crf 22 -c:a aac "{}"'.format(
-            file_path, save_name
-        )
+        command = f'ffmpeg -hwaccel auto -c:v h264_cuvid -i "{file_path}" -c:v h264_nvenc -preset slow -profile:v high -level:v 4.0 -pix_fmt yuv420p -crf 22 -c:a aac "{save_name}"'
     else:
         command = f'ffmpeg -i "{file_path}" -c:v libx264 -preset slow -profile:v high -level:v 4.0 -pix_fmt yuv420p -crf 22 -c:v libx264 -codec:a aac "{save_name}" -y'
     print("Creating video in powerpoint compatible format... ")
@@ -906,7 +904,7 @@ def video_to_greyscale(file_path: Union[str, os.PathLike],
     if save_path is None:
         save_name = os.path.join(dir, file_name + "_grayscale.mp4")
         if os.path.isfile(save_name):
-            raise FileExistError(msg="The outfile file already exist: {}.".format(save_name), source=video_to_greyscale.__name__)
+            raise FileExistError(msg=f"The outfile file already exist: {save_name}.", source=video_to_greyscale.__name__)
     else:
         check_if_dir_exists(in_dir=os.path.dirname(save_path))
         save_name = deepcopy(save_path)
@@ -1337,7 +1335,7 @@ def downsample_video(file_path: Union[str, os.PathLike],
         check_if_dir_exists(in_dir=os.path.dirname(save_path), raise_error=True)
         save_name = deepcopy(save_path)
     if os.path.isfile(save_name):
-        raise FileExistError("The outfile file already exist: {}.".format(save_name), source=downsample_video.__name__)
+        raise FileExistError(f"The outfile file already exist: {save_name}.", source=downsample_video.__name__)
     quality = 23 if not check_int(name=f'{downsample_video.__name__} quality', value=quality, min_value=0, max_value=52, raise_error=False)[0] else int(quality)
     if codec is None:
         codec = get_ffmpeg_codec(file_name=file_path)
@@ -1456,20 +1454,18 @@ def batch_convert_video_format(directory: Union[str, os.PathLike],
         )
     if not os.path.isdir(directory):
         raise NotDirectoryError(
-            msg="{} is not a valid directory".format(directory),
+            msg=f"{directory} is not a valid directory",
             source=batch_convert_video_format.__name__,
         )
     video_paths = []
     file_paths_in_folder = [f for f in glob.glob(directory + "/*") if os.path.isfile(f)]
     for file_path in file_paths_in_folder:
         _, _, ext = get_fn_ext(filepath=file_path)
-        if ext.lower() == ".{}".format(input_format.lower()):
+        if ext.lower() == f".{input_format.lower()}":
             video_paths.append(file_path)
     if len(video_paths) < 1:
         raise NoFilesFoundError(
-            msg="No files with .{} file extension found in the {} directory".format(
-                input_format, directory
-            ),
+            msg=f"No files with .{input_format} file extension found in the {directory} directory",
             source=batch_convert_video_format.__name__,
         )
     for file_cnt, file_path in enumerate(video_paths):
@@ -1477,19 +1473,15 @@ def batch_convert_video_format(directory: Union[str, os.PathLike],
         dir_name, file_name, ext = get_fn_ext(filepath=file_path)
         print(f"Processing video {file_name}...")
         save_path = os.path.join(
-            dir_name, file_name + ".{}".format(output_format.lower())
+            dir_name, file_name + f".{output_format.lower()}"
         )
         if os.path.isfile(save_path):
             raise FileExistError(
-                msg="The outfile file already exist: {}.".format(
-                    save_path
-                ),
+                msg=f"The outfile file already exist: {save_path}.",
                 source=batch_convert_video_format.__name__,
             )
         if gpu:
-            command = 'ffmpeg -hwaccel auto -c:v h264_cuvid -i "{}" -c:v h264_nvenc -cq 23 -preset:v medium -c:a copy "{}"'.format(
-                file_path, save_path
-            )
+            command = f'ffmpeg -hwaccel auto -c:v h264_cuvid -i "{file_path}" -c:v h264_nvenc -cq 23 -preset:v medium -c:a copy "{save_path}"'
         else:
             command = f'ffmpeg -y -i "{file_path}" -c:v libx264 -crf 21 -preset medium -c:a libmp3lame -b:a 320k "{save_path}"'
         subprocess.call(command, shell=True, stdout=subprocess.PIPE)
@@ -1519,7 +1511,7 @@ def batch_create_frames(directory: Union[str, os.PathLike]) -> None:
 
     if not os.path.isdir(directory):
         raise NotDirectoryError(
-            msg="{} is not a valid directory".format(directory),
+            msg=f"{directory} is not a valid directory",
             source=batch_create_frames.__name__,
         )
     video_paths = []
@@ -1530,22 +1522,18 @@ def batch_create_frames(directory: Union[str, os.PathLike]) -> None:
             video_paths.append(file_path)
     if len(video_paths) < 1:
         raise NoFilesFoundError(
-            msg="No files with .mp4, .avi, .mov, .flv file ending found in the {} directory".format(
-                directory
-            ),
+            msg=f"No files with .mp4, .avi, .mov, .flv file ending found in the {directory} directory",
             source=batch_create_frames.__name__,
         )
     for file_cnt, file_path in enumerate(video_paths):
         dir_name, file_name, ext = get_fn_ext(filepath=file_path)
-        print("Processing video {}...".format(file_name))
+        print(f"Processing video {file_name}...")
         save_dir = os.path.join(dir_name, file_name)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         video_to_frames(file_path, save_dir, overwrite=True, every=1, chunk_size=1000)
         print(
-            "Video {} complete, (Video {}/{})...".format(
-                file_name, str(file_cnt + 1), str(len(video_paths))
-            )
+            f"Video {file_name} complete, (Video {str(file_cnt + 1)}/{str(len(video_paths))})..."
         )
     stdout_success(
         msg=f"{str(len(video_paths))} videos converted into frames in {directory} directory!",
@@ -1644,7 +1632,7 @@ def multi_split_video(file_path: Union[str, os.PathLike],
         )
         if not include_clip_time_in_filename:
             save_path = os.path.join(
-                dir_name, file_name + "_{}".format(str(clip_cnt + 1)) + ".mp4"
+                dir_name, file_name + f"_{str(clip_cnt + 1)}" + ".mp4"
             )
         else:
             save_path = os.path.join(
@@ -1855,7 +1843,7 @@ def frames_to_movie(directory: Union[str, os.PathLike],
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as tf:
         for path in sorted_filepaths:
             safe_path = path.replace('\\', '/')
-            tf.write("file '{}'\n".format(safe_path))
+            tf.write(f"file '{safe_path}'\n")
         list_path = tf.name
 
     if gpu:
@@ -1950,7 +1938,7 @@ def video_concatenator(video_one_path: Union[str, os.PathLike],
             subprocess.run(gpu_cmd, check=True, shell=True)
         except subprocess.CalledProcessError as e:
             print(e.args)
-            FFMpegCodecWarning(msg=f'GPU concatenation for videos failed, reverting to CPU', source=video_concatenator.__name__)
+            FFMpegCodecWarning(msg='GPU concatenation for videos failed, reverting to CPU', source=video_concatenator.__name__)
             subprocess.call(cpu_cmd, shell=True)
     else:
         subprocess.call(cpu_cmd, shell=True)
@@ -2988,7 +2976,7 @@ def mosaic_concatenator(
     else:
         height = height_px
     if verbose:
-        print(f"Creating mosaic video ...")
+        print("Creating mosaic video ...")
     temp_dir = os.path.join(os.path.dirname(video_paths[0]), f"temp_{dt}")
     os.makedirs(temp_dir)
     if not (len(video_paths) % 2) == 0:
@@ -3186,7 +3174,7 @@ def clip_videos_by_frame_ids(file_paths: List[Union[str, os.PathLike]],
         if i[0] >= i[1]:
             raise FrameRangeError( msg=f"Start frame for video {i} is after or the same as the end frame ({i[0]}, {i[1]})", source=clip_videos_by_frame_ids.__name__)
         if (i[0] < 0) or (i[1] < 1):
-            raise FrameRangeError(msg=f"Start frame has to be at least 0 and end frame has to be at least 1", source=clip_videos_by_frame_ids.__name__)
+            raise FrameRangeError(msg="Start frame has to be at least 0 and end frame has to be at least 1", source=clip_videos_by_frame_ids.__name__)
     video_meta_data = [get_video_meta_data(video_path=x) for x in file_paths]
     for i in range(len(video_meta_data)):
         if (frm_ids[i][0] > video_meta_data[i]["frame_count"]) or (frm_ids[i][1] > video_meta_data[i]["frame_count"]):
@@ -3272,7 +3260,7 @@ def convert_to_mp4(path: Union[str, os.PathLike],
             save_dir = os.path.join(path, f'mp4_{datetime_}')
             os.makedirs(save_dir)
     else:
-        raise InvalidInputError(msg=f'Paths is not a valid file or directory path.', source=convert_to_mp4.__name__)
+        raise InvalidInputError(msg='Paths is not a valid file or directory path.', source=convert_to_mp4.__name__)
     for file_cnt, file_path in enumerate(file_paths):
         _, video_name, _ = get_fn_ext(filepath=file_path)
         print(f'Converting video {video_name} to MP4 (Video {file_cnt+1}/{len(file_paths)})...')
@@ -3342,7 +3330,7 @@ def convert_to_avi(path: Union[str, os.PathLike],
             save_dir = os.path.join(path, f'avi_{datetime_}')
             os.makedirs(save_dir)
     else:
-        raise InvalidInputError(msg=f'Paths is not a valid file or directory path.', source=convert_to_avi.__name__)
+        raise InvalidInputError(msg='Paths is not a valid file or directory path.', source=convert_to_avi.__name__)
     for file_cnt, file_path in enumerate(file_paths):
         _, video_name, _ = get_fn_ext(filepath=file_path)
         print(f'Converting video {video_name} to avi (Video {file_cnt+1}/{len(file_paths)})...')
@@ -3405,7 +3393,7 @@ def convert_to_webm(path: Union[str, os.PathLike],
             save_dir = os.path.join(path, f'webm_{datetime_}')
         os.makedirs(save_dir)
     else:
-        raise InvalidInputError(msg=f'Paths is not a valid file or directory path.', source=convert_to_webm.__name__)
+        raise InvalidInputError(msg='Paths is not a valid file or directory path.', source=convert_to_webm.__name__)
 
     for file_cnt, file_path in enumerate(file_paths):
         _, video_name, _ = get_fn_ext(filepath=file_path)
@@ -3457,7 +3445,7 @@ def convert_to_mov(path: Union[str, os.PathLike],
             save_dir = os.path.join(path, f'mov_{datetime_}')
             os.makedirs(save_dir)
     else:
-        raise InvalidInputError(msg=f'Paths is not a valid file or directory path.', source=convert_to_mov.__name__)
+        raise InvalidInputError(msg='Paths is not a valid file or directory path.', source=convert_to_mov.__name__)
     for file_cnt, file_path in enumerate(file_paths):
         _, video_name, _ = get_fn_ext(filepath=file_path)
         print(f'Converting video {video_name} to MOV (Video {file_cnt + 1}/{len(file_paths)})...')
@@ -3990,7 +3978,7 @@ def reverse_videos(path: Union[str, os.PathLike],
             save_dir = os.path.join(path, f'mp4_{datetime_}')
             os.makedirs(save_dir)
     else:
-        raise InvalidInputError(msg=f'Path is not a valid file or directory path.', source=reverse_videos.__name__)
+        raise InvalidInputError(msg='Path is not a valid file or directory path.', source=reverse_videos.__name__)
     if codec is not None: check_valid_codec(codec=codec, raise_error=True, source=reverse_videos.__name__)
     for file_cnt, file_path in enumerate(file_paths):
         _, video_name, ext = get_fn_ext(filepath=file_path)
@@ -4279,11 +4267,11 @@ def create_average_frm(video_path: Union[str, os.PathLike],
     """
 
     if ((start_frm is not None) or (end_frm is not None)) and ((start_time is not None) or (end_time is not None)):
-        raise InvalidInputError(msg=f'Pass start_frm and end_frm OR start_time and end_time', source=create_average_frm.__name__)
+        raise InvalidInputError(msg='Pass start_frm and end_frm OR start_time and end_time', source=create_average_frm.__name__)
     elif type(start_frm) != type(end_frm):
-        raise InvalidInputError(msg=f'Pass start frame and end frame', source=create_average_frm.__name__)
+        raise InvalidInputError(msg='Pass start frame and end frame', source=create_average_frm.__name__)
     elif type(start_time) != type(end_time):
-        raise InvalidInputError(msg=f'Pass start time and end time', source=create_average_frm.__name__)
+        raise InvalidInputError(msg='Pass start time and end time', source=create_average_frm.__name__)
     check_file_exist_and_readable(file_path=video_path)
     video_meta_data = get_video_meta_data(video_path=video_path)
     cap = cv2.VideoCapture(video_path)
@@ -4327,7 +4315,7 @@ def create_average_frm(video_path: Union[str, os.PathLike],
         if verbose:
             stdout_success(msg=f'Saved average frame at {save_path}', source=create_average_frm.__name__, elapsed_time=timer.elapsed_time_str)
     else:
-        if verbose: stdout_success(msg=f'Average frame computed.', source=create_average_frm.__name__,  elapsed_time=timer.elapsed_time_str)
+        if verbose: stdout_success(msg='Average frame computed.', source=create_average_frm.__name__,  elapsed_time=timer.elapsed_time_str)
         return img
 
 

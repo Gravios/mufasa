@@ -85,7 +85,7 @@ class PupRetrieverCalculator(ConfigReader):
         self.data_files = glob.glob(machine_results_path + "/*." + self.file_type)
         check_if_filepath_list_is_empty(
             filepaths=self.data_files,
-            error_msg="NO FILES FOUND IN {}".format(machine_results_path),
+            error_msg=f"NO FILES FOUND IN {machine_results_path}",
         )
         self.vid_info_df = read_video_info_csv(
             os.path.join(self.project_path, Paths.VIDEO_INFO.value)
@@ -137,7 +137,7 @@ class PupRetrieverCalculator(ConfigReader):
             self.logs_dir_path, f"Log_pup_retrieval_{self.datetime}"
         )
         log_df.to_csv(log_save_path)
-        print("Pup retreival log saved at {}...".format(log_save_path))
+        print(f"Pup retreival log saved at {log_save_path}...")
 
     def __generate_figure(
         self,
