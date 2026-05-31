@@ -3,7 +3,7 @@ tests/smoke_122fo_computed_feature_badges.py
 ================================================
 
 Patch 122fo — per-family "already computed" badge in the
-Compute feature subsets form.
+Compute Features form.
 
 User request (Thu May 28, 2026):
 

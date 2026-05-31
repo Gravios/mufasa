@@ -28,7 +28,7 @@ WHAT THIS PATCH LANDED
 mufasa/section_provenance.py:
 
 * NEW SectionSpec ``features_compute_subset``:
-    page="Features", section_title="Compute feature subsets",
+    page="Features", section_title="Compute Features",
     depends_on=("outlier_correction",), detect_path=None.
 * Updated comments on existing ``features_roi`` spec to note
   the new section_id wiring.
@@ -66,7 +66,7 @@ COVERAGE
 SectionSpec contract (3 checks):
 1.  SECTIONS["features_compute_subset"] is registered.
 2.  features_compute_subset has page="Features" and
-    section_title="Compute feature subsets" (matches the form's
+    section_title="Compute Features" (matches the form's
     add_section call).
 3.  features_compute_subset.depends_on includes
     "outlier_correction" (the user's "dependent on
@@ -150,11 +150,11 @@ def main() -> int:
     )
     check(
         "features_compute_subset has page='Features' and "
-        "section_title='Compute feature subsets' (matches the "
-        "Features-page add_section call)",
+        "section_title='Compute Features' (matches the "
+        "Features-page add_section call; renamed in 122fv)",
         fcs is not None
         and fcs.page == "Features"
-        and fcs.section_title == "Compute feature subsets",
+        and fcs.section_title == "Compute Features",
         detail=(
             f"page={getattr(fcs, 'page', None)!r} "
             f"section_title={getattr(fcs, 'section_title', None)!r}"

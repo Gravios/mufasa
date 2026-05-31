@@ -90,7 +90,7 @@ class FeatureSubsetExtractorForm(OperationForm):
     """Compute a subset of feature families and merge into existing
     feature CSVs."""
 
-    title = "Compute feature subsets"
+    title = "Compute Features"
     description = (
         "Recompute one or more feature families and optionally "
         "append them to the existing feature / targets CSVs. "
@@ -429,6 +429,39 @@ class FeatureSubsetExtractorForm(OperationForm):
             item.setForeground(QColor(46, 139, 87))  # sea green
         return item
 
+    def _refresh_computed_badges(self) -> None:
+        """Re-scan derived/features/ and re-apply the per-family
+        "already computed" badge to every item in both selector
+        lists. Patch 122fv.
+
+        The lists are built once in build(); without this the ✓
+        badge only reflects disk state at construction time, so a
+        family computed during this session stays un-badged until
+        the form is reopened (the symptom reported: "I have to
+        restart mufasa for the green checkmark to appear"). Called
+        from on_run's on_success after a compute finishes.
+
+        Reuses _make_family_item as the SINGLE source of badge
+        decoration: it builds a throwaway fully-decorated item per
+        family and copies the visual attributes (text, tooltip,
+        foreground) onto the live item. This preserves the live
+        item's selection state and Qt.UserRole, and — because
+        _make_family_item leaves those attributes at their defaults
+        for an uncomputed family — it also correctly *clears* a
+        badge if a family is no longer computed, not only sets one.
+        """
+        computed_slugs = self._computed_family_slugs()
+        for widget in (self.subject_families, self.roi_families):
+            for row in range(widget.count()):
+                item = widget.item(row)
+                fam = item.data(Qt.UserRole)
+                if fam is None:
+                    continue
+                fresh = self._make_family_item(fam, computed_slugs)
+                item.setText(fresh.text())
+                item.setToolTip(fresh.toolTip())
+                item.setForeground(fresh.foreground())
+
     def collect_args(self) -> dict:
         if not self.config_path:
             raise RuntimeError("No project loaded.")
@@ -658,6 +691,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             title=f"{self.title}…",
             target=_work,
             on_success=lambda: (
+                self._refresh_computed_badges(),
                 self.completed.emit(),
                 QMessageBox.information(self, self.title, "Done."),
             ),

@@ -513,14 +513,14 @@ SECTIONS: dict[str, SectionSpec] = {
         # via the form's section_id wiring is the reliable
         # signal (same pattern as features_roi below).
         page="Features",
-        section_title="Compute feature subsets",
+        section_title="Compute Features",
         depends_on=("outlier_correction",),
     ),
     "features_roi": SectionSpec(
         section_id="features_roi",
         # Patch 122el — ROI features form is on the ROI page,
         # registered as "Features", not on the Features page
-        # (which only has "Compute feature subsets"). Audit
+        # (which only has "Compute Features"). Audit
         # caught the cross-page misbinding.
         page="ROI",
         section_title="Features",
