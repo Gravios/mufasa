@@ -231,8 +231,8 @@ class DirectingOtherAnimalsAnalyzer(ConfigReader, FeatureExtractionMixin):
                     for bp_name, bp_data in permutation_data.items():
                         idx_directing.update(list(bp_data.index[bp_data["Directing_BOOL"] == 1]))
                     directing_time = round(len(idx_directing) / fps, 3)
-                    first_directing_time = seconds_to_timestamp((min(idx_directing) / fps)) if len(idx_directing) > 0 else 'NONE'
-                    last_directing_time = seconds_to_timestamp((max(idx_directing) / fps)) if len(idx_directing) > 0 else 'NONE'
+                    first_directing_time = seconds_to_timestamp(min(idx_directing) / fps) if len(idx_directing) > 0 else 'NONE'
+                    last_directing_time = seconds_to_timestamp(max(idx_directing) / fps) if len(idx_directing) > 0 else 'NONE'
                     directing_bout_cnt, longest_bout, shortest_bout, mean_bout = self._count_bouts_from_frame_indexes(frame_indexes=idx_directing, video_name=video_name, fps=fps)
                     prop = round((len(idx_directing) / self.frm_cnts[video_name]) * 100, 3) if len(idx_directing) > 0 else 0.00
                     out_df.loc[len(out_df)] = [video_name, animal_permutation, directing_time, prop, first_directing_time, last_directing_time, directing_bout_cnt, longest_bout, shortest_bout, mean_bout]

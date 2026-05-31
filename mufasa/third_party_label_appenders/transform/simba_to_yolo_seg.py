@@ -165,7 +165,7 @@ class SimBA2YoloSegmentation(ConfigReader):
                     instance_str += ' '.join(str(x) for x in kps).strip() + '\n'
                     img_lbl += instance_str
             if img_lbl:
-                with open(label_save_path, mode='wt', encoding='utf-8') as f:
+                with open(label_save_path, mode='w', encoding='utf-8') as f:
                     f.write(img_lbl)
                 cv2.imwrite(img_save_path, img)
 

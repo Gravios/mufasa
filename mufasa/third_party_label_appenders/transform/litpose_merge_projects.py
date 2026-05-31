@@ -63,7 +63,7 @@ class LitPoseMergeProjects:
         yaml_path = os.path.join(project_dir, PROJECT_YAML)
         if not os.path.isfile(yaml_path):
             raise FileNotFoundError(f'project.yaml not found: {yaml_path}')
-        with open(yaml_path, 'r') as f:
+        with open(yaml_path) as f:
             return yaml.safe_load(f)
 
     @staticmethod

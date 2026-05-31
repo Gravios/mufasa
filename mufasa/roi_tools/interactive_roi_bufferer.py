@@ -41,7 +41,7 @@ def _plot_roi(roi_dict: dict,
     img = PlottingMixin.roi_dict_onto_img(img=img, roi_dict=roi_dict, circle_size=None, show_tags=False, show_center=True, omitted_centers=list(polygon_df['Name'].unique()))
     return img
 
-class InteractiveROIBufferer():
+class InteractiveROIBufferer:
     """
     Interactive Tkinter-based tool for buffering (expanding or shrinking) ROI shapes by specified metric millimeter by clicking on their tags.
 

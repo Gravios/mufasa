@@ -126,7 +126,7 @@ class LabelmeKeypoints2YoloSeg:
             seg_arr_x, seg_arr_y = np.clip(seg_arr[:, 0].flatten() / img_w, 0, 1), np.clip(seg_arr[:, 1].flatten() / img_h, 0, 1)
             kps = list(np.column_stack((seg_arr_x, seg_arr_y)).flatten())
             instance_str += ' '.join(str(x) for x in kps) + '\n'
-            with open(label_save_path, mode='wt', encoding='utf-8') as f:
+            with open(label_save_path, mode='w', encoding='utf-8') as f:
                 f.write(instance_str)
                 cv2.imwrite(img_save_path, img)
         create_yolo_yaml(path=self.save_dir, train_path=self.img_train_dir, val_path=self.img_val_dir, names={'Mouse': 0}, save_path=self.map_path)

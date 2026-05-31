@@ -62,7 +62,7 @@ def _plot_roi(roi_dict: dict,
     return img
 
 
-class InteractiveROIModifier():
+class InteractiveROIModifier:
     """
     Interactive GUI tool for modifying ROI (Region of Interest) shapes by clicking and dragging.
 

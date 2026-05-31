@@ -31,7 +31,7 @@ RIGHT_Y = 'right_y'
 
 BP_COLS = [NOSE_X, NOSE_Y, TAIL_X, TAIL_Y, LEFT_X, LEFT_Y, RIGHT_X, RIGHT_Y]
 
-class BlobVisualizer():
+class BlobVisualizer:
     """
     Visualize blob tracking data by overlaying geometric shapes and body part markers on video frames.
 

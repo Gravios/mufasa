@@ -98,7 +98,7 @@ class SLEAPImporterSLP(ConfigReader, PoseImporterMixin):
         existing_animals = list(self.frame_dict.keys())
         missing_animals = [x for x in range(self.animal_cnt) if x not in existing_animals]
         for missing_animal in missing_animals:
-            self.frame_dict[missing_animal] = ([0] * ((len(self.analysis_dict["ordered_bps"]))) * 3)
+            self.frame_dict[missing_animal] = ([0] * (len(self.analysis_dict["ordered_bps"])) * 3)
 
     def __fill_missing_indexes(self):
         missing_indexes = list(set(list(range(0, self.video_info["frame_count"]))) - set(list(self.data_df.index)))
@@ -123,7 +123,7 @@ class SLEAPImporterSLP(ConfigReader, PoseImporterMixin):
             for bp in self.sleap_dict["nodes"]:
                 self.analysis_dict["bp_names"].append(bp["name"])
             for orderVar in self.sleap_dict["skeletons"][0]["nodes"]:
-                self.analysis_dict["ordered_ids"].append((orderVar["id"]))
+                self.analysis_dict["ordered_ids"].append(orderVar["id"])
             for index in self.analysis_dict["ordered_ids"]:
                 self.analysis_dict["ordered_bps"].append(self.analysis_dict["bp_names"][index])
 

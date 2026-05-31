@@ -20,7 +20,7 @@ PADDING = 5
 MAX_SIZE = (1080, 650)
 
 
-class InteractiveVideoPlotterWindow(object):
+class InteractiveVideoPlotterWindow:
     def __init__(self,
                  video_path: Union[str, os.PathLike],
                  p_arr: np.array):

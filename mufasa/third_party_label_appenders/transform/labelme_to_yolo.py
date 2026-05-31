@@ -129,7 +129,7 @@ class LabelmeBoundingBoxes2YoloBoundingBoxes:
                         roi_str += ' '.join([f"{label_id}", str(top_left[0]), str(top_left[1]), str(top_right[0]), str(top_right[1]), str(bottom_right[0]), str(bottom_right[1]), str(bottom_left[0]), str(bottom_left[1]) + '\n'])
                 else:
                     ROIWarning(msg=f'Only Labelme shape type rectangle recognized for YOLO bounding box transformation. Got {bp_data["shape_type"]}. Skipping annotation...', source=self.__class__.__name__)
-            with open(label_save_path, mode='wt', encoding='utf-8') as f:
+            with open(label_save_path, mode='w', encoding='utf-8') as f:
                 f.write(roi_str)
             cv2.imwrite(img_save_path, img)
         with open(self.map_path, 'w') as f:

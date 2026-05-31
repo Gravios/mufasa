@@ -365,7 +365,7 @@ def _worker(task_queue, result_queue, ready_queue, engine_path,
             result_queue.put((video_path, [] if save_dir is None else 0, {}, str(exc)))
 
 
-class YoloNVDECInference(object):
+class YoloNVDECInference:
     """
     GPU-accelerated YOLO inference on videos using NVDEC decode + TensorRT.
 

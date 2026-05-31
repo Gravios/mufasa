@@ -22,7 +22,7 @@ from mufasa.utils.read_write import get_fn_ext
 from mufasa.utils.warnings import FrameRangeWarning
 
 
-class PoseImporterMixin(object):
+class PoseImporterMixin:
     """
     Methods for importing pose-estimation data.
     """

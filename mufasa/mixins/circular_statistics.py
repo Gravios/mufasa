@@ -11,7 +11,7 @@ from mufasa.utils.enums import Formats
 from mufasa.utils.errors import InvalidInputError
 
 
-class CircularStatisticsMixin(object):
+class CircularStatisticsMixin:
     """
     Mixin for circular statistics. Unlike linear data, circular data wrap around in a circular or periodic
     manner such as two measurements of e.g., 360 vs. 1 are more similar than two measurements of 1 vs. 3. Thus, the

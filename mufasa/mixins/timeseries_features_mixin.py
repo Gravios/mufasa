@@ -43,7 +43,7 @@ def dynamic_numba_decorator(dtypes, cache=True, fastmath=False):
     return decorator
 
 
-class TimeseriesFeatureMixin(object):
+class TimeseriesFeatureMixin:
     """
     Time-series methods focused on signal complexity in sliding windows. Mainly in time-domain - fft methods (through e.g. scipy)
     I've found so far has not been fast enough for rolling windows in large datasets.
@@ -1565,7 +1565,7 @@ class TimeseriesFeatureMixin(object):
                 spike_train_idx = [
                     k for j, k in enumerate(spike_idx) if j in train_spikes_idx[i]
                 ]
-                train_spike_lengths = np.array(([len(j) for j in spike_train_idx]))
+                train_spike_lengths = np.array([len(j) for j in spike_train_idx])
                 spike_dict[int(i)] = {
                     "train_start_time": float(train_data_idx[i][0] * sample_rate),
                     "train_end_time": train_data_idx[i][-1] * sample_rate,

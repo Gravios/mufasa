@@ -39,7 +39,7 @@ from mufasa.utils.read_write import (find_core_cnt,
                                     read_frm_of_video, seconds_to_timestamp)
 
 
-class ImageMixin(object):
+class ImageMixin:
     """
     Methods to slice and compute attributes of images from tracking data and comparing those image attributes across sequential images.
 
@@ -2054,7 +2054,7 @@ class ImageMixin(object):
             img_to_denoise_idx = int(np.floor(imgs.shape[0] / 2))
         else:
             check_int(name=f'{ImageMixin.non_local_mean_denoising_sequence.__name__} img_to_denoise_idx', value=img_to_denoise_idx, max_value=imgs.shape[0] - 1, min_value=0)
-        temporal_window_size = int((imgs.shape[0] / 2))
+        temporal_window_size = int(imgs.shape[0] / 2)
         temporal_window_size = temporal_window_size if temporal_window_size % 2 == 1 else temporal_window_size - 1
         if imgs.shape[0] <= 2:
             temporal_window_size = 1

@@ -133,7 +133,7 @@ class MovementCalculator(ConfigReader, FeatureExtractionMixin):
             if not bp_name.endswith("CENTER OF GRAVITY"):
                 animal_name = self.find_animal_name_from_body_part_name(bp_name=bp_name, bp_dict=self.animal_bp_dict)
                 self.body_parts_dict[bp_cnt] = {"ANIMAL NAME": animal_name, "BODY-PART": bp_name, "BODY-PART HEADERS": [f"{bp_name}_x", f"{bp_name}_y", f"{bp_name}_p"]}
-                self.bp_list.extend((self.body_parts_dict[bp_cnt]["BODY-PART HEADERS"]))
+                self.bp_list.extend(self.body_parts_dict[bp_cnt]["BODY-PART HEADERS"])
             else:
                 pass
 

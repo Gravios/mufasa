@@ -43,7 +43,7 @@ SETTINGS = [
 # E.g., for rows where *Subject* is Simon AND *Behavior* is behavior1, the *Behavior* will be changed to Simon_behavior1.
 
 
-class BorisSourceCleaner(object):
+class BorisSourceCleaner:
     """
     Helper to clean BORIS files where behavior with the same name are assigned to different
     animals through the **Subjects** field.

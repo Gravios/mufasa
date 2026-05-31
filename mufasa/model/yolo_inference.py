@@ -43,7 +43,7 @@ SMOOTHING_METHODS = ('savitzky-golay', 'bartlett', 'blackman', 'boxcar', 'cosine
 NEAREST = 'nearest'
 SAVITZKY_GOLAY, CONFIDENCE = 'savitzky-golay', 'CONFIDENCE'
 
-class YoloInference():
+class YoloInference:
     """
     Performs object detection inference on a video using a YOLO model.
 

@@ -437,7 +437,7 @@ def clahe_enhance_video(file_path: Union[str, os.PathLike],
     check_int(name=f"{clahe_enhance_video.__name__} clip_limit", value=clip_limit, min_value=0)
     video_meta_data = get_video_meta_data(file_path)
     check_valid_tuple(x=tile_grid_size, source=f'{clahe_enhance_video.__name__} tile_grid_size', accepted_lengths=(2,), valid_dtypes=(int,),)
-    if (tile_grid_size[0] > video_meta_data["height"]) or ((tile_grid_size[1] > video_meta_data["width"])):
+    if (tile_grid_size[0] > video_meta_data["height"]) or (tile_grid_size[1] > video_meta_data["width"]):
         raise InvalidInputError(msg=f'The tile grid size ({tile_grid_size}) is larger than the video size ({video_meta_data["resolution_str"]})', source=clahe_enhance_video.__name__,)
     dir, file_name, file_ext = get_fn_ext(filepath=file_path)
     if out_path is None:
@@ -554,7 +554,7 @@ def clahe_enhance_video_mp(file_path: Union[str, os.PathLike],
     if gpu and not check_nvidea_gpu_available():
         GPUToolsWarning(msg='No NVIDEA GPU detected and GPU selected. Running without GPU', source=clahe_enhance_video_mp.__name__)
         gpu = False
-    if (tile_grid_size[0] > video_meta_data["height"]) or ((tile_grid_size[1] > video_meta_data["width"])):
+    if (tile_grid_size[0] > video_meta_data["height"]) or (tile_grid_size[1] > video_meta_data["width"]):
         raise InvalidInputError(msg=f'The tile grid size ({tile_grid_size}) is larger than the video size ({video_meta_data["resolution_str"]})', source=clahe_enhance_video_mp.__name__,)
     dir, file_name, file_ext = get_fn_ext(filepath=file_path)
     if out_path is None:

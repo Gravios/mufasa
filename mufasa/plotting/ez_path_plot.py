@@ -23,7 +23,7 @@ H5 = ".h5"
 CSV = ".csv"
 
 
-class EzPathPlot(object):
+class EzPathPlot:
     """
     Create a simpler path plot for a single path in a single video.
 

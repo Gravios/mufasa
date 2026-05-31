@@ -121,7 +121,7 @@ class LabelmeKeypoints2YoloKeypoints:
             instance_str = f'0 '
             instance_str += keypoint_array_to_yolo_annotation_str(x=bp_arr, img_w=img_w, img_h=img_h, padding=self.padding)
             img_yolo_lbl += instance_str
-            with open(label_save_path, mode='wt', encoding='utf-8') as f:
+            with open(label_save_path, mode='w', encoding='utf-8') as f:
                 f.write(img_yolo_lbl)
             cv2.imwrite(img_save_path, img)
 

@@ -39,7 +39,7 @@ OUT_COLS = ['FRAME', 'CLASS_ID', 'CLASS_NAME', 'CONFIDENCE', 'TRACK', 'X1', 'Y1'
 COORD_COLS = ['X1', 'Y1', 'X2', 'Y2', 'X3', 'Y3', 'X4', 'Y4']
 NEAREST, CLASS_ID, CONFIDENCE, FRAME  = 'nearest', 'CLASS_ID', 'CONFIDENCE', 'FRAME'
 
-class YOLOPoseTrackInference():
+class YOLOPoseTrackInference:
     """
     Perform YOLO-based pose estimation and object tracking inference on single or multiple videos.
 

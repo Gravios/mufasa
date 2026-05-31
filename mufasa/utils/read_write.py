@@ -3146,7 +3146,7 @@ def read_json(x: Union[Union[str, os.PathLike], List[Union[str, os.PathLike]]], 
     try:
         if isinstance(x, (str, os.PathLike)):
             check_file_exist_and_readable(x)
-            with open(x, 'r', encoding=encoding) as file:
+            with open(x, encoding=encoding) as file:
                 results = json.load(file)
         elif isinstance(x, (list, tuple,)):
             results = {}
@@ -3595,7 +3595,7 @@ def get_recent_projects_paths(max: int = 15, sort_alphabetically: bool = True) -
     if not os.path.isfile(file_path):
         Path(file_path).touch(); return []
     try:
-        with open(file_path, "r") as file:
+        with open(file_path) as file:
             project_paths = [line.strip() for line in file if line.strip()]
             project_paths = list(set(project_paths))
             project_paths = [x for x in project_paths if os.path.isfile(x)]
@@ -3615,7 +3615,7 @@ def write_to_recent_project_paths(config_path: Union[str, os.PathLike]):
     print(existing_paths)
     if os.path.isfile(config_path) and (config_path not in existing_paths):
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 existing_content = f.read()
             with open(file_path, "w") as f:
                 f.write(config_path + "\n" + existing_content)

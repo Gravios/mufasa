@@ -20,7 +20,7 @@ from mufasa.utils.read_write import (get_fn_ext, read_config_file,
                                     read_project_path_and_file_type, write_df)
 
 
-class MarsImporter(object):
+class MarsImporter:
     """
     Import two animal MARS pose-estimation data (in JSON format) into a SimBA project in
     parquet or CSV format.
@@ -167,7 +167,7 @@ class MarsImporter(object):
             self.save_path = os.path.join(
                 self.save_dir, self.file_name + "." + self.file_type
             )
-            with open(file_path, "r") as j:
+            with open(file_path) as j:
                 data = json.loads(j.read())
             key_points, scores = np.array(data["keypoints"]).astype(int), np.array(
                 data["scores"]

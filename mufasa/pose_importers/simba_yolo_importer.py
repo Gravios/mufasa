@@ -117,7 +117,7 @@ class SimBAYoloImporter(ConfigReader):
             col_order = []
             for class_name in class_names:
                 class_cols = [x for x in out_df.columns if class_name in x]
-                col_order.extend((class_cols))
+                col_order.extend(class_cols)
             out_df = out_df[col_order].reset_index(drop=True)
             out_df.columns = [s[:-1] + s[-1].lower() if s else s for s in list(out_df.columns)]
             data_save_path = os.path.join(self.outlier_corrected_dir, f'{video_name}.csv')

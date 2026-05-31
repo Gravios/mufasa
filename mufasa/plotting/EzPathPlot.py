@@ -30,7 +30,7 @@ H5 = ".h5"
 CSV = ".csv"
 
 
-class EzPathPlot(object):
+class EzPathPlot:
     """
     Create a simple path plot image for a single or several pose-estimation files.
 

@@ -15,7 +15,7 @@ from mufasa.utils.warnings import ROIWarning
 DRAW_FRAME_NAME = "DEFINE SHAPE"
 
 
-class ROISelectorCircle(object):
+class ROISelectorCircle:
 
     """
     A class to allow users to interactively select a Region of Interest (ROI) circle from an image displayed in a Tkinter window.

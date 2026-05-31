@@ -27,7 +27,7 @@ from mufasa.video_processors.roi_selector import ROISelector
 from mufasa.video_processors.video_processing import crop_video
 
 
-class MultiCropper(object):
+class MultiCropper:
     """
     Crop each video of a specific file format (e.g., mp4) in a directory into N smaller cropped videos.
 

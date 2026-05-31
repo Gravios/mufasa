@@ -14,7 +14,7 @@ from mufasa.utils.enums import Formats
 from mufasa.utils.printing import stdout_success
 
 
-class KeypointReorganizer(object):
+class KeypointReorganizer:
     """
     Re-organizing the order of pose-estimated keypoints in directory containing
     CSV or H5 format files.

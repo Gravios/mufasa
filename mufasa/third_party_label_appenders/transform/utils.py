@@ -414,7 +414,7 @@ def check_valid_yolo_map(yolo_map: Union[str, os.PathLike]) -> None:
 
     REQUIRED_KEYS = ['path', 'train', 'val', 'kpt_shape', 'flip_idx', 'names']
     check_file_exist_and_readable(file_path=yolo_map, raise_error=True)
-    with open(yolo_map, "r") as f: yolo_map = yaml.safe_load(f)
+    with open(yolo_map) as f: yolo_map = yaml.safe_load(f)
     check_if_keys_exist_in_dict(data=yolo_map, key=REQUIRED_KEYS)
 
     path = yolo_map['path']

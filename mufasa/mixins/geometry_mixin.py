@@ -52,7 +52,7 @@ from mufasa.utils.read_write import (SimbaTimer, find_core_cnt,
                                     stdout_success, write_pickle)
 
 
-class GeometryMixin(object):
+class GeometryMixin:
     """
     Methods to perform geometry transformation of pose-estimation data. This includes creating bounding boxes,
     line objects, circles etc. from pose-estimated body-parts and computing metric representations
@@ -1020,7 +1020,7 @@ class GeometryMixin(object):
                     cv2.polylines(img, [np.array(shape[line_cnt].coords, dtype=np.int32)], False,
                                   (colors[shape_cnt][::-1]), thickness=thickness)
             if isinstance(shape, Point):
-                arr = np.array((shape.coords)).astype(np.int32)
+                arr = np.array(shape.coords).astype(np.int32)
                 x, y = arr[0][0], arr[0][1]
                 cv2.circle(img, (x, y), circle_size, colors[shape_cnt][::-1], -1)
         if size:
@@ -1438,7 +1438,7 @@ class GeometryMixin(object):
         results = []
         data = np.array_split(data, core_cnt)
         for cnt, mp_return in enumerate(pool.imap(constants, data, chunksize=1)):
-            results.extend((mp_return))
+            results.extend(mp_return)
         if pool_terminate_flag: terminate_cpu_pool(pool=pool, source=GeometryMixin().multiframe_bodyparts_to_circle.__name__)
         timer.stop_timer()
         if verbose: stdout_success(msg="Multiframe body-parts to circle complete", source=GeometryMixin.multiframe_bodyparts_to_circle.__name__, elapsed_time=timer.elapsed_time_str )
@@ -1683,7 +1683,7 @@ class GeometryMixin(object):
                 if not names: print(f"Computing overlap {cnt + 1}/{len(data)}...")
                 else:
                     print(f"Computing overlap {cnt + 1}/{len(data)} (Shape 1: {names[0]}, Shape 2: {names[1]}, Video: {names[2]}...)")
-            results.extend((result))
+            results.extend(result)
         if pool_terminate_flag: terminate_cpu_pool(pool=pool, source=GeometryMixin().multiframe_compute_shape_overlap.__name__)
         return results
 
@@ -3455,7 +3455,7 @@ class GeometryMixin(object):
         data = np.hstack((data, bool_data))
         data = np.hstack((frm_id, data))
         img_arr = np.zeros((data.shape[0], h + 1, w + 1))
-        data = data[np.argwhere((data[:, 3] == 1))].reshape(-1, 4)
+        data = data[np.argwhere(data[:, 3] == 1)].reshape(-1, 4)
         pool_terminate_flag = False if pool is not None else True
         if pool is not None: check_valid_cpu_pool(value=pool, source=f'{GeometryMixin().cumsum_bool_geometries.__name__} pool', raise_error=True, accepted_cores=core_cnt)
         else: pool = get_cpu_pool(core_cnt=core_cnt, source=GeometryMixin().cumsum_bool_geometries.__name__)

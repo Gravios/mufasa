@@ -97,7 +97,7 @@ def egocentric_video_aligner(frm_range: np.ndarray,
     writer.release()
     return batch + 1
 
-class EgocentricVideoRotator():
+class EgocentricVideoRotator:
     """
     Perform egocentric rotation of a video using CPU multiprocessing.
 

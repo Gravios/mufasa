@@ -87,7 +87,7 @@ def pose_plotter_mp(data: pd.DataFrame,
     writer.release()
 
 
-class PosePlotterMultiProcess():
+class PosePlotterMultiProcess:
     """
     Create pose-estimation visualizations from data within a SimBA project folder using multiprocessing.
 

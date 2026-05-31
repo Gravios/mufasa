@@ -25,7 +25,7 @@ from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     get_fn_ext, get_video_meta_data, write_df)
 
 
-class SamInference():
+class SamInference:
 
     r"""
     :example:

@@ -59,7 +59,7 @@ from mufasa.utils.warnings import NoDataFoundWarning
 
 RGBFloat = Tuple[float, float, float]
 
-class SharedCounter(object):
+class SharedCounter:
     """Counter that can be shared across processes on different cores"""
 
     def __init__(self, initval=0):
@@ -479,7 +479,7 @@ def create_color_palettes(no_animals: int, map_size: int) -> List[List[int]]:
             currColorMap = cm.get_cmap("spring", map_size)
         currColorList = []
         for i in range(currColorMap.N):
-            rgb = list((currColorMap(i)[:3]))
+            rgb = list(currColorMap(i)[:3])
             rgb = [i * 255 for i in rgb]
             rgb.reverse()
             currColorList.append(rgb)

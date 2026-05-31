@@ -105,7 +105,7 @@ class MergeYoloProjects:
     def _parse_yamls(self) -> List[Dict]:
         projects = []
         for yaml_path in self.yaml_paths:
-            with open(yaml_path, 'r') as f:
+            with open(yaml_path) as f:
                 cfg = yaml.safe_load(f)
 
             root = cfg.get('path', os.path.dirname(yaml_path))

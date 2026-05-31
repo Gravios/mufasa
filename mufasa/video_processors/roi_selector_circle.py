@@ -13,7 +13,7 @@ from mufasa.utils.read_write import get_fn_ext, read_frm_of_video
 from mufasa.utils.warnings import CropWarning, ROIWarning
 
 
-class ROISelectorCircle(object):
+class ROISelectorCircle:
     r"""
     Class for selecting a circular region of interest (ROI) within an image or video frame.
     The selected region variables are stored in self: circle_center, circle_radius.

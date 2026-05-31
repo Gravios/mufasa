@@ -139,7 +139,7 @@ class LitPose2YOLOBbox:
                 y_center = ((y_min + y_max) / 2.0) / img_h
                 yolo_w, yolo_h = box_w / img_w, box_h / img_h
                 img_lbl.append(f'{cls_id} {x_center} {y_center} {yolo_w} {yolo_h}')
-            with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+            with open(lbl_save_path, mode='w', encoding='utf-8') as f:
                 f.write('\n'.join(img_lbl))
             cv2.imwrite(img_save_path, img)
         create_yolo_yaml(path=self.save_dir, train_path=self.img_train_dir, val_path=self.img_val_dir, names=self.names, save_path=self.map_path)

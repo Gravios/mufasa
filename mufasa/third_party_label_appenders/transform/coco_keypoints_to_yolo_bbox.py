@@ -207,7 +207,7 @@ class COCOKeypoints2YoloBbox:
                             *[f"{x:.6f} {y:.6f}" for x, y in norm_obb_pts]
                         ]) + '\n'
             if roi_str:
-                with open(label_save_path, mode='wt', encoding='utf-8') as f:
+                with open(label_save_path, mode='w', encoding='utf-8') as f:
                     f.write(roi_str)
                 cv2.imwrite(img_save_path, img)
 

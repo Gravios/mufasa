@@ -126,7 +126,7 @@ class KleinbergCalculator(ConfigReader):
             start_idx = list(kleinberg_df.index[kleinberg_df["hierarchy_difference"] <= 0])
             end_idx = list([x - 1 for x in start_idx][1:])
             end_idx_2 = list(kleinberg_df.index[(kleinberg_df["hierarchy_difference"] == 0) | (kleinberg_df["hierarchy_difference"] > 1)])
-            end_idx.extend((end_idx_2))
+            end_idx.extend(end_idx_2)
             for start, end in zip(start_idx, end_idx):
                 hierarchies_in_bout = kleinberg_df.loc[start:end]
                 target_hierarchy_in_hierarchies_bout = hierarchies_in_bout[hierarchies_in_bout["Hierarchy"] == self.hierarchy]

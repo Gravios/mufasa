@@ -101,7 +101,7 @@ plt.switch_backend("agg")
 CUML = 'cuml'
 SKLEARN = 'sklearn'
 
-class TrainModelMixin(object):
+class TrainModelMixin:
     """Train model methods"""
 
     def __init__(self):
@@ -1297,7 +1297,7 @@ class TrainModelMixin(object):
         remove_set = {(-1, -1)}
         for i in range(column_corr.shape[0]):
             field_corr = column_corr[i]
-            idxs = np.argwhere((field_corr > threshold)).flatten()
+            idxs = np.argwhere(field_corr > threshold).flatten()
             idxs = idxs[idxs != i]
             for j in idxs:
                 remove_set.add((np.min(np.array([i, j])), np.max(np.array([i, j]))))
@@ -1685,7 +1685,7 @@ class TrainModelMixin(object):
                         repeat(raise_bool_clf_error),
                 ):
                     df_lst.append(res[0])
-                    frame_numbers_lst.extend((res[1]))
+                    frame_numbers_lst.extend(res[1])
             df_concat = pd.concat(df_lst, axis=0).round(4)
             if "scorer" in df_concat.columns:
                 df_concat = df_concat.drop(["scorer"], axis=1)
@@ -1811,7 +1811,7 @@ class TrainModelMixin(object):
                 results = [executor.submit(self._read_data_file_helper_futures, data, file_type, classifier_names, raise_bool_clf_error, config_path) for data in annotations_file_paths]
                 for result in concurrent.futures.as_completed(results):
                     dfs.append(result.result()[0])
-                    frm_number_list.extend((result.result()[-1]))
+                    frm_number_list.extend(result.result()[-1])
                     stdout_information(msg=f"Reading complete {result.result()[1]} (elapsed time: {result.result()[2]}s)...")
 
             check_all_dfs_in_list_has_same_cols(dfs=dfs, source='derived/features + derived/labels', raise_error=True)

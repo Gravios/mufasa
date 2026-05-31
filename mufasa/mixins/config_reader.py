@@ -45,7 +45,7 @@ from mufasa.utils.warnings import (BodypartColumnNotFoundWarning,
                                   NoDataFoundWarning, NoFileFoundWarning)
 
 
-class ConfigReader(object):
+class ConfigReader:
     """
     Methods for reading SimBA configparser.Configparser project config and associated project data.
 

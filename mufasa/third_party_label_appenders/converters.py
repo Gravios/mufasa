@@ -209,7 +209,7 @@ def geometries_to_yolo(geometries: Dict[Union[str, int], np.ndarray],
     for k, v in results.items():
         name = k.split(sep='.', maxsplit=2)[0]
         file_name = os.path.join(save_labels_dir, f'{name}.txt')
-        with open(file_name, mode='wt', encoding='utf-8') as f:
+        with open(file_name, mode='w', encoding='utf-8') as f:
             f.write('\n'.join(v))
 
     if map is None:
@@ -861,7 +861,7 @@ def simba_rois_to_yolo(config_path: Optional[Union[str, os.PathLike]] = None,
             # cv2.polylines(img, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
             # cv2.imshow('sadasdasd', img)
             x = list(roi_results[video_name].values())
-            with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+            with open(lbl_save_path, mode='w', encoding='utf-8') as f:
                 f.write('\n'.join(x))
             cnt += 1
 
@@ -1021,7 +1021,7 @@ def labelme_to_yolo(labelme_dir: Union[str, os.PathLike],
                     bottom_right = (x_max / img_w, y_max / img_h)
                     bottom_left = (x_min / img_w, y_max / img_h)
                     roi_str += ' '.join([f"{label_id}", str(top_left[0]), str(top_left[1]), str(top_right[0]), str(top_right[1]), str(bottom_right[0]), str(bottom_right[1]), str(bottom_left[0]), str(bottom_left[1]) + '\n'])
-        with open(label_save_path, mode='wt', encoding='utf-8') as f:
+        with open(label_save_path, mode='w', encoding='utf-8') as f:
             f.write(roi_str)
         cv2.imwrite(img_save_path, img)
     with open(map_path, 'w') as f:
@@ -1193,7 +1193,7 @@ def coco_keypoints_to_yolo(coco_path: Union[str, os.PathLike],
             kps = list(np.column_stack((x, y, v)).flatten())
             roi_str += ' '.join(str(x) for x in kps) + '\n'
 
-        with open(label_save_path, mode='wt', encoding='utf-8') as f:
+        with open(label_save_path, mode='w', encoding='utf-8') as f:
             f.write(roi_str)
         cv2.imwrite(img_save_path, img)
     if len(list(set(shapes))) > 1:
@@ -1412,7 +1412,7 @@ def sleap_to_yolo_keypoints(data_dir: Union[str, os.PathLike],
             for kp in keypoints:
                 instance_str += f"{kp[0]:.6f} {kp[1]:.6f} {int(kp[2])} "
             img_lbl += instance_str.strip() + '\n'
-        with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+        with open(lbl_save_path, mode='w', encoding='utf-8') as f:
             f.write(img_lbl)
         cv2.imwrite(img_save_path, img)
 
@@ -1607,7 +1607,7 @@ def dlc_to_yolo_keypoints(dlc_dir: Union[str, os.PathLike],
             for kp in keypoints:
                 instance_str += f"{kp[0]:.6f} {kp[1]:.6f} {int(kp[2])} "
             img_lbl += instance_str.strip() + '\n'
-        with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+        with open(lbl_save_path, mode='w', encoding='utf-8') as f:
             f.write(img_lbl)
         cv2.imwrite(img_save_path, img)
     create_yolo_keypoint_yaml(path=save_dir, train_path=img_train_dir, val_path=img_val_dir, names=map_dict, save_path=map_path, kpt_shape=(len(flip_idx), 3), flip_idx=flip_idx)
@@ -1745,7 +1745,7 @@ def dlc_multi_animal_h5_to_yolo_keypoints(data_dir: Union[str, os.PathLike],
             for kp in keypoints:
                 instance_str += f"{kp[0]:.6f} {kp[1]:.6f} {int(kp[2])} "
             img_lbl += instance_str.strip() + '\n'
-        with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+        with open(lbl_save_path, mode='w', encoding='utf-8') as f:
             f.write(img_lbl)
         cv2.imwrite(img_save_path, img)
     create_yolo_keypoint_yaml(path=save_dir, train_path=img_train_dir, val_path=img_val_dir, names=map_dict, save_path=map_path, kpt_shape=(len(flip_idx), 3), flip_idx=flip_idx)
@@ -1908,7 +1908,7 @@ def simba_to_yolo_keypoints(config_path: Union[str, os.PathLike],
             for kp in keypoints:
                 instance_str += f"{kp[0]:.6f} {kp[1]:.6f} {int(kp[2])} "
             img_lbl += instance_str.strip() + '\n'
-            with open(lbl_save_path, mode='wt', encoding='utf-8') as f:
+            with open(lbl_save_path, mode='w', encoding='utf-8') as f:
                 f.write(img_lbl)
             cv2.imwrite(img_save_path, img)
 

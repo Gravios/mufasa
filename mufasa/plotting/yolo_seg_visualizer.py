@@ -66,7 +66,7 @@ def _yolo_seg_visualizer(frm_range: tuple,
     return batch_id
 
 
-class YOLOSegmentationVisualizer():
+class YOLOSegmentationVisualizer:
     """
     Visualizes polygon-based YOLO segmentation results overlaid on video frames.
 

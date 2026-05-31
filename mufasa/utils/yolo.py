@@ -374,7 +374,7 @@ def detect_yolo_project_type(label_path: str) -> str:
 
     BBOX_VALUE_CNT = 4
     KPT_DIM = 3
-    with open(label_path, 'r') as f:
+    with open(label_path) as f:
         for line in f:
             parts = line.strip().split()
             if len(parts) < 2:

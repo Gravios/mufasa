@@ -40,7 +40,7 @@ from mufasa.utils.read_write import (concatenate_videos_in_folder,
 from mufasa.utils.warnings import FrameRangeWarning
 
 SECONDS, HHMMSSSSSS = ['seconds', 'hh:mm:ss.ssss']
-CLF_CLR = tuple((x/255 for x in TextOptions.FLAMINGO.value))
+CLF_CLR = tuple(x/255 for x in TextOptions.FLAMINGO.value)
 
 
 def _validation_video_mp(data: pd.DataFrame,

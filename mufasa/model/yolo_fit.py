@@ -34,7 +34,7 @@ YOLO_M_PATH = "https://huggingface.co/Ultralytics/YOLO11/resolve/main/yolo11m-po
 
 
 
-class FitYolo():
+class FitYolo:
 
     """
     Fit an Ultralytics YOLO model (detection, pose, or segmentation) from SimBA projects with parameter validation.

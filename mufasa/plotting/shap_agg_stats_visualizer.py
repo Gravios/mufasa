@@ -115,7 +115,7 @@ def _insert_data_in_base_shap_plot(img: np.ndarray,
     cv2.putText(img, "CLASSIFICATION PROBABILITY", color_bar_middle, cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 0), 2)
     return img
 
-class ShapAggregateStatisticsCalculator():
+class ShapAggregateStatisticsCalculator:
     """
     Calculate aggregate (binned) SHAP value statistics where individual bins represent reaulated features.
     and create line chart visualizations reprsenting aggregations of behavior-present SHAP values.

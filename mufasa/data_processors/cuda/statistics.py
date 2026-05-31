@@ -629,7 +629,7 @@ def dunn_index(x: np.ndarray, y: np.ndarray) -> float:
     inter_deltas = cp.full((cp.unique(y).shape[0], cp.unique(y).shape[0]), fill_value=cp.inf, dtype=cp.float64)
     for cnt, k in enumerate(ys):
         k = int(k)
-        idx = cp.argwhere((y == k)).flatten()
+        idx = cp.argwhere(y == k).flatten()
         current_vals = x[idx, :].get()
         boundaries[k] = cp.array(current_vals[ConvexHull(current_vals).vertices])
         intra_dists = cdist(boundaries[k], boundaries[k])

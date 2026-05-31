@@ -47,7 +47,7 @@ COORD_COLS = ['X1', 'Y1', 'X2', 'Y2', 'X3', 'Y3', 'X4', 'Y4']
 NEAREST, CLASS_ID, CONFIDENCE, FRAME  = 'nearest', 'CLASS_ID', 'CONFIDENCE', 'FRAME'
 
 
-class YOLOPoseInference():
+class YOLOPoseInference:
 
     """
     YOLOPoseInference performs pose estimation on videos using a YOLO-based keypoint detection model.
