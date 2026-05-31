@@ -1,9 +1,6 @@
 import functools
-import multiprocessing
 import os
-import platform
 from pathlib import Path
-from typing import Dict, Optional, Tuple, Union
 
 try:
     from typing import Literal
@@ -24,7 +21,7 @@ from mufasa.utils.checks import (check_if_valid_rgb_tuple, check_instance,
                                 check_valid_boolean)
 from mufasa.utils.data import (create_color_palette, get_cpu_pool,
                               terminate_cpu_pool)
-from mufasa.utils.enums import OS, Formats, Options
+from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import CountError, InvalidFilepathError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,

@@ -1,6 +1,5 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
-from typing import List
 
 import pandas as pd
 

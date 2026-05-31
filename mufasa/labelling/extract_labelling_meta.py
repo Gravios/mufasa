@@ -1,5 +1,4 @@
 import os
-from typing import Optional, Union
 
 import pandas as pd
 
@@ -9,7 +8,7 @@ from mufasa.utils.checks import (
     check_if_df_field_is_boolean, check_that_column_exist, check_valid_boolean)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.errors import CountError
-from mufasa.utils.printing import SimbaTimer, stdout_success
+from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_df
 
 

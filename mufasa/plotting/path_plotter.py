@@ -2,7 +2,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import cv2
 import numpy as np
@@ -23,8 +23,7 @@ from mufasa.utils.enums import Formats, TagNames
 from mufasa.utils.errors import (FrameRangeError, InvalidInputError,
                                 InvalidVideoFileError, NoSpecifiedOutputError)
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
-from mufasa.utils.read_write import (find_video_of_file, get_fn_ext, read_df,
-                                    read_frm_of_video, remove_a_folder)
+from mufasa.utils.read_write import (find_video_of_file, get_fn_ext, read_frm_of_video, remove_a_folder)
 from mufasa.utils.warnings import ROIWarning
 
 STYLE_WIDTH = "width"

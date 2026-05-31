@@ -45,7 +45,6 @@ from __future__ import annotations
 import os
 import warnings
 from pathlib import Path
-from typing import List, Optional
 
 import pandas as pd
 

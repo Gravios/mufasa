@@ -4,7 +4,6 @@ import glob
 import os
 from collections import OrderedDict
 from datetime import datetime
-from typing import Optional
 
 import pandas as pd
 

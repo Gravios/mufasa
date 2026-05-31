@@ -2,7 +2,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import itertools
 import os
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import cv2
 import numpy as np
@@ -11,9 +11,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.roi_tools.ROI_feature_analyzer import ROIFeatureCreator
 from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_keys_exist_in_dict, check_int,
-                                check_valid_array, check_valid_dataframe,
-                                check_valid_lst,
+                                check_if_keys_exist_in_dict, check_valid_lst,
                                 check_video_and_data_frm_count_align)
 from mufasa.utils.data import slice_roi_dict_for_video
 from mufasa.utils.enums import Formats, Keys, TextOptions

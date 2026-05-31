@@ -1,15 +1,10 @@
 import functools
-import gc
 import multiprocessing
 import os
-import platform
-import time
-from copy import copy, deepcopy
-from typing import Dict, List, Optional, Tuple, Union
+from copy import deepcopy
 
 import cv2
 import numpy as np
-import pandas as pd
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import cdist
 from scipy.spatial.qhull import QhullError
@@ -19,18 +14,14 @@ from shapely.geometry import MultiPolygon, Polygon
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.utils.checks import (check_float, check_instance, check_int,
                                 check_nvidea_gpu_available,
-                                check_valid_boolean, check_valid_cpu_pool,
-                                is_img_bw)
+                                check_valid_boolean, check_valid_cpu_pool)
 from mufasa.utils.data import resample_geometry_vertices, terminate_cpu_pool
-from mufasa.utils.enums import OS, Defaults
+from mufasa.utils.enums import Defaults
 from mufasa.utils.errors import FFMPEGCodecGPUError, MufasaGPUError
 from mufasa.utils.lookups import get_available_ram
 from mufasa.utils.read_write import (find_core_cnt, get_fn_ext,
                                     get_memory_usage_array,
-                                    get_video_meta_data, img_stack_to_bw,
-                                    img_to_bw, read_frm_of_video,
-                                    read_img_batch_from_video,
-                                    read_img_batch_from_video_gpu)
+                                    get_video_meta_data, img_to_bw, read_frm_of_video)
 
 
 def stabilize_body_parts(bp_1: np.ndarray,

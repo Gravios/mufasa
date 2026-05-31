@@ -1,7 +1,6 @@
 import json
 import os
 from datetime import datetime
-from typing import Optional, Tuple, Union
 
 import pandas as pd
 

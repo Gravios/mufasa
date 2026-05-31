@@ -3,7 +3,6 @@ import multiprocessing
 import os
 import random
 from copy import deepcopy
-from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -24,7 +23,7 @@ from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     create_directory, find_core_cnt,
                                     find_files_of_filetypes_in_directory,
-                                    get_current_time, get_fn_ext,
+                                    get_fn_ext,
                                     get_video_meta_data, read_frm_of_video,
                                     recursive_file_search, remove_a_folder)
 

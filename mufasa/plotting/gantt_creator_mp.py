@@ -5,12 +5,9 @@ import warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 import functools
 import gc
-import multiprocessing
 import os
-import platform
 import sys
 from copy import deepcopy
-from typing import List, Optional, Union
 
 import cv2
 
@@ -53,7 +50,7 @@ from mufasa.utils.lookups import get_fonts
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     create_directory, find_core_cnt,
-                                    get_fn_ext, read_df, seconds_to_timestamp)
+                                    get_fn_ext, seconds_to_timestamp)
 
 HEIGHT = "height"
 WIDTH = "width"

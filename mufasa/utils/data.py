@@ -10,7 +10,7 @@ import subprocess
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import h5py
 import numpy as np
@@ -53,7 +53,7 @@ from mufasa.utils.printing import stdout_success, stdout_warning
 from mufasa.utils.read_write import (find_core_cnt, find_video_of_file,
                                     get_current_time, get_fn_ext,
                                     get_video_meta_data, read_config_entry,
-                                    read_config_file, read_df,
+                                    read_df,
                                     read_project_path_and_file_type,
                                     read_roi_data, write_df)
 from mufasa.utils.warnings import DuplicateNamesWarning

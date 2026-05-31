@@ -12,13 +12,12 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from tkinter import *
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import cv2
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageTk
-from shapely.affinity import scale
 from shapely.geometry import Polygon
 from skimage.color import label2rgb
 from skimage.segmentation import slic
@@ -53,9 +52,9 @@ from mufasa.utils.errors import (CountError, DirectoryExistError,
                                 NoDataError, NoFilesFoundError,
                                 NotDirectoryError, ResolutionError,
                                 MufasaGPUError)
-from mufasa.utils.lookups import (get_current_time, get_ffmpeg_codec,
+from mufasa.utils.lookups import (get_ffmpeg_codec,
                                  get_ffmpeg_crossfade_methods,
-                                 get_ffmpeg_encoders, get_fonts,
+                                 get_fonts,
                                  get_named_colors, percent_to_crf_lookup,
                                  percent_to_qv_lk, quality_pct_to_crf,
                                  video_quality_to_preset_lookup)

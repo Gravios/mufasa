@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import math
 from copy import deepcopy
 from tkinter import Event, Toplevel
-from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np

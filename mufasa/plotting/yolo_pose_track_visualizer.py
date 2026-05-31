@@ -1,9 +1,5 @@
-import argparse
 import functools
-import multiprocessing
 import os
-import sys
-from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np

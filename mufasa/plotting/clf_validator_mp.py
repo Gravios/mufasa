@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import functools
 import multiprocessing
 import os
-from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -17,10 +16,10 @@ from mufasa.utils.checks import (check_float, check_if_valid_rgb_tuple,
 from mufasa.utils.data import detect_bouts, terminate_cpu_pool
 from mufasa.utils.enums import Formats, TextOptions
 from mufasa.utils.errors import NoSpecifiedOutputError
-from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
+from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     find_core_cnt, get_fn_ext,
-                                    get_video_meta_data, read_df, remove_files)
+                                    get_video_meta_data, remove_files)
 from mufasa.utils.warnings import NoDataFoundWarning
 
 SPACE_SCALE = 60

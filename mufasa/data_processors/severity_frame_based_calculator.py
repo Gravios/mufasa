@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from datetime import datetime
-from typing import Dict, Union
 
 import cv2
 import numpy as np
@@ -14,9 +13,9 @@ from mufasa.utils.checks import (check_if_filepath_list_is_empty,
                                 check_that_column_exist)
 from mufasa.utils.data import (create_color_palettes, detect_bouts, find_bins,
                               get_video_meta_data)
-from mufasa.utils.errors import InvalidVideoFileError, NoDataError
+from mufasa.utils.errors import InvalidVideoFileError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df
+from mufasa.utils.read_write import get_fn_ext
 from mufasa.utils.warnings import NoDataFoundWarning
 
 

@@ -23,7 +23,7 @@ from configparser import ConfigParser
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Iterable
 
 import h5py
 from PIL import Image, ImageFile

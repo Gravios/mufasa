@@ -1,8 +1,6 @@
 __author__ = "Tzuk Polinsky"
 
-import itertools
 import os
-from typing import Union
 
 import numpy as np
 import pandas as pd
@@ -10,8 +8,6 @@ import pandas as pd
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.utils.checks import check_if_filepath_list_is_empty
-from mufasa.utils.enums import ConfigKey, Dtypes
-from mufasa.utils.errors import AnimalNumberError
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_df
 

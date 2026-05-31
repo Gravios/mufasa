@@ -3,7 +3,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import ast
 import glob
 import os
-from configparser import ConfigParser, NoOptionError, NoSectionError
+from configparser import ConfigParser, NoOptionError
 
 import pandas as pd
 import scipy.io

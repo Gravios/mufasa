@@ -1,6 +1,5 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
-from typing import List, Optional, Tuple
 
 import numpy as np
 from numba import float32, float64, int64, jit, njit, prange, typed, types

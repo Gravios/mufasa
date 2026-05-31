@@ -1,13 +1,13 @@
 import json
 import os
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import pandas as pd
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 from mufasa.third_party_label_appenders.transform.utils import arr_to_b64
 from mufasa.utils.checks import (check_file_exist_and_readable,

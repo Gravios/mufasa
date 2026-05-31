@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -18,7 +17,7 @@ from mufasa.utils.data import detect_bouts, slice_roi_dict_for_video
 from mufasa.utils.enums import ROI_SETTINGS, Keys
 from mufasa.utils.errors import InvalidInputError, NoROIDataError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df
+from mufasa.utils.read_write import get_fn_ext
 from mufasa.utils.warnings import NotEnoughDataWarning, ROIWarning
 
 TOTAL_TIME = 'TOTAL BEHAVIOR TIME IN ROI (S)'

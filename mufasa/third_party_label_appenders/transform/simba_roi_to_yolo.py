@@ -1,12 +1,11 @@
 import os
 import random
 from datetime import datetime
-from typing import Optional, Union
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import cv2
 import numpy as np
@@ -18,7 +17,7 @@ from mufasa.third_party_label_appenders.transform.utils import \
     create_yolo_keypoint_yaml
 from mufasa.utils.checks import (check_float, check_if_dir_exists, check_int,
                                 check_valid_boolean)
-from mufasa.utils.enums import Formats, Options
+from mufasa.utils.enums import Options
 from mufasa.utils.errors import InvalidInputError, NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (create_directory,

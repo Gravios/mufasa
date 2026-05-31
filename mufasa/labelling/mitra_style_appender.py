@@ -1,6 +1,5 @@
 import os
 from copy import deepcopy
-from typing import Union
 
 import pandas as pd
 

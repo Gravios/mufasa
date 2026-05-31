@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from datetime import datetime
-from typing import Dict, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -11,7 +10,7 @@ from numba import jit
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import check_if_filepath_list_is_empty
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df
+from mufasa.utils.read_write import get_fn_ext
 from mufasa.utils.warnings import NoDataFoundWarning
 
 

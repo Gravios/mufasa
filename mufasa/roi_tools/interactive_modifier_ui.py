@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
 from tkinter import *
-from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np

@@ -2,10 +2,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import functools
 import itertools
-import multiprocessing
 import os
-import platform
-from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd

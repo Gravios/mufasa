@@ -43,12 +43,10 @@ from __future__ import annotations
 
 import argparse
 import csv
-import os
 import platform
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
 
 import mufasa
 from mufasa.project_layout import (

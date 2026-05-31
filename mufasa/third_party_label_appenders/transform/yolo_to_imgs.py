@@ -1,13 +1,11 @@
 import os
-from typing import Optional, Union
 
 import cv2
-import numpy as np
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import check_float, check_if_dir_exists, check_str
 from mufasa.utils.data import create_color_palettes
-from mufasa.utils.enums import Formats, Options
+from mufasa.utils.enums import Options
 from mufasa.utils.read_write import read_img, recursive_file_search
 
 

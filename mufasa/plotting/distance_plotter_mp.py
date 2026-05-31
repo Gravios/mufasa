@@ -2,8 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import functools
 import multiprocessing
 import os
-import platform
-from typing import Dict, List, Optional, Union
 
 import cv2
 import numpy as np

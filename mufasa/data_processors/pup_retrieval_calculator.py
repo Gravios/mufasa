@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import glob
 import os
 from datetime import datetime
-from typing import Dict, Union
 
 import pandas as pd
 import seaborn as sns

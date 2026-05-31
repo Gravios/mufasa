@@ -1,9 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
-import glob
 import os
-import subprocess
-from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np

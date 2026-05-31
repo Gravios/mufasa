@@ -3,15 +3,14 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from itertools import product
-from typing import Union
 
 import numpy as np
 import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
-from mufasa.utils.checks import check_float, check_str
-from mufasa.utils.errors import MissingColumnsError, ParametersFileError
+from mufasa.utils.checks import check_str
+from mufasa.utils.errors import MissingColumnsError
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_df, write_df
 

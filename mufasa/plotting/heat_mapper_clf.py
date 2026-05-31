@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
-from typing import List, Union
 
 import cv2
 import numpy as np
@@ -16,7 +15,7 @@ from mufasa.utils.checks import (
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import InvalidInputError, NoSpecifiedOutputError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df
+from mufasa.utils.read_write import get_fn_ext
 
 
 class HeatMapperClfSingleCore(ConfigReader, PlottingMixin):

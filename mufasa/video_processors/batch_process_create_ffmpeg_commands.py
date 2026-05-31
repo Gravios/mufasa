@@ -1,4 +1,3 @@
-from typing import Tuple, Union
 
 try:
     from typing import Literal

@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from tkinter import *
-from typing import Union
 
 import cv2
 import numpy as np
@@ -11,7 +10,6 @@ from PIL import ImageTk
 
 from mufasa.utils.checks import check_file_exist_and_readable, check_valid_array
 from mufasa.utils.enums import Formats
-from mufasa.utils.errors import FrameRangeError
 from mufasa.utils.lookups import get_icons_paths
 from mufasa.utils.read_write import get_video_meta_data
 from mufasa.utils.warnings import FrameRangeWarning

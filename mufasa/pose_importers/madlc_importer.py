@@ -1,8 +1,7 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
-from copy import deepcopy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 try:
     from typing import Literal
@@ -18,8 +17,7 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pose_importer_mixin import PoseImporterMixin
 from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_dir_exists,
-                                check_if_keys_exist_in_dict, check_instance,
-                                check_int, check_str, check_valid_lst)
+                                check_if_keys_exist_in_dict, check_int, check_str, check_valid_lst)
 from mufasa.utils.enums import Formats, Methods, Options
 from mufasa.utils.errors import BodypartColumnNotFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success

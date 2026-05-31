@@ -1,7 +1,6 @@
 import json
 import os
 import random
-from typing import Optional, Union
 
 import cv2
 import h5py

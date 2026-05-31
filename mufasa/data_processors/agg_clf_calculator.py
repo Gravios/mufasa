@@ -1,15 +1,12 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
-import argparse
 import os
-import sys
 from copy import deepcopy
-from typing import List, Optional, Union
 
 try:
     from typing import Literal
 except ImportError:
-    from typing_extensions import Literal
+    pass
 
 import pandas as pd
 
@@ -23,7 +20,7 @@ from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import NoChoosenMeasurementError
 from mufasa.utils.printing import log_event, stdout_information, stdout_success
 from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df)
+                                    get_fn_ext)
 from mufasa.utils.warnings import NoDataFoundWarning
 
 FIRST_OCCURRENCE = "First occurrence (s)"

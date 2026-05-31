@@ -13,7 +13,7 @@ from copy import copy
 from datetime import datetime
 from multiprocessing import Lock, Value
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 try:
     from typing import Literal
@@ -33,7 +33,7 @@ from mufasa.utils.checks import (check_ffmpeg_available,
                                 check_if_dir_exists, check_if_valid_rgb_tuple,
                                 check_instance, check_int, check_str,
                                 check_valid_dict, check_valid_tuple)
-from mufasa.utils.enums import (OS, UML, Defaults, FontPaths, Formats, Keys,
+from mufasa.utils.enums import (OS, UML, Defaults, Formats, Keys,
                                Methods, Options, Paths)
 from mufasa.utils.errors import (FFMPEGNotFoundError, InvalidInputError,
                                 NoFilesFoundError, MufasaPackageVersionError)

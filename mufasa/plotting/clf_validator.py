@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -15,8 +14,8 @@ from mufasa.utils.checks import (check_float, check_if_valid_rgb_tuple,
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats, TextOptions
 from mufasa.utils.errors import NoFilesFoundError, NoSpecifiedOutputError
-from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import get_fn_ext, get_video_meta_data, read_df
+from mufasa.utils.printing import stdout_success
+from mufasa.utils.read_write import get_fn_ext, get_video_meta_data
 from mufasa.utils.warnings import NoDataFoundWarning
 
 

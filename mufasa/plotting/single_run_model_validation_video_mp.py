@@ -7,9 +7,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import functools
 import multiprocessing
 import os
-import platform
 from copy import deepcopy
-from typing import List, Optional, Union
 
 import cv2
 import pandas as pd

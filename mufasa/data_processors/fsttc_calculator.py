@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import itertools
 import os
-from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -14,7 +13,7 @@ from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import CountError
 from mufasa.utils.printing import log_event, stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df
+from mufasa.utils.read_write import get_fn_ext
 
 
 class FSTTCCalculator(ConfigReader, PlottingMixin):

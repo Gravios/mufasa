@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import functools
 import multiprocessing
 import os
-from typing import Dict, Optional, Union
 
 import numpy as np
 import pandas as pd

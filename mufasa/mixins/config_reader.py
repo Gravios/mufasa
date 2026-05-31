@@ -11,7 +11,7 @@ import shutil
 from configparser import ConfigParser
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import cv2
 import pandas as pd

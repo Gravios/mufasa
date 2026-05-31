@@ -1,6 +1,4 @@
 import math
-from time import perf_counter
-from typing import Optional
 
 import numpy as np
 from numba import cuda, float64

@@ -3,7 +3,7 @@ import io
 import os
 import shutil
 from copy import copy
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import cv2
 import imutils

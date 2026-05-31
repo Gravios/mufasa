@@ -1,6 +1,5 @@
 import os
 from copy import copy
-from typing import Optional, Union
 
 from mufasa.data_processors.interpolate import Interpolate
 from mufasa.data_processors.smoothing import Smoothing

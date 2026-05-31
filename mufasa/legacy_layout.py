@@ -33,7 +33,7 @@ from __future__ import annotations
 import configparser
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # Maps a legacy subdirectory (relative to project_folder/) to
 # the v1 destination (relative to project root) and a free-form

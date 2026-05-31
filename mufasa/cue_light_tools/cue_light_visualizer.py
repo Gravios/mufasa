@@ -1,10 +1,8 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import functools
-import itertools
 import multiprocessing
 import os
-from typing import List, Optional, Union
 
 import cv2
 import numpy as np
@@ -17,13 +15,13 @@ from mufasa.utils.checks import (check_file_exist_and_readable, check_int,
                                 check_valid_lst)
 from mufasa.utils.data import (create_color_palettes, detect_bouts,
                               slice_roi_dict_from_attribute)
-from mufasa.utils.enums import Defaults, Formats, Keys, TextOptions
+from mufasa.utils.enums import Defaults, Formats, TextOptions
 from mufasa.utils.errors import NoROIDataError, NoSpecifiedOutputError
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import (concatenate_videos_in_folder,
                                     create_directory, find_core_cnt,
                                     get_fn_ext, get_video_meta_data, read_df,
-                                    read_frm_of_video, remove_a_folder)
+                                    read_frm_of_video)
 
 
 def _plot_cue_light_data(frm_idxs: list,

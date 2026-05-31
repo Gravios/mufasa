@@ -3,7 +3,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import os
 import platform
 from copy import copy
-from typing import Tuple, Union
 
 import matplotlib.pyplot as plt
 
@@ -14,7 +13,7 @@ from mufasa.utils.checks import (check_file_exist_and_readable,
                                 check_if_valid_rgb_tuple, check_int,
                                 check_valid_boolean, check_valid_dataframe)
 from mufasa.utils.enums import OS, Formats, Paths
-from mufasa.utils.errors import ColumnNotFoundError, InvalidInputError
+from mufasa.utils.errors import InvalidInputError
 from mufasa.utils.read_write import get_fn_ext, get_video_meta_data, read_df
 from mufasa.utils.warnings import FrameRangeWarning
 

@@ -1,7 +1,6 @@
 import ast
 import os
 from itertools import product
-from typing import Dict, Union
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -11,7 +10,7 @@ from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.utils.checks import check_if_filepath_list_is_empty
 from mufasa.utils.enums import ConfigKey, Methods, Options, TagNames
 from mufasa.utils.errors import SamplingError
-from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
+from mufasa.utils.printing import SimbaTimer, log_event
 from mufasa.utils.read_write import read_config_entry
 
 

@@ -1,10 +1,8 @@
 from itertools import product
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.model_selection import StratifiedKFold
 
 from mufasa.model.regression.metrics import (mean_absolute_error,
                                             mean_absolute_percentage_error,

@@ -1,13 +1,12 @@
 import os
 import random
-from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import cv2
 import numpy as np
@@ -18,7 +17,6 @@ from mufasa.third_party_label_appenders.converters import create_yolo_yaml
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_if_dir_exists, check_int, check_str,
                                 check_valid_boolean, check_valid_dataframe,
-                                check_valid_tuple,
                                 check_video_and_data_frm_count_align)
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import NoFilesFoundError

@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 from itertools import combinations, permutations
-from typing import List, Optional, Tuple, Union
 
 import pandas as pd
 from sklearn.metrics import (adjusted_mutual_info_score, adjusted_rand_score,

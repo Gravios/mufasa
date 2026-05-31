@@ -1,6 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import os
-from typing import Iterable, List, Optional, Tuple, Union
+from typing import Iterable
 
 import numpy as np
 import pandas as pd

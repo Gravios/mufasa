@@ -1,7 +1,6 @@
 import os
 import threading
 from queue import Queue
-from typing import Optional, Tuple, Union
 
 import numpy as np
 

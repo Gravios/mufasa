@@ -1,12 +1,8 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
-import glob
 import os
 from copy import deepcopy
-from typing import Dict, Optional, Union
 
-import numpy as np
-import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (
@@ -16,7 +12,7 @@ from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import (bento_file_reader,
                                     find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, write_df)
+                                    get_fn_ext)
 from mufasa.utils.warnings import (
     ThirdPartyAnnotationsClfMissingWarning,
     ThirdPartyAnnotationsOutsidePoseEstimationDataWarning)

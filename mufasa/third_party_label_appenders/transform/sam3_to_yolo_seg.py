@@ -1,15 +1,14 @@
 import os
 import random
 import time
-from typing import Optional, Tuple, Union
 
 import cv2
 import numpy as np
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 try:

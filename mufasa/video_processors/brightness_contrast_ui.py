@@ -1,5 +1,4 @@
 import os
-from typing import Tuple, Union
 
 import cv2
 import numpy as np

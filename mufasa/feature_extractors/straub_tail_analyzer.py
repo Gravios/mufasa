@@ -1,13 +1,13 @@
 import os
-from typing import Iterable, List, Optional, Union
+from typing import Iterable
 
 import pandas as pd
 from numba import typed
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 from copy import deepcopy
 
@@ -18,12 +18,10 @@ from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.image_mixin import ImageMixin
 from mufasa.mixins.timeseries_features_mixin import TimeseriesFeatureMixin
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_float, check_int,
-    check_valid_array, check_valid_dataframe)
-from mufasa.utils.enums import Defaults, Formats
+    check_all_file_names_are_represented_in_video_log, check_valid_dataframe)
+from mufasa.utils.enums import Formats
 from mufasa.utils.printing import SimbaTimer
-from mufasa.utils.read_write import (find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
+from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
                                     find_video_of_file, get_fn_ext, read_df,
                                     read_video_info, write_df)
 

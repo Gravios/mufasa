@@ -1,9 +1,9 @@
 import math
 import os
-from typing import Any, Dict, Tuple, Union
+from typing import Any
 
 import numpy as np
-from numba import cuda, float64
+from numba import cuda
 
 try:
     import PyNvVideoCodec as nvc

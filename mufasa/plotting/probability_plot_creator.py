@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from copy import deepcopy
-from typing import List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
@@ -17,7 +16,7 @@ from mufasa.utils.enums import Formats
 from mufasa.utils.errors import NoSpecifiedOutputError
 from mufasa.utils.lookups import get_color_dict
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import get_fn_ext, read_df
+from mufasa.utils.read_write import get_fn_ext
 
 VALID_COLORS = list(get_color_dict().keys())
 FOURCC = cv2.VideoWriter_fourcc(*Formats.MP4_CODEC.value)

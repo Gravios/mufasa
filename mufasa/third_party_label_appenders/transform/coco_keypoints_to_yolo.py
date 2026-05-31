@@ -3,12 +3,11 @@ import os
 import random
 import sys
 from copy import copy
-from typing import Optional, Tuple, Union
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 import cv2
 import numpy as np

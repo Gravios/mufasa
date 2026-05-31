@@ -2,7 +2,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import os
 from pathlib import Path
-from typing import Dict, Optional, Union
 
 import cv2
 import numpy as np

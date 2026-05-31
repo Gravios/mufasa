@@ -5,7 +5,6 @@ start = time.time()
 import glob
 import itertools
 import os
-from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,9 +13,9 @@ import seaborn as sns
 from numba import jit, prange, typed
 
 try:
-    from typing import Literal
+    pass
 except:
-    from typing_extensions import Literal
+    pass
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
