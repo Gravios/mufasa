@@ -127,7 +127,7 @@ class TrainModelMixin(object):
         :rtype: Tuple[pd.DataFrame, List[int]]
 
         :examples:
-        >>> self.read_all_files_in_folder(file_paths=['targets_inserted/Video_1.csv', 'targets_inserted/Video_2.csv'], file_type='csv', classifier_names=['Attack'])
+        >>> self.read_all_files_in_folder(file_paths=['Video_1.csv', 'Video_2.csv'], file_type='csv', classifier_names=['Attack'])
         """
         # Patch 122ak: v1-native only. config_path is required —
         # the legacy read_df(file_path) branch is gone. file_path
@@ -2408,7 +2408,7 @@ class TrainModelMixin(object):
 
 
         :examples:
-        >>> df = pd.read_csv('/path/to/troubleshooting/multilabel/project_folder/csv/targets_inserted/01.YC015YC016phase45-sample_sampler.csv', index_col=0)
+        >>> df = pd.read_csv('/path/to/troubleshooting/multilabel/project_folder/derived/labels/01.YC015YC016phase45-sample_sampler.csv', index_col=0)
         >>> TrainModelMixin().random_multiclass_frm_sampler(data_df=df, target_field='syllable_class', target_var=0, sampling_ratio=0.20)
         >>> TrainModelMixin().random_multiclass_frm_sampler(data_df=df, target_field='syllable_class', target_var=0, sampling_ratio={1: 0.1, 2: 0.2, 3: 0.3})
         """
@@ -2501,7 +2501,7 @@ class TrainModelMixin(object):
         :return (pd.DataFrame, pd.DataFrame): resampled features, and resampled associated target.
 
         :examples:
-        >>> df = pd.read_csv('/path/to/troubleshooting/multilabel/project_folder/csv/targets_inserted/01.YC015YC016phase45-sample_sampler.csv', index_col=0)
+        >>> df = pd.read_csv('/path/to/troubleshooting/multilabel/project_folder/derived/labels/01.YC015YC016phase45-sample_sampler.csv', index_col=0)
         >>> undersampled_df = TrainModelMixin().random_multiclass_bout_sampler(data=df, target_field='syllable_class', target_var=0, sampling_ratio={1: 1.0, 2: 1, 3: 1}, raise_error=True)
         """
 
@@ -2753,7 +2753,7 @@ class TrainModelMixin(object):
         :example:
         >>> CONFIG_PATH = r"C:/troubleshooting/mitra/project.toml"
         >>> RF_PATH = r"C:/troubleshooting/mitra/models/validations/straub_tail_5_new/straub_tail_5.sav"
-        >>> DATA_PATH = r"C:/troubleshooting/mitra/project_folder/csv/targets_inserted/new_straub/appended/501_MA142_Gi_CNO_0514.csv"
+        >>> DATA_PATH = r"C:/troubleshooting/mitra/project_folder/derived/labels/new_straub/appended/501_MA142_Gi_CNO_0514.csv"
         >>> config = ConfigReader(config_path=CONFIG_PATH)
         >>> df = read_df(file_path=DATA_PATH, file_type='csv')
         >>> y = df['straub_tail']
