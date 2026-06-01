@@ -1133,13 +1133,13 @@ def rotate_img_stack_cupy(imgs: np.ndarray,
     check_valid_array(data=imgs, source=f'{rotate_img_stack_cupy.__name__} imgs', accepted_ndims=(3, 4))
     check_int(name=f'{rotate_img_stack_cupy.__name__} rotation', value=rotation_degrees, min_value=1, max_value=359)
     check_valid_boolean(value=verbose, source=f'{rotate_img_stack_cupy.__name__} verbose', raise_error=True)
-    
+
     first_img = cp.array(imgs[0:1])
     rotated_first = rotate(input=first_img, angle=rotation_degrees, axes=(2, 1), reshape=True)
     output_shape = (imgs.shape[0],) + rotated_first.shape[1:]
-    
+
     results = cp.zeros(output_shape, dtype=np.uint8)
-    
+
     for l in range(0, imgs.shape[0], batch_size):
         r = min(l + batch_size, imgs.shape[0])
         if verbose:
@@ -1152,7 +1152,7 @@ def rotate_img_stack_cupy(imgs: np.ndarray,
         final_results = results.get()
     else:
         final_results = results
-    
+
     timer.stop_timer()
     if verbose: print(f'[{get_current_time()}] Image rotation complete (elapsed time: {timer.elapsed_time_str}s)')
     return final_results

@@ -1860,11 +1860,11 @@ class ImageMixin:
         """
 
         frm, frm_idx = ImageMixin.find_first_non_uniform_clr_frm(video_path=video)
-        
+
         # If frame has only 2 dimensions, it's definitely greyscale
         if frm.ndim == 2:
             return False
-        
+
         # If frame has 3 dimensions, check if it's actually greyscale
         # (some greyscale videos are stored as 3-channel with identical values)
         if frm.ndim == 3:
@@ -1879,7 +1879,7 @@ class ImageMixin:
                 return False  # Single channel = greyscale
             else:
                 return True   # Other multi-channel formats = color
-        
+
         # Default case: assume greyscale
         return False
 
@@ -2090,7 +2090,7 @@ class ImageMixin:
         scaled_frms = [cv2.resize(x, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_LINEAR) for x in frms]
         if crop_ratio is not None:
             scaled_frms = [ImageMixin.segment_img_vertical(img=x, pct=crop_ratio, left=True) for x in scaled_frms]
-        
+
         return cv2.hconcat(scaled_frms)
 
     @staticmethod

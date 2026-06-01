@@ -124,22 +124,22 @@ class InteractiveROIBufferer:
                 self.top_left = (new_center[0] - new_radius, new_center[1] - new_radius)
                 self.bottom_right = (new_center[0] + new_radius, new_center[1] + new_radius)
                 self.left_border_tag = (new_center[0] - new_radius, new_center[1])
-                
+
                 new_roi = create_circle_entry(circle_selector=self, video_name=self.clicked_roi['Video'], shape_name=self.clicked_roi['Name'], clr_name=self.clicked_roi['Color name'], clr_bgr=self.clicked_roi['Color BGR'], thickness=self.clicked_roi['Thickness'], ear_tag_size=int(self.clicked_roi['Ear_tag_size']), px_conversion_factor=self.px_per_mm)
-                
+
             else:
                 center_tag_names = ['Center tag', 'Center_tag']
                 corner_tags = {k: v for k, v in original_tags.items() if k not in center_tag_names}
                 if len(corner_tags) > 0:
                     tag_coords = np.array(list(corner_tags.values()))
                     centroid = np.mean(tag_coords, axis=0)
-                    
+
                     buffered_tags = {}
                     for tag_name, tag_coord in corner_tags.items():
                         tag_coord_np = np.array(tag_coord)
                         vec_to_tag = tag_coord_np - centroid
                         vec_length = np.linalg.norm(vec_to_tag)
-                        
+
                         if vec_length > 1e-10:
                             vec_normalized = vec_to_tag / vec_length
                             new_coord = tag_coord_np + vec_normalized * buffer_px
@@ -169,9 +169,9 @@ class InteractiveROIBufferer:
                 self.height = abs(self.bottom_right[1] - self.top_left[1])
                 self.circle_radius = int(self.width / 2)
                 self.left_border_tag = self.left_tag
-                
+
                 new_roi = create_rectangle_entry(rectangle_selector=self, video_name=self.clicked_roi['Video'], shape_name=self.clicked_roi['Name'], clr_name=self.clicked_roi['Color name'], clr_bgr=self.clicked_roi['Color BGR'], thickness=self.clicked_roi['Thickness'], ear_tag_size=int(self.clicked_roi['Ear_tag_size']), px_conversion_factor=self.px_per_mm)
-            
+
             self.roi_dict[self.clicked_roi['Name']] = new_roi
             self.temp_img = _plot_roi(roi_dict=self.roi_dict, img=self.original_img.copy())
             self.__update_image(img=self.temp_img)

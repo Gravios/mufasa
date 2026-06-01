@@ -137,7 +137,7 @@ class InteractiveProbabilityGrapher(ConfigReader):
             fig.canvas.manager.window.iconbitmap(ICON_WINDOWS)
         if (platform.system() == OS.MAC.value) and os.path.isfile(ICON_DARWIN):
             fig.canvas.manager.window.iconbitmap(ICON_DARWIN)
-        
+
         plt.xlabel("Frame #", fontsize=self.lbl_font_size, fontweight='500')
         plt.ylabel(f"{self.clf_name} Probability", fontsize=self.lbl_font_size, fontweight='500')
         plt.title(plt_title, fontsize=self.lbl_font_size - 2, pad=20)
