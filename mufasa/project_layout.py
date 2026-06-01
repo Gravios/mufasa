@@ -538,7 +538,7 @@ class ProjectPaths:
     root: Path
 
     @classmethod
-    def open(cls, root: Path) -> "ProjectPaths":
+    def open(cls, root: Path) -> ProjectPaths:
         """Validate that ``root`` is a v1 project, return a
         ProjectPaths.
 

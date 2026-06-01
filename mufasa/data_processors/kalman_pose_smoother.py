@@ -1480,7 +1480,7 @@ class _MStepStats:
     sigma_n: np.ndarray
 
     @classmethod
-    def zeros(cls, n_markers: int, state_dim: int) -> "_MStepStats":
+    def zeros(cls, n_markers: int, state_dim: int) -> _MStepStats:
         return cls(
             S00=np.zeros((state_dim, state_dim)),
             S11=np.zeros((state_dim, state_dim)),
@@ -1490,7 +1490,7 @@ class _MStepStats:
             sigma_n=np.zeros(n_markers, dtype=np.int64),
         )
 
-    def add(self, other: "_MStepStats") -> None:
+    def add(self, other: _MStepStats) -> None:
         self.S00 += other.S00
         self.S11 += other.S11
         self.S10 += other.S10

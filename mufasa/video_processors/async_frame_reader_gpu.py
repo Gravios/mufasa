@@ -3,7 +3,7 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import queue
 import threading
-from typing import Generator
+from collections.abc import Generator
 
 import cv2
 import numpy as np

@@ -6,7 +6,7 @@ import pandas as pd
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
                                 check_if_dir_exists,

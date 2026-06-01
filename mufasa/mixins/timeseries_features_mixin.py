@@ -20,7 +20,7 @@ from mufasa.utils.errors import InvalidInputError
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 from typing import get_type_hints
 

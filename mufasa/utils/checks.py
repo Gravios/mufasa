@@ -6,12 +6,13 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 try:
     import cupy as cp

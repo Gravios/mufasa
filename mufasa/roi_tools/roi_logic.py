@@ -180,7 +180,7 @@ class ROILogic:
         # ~1.25 GB even if the user scrubs through a long video.
         # Cache holds decoded BGR frames; oldest evicted first.
         self.frame_idx = 0
-        self._frame_cache: "OrderedDict[int, np.ndarray]" = OrderedDict()
+        self._frame_cache: OrderedDict[int, np.ndarray] = OrderedDict()
         self._cur_frame: np.ndarray | None = self._read_frame(0)
 
         # ROI state — defs[shape_type] = {name: ROIDefinition}

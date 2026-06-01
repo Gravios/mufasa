@@ -81,9 +81,10 @@ def main() -> int:
             ruler_tree, "mufasa.ui.tkinter_functions"),
     )
     check(
-        "roi_ruler.py imports Callable from typing",
+        "roi_ruler.py imports Callable from collections.abc "
+        "(UP035-modernized from typing in 122ga)",
         any(
-            isinstance(n, ast.ImportFrom) and n.module == "typing"
+            isinstance(n, ast.ImportFrom) and n.module == "collections.abc"
             and any(a.name == "Callable" for a in n.names)
             for n in ruler_tree.body
         ),

@@ -1,9 +1,9 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import base64
 import io

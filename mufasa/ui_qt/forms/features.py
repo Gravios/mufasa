@@ -326,7 +326,7 @@ class FeatureSubsetExtractorForm(OperationForm):
         outer.addLayout(form)
         self.body_layout.addLayout(outer)
 
-    def _bold(self, text: str) -> "QWidget":
+    def _bold(self, text: str) -> QWidget:
         from PySide6.QtWidgets import QLabel
         lbl = QLabel(f"<b>{text}</b>")
         return lbl

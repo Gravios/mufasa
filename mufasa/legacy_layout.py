@@ -81,7 +81,7 @@ class LegacyProjectPaths:
     models_folder: Path    # parent_of_project_folder/<project_name>/models/
 
     @classmethod
-    def open(cls, path: Path) -> "LegacyProjectPaths":
+    def open(cls, path: Path) -> LegacyProjectPaths:
         path = Path(path).resolve()
         # Case A: user pointed at the parent (project_path/<project_name>)
         # so that path/project_folder/project_config.ini exists.
