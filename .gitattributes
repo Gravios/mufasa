@@ -1,0 +1,44 @@
+# Line-ending policy (patch 122fz).
+#
+# The repo's text/source files are stored with LF endings. A few source
+# files had crept in as CRLF (notably mufasa/video_processors/
+# extract_frames.py); the ruff-sweep patches that touched them emitted LF,
+# and `git am` strips a patch's CR by default, so applying those patches
+# failed with "patch does not apply" unless `--keep-cr` was used. Pinning
+# text files to LF here stops CRLF re-entering the tree and removes that
+# whole class of `git am` friction going forward.
+
+# Source and text files: always LF in the repo.
+*.py     text eol=lf
+*.pyi    text eol=lf
+*.md     text eol=lf
+*.rst    text eol=lf
+*.txt    text eol=lf
+*.toml   text eol=lf
+*.cfg    text eol=lf
+*.ini    text eol=lf
+*.json   text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.sh     text eol=lf
+*.csv    text eol=lf
+
+# Binary assets: never apply text / EOL conversion.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.icns   binary
+*.mp4    binary
+*.mov    binary
+*.pptx   binary
+*.parquet binary
+*.h5     binary
+*.hdf5   binary
+*.npy    binary
+*.npz    binary
+*.pickle binary
+*.pkl    binary
+*.sav    binary
+*.zip    binary
