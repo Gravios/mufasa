@@ -2566,13 +2566,7 @@ def resize_videos_by_height(video_paths: list[str | os.PathLike],
     >>> _ = resize_videos_by_height(video_paths=video_paths, height=300, overwrite=False, save_dir='/path/to/mufasa/troubleshooting/RAT_NOR/project_folder/videos/test/new')
     """
     timer = SimbaTimer(start=True)
-    if (not overwrite) and (save_dir is None) and (suffix is None):
-        raise InvalidInputError(msg="Provide a save_dir, OR set overwrite to True, OR provide a suffix", source=resize_videos_by_height.__name__)
-    elif (overwrite) and (save_dir is not None):
-        raise InvalidInputError(msg="Provide a save_dir, OR set overwrite to True, OR provide a suffix", source=resize_videos_by_height.__name__)
-    elif (overwrite) and (suffix is not None):
-        raise InvalidInputError(msg="Provide a save_dir, OR set overwrite to True, OR provide a suffix", source=resize_videos_by_height.__name__)
-    elif (save_dir is not None) and (suffix is not None):
+    if (not overwrite) and (save_dir is None) and (suffix is None) or (overwrite) and (save_dir is not None) or (overwrite) and (suffix is not None) or (save_dir is not None) and (suffix is not None):
         raise InvalidInputError(msg="Provide a save_dir, OR set overwrite to True, OR provide a suffix", source=resize_videos_by_height.__name__)
     if save_dir is not None:
         if not os.path.isdir(save_dir):
@@ -2652,13 +2646,7 @@ def resize_videos_by_width(video_paths: list[str | os.PathLike],
     """
 
     timer = SimbaTimer(start=True)
-    if (not overwrite) and (save_dir is None) and (suffix is None):
-        raise InvalidInputError(msg="Provide a save_dir, OR set overwrite to True, OR provide a suffix", source=resize_videos_by_width.__name__)
-    elif (overwrite) and (save_dir is not None):
-        raise InvalidInputError(msg="Provide a save_dir, OR set overwrite to True, OR provide a suffix", source=resize_videos_by_width.__name__)
-    elif (overwrite) and (suffix is not None):
-        raise InvalidInputError(msg="Provide a save_dir, OR set overwrite to True, OR provide a suffix", source=resize_videos_by_width.__name__)
-    elif (save_dir is not None) and (suffix is not None):
+    if (not overwrite) and (save_dir is None) and (suffix is None) or (overwrite) and (save_dir is not None) or (overwrite) and (suffix is not None) or (save_dir is not None) and (suffix is not None):
         raise InvalidInputError(msg="Provide a save_dir, OR set overwrite to True, OR provide a suffix", source=resize_videos_by_width.__name__)
     if save_dir is not None:
         if not os.path.isdir(save_dir):

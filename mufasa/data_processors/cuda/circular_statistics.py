@@ -696,9 +696,7 @@ def sliding_angular_diff(x: np.ndarray,
 def _rotational_direction(data, stride, results):
     r = cuda.grid(1)
     l = int(r - stride[0])
-    if (r < 0) or (r > data.shape[0] - 1):
-        return
-    elif (l < 0):
+    if (r < 0) or (r > data.shape[0] - 1) or (l < 0):
         return
     else:
         l_val, r_val = data[l], data[r]

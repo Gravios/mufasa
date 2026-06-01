@@ -220,9 +220,7 @@ class PathPlotterMulticore(ConfigReader, PlottingMixin):
             check_if_keys_exist_in_dict(data=v, key=[COLOR, BODY_PART], name=f'{self.__class__.__name__} animal_attr')
             check_str(name=f'{self.__class__.__name__} animal {k} body_part', value=v[BODY_PART], options=self.body_parts_lst)
             name = self.find_animal_name_from_body_part_name(bp_name=v[BODY_PART], bp_dict=self.animal_bp_dict)
-            if check_if_valid_rgb_tuple(data=v[COLOR], raise_error=False, source=f'{self.__class__.__name__} animal_attr {cnt}'):
-                colors.append(v[COLOR])
-            elif v[COLOR] in Options.PALETTE_OPTIONS.value:
+            if check_if_valid_rgb_tuple(data=v[COLOR], raise_error=False, source=f'{self.__class__.__name__} animal_attr {cnt}') or v[COLOR] in Options.PALETTE_OPTIONS.value:
                 colors.append(v[COLOR])
             else:
                 raise InvalidInputError(msg=f'The color {v[COLOR]} for animal {cnt} ({name}) is not a valid color palette or valid rgb color tuple.', source=self.__class__.__name__)

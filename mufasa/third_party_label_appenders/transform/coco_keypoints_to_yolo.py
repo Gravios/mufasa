@@ -132,7 +132,7 @@ class COCOKeypoints2Yolo:
             _, img_name, ext = get_fn_ext(filepath=img_data['file_name'])
             if self.verbose:
                 print(f'Processing annotation {cnt + 1}/{self.img_cnt} from COCO to YOLO ({img_name})...')
-            if not img_name in self.img_file_paths.keys():
+            if img_name not in self.img_file_paths.keys():
                 raise NoFilesFoundError(msg=f'The file {img_name} could not be found in the {self.img_dir} directory', source=self.__class__.__name__)
             img = read_img(img_path=self.img_file_paths[img_name], greyscale=self.greyscale, clahe=self.clahe)
             if (img.shape[0] != img_data['height']) or (img.shape[1] != img_data['width']):

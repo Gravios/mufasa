@@ -1859,7 +1859,7 @@ def _em_validation_check(
     T = positions.shape[0]
     if T == 0:
         return True, "empty session, skipped"
-    if T <= sample_size:
+    if sample_size >= T:
         idx = np.arange(T)
     else:
         idx = np.linspace(0, T - 1, sample_size, dtype=np.int64)

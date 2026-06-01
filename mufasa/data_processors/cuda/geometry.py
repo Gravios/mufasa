@@ -212,9 +212,7 @@ def _convex_hull_kernel(pts: np.ndarray, results: np.ndarray) -> np.ndarray:
         count += 1
         endpoint = 0
         for j in range(pts.shape[1]):
-            if endpoint == point_on_hull:
-                endpoint = j
-            elif _cross_test(
+            if endpoint == point_on_hull or _cross_test(
                 pts[row, j, 0],
                 pts[row, j, 1],
                 pts[row, point_on_hull, 0],

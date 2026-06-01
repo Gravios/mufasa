@@ -488,7 +488,7 @@ class InteractiveROIModifier:
                     self.tl_x, self.tl_y = self.x - int(self.w/2), self.y - int(self.h/2)
                     self.tr_x, self.tr_y = self.x + int(self.w/2), self.y - int(self.h/2)
                     self.br_x, self.br_y = self.x + int(self.w/2), self.y + int(self.h/2)
-                    if (0 <= self.tl_x) and (0 <= self.tl_y) and (self.tr_x <= self.img_w) and (self.br_y <= self.img_h):
+                    if (self.tl_x >= 0) and (self.tl_y >= 0) and (self.tr_x <= self.img_w) and (self.br_y <= self.img_h):
                         self._select_rectangle_center_tag()
             elif self.clicked_roi['Shape_type'].lower() == ROI_SETTINGS.CIRCLE.value:
                 if self.clicked_tag == BORDER_TAG:
@@ -496,13 +496,13 @@ class InteractiveROIModifier:
                     self.radius = self.clicked_roi[TAGS][C_TAG][0] - self.x
                     self.l_edge, t_edge =  (c_x - self.radius, c_y), (c_x, c_y - self.radius)
                     r_edge, b_edge = (c_x +self. radius, c_y), (c_x, c_y + self.radius)
-                    if (0 <= self.l_edge[0]) and (0 <= t_edge[1]) and (r_edge[0] <= self.img_w) and (b_edge[1] <= self.img_h) and (self.radius >= 1):
+                    if (self.l_edge[0] >= 0) and (t_edge[1] >= 0) and (r_edge[0] <= self.img_w) and (b_edge[1] <= self.img_h) and (self.radius >= 1):
                         self._select_circle_border()
                 if self.clicked_tag == C_TAG:
                     self.radius = self.clicked_roi[RADIUS]
                     self.l_edge, t_edge = (self.x - self.radius, self.y), (self.x, self.y - self.radius)
                     r_edge, b_edge = (self.x + self.radius, self.y), (self.x, self.y + self.radius)
-                    if (0 <= self.l_edge[0]) and (0 <= t_edge[1]) and (r_edge[0] <= self.img_w) and (b_edge[1] <= self.img_h):
+                    if (self.l_edge[0] >= 0) and (t_edge[1] >= 0) and (r_edge[0] <= self.img_w) and (b_edge[1] <= self.img_h):
                         self._select_circle_center()
 
             elif self.clicked_roi['Shape_type'].lower() == ROI_SETTINGS.POLYGON.value:
@@ -512,7 +512,7 @@ class InteractiveROIModifier:
                     for tag_name, tag in self.clicked_roi[TAGS].items():
                         t  = (tag[0] + x_diff, tag[1] + y_diff)
                         self.new_tags[tag_name] = t
-                        if (0 > t[0]) or (t[0] > self.img_w) or (0 > t[1]) or (t[1] > self.img_h):
+                        if (t[0] < 0) or (t[0] > self.img_w) or (t[1] < 0) or (t[1] > self.img_h):
                             outside_img_flag = True
                     if not outside_img_flag:
                         self._select_polygon_center()
@@ -524,7 +524,7 @@ class InteractiveROIModifier:
                     self.n_tag_2_id = f'Tag_{self.clicked_tag_id - 1 if self.clicked_tag_id == max_tag_id else self.clicked_tag_id + 1}'
                     x_diff, y_diff = self.x - click_tag[0], self.y - click_tag[1]
                     self.new_poly_tag_loc = (click_tag[0] + x_diff, click_tag[1] + y_diff)
-                    if (0 < self.new_poly_tag_loc[0]) and (self.new_poly_tag_loc[0] < self.img_w) and (0 < self.new_poly_tag_loc[1]) and (self.new_poly_tag_loc[1] < self.img_h):
+                    if (self.new_poly_tag_loc[0] > 0) and (self.new_poly_tag_loc[0] < self.img_w) and (self.new_poly_tag_loc[1] > 0) and (self.new_poly_tag_loc[1] < self.img_h):
                         self.new_vertices = np.copy(self.clicked_roi[VERTICES]).astype(np.int32)
                         self.new_vertices[self.clicked_tag_id] = np.array([self.new_poly_tag_loc])
                         polygon = Polygon(self.new_vertices)

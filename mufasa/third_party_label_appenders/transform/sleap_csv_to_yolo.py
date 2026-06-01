@@ -114,7 +114,7 @@ class Sleap2Yolo:
             check_valid_dataframe(df=df, source=self.__class__.__name__, required_fields=['track', 'frame_idx', 'instance.score'])
             df = df if self.instance_threshold is None else df[df['instance.score'] >= self.instance_threshold]
             cord_cols, frame_idx = df.drop(['track', 'frame_idx', 'instance.score'], axis=1), df['frame_idx']
-            bp_cols = [x for x in cord_cols if not '.score' in x]
+            bp_cols = [x for x in cord_cols if '.score' not in x]
             selected_frms = random.sample(list(frame_idx.unique()), self.frms_cnt) if self.frms_cnt is not None else list(frame_idx.unique())
             df = df[df['frame_idx'].isin(selected_frms)]
             df['video'] = self.video_paths[file_name]

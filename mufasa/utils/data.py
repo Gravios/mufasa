@@ -513,11 +513,11 @@ def add_missing_ROI_cols(shape_df: pd.DataFrame) -> pd.DataFrame:
     :returns DataFrame
     """
 
-    if not "Color BGR" in shape_df.columns:
+    if "Color BGR" not in shape_df.columns:
         shape_df["Color BGR"] = [(255, 255, 255)] * len(shape_df)
-    if not "Thickness" in shape_df.columns:
+    if "Thickness" not in shape_df.columns:
         shape_df["Thickness"] = [5] * len(shape_df)
-    if not "Color name" in shape_df.columns:
+    if "Color name" not in shape_df.columns:
         shape_df["Color name"] = "White"
 
     return shape_df
@@ -1024,7 +1024,7 @@ def slp_to_df_convert(
         missing_keys = [
             x
             for x in ["tracks", "point_scores", "node_names", "track_names"]
-            if not x in list(f.keys())
+            if x not in list(f.keys())
         ]
         if missing_keys:
             raise InvalidFileTypeError(
@@ -1900,8 +1900,7 @@ def get_cpu_pool(core_cnt: int = -1,
             context = existing_method
         else:
             system = platform.system()
-            if system == OS.WINDOWS.value: context = OS.SPAWN.value
-            elif system == OS.MAC.value: context = OS.SPAWN.value
+            if system == OS.WINDOWS.value or system == OS.MAC.value: context = OS.SPAWN.value
             else: context = OS.FORK.value
 
     if context is not None and not is_wsl():
@@ -1909,8 +1908,7 @@ def get_cpu_pool(core_cnt: int = -1,
             ctx = multiprocessing.get_context(context)
         except ValueError:
             system = platform.system()
-            if system == OS.WINDOWS.value: fallback_context = OS.SPAWN.value
-            elif system == OS.MAC.value: fallback_context = OS.SPAWN.value
+            if system == OS.WINDOWS.value or system == OS.MAC.value: fallback_context = OS.SPAWN.value
             else: fallback_context = OS.FORK.value
             try:
                 ctx = multiprocessing.get_context(fallback_context)

@@ -91,7 +91,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -691,7 +691,7 @@ def record_run(
     if run_id is not None:
         entry["last_run_id"] = run_id
     if run_at is None:
-        run_at = datetime.now(timezone.utc)
+        run_at = datetime.now(UTC)
     entry["last_run_at"] = run_at.isoformat(timespec="seconds")
     prov[section_id] = entry
 
@@ -867,7 +867,7 @@ def _path_mtime_if_has_content(path: Path) -> datetime | None:
         return None
     if path.is_file():
         return datetime.fromtimestamp(
-            path.stat().st_mtime, tz=timezone.utc,
+            path.stat().st_mtime, tz=UTC,
         )
     if not path.is_dir():
         return None
@@ -888,7 +888,7 @@ def _path_mtime_if_has_content(path: Path) -> datetime | None:
         return None
     if latest is None:
         return None
-    return datetime.fromtimestamp(latest, tz=timezone.utc)
+    return datetime.fromtimestamp(latest, tz=UTC)
 
 
 def get_all_statuses(

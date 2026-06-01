@@ -749,11 +749,11 @@ class ConfigReader:
         :return pd.DataFrame with ``Color BGR``, ``Thickness``, ``Color name`` fields
         """
 
-        if not "Color BGR" in shape_df.columns:
+        if "Color BGR" not in shape_df.columns:
             shape_df["Color BGR"] = [(255, 255, 255)] * len(shape_df)
-        if not "Thickness" in shape_df.columns:
+        if "Thickness" not in shape_df.columns:
             shape_df["Thickness"] = [5] * len(shape_df)
-        if not "Color name" in shape_df.columns:
+        if "Color name" not in shape_df.columns:
             shape_df["Color name"] = "White"
 
         return shape_df

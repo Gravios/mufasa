@@ -2358,7 +2358,7 @@ def is_lxc_container() -> bool:
             for line in f:
                 if 'lxc' in line:
                     return True
-    except IOError:
+    except OSError:
         pass
     try:
         with open('/proc/self/mountinfo') as f:
@@ -2367,7 +2367,7 @@ def is_lxc_container() -> bool:
                     mount_point = line.strip().split()[-1]
                     if 'lxc' in mount_point:
                         return True
-    except IOError:
+    except OSError:
         pass
     try:
         with open('/proc/1/environ', 'rb') as f:
@@ -2375,7 +2375,7 @@ def is_lxc_container() -> bool:
             for e in env:
                 if e == b'container=lxc':
                     return True
-    except IOError:
+    except OSError:
         pass
     try:
         import subprocess

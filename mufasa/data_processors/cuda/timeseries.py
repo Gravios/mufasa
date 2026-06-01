@@ -30,9 +30,7 @@ def _count_at_threshold(x: np.ndarray, inverse: int, threshold: float):
 def _sliding_crossings_kernal(data, time, threshold, inverse, results):
     r = cuda.grid(1)
     l = int(r - time[0])
-    if r > data.shape[0] or r < 0:
-        return
-    elif l > data.shape[0] or l < 0:
+    if r > data.shape[0] or r < 0 or l > data.shape[0] or l < 0:
         return
     else:
         sample = data[l:r]
@@ -73,9 +71,7 @@ def sliding_threshold(data: np.ndarray, time_window: float, sample_rate: float, 
 def _sliding_percent_beyond_n_std_kernel(data, time, std_n, results):
     r = cuda.grid(1)
     l = int(r - time[0])
-    if r > data.shape[0] or r < 0:
-        return
-    elif l > data.shape[0] or l < 0:
+    if r > data.shape[0] or r < 0 or l > data.shape[0] or l < 0:
         return
     else:
         sample = data[l:r]

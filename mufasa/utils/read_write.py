@@ -601,7 +601,7 @@ def get_video_info_ffmpeg(video_path: str | os.PathLike) -> dict[str, Any]:
     check_file_exist_and_readable(file_path=video_path)
     video_name = get_fn_ext(filepath=video_path)[1]
     cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_frames", "-show_entries", "stream=width,height,r_frame_rate,nb_read_frames,duration,pix_fmt", "-of", "json", video_path]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     data = json.loads(result.stdout)
     try:
         stream = data['streams'][0]
@@ -2851,7 +2851,7 @@ def read_boris_file(file_path: str | os.PathLike,
     boris_df = pd.read_csv(file_path)
     if not _is_new_boris_version(boris_df):
         expected_headers = [TIME, MEDIA_FILE_PATH, BEHAVIOR, STATUS]
-        if not OBSERVATION_ID in boris_df.columns:
+        if OBSERVATION_ID not in boris_df.columns:
             if raise_error:
                 raise InvalidFileTypeError(msg=f'{file_path} is not a valid BORIS file', source=read_boris_file.__name__)
             else:
@@ -2886,7 +2886,7 @@ def read_boris_file(file_path: str | os.PathLike,
     FRAME_INDEX = _find_cap_insensitive_name(target=FRAME_INDEX, values=list(df.columns))
     if fps is None:
         FPS = _find_cap_insensitive_name(target=FPS, values=list(df.columns))
-        if not FPS in df.columns:
+        if FPS not in df.columns:
             if raise_error:
                 raise FrameRangeError('The annotations are in seconds and FPS was not passed. FPS could also not be read from the BORIS file', source=read_boris_file.__name__)
             else:
@@ -3090,7 +3090,7 @@ def read_shap_feature_categories_csv() -> tuple[pd.DataFrame, list[str], list[st
     feature_categories_df = pd.read_csv(feature_categories_csv_path, header=[0, 1])
     x_names = [list(x) for x in list(feature_categories_df.values)]
     x_names = [item for sublist in x_names for item in sublist]
-    x_names = [x for x in x_names if not x is np.nan]
+    x_names = [x for x in x_names if x is not np.nan]
     x_cat_names, time_bin_names = set(list(feature_categories_df.columns.levels[0])), set(list(feature_categories_df.columns.levels[1]))
     return (feature_categories_df, x_names, x_cat_names, time_bin_names)
 
@@ -3177,7 +3177,7 @@ def save_json(data: dict, filepath: str | os.PathLike, encoding: str = 'utf-8') 
         with open(filepath, 'w', encoding=encoding) as file:
             json.dump(data, file, indent=4)
     except Exception as e:
-        raise IOError(f"Error saving JSON file to {filepath}: {e}")
+        raise OSError(f"Error saving JSON file to {filepath}: {e}")
 
 
 def df_to_xlsx_sheet(xlsx_path: str | os.PathLike,
@@ -3543,12 +3543,12 @@ def read_sleap_h5(file_path: str | os.PathLike) -> pd.DataFrame:
     check_file_exist_and_readable(file_path=file_path)
     try:
         with h5py.File(file_path, "r") as f:
-            missing_keys = [x for x in EXPECTED_KEYS if not x in list(f.keys())]
+            missing_keys = [x for x in EXPECTED_KEYS if x not in list(f.keys())]
             if missing_keys:
                 raise InvalidFileTypeError(msg=f'{file_path} is not a valid SLEAP H5 file. Missing expected keys: {missing_keys}')
             tracks = f["tracks"][:].T
             point_scores = f["point_scores"][:].T
-    except (OSError,) as e:
+    except OSError as e:
         raise CorruptedFileError(msg=f'Could not read SLEAP file {file_path}. The file appears corrupted, or unable to read in the current python/h5py,hdf environment. Try recreating the file using the SLEAP GUI, or reach out on for help ({e.args})', source=read_sleap_h5.__name__)
 
     csv_rows = []
@@ -3640,7 +3640,7 @@ def read_facemap_h5(file_path: str | os.PathLike) -> pd.DataFrame:
     check_file_exist_and_readable(file_path=file_path, raise_error=True)
     pose_data = h5py.File(file_path, "r")
     pose_keys = list(pose_data.keys())
-    if not FACEMAP in pose_keys:
+    if FACEMAP not in pose_keys:
         raise InvalidInputError(msg=f'The file {file_path} does not contain the key {FACEMAP}', source=read_facemap_h5.__name__)
     pose_data = pose_data[FACEMAP]
     missing_bp_keys = [x for x in BODYPARTS if x not in pose_data.keys()]
@@ -3946,8 +3946,7 @@ def get_cpu_pool(core_cnt: int = -1,
             context = existing_method
         else:
             system = platform.system()
-            if system == OS.WINDOWS.value: context = OS.SPAWN.value
-            elif system == OS.MAC.value: context = OS.SPAWN.value
+            if system == OS.WINDOWS.value or system == OS.MAC.value: context = OS.SPAWN.value
             else: context = OS.FORK.value
 
     if context is not None:
@@ -3955,8 +3954,7 @@ def get_cpu_pool(core_cnt: int = -1,
             ctx = multiprocessing.get_context(context)
         except ValueError:
             system = platform.system()
-            if system == OS.WINDOWS.value: fallback_context = OS.SPAWN.value
-            elif system == OS.MAC.value: fallback_context = OS.SPAWN.value
+            if system == OS.WINDOWS.value or system == OS.MAC.value: fallback_context = OS.SPAWN.value
             else: fallback_context = OS.FORK.value
             try:
                 ctx = multiprocessing.get_context(fallback_context)

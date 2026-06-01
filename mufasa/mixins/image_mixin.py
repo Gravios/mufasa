@@ -1222,9 +1222,7 @@ class ImageMixin:
         check_str(name='method', value=method, options=['absolute', 'light', 'dark'], raise_error=True)
         if method == 'absolute':
             diff = cv2.absdiff(x, y)
-        elif method == 'light':
-            diff = np.abs(x.astype(np.int16) - y.astype(np.int16)).astype(np.uint8)
-        elif method == 'dark':
+        elif method == 'light' or method == 'dark':
             diff = np.abs(x.astype(np.int16) - y.astype(np.int16)).astype(np.uint8)
         else:
             diff = cv2.absdiff(x, y)

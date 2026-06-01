@@ -56,7 +56,7 @@ def shah_appender(labels_dir: str | os.PathLike,
             if FULL_LOG in line: full_log_start = idx
         for idx in range(full_log_start + 4, len(data)):
             if data[idx].startswith('---'):
-                full_log_end = idx;
+                full_log_end = idx
                 break
         results = pd.DataFrame(columns=[FRAME, 'START_TIME', BEHAVIOR, 'GROUP', EVENT])
         for i in range(full_log_start + 4, full_log_end):

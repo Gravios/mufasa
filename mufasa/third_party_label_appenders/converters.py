@@ -1162,7 +1162,7 @@ def coco_keypoints_to_yolo(coco_path: str | os.PathLike,
         _, img_name, ext = get_fn_ext(filepath=img_data['file_name'])
         if verbose:
             print(f'Processing annotation {cnt + 1}/{img_cnt} ({img_name})...')
-        if not img_name in img_file_paths.keys():
+        if img_name not in img_file_paths.keys():
             raise NoFilesFoundError(msg=f'The file {img_name} could not be found in the {img_dir} directory',
                                     source=coco_keypoints_to_yolo.__name__)
         img = read_img(img_path=img_file_paths[img_name])

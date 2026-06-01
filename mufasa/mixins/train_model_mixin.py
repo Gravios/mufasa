@@ -164,7 +164,7 @@ class TrainModelMixin:
             df.index = [vid_name] * len(df)
             if classifier_names != None:
                 for clf_name in classifier_names:
-                    if not clf_name in df.columns:
+                    if clf_name not in df.columns:
                         raise MissingColumnsError(msg=f"Data for video {vid_name} does not contain any annotations for behavior {clf_name}. Delete classifier {clf_name} from the Mufasa project, or add annotations for behavior {clf_name} to the video {vid_name}", source=self.__class__.__name__,)
                     elif (len(set(df[clf_name].unique()) - {0, 1}) > 0 and raise_bool_clf_error):
                         raise InvalidInputError(msg=f"The annotation column for a classifier should contain only 0 or 1 values. However, in file {file} the {clf_name} field contains additional value(s): {list(set(df[clf_name].unique()) - {0, 1})}.", source=self.__class__.__name__)
@@ -1634,7 +1634,7 @@ class TrainModelMixin:
         df.index = [vid_name] * len(df)
         if clf_names != None:
             for clf_cnt, clf_name in enumerate(clf_names):
-                if not clf_name in df.columns:
+                if clf_name not in df.columns:
                     if clf_name.lower() == Dtypes.NONE.value.lower():
                         raise InvalidInputError(msg=f'The classifier {clf_cnt+1} name is set to {clf_name}. Make sure you have correctly set the model hyperparameters as documented at {Links.TRAIN_ML_MODEL.value}', source=TrainModelMixin._read_data_file_helper.__name__)
                     else:
@@ -1751,7 +1751,7 @@ class TrainModelMixin:
         df.index = [vid_name] * len(df)
         if clf_names != None:
             for clf_name in clf_names:
-                if not clf_name in df.columns:
+                if clf_name not in df.columns:
                     raise MissingColumnsError(msg=f'The Mufasa project specifies a classifier named "{clf_name}" that could not be found in your dataset for file {file_path}. Make sure that your project.toml is created correctly.')
                 elif (len(set(df[clf_name].unique()) - {0, 1}) > 0 and raise_bool_clf_error):
                     raise InvalidInputError(msg=f"The annotation column for a classifier should contain only 0 or 1 values. However, in file {file_path} the {clf_name} field contains additional value(s): {list(set(df[clf_name].unique()) - {0, 1})}.")

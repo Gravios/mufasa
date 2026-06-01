@@ -124,9 +124,7 @@ class YOLOPoseTrackVisualizer:
             raise InvalidFilepathError(msg=f'data_path {data_path} is not a valid directory of file path.', source=self.__class__.__name__)
         if not os.path.isdir(video_path) and not os.path.isfile(video_path):
             raise InvalidFilepathError(msg=f'video_path {video_path} is not a valid directory of file path.', source=self.__class__.__name__)
-        if os.path.isdir(data_path) and not os.path.isdir(video_path):
-            raise InvalidFilepathError(msg=f'If data_path ({data_path}) is a directory, video_path ({video_path}) also needs to be a directory.', source=self.__class__.__name__)
-        elif os.path.isdir(video_path) and not os.path.isdir(data_path):
+        if os.path.isdir(data_path) and not os.path.isdir(video_path) or os.path.isdir(video_path) and not os.path.isdir(data_path):
             raise InvalidFilepathError(msg=f'If data_path ({data_path}) is a directory, video_path ({video_path}) also needs to be a directory.', source=self.__class__.__name__)
 
         if os.path.isfile(video_path):
