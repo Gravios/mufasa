@@ -7,7 +7,8 @@ import multiprocessing
 import os
 import platform
 from copy import deepcopy
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 import cv2
 import imutils
@@ -22,7 +23,7 @@ from shapely.geometry import (JOIN_STYLE, GeometryCollection, LineString,
 from shapely.ops import linemerge, split, triangulate, unary_union
 
 try:
-    from typing_extensions import Literal
+    from typing import Literal
 except:
     from typing import Literal
 

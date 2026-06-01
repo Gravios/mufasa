@@ -7,7 +7,7 @@ import numpy as np
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import functools
 import multiprocessing

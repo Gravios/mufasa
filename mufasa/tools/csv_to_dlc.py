@@ -58,7 +58,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Iterable
+from collections.abc import Iterable
 
 import pandas as pd
 

@@ -7,7 +7,7 @@ import pandas as pd
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.data import detect_bouts, plug_holes_shortest_bout

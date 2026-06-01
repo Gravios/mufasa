@@ -25,7 +25,7 @@ from skimage.segmentation import slic
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.image_mixin import ImageMixin

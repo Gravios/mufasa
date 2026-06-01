@@ -9,7 +9,7 @@ import argparse
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 try:
     from ultralytics import YOLO

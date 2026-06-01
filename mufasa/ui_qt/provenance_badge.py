@@ -84,7 +84,7 @@ _SVG_FOR_STATUS = {
 
 
 @lru_cache(maxsize=None)
-def icon_for_status(status: SectionStatus) -> "QIcon":
+def icon_for_status(status: SectionStatus) -> QIcon:
     """Return the :class:`QIcon` for ``status``.
 
     Renders the corresponding SVG to a 16×16 pixmap on first call;

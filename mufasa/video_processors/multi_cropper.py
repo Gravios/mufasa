@@ -9,7 +9,7 @@ import pandas as pd
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (check_if_dir_exists, check_int, check_str,

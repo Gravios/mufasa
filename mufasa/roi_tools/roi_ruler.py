@@ -2,7 +2,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
 from tkinter import *
-from typing import Callable
+from collections.abc import Callable
 
 import cv2
 import numpy as np

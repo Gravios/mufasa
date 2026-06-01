@@ -3,7 +3,7 @@ import os
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 import random
 import warnings

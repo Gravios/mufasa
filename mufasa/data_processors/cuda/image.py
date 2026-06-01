@@ -7,7 +7,7 @@ import os
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 try:
     import cupy as cp
     from cupyx.scipy.ndimage import rotate

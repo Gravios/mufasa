@@ -56,7 +56,7 @@ are battle-tested.
 """
 from __future__ import annotations
 
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 import numpy as np
 import pandas as pd

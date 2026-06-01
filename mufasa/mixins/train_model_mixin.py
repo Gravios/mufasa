@@ -62,7 +62,7 @@ import matplotlib.pyplot as plt
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.plotting.shap_agg_stats_visualizer import \

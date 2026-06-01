@@ -1389,7 +1389,7 @@ def state_to_marker_positions(
     state: np.ndarray,
     layout: BodyLayout,
     fk: ForwardKinematicsResult | None = None,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
 ) -> np.ndarray:
     """Compute predicted 2D positions for all markers.
 
@@ -1464,7 +1464,7 @@ def state_to_marker_jacobian(
     state: np.ndarray,
     layout: BodyLayout,
     fk: ForwardKinematicsResult | None = None,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
     marker_mask: np.ndarray | None = None,
 ) -> np.ndarray:
     """Compute the Jacobian of marker positions w.r.t. state.
@@ -1892,8 +1892,8 @@ def _state_to_world_transforms_batch_torch(
     T = states.shape[0]
     device = states.device
     dtype = states.dtype
-    P_distal: dict[str, "torch.Tensor"] = {}
-    R_world: dict[str, "torch.Tensor"] = {}
+    P_distal: dict[str, torch.Tensor] = {}
+    R_world: dict[str, torch.Tensor] = {}
 
     drift_set = set(layout.orientation_drift_segments)
 
@@ -1968,7 +1968,7 @@ def _state_to_world_transforms_batch_torch(
 def state_to_marker_positions_batch(
     states: np.ndarray,  # (T, D)
     layout: BodyLayout,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
     device: str = "cpu",
 ) -> np.ndarray:
     """Vectorized state_to_marker_positions across T frames.
@@ -2073,7 +2073,7 @@ def state_to_marker_positions_batch(
 
 
 def _perspective_scales_batch_np(
-    perspective: "PerspectiveModelV2",
+    perspective: PerspectiveModelV2,
     root_x: np.ndarray,  # (T,)
     root_y: np.ndarray,  # (T,)
     marker_names: list[str],
@@ -2097,7 +2097,7 @@ def _perspective_scales_batch_np(
 
 
 def _perspective_scales_batch_torch(
-    perspective: "PerspectiveModelV2",
+    perspective: PerspectiveModelV2,
     root_x,  # torch tensor (T,)
     root_y,
     marker_names: list[str],
@@ -2123,7 +2123,7 @@ def _perspective_scales_batch_torch(
 def state_to_marker_jacobian_batch(
     states: np.ndarray,  # (T, D)
     layout: BodyLayout,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
     device: str = "cpu",
 ) -> np.ndarray:
     """Vectorized state_to_marker_jacobian across T frames.
@@ -2624,14 +2624,14 @@ class NoiseParamsV2:
         # whose body-frame scatter genuinely is large) from
         # producing drift radii that effectively disable the
         # bound. None means no cap.
-        fitted_lengths: "FittedLengths" | None = None,
+        fitted_lengths: FittedLengths | None = None,
         r_drift_cap: float | None = 20.0,
         # Patch 121a orientation-drift defaults. Used only
         # when ``layout.orientation_drift_segments`` is
         # non-empty.
         r_theta_drift: float = 0.1,           # rad (~5.7°)
         alpha_theta_drift: float = 0.05,      # per-step
-    ) -> "NoiseParamsV2":
+    ) -> NoiseParamsV2:
         """Build default noise params with uniform per-marker
         and per-segment values. Useful as initial values for
         EM.
@@ -2768,7 +2768,7 @@ class NoiseParamsV2:
 def build_F_v2(
     layout: BodyLayout,
     dt: float,
-    params: "NoiseParamsV2" | None = None,
+    params: NoiseParamsV2 | None = None,
 ) -> np.ndarray:
     """Build the state transition matrix F.
 
@@ -3197,7 +3197,7 @@ def _build_marker_observations(
     layout: BodyLayout,
     params: NoiseParamsV2,
     likelihood_threshold: float,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
     """Build the observation vector, predicted observation,
     Jacobian, and observation noise R for one frame's marker
@@ -3289,7 +3289,7 @@ def forward_filter_v2(
     initial_cov: np.ndarray | None = None,
     likelihood_threshold: float = 0.5,
     apply_constraints: bool = True,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
 ) -> FilterResultV2:
     """EKF forward pass on the v2 body-state representation.
 
@@ -3929,7 +3929,7 @@ class _MStepStatsV2:
     sigma_n_obs: dict[str, int]
 
     @classmethod
-    def empty(cls, layout: BodyLayout) -> "_MStepStatsV2":
+    def empty(cls, layout: BodyLayout) -> _MStepStatsV2:
         D = layout.state_dim
         return cls(
             S00=np.zeros((D, D)),
@@ -3940,7 +3940,7 @@ class _MStepStatsV2:
             sigma_n_obs={m: 0 for m in layout.marker_names},
         )
 
-    def __iadd__(self, other: "_MStepStatsV2") -> "_MStepStatsV2":
+    def __iadd__(self, other: _MStepStatsV2) -> _MStepStatsV2:
         """Combine stats from two sessions (used for multi-
         session EM).
         """
@@ -3981,7 +3981,7 @@ class _PerSessionFitV2:
     n_obs_per_marker: dict[str, int]   # observation count per m
 
     @classmethod
-    def empty(cls, layout: BodyLayout) -> "_PerSessionFitV2":
+    def empty(cls, layout: BodyLayout) -> _PerSessionFitV2:
         return cls(
             q_root_pos=0.0,
             q_root_ori=0.0,
@@ -3999,7 +3999,7 @@ def accumulate_m_step_stats_v2(
     likelihoods: np.ndarray,
     layout: BodyLayout,
     likelihood_threshold: float = 0.5,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
     device: str = "cpu",
 ) -> _MStepStatsV2:
     """Accumulate sufficient statistics for the M-step from
@@ -5125,7 +5125,7 @@ def fit_warm_start_sigma_v2(
     likelihood_threshold: float = 0.5,
     sigma_inflation_cap: float = 20.0,
     apply_constraints: bool = True,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
     verbose: bool = False,
     session_names: list[str] | None = None,
     device: str = "cpu",
@@ -5376,7 +5376,7 @@ def _validate_trajectory_v2(
     strict: bool = False,
     session_idx: int = 0,
     session_name: str = "",
-) -> list["_ValidationViolation"]:
+) -> list[_ValidationViolation]:
     """Validation hook: catches degenerate trajectories.
 
     Two checks per marker (port from v1 patch 91-93):
@@ -5627,8 +5627,8 @@ class EMResultV2:
     history: list[dict[str, float]]
     initial_params: NoiseParamsV2
     converged: bool
-    perspective: "PerspectiveModelV2" | None = None
-    validation_violations: list["_ValidationViolation"] = (
+    perspective: PerspectiveModelV2 | None = None
+    validation_violations: list[_ValidationViolation] = (
         field(default_factory=list)
     )
 
@@ -5745,12 +5745,12 @@ def _pool_init(
 
 def _pool_em_e_step(
     args: tuple[
-        int, NoiseParamsV2, "PerspectiveModelV2" | None,
+        int, NoiseParamsV2, PerspectiveModelV2 | None,
         int, bool, bool, str, str,
     ],
 ) -> tuple[
-    int, "_MStepStatsV2", "_PerSessionFitV2",
-    list["_ValidationViolation"], float,
+    int, _MStepStatsV2, _PerSessionFitV2,
+    list[_ValidationViolation], float,
 ]:
     """Per-session E-step in a worker process.
 
@@ -5842,7 +5842,7 @@ def _pool_em_e_step(
 
 def _pool_warm_start_pass(
     args: tuple[
-        int, NoiseParamsV2, "PerspectiveModelV2" | None, str,
+        int, NoiseParamsV2, PerspectiveModelV2 | None, str,
     ],
 ) -> tuple[int, np.ndarray, np.ndarray, float]:
     """Per-session warm-start σ pass in a worker.
@@ -6018,7 +6018,7 @@ def _pool_perspective_pass(
 
 def _pool_final_smooth(
     args: tuple[
-        int, NoiseParamsV2, "PerspectiveModelV2" | None, str,
+        int, NoiseParamsV2, PerspectiveModelV2 | None, str,
     ],
 ) -> tuple[int, np.ndarray | None, np.ndarray | None, float, str | None]:
     """Per-session final smoother pass in a worker.
@@ -6739,7 +6739,7 @@ def state_to_marker_variances(
     x_smooth: np.ndarray,   # (T, D)
     P_smooth: np.ndarray,   # (T, D, D)
     layout: BodyLayout,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
     device: str = "cpu",
     H_batch: np.ndarray | None = None,
 ) -> np.ndarray:
@@ -6803,7 +6803,7 @@ def smooth_session_v2(
     fps: float,
     likelihood_threshold: float = 0.7,
     apply_constraints: bool = True,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
     device: str = "cpu",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Run forward filter + RTS smoother on one session, return
@@ -6870,7 +6870,7 @@ def save_model_v2(
     params: NoiseParamsV2,
     fps: float,
     likelihood_threshold: float,
-    perspective: "PerspectiveModelV2" | None = None,
+    perspective: PerspectiveModelV2 | None = None,
 ) -> None:
     """Serialize a fitted v2 model to .npz.
 
@@ -7041,7 +7041,7 @@ def load_model_v2(
     path,
 ) -> tuple[
     BodyLayout, FittedLengths, NoiseParamsV2, float, float,
-    "PerspectiveModelV2" | None,
+    PerspectiveModelV2 | None,
 ]:
     """Load a v2 model from .npz.
 
@@ -7204,7 +7204,7 @@ def load_model_v2(
 
     # Perspective model (optional, only present in patch-109+
     # saved models)
-    perspective: "PerspectiveModelV2" | None = None
+    perspective: PerspectiveModelV2 | None = None
     has_perspective = (
         "has_perspective" in data.files
         and bool(data["has_perspective"])
@@ -8236,7 +8236,7 @@ class PerspectiveModelV2:
     arena_y_range: float
 
     @classmethod
-    def identity(cls, layout: BodyLayout) -> "PerspectiveModelV2":
+    def identity(cls, layout: BodyLayout) -> PerspectiveModelV2:
         """Identity perspective model (scale = 1 everywhere).
         Useful for testing / when perspective fitting is
         disabled.

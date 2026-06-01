@@ -7,7 +7,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import json
 

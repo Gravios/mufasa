@@ -5,7 +5,7 @@ from pathlib import Path
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import cv2
 import numpy as np

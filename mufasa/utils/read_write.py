@@ -23,7 +23,8 @@ from configparser import ConfigParser
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 import h5py
 from PIL import Image, ImageFile
@@ -31,7 +32,7 @@ from PIL import Image, ImageFile
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import sysconfig
 from urllib import request

@@ -18,7 +18,7 @@ from typing import Any
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import matplotlib.font_manager
 import pandas as pd

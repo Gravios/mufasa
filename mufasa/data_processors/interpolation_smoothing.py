@@ -12,7 +12,7 @@ from scipy.signal import savgol_filter
 try:
     from typing import Literal
 except ImportError:
-    from typing_extensions import Literal
+    from typing import Literal
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (check_if_filepath_list_is_empty,

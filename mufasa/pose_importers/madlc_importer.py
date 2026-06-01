@@ -6,7 +6,7 @@ from typing import Any
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import numpy as np
 import pandas as pd

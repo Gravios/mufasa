@@ -6,7 +6,8 @@ import os
 import random
 from copy import copy, deepcopy
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 import pandas as pd
 from PIL import Image
@@ -14,7 +15,7 @@ from PIL import Image
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import cv2
 import numpy as np

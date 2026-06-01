@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Mapping
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd

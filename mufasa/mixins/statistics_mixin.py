@@ -12,7 +12,7 @@ from mufasa.utils.printing import SimbaTimer
 try:
     from typing import Literal
 except:
-    from typing_extensions import Literal
+    from typing import Literal
 
 import numpy as np
 from numba import (bool_, float32, float64, int8, jit, njit, prange, typed,
