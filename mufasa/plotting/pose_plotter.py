@@ -10,14 +10,23 @@ import pandas as pd
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_instance, check_int, check_str,
-                                check_that_column_exist, check_valid_boolean)
+from mufasa.utils.checks import (
+    check_instance,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+)
 from mufasa.utils.data import create_color_palette
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import CountError, InvalidFilepathError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data, read_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+)
 from mufasa.utils.warnings import FrameRangeWarning
 
 

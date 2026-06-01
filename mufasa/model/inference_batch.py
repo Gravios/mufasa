@@ -10,23 +10,26 @@ import numpy as np
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_if_dir_exists,
-    check_if_keys_exist_in_dict, check_int, check_that_column_exist,
-    check_valid_dict, check_valid_lst)
+    check_all_file_names_are_represented_in_video_log,
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_int,
+    check_that_column_exist,
+    check_valid_dict,
+    check_valid_lst,
+)
 from mufasa.utils.data import plug_holes_shortest_bout
 from mufasa.utils.enums import ConfigKey, TagNames
 from mufasa.utils.errors import InvalidInputError, NoFilesFoundError
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
-                                  stdout_success)
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext)
-from mufasa.utils.warnings import NoFileFoundWarning
+
 # Patch 122ae-5b: layout-aware discovery + read so v1
 # projects (where features live under derived/features/)
 # don't get "Zero files found" when run without an explicit
 # features_dir override.
-from mufasa.utils.feature_io import (list_video_stems_with_features,
-                                      load_features_for_video)
+from mufasa.utils.feature_io import list_video_stems_with_features, load_features_for_video
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_information, stdout_success
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, get_fn_ext
+from mufasa.utils.warnings import NoFileFoundWarning
 
 MINIMUM_BOUT_LENGTH = 'minimum_bout_length'
 THRESHOLD = 'threshold'
@@ -195,8 +198,8 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
             # this is the canonical write site now, so silent
             # degradation would corrupt the project.
             from mufasa.utils.classification_io import (
-                save_classifications_for_video,
                 _prediction_columns,
+                save_classifications_for_video,
             )
             pred_cols = _prediction_columns(out_df, self.clf_names)
             if pred_cols:

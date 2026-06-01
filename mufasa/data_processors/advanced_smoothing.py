@@ -12,18 +12,27 @@ except ImportError:
     from typing import Literal
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable, check_instance,
-                                check_int, check_str, check_that_column_exist,
-                                check_valid_boolean)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_instance,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+)
 from mufasa.utils.data import df_smoother, savgol_smoother
 from mufasa.utils.enums import TagNames
-from mufasa.utils.errors import (DataHeaderError, InvalidInputError,
-                                NoFilesFoundError)
+from mufasa.utils.errors import DataHeaderError, InvalidInputError, NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
-from mufasa.utils.read_write import (copy_files_to_directory,
-                                    find_files_of_filetypes_in_directory,
-                                    find_video_of_file, get_fn_ext,
-                                    get_video_meta_data, read_df, write_df)
+from mufasa.utils.read_write import (
+    copy_files_to_directory,
+    find_files_of_filetypes_in_directory,
+    find_video_of_file,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    write_df,
+)
 
 BODY_PART_TYPE = 'body-part'
 ANIMAL_TYPE = 'animal'

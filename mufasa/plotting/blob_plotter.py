@@ -16,16 +16,24 @@ from numba import jit
 
 from mufasa.data_processors.blob_location_computer import BlobLocationComputer
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_int, check_nvidea_gpu_available,
-                                check_str, check_valid_boolean)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_valid_boolean,
+)
 from mufasa.utils.enums import Defaults, Options, TextOptions
 from mufasa.utils.errors import FFMPEGCodecGPUError, InvalidInputError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_all_videos_in_directory,
-                                    find_core_cnt, get_fn_ext,
-                                    get_video_meta_data)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    find_all_videos_in_directory,
+    find_core_cnt,
+    get_fn_ext,
+    get_video_meta_data,
+)
 
 
 class BlobPlotter(PlottingMixin):

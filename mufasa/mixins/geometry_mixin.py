@@ -6,9 +6,9 @@ import math
 import multiprocessing
 import os
 import platform
+from collections.abc import Iterable
 from copy import deepcopy
 from typing import Any
-from collections.abc import Iterable
 
 import cv2
 import imutils
@@ -17,9 +17,16 @@ import pandas as pd
 from numba import jit, njit, prange, typed, types
 from scipy.interpolate import splev, splprep
 from scipy.spatial.qhull import QhullError
-from shapely.geometry import (JOIN_STYLE, GeometryCollection, LineString,
-                              MultiLineString, MultiPoint, MultiPolygon, Point,
-                              Polygon)
+from shapely.geometry import (
+    JOIN_STYLE,
+    GeometryCollection,
+    LineString,
+    MultiLineString,
+    MultiPoint,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
 from shapely.ops import linemerge, split, triangulate, unary_union
 
 try:
@@ -33,23 +40,42 @@ InsidePolygon = FeatureExtractionMixin.framewise_inside_polygon_roi
 
 from mufasa.mixins.image_mixin import ImageMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_float,
-                                check_if_2d_array_has_min_unique_values,
-                                check_if_dir_exists, check_if_valid_img,
-                                check_if_valid_input, check_if_valid_rgb_tuple,
-                                check_instance, check_int,
-                                check_iterable_length, check_str,
-                                check_valid_array, check_valid_boolean,
-                                check_valid_cpu_pool, check_valid_dict,
-                                check_valid_lst, check_valid_tuple)
-from mufasa.utils.data import (create_color_palette, create_color_palettes,
-                              get_cpu_pool, terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_2d_array_has_min_unique_values,
+    check_if_dir_exists,
+    check_if_valid_img,
+    check_if_valid_input,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_iterable_length,
+    check_str,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_cpu_pool,
+    check_valid_dict,
+    check_valid_lst,
+    check_valid_tuple,
+)
+from mufasa.utils.data import (
+    create_color_palette,
+    create_color_palettes,
+    get_cpu_pool,
+    terminate_cpu_pool,
+)
 from mufasa.utils.enums import Defaults, Formats, GeometryEnum, Options
 from mufasa.utils.errors import CountError, InvalidInputError
 from mufasa.utils.printing import stdout_information
-from mufasa.utils.read_write import (SimbaTimer, find_core_cnt,
-                                    find_max_vertices_coordinates, read_frm_of_video, read_sleap_csv,
-                                    stdout_success, write_pickle)
+from mufasa.utils.read_write import (
+    SimbaTimer,
+    find_core_cnt,
+    find_max_vertices_coordinates,
+    read_frm_of_video,
+    read_sleap_csv,
+    stdout_success,
+    write_pickle,
+)
 
 
 class GeometryMixin:

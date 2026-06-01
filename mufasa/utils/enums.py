@@ -4,11 +4,13 @@ import os
 import platform
 import sys
 from enum import Enum
+from importlib import (
+    metadata as _metadata,  # replaces pkg_resources (removed from setuptools >=82, Python 3.12+)
+)
 from pathlib import Path
 
 import cv2
 import numpy as np
-from importlib import metadata as _metadata  # replaces pkg_resources (removed from setuptools >=82, Python 3.12+)
 
 import mufasa
 

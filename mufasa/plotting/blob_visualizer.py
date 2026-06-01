@@ -4,17 +4,25 @@ import numpy as np
 
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.plotting.geometry_plotter import GeometryPlotter
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_int, check_valid_dataframe,
-                                check_video_and_data_frm_count_align)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_valid_dataframe,
+    check_video_and_data_frm_count_align,
+)
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.lookups import get_current_time
-from mufasa.utils.read_write import (find_all_videos_in_directory,
-                                    find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df)
+from mufasa.utils.read_write import (
+    find_all_videos_in_directory,
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_df,
+)
 
 VERTICE = 'vertice'
 CENTER_X = 'center_x'

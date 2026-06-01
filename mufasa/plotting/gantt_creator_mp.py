@@ -38,17 +38,26 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_float, check_int, check_str,
-    check_that_column_exist, check_valid_boolean, check_valid_lst)
-from mufasa.utils.data import (create_color_palette, detect_bouts, get_cpu_pool,
-                              terminate_cpu_pool)
+    check_file_exist_and_readable,
+    check_float,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_lst,
+)
+from mufasa.utils.data import create_color_palette, detect_bouts, get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import NoSpecifiedOutputError
 from mufasa.utils.lookups import get_fonts
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    create_directory, find_core_cnt,
-                                    get_fn_ext, seconds_to_timestamp)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    create_directory,
+    find_core_cnt,
+    get_fn_ext,
+    seconds_to_timestamp,
+)
 
 HEIGHT = "height"
 WIDTH = "width"

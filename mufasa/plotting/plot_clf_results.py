@@ -11,18 +11,25 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.mixins.train_model_mixin import TrainModelMixin
-from mufasa.utils.checks import (check_float, check_if_valid_rgb_tuple,
-                                check_int, check_str, check_that_column_exist,
-                                check_valid_boolean,
-                                check_video_and_data_frm_count_align)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_video_and_data_frm_count_align,
+)
 from mufasa.utils.data import create_color_palette, detect_bouts
-from mufasa.utils.enums import (ConfigKey, Dtypes, Formats, Options, TagNames,
-                               TextOptions)
-from mufasa.utils.errors import (InvalidInputError, NoDataError,
-                                NoSpecifiedOutputError)
+from mufasa.utils.enums import ConfigKey, Dtypes, Formats, Options, TagNames, TextOptions
+from mufasa.utils.errors import InvalidInputError, NoDataError, NoSpecifiedOutputError
 from mufasa.utils.printing import log_event, stdout_success
-from mufasa.utils.read_write import (find_all_videos_in_project, get_fn_ext,
-                                    get_video_meta_data, read_config_entry)
+from mufasa.utils.read_write import (
+    find_all_videos_in_project,
+    get_fn_ext,
+    get_video_meta_data,
+    read_config_entry,
+)
 from mufasa.utils.warnings import FrameRangeWarning
 
 CIRCLE_SCALE = 'circle_scale'

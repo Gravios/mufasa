@@ -8,8 +8,7 @@ from copy import deepcopy
 import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_filepath_list_is_empty)
+from mufasa.utils.checks import check_if_dir_exists, check_if_filepath_list_is_empty
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_df
 

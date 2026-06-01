@@ -6,8 +6,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from numba import jit
-from numba.core.errors import (NumbaDeprecationWarning,
-                               NumbaPendingDeprecationWarning)
+from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
 from tqdm import tqdm
 
 warnings.simplefilter('ignore', category=NumbaDeprecationWarning)

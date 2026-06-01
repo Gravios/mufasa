@@ -6,15 +6,17 @@ import os
 import numpy as np
 import pandas as pd
 
-from mufasa.data_processors.timebins_movement_calculator import \
-    TimeBinsMovementCalculator
+from mufasa.data_processors.timebins_movement_calculator import TimeBinsMovementCalculator
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
+from mufasa.mixins.feature_extraction_supplement_mixin import FeatureExtractionSupplemental
 from mufasa.roi_tools.ROI_analyzer import ROIAnalyzer
 from mufasa.utils.checks import check_float
-from mufasa.utils.errors import (BodypartColumnNotFoundError, DuplicationError,
-                                FrameRangeError, ROICoordinatesNotFoundError)
+from mufasa.utils.errors import (
+    BodypartColumnNotFoundError,
+    DuplicationError,
+    FrameRangeError,
+    ROICoordinatesNotFoundError,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_data_paths, read_df
 

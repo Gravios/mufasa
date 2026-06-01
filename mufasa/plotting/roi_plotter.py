@@ -10,23 +10,29 @@ import pandas as pd
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.roi_tools.roi_aggregate_statistics_analyzer import \
-    ROIAggregateStatisticsAnalyzer
+from mufasa.roi_tools.roi_aggregate_statistics_analyzer import ROIAggregateStatisticsAnalyzer
 from mufasa.roi_tools.roi_utils import get_roi_dict_from_dfs
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_int, check_valid_boolean,
-                                check_valid_lst,
-                                check_video_and_data_frm_count_align)
-from mufasa.utils.data import (create_color_palettes, detect_bouts,
-                              slice_roi_dict_for_video)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_valid_boolean,
+    check_valid_lst,
+    check_video_and_data_frm_count_align,
+)
+from mufasa.utils.data import create_color_palettes, detect_bouts, slice_roi_dict_for_video
 from mufasa.utils.enums import Formats, Keys, Paths, TagNames, TextOptions
-from mufasa.utils.errors import (BodypartColumnNotFoundError, DuplicationError,
-                                NoFilesFoundError, NoROIDataError,
-                                ROICoordinatesNotFoundError)
+from mufasa.utils.errors import (
+    BodypartColumnNotFoundError,
+    DuplicationError,
+    NoFilesFoundError,
+    NoROIDataError,
+    ROICoordinatesNotFoundError,
+)
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
-from mufasa.utils.read_write import (get_video_meta_data, read_df,
-                                    read_frm_of_video)
+from mufasa.utils.read_write import get_video_meta_data, read_df, read_frm_of_video
 from mufasa.utils.warnings import FrameRangeWarning
 
 OUTSIDE_ROI = 'OUTSIDE REGIONS OF INTEREST'

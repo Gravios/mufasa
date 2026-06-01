@@ -4,8 +4,7 @@ from copy import deepcopy
 import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_dir_exists)
+from mufasa.utils.checks import check_file_exist_and_readable, check_if_dir_exists
 from mufasa.utils.printing import SimbaTimer
 from mufasa.utils.read_write import read_df, write_df
 

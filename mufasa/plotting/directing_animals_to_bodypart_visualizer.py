@@ -7,8 +7,7 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from mufasa.data_processors.directing_animal_to_bodypart import \
-    DirectingAnimalsToBodyPartAnalyzer
+from mufasa.data_processors.directing_animal_to_bodypart import DirectingAnimalsToBodyPartAnalyzer
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.data import create_color_palettes

@@ -8,18 +8,27 @@ import numpy as np
 import pandas as pd
 from shapely.geometry import Polygon
 
-from mufasa.data_processors.spontaneous_alternation_calculator import \
-    SpontaneousAlternationCalculator
+from mufasa.data_processors.spontaneous_alternation_calculator import (
+    SpontaneousAlternationCalculator,
+)
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_int, check_str, check_valid_lst)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_int,
+    check_str,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts, terminate_cpu_pool
 from mufasa.utils.enums import Formats, Paths, TextOptions
 from mufasa.utils.errors import AnimalNumberError, InvalidInputError
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt, find_video_of_file,
-                                    get_video_meta_data)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    find_core_cnt,
+    find_video_of_file,
+    get_video_meta_data,
+)
 
 ALTERNATION_COLOR = (0, 255, 0)
 ERROR_COLOR = (0, 0, 255)

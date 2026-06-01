@@ -12,8 +12,12 @@ from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import check_file_exist_and_readable
 from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder, get_fn_ext,
-                                    get_video_meta_data, read_df)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+)
 
 #
 # def _image_creator(frm_range: list,

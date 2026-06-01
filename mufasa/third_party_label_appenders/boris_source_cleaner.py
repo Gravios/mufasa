@@ -4,8 +4,7 @@ import pandas as pd
 
 from mufasa.utils.checks import check_if_dir_exists, check_that_column_exist
 from mufasa.utils.printing import stdout_success, stdout_warning
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, write_df)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, get_fn_ext, write_df
 
 """
 INSTRUCTIONS:

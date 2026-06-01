@@ -16,8 +16,7 @@ except ImportError:
     torch = None
 
 from mufasa.data_processors.cuda.utils import get_nvc_decoder
-from mufasa.utils.checks import (check_int, check_nvidea_gpu_available,
-                                check_valid_boolean)
+from mufasa.utils.checks import check_int, check_nvidea_gpu_available, check_valid_boolean
 from mufasa.utils.errors import MufasaGPUError, MufasaModuleNotFoundError
 
 

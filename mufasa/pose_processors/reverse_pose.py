@@ -7,26 +7,26 @@ from datetime import datetime
 
 import pandas as pd
 
-from mufasa.feature_extractors.feature_extractor_4bp import \
-    ExtractFeaturesFrom4bps
-from mufasa.feature_extractors.feature_extractor_7bp import \
-    ExtractFeaturesFrom7bps
-from mufasa.feature_extractors.feature_extractor_8bp import \
-    ExtractFeaturesFrom8bps
-from mufasa.feature_extractors.feature_extractor_9bp import \
-    ExtractFeaturesFrom9bps
-from mufasa.feature_extractors.feature_extractor_14bp import \
-    ExtractFeaturesFrom14bps
-from mufasa.feature_extractors.feature_extractor_16bp import \
-    ExtractFeaturesFrom16bps
-from mufasa.feature_extractors.feature_extractor_user_defined import \
-    UserDefinedFeatureExtractor
+from mufasa.feature_extractors.feature_extractor_4bp import ExtractFeaturesFrom4bps
+from mufasa.feature_extractors.feature_extractor_7bp import ExtractFeaturesFrom7bps
+from mufasa.feature_extractors.feature_extractor_8bp import ExtractFeaturesFrom8bps
+from mufasa.feature_extractors.feature_extractor_9bp import ExtractFeaturesFrom9bps
+from mufasa.feature_extractors.feature_extractor_14bp import ExtractFeaturesFrom14bps
+from mufasa.feature_extractors.feature_extractor_16bp import ExtractFeaturesFrom16bps
+from mufasa.feature_extractors.feature_extractor_user_defined import UserDefinedFeatureExtractor
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_that_column_exist,
-                                check_that_two_dfs_are_equal_len)
-from mufasa.utils.read_write import (get_all_clf_names, get_fn_ext,
-                                    read_config_entry, read_df, write_df)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_that_column_exist,
+    check_that_two_dfs_are_equal_len,
+)
+from mufasa.utils.read_write import (
+    get_all_clf_names,
+    get_fn_ext,
+    read_config_entry,
+    read_df,
+    write_df,
+)
 
 
 class Reverse2AnimalTracking(ConfigReader):

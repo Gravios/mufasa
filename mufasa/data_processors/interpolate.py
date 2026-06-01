@@ -12,15 +12,17 @@ except ImportError:
     from typing import Literal
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable, check_str,
-                                check_valid_lst)
+from mufasa.utils.checks import check_file_exist_and_readable, check_str, check_valid_lst
 from mufasa.utils.data import animal_interpolator, body_part_interpolator
 from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import DataHeaderError, InvalidInputError
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
-                                  stdout_success)
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, write_df)
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_information, stdout_success
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_df,
+    write_df,
+)
 
 
 class Interpolate(ConfigReader):
@@ -102,8 +104,9 @@ class Interpolate(ConfigReader):
         # Patch 122ed — allocate the v1 run directory now so it
         # exists when run() starts writing files into it. Lazy-import
         # ``generate_run_id`` to keep import-time deps minimal.
-        from mufasa.project_layout import generate_run_id
         from pathlib import Path as _Path
+
+        from mufasa.project_layout import generate_run_id
         self.run_id = generate_run_id()
         self.run_dir = str(
             _Path(self.project_path) / "derived"

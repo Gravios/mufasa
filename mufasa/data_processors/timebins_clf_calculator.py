@@ -15,14 +15,20 @@ except:
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_int, check_that_column_exist,
-    check_valid_boolean, check_valid_lst)
+    check_file_exist_and_readable,
+    check_int,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.errors import NoDataError
 from mufasa.utils.printing import stdout_information, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    find_time_stamp_from_frame_numbers,
-                                    get_fn_ext)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    find_time_stamp_from_frame_numbers,
+    get_fn_ext,
+)
 
 FIRST_OCCURRENCE = "First occurrence (s)"
 EVENT_COUNT = "Event count"

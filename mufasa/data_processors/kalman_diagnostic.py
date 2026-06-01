@@ -90,12 +90,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
 
 # Column-naming conventions. DLC/Mufasa use the suffix pattern
 # `<bodypart>_x`, `<bodypart>_y`, `<bodypart>_p`. The diagnostic

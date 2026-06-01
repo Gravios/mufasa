@@ -85,7 +85,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 # Standard subdirectories under csv/ that contain pose-data files.
 # Files in OTHER csv/ subdirectories (or in logs/) are skipped.
 POSE_DATA_DIRS = (

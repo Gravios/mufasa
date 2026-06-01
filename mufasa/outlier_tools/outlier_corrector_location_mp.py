@@ -13,10 +13,14 @@ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.utils.checks import check_float, check_if_dir_exists, check_int
 from mufasa.utils.enums import ConfigKey, Defaults, Dtypes
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_config_entry, read_df,
-                                    write_df)
+from mufasa.utils.read_write import (
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_config_entry,
+    read_df,
+    write_df,
+)
 
 
 def _location_outlier_corrector(data_path: str,

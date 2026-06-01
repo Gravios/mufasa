@@ -13,16 +13,27 @@ from copy import deepcopy
 import numpy as np
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_instance, check_int, check_str,
-                                check_that_column_exist, check_valid_boolean,
-                                check_valid_tuple)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_tuple,
+)
 from mufasa.utils.errors import InvalidInputError
 from mufasa.utils.printing import stdout_information, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    find_video_of_file, get_fn_ext, read_df,
-                                    read_frm_of_video)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    find_video_of_file,
+    get_fn_ext,
+    read_df,
+    read_frm_of_video,
+)
 from mufasa.utils.warnings import VideoFileWarning
 
 H5 = ".h5"

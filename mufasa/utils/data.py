@@ -30,32 +30,52 @@ import multiprocessing
 
 from joblib import Parallel, delayed
 
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_df_field_is_boolean,
-                                check_if_dir_exists,
-                                check_if_keys_exist_in_dict,
-                                check_if_module_has_import,
-                                check_if_string_value_is_valid_video_timestamp,
-                                check_if_valid_rgb_tuple, check_instance,
-                                check_int, check_iterable_length, check_str,
-                                check_that_column_exist,
-                                check_that_hhmmss_start_is_before_end,
-                                check_valid_array, check_valid_boolean,
-                                check_valid_cpu_pool, check_valid_dataframe,
-                                check_valid_lst, check_valid_tuple, is_wsl)
-from mufasa.utils.enums import (OS, ConfigKey, Defaults, Dtypes, Formats, Keys,
-                               Options)
-from mufasa.utils.errors import (BodypartColumnNotFoundError, CountError,
-                                InvalidFileTypeError, InvalidInputError,
-                                NoFilesFoundError, NoROIDataError,
-                                MufasaModuleNotFoundError)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_df_field_is_boolean,
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_if_module_has_import,
+    check_if_string_value_is_valid_video_timestamp,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_iterable_length,
+    check_str,
+    check_that_column_exist,
+    check_that_hhmmss_start_is_before_end,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_cpu_pool,
+    check_valid_dataframe,
+    check_valid_lst,
+    check_valid_tuple,
+    is_wsl,
+)
+from mufasa.utils.enums import OS, ConfigKey, Defaults, Dtypes, Formats, Keys, Options
+from mufasa.utils.errors import (
+    BodypartColumnNotFoundError,
+    CountError,
+    InvalidFileTypeError,
+    InvalidInputError,
+    MufasaModuleNotFoundError,
+    NoFilesFoundError,
+    NoROIDataError,
+)
 from mufasa.utils.printing import stdout_success, stdout_warning
-from mufasa.utils.read_write import (find_core_cnt, find_video_of_file,
-                                    get_current_time, get_fn_ext,
-                                    get_video_meta_data, read_config_entry,
-                                    read_df,
-                                    read_project_path_and_file_type,
-                                    read_roi_data, write_df)
+from mufasa.utils.read_write import (
+    find_core_cnt,
+    find_video_of_file,
+    get_current_time,
+    get_fn_ext,
+    get_video_meta_data,
+    read_config_entry,
+    read_df,
+    read_project_path_and_file_type,
+    read_roi_data,
+    write_df,
+)
 from mufasa.utils.warnings import DuplicateNamesWarning
 
 

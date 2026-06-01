@@ -11,8 +11,7 @@ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.utils.checks import check_file_exist_and_readable
 from mufasa.utils.data import slice_roi_dict_for_video
 from mufasa.utils.enums import ROI_SETTINGS
-from mufasa.utils.errors import (InvalidInputError, NoDataError,
-                                ROICoordinatesNotFoundError)
+from mufasa.utils.errors import InvalidInputError, NoDataError, ROICoordinatesNotFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_data_paths, read_df
 

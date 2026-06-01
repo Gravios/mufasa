@@ -9,23 +9,38 @@ import numpy as np
 import pandas as pd
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_int,
-                                check_valid_boolean, check_valid_cpu_pool,
-                                check_valid_dataframe, check_valid_lst,
-                                check_valid_tuple)
-from mufasa.utils.data import (create_color_palette, get_cpu_pool,
-                              terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_int,
+    check_valid_boolean,
+    check_valid_cpu_pool,
+    check_valid_dataframe,
+    check_valid_lst,
+    check_valid_tuple,
+)
+from mufasa.utils.data import create_color_palette, get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import Defaults, Options
-from mufasa.utils.errors import (CountError, DataHeaderError, FrameRangeError,
-                                InvalidInputError, NoDataError)
+from mufasa.utils.errors import (
+    CountError,
+    DataHeaderError,
+    FrameRangeError,
+    InvalidInputError,
+    NoDataError,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    create_directory, find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext,
-                                    get_video_meta_data, read_frm_of_video,
-                                    recursive_file_search, remove_a_folder)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    create_directory,
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_frm_of_video,
+    recursive_file_search,
+    remove_a_folder,
+)
 
 FRAME = 'FRAME'
 CLASS_ID = 'CLASS_ID'

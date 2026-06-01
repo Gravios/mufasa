@@ -3,10 +3,14 @@ import math
 import numpy as np
 from numba import cuda, float64
 
-from mufasa.data_processors.cuda.utils import (_cuda_diff, _cuda_mean,
-                                              _cuda_nanvariance, _cuda_std,
-                                              _euclid_dist_2d,
-                                              _is_cuda_available)
+from mufasa.data_processors.cuda.utils import (
+    _cuda_diff,
+    _cuda_mean,
+    _cuda_nanvariance,
+    _cuda_std,
+    _euclid_dist_2d,
+    _is_cuda_available,
+)
 from mufasa.utils.checks import check_float, check_int, check_valid_array
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import MufasaGPUError

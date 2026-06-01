@@ -17,10 +17,15 @@ except ModuleNotFoundError:
     YOLO = None
 
 from mufasa.data_processors.cuda.utils import _is_cuda_available
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_dir_exists, check_int, check_str,
-                                check_valid_boolean, check_valid_device,
-                                check_valid_url)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_int,
+    check_str,
+    check_valid_boolean,
+    check_valid_device,
+    check_valid_url,
+)
 from mufasa.utils.enums import Options
 from mufasa.utils.errors import MufasaGPUError, MufasaPackageVersionError
 from mufasa.utils.printing import stdout_information

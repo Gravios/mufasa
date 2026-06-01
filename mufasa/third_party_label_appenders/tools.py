@@ -11,15 +11,24 @@ import pandas as pd
 
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_if_dir_exists, check_str,
-    check_valid_boolean, check_valid_dataframe, check_valid_lst)
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_str,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Methods
 from mufasa.utils.errors import ColumnNotFoundError, InvalidFileTypeError
-from mufasa.utils.read_write import (bento_file_reader,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_boris_file,
-                                    read_video_info, read_video_info_csv)
+from mufasa.utils.read_write import (
+    bento_file_reader,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_boris_file,
+    read_video_info,
+    read_video_info_csv,
+)
 from mufasa.utils.warnings import ThirdPartyAnnotationsInvalidFileFormatWarning
 
 BENTO = "Bento"

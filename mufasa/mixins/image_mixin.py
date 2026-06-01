@@ -20,21 +20,35 @@ from PIL import Image, ImageDraw, ImageFont
 from shapely.geometry import Polygon
 from skimage.metrics import structural_similarity
 
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_if_valid_img,
-                                check_if_valid_rgb_tuple, check_instance,
-                                check_int, check_str, check_valid_array,
-                                check_valid_boolean, check_valid_lst,
-                                check_valid_tuple, is_img_bw, is_img_greyscale)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_img,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_str,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_lst,
+    check_valid_tuple,
+    is_img_bw,
+    is_img_greyscale,
+)
 from mufasa.utils.data import terminate_cpu_pool
 from mufasa.utils.enums import Defaults, Formats, GeometryEnum, Options
 from mufasa.utils.errors import ArrayError, FrameRangeError, InvalidInputError
 from mufasa.utils.lookups import get_fonts
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data,
-                                    read_frm_of_video, seconds_to_timestamp)
+from mufasa.utils.read_write import (
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_frm_of_video,
+    seconds_to_timestamp,
+)
 
 
 class ImageMixin:

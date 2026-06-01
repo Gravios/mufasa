@@ -7,8 +7,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_filepath_list_is_empty)
+from mufasa.utils.checks import check_if_dir_exists, check_if_filepath_list_is_empty
 from mufasa.utils.enums import Formats
 from mufasa.utils.printing import stdout_success
 

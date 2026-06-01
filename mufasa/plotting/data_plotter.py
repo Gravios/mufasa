@@ -7,14 +7,19 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
-from mufasa.data_processors.timebins_movement_calculator import \
-    TimeBinsMovementCalculator
+from mufasa.data_processors.timebins_movement_calculator import TimeBinsMovementCalculator
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_if_valid_rgb_tuple, check_int,
-    check_str, check_valid_boolean, check_valid_lst, check_valid_tuple)
+    check_file_exist_and_readable,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+    check_valid_boolean,
+    check_valid_lst,
+    check_valid_tuple,
+)
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import NoSpecifiedOutputError
 from mufasa.utils.printing import SimbaTimer, stdout_success

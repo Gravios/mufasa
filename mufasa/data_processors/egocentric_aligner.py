@@ -3,20 +3,30 @@ import os
 import numpy as np
 import pandas as pd
 
-from mufasa.utils.checks import (check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_int, check_str, check_valid_boolean,
-                                check_valid_dataframe, check_valid_tuple)
-from mufasa.utils.data import (egocentrically_align_pose_numba, get_cpu_pool,
-                              terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_tuple,
+)
+from mufasa.utils.data import egocentrically_align_pose_numba, get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import InvalidInputError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (bgr_to_rgb_tuple, find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
-                                    find_video_of_file, get_fn_ext,
-                                    get_video_meta_data, read_df, write_df)
-from mufasa.video_processors.egocentric_video_rotator import \
-    EgocentricVideoRotator
+from mufasa.utils.read_write import (
+    bgr_to_rgb_tuple,
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    find_video_of_file,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    write_df,
+)
+from mufasa.video_processors.egocentric_video_rotator import EgocentricVideoRotator
 
 
 class EgocentricalAligner:

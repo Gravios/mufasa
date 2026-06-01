@@ -10,9 +10,12 @@ except:
     pass
 
 from mufasa.third_party_label_appenders.transform.utils import arr_to_b64
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_dir_exists, check_instance,
-                                check_valid_boolean)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_instance,
+    check_valid_boolean,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_img, recursive_file_search
 

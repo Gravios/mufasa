@@ -24,22 +24,40 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 from mufasa.data_processors.cuda.utils import _is_cuda_available
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_instance, check_int,
-                                check_valid_boolean, check_valid_lst,
-                                check_valid_tuple, get_fn_ext)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_instance,
+    check_int,
+    check_valid_boolean,
+    check_valid_lst,
+    check_valid_tuple,
+    get_fn_ext,
+)
 from mufasa.utils.enums import Formats, Options
-from mufasa.utils.errors import (CountError, InvalidFilepathError,
-                                InvalidFileTypeError, MufasaGPUError,
-                                MufasaPackageVersionError)
+from mufasa.utils.errors import (
+    CountError,
+    InvalidFilepathError,
+    InvalidFileTypeError,
+    MufasaGPUError,
+    MufasaPackageVersionError,
+)
 from mufasa.utils.lookups import get_current_time
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_video_meta_data, recursive_file_search)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_video_meta_data,
+    recursive_file_search,
+)
 from mufasa.utils.warnings import FileExistWarning, NoDataFoundWarning
-from mufasa.utils.yolo import (_get_undetected_obs, apply_fixed_bbox_size,
-                              filter_yolo_keypoint_data, load_yolo_model,
-                              yolo_predict)
+from mufasa.utils.yolo import (
+    _get_undetected_obs,
+    apply_fixed_bbox_size,
+    filter_yolo_keypoint_data,
+    load_yolo_model,
+    yolo_predict,
+)
 
 OUT_COLS = ['FRAME', 'CLASS_ID', 'CLASS_NAME', 'CONFIDENCE', 'X1', 'Y1', 'X2', 'Y2', 'X3', 'Y3', 'X4', 'Y4']
 COORD_COLS = ['X1', 'Y1', 'X2', 'Y2', 'X3', 'Y3', 'X4', 'Y4']

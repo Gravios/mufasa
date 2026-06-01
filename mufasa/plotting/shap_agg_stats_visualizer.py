@@ -9,18 +9,27 @@ import numpy as np
 import pandas as pd
 
 import mufasa
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_df_field_is_boolean,
-                                check_if_dir_exists, check_if_valid_img,
-                                check_instance, check_int, check_str,
-                                check_that_column_exist, check_valid_boolean,
-                                check_valid_dataframe, check_valid_tuple)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_df_field_is_boolean,
+    check_if_dir_exists,
+    check_if_valid_img,
+    check_instance,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_tuple,
+)
 from mufasa.utils.enums import Paths
 from mufasa.utils.errors import FeatureNumberMismatchError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (bgr_to_rgb_tuple,
-                                    read_shap_feature_categories_csv,
-                                    read_shap_img_paths)
+from mufasa.utils.read_write import (
+    bgr_to_rgb_tuple,
+    read_shap_feature_categories_csv,
+    read_shap_img_paths,
+)
 
 MUFASA_DIR = os.path.dirname(mufasa.__file__)
 

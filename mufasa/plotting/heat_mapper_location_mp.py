@@ -15,22 +15,32 @@ from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_filepaths_in_iterable_exist,
-    check_float, check_if_keys_exist_in_dict,
-    check_if_string_value_is_valid_video_timestamp, check_int, check_str,
-    check_that_hhmmss_start_is_before_end, check_valid_boolean,
-    check_valid_lst)
-from mufasa.utils.data import (find_frame_numbers_from_time_stamp, get_cpu_pool,
-                              terminate_cpu_pool)
+    check_file_exist_and_readable,
+    check_filepaths_in_iterable_exist,
+    check_float,
+    check_if_keys_exist_in_dict,
+    check_if_string_value_is_valid_video_timestamp,
+    check_int,
+    check_str,
+    check_that_hhmmss_start_is_before_end,
+    check_valid_boolean,
+    check_valid_lst,
+)
+from mufasa.utils.data import find_frame_numbers_from_time_stamp, get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import OS, Formats
-from mufasa.utils.errors import (FrameRangeError, NoDataError,
-                                NoSpecifiedOutputError)
+from mufasa.utils.errors import FrameRangeError, NoDataError, NoSpecifiedOutputError
 from mufasa.utils.lookups import get_named_colors
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt, find_video_of_file,
-                                    get_fn_ext, get_video_meta_data, read_df,
-                                    read_frm_of_video, remove_a_folder)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    find_core_cnt,
+    find_video_of_file,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    read_frm_of_video,
+    remove_a_folder,
+)
 
 STYLE_PALETTE = 'palette'
 STYLE_SHADING = 'shading'

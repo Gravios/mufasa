@@ -4,16 +4,22 @@ from queue import Queue
 
 import numpy as np
 
-from mufasa.utils.checks import (check_instance, check_int,
-                                check_nvidea_gpu_available,
-                                check_valid_boolean, check_valid_tuple)
+from mufasa.utils.checks import (
+    check_instance,
+    check_int,
+    check_nvidea_gpu_available,
+    check_valid_boolean,
+    check_valid_tuple,
+)
 from mufasa.utils.data import get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import MufasaGPUError
 from mufasa.utils.printing import SimbaTimer, stdout_information
-from mufasa.utils.read_write import (get_video_meta_data,
-                                    read_img_batch_from_video,
-                                    read_img_batch_from_video_gpu)
+from mufasa.utils.read_write import (
+    get_video_meta_data,
+    read_img_batch_from_video,
+    read_img_batch_from_video_gpu,
+)
 
 
 class AsyncVideoFrameReader:

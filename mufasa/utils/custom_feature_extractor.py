@@ -7,9 +7,12 @@ import sys
 from pathlib import Path
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_module_has_import, check_instance,
-                                check_str)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_module_has_import,
+    check_instance,
+    check_str,
+)
 from mufasa.utils.errors import CountError, InvalidFileTypeError
 from mufasa.utils.printing import stdout_warning
 from mufasa.utils.read_write import get_fn_ext

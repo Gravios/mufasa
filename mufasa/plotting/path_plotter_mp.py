@@ -14,24 +14,43 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_if_keys_exist_in_dict,
-    check_if_string_value_is_valid_video_timestamp, check_if_valid_rgb_tuple,
-    check_instance, check_str, check_that_column_exist,
-    check_that_hhmmss_start_is_before_end, check_valid_boolean,
-    check_valid_dataframe, check_valid_lst,
-    check_video_and_data_frm_count_align)
-from mufasa.utils.data import (create_color_palette,
-                              find_frame_numbers_from_time_stamp, get_cpu_pool,
-                              slice_roi_dict_for_video, terminate_cpu_pool)
+    check_file_exist_and_readable,
+    check_if_keys_exist_in_dict,
+    check_if_string_value_is_valid_video_timestamp,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_str,
+    check_that_column_exist,
+    check_that_hhmmss_start_is_before_end,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_lst,
+    check_video_and_data_frm_count_align,
+)
+from mufasa.utils.data import (
+    create_color_palette,
+    find_frame_numbers_from_time_stamp,
+    get_cpu_pool,
+    slice_roi_dict_for_video,
+    terminate_cpu_pool,
+)
 from mufasa.utils.enums import Formats, Options, TagNames
-from mufasa.utils.errors import (FrameRangeError, InvalidInputError,
-                                InvalidVideoFileError, NoSpecifiedOutputError)
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
-                                  stdout_success)
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    create_directory, find_core_cnt,
-                                    find_video_of_file, get_current_time,
-                                    get_fn_ext, read_frm_of_video)
+from mufasa.utils.errors import (
+    FrameRangeError,
+    InvalidInputError,
+    InvalidVideoFileError,
+    NoSpecifiedOutputError,
+)
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_information, stdout_success
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    create_directory,
+    find_core_cnt,
+    find_video_of_file,
+    get_current_time,
+    get_fn_ext,
+    read_frm_of_video,
+)
 from mufasa.utils.warnings import ROIWarning
 
 STYLE_WIDTH = "width"

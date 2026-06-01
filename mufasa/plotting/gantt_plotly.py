@@ -5,8 +5,7 @@ import pandas as pd
 import PIL
 import plotly.express as px
 
-from mufasa.utils.checks import (check_float, check_instance, check_int,
-                                check_valid_dataframe)
+from mufasa.utils.checks import check_float, check_instance, check_int, check_valid_dataframe
 from mufasa.utils.data import create_color_palettes
 from mufasa.utils.errors import InvalidInputError
 from mufasa.utils.read_write import seconds_to_timestamp

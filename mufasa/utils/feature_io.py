@@ -59,7 +59,6 @@ import pandas as pd
 
 from mufasa.project_layout import project_paths_from_config
 
-
 __all__ = [
     "family_slug",
     "list_video_stems_with_features",

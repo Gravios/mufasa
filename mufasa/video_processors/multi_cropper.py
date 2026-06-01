@@ -12,14 +12,16 @@ except:
     from typing import Literal
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_if_dir_exists, check_int, check_str,
-                                check_valid_boolean)
+from mufasa.utils.checks import check_if_dir_exists, check_int, check_str, check_valid_boolean
 from mufasa.utils.enums import Formats, Options, TextOptions
 from mufasa.utils.errors import CountError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data,
-                                    read_frm_of_video)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_frm_of_video,
+)
 from mufasa.video_processors.roi_selector import ROISelector
 from mufasa.video_processors.video_processing import crop_video
 

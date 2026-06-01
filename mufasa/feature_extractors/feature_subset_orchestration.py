@@ -38,21 +38,25 @@ order is preserved).
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
 from mufasa.feature_extractors.feature_subset_kernels import (
-    compute_animal_convex_hulls, compute_distances_to_frame_edge,
-    compute_four_point_hulls, compute_framewise_movement,
-    compute_inside_roi, compute_roi_center_distances,
-    compute_three_point_angles, compute_three_point_hulls,
-    compute_two_point_distances)
+    compute_animal_convex_hulls,
+    compute_distances_to_frame_edge,
+    compute_four_point_hulls,
+    compute_framewise_movement,
+    compute_inside_roi,
+    compute_roi_center_distances,
+    compute_three_point_angles,
+    compute_three_point_hulls,
+    compute_two_point_distances,
+)
 from mufasa.utils.printing import SimbaTimer
 from mufasa.utils.read_write import get_fn_ext, read_df, write_df
-
 
 # Feature family name constants. Duplicated from feature_subsets.py
 # because importing them here would cause a circular import (the

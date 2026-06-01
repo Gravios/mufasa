@@ -15,20 +15,28 @@ from mufasa.feature_extractors.perimeter_jit import jitted_centroid
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_if_valid_rgb_tuple, check_instance,
-                                check_int, check_nvidea_gpu_available,
-                                check_str, check_that_column_exist,
-                                check_valid_boolean)
-from mufasa.utils.data import (create_color_palette, get_cpu_pool,
-                              terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+)
+from mufasa.utils.data import create_color_palette, get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import CountError, InvalidFilepathError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
-                                    get_current_time, get_fn_ext,
-                                    get_video_meta_data, read_df)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    get_current_time,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+)
 from mufasa.utils.warnings import FrameRangeWarning
 
 

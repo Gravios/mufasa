@@ -14,13 +14,16 @@ from mufasa.data_processors.interpolate import Interpolate
 from mufasa.data_processors.smoothing import Smoothing
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pose_importer_mixin import PoseImporterMixin
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_keys_exist_in_dict, check_int,
-                                check_str, check_valid_lst)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_int,
+    check_str,
+    check_valid_lst,
+)
 from mufasa.utils.enums import Methods
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_all_videos_in_project,
-                                    get_video_meta_data, write_df)
+from mufasa.utils.read_write import find_all_videos_in_project, get_video_meta_data, write_df
 
 
 class SLEAPImporterSLP(ConfigReader, PoseImporterMixin):

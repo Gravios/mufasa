@@ -89,13 +89,12 @@ or moving provenance to a sidecar file with atomic-rename writes).
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
-from collections.abc import Callable
 
 from mufasa.project_layout import read_project_toml, write_project_toml
 

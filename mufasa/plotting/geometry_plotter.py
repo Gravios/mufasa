@@ -5,29 +5,45 @@ import os
 import cv2
 import numpy as np
 import pandas as pd
-from shapely.geometry import (LineString, MultiLineString, MultiPolygon, Point,
-                              Polygon)
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point, Polygon
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_float, check_if_dir_exists,
-                                check_if_string_value_is_valid_video_timestamp,
-                                check_if_valid_rgb_tuple, check_instance,
-                                check_int, check_iterable_length, check_str,
-                                check_that_hhmmss_start_is_before_end,
-                                check_valid_boolean, check_valid_cpu_pool,
-                                check_valid_dict, check_valid_lst)
-from mufasa.utils.data import (create_color_palettes,
-                              find_frame_numbers_from_time_stamp, get_cpu_pool,
-                              terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_dir_exists,
+    check_if_string_value_is_valid_video_timestamp,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_iterable_length,
+    check_str,
+    check_that_hhmmss_start_is_before_end,
+    check_valid_boolean,
+    check_valid_cpu_pool,
+    check_valid_dict,
+    check_valid_lst,
+)
+from mufasa.utils.data import (
+    create_color_palettes,
+    find_frame_numbers_from_time_stamp,
+    get_cpu_pool,
+    terminate_cpu_pool,
+)
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import InvalidInputError
 from mufasa.utils.lookups import get_color_dict
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (
     check_if_hhmmss_timestamp_is_valid_part_of_video,
-    concatenate_videos_in_folder, find_core_cnt, find_video_of_file,
-    get_fn_ext, get_video_meta_data, remove_a_folder, seconds_to_timestamp)
+    concatenate_videos_in_folder,
+    find_core_cnt,
+    find_video_of_file,
+    get_fn_ext,
+    get_video_meta_data,
+    remove_a_folder,
+    seconds_to_timestamp,
+)
 from mufasa.utils.warnings import FrameRangeWarning
 
 ACCEPTED_TYPES = [Polygon, LineString, MultiPolygon, MultiLineString, Point]

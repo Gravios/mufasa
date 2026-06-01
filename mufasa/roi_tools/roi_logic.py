@@ -46,9 +46,12 @@ import numpy as np
 import pandas as pd
 
 from mufasa.utils.checks import check_file_exist_and_readable
-from mufasa.utils.read_write import (get_fn_ext, get_video_meta_data,
-                                     read_frm_of_video, read_roi_data)
-
+from mufasa.utils.read_write import (
+    get_fn_ext,
+    get_video_meta_data,
+    read_frm_of_video,
+    read_roi_data,
+)
 
 # Shape-type constants. Mirror the values used by the legacy code so
 # in-memory dicts stay compatible with read_roi_data() / write_df.

@@ -4,13 +4,15 @@ import numpy as np
 import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_dir_exists, check_valid_dataframe)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_valid_dataframe,
+)
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import FrameRangeError, NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    read_df, write_df)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, read_df, write_df
 
 CLASSIFIER_NAME = 'ATTACK'
 START, END = 'START', 'END'

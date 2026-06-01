@@ -8,9 +8,14 @@ import numpy as np
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_float, check_if_valid_rgb_tuple,
-                                check_int, check_str, check_that_column_exist,
-                                check_valid_lst)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats, TextOptions
 from mufasa.utils.errors import NoFilesFoundError, NoSpecifiedOutputError

@@ -41,7 +41,6 @@ for having flattened any MultiIndex columns before calling this.
 """
 from __future__ import annotations
 
-
 import pandas as pd
 
 

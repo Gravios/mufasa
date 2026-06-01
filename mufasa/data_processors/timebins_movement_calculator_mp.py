@@ -9,22 +9,30 @@ import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
+from mufasa.mixins.feature_extraction_supplement_mixin import FeatureExtractionSupplemental
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_float, check_int,
-    check_that_column_exist, check_valid_boolean, check_valid_lst,
-    check_valid_tuple)
+    check_all_file_names_are_represented_in_video_log,
+    check_float,
+    check_int,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_lst,
+    check_valid_tuple,
+)
 from mufasa.utils.data import get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import FrameRangeError, InvalidInputError, NoDataError
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
-                                  stdout_success)
-from mufasa.utils.read_write import (create_directory, find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
-                                    find_time_stamp_from_frame_numbers,
-                                    get_fn_ext, read_df, read_video_info)
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_information, stdout_success
+from mufasa.utils.read_write import (
+    create_directory,
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    find_time_stamp_from_frame_numbers,
+    get_fn_ext,
+    read_df,
+    read_video_info,
+)
 
 
 def _time_bin_movement_helper(data: list,

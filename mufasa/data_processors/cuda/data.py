@@ -3,9 +3,12 @@ import math
 import numpy as np
 from numba import cuda
 
-from mufasa.data_processors.cuda.utils import (_cuda_2d_transpose, _cuda_add_2d,
-                                              _cuda_matrix_multiplication,
-                                              _cuda_subtract_2d)
+from mufasa.data_processors.cuda.utils import (
+    _cuda_2d_transpose,
+    _cuda_add_2d,
+    _cuda_matrix_multiplication,
+    _cuda_subtract_2d,
+)
 from mufasa.utils.checks import check_int, check_valid_array
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import InvalidInputError

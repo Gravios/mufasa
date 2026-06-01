@@ -9,14 +9,20 @@ import pandas as pd
 from mufasa.data_processors.interpolate import Interpolate
 from mufasa.data_processors.smoothing import Smoothing
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_keys_exist_in_dict, check_instance,
-                                check_int, check_str)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_keys_exist_in_dict,
+    check_instance,
+    check_int,
+    check_str,
+)
 from mufasa.utils.errors import FileExistError, InvalidInputError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext,
-                                    get_number_of_header_columns_in_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_number_of_header_columns_in_df,
+)
 
 DLC_ = 'DLC_'
 DeepCut = 'DeepCut'

@@ -7,15 +7,20 @@ import pandas as pd
 from mufasa.data_processors.interpolate import Interpolate
 from mufasa.data_processors.smoothing import Smoothing
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_float, check_if_dir_exists,
-                                check_if_keys_exist_in_dict, check_int,
-                                check_str, check_valid_boolean,
-                                check_valid_dataframe, check_valid_tuple)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_int,
+    check_str,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_tuple,
+)
 from mufasa.utils.enums import ConfigKey
 from mufasa.utils.errors import PermissionError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    write_df)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, write_df
 
 OUT_COLS = ['FRAME', 'CLASS_ID', 'CLASS_NAME', 'CONFIDENCE', 'X1', 'Y1', 'X2', 'Y2', 'X3', 'Y3', 'X4', 'Y4']
 COORD_COLS = ['X1', 'Y1', 'X2', 'Y2', 'X3', 'Y3', 'X4', 'Y4']

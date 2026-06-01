@@ -10,12 +10,15 @@ from datetime import datetime
 
 import cv2
 
-from mufasa.utils.checks import (check_if_dir_exists, check_int, check_str,
-                                check_valid_boolean)
+from mufasa.utils.checks import check_if_dir_exists, check_int, check_str, check_valid_boolean
 from mufasa.utils.data import get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_core_cnt, get_fn_ext,
-                                    get_video_meta_data, read_frm_of_video)
+from mufasa.utils.read_write import (
+    find_core_cnt,
+    get_fn_ext,
+    get_video_meta_data,
+    read_frm_of_video,
+)
 
 JPEG, PNG, WEBP = 'jpeg', 'png', 'webp'
 

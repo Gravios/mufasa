@@ -16,14 +16,18 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.mixins.train_model_mixin import TrainModelMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_int, check_str, check_valid_boolean,
-                                check_video_and_data_frm_count_align)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_int,
+    check_str,
+    check_valid_boolean,
+    check_video_and_data_frm_count_align,
+)
 from mufasa.utils.data import create_color_palette, plug_holes_shortest_bout
 from mufasa.utils.enums import Options, TagNames, TextOptions
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
-from mufasa.utils.read_write import (get_fn_ext, get_video_meta_data, read_df,
-                                    read_pickle, write_df)
+from mufasa.utils.read_write import get_fn_ext, get_video_meta_data, read_df, read_pickle, write_df
 from mufasa.utils.warnings import FrameRangeWarning
 
 plt.interactive(True)

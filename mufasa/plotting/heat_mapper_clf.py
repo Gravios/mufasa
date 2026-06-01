@@ -10,8 +10,12 @@ from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_filepaths_in_iterable_exist, check_int, check_str,
-    check_valid_dataframe, check_valid_dict)
+    check_filepaths_in_iterable_exist,
+    check_int,
+    check_str,
+    check_valid_dataframe,
+    check_valid_dict,
+)
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import InvalidInputError, NoSpecifiedOutputError
 from mufasa.utils.printing import SimbaTimer, stdout_success

@@ -10,16 +10,25 @@ import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_float, check_if_valid_rgb_tuple,
-                                check_int, check_str, check_that_column_exist,
-                                check_valid_lst)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts, terminate_cpu_pool
 from mufasa.utils.enums import Formats, TextOptions
 from mufasa.utils.errors import NoSpecifiedOutputError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt, get_fn_ext,
-                                    get_video_meta_data, remove_files)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    find_core_cnt,
+    get_fn_ext,
+    get_video_meta_data,
+    remove_files,
+)
 from mufasa.utils.warnings import NoDataFoundWarning
 
 SPACE_SCALE = 60

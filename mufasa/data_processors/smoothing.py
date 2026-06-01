@@ -11,18 +11,21 @@ except ImportError:
     from typing import Literal
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable, check_int,
-                                check_str, check_valid_lst)
+from mufasa.utils.checks import check_file_exist_and_readable, check_int, check_str, check_valid_lst
 from mufasa.utils.data import df_smoother, savgol_smoother
 from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import InvalidInputError, NoFilesFoundError
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
-                                  stdout_success)
-from mufasa.utils.read_write import (copy_files_to_directory,
-                                    find_files_of_filetypes_in_directory,
-                                    find_video_of_file, get_fn_ext,
-                                    get_video_meta_data, read_df,
-                                    read_video_info, write_df)
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_information, stdout_success
+from mufasa.utils.read_write import (
+    copy_files_to_directory,
+    find_files_of_filetypes_in_directory,
+    find_video_of_file,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    read_video_info,
+    write_df,
+)
 
 
 class Smoothing(ConfigReader):

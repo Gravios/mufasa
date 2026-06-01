@@ -102,7 +102,6 @@ from pathlib import Path
 
 import numpy as np
 
-
 # Try imports lazily so import-time errors are clear and the
 # module doesn't crash users who only want the helper functions.
 try:
@@ -116,15 +115,33 @@ else:
 try:
     from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
     from PySide6.QtGui import (
-        QBrush, QColor, QImage, QKeySequence, QPainter, QPen,
-        QPixmap, QShortcut,
+        QBrush,
+        QColor,
+        QImage,
+        QKeySequence,
+        QPainter,
+        QPen,
+        QPixmap,
+        QShortcut,
     )
     from PySide6.QtWidgets import (
-        QApplication, QCheckBox, QComboBox, QGraphicsEllipseItem,
-        QGraphicsLineItem, QGraphicsPathItem, QGraphicsPixmapItem,
-        QGraphicsScene, QGraphicsView, QHBoxLayout, QLabel,
-        QMainWindow, QPushButton, QSlider, QStatusBar,
-        QVBoxLayout, QWidget,
+        QApplication,
+        QCheckBox,
+        QComboBox,
+        QGraphicsEllipseItem,
+        QGraphicsLineItem,
+        QGraphicsPathItem,
+        QGraphicsPixmapItem,
+        QGraphicsScene,
+        QGraphicsView,
+        QHBoxLayout,
+        QLabel,
+        QMainWindow,
+        QPushButton,
+        QSlider,
+        QStatusBar,
+        QVBoxLayout,
+        QWidget,
     )
     _QT_ERR = None
 except ImportError as e:
@@ -142,7 +159,6 @@ from mufasa.tools.pose_viewer import (
     ZoomableGraphicsView,
     _load_pose_file,
 )
-
 
 # Playback speed presets (powers of 2 from 1/8 to 8×). Match the
 # ratios used by the keyboard shortcuts so they land on preset

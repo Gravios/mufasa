@@ -18,12 +18,19 @@ from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.image_mixin import ImageMixin
 from mufasa.mixins.timeseries_features_mixin import TimeseriesFeatureMixin
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_valid_dataframe)
+    check_all_file_names_are_represented_in_video_log,
+    check_valid_dataframe,
+)
 from mufasa.utils.enums import Formats
 from mufasa.utils.printing import SimbaTimer
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    find_video_of_file, get_fn_ext, read_df,
-                                    read_video_info, write_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    find_video_of_file,
+    get_fn_ext,
+    read_df,
+    read_video_info,
+    write_df,
+)
 
 
 class StraubTailAnalyzer(ConfigReader):

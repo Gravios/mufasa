@@ -15,14 +15,22 @@ except ImportError:
     from typing import Literal
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_if_filepath_list_is_empty,
-                                check_if_valid_input, check_that_column_exist)
+from mufasa.utils.checks import (
+    check_if_filepath_list_is_empty,
+    check_if_valid_input,
+    check_that_column_exist,
+)
 from mufasa.utils.enums import Methods, TagNames
 from mufasa.utils.errors import DataHeaderError, NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    find_video_of_file, get_fn_ext,
-                                    get_video_meta_data, read_df, write_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    find_video_of_file,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    write_df,
+)
 
 
 class Interpolate(ConfigReader):

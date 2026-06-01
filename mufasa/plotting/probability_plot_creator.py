@@ -10,8 +10,15 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_float, check_instance, check_int,
-    check_str, check_that_column_exist, check_valid_boolean, check_valid_tuple)
+    check_file_exist_and_readable,
+    check_float,
+    check_instance,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_tuple,
+)
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import NoSpecifiedOutputError
 from mufasa.utils.lookups import get_color_dict

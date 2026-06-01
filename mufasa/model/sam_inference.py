@@ -13,15 +13,23 @@ try:
 except:
     SAM2VideoPredictor = None
 
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_instance, check_int,
-                                check_valid_array, check_valid_tuple)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_instance,
+    check_int,
+    check_valid_array,
+    check_valid_tuple,
+)
 from mufasa.utils.data import resample_geometry_vertices
 from mufasa.utils.enums import Formats, Options
-from mufasa.utils.errors import (InvalidInputError, MufasaGPUError,
-                                MufasaPackageVersionError)
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data)
+from mufasa.utils.errors import InvalidInputError, MufasaGPUError, MufasaPackageVersionError
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+)
 
 
 class SamInference:

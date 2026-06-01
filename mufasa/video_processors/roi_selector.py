@@ -3,12 +3,17 @@ import os
 import cv2
 import numpy as np
 
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_valid_img, check_if_valid_rgb_tuple,
-                                check_int, check_str, check_valid_boolean)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_valid_img,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+    check_valid_boolean,
+)
 from mufasa.utils.enums import Options
 from mufasa.utils.errors import InvalidFileTypeError
-from mufasa.utils.read_write import (get_fn_ext, read_frm_of_video, read_img)
+from mufasa.utils.read_write import get_fn_ext, read_frm_of_video, read_img
 from mufasa.utils.warnings import CropWarning
 
 

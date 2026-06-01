@@ -4,22 +4,34 @@ import os
 import cv2
 import numpy as np
 
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_int, check_valid_array,
-                                check_valid_boolean, check_valid_cpu_pool,
-                                check_valid_tuple)
-from mufasa.utils.data import (align_target_warpaffine_vectors,
-                              center_rotation_warpaffine_vectors,
-                              get_cpu_pool,
-                              terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_cpu_pool,
+    check_valid_tuple,
+)
+from mufasa.utils.data import (
+    align_target_warpaffine_vectors,
+    center_rotation_warpaffine_vectors,
+    get_cpu_pool,
+    terminate_cpu_pool,
+)
 from mufasa.utils.enums import Formats
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    create_directory, find_core_cnt,
-                                    get_fn_ext, get_video_meta_data, read_frm_of_video,
-                                    read_img_batch_from_video_gpu,
-                                    remove_a_folder)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    create_directory,
+    find_core_cnt,
+    get_fn_ext,
+    get_video_meta_data,
+    read_frm_of_video,
+    read_img_batch_from_video_gpu,
+    remove_a_folder,
+)
 
 
 def egocentric_video_aligner(frm_range: np.ndarray,

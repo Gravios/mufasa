@@ -81,15 +81,31 @@ import numpy as np
 import pandas as pd
 
 try:
-    from PySide6.QtCore import Qt, QTimer, QPointF, QRectF
+    from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
     from PySide6.QtGui import (
-        QBrush, QColor, QKeySequence, QPainter, QPen, QShortcut,
+        QBrush,
+        QColor,
+        QKeySequence,
+        QPainter,
+        QPen,
+        QShortcut,
     )
     from PySide6.QtWidgets import (
-        QApplication, QCheckBox, QComboBox, QGraphicsEllipseItem,
-        QGraphicsLineItem, QGraphicsScene, QGraphicsView, QHBoxLayout,
-        QLabel, QMainWindow, QPushButton, QSlider, QStatusBar,
-        QVBoxLayout, QWidget,
+        QApplication,
+        QCheckBox,
+        QComboBox,
+        QGraphicsEllipseItem,
+        QGraphicsLineItem,
+        QGraphicsScene,
+        QGraphicsView,
+        QHBoxLayout,
+        QLabel,
+        QMainWindow,
+        QPushButton,
+        QSlider,
+        QStatusBar,
+        QVBoxLayout,
+        QWidget,
     )
 except ImportError:
     print(

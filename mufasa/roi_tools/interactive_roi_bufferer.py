@@ -13,12 +13,14 @@ from shapely.ops import unary_union
 
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.roi_tools.roi_utils import (create_circle_entry,
-                                       create_rectangle_entry,
-                                       get_circle_df_headers,
-                                       get_image_from_label,
-                                       get_polygon_df_headers,
-                                       get_rectangle_df_headers)
+from mufasa.roi_tools.roi_utils import (
+    create_circle_entry,
+    create_rectangle_entry,
+    get_circle_df_headers,
+    get_image_from_label,
+    get_polygon_df_headers,
+    get_rectangle_df_headers,
+)
 from mufasa.utils.checks import check_instance
 from mufasa.utils.enums import ROI_SETTINGS, Keys, TkBinds
 

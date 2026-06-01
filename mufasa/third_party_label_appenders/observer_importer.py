@@ -7,15 +7,18 @@ import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import check_if_filepath_list_is_empty
-from mufasa.utils.errors import (AnnotationFileNotFoundError,
-                                ColumnNotFoundError,
-                                ThirdPartyAnnotationEventCountError,
-                                ThirdPartyAnnotationOverlapError)
+from mufasa.utils.errors import (
+    AnnotationFileNotFoundError,
+    ColumnNotFoundError,
+    ThirdPartyAnnotationEventCountError,
+    ThirdPartyAnnotationOverlapError,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_df, write_df
 from mufasa.utils.warnings import (
     ThirdPartyAnnotationsClfMissingWarning,
-    ThirdPartyAnnotationsOutsidePoseEstimationDataWarning)
+    ThirdPartyAnnotationsOutsidePoseEstimationDataWarning,
+)
 
 TIME_FIELD = "Time_Relative_hmsf"
 VIDEO_NAME_FIELD = "Observation"

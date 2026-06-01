@@ -6,22 +6,30 @@ import numpy as np
 import pandas as pd
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_int,
-                                check_valid_boolean, check_valid_dataframe)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_int,
+    check_valid_boolean,
+    check_valid_dataframe,
+)
 from mufasa.utils.data import get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import Defaults, Formats
 from mufasa.utils.errors import InvalidFilepathError, NoFilesFoundError
-from mufasa.utils.lookups import (get_current_time, get_random_color_palette,
-                                 intermittent_palette)
+from mufasa.utils.lookups import get_current_time, get_random_color_palette, intermittent_palette
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    create_directory,
-                                    find_all_videos_in_directory,
-                                    find_core_cnt,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data,
-                                    read_frm_of_video, remove_a_folder)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    create_directory,
+    find_all_videos_in_directory,
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_frm_of_video,
+    remove_a_folder,
+)
 from mufasa.utils.warnings import FrameRangeWarning, MissingFileWarning
 
 FRAME = 'FRAME'

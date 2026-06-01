@@ -10,19 +10,26 @@ from mufasa.data_processors.interpolate import Interpolate
 from mufasa.data_processors.smoothing import Smoothing
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.pose_importer_mixin import PoseImporterMixin
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_keys_exist_in_dict, check_int,
-                                check_str, check_that_column_exist,
-                                check_valid_lst)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_lst,
+)
 from mufasa.utils.enums import Methods, TagNames
 from mufasa.utils.errors import AnimalNumberError, CountError
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
-                                  stdout_success)
-from mufasa.utils.read_write import (clean_sleap_file_name,
-                                    find_all_videos_in_project,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data,
-                                    read_sleap_csv, write_df)
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_information, stdout_success
+from mufasa.utils.read_write import (
+    clean_sleap_file_name,
+    find_all_videos_in_project,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_sleap_csv,
+    write_df,
+)
 
 TRACK = "track"
 INSTANCE_SCORE = "instance.score"

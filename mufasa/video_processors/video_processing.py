@@ -29,47 +29,82 @@ except:
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.image_mixin import ImageMixin
+from mufasa.utils.checks import (
+    check_ffmpeg_available,
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_filepath_list_is_empty,
+    check_if_string_value_is_valid_video_timestamp,
+    check_if_valid_img,
+    check_instance,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_that_hhmmss_start_is_before_end,
+    check_valid_boolean,
+    check_valid_codec,
+    check_valid_cpu_pool,
+    check_valid_lst,
+    check_valid_tuple,
+)
 from mufasa.utils.confirm import confirm_two_option
-from mufasa.utils.checks import (check_ffmpeg_available,
-                                check_file_exist_and_readable, check_float,
-                                check_if_dir_exists,
-                                check_if_filepath_list_is_empty,
-                                check_if_string_value_is_valid_video_timestamp,
-                                check_if_valid_img, check_instance, check_int,
-                                check_nvidea_gpu_available, check_str,
-                                check_that_hhmmss_start_is_before_end,
-                                check_valid_boolean, check_valid_codec,
-                                check_valid_cpu_pool, check_valid_lst,
-                                check_valid_tuple)
-from mufasa.utils.data import (find_frame_numbers_from_time_stamp, get_cpu_pool,
-                              terminate_cpu_pool)
+from mufasa.utils.data import find_frame_numbers_from_time_stamp, get_cpu_pool, terminate_cpu_pool
 from mufasa.utils.enums import OS, ConfigKey, Defaults, Formats, Options, Paths
-from mufasa.utils.errors import (CountError, DirectoryExistError,
-                                DuplicationError, FFMPEGCodecGPUError,
-                                FFMPEGNotFoundError, FileExistError,
-                                FrameRangeError, InvalidFileTypeError,
-                                InvalidInputError, InvalidVideoFileError,
-                                NoDataError, NoFilesFoundError,
-                                NotDirectoryError, ResolutionError,
-                                MufasaGPUError)
-from mufasa.utils.lookups import (get_ffmpeg_codec,
-                                 get_ffmpeg_crossfade_methods,
-                                 get_fonts,
-                                 get_named_colors, percent_to_crf_lookup,
-                                 percent_to_qv_lk, quality_pct_to_crf,
-                                 video_quality_to_preset_lookup)
+from mufasa.utils.errors import (
+    CountError,
+    DirectoryExistError,
+    DuplicationError,
+    FFMPEGCodecGPUError,
+    FFMPEGNotFoundError,
+    FileExistError,
+    FrameRangeError,
+    InvalidFileTypeError,
+    InvalidInputError,
+    InvalidVideoFileError,
+    MufasaGPUError,
+    NoDataError,
+    NoFilesFoundError,
+    NotDirectoryError,
+    ResolutionError,
+)
+from mufasa.utils.lookups import (
+    get_ffmpeg_codec,
+    get_ffmpeg_crossfade_methods,
+    get_fonts,
+    get_named_colors,
+    percent_to_crf_lookup,
+    percent_to_qv_lk,
+    quality_pct_to_crf,
+    video_quality_to_preset_lookup,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import (
     check_if_hhmmss_timestamp_is_valid_part_of_video,
-    concatenate_videos_in_folder, create_directory,
-    find_all_videos_in_directory, find_core_cnt,
-    find_files_of_filetypes_in_directory, get_fn_ext, get_video_meta_data,
-    read_config_entry, read_config_file, read_frm_of_video, read_img,
-    read_img_batch_from_video_gpu, recursive_file_search, seconds_to_timestamp)
-from mufasa.utils.warnings import (CropWarning, FFMpegCodecWarning,
-                                  FileExistWarning, FrameRangeWarning,
-                                  GPUToolsWarning, InValidUserInputWarning,
-                                  SameInputAndOutputWarning)
+    concatenate_videos_in_folder,
+    create_directory,
+    find_all_videos_in_directory,
+    find_core_cnt,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_config_entry,
+    read_config_file,
+    read_frm_of_video,
+    read_img,
+    read_img_batch_from_video_gpu,
+    recursive_file_search,
+    seconds_to_timestamp,
+)
+from mufasa.utils.warnings import (
+    CropWarning,
+    FFMpegCodecWarning,
+    FileExistWarning,
+    FrameRangeWarning,
+    GPUToolsWarning,
+    InValidUserInputWarning,
+    SameInputAndOutputWarning,
+)
 from mufasa.video_processors.async_frame_reader import AsyncVideoFrameReader
 from mufasa.video_processors.extract_frames import video_to_frames
 from mufasa.video_processors.roi_selector import ROISelector

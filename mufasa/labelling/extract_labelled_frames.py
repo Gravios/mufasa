@@ -10,15 +10,24 @@ except:
 import cv2
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_df_field_is_boolean, check_str,
-                                check_valid_boolean,
-                                check_valid_lst)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_df_field_is_boolean,
+    check_str,
+    check_valid_boolean,
+    check_valid_lst,
+)
 from mufasa.utils.printing import stdout_information, stdout_success
-from mufasa.utils.read_write import (check_valid_dataframe, create_directory,
-                                    find_video_of_file, get_fn_ext,
-                                    get_video_meta_data, read_df,
-                                    read_frm_of_video)
+from mufasa.utils.read_write import (
+    check_valid_dataframe,
+    create_directory,
+    find_video_of_file,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    read_frm_of_video,
+)
 from mufasa.utils.warnings import FrameRangeWarning
 
 IMG_FORMATS = ('png', 'webp', 'jpg')

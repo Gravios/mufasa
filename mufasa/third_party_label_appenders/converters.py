@@ -4,10 +4,10 @@ import itertools
 import json
 import os
 import random
+from collections.abc import Iterable
 from copy import copy, deepcopy
 from datetime import datetime
 from typing import Any
-from collections.abc import Iterable
 
 import pandas as pd
 from PIL import Image
@@ -20,6 +20,7 @@ except:
 import cv2
 import numpy as np
 import yaml
+
 #from pycocotools import mask
 from shapely.geometry import Polygon
 
@@ -27,26 +28,42 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.image_mixin import ImageMixin
 from mufasa.mixins.pose_importer_mixin import PoseImporterMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists,
-                                check_if_keys_exist_in_dict,
-                                check_if_valid_img, check_instance, check_int,
-                                check_str, check_valid_array,
-                                check_valid_boolean, check_valid_dataframe,
-                                check_valid_dict, check_valid_lst,
-                                check_valid_tuple,
-                                check_video_and_data_frm_count_align)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_if_valid_img,
+    check_instance,
+    check_int,
+    check_str,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_dict,
+    check_valid_lst,
+    check_valid_tuple,
+    check_video_and_data_frm_count_align,
+)
 from mufasa.utils.enums import Formats, Options
-from mufasa.utils.errors import (FaultyTrainingSetError, InvalidInputError,
-                                NoFilesFoundError)
+from mufasa.utils.errors import FaultyTrainingSetError, InvalidInputError, NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (copy_files_to_directory, create_directory,
-                                    find_files_of_filetypes_in_directory,
-                                    find_video_of_file, get_fn_ext,
-                                    get_video_meta_data, read_df,
-                                    read_frm_of_video, read_img, read_json,
-                                    read_roi_data, recursive_file_search,
-                                    save_json, write_pickle)
+from mufasa.utils.read_write import (
+    copy_files_to_directory,
+    create_directory,
+    find_files_of_filetypes_in_directory,
+    find_video_of_file,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    read_frm_of_video,
+    read_img,
+    read_json,
+    read_roi_data,
+    recursive_file_search,
+    save_json,
+    write_pickle,
+)
 from mufasa.utils.warnings import FrameRangeWarning, NoDataFoundWarning
 
 # def geometry_to_rle(geometry: Union[np.ndarray, Polygon], img_size: Tuple[int, int]):

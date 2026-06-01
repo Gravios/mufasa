@@ -11,15 +11,18 @@ import numpy as np
 import yaml
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_dir_exists, check_int, check_str,
-                                check_valid_boolean)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_int,
+    check_str,
+    check_valid_boolean,
+)
 from mufasa.utils.data import create_color_palette
 from mufasa.utils.enums import Options
 from mufasa.utils.errors import InvalidInputError, NoDataError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, get_fn_ext
 from mufasa.utils.yolo import detect_yolo_project_type
 
 BBOX_VALUE_CNT = 4

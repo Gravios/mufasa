@@ -12,9 +12,13 @@ from mufasa.utils.checks import check_if_dir_exists
 from mufasa.utils.enums import ConfigKey, Dtypes
 from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_config_entry, read_df,
-                                    write_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_config_entry,
+    read_df,
+    write_df,
+)
 
 
 class OutlierCorrecterMovement(ConfigReader, FeatureExtractionMixin):

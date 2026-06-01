@@ -7,16 +7,17 @@ import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
+from mufasa.mixins.feature_extraction_supplement_mixin import FeatureExtractionSupplemental
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_float, check_that_column_exist,
-    check_valid_lst)
+    check_file_exist_and_readable,
+    check_float,
+    check_that_column_exist,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts, slice_roi_dict_for_video
 from mufasa.utils.enums import Keys
-from mufasa.utils.errors import (CountError, MissingColumnsError,
-                                ROICoordinatesNotFoundError)
+from mufasa.utils.errors import CountError, MissingColumnsError, ROICoordinatesNotFoundError
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_data_paths, read_df
 from mufasa.utils.warnings import NoDataFoundWarning

@@ -6,20 +6,20 @@ import os
 import numpy as np
 import pandas as pd
 
-from mufasa.data_processors.timebins_movement_calculator import \
-    TimeBinsMovementCalculator
+from mufasa.data_processors.timebins_movement_calculator import TimeBinsMovementCalculator
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
-from mufasa.roi_tools.roi_aggregate_statistics_analyzer import \
-    ROIAggregateStatisticsAnalyzer
+from mufasa.mixins.feature_extraction_supplement_mixin import FeatureExtractionSupplemental
+from mufasa.roi_tools.roi_aggregate_statistics_analyzer import ROIAggregateStatisticsAnalyzer
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_float, check_if_dir_exists,
-    check_valid_boolean, check_valid_lst)
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_valid_boolean,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts, slice_roi_dict_for_video
-from mufasa.utils.errors import (CountError, FrameRangeError,
-                                ROICoordinatesNotFoundError)
+from mufasa.utils.errors import CountError, FrameRangeError, ROICoordinatesNotFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_data_paths, read_df
 from mufasa.utils.warnings import ROIWarning

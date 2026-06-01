@@ -10,18 +10,22 @@ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.roi_tools.ROI_directing_analyzer import DirectingROIAnalyzer
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_that_column_exist,
-    check_valid_boolean, check_valid_lst)
+    check_file_exist_and_readable,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_lst,
+)
 from mufasa.utils.data import slice_roi_dict_for_video
 from mufasa.utils.enums import Keys, TagNames
-from mufasa.utils.errors import (BodypartColumnNotFoundError, CountError,
-                                InvalidFilepathError, InvalidInputError,
-                                NoFilesFoundError, ROICoordinatesNotFoundError)
-from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df,
-                                    write_df)
-from mufasa.utils.warnings import DuplicateNamesWarning, ROIWarning
+from mufasa.utils.errors import (
+    BodypartColumnNotFoundError,
+    CountError,
+    InvalidFilepathError,
+    InvalidInputError,
+    NoFilesFoundError,
+    ROICoordinatesNotFoundError,
+)
+
 # Patch 122ae-5b: layout-aware feature reader for the append
 # branch below (the read at the os.path.join(self.features_dir,
 # ...) site). Discovery (self.feature_file_paths) still uses
@@ -29,6 +33,14 @@ from mufasa.utils.warnings import DuplicateNamesWarning, ROIWarning
 # class operates on — the read swap alone is sufficient to make
 # v1 projects' append-mode work.
 from mufasa.utils.feature_io import load_features_for_video
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_df,
+    write_df,
+)
+from mufasa.utils.warnings import DuplicateNamesWarning, ROIWarning
 
 
 class ROIFeatureCreator(ConfigReader, FeatureExtractionMixin):

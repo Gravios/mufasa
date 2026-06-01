@@ -5,13 +5,15 @@ from itertools import groupby
 import numpy as np
 import pandas as pd
 
-from mufasa.utils.checks import (check_float, check_if_dir_exists, check_str,
-                                check_valid_dataframe)
+from mufasa.utils.checks import check_float, check_if_dir_exists, check_str, check_valid_dataframe
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats
 from mufasa.utils.printing import SimbaTimer
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    seconds_to_timestamp, write_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    seconds_to_timestamp,
+    write_df,
+)
 
 pd.options.mode.chained_assignment = None
 

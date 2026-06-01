@@ -9,8 +9,7 @@ from scipy.spatial.distance import cdist
 from shapely.geometry import Polygon
 
 from mufasa.roi_tools.roi_utils import get_image_from_label
-from mufasa.utils.checks import (check_if_valid_rgb_tuple, check_instance,
-                                check_int)
+from mufasa.utils.checks import check_if_valid_rgb_tuple, check_instance, check_int
 from mufasa.utils.warnings import ROIWarning
 
 DRAW_FRAME_NAME = "DEFINE SHAPE"

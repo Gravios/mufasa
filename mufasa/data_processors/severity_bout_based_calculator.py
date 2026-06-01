@@ -9,8 +9,7 @@ import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
-from mufasa.utils.checks import (check_if_filepath_list_is_empty,
-                                check_that_column_exist)
+from mufasa.utils.checks import check_if_filepath_list_is_empty, check_that_column_exist
 from mufasa.utils.data import create_color_palettes, detect_bouts, find_bins
 from mufasa.utils.errors import InvalidVideoFileError
 from mufasa.utils.printing import SimbaTimer, stdout_success

@@ -8,19 +8,29 @@ try:
 except:
     from typing import Literal
 
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists,
-                                check_if_keys_exist_in_dict, check_int,
-                                check_str, check_valid_boolean,
-                                check_valid_dict)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_int,
+    check_str,
+    check_valid_boolean,
+    check_valid_dict,
+)
 from mufasa.utils.enums import ConfigKey, Dtypes, Paths
 from mufasa.utils.lookups import get_bp_config_code_class_pairs
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_core_cnt, get_fn_ext,
-                                    get_video_meta_data, read_config_entry,
-                                    read_config_file, read_json,
-                                    read_project_path_and_file_type,
-                                    read_video_info_csv)
+from mufasa.utils.read_write import (
+    find_core_cnt,
+    get_fn_ext,
+    get_video_meta_data,
+    read_config_entry,
+    read_config_file,
+    read_json,
+    read_project_path_and_file_type,
+    read_video_info_csv,
+)
 from mufasa.video_processors.blob_tracking_executor import BlobTrackingExecutor
 
 

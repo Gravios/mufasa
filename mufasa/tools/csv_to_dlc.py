@@ -57,11 +57,10 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from pathlib import Path
 from collections.abc import Iterable
+from pathlib import Path
 
 import pandas as pd
-
 
 _DEFAULT_SCORER = "mufasa_export"
 
