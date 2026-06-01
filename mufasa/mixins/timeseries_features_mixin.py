@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import time

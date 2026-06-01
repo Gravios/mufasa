@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 __author__ = "Simon Nilsson / Florian Duclot"
 
 import os

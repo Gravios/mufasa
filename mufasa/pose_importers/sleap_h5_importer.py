@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 #### MODIFIED FROM @Toshea111 - https://github.com/Toshea111/sleap/blob/develop/docs/notebooks/Convert_HDF5_to_CSV_updated.ipynb
 import os
 from typing import Any
