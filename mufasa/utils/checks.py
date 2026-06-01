@@ -1957,7 +1957,7 @@ def is_video_color(video: str | os.PathLike | cv2.VideoCapture) -> bool:
     """
 
     check_instance(source=is_video_color.__name__, instance=video, accepted_types=(str, cv2.VideoCapture))
-    
+
     # Handle string path vs VideoCapture object
     should_release = False
     if isinstance(video, str):
@@ -1968,11 +1968,11 @@ def is_video_color(video: str | os.PathLike | cv2.VideoCapture) -> bool:
     try:
         video.set(cv2.CAP_PROP_POS_FRAMES, 0)
         _, frm = video.read()
-        
+
         # If frame has only 2 dimensions, it's definitely greyscale
         if frm.ndim == 2:
             return False
-        
+
         # If frame has 3 dimensions, check if it's actually greyscale
         # (some greyscale videos are stored as 3-channel with identical values)
         if frm.ndim == 3:
@@ -1987,10 +1987,10 @@ def is_video_color(video: str | os.PathLike | cv2.VideoCapture) -> bool:
                 return False  # Single channel = greyscale
             else:
                 return True   # Other multi-channel formats = color
-        
+
         # Default case: assume greyscale
         return False
-    
+
     finally:
         # Clean up VideoCapture if we created it
         if should_release and video.isOpened():

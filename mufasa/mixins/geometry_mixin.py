@@ -317,47 +317,47 @@ class GeometryMixin:
             raise InvalidInputError(msg=f'polygon must be a Polygon, got: {type(polygon)}', source=GeometryMixin.parallel_offset_polygon.__name__)
         check_float(name="PARALLEL OFFSET size_mm", value=size_mm, allow_negative=True, allow_zero=False)
         check_float(name="PARALLEL OFFSET pixels_per_mm", value=pixels_per_mm, allow_negative=False, allow_zero=False)
-        
+
         distance = float(size_mm / pixels_per_mm)
         if abs(distance) < 1e-10:
             return polygon
-        
+
         # Check if polygon is valid
         if not polygon.is_valid:
             polygon = polygon.buffer(0)
             if not isinstance(polygon, Polygon):
                 return polygon
-        
+
         coords = np.array(polygon.exterior.coords[:-1])  # Remove duplicate last point
         n = len(coords)
-        
+
         if n < 3:
             return polygon
-        
+
         # Get centroid
         centroid = np.array(polygon.centroid.coords[0])
-        
+
         # Calculate average distance from centroid to vertices (for scaling factor)
         distances_to_centroid = np.array([np.linalg.norm(coord - centroid) for coord in coords])
         avg_distance = np.mean(distances_to_centroid)
-        
+
         if avg_distance < 1e-10:
             # Degenerate polygon (all vertices at centroid)
             return polygon
-        
+
         # Calculate scale factor: new_distance = old_distance + offset_distance
         # scale_factor = (avg_distance + distance) / avg_distance
         scale_factor = 1.0 + (distance / avg_distance)
-        
+
         # Apply scaling from centroid to each vertex
         offset_coords = np.zeros_like(coords, dtype=np.float64)
         for i in range(n):
             vec_to_vertex = coords[i] - centroid
             offset_coords[i] = centroid + vec_to_vertex * scale_factor
-        
+
         # Create new polygon (close it by adding first point at end)
         offset_coords_closed = np.vstack([offset_coords, offset_coords[0]])
-        
+
         try:
             result = Polygon(offset_coords_closed)
             if not result.is_valid:

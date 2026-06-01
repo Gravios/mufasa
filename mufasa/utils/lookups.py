@@ -1085,12 +1085,12 @@ def find_closest_string(target: str,
         """
         tokens1 = tokenize(s1)
         tokens2 = tokenize(s2)
-        
+
         # Token set matching
         set1, set2 = set(tokens1), set(tokens2)
         intersection = len(set1 & set2)
         union = len(set1 | set2)
-        
+
         if union == 0:
             token_score = 1.0
         else:
@@ -1103,7 +1103,7 @@ def find_closest_string(target: str,
             lev_score = 0.0
         else:
             lev_score = levenshtein(sorted_s1, sorted_s2) / max_len
-        
+
         # Weighted combination: token matching (70%) + order similarity (30%)
         return token_score * 0.7 + lev_score * 0.3
 
@@ -1126,7 +1126,7 @@ def find_closest_string(target: str,
         closest_idx = min(range(len(distances)), key=lambda i: distances[i])
         closest = string_list[closest_idx]
         distance = distances[closest_idx]
-    
+
     return closest, distance
 
 
@@ -1314,13 +1314,13 @@ def get_ext_codec_map() -> dict[str, str]:
     # If no common codec found, use first available or default to mpeg4 (most universal)
     if fallback_codec is None:
         fallback_codec = codecs_available[0] if codecs_available else 'mpeg4'
-    
+
     def get_codec(preferred: str, alternative: str = None) -> str:
         if preferred in codecs_available:
             return preferred
         alt = alternative if alternative else fallback_codec
         return alt if alt in codecs_available else preferred
-    
+
     return {
         'webm': get_codec(preferred='libvpx-vp9', alternative='libvpx'),
         'avi': get_codec(preferred='mpeg4', alternative='libx264'),

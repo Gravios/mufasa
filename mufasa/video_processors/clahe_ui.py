@@ -43,10 +43,10 @@ def interactive_clahe_ui(data: str | os.PathLike) -> tuple[float, int]:
         current_time = time.time()
         if current_time - last_update_time[0] < update_delay:
             return
-        
+
         if not callback_lock.acquire(blocking=False):
             return
-        
+
         try:
             if cv2.getWindowProperty(WIN_NAME, cv2.WND_PROP_VISIBLE) < 1:
                 return
@@ -70,10 +70,10 @@ def interactive_clahe_ui(data: str | os.PathLike) -> tuple[float, int]:
         current_time = time.time()
         if current_time - last_update_time[0] < update_delay:
             return
-        
+
         if not callback_lock.acquire(blocking=False):
             return
-        
+
         try:
             if cv2.getWindowProperty(WIN_NAME, cv2.WND_PROP_VISIBLE) < 1:
                 return

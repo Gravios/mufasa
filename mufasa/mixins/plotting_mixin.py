@@ -398,7 +398,7 @@ class PlottingMixin:
         video_timer = SimbaTimer(start=True)
         colour_tuple_x = list(np.arange(3.5, 203.5, 5))
         original_font_family = copy(plt.rcParams['font.family']) if isinstance(plt.rcParams['font.family'], list) else plt.rcParams['font.family']
-        
+
         if font is not None:
             available_fonts = get_fonts()
             if font in available_fonts:
@@ -407,10 +407,10 @@ class PlottingMixin:
             else:
                 matplotlib.font_manager._get_font.cache_clear()
                 plt.rcParams['font.family'] = [font, 'sans-serif']
-        
+
         fig, ax = plt.subplots()
         fig.patch.set_facecolor('white')
-        
+
         plt.title(video_name, fontsize=font_size + 2, pad=25, fontweight='bold')
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
@@ -2205,7 +2205,7 @@ class PlottingMixin:
         if error is not None:
             check_str(name=f"{PlottingMixin.plot_bar_chart.__name__} error", value=error, options=tuple(df.columns))
             check_valid_lst(data=list(df[error]), source=f"{PlottingMixin.plot_bar_chart.__name__} error",valid_dtypes=Formats.NUMERIC_DTYPES.value)
-        
+
         if orientation == 'horizontal':
             sns.barplot(x=y, y=x, data=df, palette=palette, ax=ax, orient='h')
             ax.set_yticklabels(df[x].unique(), rotation=0, fontsize=8)
@@ -2218,10 +2218,10 @@ class PlottingMixin:
             if error is not None:
                 for i, (value, error_val) in enumerate(zip(df[y], df[error])):
                     ax.errorbar(i, value, yerr=[[0], [error_val]], fmt='o', color=error_clr, capsize=2)
-        
+
         for patch in ax.patches:
             patch.set_alpha(bar_alpha)
-        
+
         if orientation == 'horizontal':
             if y_max is not None:
                 ax.set_xlim(left=y_min, right=y_max)

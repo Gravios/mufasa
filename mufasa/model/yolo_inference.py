@@ -153,7 +153,7 @@ class YoloInference:
         check_int(name=f'{self.__class__.__name__} imgsz', value=imgsz, min_value=1)
         check_float(name=f'{self.__class__.__name__} threshold', value=threshold, min_value=0.0, max_value=1.0)
         check_int(name=f'{self.__class__.__name__} core_cnt', value=core_cnt, min_value=-1)
-        
+
         check_valid_device(device=device)
         if bbox_size is not None:
             check_valid_tuple(x=bbox_size, source=f'{self.__class__.__name__} bbox_size', accepted_lengths=(2,), valid_dtypes=Formats.INTEGER_DTYPES.value, min_integer=1, raise_error=True)

@@ -41,11 +41,11 @@ RADIUS = 'radius'
 VERTICES = 'vertices'
 OVERLAY_GRID_COLOR = 'OVERLAY_GRID_COLOR'
 
-def _plot_roi(roi_dict: dict, 
+def _plot_roi(roi_dict: dict,
               img: np.ndarray,
               show_tags: bool = False,
               omitted_roi: str | None = None):
-    
+
     rectangles_df, circles_df, polygon_df = pd.DataFrame(columns=get_rectangle_df_headers()), pd.DataFrame(columns=get_circle_df_headers()), pd.DataFrame(columns=get_polygon_df_headers())
     for roi_name, roi_data in roi_dict.items():
         if (roi_data['Shape_type'].lower() == ROI_SETTINGS.RECTANGLE.value) and (roi_name != omitted_roi):
