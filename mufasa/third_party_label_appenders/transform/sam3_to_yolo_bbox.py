@@ -9,6 +9,7 @@ To merge this project with others that share the same class names and task type,
 :class:`~mufasa.third_party_label_appenders.transform.merge_yolo_projects.MergeYoloProjects`
 (see also :mod:`mufasa.third_party_label_appenders.transform.sam3_to_yolo_seg`).
 """
+from __future__ import annotations
 
 import os
 import random

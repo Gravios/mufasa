@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
@@ -5,7 +7,7 @@ import os
 import warnings
 from copy import copy, deepcopy
 from tkinter import *
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mufasa.roi_tools.interactive_roi_bufferer import InteractiveROIBufferer
@@ -104,7 +106,7 @@ def safe_videos_in(df: pd.DataFrame) -> list[str]:
     return list(df["Video"].unique())
 
 
-def create_rectangle_entry(rectangle_selector: Union[ROISelector, "InteractiveROIBufferer"],
+def create_rectangle_entry(rectangle_selector: ROISelector | InteractiveROIBufferer,
                            video_name: str,
                            shape_name: str,
                            clr_name: str,
@@ -141,7 +143,7 @@ def create_rectangle_entry(rectangle_selector: Union[ROISelector, "InteractiveRO
                                  "Bottom tag": rectangle_selector.bottom_tag},
             'Ear_tag_size':      ear_tag_size}
 
-def create_circle_entry(circle_selector: Union[ROISelectorCircle, "InteractiveROIBufferer"],
+def create_circle_entry(circle_selector: ROISelectorCircle | InteractiveROIBufferer,
                         video_name: str,
                         shape_name: str,
                         clr_name: str,
@@ -166,7 +168,7 @@ def create_circle_entry(circle_selector: Union[ROISelectorCircle, "InteractiveRO
             'Ear_tag_size':      ear_tag_size}
 
 
-def create_polygon_entry(polygon_selector: Union[ROISelectorPolygon, "InteractiveROIBufferer"],
+def create_polygon_entry(polygon_selector: ROISelectorPolygon | InteractiveROIBufferer,
                          video_name: str,
                          shape_name: str,
                          clr_name: str,
