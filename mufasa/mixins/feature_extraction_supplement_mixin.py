@@ -803,9 +803,7 @@ class FeatureExtractionSupplemental(FeatureExtractionMixin):
         check_valid_array(data=bp_data, source=f'{FeatureExtractionSupplemental.movement_stats_from_bouts_df.__name__} bp_data', accepted_ndims=(2,), accepted_dtypes=Formats.NUMERIC_DTYPES.value, accepted_axis_1_shape=[2, ])
         check_str(name=f'{FeatureExtractionSupplemental.movement_stats_from_bouts_df.__name__} event_name)', value=event_name, raise_error=True)
 
-        if len(bout_df) == 0:
-            return 0, None
-        elif event_name not in list(bout_df['Event'].unique()):
+        if len(bout_df) == 0 or event_name not in list(bout_df['Event'].unique()):
             return 0, None
         else:
             distances, velocities = [], []

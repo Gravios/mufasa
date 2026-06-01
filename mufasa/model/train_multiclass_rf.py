@@ -266,7 +266,7 @@ class TrainMultiClassRandomForestClassifier(ConfigReader, TrainModelMixin):
             shap_plot = self.bp_config in {'14', '16'}
 
 
-            if not self.shap_multiprocess in Options.PERFORM_FLAGS.value:
+            if self.shap_multiprocess not in Options.PERFORM_FLAGS.value:
                 self.create_shap_log(rf_clf=self.rf_clf,
                                      x=self.x_train,
                                      y=self.y_train,

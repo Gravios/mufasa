@@ -427,7 +427,7 @@ class InteractiveROIModifier:
                     self.tl_x, self.tl_y = self.x - int(self.w/2), self.y - int(self.h/2)
                     self.tr_x, self.tr_y = self.x + int(self.w/2), self.y - int(self.h/2)
                     self.br_x, self.br_y = self.x + int(self.w/2), self.y + int(self.h/2)
-                    if (0 <= self.tl_x) and (0 <= self.tl_y) and (self.tr_x <= self.img_w) and (self.br_y <= self.img_h):
+                    if (self.tl_x >= 0) and (self.tl_y >= 0) and (self.tr_x <= self.img_w) and (self.br_y <= self.img_h):
                         self._select_rectangle_center_tag()
 
             elif self.clicked_roi['Shape_type'].lower() == ROI_SETTINGS.CIRCLE.value:
@@ -436,13 +436,13 @@ class InteractiveROIModifier:
                     self.radius = self.clicked_roi["Tags"][C_TAG][0] - self.x
                     self.l_edge, t_edge =  (c_x - self.radius, c_y), (c_x, c_y - self.radius)
                     r_edge, b_edge = (c_x +self. radius, c_y), (c_x, c_y + self.radius)
-                    if (0 <= self.l_edge[0]) and (0 <= t_edge[1]) and (r_edge[0] <= self.img_w) and (b_edge[1] <= self.img_h) and (self.radius >= 1):
+                    if (self.l_edge[0] >= 0) and (t_edge[1] >= 0) and (r_edge[0] <= self.img_w) and (b_edge[1] <= self.img_h) and (self.radius >= 1):
                         self._select_circle_border()
                 if self.clicked_tag == C_TAG:
                     self.radius = self.clicked_roi[RADIUS]
                     self.l_edge, t_edge = (self.x - self.radius, self.y), (self.x, self.y - self.radius)
                     r_edge, b_edge = (self.x + self.radius, self.y), (self.x, self.y + self.radius)
-                    if (0 <= self.l_edge[0]) and (0 <= t_edge[1]) and (r_edge[0] <= self.img_w) and (b_edge[1] <= self.img_h):
+                    if (self.l_edge[0] >= 0) and (t_edge[1] >= 0) and (r_edge[0] <= self.img_w) and (b_edge[1] <= self.img_h):
                         self._select_circle_center()
 
             elif self.clicked_roi['Shape_type'].lower() == ROI_SETTINGS.POLYGON.value:

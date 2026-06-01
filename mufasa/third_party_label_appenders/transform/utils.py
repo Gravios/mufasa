@@ -481,7 +481,7 @@ def downsample_coco_dataset(json_path: str | os.PathLike,
         new_img_data = deepcopy(img_data)
         check_if_keys_exist_in_dict(data=img_data, key=['width', 'height', 'file_name', 'id'], name=json_path)
         _, img_name, img_ext = get_fn_ext(filepath=img_data['file_name'])
-        if not img_name in img_paths.keys():
+        if img_name not in img_paths.keys():
             raise NoFilesFoundError(msg=f'The file {img_name} could not be found in the {img_dir} directory', source=downsample_coco_dataset.__name__)
         img = read_img(img_path=img_paths[img_name], greyscale=False, clahe=False)
         if (img.shape[0] != img_data['height']) or (img.shape[1] != img_data['width']):

@@ -1230,9 +1230,7 @@ class TimeseriesFeatureMixin:
             criterion_idx = np.argwhere(data < threshold).flatten()
 
         for i in prange(data.shape[0]):
-            if above and (data[i] > threshold):
-                results[i] = 0.0
-            elif not above and (data[i] < threshold):
+            if above and (data[i] > threshold) or not above and (data[i] < threshold):
                 results[i] = 0.0
             else:
                 x = criterion_idx[np.argwhere(criterion_idx < i).flatten()]
@@ -1288,9 +1286,7 @@ class TimeseriesFeatureMixin:
         if criterion_idx.shape[0] == 0:
             return np.full((data.shape[0]), -1.0)
         for i in prange(data.shape[0]):
-            if not inverse and (data[i] == value):
-                results[i] = 0
-            elif inverse and (data[i] != value):
+            if not inverse and (data[i] == value) or inverse and (data[i] != value):
                 results[i] = 0
             else:
                 x = criterion_idx[np.argwhere(criterion_idx < i).flatten()]

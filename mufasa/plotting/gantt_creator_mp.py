@@ -14,9 +14,7 @@ import cv2
 is_pycharm_ipython = True
 try:
     module_names = list(sys.modules.keys())
-    if any('pydev' in str(mod).lower() for mod in module_names):
-        is_pycharm_ipython = True
-    elif 'IPython' in sys.modules or 'ipython' in sys.modules:
+    if any('pydev' in str(mod).lower() for mod in module_names) or 'IPython' in sys.modules or 'ipython' in sys.modules:
         is_pycharm_ipython = True
     else:
         is_pycharm_ipython = False

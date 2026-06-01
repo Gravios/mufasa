@@ -101,8 +101,8 @@ class SpontaneousAlternationCalculator(ConfigReader):
             _, px_per_mm, fps = self.read_video_info(video_name=self.video_name)
             self.fps_dict[self.video_name] = fps
             self.data_df = read_df(file_path=file_path, file_type=self.file_type)
-            bp_df = self.data_df[[x for x in self.bp_headers if not x.endswith("_p") and not TAIL_END in x.lower()]]
-            p_df = self.data_df[[x for x in self.bp_headers if x.endswith("_p") and not TAIL_END in x.lower()]]
+            bp_df = self.data_df[[x for x in self.bp_headers if not x.endswith("_p") and TAIL_END not in x.lower()]]
+            p_df = self.data_df[[x for x in self.bp_headers if x.endswith("_p") and TAIL_END not in x.lower()]]
             bp_arr = bp_df.values.reshape(len(bp_df), int(len(bp_df.columns) / 2), 2).astype(np.int64)
             p_arr = p_df.values.reshape(len(p_df), len(p_df.columns), 1)
             if self.threshold > 0.0:

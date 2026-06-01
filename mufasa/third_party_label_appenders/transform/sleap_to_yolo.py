@@ -87,7 +87,7 @@ class SleapAnnotations2Yolo:
             check_if_keys_exist_in_dict(data=data, key=['frames', 'instances', 'points', 'videos_json'])
             img_names = json.loads(data["videos_json"].item().decode("utf-8"))
 
-            if not 'backend' in img_names.keys() and not 'filename' in img_names.keys():
+            if 'backend' not in img_names.keys() and 'filename' not in img_names.keys():
                 raise InvalidInputError(msg='Could not find backend or filename keys in videos_json', source=self.__class__.__name__)
             #check_if_keys_exist_in_dict(data=img_names, key=['filename'])
             sleap_data[file_name] = data

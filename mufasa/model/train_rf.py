@@ -201,7 +201,7 @@ class TrainRandomForestClassifier(ConfigReader, TrainModelMixin):
                 self.dviz_classification_visualization(self.x_train, self.y_train, self.clf_name, self.class_names, self.eval_out_path)
             if generate_shap_scores in Options.PERFORM_FLAGS.value:
                 shap_plot = self.bp_config in {'14', '16'}
-                if not shap_multiprocess in Options.PERFORM_FLAGS.value:
+                if shap_multiprocess not in Options.PERFORM_FLAGS.value:
                     self.create_shap_log(rf_clf=self.rf_clf,
                                          x=self.x_train,
                                          y=self.y_train,

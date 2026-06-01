@@ -61,7 +61,7 @@ class UserDefinedFeatureExtractor(ConfigReader, FeatureExtractionMixin):
                         ), other_animal_bp_x.strip("_x")
                         col_name = f"Euclidean_distance_{current_bp_name}_{other_bp_name}"
                         reverse_col_name = f"Euclidean_distance_{other_bp_name}_{current_bp_name}"
-                        if not reverse_col_name in self.data_df.columns:
+                        if reverse_col_name not in self.data_df.columns:
                             self.data_df[col_name] = (
                                 np.sqrt(
                                     (
