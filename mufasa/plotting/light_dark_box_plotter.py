@@ -10,15 +10,21 @@ import pandas as pd
 
 from mufasa.data_processors.light_dark_box_analyzer import LightDarkBoxAnalyzer
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_float, check_if_dir_exists, check_str,
-                                check_video_and_data_frm_count_align)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_dir_exists,
+    check_str,
+    check_video_and_data_frm_count_align,
+)
 from mufasa.utils.data import terminate_cpu_pool
 from mufasa.utils.enums import Defaults, Formats, Options, TextOptions
 from mufasa.utils.errors import NoDataError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_files_of_filetypes_in_directory,
-                                    get_video_meta_data)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    find_files_of_filetypes_in_directory,
+    get_video_meta_data,
+)
 
 
 def _light_dark_box_visualizer(pose_data: pd.DataFrame,

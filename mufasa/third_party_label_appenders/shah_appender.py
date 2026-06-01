@@ -5,8 +5,7 @@ import pandas as pd
 from mufasa.utils.checks import check_if_dir_exists, check_valid_lst
 from mufasa.utils.errors import FrameRangeError, NoDataError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    read_df, write_df)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, read_df, write_df
 
 VIDEO_FILE_SET, FULL_LOG, BEHAVIOR = 'Video file set', 'FULL LOG', 'BEHAVIOR'
 EVENT, FRAME = 'EVENT', 'FRAME'

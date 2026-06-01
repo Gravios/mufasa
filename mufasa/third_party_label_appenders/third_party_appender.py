@@ -12,28 +12,40 @@ import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.third_party_label_appenders.tools import (
-    check_stop_events_prior_to_start_events, fix_uneven_start_stop_count,
-    read_bento_files, read_boris_annotation_files, read_deepethogram_files,
-    read_ethovision_files, read_observer_files, read_solomon_files)
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_filepath_list_is_empty,
-                                check_instance, check_str)
+    check_stop_events_prior_to_start_events,
+    fix_uneven_start_stop_count,
+    read_bento_files,
+    read_boris_annotation_files,
+    read_deepethogram_files,
+    read_ethovision_files,
+    read_observer_files,
+    read_solomon_files,
+)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_if_filepath_list_is_empty,
+    check_instance,
+    check_str,
+)
 from mufasa.utils.enums import Methods
 from mufasa.utils.errors import (
-    ThirdPartyAnnotationEventCountError, ThirdPartyAnnotationFileNotFoundError,
-    ThirdPartyAnnotationOverlapError, ThirdPartyAnnotationsAdditionalClfError,
+    ThirdPartyAnnotationEventCountError,
+    ThirdPartyAnnotationFileNotFoundError,
+    ThirdPartyAnnotationOverlapError,
+    ThirdPartyAnnotationsAdditionalClfError,
     ThirdPartyAnnotationsMissingAnnotationsError,
-    ThirdPartyAnnotationsOutsidePoseEstimationDataError)
+    ThirdPartyAnnotationsOutsidePoseEstimationDataError,
+)
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, get_fn_ext, read_df
 from mufasa.utils.warnings import (
     ThirdPartyAnnotationEventCountWarning,
     ThirdPartyAnnotationFileNotFoundWarning,
     ThirdPartyAnnotationOverlapWarning,
     ThirdPartyAnnotationsAdditionalClfWarning,
     ThirdPartyAnnotationsMissingAnnotationsWarning,
-    ThirdPartyAnnotationsOutsidePoseEstimationDataWarning)
+    ThirdPartyAnnotationsOutsidePoseEstimationDataWarning,
+)
 
 BORIS = "BORIS"
 DEEPETHOGRAM = "DEEPETHOGRAM"

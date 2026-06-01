@@ -5,8 +5,7 @@ from copy import deepcopy
 import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_if_filepath_list_is_empty,
-                                check_that_column_exist)
+from mufasa.utils.checks import check_if_filepath_list_is_empty, check_that_column_exist
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import get_fn_ext
 from mufasa.utils.warnings import IdenticalInputWarning
@@ -121,8 +120,8 @@ class MutualExclusivityCorrector(ConfigReader):
                 file_path, os.path.join(self.save_dir, os.path.basename(file_path))
             )
             from mufasa.utils.classification_io import (
-                save_classifications_for_video,
                 _prediction_columns,
+                save_classifications_for_video,
             )
             pred_cols = _prediction_columns(self.data_df, self.clf_names)
             if pred_cols:

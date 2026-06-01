@@ -65,8 +65,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from mufasa.project_layout import (project_paths_from_config)
-
+from mufasa.project_layout import project_paths_from_config
 
 __all__ = [
     "list_video_stems_with_classifications",

@@ -8,18 +8,32 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_float, check_if_dir_exists,
-    check_if_valid_rgb_tuple, check_int, check_str, check_valid_boolean,
-    check_valid_lst, check_valid_tuple)
-from mufasa.utils.data import (create_color_palette,
-                              egocentrically_align_pose_numba, get_cpu_pool,
-                              terminate_cpu_pool)
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+    check_valid_boolean,
+    check_valid_lst,
+    check_valid_tuple,
+)
+from mufasa.utils.data import (
+    create_color_palette,
+    egocentrically_align_pose_numba,
+    get_cpu_pool,
+    terminate_cpu_pool,
+)
 from mufasa.utils.errors import InvalidInputError, NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    create_directory,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, read_video_info_csv)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    create_directory,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_df,
+    read_video_info_csv,
+)
 
 
 def _pose_video_worker(frm_range: tuple,

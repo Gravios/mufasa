@@ -7,15 +7,24 @@ import pandas as pd
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_if_df_field_is_boolean, check_if_dir_exists, check_instance,
-    check_valid_boolean, check_valid_dataframe, check_valid_dict)
+    check_if_df_field_is_boolean,
+    check_if_dir_exists,
+    check_instance,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_dict,
+)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import NoDataError
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, read_video_info,
-                                    str_2_bool)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_df,
+    read_video_info,
+    str_2_bool,
+)
 
 
 class BooleanConditionalCalculator(ConfigReader):

@@ -28,19 +28,33 @@ from matplotlib.colors import hsv_to_rgb, rgb2hex
 from tabulate import tabulate
 
 import mufasa
-from mufasa.utils.checks import (check_ffmpeg_available,
-                                check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_instance, check_int, check_str,
-                                check_valid_dict, check_valid_tuple)
-from mufasa.utils.enums import (OS, UML, Defaults, Formats, Keys,
-                               Methods, Options, Paths)
-from mufasa.utils.errors import (FFMPEGNotFoundError, InvalidInputError,
-                                NoFilesFoundError, MufasaPackageVersionError)
+from mufasa.utils.checks import (
+    check_ffmpeg_available,
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_str,
+    check_valid_dict,
+    check_valid_tuple,
+)
+from mufasa.utils.enums import OS, UML, Defaults, Formats, Keys, Methods, Options, Paths
+from mufasa.utils.errors import (
+    FFMPEGNotFoundError,
+    InvalidInputError,
+    MufasaPackageVersionError,
+    NoFilesFoundError,
+)
 from mufasa.utils.printing import stdout_information
-from mufasa.utils.read_write import (fetch_pip_data,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data, read_json)
+from mufasa.utils.read_write import (
+    fetch_pip_data,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_json,
+)
 from mufasa.utils.warnings import NoDataFoundWarning
 
 # Pre-fix this module imported pyglet at module level and set
@@ -131,24 +145,17 @@ def get_bp_config_code_class_pairs() -> dict[str, object]:
     Helper to match SimBA project.toml [create ensemble settings][pose_estimation_body_parts] setting to feature extraction module class.
     """
 
-    from mufasa.feature_extractors.amber_feature_extractor import \
-        AmberFeatureExtractor
-    from mufasa.feature_extractors.feature_extractor_4bp import \
-        ExtractFeaturesFrom4bps
-    from mufasa.feature_extractors.feature_extractor_7bp import \
-        ExtractFeaturesFrom7bps
-    from mufasa.feature_extractors.feature_extractor_8bp import \
-        ExtractFeaturesFrom8bps
-    from mufasa.feature_extractors.feature_extractor_8bps_2_animals import \
-        ExtractFeaturesFrom8bps2Animals
-    from mufasa.feature_extractors.feature_extractor_9bp import \
-        ExtractFeaturesFrom9bps
-    from mufasa.feature_extractors.feature_extractor_14bp import \
-        ExtractFeaturesFrom14bps
-    from mufasa.feature_extractors.feature_extractor_16bp import \
-        ExtractFeaturesFrom16bps
-    from mufasa.feature_extractors.feature_extractor_user_defined import \
-        UserDefinedFeatureExtractor
+    from mufasa.feature_extractors.amber_feature_extractor import AmberFeatureExtractor
+    from mufasa.feature_extractors.feature_extractor_4bp import ExtractFeaturesFrom4bps
+    from mufasa.feature_extractors.feature_extractor_7bp import ExtractFeaturesFrom7bps
+    from mufasa.feature_extractors.feature_extractor_8bp import ExtractFeaturesFrom8bps
+    from mufasa.feature_extractors.feature_extractor_8bps_2_animals import (
+        ExtractFeaturesFrom8bps2Animals,
+    )
+    from mufasa.feature_extractors.feature_extractor_9bp import ExtractFeaturesFrom9bps
+    from mufasa.feature_extractors.feature_extractor_14bp import ExtractFeaturesFrom14bps
+    from mufasa.feature_extractors.feature_extractor_16bp import ExtractFeaturesFrom16bps
+    from mufasa.feature_extractors.feature_extractor_user_defined import UserDefinedFeatureExtractor
 
     return {
         "16": ExtractFeaturesFrom16bps,

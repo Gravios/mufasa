@@ -8,14 +8,22 @@ warnings.filterwarnings("ignore")
 
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
+from mufasa.mixins.feature_extraction_supplement_mixin import FeatureExtractionSupplemental
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_float, check_int,
-    check_str, check_valid_lst, check_video_has_rois)
-from mufasa.utils.errors import (AnimalNumberError, InvalidInputError,
-                                NoFilesFoundError, ROICoordinatesNotFoundError)
+    check_all_file_names_are_represented_in_video_log,
+    check_float,
+    check_int,
+    check_str,
+    check_valid_lst,
+    check_video_has_rois,
+)
+from mufasa.utils.errors import (
+    AnimalNumberError,
+    InvalidInputError,
+    NoFilesFoundError,
+    ROICoordinatesNotFoundError,
+)
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import get_fn_ext, read_data_paths, read_df
 from mufasa.utils.warnings import NoFileFoundWarning

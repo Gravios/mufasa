@@ -3,25 +3,30 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import os
 from copy import deepcopy
 
-
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_if_dir_exists,
-    check_if_filepath_list_is_empty)
+    check_all_file_names_are_represented_in_video_log,
+    check_if_dir_exists,
+    check_if_filepath_list_is_empty,
+)
 from mufasa.utils.errors import NoFilesFoundError
-from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (bento_file_reader,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext)
-from mufasa.utils.warnings import (
-    ThirdPartyAnnotationsClfMissingWarning,
-    ThirdPartyAnnotationsOutsidePoseEstimationDataWarning)
+
 # Patch 122ae-5b: layout-aware feature reader for the
 # per-video read inside run(). The existence check on
 # features_path is replaced with a try/except around
 # load_features_for_video so v1 projects (where features
 # live under derived/features/) resolve correctly.
 from mufasa.utils.feature_io import load_features_for_video
+from mufasa.utils.printing import stdout_success
+from mufasa.utils.read_write import (
+    bento_file_reader,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+)
+from mufasa.utils.warnings import (
+    ThirdPartyAnnotationsClfMissingWarning,
+    ThirdPartyAnnotationsOutsidePoseEstimationDataWarning,
+)
 
 
 class BentoAppender(ConfigReader):

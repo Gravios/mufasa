@@ -1,8 +1,8 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
-from tkinter import *
 from collections.abc import Callable
+from tkinter import *
 
 import cv2
 import numpy as np
@@ -10,14 +10,14 @@ from PIL import Image, ImageTk
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.roi_tools.roi_utils import get_image_from_label
+
 # Patch 122cl: dropped `from mufasa.ui.tkinter_functions import
 # SimBALabel`. The status-label rendering is delegated to the
 # caller via the `on_info_text` callback (see __init__ below).
 # The file still uses `from tkinter import *` for `Toplevel` —
 # the class is fundamentally a Tk widget; that's a separate
 # coupling, tracked under the Tier-4 deletion roadmap.
-from mufasa.utils.checks import (check_float, check_if_valid_rgb_tuple,
-                                check_instance, check_int)
+from mufasa.utils.checks import check_float, check_if_valid_rgb_tuple, check_instance, check_int
 from mufasa.utils.enums import TkBinds
 
 DRAW_FRAME_NAME = "DEFINE SHAPE"

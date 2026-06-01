@@ -15,11 +15,12 @@ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.mixins.statistics_mixin import Statistics
 from mufasa.mixins.timeseries_features_mixin import TimeseriesFeatureMixin
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_if_dir_exists)
+    check_all_file_names_are_represented_in_video_log,
+    check_if_dir_exists,
+)
 from mufasa.utils.errors import ParametersFileError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    read_df, write_df)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, read_df, write_df
 
 BPS = ['NOSE', 'LEFT_EAR', 'RIGHT_EAR', 'LEFT_SIDE', 'CENTER', 'RIGHT_SIDE', 'TAIL_BASE']
 ANIMAL_NAMES = ['resident', 'intruder']

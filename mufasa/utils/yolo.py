@@ -21,18 +21,29 @@ except ModuleNotFoundError:
     torch = None
 
 from mufasa.data_processors.cuda.utils import _is_cuda_available
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_if_valid_img,
-                                check_instance, check_int, check_str,
-                                check_valid_array, check_valid_boolean,
-                                check_valid_device, check_valid_lst,
-                                check_valid_tuple)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_img,
+    check_instance,
+    check_int,
+    check_str,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_device,
+    check_valid_lst,
+    check_valid_tuple,
+)
 from mufasa.utils.enums import Formats, Options
-from mufasa.utils.errors import (InvalidFileTypeError, InvalidInputError,
-                                MufasaGPUError, MufasaPackageVersionError)
+from mufasa.utils.errors import (
+    InvalidFileTypeError,
+    InvalidInputError,
+    MufasaGPUError,
+    MufasaPackageVersionError,
+)
 from mufasa.utils.printing import stdout_information
-from mufasa.utils.read_write import (create_directory, find_core_cnt,
-                                    get_fn_ext, get_video_meta_data)
+from mufasa.utils.read_write import create_directory, find_core_cnt, get_fn_ext, get_video_meta_data
 
 YOLO_EXTENSIONS = ('.engine', '.pt', '.onnx', '.torchscript', '.xml', '.pb', '.tflite', '.edgetpu', '.paddle', '.ncnn', '.mnn', '.imx', '.rknn')
 

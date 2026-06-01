@@ -23,10 +23,15 @@ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.mixins.timeseries_features_mixin import TimeseriesFeatureMixin
 from mufasa.utils.enums import Paths
 from mufasa.utils.printing import SimbaTimer
-from mufasa.utils.read_write import (check_if_filepath_list_is_empty,
-                                    get_fn_ext, read_config_file, read_df,
-                                    read_project_path_and_file_type,
-                                    read_video_info, write_df)
+from mufasa.utils.read_write import (
+    check_if_filepath_list_is_empty,
+    get_fn_ext,
+    read_config_file,
+    read_df,
+    read_project_path_and_file_type,
+    read_video_info,
+    write_df,
+)
 
 HEAD_BP_NAMES = ["Heat_tip", "Left_eye", "Right_eye", "Head_back"]
 THORAX_BP_NAMES = ["Thorax", "Thorax_rear"]

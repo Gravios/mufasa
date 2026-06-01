@@ -10,19 +10,31 @@ import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_int,
-                                check_valid_boolean, check_valid_dataframe,
-                                check_valid_lst)
-from mufasa.utils.data import (create_color_palettes, detect_bouts,
-                              slice_roi_dict_from_attribute,
-                              terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_int,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_lst,
+)
+from mufasa.utils.data import (
+    create_color_palettes,
+    detect_bouts,
+    slice_roi_dict_from_attribute,
+    terminate_cpu_pool,
+)
 from mufasa.utils.enums import Defaults, Formats, TextOptions
 from mufasa.utils.errors import NoROIDataError, NoSpecifiedOutputError
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    create_directory, find_core_cnt,
-                                    get_fn_ext, get_video_meta_data, read_df,
-                                    read_frm_of_video)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    create_directory,
+    find_core_cnt,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    read_frm_of_video,
+)
 
 
 def _plot_cue_light_data(frm_idxs: list,

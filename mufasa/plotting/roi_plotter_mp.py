@@ -17,29 +17,44 @@ import pandas as pd
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.roi_tools.roi_aggregate_statistics_analyzer import \
-    ROIAggregateStatisticsAnalyzer
+from mufasa.roi_tools.roi_aggregate_statistics_analyzer import ROIAggregateStatisticsAnalyzer
 from mufasa.roi_tools.roi_utils import get_roi_dict_from_dfs
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_int, check_nvidea_gpu_available,
-                                check_str, check_valid_boolean,
-                                check_valid_lst,
-                                check_video_and_data_frm_count_align)
-from mufasa.utils.data import (create_color_palettes, detect_bouts,
-                              get_cpu_pool, slice_roi_dict_for_video,
-                              terminate_cpu_pool)
-from mufasa.utils.enums import (ROI_SETTINGS, Formats, Keys, Options, Paths,
-                               TextOptions)
-from mufasa.utils.errors import (BodypartColumnNotFoundError, DuplicationError,
-                                NoFilesFoundError, NoROIDataError,
-                                ROICoordinatesNotFoundError)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_valid_boolean,
+    check_valid_lst,
+    check_video_and_data_frm_count_align,
+)
+from mufasa.utils.data import (
+    create_color_palettes,
+    detect_bouts,
+    get_cpu_pool,
+    slice_roi_dict_for_video,
+    terminate_cpu_pool,
+)
+from mufasa.utils.enums import ROI_SETTINGS, Formats, Keys, Options, Paths, TextOptions
+from mufasa.utils.errors import (
+    BodypartColumnNotFoundError,
+    DuplicationError,
+    NoFilesFoundError,
+    NoROIDataError,
+    ROICoordinatesNotFoundError,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt, get_video_meta_data, read_df,
-                                    seconds_to_timestamp)
-from mufasa.utils.warnings import (DuplicateNamesWarning, FrameRangeWarning,
-                                  GPUToolsWarning)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    find_core_cnt,
+    get_video_meta_data,
+    read_df,
+    seconds_to_timestamp,
+)
+from mufasa.utils.warnings import DuplicateNamesWarning, FrameRangeWarning, GPUToolsWarning
 
 pd.options.mode.chained_assignment = None
 SECONDS, HHMMSSSSSS = ['seconds', 'hh:mm:ss.ssss']

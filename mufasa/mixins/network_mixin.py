@@ -11,15 +11,21 @@ import numpy as np
 from numba import jit
 from pyvis.network import Network
 
-from mufasa.utils.checks import (check_float, check_if_dir_exists,
-                                check_instance, check_int,
-                                check_iterable_length, check_str,
-                                check_valid_array, check_valid_hex_color,
-                                check_valid_lst, check_valid_tuple)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_dir_exists,
+    check_instance,
+    check_int,
+    check_iterable_length,
+    check_str,
+    check_valid_array,
+    check_valid_hex_color,
+    check_valid_lst,
+    check_valid_tuple,
+)
 from mufasa.utils.data import create_color_palette, get_mode
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import CountError, InvalidInputError
-
 
 # =========================================================================== #
 # Module status (patch 122dd)

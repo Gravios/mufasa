@@ -13,13 +13,20 @@ import numpy as np
 
 from mufasa.mixins.image_mixin import ImageMixin
 from mufasa.third_party_label_appenders.transform.utils import (
-    arr_to_b64, b64_to_arr, normalize_img_dict, scale_pose_img_sizes)
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_keys_exist_in_dict, check_str,
-                                check_valid_boolean, check_valid_tuple)
+    arr_to_b64,
+    b64_to_arr,
+    normalize_img_dict,
+    scale_pose_img_sizes,
+)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_str,
+    check_valid_boolean,
+    check_valid_tuple,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    img_array_to_clahe)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, img_array_to_clahe
 
 
 class LabelMe2DataFrame:

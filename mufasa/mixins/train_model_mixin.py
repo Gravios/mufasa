@@ -6,6 +6,8 @@ warnings.filterwarnings("ignore")
 import ast
 import concurrent
 import configparser
+import functools
+import multiprocessing
 import os
 import pickle
 import platform
@@ -16,30 +18,14 @@ from datetime import datetime
 from itertools import repeat
 from json import loads
 from subprocess import call
+from typing import Any
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import shap
-from imblearn.combine import SMOTEENN
-from imblearn.over_sampling import SMOTE
-from numba import njit, typed, types
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.inspection import partial_dependence, permutation_importance
-from sklearn.metrics import classification_report, precision_recall_curve
-from sklearn.model_selection import ShuffleSplit, learning_curve
-from sklearn.preprocessing import (MinMaxScaler, QuantileTransformer,
-                                   StandardScaler)
-from sklearn.tree import export_graphviz
-# parallel_backend was removed from sklearn.utils in scikit-learn 1.7
-# (deprecated in 1.5, see sklearn release notes). Since sklearn only
-# ever re-exported joblib's function, use joblib directly — this works
-# on all sklearn versions.
-from joblib import parallel_backend
-
-from mufasa.mixins import cuRF
 
 # dtreeviz 2.0 (Feb 2023) reorganised its API. The old top-level
 # dtreeviz() function is still available via ``from dtreeviz import *``
@@ -51,13 +37,25 @@ from mufasa.mixins import cuRF
 # directly, which is where it's actually used from (see
 # tree.DecisionTreeClassifier call downstream).
 from dtreeviz import *  # noqa: F401,F403 — re-exports dtreeviz() for back-compat
+from imblearn.combine import SMOTEENN
+from imblearn.over_sampling import SMOTE
+
+# parallel_backend was removed from sklearn.utils in scikit-learn 1.7
+# (deprecated in 1.5, see sklearn release notes). Since sklearn only
+# ever re-exported joblib's function, use joblib directly — this works
+# on all sklearn versions.
+from joblib import parallel_backend
+from numba import njit, typed, types
 from sklearn import tree
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.inspection import partial_dependence, permutation_importance
+from sklearn.metrics import classification_report, precision_recall_curve
+from sklearn.model_selection import ShuffleSplit, learning_curve
+from sklearn.preprocessing import MinMaxScaler, QuantileTransformer, StandardScaler
+from sklearn.tree import export_graphviz
 
-import functools
-import multiprocessing
-from typing import Any
-
-import matplotlib.pyplot as plt
+from mufasa.mixins import cuRF
 
 try:
     from typing import Literal
@@ -65,35 +63,74 @@ except:
     from typing import Literal
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.plotting.shap_agg_stats_visualizer import \
-    ShapAggregateStatisticsCalculator
+from mufasa.plotting.shap_agg_stats_visualizer import ShapAggregateStatisticsCalculator
+from mufasa.utils.checks import (
+    check_all_dfs_in_list_has_same_cols,
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_valid_input,
+    check_instance,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_lst,
+    is_lxc_container,
+)
 from mufasa.utils.confirm import confirm_two_option
-from mufasa.utils.checks import (check_all_dfs_in_list_has_same_cols,
-                                check_file_exist_and_readable,
-                                check_float,
-                                check_if_dir_exists, check_if_valid_input,
-                                check_instance, check_int, check_str,
-                                check_that_column_exist, check_valid_array,
-                                check_valid_boolean, check_valid_dataframe,
-                                check_valid_lst, is_lxc_container)
-from mufasa.utils.data import (detect_bouts, detect_bouts_multiclass,
-                              get_library_version, terminate_cpu_pool)
-from mufasa.utils.enums import (OS, ConfigKey, Defaults, Dtypes, Formats, Links,
-                               Methods, MLParamKeys, Options)
-from mufasa.utils.errors import (ClassifierInferenceError, CorruptedFileError,
-                                DataHeaderError, FaultyTrainingSetError,
-                                FeatureNumberMismatchError, InvalidInputError,
-                                MissingColumnsError, NoDataError,
-                                SamplingError, MufasaModuleNotFoundError)
+from mufasa.utils.data import (
+    detect_bouts,
+    detect_bouts_multiclass,
+    get_library_version,
+    terminate_cpu_pool,
+)
+from mufasa.utils.enums import (
+    OS,
+    ConfigKey,
+    Defaults,
+    Dtypes,
+    Formats,
+    Links,
+    Methods,
+    MLParamKeys,
+    Options,
+)
+from mufasa.utils.errors import (
+    ClassifierInferenceError,
+    CorruptedFileError,
+    DataHeaderError,
+    FaultyTrainingSetError,
+    FeatureNumberMismatchError,
+    InvalidInputError,
+    MissingColumnsError,
+    MufasaModuleNotFoundError,
+    NoDataError,
+    SamplingError,
+)
 from mufasa.utils.lookups import get_meta_data_file_headers, get_table
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (find_core_cnt, get_fn_ext, get_memory_usage_of_df,
-                                    get_pkg_version, read_config_entry,
-                                    read_df, read_meta_file, str_2_bool)
-from mufasa.utils.warnings import (GPUToolsWarning, MissingUserInputWarning,
-                                  MultiProcessingFailedWarning,
-                                  NoModuleWarning, NotEnoughDataWarning,
-                                  SamplingWarning, ShapWarning)
+from mufasa.utils.read_write import (
+    find_core_cnt,
+    get_fn_ext,
+    get_memory_usage_of_df,
+    get_pkg_version,
+    read_config_entry,
+    read_df,
+    read_meta_file,
+    str_2_bool,
+)
+from mufasa.utils.warnings import (
+    GPUToolsWarning,
+    MissingUserInputWarning,
+    MultiProcessingFailedWarning,
+    NoModuleWarning,
+    NotEnoughDataWarning,
+    SamplingWarning,
+    ShapWarning,
+)
 
 plt.switch_backend("agg")
 

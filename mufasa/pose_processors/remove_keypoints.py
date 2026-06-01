@@ -9,8 +9,7 @@ import pandas as pd
 from tables import NaturalNameWarning
 
 from mufasa.utils.checks import check_if_filepath_list_is_empty
-from mufasa.utils.errors import (BodypartColumnNotFoundError,
-                                InvalidFileTypeError, NotDirectoryError)
+from mufasa.utils.errors import BodypartColumnNotFoundError, InvalidFileTypeError, NotDirectoryError
 from mufasa.utils.printing import SimbaTimer, stdout_success
 
 warnings.filterwarnings("ignore", category=NaturalNameWarning)

@@ -31,8 +31,7 @@ class TrainMultiLabelRandomForestClassifier(ConfigReader, TrainModelMixin):
         # read_all_files_in_folder_mp_futures go through the
         # load helpers via the new config_path branch.
         if not self.target_file_paths:
-            from mufasa.utils.label_io import \
-                list_video_stems_with_labels
+            from mufasa.utils.label_io import list_video_stems_with_labels
             stems = list_video_stems_with_labels(self.config_path)
             if stems:
                 self.target_file_paths = [

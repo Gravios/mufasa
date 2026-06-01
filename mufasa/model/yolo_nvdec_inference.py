@@ -30,19 +30,28 @@ from ultralytics import YOLO
 
 from mufasa.data_processors.cuda.utils import _is_cuda_available
 from mufasa.mixins.geometry_mixin import GeometryMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists, check_int,
-                                check_nvidea_gpu_available, check_str,
-                                check_valid_boolean, check_valid_tuple)
-from mufasa.utils.data import (df_smoother, resample_geometry_vertices,
-                              savgol_smoother)
-from mufasa.utils.errors import (InvalidInputError, NoFilesFoundError,
-                                MufasaGPUError)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_valid_boolean,
+    check_valid_tuple,
+)
+from mufasa.utils.data import df_smoother, resample_geometry_vertices, savgol_smoother
+from mufasa.utils.errors import InvalidInputError, MufasaGPUError, NoFilesFoundError
 from mufasa.utils.lookups import get_nvdec_count
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (find_all_videos_in_directory,
-                                    find_core_cnt, get_fn_ext, get_pkg_version,
-                                    get_video_meta_data, write_df)
+from mufasa.utils.read_write import (
+    find_all_videos_in_directory,
+    find_core_cnt,
+    get_fn_ext,
+    get_pkg_version,
+    get_video_meta_data,
+    write_df,
+)
 
 DETECT = 'detect'
 POSE = 'pose'

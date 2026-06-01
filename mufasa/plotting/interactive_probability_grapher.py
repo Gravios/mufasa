@@ -9,9 +9,13 @@ import matplotlib.pyplot as plt
 import mufasa
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.plotting.tools.tkinter_tools import InteractiveVideoPlotterWindow
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_valid_rgb_tuple, check_int,
-                                check_valid_boolean, check_valid_dataframe)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_valid_boolean,
+    check_valid_dataframe,
+)
 from mufasa.utils.enums import OS, Formats, Paths
 from mufasa.utils.errors import InvalidInputError
 from mufasa.utils.read_write import get_fn_ext, get_video_meta_data, read_df

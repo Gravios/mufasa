@@ -11,18 +11,17 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_if_dir_exists,
-    check_that_dir_has_list_of_filenames, check_valid_boolean,
-    check_valid_dataframe, check_valid_lst)
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_that_dir_has_list_of_filenames,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats, Keys, TagNames
-from mufasa.utils.errors import (AnimalNumberError, CountError,
-                                InvalidInputError, NoFilesFoundError)
-from mufasa.utils.lookups import create_directionality_cords
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
-                                  stdout_success)
-from mufasa.utils.read_write import (create_directory, get_fn_ext, read_df,
-                                    seconds_to_timestamp, write_df)
+from mufasa.utils.errors import AnimalNumberError, CountError, InvalidInputError, NoFilesFoundError
+
 # Patch 122ae-5b: layout-aware feature reader for the
 # append-bool-tables-to-features branch in run(). Only the
 # READ swaps — the write back via write_df continues to
@@ -30,6 +29,15 @@ from mufasa.utils.read_write import (create_directory, get_fn_ext, read_df,
 # consumers (and the load helper's legacy fallback) see the
 # augmented columns.
 from mufasa.utils.feature_io import load_features_for_video
+from mufasa.utils.lookups import create_directionality_cords
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_information, stdout_success
+from mufasa.utils.read_write import (
+    create_directory,
+    get_fn_ext,
+    read_df,
+    seconds_to_timestamp,
+    write_df,
+)
 
 NOSE, EAR_LEFT, EAR_RIGHT = Keys.NOSE.value, Keys.EAR_LEFT.value, Keys.EAR_RIGHT.value
 X_BPS, Y_BPS = Keys.X_BPS.value, Keys.Y_BPS.value

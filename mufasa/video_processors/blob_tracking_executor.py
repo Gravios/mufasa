@@ -5,21 +5,31 @@ import numpy as np
 import pandas as pd
 
 from mufasa.data_processors.find_animal_blob_location import (
-    get_blob_vertices_from_video, get_left_right_points,
-    get_nose_tail_from_vertices)
+    get_blob_vertices_from_video,
+    get_left_right_points,
+    get_nose_tail_from_vertices,
+)
 from mufasa.mixins.geometry_mixin import GeometryMixin
-from mufasa.utils.checks import (check_if_dir_exists, check_instance, check_int,
-                                check_nvidea_gpu_available, check_valid_dict)
-from mufasa.utils.data import (resample_geometry_vertices, savgol_smoother,
-                              terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_instance,
+    check_int,
+    check_nvidea_gpu_available,
+    check_valid_dict,
+)
+from mufasa.utils.data import resample_geometry_vertices, savgol_smoother, terminate_cpu_pool
 from mufasa.utils.enums import Defaults
 from mufasa.utils.errors import MufasaGPUError
 from mufasa.utils.lookups import get_current_time
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_core_cnt, get_video_meta_data,
-                                    read_pickle, remove_files, write_df)
-from mufasa.video_processors.video_processing import (video_bg_subtraction,
-                                                     video_bg_subtraction_mp)
+from mufasa.utils.read_write import (
+    find_core_cnt,
+    get_video_meta_data,
+    read_pickle,
+    remove_files,
+    write_df,
+)
+from mufasa.video_processors.video_processing import video_bg_subtraction, video_bg_subtraction_mp
 
 CENTER_X = 'center_x'
 CENTER_Y = 'center_y'

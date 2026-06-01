@@ -4,13 +4,22 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 
-from mufasa.model.regression.metrics import (mean_absolute_error,
-                                            mean_absolute_percentage_error,
-                                            mean_squared_error, r2_score,
-                                            root_mean_squared_error)
-from mufasa.utils.checks import (check_float, check_instance, check_int,
-                                check_str, check_valid_array,
-                                check_valid_dataframe, check_valid_lst)
+from mufasa.model.regression.metrics import (
+    mean_absolute_error,
+    mean_absolute_percentage_error,
+    mean_squared_error,
+    r2_score,
+    root_mean_squared_error,
+)
+from mufasa.utils.checks import (
+    check_float,
+    check_instance,
+    check_int,
+    check_str,
+    check_valid_array,
+    check_valid_dataframe,
+    check_valid_lst,
+)
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import DataHeaderError
 

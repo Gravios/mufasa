@@ -13,19 +13,25 @@ except:
 import pandas as pd
 
 from mufasa.mixins.image_mixin import ImageMixin
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_int,
-                                check_nvidea_gpu_available, check_str,
-                                check_valid_boolean)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_valid_boolean,
+)
 from mufasa.utils.data import df_smoother, savgol_smoother
 from mufasa.utils.enums import Formats, Methods, Options
 from mufasa.utils.errors import FFMPEGCodecGPUError, InvalidInputError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_all_videos_in_directory, get_fn_ext,
-                                    get_video_meta_data, remove_files,
-                                    write_df)
-from mufasa.video_processors.video_processing import (video_bg_subtraction,
-                                                     video_bg_subtraction_mp)
+from mufasa.utils.read_write import (
+    find_all_videos_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    remove_files,
+    write_df,
+)
+from mufasa.video_processors.video_processing import video_bg_subtraction, video_bg_subtraction_mp
 
 
 class BlobLocationComputer:

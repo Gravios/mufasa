@@ -15,10 +15,16 @@ from mufasa.mixins.statistics_mixin import Statistics
 from mufasa.mixins.timeseries_features_mixin import TimeseriesFeatureMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_if_filepath_list_is_empty)
-from mufasa.utils.read_write import (SimbaTimer, get_fn_ext, read_df,
-                                    stdout_information, stdout_success,
-                                    write_df)
+    check_if_filepath_list_is_empty,
+)
+from mufasa.utils.read_write import (
+    SimbaTimer,
+    get_fn_ext,
+    read_df,
+    stdout_information,
+    stdout_success,
+    write_df,
+)
 
 NOSE = 'nose'
 LEFT_SIDE = 'left_side'

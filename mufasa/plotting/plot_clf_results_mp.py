@@ -17,26 +17,39 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.mixins.train_model_mixin import TrainModelMixin
-from mufasa.utils.checks import (check_float, check_if_valid_rgb_tuple,
-                                check_int, check_nvidea_gpu_available,
-                                check_str, check_that_column_exist,
-                                check_that_hhmmss_start_is_before_end,
-                                check_valid_boolean, check_valid_dict,
-                                check_video_and_data_frm_count_align)
-from mufasa.utils.data import (check_if_string_value_is_valid_video_timestamp,
-                              create_color_palette, detect_bouts,
-                              find_frame_numbers_from_time_stamp, get_cpu_pool,
-                              terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_that_column_exist,
+    check_that_hhmmss_start_is_before_end,
+    check_valid_boolean,
+    check_valid_dict,
+    check_video_and_data_frm_count_align,
+)
+from mufasa.utils.data import (
+    check_if_string_value_is_valid_video_timestamp,
+    create_color_palette,
+    detect_bouts,
+    find_frame_numbers_from_time_stamp,
+    get_cpu_pool,
+    terminate_cpu_pool,
+)
 from mufasa.utils.enums import ConfigKey, Dtypes, Options, TagNames, TextOptions
-from mufasa.utils.errors import (InvalidInputError, NoDataError,
-                                NoSpecifiedOutputError)
-from mufasa.utils.printing import (SimbaTimer, log_event, stdout_information,
-                                  stdout_success)
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    create_directory,
-                                    find_all_videos_in_project, find_core_cnt,
-                                    get_fn_ext, get_video_meta_data,
-                                    read_config_entry, seconds_to_timestamp)
+from mufasa.utils.errors import InvalidInputError, NoDataError, NoSpecifiedOutputError
+from mufasa.utils.printing import SimbaTimer, log_event, stdout_information, stdout_success
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    create_directory,
+    find_all_videos_in_project,
+    find_core_cnt,
+    get_fn_ext,
+    get_video_meta_data,
+    read_config_entry,
+    seconds_to_timestamp,
+)
 from mufasa.utils.warnings import FileExistWarning, FrameRangeWarning
 
 START_TIME, END_TIME = 'start_time', 'end_time'

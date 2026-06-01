@@ -12,11 +12,14 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.mixins.statistics_mixin import Statistics
 from mufasa.mixins.timeseries_features_mixin import TimeseriesFeatureMixin
-from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log)
+from mufasa.utils.checks import check_all_file_names_are_represented_in_video_log
 from mufasa.utils.printing import stdout_information, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    read_df, read_video_info, write_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    read_df,
+    read_video_info,
+    write_df,
+)
 
 WING_LEFT, WING_RIGHT = 'wing_L', 'wing_R'
 HEAD, THORAX, ABDOMEN = 'head', 'thorax', 'abdomen'

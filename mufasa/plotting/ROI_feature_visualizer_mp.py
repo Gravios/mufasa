@@ -18,22 +18,36 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.geometry_mixin import GeometryMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.roi_tools.ROI_feature_analyzer import ROIFeatureCreator
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_string_value_is_valid_video_timestamp,
-                                check_if_valid_rgb_tuple, check_int, check_str,
-                                check_that_hhmmss_start_is_before_end,
-                                check_valid_boolean, check_valid_dict,
-                                check_valid_lst,
-                                check_video_and_data_frm_count_align)
-from mufasa.utils.data import (find_frame_numbers_from_time_stamp, get_cpu_pool,
-                              slice_roi_dict_for_video, terminate_cpu_pool)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_string_value_is_valid_video_timestamp,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+    check_that_hhmmss_start_is_before_end,
+    check_valid_boolean,
+    check_valid_dict,
+    check_valid_lst,
+    check_video_and_data_frm_count_align,
+)
+from mufasa.utils.data import (
+    find_frame_numbers_from_time_stamp,
+    get_cpu_pool,
+    slice_roi_dict_for_video,
+    terminate_cpu_pool,
+)
 from mufasa.utils.enums import Formats, Options, TextOptions
 from mufasa.utils.errors import BodypartColumnNotFoundError, NoFilesFoundError
 from mufasa.utils.printing import stdout_information, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt, get_fn_ext,
-                                    get_video_meta_data, read_df,
-                                    remove_a_folder, seconds_to_timestamp)
+from mufasa.utils.read_write import (
+    concatenate_videos_in_folder,
+    find_core_cnt,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    remove_a_folder,
+    seconds_to_timestamp,
+)
 from mufasa.utils.warnings import DuplicateNamesWarning
 
 START_TIME, END_TIME = 'start_time', 'end_time'

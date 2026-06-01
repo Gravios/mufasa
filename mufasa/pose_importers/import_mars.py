@@ -15,8 +15,12 @@ from mufasa.utils.data import smooth_data_gaussian, smooth_data_savitzky_golay
 from mufasa.utils.enums import Dtypes, Methods, Paths
 from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (get_fn_ext, read_config_file,
-                                    read_project_path_and_file_type, write_df)
+from mufasa.utils.read_write import (
+    get_fn_ext,
+    read_config_file,
+    read_project_path_and_file_type,
+    write_df,
+)
 
 
 class MarsImporter:

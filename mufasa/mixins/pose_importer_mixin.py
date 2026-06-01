@@ -15,8 +15,13 @@ from numba import jit, prange
 
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.enums import ConfigKey
-from mufasa.utils.errors import (CountError, IntegerError, InvalidInputError,
-                                NoDataError, NoFilesFoundError)
+from mufasa.utils.errors import (
+    CountError,
+    IntegerError,
+    InvalidInputError,
+    NoDataError,
+    NoFilesFoundError,
+)
 from mufasa.utils.read_write import get_fn_ext
 from mufasa.utils.warnings import FrameRangeWarning
 

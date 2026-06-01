@@ -3,8 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from mufasa.utils.checks import (check_float, check_if_dir_exists, check_int,
-                                check_valid_array)
+from mufasa.utils.checks import check_float, check_if_dir_exists, check_int, check_valid_array
 from mufasa.utils.printing import SimbaTimer, stdout_success
 
 

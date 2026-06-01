@@ -4,14 +4,22 @@ from copy import copy
 from mufasa.data_processors.interpolate import Interpolate
 from mufasa.data_processors.smoothing import Smoothing
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_keys_exist_in_dict, check_int,
-                                check_str, check_valid_boolean)
+from mufasa.utils.checks import (
+    check_if_dir_exists,
+    check_if_keys_exist_in_dict,
+    check_int,
+    check_str,
+    check_valid_boolean,
+)
 from mufasa.utils.enums import ConfigKey, Dtypes, Methods
 from mufasa.utils.errors import InvalidInputError, NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_facemap_h5, write_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_facemap_h5,
+    write_df,
+)
 
 
 class FaceMapImporter(ConfigReader):

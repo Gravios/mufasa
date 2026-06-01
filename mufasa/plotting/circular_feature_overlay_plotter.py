@@ -8,12 +8,10 @@ from mufasa.mixins.circular_statistics import CircularStatisticsMixin
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_int)
+from mufasa.utils.checks import check_file_exist_and_readable, check_float, check_int
 from mufasa.utils.enums import Formats, TextOptions
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (find_video_of_file, get_fn_ext,
-                                    get_video_meta_data, read_df)
+from mufasa.utils.read_write import find_video_of_file, get_fn_ext, get_video_meta_data, read_df
 
 FONT_SIZE = 'font_size'
 SPACE_SIZE = 'space_size'

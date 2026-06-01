@@ -19,12 +19,12 @@ import stat
 import subprocess
 import webbrowser
 from ast import literal_eval
+from collections.abc import Iterable
 from configparser import ConfigParser
 from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
-from collections.abc import Iterable
 
 import h5py
 from PIL import Image, ImageFile
@@ -35,49 +35,84 @@ except:
     from typing import Literal
 
 import sysconfig
+from importlib import metadata as _metadata  # replaces pkg_resources
 from urllib import request
 from urllib.parse import urlparse
 
 import cv2
 import numpy as np
 import pandas as pd
-from importlib import metadata as _metadata  # replaces pkg_resources
 import pyarrow as pa
 from numba import njit, prange
 from pyarrow import csv
-from shapely.geometry import (LineString, MultiLineString, MultiPolygon, Point,
-                              Polygon)
+from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point, Polygon
 
 import mufasa
-from mufasa.utils.checks import (check_ffmpeg_available,
-                                check_file_exist_and_readable, check_float,
-                                check_if_dir_exists,
-                                check_if_filepath_list_is_empty,
-                                check_if_keys_exist_in_dict,
-                                check_if_string_value_is_valid_video_timestamp,
-                                check_if_valid_img, check_if_valid_rgb_tuple,
-                                check_instance, check_int,
-                                check_nvidea_gpu_available, check_str,
-                                check_valid_array, check_valid_boolean,
-                                check_valid_cpu_pool, check_valid_dataframe,
-                                check_valid_lst, check_valid_tuple,
-                                check_valid_url, is_video_color)
-from mufasa.utils.enums import (ENV_VARS, OS, ConfigKey, Defaults, Dtypes,
-                               Formats, Keys, Links, Options, Paths)
-from mufasa.utils.errors import (CorruptedFileError, DataHeaderError,
-                                DuplicationError, FFMPEGCodecGPUError,
-                                FFMPEGNotFoundError, FileExistError,
-                                FrameRangeError, IntegerError,
-                                InvalidFilepathError, InvalidFileTypeError,
-                                InvalidInputError, InvalidVideoFileError,
-                                MissingProjectConfigEntryError, NoDataError,
-                                NoFilesFoundError, NotDirectoryError,
-                                ParametersFileError, PermissionError,
-                                MufasaPackageVersionError)
+from mufasa.utils.checks import (
+    check_ffmpeg_available,
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_filepath_list_is_empty,
+    check_if_keys_exist_in_dict,
+    check_if_string_value_is_valid_video_timestamp,
+    check_if_valid_img,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_cpu_pool,
+    check_valid_dataframe,
+    check_valid_lst,
+    check_valid_tuple,
+    check_valid_url,
+    is_video_color,
+)
+from mufasa.utils.enums import (
+    ENV_VARS,
+    OS,
+    ConfigKey,
+    Defaults,
+    Dtypes,
+    Formats,
+    Keys,
+    Links,
+    Options,
+    Paths,
+)
+from mufasa.utils.errors import (
+    CorruptedFileError,
+    DataHeaderError,
+    DuplicationError,
+    FFMPEGCodecGPUError,
+    FFMPEGNotFoundError,
+    FileExistError,
+    FrameRangeError,
+    IntegerError,
+    InvalidFilepathError,
+    InvalidFileTypeError,
+    InvalidInputError,
+    InvalidVideoFileError,
+    MissingProjectConfigEntryError,
+    MufasaPackageVersionError,
+    NoDataError,
+    NoFilesFoundError,
+    NotDirectoryError,
+    ParametersFileError,
+    PermissionError,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.warnings import (
-    FileExistWarning, FrameRangeWarning, GPUToolsWarning, InvalidValueWarning,
-    NoFileFoundWarning, ThirdPartyAnnotationsInvalidFileFormatWarning)
+    FileExistWarning,
+    FrameRangeWarning,
+    GPUToolsWarning,
+    InvalidValueWarning,
+    NoFileFoundWarning,
+    ThirdPartyAnnotationsInvalidFileFormatWarning,
+)
 
 MUFASA_DIR = os.path.dirname(mufasa.__file__)
 

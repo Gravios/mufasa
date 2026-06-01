@@ -17,19 +17,27 @@ from PIL import ImageTk
 from scipy.spatial.distance import cdist
 from shapely.geometry import Polygon
 
-from mufasa.utils.checks import (check_file_exist_and_readable, check_int,
-                                check_str, check_valid_array,
-                                check_valid_dataframe, check_valid_tuple,
-                                check_video_and_data_frm_count_align)
-from mufasa.utils.enums import (ROI_SETTINGS, ConfigKey, Formats, Keys, Options)
-from mufasa.utils.errors import (InvalidInputError, NoROIDataError,
-                                NotDirectoryError)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_int,
+    check_str,
+    check_valid_array,
+    check_valid_dataframe,
+    check_valid_tuple,
+    check_video_and_data_frm_count_align,
+)
+from mufasa.utils.enums import ROI_SETTINGS, ConfigKey, Formats, Keys, Options
+from mufasa.utils.errors import InvalidInputError, NoROIDataError, NotDirectoryError
 from mufasa.utils.printing import stdout_success, stdout_trash
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, get_video_meta_data,
-                                    read_config_file, read_df, read_roi_data)
-from mufasa.utils.warnings import (FrameRangeWarning, NoFileFoundWarning,
-                                  VideoFileWarning)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_config_file,
+    read_df,
+    read_roi_data,
+)
+from mufasa.utils.warnings import FrameRangeWarning, NoFileFoundWarning, VideoFileWarning
 from mufasa.video_processors.roi_selector import ROISelector
 from mufasa.video_processors.roi_selector_circle import ROISelectorCircle
 from mufasa.video_processors.roi_selector_polygon import ROISelectorPolygon

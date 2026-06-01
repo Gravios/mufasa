@@ -9,8 +9,7 @@ from sklearn.model_selection import train_test_split
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.utils.checks import check_if_filepath_list_is_empty, check_int
-from mufasa.utils.enums import (ConfigKey, Dtypes, Formats, Links, Methods,
-                               MLParamKeys, Options)
+from mufasa.utils.enums import ConfigKey, Dtypes, Formats, Links, Methods, MLParamKeys, Options
 from mufasa.utils.errors import ParametersFileError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
 from mufasa.utils.read_write import read_config_entry, str_2_bool, write_df
@@ -50,8 +49,7 @@ class TrainRandomForestClassifier(ConfigReader, TrainModelMixin):
         # read_all_files_in_folder_mp_futures go through the
         # load helpers via the new config_path branch.
         if not self.target_file_paths:
-            from mufasa.utils.label_io import \
-                list_video_stems_with_labels
+            from mufasa.utils.label_io import list_video_stems_with_labels
             stems = list_video_stems_with_labels(self.config_path)
             if stems:
                 self.target_file_paths = [

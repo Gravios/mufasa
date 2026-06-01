@@ -42,7 +42,6 @@ import pandas as pd
 from mufasa.utils.feature_io import load_features_for_video
 from mufasa.utils.label_io import load_labels_for_video
 
-
 __all__ = [
     "export_features_csv",
     "export_labels_csv",

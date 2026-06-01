@@ -8,20 +8,34 @@ import pandas as pd
 
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
+from mufasa.mixins.feature_extraction_supplement_mixin import FeatureExtractionSupplemental
 from mufasa.roi_tools.roi_utils import get_roi_dict_from_dfs
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_float, check_if_dir_exists, check_int,
-    check_that_column_exist, check_valid_boolean, check_valid_lst)
-from mufasa.utils.data import (detect_bouts, get_cpu_pool,
-                              slice_roi_dict_for_video, terminate_cpu_pool)
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_int,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_lst,
+)
+from mufasa.utils.data import (
+    detect_bouts,
+    get_cpu_pool,
+    slice_roi_dict_for_video,
+    terminate_cpu_pool,
+)
 from mufasa.utils.enums import ROI_SETTINGS, Formats, Keys
 from mufasa.utils.errors import CountError, ROICoordinatesNotFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (find_core_cnt, get_fn_ext, read_data_paths,
-                                    read_df, read_video_info)
+from mufasa.utils.read_write import (
+    find_core_cnt,
+    get_fn_ext,
+    read_data_paths,
+    read_df,
+    read_video_info,
+)
 from mufasa.utils.warnings import NoDataFoundWarning
 
 SHAPE_TYPE = "Shape_type"

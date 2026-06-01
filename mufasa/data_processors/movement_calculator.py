@@ -9,17 +9,27 @@ import pandas as pd
 from mufasa.feature_extractors.perimeter_jit import jitted_centroid
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
+from mufasa.mixins.feature_extraction_supplement_mixin import FeatureExtractionSupplemental
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_float,
-    check_if_keys_exist_in_dict, check_instance, check_str,
-    check_that_column_exist, check_valid_boolean, check_valid_dict,
-    check_valid_lst, check_valid_tuple)
+    check_all_file_names_are_represented_in_video_log,
+    check_float,
+    check_if_keys_exist_in_dict,
+    check_instance,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_dict,
+    check_valid_lst,
+    check_valid_tuple,
+)
 from mufasa.utils.errors import FrameRangeError, InvalidInputError, NoDataError
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, seconds_to_timestamp)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_df,
+    seconds_to_timestamp,
+)
 
 START, END = 'START', 'END'
 

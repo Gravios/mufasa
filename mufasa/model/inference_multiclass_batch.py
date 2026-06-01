@@ -102,8 +102,8 @@ class InferenceMulticlassBatch(TrainModelMixin, ConfigReader):
             # project formats; predictions land at
             # derived/classifications/<video>.parquet.
             from mufasa.utils.classification_io import (
-                save_classifications_for_video,
                 _prediction_columns,
+                save_classifications_for_video,
             )
             clf_names = []
             for m_hyp in self.model_dict.values():

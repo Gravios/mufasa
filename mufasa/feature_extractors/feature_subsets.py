@@ -18,16 +18,23 @@ from mufasa.mixins.train_model_mixin import TrainModelMixin
 from mufasa.roi_tools.roi_utils import get_roi_dict_from_dfs
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_if_dir_exists,
+    check_file_exist_and_readable,
+    check_if_dir_exists,
     check_valid_boolean,
-    check_valid_lst, check_video_has_rois)
-from mufasa.utils.errors import (DuplicationError, InvalidInputError,
-                                NoROIDataError)
+    check_valid_lst,
+    check_video_has_rois,
+)
+from mufasa.utils.errors import DuplicationError, InvalidInputError, NoROIDataError
 from mufasa.utils.printing import stdout_success
-from mufasa.utils.read_write import (copy_files_in_directory,
-                                    find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, remove_a_folder,
-                                    remove_multiple_folders, write_df)
+from mufasa.utils.read_write import (
+    copy_files_in_directory,
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_df,
+    remove_a_folder,
+    remove_multiple_folders,
+    write_df,
+)
 
 
 def _read_columns_only(file_path: str, file_type: str) -> set:

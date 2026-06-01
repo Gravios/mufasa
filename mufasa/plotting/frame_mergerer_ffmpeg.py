@@ -9,17 +9,25 @@ except ImportError:
     from typing import Literal
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_ffmpeg_available,
-                                check_file_exist_and_readable, check_int,
-                                check_nvidea_gpu_available, check_str,
-                                check_valid_boolean, check_valid_lst)
+from mufasa.utils.checks import (
+    check_ffmpeg_available,
+    check_file_exist_and_readable,
+    check_int,
+    check_nvidea_gpu_available,
+    check_str,
+    check_valid_boolean,
+    check_valid_lst,
+)
 from mufasa.utils.enums import Paths, TagNames
 from mufasa.utils.errors import FFMPEGCodecGPUError
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
 from mufasa.utils.read_write import get_fn_ext
 from mufasa.video_processors.video_processing import (
-    horizontal_video_concatenator, mixed_mosaic_concatenator,
-    mosaic_concatenator, vertical_video_concatenator)
+    horizontal_video_concatenator,
+    mixed_mosaic_concatenator,
+    mosaic_concatenator,
+    vertical_video_concatenator,
+)
 
 HORIZONTAL = "horizontal"
 VERTICAL = "vertical"

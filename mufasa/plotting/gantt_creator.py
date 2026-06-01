@@ -11,8 +11,13 @@ from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_int, check_str, check_valid_boolean,
-    check_valid_dataframe, check_valid_lst)
+    check_file_exist_and_readable,
+    check_int,
+    check_str,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_lst,
+)
 from mufasa.utils.data import create_color_palette, detect_bouts
 from mufasa.utils.enums import Formats, Options
 from mufasa.utils.errors import NoSpecifiedOutputError

@@ -12,15 +12,17 @@ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_instance, check_int,
-    check_valid_boolean, check_valid_lst)
+    check_file_exist_and_readable,
+    check_instance,
+    check_int,
+    check_valid_boolean,
+    check_valid_lst,
+)
 from mufasa.utils.data import terminate_cpu_pool
-from mufasa.utils.errors import (CountError, InvalidInputError,
-                                NoSpecifiedOutputError)
+from mufasa.utils.errors import CountError, InvalidInputError, NoSpecifiedOutputError
 from mufasa.utils.lookups import get_color_dict
 from mufasa.utils.printing import SimbaTimer, stdout_information, stdout_success
-from mufasa.utils.read_write import (concatenate_videos_in_folder,
-                                    find_core_cnt, get_fn_ext, read_df)
+from mufasa.utils.read_write import concatenate_videos_in_folder, find_core_cnt, get_fn_ext, read_df
 
 
 def distance_plotter_mp(

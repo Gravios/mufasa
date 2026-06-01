@@ -42,8 +42,13 @@ except:
 
 from mufasa.data_processors.cuda.utils import _cuda_are_rows_equal
 from mufasa.mixins.statistics_mixin import Statistics
-from mufasa.utils.checks import (check_float, check_int, check_str,
-                                check_valid_array, check_valid_tuple)
+from mufasa.utils.checks import (
+    check_float,
+    check_int,
+    check_str,
+    check_valid_array,
+    check_valid_tuple,
+)
 from mufasa.utils.data import bucket_data
 from mufasa.utils.enums import Formats
 

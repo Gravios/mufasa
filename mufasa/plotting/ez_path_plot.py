@@ -7,14 +7,21 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_dir_exists, check_if_valid_rgb_tuple,
-                                check_int, check_valid_tuple)
-from mufasa.utils.errors import (DataHeaderError, DuplicationError,
-                                InvalidFileTypeError, InvalidInputError)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_valid_tuple,
+)
+from mufasa.utils.errors import (
+    DataHeaderError,
+    DuplicationError,
+    InvalidFileTypeError,
+    InvalidInputError,
+)
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import (get_fn_ext,
-                                    get_video_meta_data)
+from mufasa.utils.read_write import get_fn_ext, get_video_meta_data
 
 H5 = ".h5"
 CSV = ".csv"

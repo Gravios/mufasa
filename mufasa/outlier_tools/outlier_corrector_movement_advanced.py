@@ -17,8 +17,12 @@ from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import InvalidInputError, NoFilesFoundError
 from mufasa.utils.printing import SimbaTimer, log_event, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext, read_df, write_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    get_fn_ext,
+    read_df,
+    write_df,
+)
 
 
 class OutlierCorrecterMovementAdvanced(ConfigReader, FeatureExtractionMixin):

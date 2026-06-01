@@ -5,9 +5,13 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from shapely.geometry import Polygon
 
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_valid_img, check_if_valid_rgb_tuple,
-                                check_int, check_str)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_valid_img,
+    check_if_valid_rgb_tuple,
+    check_int,
+    check_str,
+)
 from mufasa.utils.enums import Options
 from mufasa.utils.errors import InvalidFileTypeError
 from mufasa.utils.read_write import get_fn_ext, read_frm_of_video

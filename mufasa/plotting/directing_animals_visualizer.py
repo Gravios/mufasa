@@ -6,18 +6,19 @@ from typing import Any
 import cv2
 import numpy as np
 
-from mufasa.data_processors.directing_other_animals_calculator import \
-    DirectingOtherAnimalsAnalyzer
+from mufasa.data_processors.directing_other_animals_calculator import DirectingOtherAnimalsAnalyzer
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_file_exist_and_readable,
-                                check_if_keys_exist_in_dict,
-                                check_if_valid_rgb_tuple, check_valid_lst,
-                                check_video_and_data_frm_count_align)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_if_keys_exist_in_dict,
+    check_if_valid_rgb_tuple,
+    check_valid_lst,
+    check_video_and_data_frm_count_align,
+)
 from mufasa.utils.data import create_color_palettes
 from mufasa.utils.enums import Formats, TextOptions
-from mufasa.utils.errors import (AnimalNumberError, InvalidInputError,
-                                NoFilesFoundError)
+from mufasa.utils.errors import AnimalNumberError, InvalidInputError, NoFilesFoundError
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import get_fn_ext, get_video_meta_data, read_df
 from mufasa.utils.warnings import NoDataFoundWarning

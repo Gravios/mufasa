@@ -63,11 +63,9 @@ import pandas as pd
 
 from mufasa.feature_extractors.perimeter_jit import jitted_hull as _numba_jitted_hull
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
-from mufasa.mixins.feature_extraction_supplement_mixin import \
-    FeatureExtractionSupplemental
+from mufasa.mixins.feature_extraction_supplement_mixin import FeatureExtractionSupplemental
 from mufasa.utils.checks import check_valid_dataframe
 from mufasa.utils.enums import ROI_SETTINGS, Formats
-
 
 # ---------------------------------------------------------------------- #
 # Cython kernel wiring
@@ -100,6 +98,8 @@ try:
     from mufasa._native.border_distances import border_distances as _kern_border_distances
     from mufasa._native.euclidean_distance import (
         framewise_euclidean_distance as _kern_euclid,
+    )
+    from mufasa._native.euclidean_distance import (
         framewise_euclidean_distance_roi as _kern_euclid_roi,
     )
     from mufasa._native.hull import jitted_hull as _kern_hull

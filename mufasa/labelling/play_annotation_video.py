@@ -11,8 +11,7 @@ from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.checks import check_file_exist_and_readable
 from mufasa.utils.enums import TextOptions
 from mufasa.utils.lookups import get_labelling_video_kbd_bindings
-from mufasa.utils.read_write import (get_fn_ext, get_video_meta_data,
-                                    read_frm_of_video)
+from mufasa.utils.read_write import get_fn_ext, get_video_meta_data, read_frm_of_video
 from mufasa.utils.warnings import FrameRangeWarning
 
 

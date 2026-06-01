@@ -315,8 +315,7 @@ def get_nvc_decoder(video_path: str | os.PathLike,
                     gpu_id: int = 0,
                     use_device_memory: bool = False):
 
-    from mufasa.utils.checks import (check_file_exist_and_readable,
-                                    check_instance, check_int)
+    from mufasa.utils.checks import check_file_exist_and_readable, check_instance, check_int
     from mufasa.utils.errors import MufasaGPUError
 
     if nvc is None:

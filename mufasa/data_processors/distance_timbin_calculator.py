@@ -8,14 +8,23 @@ import pandas as pd
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.utils.checks import (
-    check_all_file_names_are_represented_in_video_log, check_float,
-    check_instance, check_str, check_that_column_exist, check_valid_boolean,
-    check_valid_lst, check_valid_tuple)
+    check_all_file_names_are_represented_in_video_log,
+    check_float,
+    check_instance,
+    check_str,
+    check_that_column_exist,
+    check_valid_boolean,
+    check_valid_lst,
+    check_valid_tuple,
+)
 from mufasa.utils.errors import FrameRangeError, InvalidInputError, NoDataError
 from mufasa.utils.printing import stdout_information, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    find_time_stamp_from_frame_numbers,
-                                    get_fn_ext, read_df)
+from mufasa.utils.read_write import (
+    find_files_of_filetypes_in_directory,
+    find_time_stamp_from_frame_numbers,
+    get_fn_ext,
+    read_df,
+)
 from mufasa.utils.warnings import NotEnoughDataWarning
 
 

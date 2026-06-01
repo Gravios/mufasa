@@ -23,33 +23,49 @@ import numpy as np
 from numba import cuda
 from numba.core.errors import NumbaPerformanceWarning
 
-from mufasa.data_processors.cuda.utils import (_cuda_luminance_pixel_to_grey,
-                                              _cuda_mse, _is_cuda_available)
+from mufasa.data_processors.cuda.utils import (
+    _cuda_luminance_pixel_to_grey,
+    _cuda_mse,
+    _is_cuda_available,
+)
 from mufasa.mixins.image_mixin import ImageMixin
 from mufasa.mixins.plotting_mixin import PlottingMixin
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_dir_exists,
-                                check_if_string_value_is_valid_video_timestamp,
-                                check_if_valid_img, check_if_valid_rgb_tuple,
-                                check_instance, check_int,
-                                check_nvidea_gpu_available,
-                                check_that_hhmmss_start_is_before_end,
-                                check_valid_array, check_valid_boolean,
-                                is_video_color)
-from mufasa.utils.data import (create_color_palette,
-                              find_frame_numbers_from_time_stamp)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_dir_exists,
+    check_if_string_value_is_valid_video_timestamp,
+    check_if_valid_img,
+    check_if_valid_rgb_tuple,
+    check_instance,
+    check_int,
+    check_nvidea_gpu_available,
+    check_that_hhmmss_start_is_before_end,
+    check_valid_array,
+    check_valid_boolean,
+    is_video_color,
+)
+from mufasa.utils.data import create_color_palette, find_frame_numbers_from_time_stamp
 from mufasa.utils.enums import Formats
-from mufasa.utils.errors import (FFMPEGCodecGPUError, FrameRangeError,
-                                InvalidInputError, MufasaGPUError)
+from mufasa.utils.errors import (
+    FFMPEGCodecGPUError,
+    FrameRangeError,
+    InvalidInputError,
+    MufasaGPUError,
+)
 from mufasa.utils.lookups import get_current_time
 from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import (
     check_if_hhmmss_timestamp_is_valid_part_of_video,
-    concatenate_videos_in_folder, create_directory, get_fn_ext,
-    get_video_meta_data, read_df, read_img,
-    read_img_batch_from_video_gpu)
-from mufasa.video_processors.async_frame_reader import (AsyncVideoFrameReader,
-                                                       get_async_frame_batch)
+    concatenate_videos_in_folder,
+    create_directory,
+    get_fn_ext,
+    get_video_meta_data,
+    read_df,
+    read_img,
+    read_img_batch_from_video_gpu,
+)
+from mufasa.video_processors.async_frame_reader import AsyncVideoFrameReader, get_async_frame_batch
 
 warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 

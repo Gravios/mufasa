@@ -20,10 +20,16 @@ except:
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.mixins.feature_extraction_mixin import FeatureExtractionMixin
 from mufasa.mixins.timeseries_features_mixin import TimeseriesFeatureMixin
-from mufasa.utils.checks import (check_float, check_if_dir_exists,
-                                check_if_filepath_list_is_empty,
-                                check_instance, check_str, check_valid_array,
-                                check_valid_dataframe, check_valid_lst)
+from mufasa.utils.checks import (
+    check_float,
+    check_if_dir_exists,
+    check_if_filepath_list_is_empty,
+    check_instance,
+    check_str,
+    check_valid_array,
+    check_valid_dataframe,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import Formats
 from mufasa.utils.errors import CountError, InvalidInputError

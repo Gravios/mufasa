@@ -13,14 +13,17 @@ import pandas as pd
 from mufasa.mixins.config_reader import ConfigReader
 from mufasa.utils.checks import (
     check_all_file_names_are_represented_in_video_log,
-    check_file_exist_and_readable, check_if_dir_exists, check_valid_boolean,
-    check_valid_dataframe, check_valid_lst)
+    check_file_exist_and_readable,
+    check_if_dir_exists,
+    check_valid_boolean,
+    check_valid_dataframe,
+    check_valid_lst,
+)
 from mufasa.utils.data import detect_bouts
 from mufasa.utils.enums import TagNames
 from mufasa.utils.errors import NoChoosenMeasurementError
 from mufasa.utils.printing import log_event, stdout_information, stdout_success
-from mufasa.utils.read_write import (find_files_of_filetypes_in_directory,
-                                    get_fn_ext)
+from mufasa.utils.read_write import find_files_of_filetypes_in_directory, get_fn_ext
 from mufasa.utils.warnings import NoDataFoundWarning
 
 FIRST_OCCURRENCE = "First occurrence (s)"

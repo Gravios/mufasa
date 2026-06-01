@@ -8,12 +8,10 @@ import multiprocessing
 
 import numpy as np
 import pandas as pd
-from numba import (boolean, float32, float64, int64, jit, njit, prange, typed,
-                   types)
+from numba import boolean, float32, float64, int64, jit, njit, prange, typed, types
 from numba.typed import Dict, List
 from numpy.lib.stride_tricks import as_strided
-from statsmodels.tsa.stattools import (adfuller, grangercausalitytests, kpss,
-                                       zivot_andrews)
+from statsmodels.tsa.stattools import adfuller, grangercausalitytests, kpss, zivot_andrews
 
 from mufasa.utils.errors import InvalidInputError
 
@@ -25,9 +23,15 @@ except:
 from typing import get_type_hints
 
 from mufasa.mixins.statistics_mixin import Statistics
-from mufasa.utils.checks import (check_float, check_instance, check_int,
-                                check_str, check_that_column_exist,
-                                check_valid_array, check_valid_lst)
+from mufasa.utils.checks import (
+    check_float,
+    check_instance,
+    check_int,
+    check_str,
+    check_that_column_exist,
+    check_valid_array,
+    check_valid_lst,
+)
 from mufasa.utils.enums import ENV_VARS, Formats
 from mufasa.utils.read_write import find_core_cnt, read_sys_env
 

@@ -9,20 +9,20 @@ import json
 import os
 import shutil
 
-from mufasa.utils.checks import (check_ffmpeg_available,
-                                check_file_exist_and_readable, check_str)
+from mufasa.utils.checks import check_ffmpeg_available, check_file_exist_and_readable, check_str
 from mufasa.utils.errors import CropError, FFMPEGNotFoundError, PermissionError
-from mufasa.utils.lookups import (get_ffmpeg_encoders,
-                                 gpu_quality_to_cpu_quality_lk)
+from mufasa.utils.lookups import get_ffmpeg_encoders, gpu_quality_to_cpu_quality_lk
 from mufasa.utils.printing import stdout_information
 from mufasa.utils.warnings import CropWarning
-from mufasa.video_processors.video_processing import (change_single_video_fps,
-                                                     clahe_enhance_video,
-                                                     clip_video_in_range,
-                                                     crop_video,
-                                                     downsample_video,
-                                                     superimpose_frame_count,
-                                                     video_to_greyscale)
+from mufasa.video_processors.video_processing import (
+    change_single_video_fps,
+    clahe_enhance_video,
+    clip_video_in_range,
+    crop_video,
+    downsample_video,
+    superimpose_frame_count,
+    video_to_greyscale,
+)
 
 
 class FFMPEGCommandCreator:

@@ -5,11 +5,9 @@ import numpy as np
 import scipy.io as sio
 
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.utils.checks import (check_if_dir_exists,
-                                check_if_filepath_list_is_empty)
+from mufasa.utils.checks import check_if_dir_exists, check_if_filepath_list_is_empty
 from mufasa.utils.errors import CountError, NoFilesFoundError
-from mufasa.utils.read_write import (find_video_of_file, get_fn_ext,
-                                    read_config_entry)
+from mufasa.utils.read_write import find_video_of_file, get_fn_ext, read_config_entry
 
 
 class TRKImporter(ConfigReader):

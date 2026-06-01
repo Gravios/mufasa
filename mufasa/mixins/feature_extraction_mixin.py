@@ -16,16 +16,25 @@ from scipy.spatial import ConvexHull
 from scipy.spatial.qhull import QhullError
 
 import mufasa
-from mufasa.utils.checks import (check_file_exist_and_readable, check_float,
-                                check_if_filepath_list_is_empty,
-                                check_instance, check_int,
-                                check_minimum_roll_windows, check_valid_array,
-                                check_valid_boolean, check_valid_dataframe)
+from mufasa.utils.checks import (
+    check_file_exist_and_readable,
+    check_float,
+    check_if_filepath_list_is_empty,
+    check_instance,
+    check_int,
+    check_minimum_roll_windows,
+    check_valid_array,
+    check_valid_boolean,
+    check_valid_dataframe,
+)
 from mufasa.utils.enums import Formats, Options, Paths
 from mufasa.utils.errors import CountError
-from mufasa.utils.read_write import (get_bp_headers, read_config_file,
-                                    read_project_path_and_file_type,
-                                    read_video_info_csv)
+from mufasa.utils.read_write import (
+    get_bp_headers,
+    read_config_file,
+    read_project_path_and_file_type,
+    read_video_info_csv,
+)
 
 
 class FeatureExtractionMixin:
