@@ -237,6 +237,31 @@ class RunInferenceForm(OperationForm):
                 row, COL_MIN_BOUT, QTableWidgetItem(mb_text),
             )
 
+    def showEvent(self, event) -> None:
+        """Refresh the classifier table whenever this section is shown.
+
+        The classifier page is a ``QToolBox`` with once-only lazy section
+        instantiation, so the table is built on first expand and is never
+        rebuilt afterwards. Without this, classifiers added or removed in
+        the *Manage classifiers* section (a sibling section on the same
+        page) do not appear here until the user clicks *Reload classifier
+        list*. Navigating back to this section fires ``showEvent``; we
+        re-read the classifier list here so the table stays in sync.
+
+        ``_reload`` snapshots the current rows first and lets in-progress
+        per-row edits win over the on-disk INI values, so refreshing on
+        show preserves any model paths / thresholds the user has already
+        entered for classifiers whose names still exist.
+
+        (Note: a popped-out floating instance stays visible and so does
+        not receive ``showEvent`` from sibling-section edits; use the
+        *Reload classifier list* button in that case.)
+        """
+        super().showEvent(event)
+        # Guard: showEvent can fire before build() has created the table.
+        if hasattr(self, "table"):
+            self._reload()
+
     def _on_browse(self, edit: QLineEdit) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Select model (.sav)", edit.text(),
