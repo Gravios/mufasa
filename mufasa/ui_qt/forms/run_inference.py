@@ -63,7 +63,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
@@ -262,13 +262,62 @@ class RunInferenceForm(OperationForm):
         if hasattr(self, "table"):
             self._reload()
 
+    # QSettings key for the last folder a model was picked from. App-scoped
+    # (QApplication org/app name = "Mufasa"), so it persists across sessions.
+    _LAST_DIR_KEY = "run_inference/last_model_dir"
+
     def _on_browse(self, edit: QLineEdit) -> None:
+        start_dir = self._browse_start_dir(edit.text().strip())
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select model (.sav)", edit.text(),
+            self, "Select model (.sav)", start_dir,
             "SimBA classifier (*.sav)",
         )
         if path:
             edit.setText(path)
+            # Remember the folder so the next browse re-opens there (and
+            # across app restarts).
+            QSettings().setValue(self._LAST_DIR_KEY, os.path.dirname(path))
+
+    def _browse_start_dir(self, current: str) -> str:
+        """Resolve the file dialog's initial directory.
+
+        Precedence:
+          1. the directory of the path already in this row — so re-browsing
+             a filled row opens next to the current selection;
+          2. the folder a model was last picked from (saved via QSettings,
+             persists across sessions) — "remember the last path used";
+          3. the project's models folder (``models/generated_models`` if it
+             exists, else ``models/``) — the default for a fresh pick, so a
+             new selection opens straight in the project's models folder;
+          4. empty — Qt falls back to the current working directory.
+        """
+        if current and os.path.isfile(current):
+            return os.path.dirname(current)
+        last = QSettings().value(self._LAST_DIR_KEY, "", type=str)
+        if last and os.path.isdir(last):
+            return last
+        return self._project_models_dir()
+
+    def _project_models_dir(self) -> str:
+        """Absolute path to the project's models folder for the browse
+        dialog default. Prefers ``models/generated_models`` (where trained
+        ``.sav`` classifiers are written) and falls back to ``models/``.
+        Returns ``""`` if it can't be resolved (no project / legacy layout
+        error), in which case the dialog opens at the cwd."""
+        if not self.config_path:
+            return ""
+        try:
+            from mufasa.project_layout import project_paths_from_config
+            models = project_paths_from_config(
+                self.config_path).get("models_dir", "") or ""
+        except Exception:
+            return ""
+        if not models:
+            return ""
+        generated = os.path.join(models, "generated_models")
+        if os.path.isdir(generated):
+            return generated
+        return models if os.path.isdir(models) else ""
 
     def _row_path(self, row: int) -> str:
         w = self.table.cellWidget(row, COL_PATH)
