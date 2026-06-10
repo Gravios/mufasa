@@ -148,6 +148,17 @@ nvenc = [
     # no-op check step if we add a post-install verifier.
 ]
 
+# Version-stable model serialisation / inference via ONNX. Lets a trained
+# RandomForest be frozen as an ONNX graph and run through onnxruntime,
+# decoupled from the scikit-learn pickle format (which is not portable
+# across sklearn versions). skl2onnx is export-only; onnxruntime is the
+# inference runtime. See mufasa/model/onnx_classifier.py and docs/ONNX.md.
+onnx = [
+    "onnx>=1.16",
+    "onnxruntime>=1.18",
+    "skl2onnx>=1.17",
+]
+
 # Development tooling.
 dev = [
     "pytest>=8.0",
@@ -160,7 +171,7 @@ dev = [
 ]
 
 all = [
-    "mufasa[qt,gpu,dev]",
+    "mufasa[qt,gpu,onnx,dev]",
 ]
 
 [project.urls]
