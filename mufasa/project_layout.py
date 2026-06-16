@@ -1416,6 +1416,17 @@ _INFERENCE_INI_MAP = {
 }
 
 
+def model_format_for_path(model_path: str) -> str:
+    """Classify a model file by extension for provenance.
+
+    Returns ``"onnx"`` for ``.onnx`` models (version-stable, run via
+    onnxruntime) and ``"sklearn"`` for ``.sav``/pickle models. This is what
+    is recorded as ``model_format`` in ``[classifier_inference.<name>]`` so
+    ``project.toml`` documents how each classifier is served.
+    """
+    return "onnx" if str(model_path).lower().endswith(".onnx") else "sklearn"
+
+
 def read_classifier_inference_settings(
     config_path,
 ) -> dict[str, dict[str, Any]]:
@@ -1456,6 +1467,11 @@ def read_classifier_inference_settings(
             mb = settings.get("min_bout_ms")
             if isinstance(mb, int):
                 row["min_bout_ms"] = int(mb)
+            mf = settings.get("model_format")
+            if isinstance(mf, str) and mf:
+                row["model_format"] = mf
+            elif isinstance(mp, str) and mp:
+                row["model_format"] = model_format_for_path(mp)
             if row:
                 out[str(clf_name)] = row
         return out
@@ -1533,6 +1549,10 @@ def write_classifier_inference_settings(
                 entry["threshold"] = float(row["threshold"])
             if "min_bout_ms" in row:
                 entry["min_bout_ms"] = int(row["min_bout_ms"])
+            if "model_format" in row:
+                entry["model_format"] = str(row["model_format"])
+            elif "model_path" in row:
+                entry["model_format"] = model_format_for_path(row["model_path"])
             section[clf_name] = entry
         data["classifier_inference"] = section
         write_project_toml(cp, data)

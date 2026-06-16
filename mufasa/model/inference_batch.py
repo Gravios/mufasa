@@ -162,7 +162,7 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
                 if not os.path.isfile(m_hyp[MODEL_PATH]):
                     NoFileFoundWarning(msg=f'SKIPPING CLASSIFIER {m} for video {file_name}. The classifier model file {m_hyp[MODEL_PATH]} could not be found.', source=self.__class__.__name__)
                     continue
-                clf = self.read_pickle(file_path=m_hyp[MODEL_PATH])
+                clf = self.read_clf(file_path=m_hyp[MODEL_PATH])
                 if self.feature_subsets_by_clf is None or m_hyp[MODEL_NAME] not in self.feature_subsets_by_clf:
                     probability_column = f"Probability_{m_hyp[MODEL_NAME]}"
                     out_df[probability_column] = self.clf_predict_proba(clf=clf, x_df=x_df, data_path=file_path, model_name=m_hyp[MODEL_NAME])
