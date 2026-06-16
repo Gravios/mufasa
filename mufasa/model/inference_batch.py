@@ -165,7 +165,8 @@ class InferenceBatch(TrainModelMixin, ConfigReader):
                 clf = self.read_clf(file_path=m_hyp[MODEL_PATH])
                 if self.feature_subsets_by_clf is None or m_hyp[MODEL_NAME] not in self.feature_subsets_by_clf:
                     probability_column = f"Probability_{m_hyp[MODEL_NAME]}"
-                    out_df[probability_column] = self.clf_predict_proba(clf=clf, x_df=x_df, data_path=file_path, model_name=m_hyp[MODEL_NAME])
+                    x_df_model = self.select_model_features(clf=clf, x_df=x_df)
+                    out_df[probability_column] = self.clf_predict_proba(clf=clf, x_df=x_df_model, data_path=file_path, model_name=m_hyp[MODEL_NAME])
                     out_df[m_hyp[MODEL_NAME]] = np.where(out_df[probability_column] > m_hyp[THRESHOLD], 1, 0)
                     clf_min_bout = self.minimum_bout_length if self.minimum_bout_length is not None else m_hyp[MINIMUM_BOUT_LENGTH]
                     if int(clf_min_bout) > 0:

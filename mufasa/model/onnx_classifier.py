@@ -45,6 +45,7 @@ and imported lazily, so importing this module never requires them.
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import os
 import warnings
 from typing import TYPE_CHECKING, Any
@@ -62,6 +63,11 @@ META_CLASSES = "mufasa.classes"
 META_SOURCE_SKLEARN = "mufasa.source_sklearn_version"
 META_CONVERTED_UTC = "mufasa.converted_utc"
 META_MAX_PROBA_DELTA = "mufasa.max_proba_delta"
+# Ordered training feature names (JSON list). Lets inference select exactly
+# the columns the model was trained on (feature dispatch) instead of feeding
+# the full computed feature set. sklearn 0.22-era models carry no feature
+# names, so this is supplied at export/attach time.
+META_FEATURE_NAMES = "mufasa.feature_names"
 
 # Default tolerance for the sklearn-vs-ONNX probability check.
 DEFAULT_ATOL = 1e-4
@@ -108,6 +114,10 @@ class OnnxClassifier:
         # Provenance, surfaced for logging / model cards.
         self.source_sklearn_version = meta.get(META_SOURCE_SKLEARN, "")
         self.converted_utc = meta.get(META_CONVERTED_UTC, "")
+        # Ordered training feature names, if embedded. None -> inference uses
+        # the full feature set (legacy behaviour); a list -> the inference
+        # loop selects exactly these columns in this order (feature dispatch).
+        self.feature_names_in_ = self._decode_feature_names(meta)
 
     # -- introspection helpers ------------------------------------------
     def _resolve_proba_output(self) -> str:
@@ -118,6 +128,18 @@ class OnnxClassifier:
         # skl2onnx classifier outputs are [label, probabilities]; fall back
         # to the second output, or the only one if there is just one.
         return outputs[1].name if len(outputs) > 1 else outputs[0].name
+
+    def _decode_feature_names(self, meta: dict[str, str]) -> np.ndarray | None:
+        raw = meta.get(META_FEATURE_NAMES, "")
+        if not raw:
+            return None
+        try:
+            names = json.loads(raw)
+        except (ValueError, TypeError):
+            return None
+        if isinstance(names, list) and names:
+            return np.array([str(n) for n in names])
+        return None
 
     def _decode_classes(self, meta: dict[str, str]) -> np.ndarray:
         raw = meta.get(META_CLASSES, "")
@@ -201,6 +223,7 @@ def export_rf_to_onnx(
     n_validate: int = 256,
     error_on_mismatch: bool = False,
     source_sklearn_version: str | None = None,
+    feature_names: list[str] | None = None,
 ) -> dict[str, Any]:
     """Convert a fitted sklearn RandomForest to ONNX at ``save_path``.
 
@@ -215,11 +238,28 @@ def export_rf_to_onnx(
     :param error_on_mismatch: If True, raise when the delta exceeds
         ``atol`` (otherwise warn). Default warns, so a tiny float32 drift
         does not block export.
+    :param feature_names: Ordered training feature names to embed, enabling
+        feature dispatch at inference (the loop selects exactly these
+        columns). Defaults to ``clf.feature_names_in_`` when present
+        (sklearn >= 1.0 fitted on a DataFrame); 0.22-era models carry none,
+        so pass the names from the original training data.
     :returns: A metadata dict (save_path, n_features, classes,
-        max_proba_delta, source_sklearn_version, converted_utc).
+        max_proba_delta, source_sklearn_version, converted_utc,
+        feature_names).
     """
     skl2onnx = _require("skl2onnx")
     from skl2onnx.common.data_types import FloatTensorType
+
+    if feature_names is None:
+        fni = getattr(clf, "feature_names_in_", None)
+        feature_names = [str(n) for n in fni] if fni is not None else None
+    if feature_names is not None and len(feature_names) != int(
+        getattr(clf, "n_features_in_", None) or getattr(clf, "n_features_", 0) or 0
+    ):
+        raise ValueError(
+            f"feature_names has {len(feature_names)} entries but the model "
+            f"expects {getattr(clf, 'n_features_in_', getattr(clf, 'n_features_', '?'))} features."
+        )
 
     n_features = int(
         getattr(clf, "n_features_in_", None)
@@ -292,6 +332,11 @@ def export_rf_to_onnx(
             META_SOURCE_SKLEARN: source_sklearn_version or "",
             META_CONVERTED_UTC: converted_utc,
             META_MAX_PROBA_DELTA: "" if max_delta is None else f"{max_delta:.6e}",
+            **(
+                {META_FEATURE_NAMES: json.dumps([str(n) for n in feature_names])}
+                if feature_names is not None
+                else {}
+            ),
         },
     )
 
@@ -306,6 +351,7 @@ def export_rf_to_onnx(
         "max_proba_delta": max_delta,
         "source_sklearn_version": source_sklearn_version or "",
         "converted_utc": converted_utc,
+        "feature_names": list(feature_names) if feature_names is not None else None,
     }
 
 
@@ -331,3 +377,49 @@ def convert_sav_to_onnx(
     if onnx_path is None:
         onnx_path = os.path.splitext(sav_path)[0] + ".onnx"
     return export_rf_to_onnx(clf, onnx_path, **export_kwargs)
+
+
+def attach_feature_names(
+    onnx_path: str | os.PathLike,
+    feature_names: list[str],
+) -> int:
+    """Attach (or replace) the ordered training feature-name manifest on an
+    existing ONNX model in place, enabling feature dispatch at inference.
+
+    Pure ONNX metadata editing — needs only ``onnx`` (no sklearn, no legacy
+    environment), so it runs in the normal Mufasa env on a model that was
+    already converted without names. The number of names must equal the
+    model's input feature count.
+
+    :param onnx_path: Path to the ``.onnx`` model (overwritten in place).
+    :param feature_names: Ordered feature names, length == model n_features.
+    :returns: The number of feature names written.
+    """
+    onnx = _require("onnx")
+    feature_names = [str(n) for n in feature_names]
+    model_path = os.fspath(onnx_path)
+    model = onnx.load(model_path)
+
+    # Sanity-check length against the model's declared input width.
+    expected = None
+    try:
+        dims = model.graph.input[0].type.tensor_type.shape.dim
+        expected = dims[-1].dim_value or None
+    except (IndexError, AttributeError):
+        expected = None
+    if expected and expected != len(feature_names):
+        raise ValueError(
+            f"feature_names has {len(feature_names)} entries but the model "
+            f"input declares {expected} features."
+        )
+
+    # Drop any existing manifest, then write the new one.
+    keep = [p for p in model.metadata_props if p.key != META_FEATURE_NAMES]
+    del model.metadata_props[:]
+    model.metadata_props.extend(keep)
+    entry = model.metadata_props.add()
+    entry.key = META_FEATURE_NAMES
+    entry.value = json.dumps(feature_names)
+
+    onnx.save(model, model_path)
+    return len(feature_names)
