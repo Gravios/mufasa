@@ -1275,6 +1275,54 @@ class TrainModelMixin:
             return OnnxClassifier(file_path)
         return self.read_pickle(file_path=file_path)
 
+    def select_model_features(self, clf, x_df: pd.DataFrame) -> pd.DataFrame:
+        """Feature dispatch: reduce ``x_df`` to exactly the columns a model
+        was trained on, in training order.
+
+        If the classifier carries an ordered feature manifest
+        (``feature_names_in_`` — present on sklearn >= 1.0 models fitted on a
+        DataFrame, or embedded in an ONNX model via
+        :func:`mufasa.model.onnx_classifier.attach_feature_names`), the
+        computed feature frame is selected down to those columns so a model
+        trained on an older / smaller feature set still applies to data
+        carrying a larger superset of features. Models without a manifest
+        (e.g. sklearn 0.22-era pickles) are returned unchanged — the legacy
+        all-features behaviour.
+
+        Missing expected columns raise :class:`MissingColumnsError` listing
+        them, which makes a genuine schema divergence (renamed body-parts /
+        redefined features) visible instead of silently mis-aligning.
+
+        :param clf: A loaded classifier (sklearn or OnnxClassifier).
+        :param pd.DataFrame x_df: The full computed feature frame.
+        :returns pd.DataFrame: ``x_df`` selected/ordered to the manifest, or
+            unchanged when the model carries no manifest.
+        """
+        names = getattr(clf, "feature_names_in_", None)
+        if names is None:
+            return x_df
+        names = [str(n) for n in names]
+        if not names:
+            return x_df
+        if not isinstance(x_df, pd.DataFrame):
+            return x_df
+        missing = [n for n in names if n not in x_df.columns]
+        if missing:
+            preview = ", ".join(missing[:15]) + ("..." if len(missing) > 15 else "")
+            raise MissingColumnsError(
+                msg=(
+                    f"Feature dispatch: the model expects {len(names)} named "
+                    f"features but {len(missing)} are absent from the computed "
+                    f"feature set ({x_df.shape[1]} columns). This usually means "
+                    f"the model was trained on a different feature schema "
+                    f"(renamed body-parts or redefined features) and cannot be "
+                    f"applied directly — recompute features in the model's "
+                    f"schema or retrain. Missing: {preview}"
+                ),
+                source=self.__class__.__name__,
+            )
+        return x_df[names]
+
     def bout_train_test_splitter(self,
                                  x_df: pd.DataFrame,
                                  y_df: pd.DataFrame,
