@@ -269,8 +269,8 @@ class RunInferenceForm(OperationForm):
     def _on_browse(self, edit: QLineEdit) -> None:
         start_dir = self._browse_start_dir(edit.text().strip())
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select model (.sav)", start_dir,
-            "SimBA classifier (*.sav)",
+            self, "Select model (.sav / .onnx)", start_dir,
+            "Classifiers (*.sav *.onnx);;SimBA pickle (*.sav);;ONNX model (*.onnx)",
         )
         if path:
             edit.setText(path)

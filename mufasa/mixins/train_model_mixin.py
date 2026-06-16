@@ -1255,6 +1255,26 @@ class TrainModelMixin:
 
         return clf
 
+    def read_clf(self, file_path: str | os.PathLike):
+        """Load a classifier for inference, dispatching on file type.
+
+        ``.onnx`` models are loaded as an
+        :class:`mufasa.model.onnx_classifier.OnnxClassifier` (version-stable,
+        run via onnxruntime and independent of the installed scikit-learn
+        version); any other extension is treated as a pickled scikit-learn
+        classifier via :meth:`read_pickle`. Both return objects are
+        interchangeable inside :meth:`clf_predict_proba` (they expose
+        ``n_features_in_`` / ``n_classes_`` / ``classes_`` and
+        ``predict_proba``), so callers need no format-specific branching.
+
+        :param Union[str, os.PathLike] file_path: Path to a ``.onnx`` or
+            ``.sav``/pickle classifier file.
+        """
+        if os.fspath(file_path).lower().endswith(".onnx"):
+            from mufasa.model.onnx_classifier import OnnxClassifier
+            return OnnxClassifier(file_path)
+        return self.read_pickle(file_path=file_path)
+
     def bout_train_test_splitter(self,
                                  x_df: pd.DataFrame,
                                  y_df: pd.DataFrame,
