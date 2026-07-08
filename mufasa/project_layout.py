@@ -1416,6 +1416,47 @@ _INFERENCE_INI_MAP = {
 }
 
 
+def write_skeleton(config_path, nodes, edges) -> None:
+    """Persist the pose skeleton to ``project.toml`` under ``[skeleton]``.
+
+    :param config_path: Path to project ``project.toml``.
+    :param nodes: Iterable of body-part (node) names.
+    :param edges: Iterable of ``(a, b)`` name pairs (undirected edges).
+
+    Stored as ``nodes = [...]`` and ``edges = [[a, b], ...]`` — the shape the
+    pose viewer / overlay consume (name-pair edges), so a project's skeleton
+    overrides the hard-coded DEFAULT_SKELETON_EDGES.
+    """
+    cp = Path(config_path)
+    data = read_project_toml(cp)
+    data["skeleton"] = {
+        "nodes": [str(n) for n in nodes],
+        "edges": [[str(a), str(b)] for a, b in edges],
+    }
+    write_project_toml(cp, data)
+
+
+def read_skeleton(config_path) -> dict | None:
+    """Return the project skeleton as ``{'nodes': [...], 'edges': [(a, b), ...]}``
+    from ``project.toml`` ``[skeleton]``, or ``None`` if none is stored."""
+    try:
+        data = read_project_toml(Path(config_path))
+    except Exception:
+        return None
+    sk = data.get("skeleton")
+    if not isinstance(sk, dict):
+        return None
+    nodes = [str(n) for n in sk.get("nodes", []) if str(n)]
+    edges = [
+        (str(e[0]), str(e[1]))
+        for e in sk.get("edges", [])
+        if isinstance(e, (list, tuple)) and len(e) >= 2
+    ]
+    if not nodes and not edges:
+        return None
+    return {"nodes": nodes, "edges": edges}
+
+
 def model_format_for_path(model_path: str) -> str:
     """Classify a model file by extension for provenance.
 

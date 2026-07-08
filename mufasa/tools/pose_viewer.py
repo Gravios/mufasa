@@ -1086,6 +1086,11 @@ def main(argv: list[str] | None = None) -> int:
         "--trail", type=int, default=0,
         help="Length of fade-out trail in frames (default 0 = off)",
     )
+    parser.add_argument(
+        "--config", default=None,
+        help="Project project.toml; if given, use its stored [skeleton] "
+             "edges instead of the built-in default.",
+    )
     args = parser.parse_args(argv)
 
     print(f"Loading {args.input}...")
@@ -1124,6 +1129,19 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 smoothed = None
 
+    skeleton_edges = None
+    if args.config is not None:
+        try:
+            from mufasa.project_layout import read_skeleton
+            sk = read_skeleton(args.config)
+        except Exception:
+            sk = None
+        if sk and sk.get("edges"):
+            skeleton_edges = [tuple(e) for e in sk["edges"]]
+            print(f"  using project skeleton: {len(skeleton_edges)} edges")
+        else:
+            print("  no [skeleton] in project.toml; using default edges")
+
     app = QApplication(sys.argv)
     viewer = PoseViewer(
         smoothed=smoothed,
@@ -1133,6 +1151,7 @@ def main(argv: list[str] | None = None) -> int:
         trail_length=args.trail,
         show_skeleton=not args.no_skeleton,
         show_ellipses=not args.no_ellipses,
+        skeleton_edges=skeleton_edges,
     )
     viewer.show()
     return app.exec()

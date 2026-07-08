@@ -41,6 +41,8 @@ from __future__ import annotations
 __author__ = "Gravio"
 
 import os
+import tomllib
+import warnings
 from typing import Any
 
 import numpy as np
@@ -62,7 +64,88 @@ from mufasa.utils.printing import SimbaTimer, stdout_success
 from mufasa.utils.read_write import find_all_videos_in_project, get_fn_ext, write_df
 
 FDLC_SUFFIX = ".fdlc.parquet"
+FDLC_SKELETON_SUFFIX = ".fdlc.toml"
 _LONG_COLUMNS = ("frame", "individual", "bodypart", "x", "y", "likelihood")
+
+
+def read_fdlc_skeleton(path: str | os.PathLike) -> dict | None:
+    """Read a FreeDLC skeleton sidecar and return its nodes and edges.
+
+    FreeDLC writes ``<stem>.fdlc.toml`` next to ``<stem>.fdlc.parquet`` in
+    the same folder. This resolves the sidecar from either path and parses
+    it, tolerantly:
+
+    * nodes come from top-level ``bodyparts`` (FreeDLC's key); ``nodes`` or
+      a ``[skeleton]`` table's ``nodes`` are also accepted;
+    * edges come from the top-level ``skeleton`` list (FreeDLC's key); a
+      ``[skeleton]`` table's ``edges`` or a top-level ``edges`` also work;
+    * edges may be **name** pairs (``[["nose", "headmid"], ...]``) or
+      integer **index** pairs (``[[0, 1], ...]``, mapped through nodes);
+    * unknown keys are ignored.
+
+    :returns: ``{'nodes': [...], 'edges': [(a, b), ...], 'source': <path>}``
+        with edges normalised to name pairs, or ``None`` when the sidecar is
+        absent or unparseable (a warning is emitted on parse failure). This
+        graceful ``None`` keeps pose import working for files that predate
+        the sidecar (nodes-only behaviour).
+    """
+    p = os.fspath(path)
+    low = p.lower()
+    if low.endswith(FDLC_SUFFIX):
+        toml_path = p[: -len(FDLC_SUFFIX)] + FDLC_SKELETON_SUFFIX
+    elif low.endswith(FDLC_SKELETON_SUFFIX):
+        toml_path = p
+    else:
+        toml_path = os.path.splitext(p)[0] + FDLC_SKELETON_SUFFIX
+    if not os.path.isfile(toml_path):
+        return None
+    try:
+        with open(toml_path, "rb") as f:
+            data = tomllib.load(f)
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        warnings.warn(
+            f"Could not parse FreeDLC skeleton {toml_path}: {exc}", stacklevel=2
+        )
+        return None
+
+    # Nodes: FreeDLC writes top-level `bodyparts`. Also accept a `nodes`
+    # key or a [skeleton] table's `nodes` (tolerant).
+    sk = data.get("skeleton")
+    table = sk if isinstance(sk, dict) else {}
+    nodes_src = (
+        data.get("bodyparts")
+        or table.get("nodes")
+        or data.get("nodes")
+        or []
+    )
+    nodes = [str(n) for n in nodes_src if str(n)]
+
+    # Edges: FreeDLC writes a top-level `skeleton` list of pairs. Also
+    # accept a [skeleton] table's `edges` or a top-level `edges` (tolerant).
+    if isinstance(sk, list):
+        raw_edges = sk
+    elif isinstance(table.get("edges"), list):
+        raw_edges = table["edges"]
+    elif isinstance(data.get("edges"), list):
+        raw_edges = data["edges"]
+    else:
+        raw_edges = []
+
+    edges: list[tuple[str, str]] = []
+    for e in raw_edges:
+        if not isinstance(e, (list, tuple)) or len(e) < 2:
+            continue
+        a, b = e[0], e[1]
+        if isinstance(a, int) and isinstance(b, int) and not isinstance(a, bool):
+            if nodes and 0 <= a < len(nodes) and 0 <= b < len(nodes):
+                edges.append((nodes[a], nodes[b]))
+            # index pair with no/short node list is unmappable -> skip
+        else:
+            edges.append((str(a), str(b)))
+    if not nodes and not edges:
+        return None
+    return {"nodes": nodes, "edges": edges, "source": toml_path}
+
 
 
 class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
@@ -227,8 +310,47 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
+    def _import_skeleton(self) -> None:
+        """Discover a FreeDLC skeleton sidecar next to the parquet files and
+        persist it project-wide to ``project.toml``.
+
+        The skeleton is taken **as provided in the sidecar** — nodes and
+        edges are written verbatim, not filtered against the project
+        body-parts. The first sidecar carrying a skeleton wins (all sessions
+        share one rig). Any edge names that are not among the nodes /
+        project body-parts are reported as a non-blocking note (they won't
+        render until renamed) but are still kept. An absent or malformed
+        sidecar is skipped so pose import still succeeds (nodes-only,
+        backward-compatible with pre-sidecar files).
+        """
+        for path in self.input_data_paths:
+            sk = read_fdlc_skeleton(path)
+            if sk is None:
+                continue
+            nodes = sk["nodes"] or list(self.body_parts_lst)
+            edges = sk["edges"]
+            if not edges:
+                continue
+            known = set(nodes) | set(self.body_parts_lst)
+            unknown = sorted({
+                n for (a, b) in edges for n in (a, b) if n not in known
+            })
+            if unknown:
+                print(
+                    f"Skeleton: note — {len(unknown)} edge name(s) are not "
+                    f"among the body-parts and won't render until the FreeDLC "
+                    f"skeleton is renamed to match: {unknown}. Importing all "
+                    f"{len(edges)} edges as provided."
+                )
+            from mufasa.project_layout import write_skeleton
+            write_skeleton(self.config_path, nodes=nodes, edges=edges)
+            print(f"Imported skeleton ({len(nodes)} nodes, {len(edges)} edges) "
+                  f"from {os.path.basename(sk['source'])} into project.toml")
+            return
+
     def run(self) -> None:
         """Import every ``*.fdlc.parquet`` found in ``self.data_folder``."""
+        self._import_skeleton()
         import_log_rows = []
         mask_totals: dict[str, dict[str, int]] = {}
         for cnt, path in enumerate(self.input_data_paths):
