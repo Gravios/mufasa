@@ -132,6 +132,14 @@ POSE_IMPORT_ROUTES: dict = {
         accepts_p_threshold=True,
         source_hint="Directory containing DLC .csv files",
     ),
+    "FreeDLC parquet (single animal)": dict(
+        backend=_lazy("mufasa.pose_importers.fdlc_parquet_importer",
+                      "FDLCParquetImporter"),
+        kwargs_map={"source_path": "data_folder"},
+        requires_animal_ids=False,
+        accepts_p_threshold=True,
+        source_hint="Directory containing *.fdlc.parquet files",
+    ),
     "DLC H5 (multi-animal / maDLC)": dict(
         backend=_lazy("mufasa.pose_importers.madlc_importer",
                       "MADLCImporterH5"),
