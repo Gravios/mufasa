@@ -70,6 +70,16 @@ class FrameScrubberWidget(QWidget):
         self._playback_fps: float = 30.0
         self._current_frame: int = 0
         self._last_pixmap: QPixmap | None = None
+        # Patch 122go — display-only orientation. Rotation is clockwise
+        # degrees in {0, 90, 180, 270}; flips are booleans applied before
+        # rotation. Annotation is frame-level (behaviour labels), so these
+        # are purely a viewing transform — no label/coordinate remapping.
+        # _last_raw_frame caches the untransformed BGR frame so an
+        # orientation change re-renders without re-seeking the file.
+        self._rotation: int = 0
+        self._flip_h: bool = False
+        self._flip_v: bool = False
+        self._last_raw_frame: np.ndarray | None = None
         # Playback state. _play_direction is +1 (forward), -1
         # (backward), or 0 (paused). The single timer drives both
         # directions; the direction flips by clicking the opposite
@@ -259,6 +269,25 @@ class FrameScrubberWidget(QWidget):
         ctrl.addWidget(self._time_lbl)
         ctrl.addStretch()
 
+        # Patch 122go — display orientation controls: rotate CCW / CW,
+        # flip horizontal / vertical. Right-aligned so they don't crowd the
+        # transport buttons. Purely a viewing transform.
+        ctrl.addWidget(QLabel("View:", self))
+        self._b_rot_ccw = QPushButton("\u21B6", self)   # ↶
+        self._b_rot_cw = QPushButton("\u21B7", self)    # ↷
+        self._b_flip_h = QPushButton("\u2194", self)    # ↔
+        self._b_flip_v = QPushButton("\u2195", self)    # ↕
+        for b, tip, fn in [
+            (self._b_rot_ccw, "Rotate 90° counter-clockwise", self.rotate_ccw),
+            (self._b_rot_cw, "Rotate 90° clockwise", self.rotate_cw),
+            (self._b_flip_h, "Flip horizontal (mirror left-right)", self.flip_horizontal),
+            (self._b_flip_v, "Flip vertical (mirror top-bottom)", self.flip_vertical),
+        ]:
+            b.setStyleSheet("padding: 2px 8px;")
+            b.setToolTip(tip)
+            b.clicked.connect(fn)
+            ctrl.addWidget(b)
+
         outer.addLayout(ctrl)
 
     def _on_slider(self, val: int) -> None:
@@ -340,6 +369,10 @@ class FrameScrubberWidget(QWidget):
         self.seek(next_idx)
 
     def _render(self, frame_bgr: np.ndarray) -> None:
+        # Cache the untransformed frame so orientation changes can
+        # re-render without re-reading from the file.
+        self._last_raw_frame = frame_bgr
+        frame_bgr = self._apply_orientation(frame_bgr)
         h, w = frame_bgr.shape[:2]
         if not frame_bgr.flags["C_CONTIGUOUS"]:
             frame_bgr = np.ascontiguousarray(frame_bgr)
@@ -347,6 +380,68 @@ class FrameScrubberWidget(QWidget):
         pix = QPixmap.fromImage(qimg)
         self._last_pixmap = pix
         self._rescale_display()
+
+    def _apply_orientation(self, frame_bgr: np.ndarray) -> np.ndarray:
+        """Apply the display flips then rotation. Order (flip → rotate) is
+        fixed so the transform is deterministic and invertible."""
+        f = frame_bgr
+        if self._flip_h:
+            f = cv2.flip(f, 1)
+        if self._flip_v:
+            f = cv2.flip(f, 0)
+        if self._rotation == 90:
+            f = cv2.rotate(f, cv2.ROTATE_90_CLOCKWISE)
+        elif self._rotation == 180:
+            f = cv2.rotate(f, cv2.ROTATE_180)
+        elif self._rotation == 270:
+            f = cv2.rotate(f, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        return f
+
+    def _rerender(self) -> None:
+        if self._last_raw_frame is not None:
+            self._render(self._last_raw_frame)
+
+    def rotate_cw(self) -> None:
+        """Rotate the display 90° clockwise."""
+        self._rotation = (self._rotation + 90) % 360
+        self._rerender()
+
+    def rotate_ccw(self) -> None:
+        """Rotate the display 90° counter-clockwise."""
+        self._rotation = (self._rotation - 90) % 360
+        self._rerender()
+
+    def flip_horizontal(self) -> None:
+        """Toggle horizontal (left-right) mirroring of the display."""
+        self._flip_h = not self._flip_h
+        self._rerender()
+
+    def flip_vertical(self) -> None:
+        """Toggle vertical (top-bottom) mirroring of the display."""
+        self._flip_v = not self._flip_v
+        self._rerender()
+
+    def reset_orientation(self) -> None:
+        """Clear all rotation and flips."""
+        self._rotation, self._flip_h, self._flip_v = 0, False, False
+        self._rerender()
+
+    def set_orientation(
+        self, rotation: int = 0, flip_h: bool = False, flip_v: bool = False
+    ) -> None:
+        """Set the display orientation explicitly (used to mirror one
+        scrubber's orientation onto another, e.g. in the synced viewer)."""
+        self._rotation = int(rotation) % 360
+        self._flip_h, self._flip_v = bool(flip_h), bool(flip_v)
+        self._rerender()
+
+    @property
+    def orientation(self) -> dict:
+        return {
+            "rotation": self._rotation,
+            "flip_h": self._flip_h,
+            "flip_v": self._flip_v,
+        }
 
     def _rescale_display(self) -> None:
         if self._last_pixmap is None:
