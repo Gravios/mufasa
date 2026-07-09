@@ -790,6 +790,9 @@ class MufasaWorkbench(QMainWindow):
         self._file_menu.addAction(a_quit)
 
         self._tools_menu = mb.addMenu("&Tools")
+        self.add_tools_action(
+            "Synced video viewer\u2026", self._launch_synced_viewer,
+        )
 
         self._help_menu = mb.addMenu("&Help")
         a_about = QAction("About Mufasa", self)
@@ -866,6 +869,22 @@ class MufasaWorkbench(QMainWindow):
         refs.append(new_wb)
         app.setProperty("_mufasa_workbenches", refs)
         self.close()
+
+    def _launch_synced_viewer(self) -> None:
+        """Open two or more videos in a synced, docked viewer window."""
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Select two or more videos to view together", "",
+            "Videos (*.mp4 *.avi *.mov *.mkv *.webm);;All files (*)",
+        )
+        if len(paths) < 2:
+            return  # need at least two videos to synchronise
+        from mufasa.ui_qt.synced_video_viewer import open_synced_video_viewer
+        viewer = open_synced_video_viewer(paths, parent=self)
+        # Keep a reference so the window isn't garbage-collected.
+        refs = getattr(self, "_synced_viewers", [])
+        refs = [v for v in refs if v is not None]
+        refs.append(viewer)
+        self._synced_viewers = refs
 
     def add_tools_action(self, label: str,
                          callback: Callable[[], None],
