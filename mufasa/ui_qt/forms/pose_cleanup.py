@@ -1634,8 +1634,8 @@ class KalmanV2SmoothingForm(OperationForm):
         import dataclasses as _dc
 
         from mufasa.data_processors.kalman_pose_smoother_v2 import (
+            layout_from_config,
             smooth_pose_v2,
-            standard_rat_layout,
         )
 
         # Patch 122b: dual-save provenance. Any model that crosses
@@ -1694,7 +1694,10 @@ class KalmanV2SmoothingForm(OperationForm):
 
         if mode == "train":
             # Build the layout with the requested feature flags.
-            layout = standard_rat_layout()
+            # Patch 122gv: names come from the project (project.toml
+            # [pose.layout] role map), not the hard-coded canonical set, so
+            # renamed markers still line up with the kinematic tree.
+            layout = layout_from_config(self.config_path)
             replacements: dict = {}
             if kwargs["with_drift"]:
                 replacements["with_drift"] = True

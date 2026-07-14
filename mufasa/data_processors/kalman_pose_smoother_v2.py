@@ -607,11 +607,23 @@ class BodyLayout:
         return slice(start, start + total)
 
 
+CANONICAL_LAYOUT_ROLES: tuple[str, ...] = (
+    "back2", "back1", "back3", "lateral_left", "lateral_right", "center",
+    "back4", "neck", "headmid", "nose", "ear_left", "ear_right",
+    "tailbase", "tailmid", "tailend",
+)
+"""Structural roles of :func:`standard_rat_layout`, named by their historical
+marker names. A project maps each role to whatever it calls that marker
+(``[pose.layout]`` in ``project.toml``); the kinematic topology is fixed, only
+the names vary. See :func:`layout_from_config`."""
+
+
 def standard_rat_layout(
     include_lateral: bool = True,
     include_center: bool = True,
     include_back4: bool = True,
     include_tail: bool = True,
+    names: dict[str, str] | None = None,
 ) -> BodyLayout:
     """Default mufasa rat skeleton.
 
@@ -733,7 +745,79 @@ def standard_rat_layout(
             markers={"tailend": (0.0, 0.0)},
         ))
 
+    if names:
+        # Structural roles are fixed; only the marker NAMES vary per
+        # project (patch 122gv). Remap each segment's attached-marker keys
+        # from the canonical role name to the project's marker name. The
+        # topology, rest angles, and offsets are untouched.
+        for seg in segments:
+            seg.markers = {
+                str(names.get(role, role)): off
+                for role, off in seg.markers.items()
+            }
+
     return BodyLayout(segments=segments)
+
+
+def layout_from_config(config_path, **flags) -> BodyLayout:
+    """Build the smoother's :class:`BodyLayout` using the project's own
+    marker names (patch 122gv).
+
+    The kinematic topology is always :func:`standard_rat_layout`'s; only the
+    marker *names* come from the project. Resolution order:
+
+    1. ``[pose.layout]`` in ``project.toml`` — an explicit
+       ``{role: marker_name}`` map. Authoritative.
+    2. If absent, and the canonical role names are themselves present in the
+       project's ``body_parts``, use them unchanged (the historical case —
+       fully backward compatible).
+    3. Otherwise raise, listing the roles to define and the markers
+       available. This is the case that used to fail silently: a renamed
+       project produced a layout whose names matched nothing in the data, so
+       every marker went unfilled and the EKF was handed an all-NaN array.
+
+    :param config_path: Path to the project ``project.toml``.
+    :param flags: Passed through to :func:`standard_rat_layout`
+        (``include_lateral``, ``include_tail``, ...).
+    """
+    from mufasa.project_layout import (
+        project_metadata_from_config,
+        read_layout_roles,
+    )
+
+    roles = read_layout_roles(config_path)
+    try:
+        body_parts = list(project_metadata_from_config(config_path)["body_parts"])
+    except Exception:
+        body_parts = []
+
+    if roles is None:
+        if set(CANONICAL_LAYOUT_ROLES) & set(body_parts):
+            roles = {r: r for r in CANONICAL_LAYOUT_ROLES}
+        else:
+            raise ValueError(
+                "Cannot build the pose smoother layout: this project's "
+                f"markers ({body_parts}) don't include the canonical layout "
+                f"roles ({list(CANONICAL_LAYOUT_ROLES)}), and project.toml "
+                "has no [pose.layout] section mapping roles to marker names. "
+                "Markers were most likely renamed. Add a [pose.layout] table "
+                "under [pose] mapping each role to the marker that now plays "
+                "it, e.g.\n\n"
+                "    [pose.layout]\n"
+                '    back2 = "<your body-centre marker>"\n'
+                '    headmid = "<your head-centre marker>"\n'
+                "    ...\n"
+            )
+
+    if body_parts:
+        unknown = {r: n for r, n in roles.items() if n not in set(body_parts)}
+        if unknown:
+            raise ValueError(
+                "project.toml [pose.layout] maps role(s) to marker names that "
+                f"don't exist in the project: {unknown}. Project markers are "
+                f"{body_parts}."
+            )
+    return standard_rat_layout(names=roles, **flags)
 
 
 @dataclass
@@ -7479,6 +7563,23 @@ def smooth_pose_v2(
                 f"data: {sorted(missing)}. These markers will "
                 f"have default offsets."
             )
+    # Patch 122gv: hard guard. Session arrays are pre-filled with NaN and
+    # only populated for markers whose names appear in BOTH the layout and
+    # the data. If the two name sets don't overlap (e.g. the project's
+    # markers were renamed but the layout still uses the old names), every
+    # marker stays NaN and the EKF "diverges" on an empty array — a
+    # confusing failure far from its cause. Fail here, where the cause is
+    # obvious.
+    matched = set(layout.marker_names) & set(marker_names_data)
+    if not matched:
+        raise ValueError(
+            "No layout markers were found in the pose data: the layout "
+            f"expects {sorted(layout.marker_names)} but the data contains "
+            f"{sorted(marker_names_data)}. Nothing would be filled in and "
+            "every value would be NaN. If the project's markers were "
+            "renamed, map the layout roles to the new names via a "
+            "[pose.layout] table in project.toml (see layout_from_config)."
+        )
 
     # Build session arrays in layout marker order — that's what
     # the EM/filter expect. We keep a mapping data_idx → layout_idx.
