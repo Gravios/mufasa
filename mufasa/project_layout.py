@@ -1458,6 +1458,48 @@ def read_skeleton(config_path) -> dict | None:
     return {"nodes": nodes, "edges": edges}
 
 
+def write_layout_roles(config_path, roles: dict[str, str]) -> None:
+    """Persist the smoother's structural role -> marker-name map to
+    ``project.toml`` under ``[pose.layout]``.
+
+    The Kalman smoother's kinematic tree is defined by fixed structural
+    *roles* (which marker is the body root, the head, the tail base, ...).
+    Historically those roles were identified by hard-coded marker names, so
+    renaming a marker silently detached the data from the layout. Storing
+    the mapping here lets a project name its markers anything and still
+    build the layout. See
+    :func:`mufasa.data_processors.kalman_pose_smoother_v2.layout_from_config`.
+
+    :param config_path: Path to project ``project.toml``.
+    :param roles: ``{canonical_role: project_marker_name}``.
+    """
+    cp = Path(config_path)
+    data = read_project_toml(cp)
+    pose = data.get("pose", {})
+    if not isinstance(pose, dict):
+        pose = {}
+    pose["layout"] = {str(k): str(v) for k, v in roles.items()}
+    data["pose"] = pose
+    write_project_toml(cp, data)
+
+
+def read_layout_roles(config_path) -> dict[str, str] | None:
+    """Return the ``[pose.layout]`` role -> marker-name map, or ``None`` if
+    the project doesn't define one (callers then fall back to the canonical
+    names)."""
+    try:
+        data = read_project_toml(Path(config_path))
+    except Exception:
+        return None
+    pose = data.get("pose")
+    if not isinstance(pose, dict):
+        return None
+    roles = pose.get("layout")
+    if not isinstance(roles, dict) or not roles:
+        return None
+    return {str(k): str(v) for k, v in roles.items()}
+
+
 def relativize_project_path(path: str, root) -> str:
     """Return ``path`` relative to the project ``root`` for storage.
 

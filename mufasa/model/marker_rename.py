@@ -266,6 +266,23 @@ def rename_markers(
 
     # 1) project.toml [pose].body_parts
     pose["body_parts"] = new_body_parts
+    # 1b) [pose.layout] — the smoother's structural role -> marker map
+    # (patch 122gv). Renaming a marker must carry its layout role with it,
+    # or the Kalman layout detaches from the data. If the project has no
+    # role map yet, seed it from the canonical roles (which, pre-rename,
+    # ARE the marker names) so the rename records where each role went.
+    roles = pose.get("layout")
+    if not isinstance(roles, dict) or not roles:
+        from mufasa.data_processors.kalman_pose_smoother_v2 import (
+            CANONICAL_LAYOUT_ROLES,
+        )
+        seed = {r: r for r in CANONICAL_LAYOUT_ROLES if r in set(body_parts)}
+        roles = seed or None
+    if roles:
+        pose["layout"] = {
+            str(role): str(rename_map.get(str(name), str(name)))
+            for role, name in roles.items()
+        }
     data["pose"] = pose
     write_project_toml(cp, data)
     # 2) project.toml [skeleton]
