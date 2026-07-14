@@ -25,6 +25,7 @@ warn.
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -119,20 +120,82 @@ def rename_pose_columns(
     return df
 
 
+def snapshot_before_rename(
+    config_path,
+    pose_files: list[str],
+    rename_map: dict[str, str],
+) -> str:
+    """Copy ``project.toml`` and every pose file into a timestamped backup
+    directory **before** a rename rewrites them.
+
+    Because :func:`rename_markers` edits project.toml and the pose files in
+    place, this is the undo: the snapshot holds byte-for-byte copies of
+    everything the rename is about to touch, plus a ``manifest.toml``
+    recording the rename map and where each file came from — so a restore is
+    a plain file copy back.
+
+    :param config_path: Path to the project ``project.toml``.
+    :param pose_files: Absolute paths of the pose files about to be
+        rewritten.
+    :param rename_map: The ``{old: new}`` map being applied (recorded in the
+        manifest).
+    :returns: The snapshot directory path.
+    """
+    import shutil
+
+    from mufasa.project_layout import generate_run_id
+
+    cp = Path(config_path)
+    root = cp.parent
+    snap = root / "backups" / f"marker_rename-{generate_run_id()}"
+    (snap / "input_pose").mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(str(cp), str(snap / cp.name))
+    copied = []
+    for fp in pose_files:
+        dest = snap / "input_pose" / os.path.basename(fp)
+        shutil.copy2(fp, str(dest))
+        copied.append((fp, str(dest)))
+
+    lines = [
+        "# Snapshot taken by Mufasa before a marker rename (Save model).",
+        "# Restore = copy these files back over the originals.",
+        f'created = "{time.strftime("%Y-%m-%dT%H:%M:%S%z")}"',
+        f'project_toml = "{cp.name}"',
+        "",
+        "[rename_map]",
+    ]
+    lines.extend(f'"{o}" = "{n}"' for o, n in rename_map.items())
+    lines.append("")
+    lines.append("[[files]]" if copied else "# no pose files were rewritten")
+    for original, dest in copied:
+        lines.append(f'original = "{original}"')
+        lines.append(f'snapshot = "{dest}"')
+        lines.append("")
+        if (original, dest) != copied[-1]:
+            lines.append("[[files]]")
+    (snap / "manifest.toml").write_text("\n".join(lines), encoding="utf-8")
+    return str(snap)
+
+
 def rename_markers(
     config_path: str | os.PathLike,
     rename_map: dict[str, str],
     *,
     dry_run: bool = False,
+    snapshot: bool = True,
 ) -> dict[str, Any]:
     """Apply a marker rename across project.toml and the pose parquets.
 
     :param config_path: Path to the project ``project.toml``.
     :param rename_map: ``{old_name: new_name}`` (only changed markers).
     :param dry_run: If True, validate and report without writing anything.
+    :param snapshot: If True (default), copy project.toml and every pose
+        file into ``backups/marker_rename-<run_id>/`` before rewriting, so
+        the change can be undone. See :func:`snapshot_before_rename`.
     :returns: A summary dict (renamed count, updated body_parts, pose files
         rewritten, skeleton edges updated, feature files that now need
-        recompute).
+        recompute, and ``snapshot_dir``).
     """
     from mufasa.project_layout import (
         project_paths_from_config,
@@ -192,9 +255,14 @@ def rename_markers(
         "skeleton_edges": len(new_edges),
         "feature_files_need_recompute": feature_file_count,
         "dry_run": dry_run,
+        "snapshot_dir": None,
     }
     if dry_run or not rename_map:
         return summary
+
+    # 0) snapshot everything the rename is about to rewrite, so it's undoable
+    if snapshot:
+        summary["snapshot_dir"] = snapshot_before_rename(cp, pose_files, rename_map)
 
     # 1) project.toml [pose].body_parts
     pose["body_parts"] = new_body_parts
@@ -223,6 +291,7 @@ def _walk_files(root: str):
 
 
 __all__ = [
+    "snapshot_before_rename",
     "validate_rename_map",
     "apply_rename_to_names",
     "apply_rename_to_skeleton",
