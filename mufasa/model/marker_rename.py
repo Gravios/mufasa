@@ -25,6 +25,7 @@ warn.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -139,12 +140,11 @@ def rename_markers(
         write_project_toml,
         write_skeleton,
     )
-    from mufasa.utils.read_write import read_df, write_df
 
     rename_map = {str(o): str(n).strip() for o, n in rename_map.items()
                   if str(o) != str(n).strip() and str(n).strip()}
-    cp = os.fspath(config_path)
-    data = read_project_toml(cp)  # type: ignore[arg-type]
+    cp = Path(config_path)
+    data = read_project_toml(cp)
     pose = data.get("pose", {}) if isinstance(data.get("pose"), dict) else {}
     body_parts = list(pose.get("body_parts", []))
 
@@ -199,16 +199,18 @@ def rename_markers(
     # 1) project.toml [pose].body_parts
     pose["body_parts"] = new_body_parts
     data["pose"] = pose
-    write_project_toml(cp, data)  # type: ignore[arg-type]
+    write_project_toml(cp, data)
     # 2) project.toml [skeleton]
     if isinstance(sk, dict) and (new_nodes or new_edges):
         write_skeleton(cp, nodes=new_nodes or new_body_parts, edges=new_edges)
     # 3) pose parquets/csvs
-    for fp in pose_files:
-        df = read_df(fp, file_type, check_multiindex=True)
-        df = rename_pose_columns(df, rename_map)
-        write_df(df, file_type, fp,
-                 multi_idx_header=isinstance(df.columns, pd.MultiIndex))
+    if pose_files:
+        from mufasa.utils.read_write import read_df, write_df
+        for fp in pose_files:
+            df = read_df(fp, file_type, check_multiindex=True)
+            df = rename_pose_columns(df, rename_map)
+            write_df(df, file_type, fp,
+                     multi_idx_header=isinstance(df.columns, pd.MultiIndex))
 
     return summary
 
