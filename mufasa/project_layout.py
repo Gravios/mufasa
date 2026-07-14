@@ -57,6 +57,7 @@ but it should generally route v1-only paths through
 """
 from __future__ import annotations
 
+import os
 import re
 import secrets
 import time
@@ -1457,6 +1458,38 @@ def read_skeleton(config_path) -> dict | None:
     return {"nodes": nodes, "edges": edges}
 
 
+def relativize_project_path(path: str, root) -> str:
+    """Return ``path`` relative to the project ``root`` for storage.
+
+    Absolute paths are converted to a root-relative form (so ``project.toml``
+    holds no absolute paths and travels with the project directory); paths
+    already relative are returned unchanged. ``root`` is the project
+    directory (the folder containing ``project.toml``), because Mufasa is
+    run from the top of the project.
+    """
+    if not path:
+        return path
+    p = str(path)
+    if not os.path.isabs(p):
+        return p
+    try:
+        return os.path.relpath(p, str(root))
+    except ValueError:
+        return p
+
+
+def resolve_project_path(path: str, root) -> str:
+    """Resolve a stored (root-relative) ``path`` back to an absolute path
+    against the project ``root`` for runtime use. Absolute paths pass
+    through unchanged."""
+    if not path:
+        return path
+    p = str(path)
+    if os.path.isabs(p):
+        return p
+    return os.path.normpath(os.path.join(str(root), p))
+
+
 def model_format_for_path(model_path: str) -> str:
     """Classify a model file by extension for provenance.
 
@@ -1501,7 +1534,7 @@ def read_classifier_inference_settings(
             row: dict[str, Any] = {}
             mp = settings.get("model_path")
             if isinstance(mp, str) and mp:
-                row["model_path"] = mp
+                row["model_path"] = resolve_project_path(mp, cp.parent)
             thr = settings.get("threshold")
             if isinstance(thr, (int, float)):
                 row["threshold"] = float(thr)
@@ -1585,7 +1618,9 @@ def write_classifier_inference_settings(
         for clf_name, row in settings.items():
             entry = dict(section.get(clf_name, {}))
             if "model_path" in row:
-                entry["model_path"] = str(row["model_path"])
+                entry["model_path"] = relativize_project_path(
+                    str(row["model_path"]), cp.parent
+                )
             if "threshold" in row:
                 entry["threshold"] = float(row["threshold"])
             if "min_bout_ms" in row:
