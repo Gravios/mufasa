@@ -140,7 +140,9 @@ class ModelModificationsForm(QWidget):
             f"Rename {summary['n_renamed']} marker(s):\n\n{changes}\n\n"
             f"This will update project.toml, {summary['skeleton_edges']} "
             f"skeleton edge(s), and rewrite {summary['pose_files']} pose "
-            f"file(s).{warn}\n\nProceed?"
+            f"file(s).{warn}\n\n"
+            f"A snapshot of project.toml and the pose files will be saved to "
+            f"backups/ first, so this can be undone.\n\nProceed?"
         )
         if QMessageBox.question(
             self, "Save model", msg,
@@ -156,13 +158,16 @@ class ModelModificationsForm(QWidget):
             QMessageBox.critical(self, self.title, f"Rename failed:\n{exc}")
             return
         self.unsetCursor()
+        snap = result.get("snapshot_dir")
         QMessageBox.information(
             self, "Save model",
             f"Renamed {result['n_renamed']} marker(s). Updated project.toml, "
             f"the skeleton, and {result['pose_files']} pose file(s)."
             + (f"\n\nRemember to recompute features "
                f"({result['feature_files_need_recompute']} file(s) affected)."
-               if result.get("feature_files_need_recompute") else ""),
+               if result.get("feature_files_need_recompute") else "")
+            + (f"\n\nSnapshot (to undo, copy these back):\n{snap}"
+               if snap else ""),
         )
         self._reload()
 
