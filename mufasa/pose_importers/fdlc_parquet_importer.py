@@ -51,7 +51,10 @@ import pandas as pd
 from mufasa.data_processors.interpolate import Interpolate
 from mufasa.data_processors.smoothing import Smoothing
 from mufasa.mixins.config_reader import ConfigReader
-from mufasa.mixins.pose_importer_mixin import PoseImporterMixin
+from mufasa.mixins.pose_importer_mixin import (
+    PoseImporterMixin,
+    validate_pose_markers,
+)
 from mufasa.utils.checks import (
     check_file_exist_and_readable,
     check_if_dir_exists,
@@ -448,7 +451,16 @@ def _resolve_bodypart_order(
 ) -> list[tuple[str, str]]:
     """Map project body-parts to data nodes, returning ordered
     ``(project_bp, data_bp)`` pairs. Precedence: exact name match ->
-    case-insensitive -> positional (counts equal) -> error."""
+    case-insensitive -> error.
+
+    Patch 122ha: there is no positional fallback. It used to zip the two
+    lists whenever their lengths matched, on the theory that the data's node
+    order could be trusted. That silently accepted a file from a *different*
+    pose: rename a project's 15 markers and an old 15-marker file still
+    imports, mapping nose->head_nose, headmid->head_mid and so on, writing
+    plausible-looking columns that are simply wrong. A project has one pose
+    model, so a file either speaks its marker names or it does not belong.
+    """
     data_set, proj_set = set(data_bps), set(project_bps)
 
     if proj_set <= data_set:  # exact names present (extra data nodes tolerated)
@@ -458,10 +470,10 @@ def _resolve_bodypart_order(
     if len(lower_map) == len(data_bps) and {b.lower() for b in project_bps} <= set(lower_map):
         return [(bp, lower_map[bp.lower()]) for bp in project_bps]
 
-    if len(data_bps) == len(project_bps):
-        # Positional fallback (H5 parity): trust the data's node order.
-        return list(zip(project_bps, data_bps))
-
+    validate_pose_markers(data_bps, project_bps, source=source)
+    # validate_pose_markers raises whenever the sets differ; reaching here
+    # means they match as sets but neither branch above resolved them, which
+    # would be a bug rather than bad input.
     missing = [b for b in project_bps if b not in data_set and b.lower() not in lower_map]
     raise BodypartColumnNotFoundError(
         msg=(

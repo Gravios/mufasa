@@ -51,47 +51,15 @@ def _candidate_files(source: str | os.PathLike) -> list[str]:
 
 
 def _markers_of(path: str) -> list[str]:
-    """Read a pose file's marker names without loading the whole thing.
+    """Read a pose file's marker names without loading the whole file.
 
-    Handles the two shapes Mufasa sees: FreeDLC's long/tidy table (a
-    ``bodypart`` column) and the wide ``<bp>_x/_y/_p`` layout (flat or under
-    the IMPORTED_POSE MultiIndex).
+    Patch 122ha: delegates to the importer layer, which is where mismatch
+    validation lives — one implementation, so a pre-flight check and an
+    actual import can never disagree about what a file contains.
     """
-    import pandas as pd
+    from mufasa.mixins.pose_importer_mixin import markers_from_pose_file
 
-    low = path.lower()
-    if low.endswith(".parquet"):
-        import pyarrow.parquet as pq
-        pf = pq.ParquetFile(path)
-        names = [c for c in pf.schema_arrow.names]
-        if "bodypart" in names:
-            # long format — the distinct bodyparts are the marker set
-            col = pq.read_table(path, columns=["bodypart"]).column("bodypart")
-            import pyarrow.compute as pc
-            return [str(v) for v in pc.unique(col).to_pylist()]
-        try:
-            head = next(pf.iter_batches(batch_size=1)).to_pandas()
-        except StopIteration:
-            head = pd.DataFrame(columns=names)
-        cols = head.columns
-    elif low.endswith(".csv"):
-        head = pd.read_csv(path, nrows=1)
-        cols = head.columns
-    else:
-        raise ValueError(f"Unsupported pose file: {os.path.basename(path)}")
-
-    labels = [
-        str(c[-1]) if isinstance(c, tuple) else str(c) for c in cols
-    ]
-    markers: list[str] = []
-    for lab in labels:
-        for suf in ("_x", "_y", "_p", "_likelihood"):
-            if lab.endswith(suf):
-                bp = lab[: -len(suf)]
-                if bp and bp not in markers:
-                    markers.append(bp)
-                break
-    return markers
+    return markers_from_pose_file(path)
 
 
 def check_pose_compatibility(
@@ -104,11 +72,11 @@ def check_pose_compatibility(
         set equals the project's ``body_parts`` — same names, no missing, no
         extras. Order is not required to match: the importers align by name.
     """
+    from mufasa.mixins.pose_importer_mixin import describe_marker_mismatch
     from mufasa.project_layout import project_metadata_from_config
 
     meta = project_metadata_from_config(config_path)
     project_markers = [str(b) for b in meta.get("body_parts", [])]
-    expected = set(project_markers)
 
     files = _candidate_files(source)
     accepted: list[str] = []
@@ -122,18 +90,12 @@ def check_pose_compatibility(
         if not found:
             rejected[fp] = "no marker columns found"
             continue
-        got = set(found)
-        if got == expected:
+        # Same rule the importer enforces — this is only a preview of it.
+        why = describe_marker_mismatch(found, project_markers)
+        if why:
+            rejected[fp] = why
+        else:
             accepted.append(fp)
-            continue
-        missing = sorted(expected - got)
-        extra = sorted(got - expected)
-        bits = []
-        if missing:
-            bits.append(f"missing {missing}")
-        if extra:
-            bits.append(f"unexpected {extra}")
-        rejected[fp] = "pose differs from the project: " + "; ".join(bits)
 
     return {
         "files": files,
