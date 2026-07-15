@@ -8,7 +8,7 @@ FreeDLC (modified DeepLabCut) writes pose as a long table
 (frame|individual|bodypart|x|y|likelihood) named <stem>.fdlc.parquet.
 FDLCParquetImporter mirrors DLCSingleAnimalH5Importer but reads that layout,
 aligns nodes to the project body-parts BY NAME (exact -> case-insensitive ->
-positional fallback -> error), clamps the -1.0 "no detection" likelihood
+error — patch 122ha removed the positional fallback), clamps the -1.0 "no detection" likelihood
 sentinel to 0.0, and writes the standard IMPORTED_POSE multi-index output.
 Registered in the pose-import UI registry.
 

@@ -18,6 +18,7 @@ from numba import jit, prange
 from mufasa.mixins.plotting_mixin import PlottingMixin
 from mufasa.utils.enums import ConfigKey
 from mufasa.utils.errors import (
+    BodypartColumnNotFoundError,
     CountError,
     IntegerError,
     InvalidInputError,
@@ -26,6 +27,93 @@ from mufasa.utils.errors import (
 )
 from mufasa.utils.read_write import get_fn_ext
 from mufasa.utils.warnings import FrameRangeWarning
+
+_MARKER_SUFFIXES = ("_x", "_y", "_p", "_likelihood")
+
+
+def markers_from_pose_file(path: str | os.PathLike) -> list[str]:
+    """Read a pose file's marker names without loading the whole file.
+
+    Handles both shapes Mufasa ingests: FreeDLC's long/tidy table (a
+    ``bodypart`` column) and the wide ``<bp>_x/_y/_p`` layout (flat, or
+    under the IMPORTED_POSE MultiIndex — only the innermost level names the
+    marker).
+
+    :raises ValueError: if the file type isn't a supported pose format.
+    """
+    import pandas as pd
+
+    p = os.fspath(path)
+    low = p.lower()
+    if low.endswith(".parquet"):
+        import pyarrow.compute as pc
+        import pyarrow.parquet as pq
+        pf = pq.ParquetFile(p)
+        if "bodypart" in pf.schema_arrow.names:
+            col = pq.read_table(p, columns=["bodypart"]).column("bodypart")
+            return [str(v) for v in pc.unique(col).to_pylist()]
+        try:
+            cols = next(pf.iter_batches(batch_size=1)).to_pandas().columns
+        except StopIteration:
+            cols = pd.Index(pf.schema_arrow.names)
+    elif low.endswith(".csv"):
+        cols = pd.read_csv(p, nrows=1).columns
+    else:
+        raise ValueError(f"Unsupported pose file: {os.path.basename(p)}")
+
+    labels = [str(c[-1]) if isinstance(c, tuple) else str(c) for c in cols]
+    markers: list[str] = []
+    for lab in labels:
+        for suf in _MARKER_SUFFIXES:
+            if lab.endswith(suf):
+                bp = lab[: -len(suf)]
+                if bp and bp not in markers:
+                    markers.append(bp)
+                break
+    return markers
+
+
+def describe_marker_mismatch(found, expected) -> str:
+    """Return a human explanation of how a file's markers differ from the
+    project's, or ``""`` when they match. Order is not compared — importers
+    align by name."""
+    got, want = set(found), set(expected)
+    if got == want:
+        return ""
+    missing = sorted(want - got)
+    extra = sorted(got - want)
+    bits = []
+    if missing:
+        bits.append(f"missing {missing}")
+    if extra:
+        bits.append(f"unexpected {extra}")
+    if not bits:
+        return ""
+    return "pose differs from the project: " + "; ".join(bits)
+
+
+def validate_pose_markers(found, expected, *, source: str) -> None:
+    """Raise unless ``found`` names exactly the project's markers.
+
+    A project has one pose model, so an imported file either speaks its
+    marker vocabulary or it doesn't belong. This is checked at the import
+    step deliberately: a mismatched file does not fail on its own, it writes
+    columns nothing downstream can find and only surfaces much later as
+    all-NaN arrays (cf. the layout regression fixed in 122gv/122gx). Failing
+    here names the difference while the cause is still obvious.
+
+    :raises BodypartColumnNotFoundError: with the exact difference.
+    """
+    why = describe_marker_mismatch(found, expected)
+    if why:
+        raise BodypartColumnNotFoundError(
+            msg=(
+                f"{why}. Project markers ({len(list(expected))}): "
+                f"{list(expected)}. File markers ({len(list(found))}): "
+                f"{list(found)}."
+            ),
+            source=source,
+        )
 
 
 class PoseImporterMixin:
