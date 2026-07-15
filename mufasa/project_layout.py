@@ -419,16 +419,34 @@ def _format_toml(data: dict[str, Any]) -> list[str]:
             )
         flat = {
             k: v for k, v in sec_body.items()
-            if not isinstance(v, dict)
+            if not isinstance(v, dict) and not _is_table_array(v)
         }
         subs = {
             k: v for k, v in sec_body.items()
             if isinstance(v, dict)
         }
+        # Patch 122gx: arrays of tables (e.g. [[pose.segments]] — a
+        # project-defined kinematic tree). Without this, any rewrite of a
+        # project.toml containing one (a marker rename, say) would raise
+        # "unsupported TOML value type dict" and the section would be lost.
+        table_arrays = {
+            k: v for k, v in sec_body.items() if _is_table_array(v)
+        }
         out.append(f"[{sec_name}]")
         for k, v in flat.items():
             out.append(f"{k} = {_format_toml_value(v)}")
         out.append("")
+        for arr_name, rows in table_arrays.items():
+            for row in rows:
+                out.append(f"[[{sec_name}.{arr_name}]]")
+                for k, v in row.items():
+                    if isinstance(v, dict) or _is_table_array(v):
+                        raise TypeError(
+                            f"nested tables inside an array of tables are "
+                            f"not supported (at {sec_name}.{arr_name}.{k})"
+                        )
+                    out.append(f"{k} = {_format_toml_value(v)}")
+                out.append("")
         for sub_name, sub_body in subs.items():
             out.append(f"[{sec_name}.{sub_name}]")
             for k, v in sub_body.items():
@@ -443,6 +461,15 @@ def _format_toml(data: dict[str, Any]) -> list[str]:
     while out and out[-1] == "":
         out.pop()
     return out
+
+
+def _is_table_array(v: Any) -> bool:
+    """True for a non-empty list of dicts — a TOML array of tables."""
+    return (
+        isinstance(v, (list, tuple))
+        and len(v) > 0
+        and all(isinstance(x, dict) for x in v)
+    )
 
 
 def _format_toml_value(v: Any) -> str:

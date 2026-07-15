@@ -607,6 +607,177 @@ class BodyLayout:
         return slice(start, start + total)
 
 
+def segments_from_skeleton(
+    nodes: list[str],
+    edges: list[tuple[str, str]],
+    root: str | None = None,
+) -> list[BodySegment]:
+    """Derive a kinematic tree from an arbitrary skeleton graph.
+
+    Works for *any* marker set and connectivity — no assumptions about
+    marker count, names, or anatomy (patch 122gx).
+
+    A skeleton is an undirected graph and generally contains cycles (the
+    FreeDLC rat rig, for instance, has 24 edges over 15 nodes, so 10 more
+    than a tree). The EKF needs a tree, so a breadth-first **spanning
+    tree** is taken from ``root``: every marker except the root becomes a
+    segment whose parent is the segment of the marker it was first reached
+    from, and the marker sits at that segment's distal end (offset
+    ``(0, 0)``; segment lengths are fitted from data downstream). The
+    extra, cycle-forming edges are redundant constraints a tree cannot
+    express, and are dropped.
+
+    :param nodes: Marker names.
+    :param edges: ``(a, b)`` connections; endpoints outside ``nodes`` are
+        ignored.
+    :param root: Marker to anchor the tree. Defaults to a **graph centre**
+        (a node of minimum eccentricity — i.e. closest to everything else,
+        which keeps the chains short), tie-broken by highest degree then
+        name for determinism.
+    :returns: Segments, root first, then breadth-first order.
+    """
+    from collections import defaultdict, deque
+
+    node_set = list(dict.fromkeys(str(n) for n in nodes))
+    if not node_set:
+        raise ValueError("Cannot derive a layout: the skeleton has no markers.")
+    valid = set(node_set)
+    adj: dict[str, set[str]] = defaultdict(set)
+    for e in edges:
+        if not isinstance(e, (list, tuple)) or len(e) < 2:
+            continue
+        a, b = str(e[0]), str(e[1])
+        if a in valid and b in valid and a != b:
+            adj[a].add(b)
+            adj[b].add(a)
+
+    def _reach(src: str) -> dict[str, int]:
+        dist = {src: 0}
+        q = deque([src])
+        while q:
+            u = q.popleft()
+            for v in sorted(adj[u]):
+                if v not in dist:
+                    dist[v] = dist[u] + 1
+                    q.append(v)
+        return dist
+
+    if root is not None:
+        root = str(root)
+        if root not in valid:
+            raise ValueError(
+                f"Layout root '{root}' is not one of the project's markers "
+                f"({node_set})."
+            )
+    else:
+        # Graph centre: minimum eccentricity over the largest component.
+        best: tuple[int, int, str] | None = None
+        for n in node_set:
+            d = _reach(n)
+            # Prefer nodes that reach the most markers, then are most
+            # central, then have the highest degree; name breaks ties.
+            key = (-len(d), max(d.values()) if d else 0, -len(adj[n]), n)
+            if best is None or key < best:  # type: ignore[operator]
+                best = key  # type: ignore[assignment]
+                root = n
+
+    assert root is not None
+    reachable = _reach(root)
+    unreachable = [n for n in node_set if n not in reachable]
+
+    segments: list[BodySegment] = [
+        BodySegment(name=root, parent=None, rest_angle=0.0,
+                    markers={root: (0.0, 0.0)})
+    ]
+    seen = {root}
+    q = deque([root])
+    while q:
+        u = q.popleft()
+        for v in sorted(adj[u]):
+            if v in seen:
+                continue
+            seen.add(v)
+            segments.append(BodySegment(
+                name=v, parent=u, rest_angle=0.0, markers={v: (0.0, 0.0)},
+            ))
+            q.append(v)
+
+    # Markers in a disconnected component can't be placed on the tree;
+    # attach them to the root so their data is still used (their fitted
+    # offset absorbs the relationship) rather than silently dropped.
+    for n in unreachable:
+        segments.append(BodySegment(
+            name=n, parent=root, rest_angle=0.0, markers={n: (0.0, 0.0)},
+        ))
+    return segments
+
+
+def layout_from_segments(spec: list[dict], **flags) -> BodyLayout:
+    """Build a :class:`BodyLayout` from an explicit segment specification.
+
+    This is the fully general, no-assumptions path: the project states its
+    own kinematic tree, so any skeleton (any marker count, any topology,
+    rigid clusters included) can be expressed. ``project.toml``::
+
+        [[pose.segments]]
+        name    = "body"
+        markers = ["back_T8", "back_T4", "back_L2", "hip_left"]  # rigid cluster
+
+        [[pose.segments]]
+        name       = "neck"
+        parent     = "body"
+        rest_angle = 0.0
+        markers    = ["head_back"]
+
+    The first marker of each segment is its distal end (offset ``(0, 0)``);
+    any further markers are rigid attachments whose offsets are placeholders
+    fitted from data. Exactly one segment must have no parent.
+
+    :param spec: List of ``{name, parent, rest_angle, markers}`` dicts.
+    :param flags: Forwarded to :class:`BodyLayout` (``with_drift``, ...).
+    """
+    if not spec:
+        raise ValueError("[[pose.segments]] is empty.")
+    segments: list[BodySegment] = []
+    names = [str(s.get("name", "")) for s in spec]
+    if len(set(names)) != len(names) or not all(names):
+        raise ValueError(f"[[pose.segments]] names must be unique/non-empty: {names}")
+    roots = [s for s in spec if not s.get("parent")]
+    if len(roots) != 1:
+        raise ValueError(
+            f"[[pose.segments]] needs exactly one segment with no parent "
+            f"(the root); found {len(roots)}: "
+            f"{[s.get('name') for s in roots]}"
+        )
+    seen_markers: set[str] = set()
+    for s in spec:
+        markers = [str(m) for m in (s.get("markers") or [])]
+        if not markers:
+            raise ValueError(f"Segment '{s.get('name')}' lists no markers.")
+        dup = seen_markers & set(markers)
+        if dup:
+            raise ValueError(f"Marker(s) {sorted(dup)} attached to more than one segment.")
+        seen_markers |= set(markers)
+        parent = s.get("parent") or None
+        if parent is not None and str(parent) not in names:
+            raise ValueError(
+                f"Segment '{s['name']}' has unknown parent '{parent}'; "
+                f"known segments: {names}."
+            )
+        offsets: dict[str, tuple[float, float]] = {markers[0]: (0.0, 0.0)}
+        for i, m in enumerate(markers[1:]):
+            # Placeholder offsets, fanned out; fitted from data later.
+            ang = 2.0 * np.pi * (i + 1) / max(len(markers) - 1, 1)
+            offsets[m] = (1.0, ang)
+        segments.append(BodySegment(
+            name=str(s["name"]),
+            parent=None if parent is None else str(parent),
+            rest_angle=float(s.get("rest_angle", 0.0)),
+            markers=offsets,
+        ))
+    return BodyLayout(segments=segments, **flags)
+
+
 CANONICAL_LAYOUT_ROLES: tuple[str, ...] = (
     "back2", "back1", "back3", "lateral_left", "lateral_right", "center",
     "back4", "neck", "headmid", "nose", "ear_left", "ear_right",
@@ -760,64 +931,103 @@ def standard_rat_layout(
 
 
 def layout_from_config(config_path, **flags) -> BodyLayout:
-    """Build the smoother's :class:`BodyLayout` using the project's own
-    marker names (patch 122gv).
+    """Build the smoother's :class:`BodyLayout` from the project (patches
+    122gv/122gx).
 
-    The kinematic topology is always :func:`standard_rat_layout`'s; only the
-    marker *names* come from the project. Resolution order:
+    Nothing about the marker set is assumed — count, names and topology all
+    come from the project. Resolution order, most explicit first:
 
-    1. ``[pose.layout]`` in ``project.toml`` — an explicit
-       ``{role: marker_name}`` map. Authoritative.
-    2. If absent, and the canonical role names are themselves present in the
-       project's ``body_parts``, use them unchanged (the historical case —
-       fully backward compatible).
-    3. Otherwise raise, listing the roles to define and the markers
-       available. This is the case that used to fail silently: a renamed
-       project produced a layout whose names matched nothing in the data, so
-       every marker went unfilled and the EKF was handed an all-NaN array.
+    1. ``[[pose.segments]]`` — the project states its own kinematic tree
+       (rigid clusters included). Fully general; see
+       :func:`layout_from_segments`.
+    2. ``[skeleton]`` — derive a tree from the skeleton graph via a
+       breadth-first spanning tree (:func:`segments_from_skeleton`).
+       ``[pose.kinematics].root`` picks the anchor; otherwise a graph
+       centre is chosen. This is the general default: any skeleton works
+       with no extra configuration.
+    3. ``[pose.layout]`` — role -> marker map onto the built-in rat rig
+       (kept for projects already using it).
+    4. The built-in rat rig unchanged, when the project's markers are the
+       canonical ones (legacy projects).
+    5. Otherwise raise, saying what to add.
 
     :param config_path: Path to the project ``project.toml``.
-    :param flags: Passed through to :func:`standard_rat_layout`
-        (``include_lateral``, ``include_tail``, ...).
+    :param flags: Forwarded to the layout builders (``with_drift``, ...).
     """
+    from pathlib import Path
+
     from mufasa.project_layout import (
         project_metadata_from_config,
         read_layout_roles,
+        read_project_toml,
+        read_skeleton,
     )
 
-    roles = read_layout_roles(config_path)
     try:
         body_parts = list(project_metadata_from_config(config_path)["body_parts"])
-    except Exception:
+    except (ValueError, OSError, KeyError):
         body_parts = []
 
-    if roles is None:
-        if set(CANONICAL_LAYOUT_ROLES) & set(body_parts):
-            roles = {r: r for r in CANONICAL_LAYOUT_ROLES}
-        else:
-            raise ValueError(
-                "Cannot build the pose smoother layout: this project's "
-                f"markers ({body_parts}) don't include the canonical layout "
-                f"roles ({list(CANONICAL_LAYOUT_ROLES)}), and project.toml "
-                "has no [pose.layout] section mapping roles to marker names. "
-                "Markers were most likely renamed. Add a [pose.layout] table "
-                "under [pose] mapping each role to the marker that now plays "
-                "it, e.g.\n\n"
-                "    [pose.layout]\n"
-                '    back2 = "<your body-centre marker>"\n'
-                '    headmid = "<your head-centre marker>"\n'
-                "    ...\n"
-            )
+    # 1) Explicit segment spec — the project defines its own tree.
+    try:
+        data = read_project_toml(Path(config_path))
+    except (ValueError, OSError):
+        data = {}
+    pose_cfg = data.get("pose") if isinstance(data.get("pose"), dict) else {}
+    spec = pose_cfg.get("segments")
+    if isinstance(spec, list) and spec:
+        layout = layout_from_segments(spec, **flags)
+        if body_parts:
+            unknown = sorted(set(layout.marker_names) - set(body_parts))
+            if unknown:
+                raise ValueError(
+                    f"[[pose.segments]] references marker(s) not in the "
+                    f"project: {unknown}. Project markers: {body_parts}."
+                )
+        return layout
 
-    if body_parts:
-        unknown = {r: n for r, n in roles.items() if n not in set(body_parts)}
-        if unknown:
-            raise ValueError(
-                "project.toml [pose.layout] maps role(s) to marker names that "
-                f"don't exist in the project: {unknown}. Project markers are "
-                f"{body_parts}."
-            )
-    return standard_rat_layout(names=roles, **flags)
+    # 2) Derive from the skeleton graph — general, no assumptions.
+    sk = read_skeleton(config_path)
+    if sk and sk.get("edges"):
+        kin = pose_cfg.get("kinematics")
+        root = kin.get("root") if isinstance(kin, dict) else None
+        nodes = sk.get("nodes") or body_parts
+        # Only place markers the project actually has.
+        if body_parts:
+            nodes = [n for n in nodes if n in set(body_parts)] or body_parts
+        segments = segments_from_skeleton(nodes, sk["edges"], root=root)
+        return BodyLayout(segments=segments, **flags)
+
+    # 3/4) Built-in rat rig, optionally renamed via [pose.layout].
+    roles = read_layout_roles(config_path)
+    if roles is None and set(CANONICAL_LAYOUT_ROLES) & set(body_parts):
+        roles = {r: r for r in CANONICAL_LAYOUT_ROLES}
+    if roles is not None:
+        if body_parts:
+            unknown = {r: n for r, n in roles.items() if n not in set(body_parts)}
+            if unknown:
+                raise ValueError(
+                    "project.toml [pose.layout] maps role(s) to marker names "
+                    f"that don't exist in the project: {unknown}. Project "
+                    f"markers are {body_parts}."
+                )
+        return standard_rat_layout(names=roles, **flags)
+
+    raise ValueError(
+        "Cannot build the pose smoother layout: this project has no "
+        "[skeleton] connections to derive a kinematic tree from, no "
+        "[[pose.segments]] tree of its own, and its markers "
+        f"({body_parts}) aren't the built-in rat rig. Add skeleton "
+        "connections (importing FreeDLC pose brings them in from the "
+        "<video>.fdlc.toml sidecar), or define the tree explicitly:\n\n"
+        "    [[pose.segments]]\n"
+        '    name    = "body"\n'
+        '    markers = ["<centre marker>", "<other rigid trunk markers>"]\n\n'
+        "    [[pose.segments]]\n"
+        '    name    = "head"\n'
+        '    parent  = "body"\n'
+        '    markers = ["<head marker>"]\n'
+    )
 
 
 @dataclass
