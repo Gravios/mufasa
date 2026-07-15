@@ -51,23 +51,26 @@ from PySide6.QtWidgets import (
 class ProjectInfoForm(QWidget):
     """Read-only summary of the loaded project.
 
-    Fields displayed:
+    Rows are grouped (patch 122gw) rather than presented as one flat
+    list, so the frame can be scanned rather than read top-to-bottom:
 
-    * **Layout**       — "v1 (project.toml)" or "legacy (project.toml)"
-    * **Name**         — from project_name / [General settings].project_name
-    * **Root**         — project root path (v1: project.toml's parent;
-      legacy: <General settings>.project_path)
-    * **Animals**      — animal count + ID list
-    * **File type**    — csv / parquet / h5
-    * **Body parts**   — flat list, truncated with "(+N more)" if long
-    * **Classifiers**  — list of target names (or "none")
-    * **Source files** — count of pose files in input_pose_dir
-    * **Smoothed runs** — count of v1 runs under
-      derived/smoothed/<flavor>/ (v1 only; legacy shows "-")
+    * **Project** — Name, Location (root path), Format ("v1
+      (project.toml)" / "legacy"). Identity first; the storage format
+      is a footnote.
+    * **Configuration** — Animals (count + IDs), File type, Markers
+      (count + names, truncated with "(+N more)"), Classifiers (count +
+      target names).
+    * **Data** — Pose files (count + source dir), and for v1 the
+      per-stage run counts: Smoothed, Outlier-corrected, Features,
+      Classifications.
 
-    A Refresh button at the bottom re-reads from disk so the
-    user can update the view after editing project.toml or
-    running a new pipeline step externally.
+    Naming: "Format" avoids colliding with ``[pose.layout]`` (the
+    skeleton role map added in 122gv); "Markers" matches the vocabulary
+    of the Model modifications tab.
+
+    Edit… opens the metadata editor; Refresh re-reads from disk so the
+    view can be updated after editing project.toml or running a
+    pipeline step externally.
     """
 
     # Surface the title so WorkflowPage._instantiate uses it as
@@ -89,13 +92,28 @@ class ProjectInfoForm(QWidget):
     def _build_shell(self) -> None:
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 8, 12, 8)
-        outer.setSpacing(8)
+        outer.setSpacing(10)
 
-        self._form_host = QWidget(self)
-        self._form_layout = QFormLayout(self._form_host)
-        self._form_layout.setLabelAlignment(Qt.AlignRight)
-        self._form_layout.setSpacing(6)
-        outer.addWidget(self._form_host)
+        # Patch 122gw: the rows used to be one flat 12-row form mixing
+        # project identity, pose configuration and file counts, so nothing
+        # was scannable. Group them by what the reader is actually looking
+        # for. QGroupBox is already this file's idiom (NewProjectForm uses
+        # it), so this stays consistent with the rest of the workbench.
+        self._forms: dict[str, QFormLayout] = {}
+        for key, title in (
+            ("project", "Project"),
+            ("config", "Configuration"),
+            ("data", "Data"),
+        ):
+            box = QGroupBox(title, self)
+            fl = QFormLayout(box)
+            fl.setLabelAlignment(Qt.AlignRight)
+            fl.setFormAlignment(Qt.AlignLeft | Qt.AlignTop)
+            fl.setSpacing(6)
+            fl.setContentsMargins(12, 6, 12, 8)
+            self._forms[key] = fl
+            outer.addWidget(box)
+        outer.addStretch()
 
         row = QHBoxLayout()
         row.addStretch()
@@ -140,10 +158,11 @@ class ProjectInfoForm(QWidget):
         # QFormLayout doesn't have a one-shot "remove all rows" method
         # that's portable across PySide6 versions; remove rows from the
         # end so indices stay stable.
-        while self._form_layout.rowCount() > 0:
-            self._form_layout.removeRow(self._form_layout.rowCount() - 1)
+        for fl in self._forms.values():
+            while fl.rowCount() > 0:
+                fl.removeRow(fl.rowCount() - 1)
 
-    def _add_row(self, label: str, value: str) -> None:
+    def _add_row(self, group: str, label: str, value: str) -> None:
         # Labels are proper form labels — keep them at the theme's
         # default text color (which inherits from palette(text), the
         # high-contrast text role). Earlier versions dimmed these with
@@ -158,7 +177,7 @@ class ProjectInfoForm(QWidget):
             Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard,
         )
         val.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._form_layout.addRow(lbl, val)
+        self._forms[group].addRow(lbl, val)
 
     def _populate(self) -> None:
         """Read metadata from disk and refresh the displayed rows.
@@ -172,15 +191,12 @@ class ProjectInfoForm(QWidget):
         """
         self._clear_form()
         if not self.config_path:
-            self._add_row(
-                "Status",
-                "<i>No project loaded.</i>",
-            )
+            self._add_row("project", "Status", "<i>No project loaded.</i>")
             return
 
         cp = Path(self.config_path)
         if not cp.exists():
-            self._add_row("Status", f"<i>{cp} no longer exists.</i>")
+            self._add_row("project", "Status", f"<i>{cp} no longer exists.</i>")
             return
 
         # Lazy import — keeps page-build cost minimal.
@@ -193,18 +209,13 @@ class ProjectInfoForm(QWidget):
             meta = project_metadata_from_config(self.config_path)
         except (ValueError, OSError) as exc:
             self._add_row(
-                "Error",
+                "project", "Error",
                 f"<i>Could not read project config: "
                 f"{type(exc).__name__}: {exc}</i>",
             )
             return
 
         is_v1 = str(cp).lower().endswith(".toml")
-        self._add_row(
-            "Layout",
-            "v1 (<code>project.toml</code>)" if is_v1
-            else "legacy (<code>project.toml</code>)",
-        )
         # Project name — for v1 from project.toml, for legacy we
         # can't trivially get it without parsing the ini, so fall
         # back to the project_root directory name.
@@ -220,10 +231,17 @@ class ProjectInfoForm(QWidget):
             proj_name = ""
         if not proj_name:
             proj_name = Path(paths["project_root"]).name
-        self._add_row("Name", proj_name)
+        # Identity first — name and location are what the reader scans
+        # for; the storage format is a footnote, so it goes last.
+        self._add_row("project", "Name", f"<b>{proj_name}</b>")
+        self._add_row("project", "Location", f"<code>{paths['project_root']}</code>")
+        # "Format", not "Layout": project.toml now also has a [pose.layout]
+        # (the skeleton role map, patch 122gv), and two different "layout"s
+        # on one page is a coin-flip for the reader.
         self._add_row(
-            "Root",
-            f"<code>{paths['project_root']}</code>",
+            "project", "Format",
+            "v1 (<code>project.toml</code>)" if is_v1
+            else "legacy (<code>project.toml</code>)",
         )
 
         animal_ids = meta.get("animal_ids") or []
@@ -234,35 +252,35 @@ class ProjectInfoForm(QWidget):
                 if len(animal_ids) <= 4
                 else f"{', '.join(animal_ids[:4])} (+{len(animal_ids) - 4} more)"
             )
-            self._add_row(
-                "Animals",
-                f"{animal_count} ({ids_summary})",
-            )
+            self._add_row("config", "Animals", f"{animal_count} ({ids_summary})")
         else:
-            self._add_row("Animals", str(animal_count))
+            self._add_row("config", "Animals", str(animal_count))
 
-        self._add_row("File type", meta.get("file_type", "csv"))
+        self._add_row("config", "File type", meta.get("file_type", "csv"))
 
+        # "Markers" matches the vocabulary used by the Model modifications
+        # tab ("Rename markers"); lead with the count, which is the thing
+        # people actually check, then the names.
         bps = meta.get("body_parts") or []
         if bps:
             head = ", ".join(bps[:8])
             tail = (
                 ""
                 if len(bps) <= 8
-                else f" <span style='color:palette(placeholder-text)'>(+{len(bps) - 8} more)</span>"
+                else f" <span style='color:palette(placeholder-text)'>"
+                     f"(+{len(bps) - 8} more)</span>"
             )
-            self._add_row("Body parts", f"{head}{tail}")
+            self._add_row("config", "Markers", f"<b>{len(bps)}</b> — {head}{tail}")
         else:
-            self._add_row("Body parts", "<i>none</i>")
+            self._add_row("config", "Markers", "<i>none</i>")
 
         clf = meta.get("classifier_targets") or []
         if clf:
-            self._add_row("Classifiers", ", ".join(clf))
-        else:
             self._add_row(
-                "Classifiers",
-                "<i>none</i>",
+                "config", "Classifiers", f"<b>{len(clf)}</b> — {', '.join(clf)}",
             )
+        else:
+            self._add_row("config", "Classifiers", "<i>none</i>")
 
         # File counts. Cheap glob; tolerate non-existent dirs.
         pose_dir = Path(paths["input_pose_dir"])
@@ -272,30 +290,25 @@ class ProjectInfoForm(QWidget):
         else:
             n_pose = 0
         self._add_row(
-            "Source pose files",
-            f"{n_pose} <span style='color:palette(placeholder-text)'>"
+            "data", "Pose files",
+            f"<b>{n_pose}</b> <span style='color:palette(placeholder-text)'>"
             f"in <code>{pose_dir.name}/</code></span>",
         )
 
-        # v1 derived-runs counts. Skip for legacy.
+        # v1 derived-runs counts. Skip for legacy. The group title already
+        # says "Data" and these are all run counts, so the labels don't
+        # need to repeat "runs" four times.
         if is_v1:
             root = Path(paths["project_root"])
-            self._add_row(
-                "Smoothed runs",
-                self._count_runs(root / "derived" / "smoothed"),
-            )
-            self._add_row(
-                "Outlier-corrected runs",
-                self._count_runs(root / "derived" / "outlier_corrected"),
-            )
-            self._add_row(
-                "Feature runs",
-                self._count_runs(root / "derived" / "features"),
-            )
-            self._add_row(
-                "Classification runs",
-                self._count_runs(root / "derived" / "classifications"),
-            )
+            for label, stage in (
+                ("Smoothed", "smoothed"),
+                ("Outlier-corrected", "outlier_corrected"),
+                ("Features", "features"),
+                ("Classifications", "classifications"),
+            ):
+                self._add_row(
+                    "data", label, self._count_runs(root / "derived" / stage),
+                )
 
         self.refreshed.emit()
 
