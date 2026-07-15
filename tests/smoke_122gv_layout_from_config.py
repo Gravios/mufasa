@@ -100,9 +100,11 @@ def main():
         layout_from_config(cp_bare)
     except ValueError as e:
         raised = str(e)
-    check("renamed project without roles raises an actionable error "
-          "(instead of silent all-NaN)",
-          "[pose.layout]" in raised and "renamed" in raised)
+    # Patch 122gx changed this message: with no [skeleton] to derive a tree
+    # from and no [[pose.segments]], the error now points at those first.
+    check("renamed project with nothing to build from raises an actionable "
+          "error (instead of silent all-NaN)",
+          "[[pose.segments]]" in raised and "[skeleton]" in raised)
 
     write_layout_roles(cp_bare, {**NEW, "back2": "NOPE"})
     raised2 = ""

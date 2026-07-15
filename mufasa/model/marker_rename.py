@@ -283,6 +283,22 @@ def rename_markers(
             str(role): str(rename_map.get(str(name), str(name)))
             for role, name in roles.items()
         }
+    # 1c) [[pose.segments]] — a project-defined kinematic tree (patch
+    # 122gx) names its markers explicitly, so a rename has to carry them
+    # too or the tree would reference markers that no longer exist.
+    segs = pose.get("segments")
+    if isinstance(segs, list) and segs:
+        new_segs = []
+        for s in segs:
+            if not isinstance(s, dict):
+                continue
+            s = dict(s)
+            s["markers"] = [
+                str(rename_map.get(str(m), str(m)))
+                for m in (s.get("markers") or [])
+            ]
+            new_segs.append(s)
+        pose["segments"] = new_segs
     data["pose"] = pose
     write_project_toml(cp, data)
     # 2) project.toml [skeleton]
