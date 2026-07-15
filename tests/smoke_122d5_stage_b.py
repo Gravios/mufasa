@@ -30,8 +30,10 @@ Survivors confirmed:
 Integrity:
 11. No surviving file in the tree imports from any deleted module.
 12. All mufasa/**/*.py files parse cleanly post-deletion.
-13. Total post-Stage-B .py file count is ≤ 425 (was ~534 pre-Stage-B
-    per 122cx scoping; the cascade removed 109 .py files).
+13. Total post-Stage-B .py file count is ≤ 427 (was ~534 pre-Stage-B
+    per 122cx scoping; the cascade removed 109 .py files). The cap is a
+    bloat tripwire, not a freeze: it moved 425 -> 427 in 122gz for five
+    new feature modules (data inspector 122gy, add-sessions 122gz).
 
 Doc updates:
 14. cascade doc records Stage B as EXECUTED 122d5.
@@ -216,9 +218,9 @@ def main() -> int:
     # or churn things slightly).
     total_py = sum(1 for _ in pkg.rglob("*.py"))
     check(
-        f"Total mufasa/**/*.py count post-Stage-B ≤ 425 "
+        f"Total mufasa/**/*.py count post-Stage-B ≤ 427 "
         f"(got {total_py}; Stage B removed ~109 .py files)",
-        total_py <= 425,
+        total_py <= 427,
     )
 
     # 14. Doc updates
