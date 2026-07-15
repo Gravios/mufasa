@@ -49,6 +49,7 @@ Patch history
 """
 from __future__ import annotations
 
+from mufasa.ui_qt.forms.add_sessions import AddSessionsForm
 from mufasa.ui_qt.forms.pose_import import PoseImportForm
 from mufasa.ui_qt.forms.video_import import VideoImportForm
 from mufasa.ui_qt.workbench import WorkflowPage
@@ -64,7 +65,7 @@ def build_data_import_page(workbench,
     # 122eb badge lookup does exact-string matching against
     # SECTIONS, so case matters here.
     page.add_section("Import pose data",
-                     [(PoseImportForm, {})])
+                     [(PoseImportForm, {}), (AddSessionsForm, {})])
     page.add_section("Import video",
                      [(VideoImportForm, {})])
     return page
