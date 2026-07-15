@@ -63,6 +63,9 @@ def build_workbench(project_config_path: str | None = None
     from mufasa.ui_qt.pages.data_import_page import build_data_import_page
     build_data_import_page(wb, config_path=project_config_path)
 
+    from mufasa.ui_qt.pages.data_inspector_page import build_data_inspector_page
+    build_data_inspector_page(wb, config_path=project_config_path)
+
     from mufasa.ui_qt.pages.model_modifications_page import (
         build_model_modifications_page,
     )
