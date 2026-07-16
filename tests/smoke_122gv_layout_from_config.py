@@ -43,6 +43,7 @@ def check(label, cond, *, detail=""):
 def main():
     from mufasa.data_processors.kalman_pose_smoother_v2 import (
         CANONICAL_LAYOUT_ROLES,
+        _validate_layout_against_data,
         layout_from_config,
         standard_rat_layout,
     )
@@ -114,10 +115,22 @@ def main():
         raised2 = str(e)
     check("roles pointing at a nonexistent marker raise", "don't exist" in raised2)
 
+    # Patch 122hb replaced this inline guard with the _validate_layout_against
+    # _data helper and tightened it: the 122gv version only fired on ZERO
+    # overlap, so a 7-of-15 mismatch merely warned and went on to burn hours
+    # on an unobservable skeleton. Assert the behaviour (zero overlap is
+    # still fatal), not the wording — smoke_122hb owns the details.
     src = (REPO / "mufasa" / "data_processors" / "kalman_pose_smoother_v2.py").read_text()
+    guard_raised = ""
+    try:
+        _validate_layout_against_data(
+            standard_rat_layout(), ["nothing", "in", "common"],
+        )
+    except ValueError as e:
+        guard_raised = str(e)
     check("smooth_pose_v2 hard-guards the zero-overlap all-NaN case",
-          "matched = set(layout.marker_names) & set(marker_names_data)" in src
-          and "No layout markers were found in the pose data" in src)
+          "_validate_layout_against_data(layout, marker_names_data)" in src
+          and "every value would be NaN" in guard_raised)
 
     cleanup = (REPO / "mufasa" / "ui_qt" / "forms" / "pose_cleanup.py").read_text()
     check("pose_cleanup builds the layout from the project config",

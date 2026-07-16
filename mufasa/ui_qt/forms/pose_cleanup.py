@@ -1732,6 +1732,7 @@ class KalmanV2SmoothingForm(OperationForm):
                     pose_input=training_files,
                     output_dir=None,  # don't write smoothed output
                     layout=layout,
+                    config_path=self.config_path,
                     fps=kwargs["fps"],
                     likelihood_threshold=kwargs["likelihood_threshold"],
                     em_max_iter=kwargs["em_max_iter"],
@@ -1747,10 +1748,16 @@ class KalmanV2SmoothingForm(OperationForm):
                 )
                 # Patch 122b: mirror freshly-trained model.
                 _post_train_dual_save(save_path)
-                # Pass 2: load model, smooth all input
+                # Pass 2: load model, smooth all input.
+                # Patch 122hb: config_path is passed for symmetry, but the
+                # layout that matters comes out of the model written by
+                # pass 1 — smooth_pose_v2 now reads it before it validates
+                # or packs the data. Previously this call passed no layout
+                # at all and got the built-in rat rig's marker names.
                 smooth_pose_v2(
                     pose_input=kwargs["input_dir"],
                     output_dir=kwargs["output_dir"],
+                    config_path=self.config_path,
                     fps=kwargs["fps"],
                     likelihood_threshold=kwargs["likelihood_threshold"],
                     n_workers=kwargs["n_workers"],
@@ -1763,6 +1770,7 @@ class KalmanV2SmoothingForm(OperationForm):
                     pose_input=kwargs["input_dir"],
                     output_dir=kwargs["output_dir"],
                     layout=layout,
+                    config_path=self.config_path,
                     fps=kwargs["fps"],
                     likelihood_threshold=kwargs["likelihood_threshold"],
                     em_max_iter=kwargs["em_max_iter"],
@@ -1827,10 +1835,14 @@ class KalmanV2SmoothingForm(OperationForm):
                             f"using original path {load_path}."
                         )
 
-            # Load mode: skip EM, just smooth.
+            # Load mode: skip EM, just smooth. Patch 122hb: the layout
+            # comes from the loaded model (resolved before validation), so
+            # a model trained on this project's markers no longer gets
+            # checked against the built-in rat rig's names.
             smooth_pose_v2(
                 pose_input=kwargs["input_dir"],
                 output_dir=kwargs["output_dir"],
+                config_path=self.config_path,
                 fps=kwargs["fps"],
                 likelihood_threshold=kwargs["likelihood_threshold"],
                 n_workers=kwargs["n_workers"],

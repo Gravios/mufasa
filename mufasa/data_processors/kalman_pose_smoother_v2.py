@@ -7533,10 +7533,120 @@ def load_model_v2(
     )
 
 
+def _resolve_layout(
+    config_path, marker_names_data: list[str], *, verbose: bool = False,
+) -> BodyLayout:
+    """Pick a :class:`BodyLayout` when the caller supplied neither a layout
+    nor a model to load (patch 122hb).
+
+    The old behaviour here was a bare ``standard_rat_layout()``. That is a
+    *rat rig from 2019* with hard-coded marker names (``nose``, ``back1``,
+    ``tailbase``, ...), and silently reaching for it is how a project with a
+    perfectly well-specified 15-marker skeleton ended up being told its data
+    was missing ``back1``. A default that names markers the project has never
+    heard of is not a default, it's a wrong answer with a confident tone.
+
+    Order: the project's own configuration first, the built-in rig only when
+    the data genuinely *is* the built-in rig, and otherwise an error that says
+    what to do.
+
+    :param config_path: ``project.toml`` path, or None.
+    :param marker_names_data: Marker names as read from the pose files.
+    :param verbose: Print which source won.
+    """
+    if config_path is not None:
+        layout = layout_from_config(config_path)
+        if verbose:
+            print(
+                f"[smoother-v2] Layout from {config_path} "
+                f"({layout.n_markers} markers)"
+            )
+        return layout
+
+    # Legacy: no project context, but the data is the canonical rig.
+    if set(CANONICAL_LAYOUT_ROLES) & set(marker_names_data):
+        if verbose:
+            print("[smoother-v2] Layout: built-in rat rig (canonical names)")
+        return standard_rat_layout()
+
+    raise ValueError(
+        "Cannot choose a pose layout: no layout was passed, no model was "
+        "loaded, no project.toml was given (config_path=None), and the "
+        f"data's markers ({sorted(marker_names_data)}) are not the built-in "
+        "rat rig's. Pass config_path= so the layout can be built from the "
+        "project's [[pose.segments]] or [skeleton], or pass an explicit "
+        "layout=."
+    )
+
+
+def _validate_layout_against_data(
+    layout: BodyLayout, marker_names_data: list[str],
+) -> None:
+    """Require every layout marker to be present in the data (patch 122hb).
+
+    Session arrays are pre-filled with NaN and only populated for markers
+    named in BOTH the layout and the data, so a layout marker with no column
+    behind it is an unobservable segment: its covariance grows without bound,
+    the EKF matrices go ill-conditioned, and throughput collapses into
+    denormals. It looks like a hang, hours from the cause.
+
+    Patch 122gv guarded this, but only against *zero* overlap — a partial
+    mismatch merely warned that the markers "will have default offsets",
+    which undersells "two thirds of the skeleton is unobservable" to the point
+    of dishonesty. That hole cost the user a multi-hour run. A partial
+    mismatch is as fatal as a total one, so the threshold is now: any missing
+    marker is an error.
+
+    This is also safe to be strict about. Per the project's own rule, one
+    project has one pose model, so marker names that don't line up never mean
+    "a different model" — they mean the wrong files, or a layout built from
+    something other than the data's own project.
+
+    :raises ValueError: If any layout marker is absent from the data.
+    """
+    data = set(marker_names_data)
+    wanted = list(layout.marker_names)
+    missing = sorted(set(wanted) - data)
+    if not missing:
+        return
+
+    matched = sorted(set(wanted) & data)
+    lines = [
+        f"Pose data does not match the layout: {len(matched)}/{len(wanted)} "
+        f"layout markers found.",
+        f"  missing from data : {missing}",
+        f"  layout expects    : {sorted(wanted)}",
+        f"  data contains     : {sorted(marker_names_data)}",
+    ]
+
+    # The mismatch that actually bit: names differing only by case.
+    lower_map = {m.lower(): m for m in data}
+    case_only = {
+        m: lower_map[m.lower()] for m in missing if m.lower() in lower_map
+    }
+    if case_only:
+        lines.append(
+            f"  NOTE: {len(case_only)} of these differ from a data column by "
+            f"CASE ONLY: {case_only}. Marker names are case-sensitive; make "
+            f"project.toml and the pose files agree."
+        )
+    if not matched:
+        lines.append(
+            "  Nothing would be filled in and every value would be NaN."
+        )
+    lines.append(
+        "  Usual causes: the wrong files were discovered (pre-rename copies "
+        "under backups/, or previously-smoothed output under derived/), or "
+        "the layout was built from a different project than the data."
+    )
+    raise ValueError("\n".join(lines))
+
+
 def smooth_pose_v2(
     pose_input,
     output_dir=None,
     layout: BodyLayout | None = None,
+    config_path=None,
     fps: float = 30.0,
     likelihood_threshold: float = 0.7,
     em_max_iter: int = 10,
@@ -7574,7 +7684,15 @@ def smooth_pose_v2(
         Output directory. Created if missing. If None, no
         output written (useful for in-process use).
     layout : BodyLayout, optional
-        Custom body layout. Defaults to standard_rat_layout().
+        Custom body layout. Ignored when ``load_model`` is given (the
+        model's own layout wins — its parameters are dimensioned to it).
+        When None and no model is loaded, the layout is resolved from
+        ``config_path``; see :func:`_resolve_layout`.
+    config_path : str, optional
+        Path to the project's ``project.toml``. Patch 122hb: used to build
+        the layout from the project's ``[[pose.segments]]`` / ``[skeleton]``
+        when no explicit layout or model is supplied, instead of silently
+        assuming the built-in rat rig's marker names.
     fps : float
     likelihood_threshold : float
     em_max_iter : int
@@ -7665,9 +7783,14 @@ def smooth_pose_v2(
                     df_direct = pd.read_parquet(path)
                 except Exception:
                     df_direct = pd.read_csv(path, low_memory=False)
-            df_direct.columns = [
-                str(c).lower() for c in df_direct.columns
-            ]
+            # Patch 122hb: normalize the SUFFIX only. This used to be a
+            # blanket `.lower()`, which silently renamed every marker with
+            # an upper-case letter in it (back_T4 → back_t4) and made it
+            # unmatchable against a layout built from project.toml.
+            from mufasa.data_processors.kalman_diagnostic import (
+                normalize_pose_columns,
+            )
+            df_direct.columns = normalize_pose_columns(df_direct.columns)
             # Check for marker columns
             markers_found = set()
             for col in df_direct.columns:
@@ -7761,34 +7884,68 @@ def smooth_pose_v2(
     marker_names_data = first_markers
 
     # ---------- Layout ----------
-    if layout is None:
-        layout = standard_rat_layout()
+    # Patch 122hb. Ordering matters and used to be wrong: the layout was
+    # defaulted to standard_rat_layout() here, the data was validated and
+    # packed against it, and only ~50 lines later did `load_model` open the
+    # .npz that carries the model's OWN layout. So every load-mode call
+    # (GUI "load model", and pass 2 of the train-on-a-subset two-pass
+    # workflow, neither of which passes layout=) validated the project's
+    # data against the built-in rat rig's historical names and died on the
+    # 122gv guard citing markers no one had mentioned. Resolve the layout
+    # first, from the most authoritative source available.
+    fitted_lengths = None
+    params = None
+    perspective: PerspectiveModelV2 | None = None
+    loaded_model = False
 
-    # Verify layout marker names are subset of data marker names
-    missing = set(layout.marker_names) - set(marker_names_data)
-    if missing:
+    if load_model is not None:
         if verbose:
+            print(f"[smoother-v2] Loading model from {load_model}")
+        if layout is not None and verbose:
             print(
-                f"[smoother-v2] WARNING: layout markers not in "
-                f"data: {sorted(missing)}. These markers will "
-                f"have default offsets."
+                "[smoother-v2] NOTE: ignoring the caller's layout — the "
+                "loaded model's parameters are dimensioned to the layout "
+                "it was trained with, which wins."
             )
-    # Patch 122gv: hard guard. Session arrays are pre-filled with NaN and
-    # only populated for markers whose names appear in BOTH the layout and
-    # the data. If the two name sets don't overlap (e.g. the project's
-    # markers were renamed but the layout still uses the old names), every
-    # marker stays NaN and the EKF "diverges" on an empty array — a
-    # confusing failure far from its cause. Fail here, where the cause is
-    # obvious.
-    matched = set(layout.marker_names) & set(marker_names_data)
-    if not matched:
-        raise ValueError(
-            "No layout markers were found in the pose data: the layout "
-            f"expects {sorted(layout.marker_names)} but the data contains "
-            f"{sorted(marker_names_data)}. Nothing would be filled in and "
-            "every value would be NaN. If the project's markers were "
-            "renamed, map the layout roles to the new names via a "
-            "[pose.layout] table in project.toml (see layout_from_config)."
+        (
+            layout, fitted_lengths, params, _, _, perspective
+        ) = load_model_v2(load_model)
+        loaded_model = True
+    elif layout is None:
+        layout = _resolve_layout(
+            config_path, marker_names_data, verbose=verbose,
+        )
+
+    _validate_layout_against_data(layout, marker_names_data)
+
+    # Patch 122hb: pre-flight block. Everything that decides how long this
+    # will take and how much memory it will eat is known right here, before
+    # a single frame is filtered — so say it, once, instead of leaving the
+    # user to infer it from a progress bar that hasn't moved in two hours.
+    # Cost model (measured, patch 122gz): the per-worker smoother allocates
+    # four (T, D, D) covariance stacks — P_pred, P_filt, P_smooth,
+    # P_lag_one — plus H at (T, 2K, D). Quadratic in D, which is why the
+    # layout choice is worth printing next to it.
+    if verbose:
+        D = layout.state_dim
+        K = layout.n_markers
+        T_max = max(s["n_frames"] for s in raw_sessions)
+        n_pool = min(n_workers, len(raw_sessions))
+        gib = (T_max * (4 * D * D + 2 * K * D) * 8) / (1024 ** 3)
+        print(
+            f"[smoother-v2] Pre-flight:\n"
+            f"    layout       : {len(layout.segments)} segments, "
+            f"{K} markers, state_dim D={D}"
+            f"{' (+drift)' if layout.with_drift else ''}\n"
+            f"    markers       : {len(set(layout.marker_names) & set(marker_names_data))}"
+            f"/{K} matched to data\n"
+            f"    sessions      : {len(raw_sessions)} "
+            f"({total_frames} frames, longest {T_max})\n"
+            f"    workers       : {n_pool} "
+            f"(≈{gib:.1f} GiB/worker peak, ≈{gib * n_pool:.0f} GiB total)\n"
+            f"    stage         : "
+            f"{'smoothing with loaded model' if loaded_model else f'EM ({em_max_iter} iterations) then smoothing'}",
+            flush=True,
         )
 
     # Build session arrays in layout marker order — that's what
@@ -7815,13 +7972,10 @@ def smooth_pose_v2(
 
     # ---------- Get fitted_lengths (load or fit) ----------
     # We need fitted_lengths up front to build the worker pool.
-    perspective: PerspectiveModelV2 | None = None
-    if load_model is not None:
-        if verbose:
-            print(f"[smoother-v2] Loading model from {load_model}")
-        (
-            layout, fitted_lengths, params, _, _, perspective
-        ) = load_model_v2(load_model)
+    # Patch 122hb: when a model was loaded, layout/fitted_lengths/params/
+    # perspective already came off disk in the Layout block above — they
+    # have to, because the layout decides how the data is packed.
+    if loaded_model:
         em_history: list[dict] = []
         converged = True
     else:
@@ -8196,6 +8350,20 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--config", default=None,
+        help=(
+            "Patch 122hb: path to the project's project.toml. The "
+            "kinematic tree and the marker names are then taken from "
+            "the project ([[pose.segments]], else [skeleton]) instead "
+            "of the built-in rat rig, whose marker names (nose, back1, "
+            "tailbase, ...) are almost certainly not yours. Strongly "
+            "recommended for any project that renamed its markers. "
+            "Ignored with --load-model, where the model's own layout "
+            "wins. The --no-back4/--no-tail/--no-lateral/--no-center "
+            "switches only apply to the built-in rig."
+        ),
+    )
+    parser.add_argument(
         "--likelihood-threshold", type=float, default=0.7,
         help="Likelihood threshold for high-confidence frames",
     )
@@ -8424,12 +8592,17 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    layout = standard_rat_layout(
-        include_back4=not args.no_back4,
-        include_tail=not args.no_tail,
-        include_lateral=not args.no_lateral,
-        include_center=not args.no_center,
-    )
+    # Patch 122hb: the built-in rig is a fallback, not a default. With
+    # --config the layout is the project's own.
+    if args.config:
+        layout = layout_from_config(args.config)
+    else:
+        layout = standard_rat_layout(
+            include_back4=not args.no_back4,
+            include_tail=not args.no_tail,
+            include_lateral=not args.no_lateral,
+            include_center=not args.no_center,
+        )
     if args.with_drift:
         layout.with_drift = True
     if args.orient_drift_segments:
@@ -8466,6 +8639,7 @@ def main(argv=None) -> int:
             pose_input=args.pose_input,
             output_dir=args.output_dir,
             layout=layout,
+            config_path=args.config,
             fps=args.fps,
             likelihood_threshold=args.likelihood_threshold,
             em_max_iter=args.em_max_iter,
