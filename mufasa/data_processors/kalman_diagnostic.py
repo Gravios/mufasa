@@ -103,6 +103,49 @@ SUFFIX_X = "_x"
 SUFFIX_Y = "_y"
 SUFFIX_P = "_p"
 
+MARKER_SUFFIXES = (SUFFIX_X, SUFFIX_Y, SUFFIX_P)
+
+
+def normalize_pose_columns(columns) -> list[str]:
+    """Normalize pose column names **without touching the marker's case**.
+
+    Patch 122hb. Every loader here used to do ``[str(c).lower() for c in
+    df.columns]``. The intent was only ever to make the *suffix* match
+    case-insensitively (``_X`` vs ``_x``, ``Likelihood`` vs ``likelihood``) —
+    but it folded the marker name with it. A project whose markers are
+    ``back_T4``/``tail_V6``/``back_L2`` got ``back_t4``/``tail_v6``/``back_l2``
+    back from the reader, which then matched nothing in a layout built from
+    ``project.toml`` (where the case is as the user typed it). Markers whose
+    names are already lower-case survived, so the failure looked like a
+    *partial* rename — seven markers fitted, eight "not in data" — and sent a
+    whole session hunting for a second generation of files that never existed.
+
+    Marker names are identifiers, not free text: ``back_T4`` and ``back_t4``
+    are different names, and the reader has no business deciding otherwise.
+
+    Rule: a column whose name ends in ``_x``/``_y``/``_p`` (any case) keeps its
+    base verbatim and gets a lower-case suffix. Anything else is not a marker
+    column and is lower-cased as before, so non-marker bookkeeping columns keep
+    the behaviour the rest of the module already expects.
+
+    Idempotent: normalizing already-normalized columns is a no-op, and for the
+    all-lower-case marker sets of legacy projects the whole function is.
+
+    :param columns: Iterable of column labels (anything ``str``-able).
+    :returns: List of normalized names, one per input, in input order.
+    """
+    out: list[str] = []
+    for c in columns:
+        s = str(c)
+        low = s.lower()
+        for suffix in MARKER_SUFFIXES:
+            if low.endswith(suffix) and len(s) > len(suffix):
+                out.append(s[: -len(suffix)] + suffix)
+                break
+        else:
+            out.append(low)
+    return out
+
 
 @dataclass
 class MarkerStats:
@@ -153,7 +196,7 @@ def detect_marker_columns(df: pd.DataFrame) -> list[str]:
     `<name>_x`, `<name>_y`, `<name>_p`. Markers missing any of
     the three are skipped with a warning.
     """
-    cols = [str(c).lower() for c in df.columns]
+    cols = normalize_pose_columns(df.columns)
     candidates = {}
     for c in cols:
         for suffix in (SUFFIX_X, SUFFIX_Y, SUFFIX_P):
@@ -179,7 +222,8 @@ def detect_marker_columns(df: pd.DataFrame) -> list[str]:
 
 def _load_csv_with_header_detection(csv_path: str) -> pd.DataFrame:
     """Load a CSV, autodetecting flat vs multi-row IMPORTED_POSE
-    header. Returns a DataFrame with lowercased column names.
+    header. Returns a DataFrame with normalized column names
+    (marker case preserved, suffix lower-cased — patch 122hb).
 
     Multi-row flattening rule: if the LAST header level already
     contains a complete marker name with suffix (e.g. ``nose_x``
@@ -195,7 +239,7 @@ def _load_csv_with_header_detection(csv_path: str) -> pd.DataFrame:
     the same column names downstream.
     """
     df = pd.read_csv(csv_path, index_col=0, low_memory=False)
-    df.columns = [str(c).lower() for c in df.columns]
+    df.columns = normalize_pose_columns(df.columns)
     if detect_marker_columns(df):
         return df
 
@@ -204,19 +248,23 @@ def _load_csv_with_header_detection(csv_path: str) -> pd.DataFrame:
     new_cols = []
     for col in df_multi.columns:
         if isinstance(col, tuple) and len(col) >= 2:
-            last = str(col[-1]).lower()
-            if last.endswith(("_x", "_y", "_p")):
+            last = str(col[-1])
+            if last.lower().endswith(("_x", "_y", "_p")):
                 # SimBA IMPORTED_POSE: last level already complete
-                # (e.g. "nose_x"). Use directly.
-                new_cols.append(last)
+                # (e.g. "nose_x"). Use directly — patch 122hb: case of
+                # the marker base is preserved, only the suffix folded.
+                new_cols.append(normalize_pose_columns([last])[0])
             else:
                 # DLC standard: last level is just "x"/"y"/"likelihood".
                 # Prepend bodypart and normalize "likelihood" → "p".
+                # Patch 122hb: the bodypart level is NOT lower-cased —
+                # it is the marker name and must survive verbatim.
+                last = last.lower()
                 if last in ("likelihood", "lik"):
                     last = "p"
-                new_cols.append(f"{str(col[-2]).lower()}_{last}")
+                new_cols.append(f"{str(col[-2])}_{last}")
         else:
-            new_cols.append(str(col).lower())
+            new_cols.append(normalize_pose_columns([col])[0])
     df_multi.columns = new_cols
     df_multi = df_multi.apply(pd.to_numeric, errors="coerce")
     return df_multi
@@ -234,7 +282,7 @@ def load_pose_file(path: str) -> tuple[pd.DataFrame, list[str]]:
     ext = Path(path).suffix.lower()
     if ext == ".parquet":
         df = pd.read_parquet(path)
-        df.columns = [str(c).lower() for c in df.columns]
+        df.columns = normalize_pose_columns(df.columns)
     elif ext in (".csv", ".tsv"):
         df = _load_csv_with_header_detection(path)
     else:

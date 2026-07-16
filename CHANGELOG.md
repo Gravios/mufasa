@@ -6,7 +6,77 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ---
 
-## Session 2026-05-12 — TOML-aware ConfigReader + configparser removal from forms
+## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
+
+One patch, **122hb**, closing two bugs that both presented as "the smoother
+can't find my markers" and were each misdiagnosed once.
+
+**Bug 1 — the loaders renamed the markers.** Every pose reader did
+`[str(c).lower() for c in df.columns]`. The intent was case-insensitive
+*suffix* matching (`_X` vs `_x`); the effect was that any marker with an
+upper-case letter came back renamed. `back_T4` → `back_t4`, `tail_V6` →
+`tail_v6`. A layout built from `project.toml` (which keeps the case the user
+typed) then matched nothing for those markers.
+
+The tell was the split: on the strohA-kj project, 7 of 15 markers matched and
+8 did not, and the 8 were **exactly** the 8 whose names contain an upper-case
+letter. This was previously read as evidence of a partial marker rename, and
+cost a session hunting for a second generation of files under `backups/` and
+`derived/` that never existed. The recursive-`rglob` discovery scope is still
+worth tightening, but it was not this bug and never was. The user's own
+report — "the csv files show the old labels and the parquet files show the new
+labels" — was correct and should have been believed.
+
+Marker names are identifiers. `normalize_pose_columns` now folds the suffix
+only and returns the base verbatim. No-op for the all-lower-case marker sets
+of legacy projects.
+
+**Bug 2 — the layout was resolved before the model that carries it.**
+`smooth_pose_v2` defaulted `layout` to `standard_rat_layout()`, validated and
+packed the data against it, and *then* — fifty lines later — opened the `.npz`
+whose layout it should have used. Both load-mode paths in the GUI (the "load
+model" mode, and pass 2 of the train-on-a-subset two-pass workflow) pass no
+layout, so both validated project data against the built-in 2019 rat rig and
+died citing `nose`/`back1`/`tailbase`. Load now happens first; the model's
+layout is authoritative because its parameters are dimensioned to it.
+
+A default that names markers the project has never heard of is not a default.
+`layout=None` with no model now resolves from `config_path`, and falls back to
+the built-in rig only when the data genuinely is the built-in rig — otherwise
+it raises and says what to add.
+
+**The 122gv hole is closed.** That guard only fired on *zero* overlap; a 7/15
+mismatch merely warned that the missing markers "will have default offsets",
+which undersells "eight segments are unobservable, the covariances will blow
+up, and this will look like a hang". Any missing layout marker is now a hard
+error, and the error names case-only differences explicitly.
+
+### Shipped
+
+* `normalize_pose_columns` in `kalman_diagnostic.py`; all four loaders there
+  plus the smoother's own direct reader routed through it.
+* `_resolve_layout` / `_validate_layout_against_data` in
+  `kalman_pose_smoother_v2.py`; `load_model_v2` hoisted above both.
+* `config_path=` on `smooth_pose_v2`, threaded through all four GUI call sites
+  and a new `--config` on the CLI (which also stopped assuming the rat rig).
+* Pre-flight block: layout, `state_dim`, markers matched, sessions, workers,
+  projected GiB/worker, and which stage is about to run — printed before the
+  first frame is filtered.
+* `tests/smoke_122hb_marker_case_and_layout.py` (29 checks, real parquet/CSV
+  round-trips rather than AST-only).
+
+### Next
+
+* Discovery scope: `discover_pose_files` and the `smooth_pose_v2` fallback
+  glob are still recursive and still sweep `backups/` and `derived/`. Now that
+  the guard is strict this surfaces as a loud error rather than silent garbage,
+  but it should be scoped or excluded outright.
+* Heartbeat inside warm-start / EM — long phases are still silent between
+  iterations.
+* `[pose.skeleton]` schema migration (drop `nodes`, move under `[pose]`).
+* Joint model phase 1: `joint = "rigid"` → merge into parent.
+
+
 
 Two patches: **122e** makes `ConfigReader` (959 lines, inherited
 by 268+ files across the codebase) read v1 `project.toml` while
