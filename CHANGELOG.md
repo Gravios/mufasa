@@ -8,6 +8,28 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hd** fixes the error message 122hc introduced. It was readable and wrong.
+Against a project that declared its own `[[pose.segments]]` and typed
+`--orient-drift-segments body,head`, it asserted the layout came from
+`[skeleton]`, that there was "no 'body' or 'head' to point at" (`head` was in
+the list the message itself had just printed), and that the fix was to add a
+`[[pose.segments]]` block the user already had — while printing the flag as
+`--orientation-drift-segments`, which is not the flag. The one real fault,
+`body` should be `back`, was the one thing it never said.
+
+The lesson is the session's lesson again, one level up: a canned narrative
+that asserts a cause it hasn't checked. An error that guesses is worse than one
+that only lists facts, because the whole value of an error is that it can be
+trusted. 122hd states what is missing, lists what exists, names the root, and
+explains only where there is a signal checkable against the object in hand:
+the name belongs to the built-in rig (compare against `standard_rat_layout()`),
+or every segment is named after a marker and therefore the tree really was
+derived from `[skeleton]` (a property of the layout, not a guess about
+provenance). Near-match suggestions use a strict cutoff, since a loose one
+invents advice (`trunk` -> `neck`) that is worse than silence.
+
+
+
 **122hc follows 122hb the same day**, because 122hb's fix was incomplete in a
 way worth recording: it made `smooth_pose_v2` stop assuming the built-in rig
 when `layout is None`, and added `--config` to the CLI so the layout could come
