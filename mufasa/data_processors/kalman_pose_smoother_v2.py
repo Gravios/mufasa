@@ -8670,25 +8670,87 @@ def main(argv=None) -> int:
     # trunk. Those names exist only in the built-in rig and in a project's
     # own [[pose.segments]]. So this can legitimately fail, and when it does
     # the fix is a real one (declare the segments), not a typo — say so.
-    def _apply_segment_flags(lay, raw, field):
+    def _describe_unknown_segments(lay, unknown, flag):
+        """Explain a bad --*-segments name using only things we can check.
+
+        Patch 122hd. The 122hc version of this message was a canned story: it
+        asserted the layout came from [skeleton], that there was "no 'body' or
+        'head' to point at", and that the fix was to add a [[pose.segments]]
+        block. Against a project that HAD such a block and did have a 'head',
+        every one of those was false, and it told the user to do something
+        they had already done. An error that guesses is worse than one that
+        only lists facts — the whole point of it is to be trusted.
+
+        So: state what is missing, list what exists, and add an explanation
+        only where there is a checkable signal for it.
+        """
+        available = sorted(sg.name for sg in lay.segments)
+        lines = [
+            f"[smoother-v2] ERROR: {flag} names segment(s) that don't exist "
+            f"in this layout: {unknown}.",
+            f"  This layout's segments: {available}",
+            f"  Its root segment is: {lay.root_segment.name!r}",
+        ]
+
+        # Signal 1: the name belongs to the built-in rig. This is the actual
+        # trap — 'body' is what the rig and the docs call the root, so it is
+        # what everyone types first, against a tree that calls it something
+        # else. Checkable: compare against the rig's own segment names.
+        rig = standard_rat_layout()
+        rig_names = {sg.name for sg in rig.segments}
+        for u in unknown:
+            if u not in rig_names:
+                continue
+            if u == rig.root_segment.name:
+                lines.append(
+                    f"  {u!r} is the built-in rat rig's name for its ROOT "
+                    f"segment. This layout's root is "
+                    f"{lay.root_segment.name!r} — try that instead."
+                )
+            else:
+                lines.append(
+                    f"  {u!r} is a segment name from the built-in rat rig, "
+                    f"not from this project's tree."
+                )
+
+        # Signal 2: near-miss typo. Deliberately strict — a loose cutoff
+        # invents suggestions ('trunk' -> 'neck') that are worse than none.
+        import difflib
+        for u in unknown:
+            close = difflib.get_close_matches(u, available, n=2, cutoff=0.6)
+            if close:
+                lines.append(
+                    f"  {u!r}: did you mean "
+                    f"{' or '.join(repr(c) for c in close)}?"
+                )
+
+        # Signal 3: a [skeleton]-derived tree names every segment after its
+        # distal marker, so its segment names are a subset of its marker
+        # names. That is a property of the object in hand, not a guess about
+        # where it came from — which is why it's safe to assert.
+        if set(available) <= set(lay.marker_names):
+            lines.append(
+                "  Every segment here is named after a marker, which means "
+                "this tree was derived from [skeleton] and has no named body "
+                "parts to point at. Declare the tree you mean with a "
+                "[[pose.segments]] block in project.toml (named segments, "
+                "rigid clusters, far fewer state dims)."
+            )
+        else:
+            lines.append(
+                "  These are the names declared by [[pose.segments]] in "
+                "project.toml. Use one of them, or rename the segment there."
+            )
+        return "\n".join(lines)
+
+    def _apply_segment_flags(lay, raw, field, flag):
         import dataclasses as _dc
         names = [s.strip() for s in raw.split(",") if s.strip()]
         if not names:
             return lay
         unknown = [n for n in names if n not in {sg.name for sg in lay.segments}]
         if unknown:
-            print(
-                f"[smoother-v2] ERROR: --{field.replace('_', '-')} names "
-                f"segment(s) that don't exist in this layout: {unknown}.\n"
-                f"  This layout's segments: "
-                f"{sorted(sg.name for sg in lay.segments)}\n"
-                f"  A layout derived from [skeleton] names every segment "
-                f"after its distal marker, so there is no 'body' or 'head' "
-                f"to point at. Declare the tree you mean with a "
-                f"[[pose.segments]] block in project.toml (named segments, "
-                f"rigid clusters, far fewer state dims) and re-run.",
-                file=sys.stderr,
-            )
+            print(_describe_unknown_segments(lay, unknown, flag), file=sys.stderr)
             raise SystemExit(1)
         # Names are validated against the layout in BodyLayout.__post_init__
         # — rebuild via dataclasses.replace to re-trigger it.
@@ -8697,12 +8759,14 @@ def main(argv=None) -> int:
     if args.orient_drift_segments:
         layout = _apply_segment_flags(
             layout, args.orient_drift_segments, "orientation_drift_segments",
+            "--orient-drift-segments",
         )
     # Patch 121d: const-accel flag plumbing. Same pattern as
     # orient-drift above.
     if args.const_accel_segments:
         layout = _apply_segment_flags(
             layout, args.const_accel_segments, "const_accel_segments",
+            "--const-accel-segments",
         )
 
     try:
