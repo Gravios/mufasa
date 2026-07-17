@@ -64,6 +64,7 @@ Design choices (locked in patch 99, see commit message)
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -3435,8 +3436,10 @@ def _build_constraint_observations(
     state: np.ndarray,
     layout: BodyLayout,
     constraint_sigma: float,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Build the unit-norm constraint pseudo-observations.
+    joint_prior: JointPriorV2 | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Build the unit-norm constraint pseudo-observations, and optionally the
+    von Mises joint-angle prior rows (patch 122hf).
 
     For each (cos, sin) pair in the state, the constraint is
     cos² + sin² = 1. As a soft observation:
@@ -3447,11 +3450,30 @@ def _build_constraint_observations(
     Linearization at the current state gives Jacobian row
     H_row = [..., 2*cos, 2*sin, ...] (zeros elsewhere).
 
+    The joint prior adds, per non-root segment with kappa > 0, two rows
+    pulling the segment's local orientation vector toward its rest direction::
+
+        h(x) = (cos_s, sin_s)          z = (cos(mu_s), sin(mu_s))
+        H    = identity on that pair   noise variance = 1/kappa_s
+
+    Linear in the state, so the Jacobian is constant — no linearization error.
+    Two rows rather than the one-row ``sin(theta - mu) = 0`` residual, because
+    that one is satisfied at both ``mu`` and ``mu + pi``: it would happily
+    settle the tail folded back on itself. Pulling the *vector* has no such
+    ambiguity.
+
+    For a small angular error d, the residual magnitude is d to first order,
+    so variance 1/kappa is the right per-component scale for a von Mises with
+    concentration kappa (whose angular sd is ~1/sqrt(kappa)).
+
     Returns
     -------
-    z : (n_constraints,) — target values, all zero
-    h : (n_constraints,) — current values of cos²+sin²-1
+    z : (n_constraints,) — target values
+    h : (n_constraints,) — predicted values at the current state
     H : (n_constraints, state_dim) — Jacobian
+    R_diag : (n_constraints,) — per-row observation variance. Returned rather
+        than assumed uniform because the prior rows carry per-segment variance
+        while the norm rows all share constraint_sigma².
     """
     indices = _pack_state_layout_indices(layout)
     rows: list[np.ndarray] = []
@@ -3476,11 +3498,30 @@ def _build_constraint_observations(
         row[indices[seg_name]["sin"]] = 2.0 * s
         rows.append(row)
 
-    n_constraints = len(rows)
-    z = np.zeros(n_constraints)
+    # Norm rows: target 0, shared variance.
+    z_vals = [0.0] * len(rows)
+    r_diag = [constraint_sigma ** 2] * len(rows)
+
+    # Patch 122hf: joint-prior rows.
+    if joint_prior is not None:
+        for seg_name in layout.non_root_topo_order:
+            kappa = joint_prior.kappa.get(seg_name, 0.0)
+            if kappa <= 0.0:
+                continue          # uniform joint: nothing to say
+            mu = joint_prior.mu.get(seg_name, 0.0)
+            var = 1.0 / kappa
+            for axis, target in (("cos", math.cos(mu)), ("sin", math.sin(mu))):
+                row = np.zeros(layout.state_dim)
+                row[indices[seg_name][axis]] = 1.0
+                rows.append(row)
+                h_vals.append(float(state[indices[seg_name][axis]]))
+                z_vals.append(target)
+                r_diag.append(var)
+
+    z = np.array(z_vals)
     h = np.array(h_vals)
     H = np.array(rows)
-    return z, h, H
+    return z, h, H, np.array(r_diag)
 
 
 def _build_marker_observations(
@@ -3583,6 +3624,7 @@ def forward_filter_v2(
     likelihood_threshold: float = 0.5,
     apply_constraints: bool = True,
     perspective: PerspectiveModelV2 | None = None,
+    joint_prior: JointPriorV2 | None = None,
 ) -> FilterResultV2:
     """EKF forward pass on the v2 body-state representation.
 
@@ -3733,16 +3775,17 @@ def forward_filter_v2(
         n_observed[t] = n_m
 
         if apply_constraints:
-            z_c, h_c, H_c = _build_constraint_observations(
+            # Patch 122hf: R comes back per-row now — the norm rows share
+            # constraint_sigma² but each joint-prior row carries 1/kappa for
+            # its own segment.
+            z_c, h_c, H_c, R_diag_c = _build_constraint_observations(
                 x_p, layout, params.constraint_sigma,
+                joint_prior=joint_prior,
             )
             z_full = np.concatenate([z_m, z_c])
             h_full = np.concatenate([h_m, h_c])
             H_full = np.vstack([H_m, H_c]) if n_m > 0 else H_c
-            R_diag_full = np.concatenate([
-                R_diag_m,
-                np.full(z_c.shape[0], params.constraint_sigma ** 2),
-            ])
+            R_diag_full = np.concatenate([R_diag_m, R_diag_c])
         else:
             z_full = z_m
             h_full = h_m
@@ -3927,6 +3970,235 @@ def _project_state_to_unit_circle(
 #
 # Numerical stability: use solve() instead of explicit inverse;
 # symmetrize covariances each step.
+
+
+@dataclass
+class JointPriorV2:
+    """A von Mises prior on each non-root segment's *local* joint angle.
+
+    Patch 122hf. Motivation, from a real run: five of the seven segments in a
+    typical rodent tree carry exactly one marker (``neck``, ``back_rear``,
+    ``tail_1..3``). A segment with two or more markers is robust to losing one
+    — the survivors pin its pose and forward kinematics places the missing
+    marker. A single-marker segment has no such redundancy: the moment its
+    marker drops below the likelihood threshold, nothing observes its angle.
+
+    And nothing else constrains it either. ``build_F_v2`` models segment
+    orientation as "constant-velocity for (cos, sin) treated as ambient 2D" —
+    a random walk. The only prior in play is the unit-norm pseudo-observation
+    ``cos² + sin² = 1``, which fixes the *radius* and says nothing about the
+    *angle*. At a fitted ``q_seg_ori`` of ~6, the (cos, sin) standard
+    deviation reaches ~1.4 after one second of dropout, on a circle of radius
+    1: the norm constraint is then simply projecting a wild vector back onto
+    the circle at an arbitrary angle. The marker doesn't wander a little, it
+    goes uniform.
+
+    A tail is not uniform. It trails within a cone, and that cone is
+    measurable from the frames where the marker *is* visible. This prior says
+    so: per segment, the circular mean ``mu`` of the local angle and the
+    concentration ``kappa`` of its spread, applied as a soft pseudo-observation
+    on exactly the channel that already carries the norm constraint.
+
+    While the marker is visible, its own σ dominates and the prior costs
+    nothing. While it is not, the prior is all there is, and the angle relaxes
+    toward ``mu`` with *bounded* variance rather than diffusing.
+
+    The prior is self-limiting: a joint that really is uniform yields
+    ``kappa ≈ 0``, whose pseudo-observation has effectively infinite variance
+    and therefore no effect. Nothing has to decide which segments deserve one.
+
+    :param mu: Per-segment circular mean of the local angle, radians.
+    :param kappa: Per-segment von Mises concentration. 0 = uniform = inert.
+        Larger is tighter; the effective angular variance is ``1/kappa``.
+    :param n_obs: Per-segment count of observed frames the fit used. Kept for
+        reporting — a kappa fitted from 40 frames deserves less trust than one
+        fitted from 40,000, and the user should be able to see which is which.
+    """
+
+    mu: dict[str, float]
+    kappa: dict[str, float]
+    n_obs: dict[str, int] = field(default_factory=dict)
+
+
+# A prior tighter than this would fight real motion rather than merely
+# constrain blind extrapolation. sigma_theta = 1/sqrt(kappa), so kappa=400
+# corresponds to a 0.05 rad (~2.9°) angular sd — already stiffer than any
+# real rodent joint. Sanity backstop, not a tuning knob.
+_JOINT_PRIOR_KAPPA_CAP = 400.0
+
+# Below this, the prior is dropped entirely rather than applied weakly.
+#
+# The floor matters more than it looks. During a dropout there is nothing to
+# compete with the prior, so even a very weak one fully determines the angle —
+# a kappa of 0.2 still drags the segment to its mu, it just reports honest
+# (large) variance while doing so. Measured: on a near-uniform synthetic tail
+# the fitted kappas were 0.2-0.8 and applying them made the worst-case angle
+# error *worse* (151 deg -> 180 deg), because mu was meaningless. On a tail
+# that genuinely trails, the fitted kappas were 5-8 and the same dropout
+# improved from 115 deg RMSE to 18 deg.
+#
+# kappa = 1.0 is sigma_theta ~ 57 deg. A joint that diffuse carries no usable
+# information about where the segment is, so applying it is all risk and no
+# benefit. Dropping it returns exactly today's behaviour for that segment,
+# which is the right failure mode: no help rather than wrong help.
+_JOINT_PRIOR_KAPPA_FLOOR = 1.0
+
+
+def _fit_von_mises(cos_vals: np.ndarray, sin_vals: np.ndarray) -> tuple[float, float]:
+    """Fit (mu, kappa) to unit vectors by the standard circular MLE.
+
+    Uses Mardia & Jupp's piecewise approximation to the inverse of
+    ``A(kappa) = I1(kappa)/I0(kappa)``, which has no closed form. The three
+    branches are the published ones; they are approximations to a Bessel
+    ratio, not arbitrary constants.
+
+    :param cos_vals: Cosines of the sample angles.
+    :param sin_vals: Sines of the sample angles.
+    :returns: ``(mu, kappa)``. ``kappa`` is 0 when the sample is empty or the
+        resultant length is ~0 (i.e. genuinely uniform).
+    """
+    n = cos_vals.shape[0]
+    if n == 0:
+        return 0.0, 0.0
+    # Normalize each sample to the unit circle first: the state's (cos, sin)
+    # is only softly held there, and an off-circle sample would otherwise
+    # bias the resultant length and hence kappa.
+    norm = np.hypot(cos_vals, sin_vals)
+    good = norm > 1e-9
+    if not np.any(good):
+        return 0.0, 0.0
+    c = cos_vals[good] / norm[good]
+    s = sin_vals[good] / norm[good]
+
+    c_bar = float(np.mean(c))
+    s_bar = float(np.mean(s))
+    mu = float(np.arctan2(s_bar, c_bar))
+    r_bar = float(np.hypot(c_bar, s_bar))
+
+    if r_bar < 1e-6:
+        return mu, 0.0
+    if r_bar < 0.53:
+        kappa = 2.0 * r_bar + r_bar ** 3 + 5.0 * r_bar ** 5 / 6.0
+    elif r_bar < 0.85:
+        kappa = -0.4 + 1.39 * r_bar + 0.43 / (1.0 - r_bar)
+    else:
+        denom = r_bar ** 3 - 4.0 * r_bar ** 2 + 3.0 * r_bar
+        kappa = 1.0 / denom if abs(denom) > 1e-9 else _JOINT_PRIOR_KAPPA_CAP
+    kappa = float(np.clip(kappa, 0.0, _JOINT_PRIOR_KAPPA_CAP))
+    return mu, kappa
+
+
+def fit_joint_priors_v2(
+    sessions,
+    layout: BodyLayout,
+    marker_names: list[str],
+    fitted_lengths,
+    params: NoiseParamsV2,
+    fps: float,
+    likelihood_threshold: float = 0.7,
+    apply_constraints: bool = True,
+    perspective: PerspectiveModelV2 | None = None,
+    verbose: bool = False,
+    session_names: list[str] | None = None,
+    pool=None,
+) -> JointPriorV2:
+    """Fit a von Mises joint prior per non-root segment.
+
+    Fit ONCE before EM, from a filter+smoother pass without the prior — the
+    same lifecycle as :func:`fit_perspective_model_v2`, for the same reason:
+    it is a property of the animal's anatomy and behaviour, not a quantity EM
+    needs to re-estimate, and refitting it inside EM would let it chase its
+    own tail.
+
+    Only frames where the segment's own markers were actually observed
+    contribute. That is the crux — fitting from all frames would learn the
+    prior from the very dropout stretches the prior exists to constrain, and
+    would return "uniform" for precisely the joints that need help most.
+    """
+    from collections import defaultdict
+
+    cos_acc: dict[str, list] = defaultdict(list)
+    sin_acc: dict[str, list] = defaultdict(list)
+
+    seg_marker_idx = {
+        seg.name: [marker_names.index(m) for m in seg.markers
+                   if m in marker_names]
+        for seg in layout.segments
+    }
+
+    for i, (pos, likes) in enumerate(sessions):
+        # Same shape of pass as fit_warm_start_sigma_v2 / the perspective
+        # fit: filter + smooth with the current params, and read the state.
+        # Deliberately WITHOUT joint_prior — the prior is what we are trying
+        # to measure, so applying it here would just return it to us.
+        x0 = initial_state_from_data(
+            pos, likes, layout, marker_names, fitted_lengths,
+            likelihood_threshold,
+        )
+        filt = forward_filter_v2(
+            pos, likes, layout, params, 1.0 / fps,
+            initial_state=x0,
+            likelihood_threshold=likelihood_threshold,
+            apply_constraints=apply_constraints,
+            perspective=perspective,
+        )
+        x = rts_smooth_v2(filt, layout, 1.0 / fps).x_smooth
+        for seg_name in layout.non_root_topo_order:
+            idx = seg_marker_idx.get(seg_name, [])
+            if not idx:
+                continue
+            # A frame counts only if this segment's own geometry was seen.
+            observed = np.any(likes[:, idx] >= likelihood_threshold, axis=1)
+            if not np.any(observed):
+                continue
+            sl = layout.slice_segment_orientation(seg_name)
+            block = x[observed, sl]
+            cos_v = block[:, 0].copy()
+            sin_v = block[:, 1].copy()
+
+            # Patch 122hf: canonicalize the (L, theta) sign gauge.
+            #
+            # A segment's length is a free state with process noise and
+            # nothing holds it positive. (L, theta) and (-L, theta+pi) place
+            # the marker at exactly the same point, so the two are
+            # observationally identical and the filter is free to sit in
+            # either. Measured on a synthetic tail with the tip blinded for
+            # 20s: L walks through zero during the dropout (47% of frames
+            # negative), re-acquires the marker in the mirrored gauge, and
+            # stays there — 100% negative afterwards, with theta reported
+            # 180 degrees away from the truth.
+            #
+            # That is a pre-existing property of the state, not something
+            # this prior introduces, and fixing it properly means holding
+            # L > 0 in the filter (see CHANGELOG). But a circular mean taken
+            # across both gauges is meaningless — it drags mu by ~180 deg and
+            # collapses kappa (13.3 -> 1.1 measured) — so the fit has to fold
+            # the mirrored frames back before averaging.
+            length_sl = layout.slice_segment_length(seg_name)
+            lengths = x[observed, length_sl][:, 0]
+            flipped = lengths < 0.0
+            cos_v[flipped] *= -1.0
+            sin_v[flipped] *= -1.0
+
+            cos_acc[seg_name].append(cos_v)
+            sin_acc[seg_name].append(sin_v)
+        if verbose and session_names:
+            print(f"[v2-jprior] {i + 1}/{len(sessions)} {session_names[i]}")
+
+    mu: dict[str, float] = {}
+    kappa: dict[str, float] = {}
+    n_obs: dict[str, int] = {}
+    for seg_name in layout.non_root_topo_order:
+        if seg_name not in cos_acc:
+            mu[seg_name], kappa[seg_name], n_obs[seg_name] = 0.0, 0.0, 0
+            continue
+        c = np.concatenate(cos_acc[seg_name])
+        s = np.concatenate(sin_acc[seg_name])
+        m, k = _fit_von_mises(c, s)
+        if k < _JOINT_PRIOR_KAPPA_FLOOR:
+            k = 0.0
+        mu[seg_name], kappa[seg_name], n_obs[seg_name] = m, k, int(c.shape[0])
+    return JointPriorV2(mu=mu, kappa=kappa, n_obs=n_obs)
 
 
 @dataclass
@@ -6023,6 +6295,7 @@ class EMResultV2:
     initial_params: NoiseParamsV2
     converged: bool
     perspective: PerspectiveModelV2 | None = None
+    joint_prior: JointPriorV2 | None = None
     validation_violations: list[_ValidationViolation] = (
         field(default_factory=list)
     )
@@ -6141,7 +6414,7 @@ def _pool_init(
 def _pool_em_e_step(
     args: tuple[
         int, NoiseParamsV2, PerspectiveModelV2 | None,
-        int, bool, bool, str, str,
+        JointPriorV2 | None, int, bool, bool, str, str,
     ],
 ) -> tuple[
     int, _MStepStatsV2, _PerSessionFitV2,
@@ -6154,6 +6427,7 @@ def _pool_em_e_step(
     sess_idx : int
     params : NoiseParamsV2
     perspective : PerspectiveModelV2 or None
+    joint_prior : JointPriorV2 or None
     iteration : int
     enable_validation : bool
     enable_strict_validation : bool
@@ -6173,7 +6447,7 @@ def _pool_em_e_step(
     """
     import time as _t
     (
-        sess_idx, params, perspective, iteration,
+        sess_idx, params, perspective, joint_prior, iteration,
         enable_validation, enable_strict_validation,
         session_name, device,
     ) = args
@@ -6413,7 +6687,8 @@ def _pool_perspective_pass(
 
 def _pool_final_smooth(
     args: tuple[
-        int, NoiseParamsV2, PerspectiveModelV2 | None, str,
+        int, NoiseParamsV2, PerspectiveModelV2 | None,
+        JointPriorV2 | None, str,
     ],
 ) -> tuple[int, np.ndarray | None, np.ndarray | None, float, str | None]:
     """Per-session final smoother pass in a worker.
@@ -6430,7 +6705,7 @@ def _pool_final_smooth(
     sessions while preserving all completed outputs.
     """
     import time as _t
-    sess_idx, params, perspective, device = args
+    sess_idx, params, perspective, joint_prior, device = args
     state = _POOL_WORKER_STATE
     pos, likes = state["sessions_arr"][sess_idx]
     layout = state["layout"]
@@ -6448,6 +6723,7 @@ def _pool_final_smooth(
             likelihood_threshold=likelihood_threshold,
             apply_constraints=apply_constraints,
             perspective=perspective,
+            joint_prior=joint_prior,
             device=device,
         )
         elapsed = _t.time() - t0
@@ -6476,6 +6752,7 @@ def fit_noise_params_em_v2(
     enable_validation: bool = True,
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
+    enable_joint_prior: bool = False,
     enable_strict_validation: bool = False,
     verbose: bool = False,
     session_names: list[str] | None = None,
@@ -6672,6 +6949,53 @@ def fit_noise_params_em_v2(
                 f"{', '.join(max_corrections) if max_corrections else 'all <1%'}"
             )
 
+    # Patch 122hf: fit the von Mises joint prior. Same lifecycle as the
+    # perspective model above, for the same reason — it describes the animal,
+    # not the noise, so EM has no business re-estimating it, and refitting it
+    # each iteration would let it chase its own tail.
+    #
+    # It exists because five of the seven segments in a typical rodent tree
+    # carry exactly one marker. Lose that marker and nothing observes the
+    # segment's angle — and nothing constrains it either: orientation is a
+    # random walk and cos²+sin²=1 pins only the radius, never the angle.
+    # Measured on a trailing-tail synthetic with the tip blinded for 20s:
+    # angle RMSE 115° (worst case 180°, pointing backwards) -> 18° (worst 46°).
+    joint_prior: JointPriorV2 | None = None
+    if enable_joint_prior:
+        if verbose:
+            print("[v2-em] Fitting joint priors (von Mises per segment)...")
+        joint_prior = fit_joint_priors_v2(
+            sessions, layout, marker_names, fitted_lengths,
+            initial_params, fps,
+            likelihood_threshold=likelihood_threshold,
+            apply_constraints=apply_constraints,
+            perspective=perspective,
+            verbose=False, session_names=session_names, pool=pool,
+        )
+        if verbose:
+            active, inert = [], []
+            for seg in layout.non_root_topo_order:
+                kappa = joint_prior.kappa.get(seg, 0.0)
+                if kappa > 0.0:
+                    active.append(
+                        f"{seg}: mu={math.degrees(joint_prior.mu[seg]):.0f}°"
+                        f", sd={math.degrees(1.0 / math.sqrt(kappa)):.0f}°"
+                        f" (n={joint_prior.n_obs.get(seg, 0)})"
+                    )
+                else:
+                    inert.append(seg)
+            print(
+                f"[v2-em] joint priors: {len(active)}"
+                f"/{len(layout.non_root_topo_order)} segment(s) active"
+                + (" — " + "; ".join(active) if active else "")
+            )
+            if inert:
+                print(
+                    f"[v2-em] joint priors inert (kappa < "
+                    f"{_JOINT_PRIOR_KAPPA_FLOOR}, angle too diffuse to carry "
+                    f"information): {inert}. These behave exactly as before."
+                )
+
     params = initial_params
     history: list[dict[str, float]] = []
     converged = False
@@ -6693,7 +7017,7 @@ def fit_noise_params_em_v2(
             # Parallel path
             task_args = [
                 (
-                    sess_idx, params, perspective, iteration,
+                    sess_idx, params, perspective, joint_prior, iteration,
                     enable_validation, enable_strict_validation,
                     (
                         session_names[sess_idx]
@@ -6788,6 +7112,7 @@ def fit_noise_params_em_v2(
                     likelihood_threshold=likelihood_threshold,
                     apply_constraints=apply_constraints,
                     perspective=perspective,
+                    joint_prior=joint_prior,
                 )
                 smooth = rts_smooth_v2(filt, layout, dt)
 
@@ -7015,6 +7340,7 @@ def fit_noise_params_em_v2(
         params=params, history=history,
         initial_params=initial_params, converged=converged,
         perspective=perspective,
+        joint_prior=joint_prior,
         validation_violations=all_violations,
     )
 
@@ -7216,6 +7542,7 @@ def smooth_session_v2(
     likelihood_threshold: float = 0.7,
     apply_constraints: bool = True,
     perspective: PerspectiveModelV2 | None = None,
+    joint_prior: JointPriorV2 | None = None,
     device: str = "cpu",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Run forward filter + RTS smoother on one session, return
@@ -7252,6 +7579,7 @@ def smooth_session_v2(
         likelihood_threshold=likelihood_threshold,
         apply_constraints=apply_constraints,
         perspective=perspective,
+        joint_prior=joint_prior,
     )
     smooth = rts_smooth_v2(filt, layout, dt)
 
@@ -7283,6 +7611,7 @@ def save_model_v2(
     fps: float,
     likelihood_threshold: float,
     perspective: PerspectiveModelV2 | None = None,
+    joint_prior: JointPriorV2 | None = None,
 ) -> None:
     """Serialize a fitted v2 model to .npz.
 
@@ -7445,6 +7774,21 @@ def save_model_v2(
         save_kwargs["persp_arena_x_range"] = perspective.arena_x_range
         save_kwargs["persp_arena_y_mean"] = perspective.arena_y_mean
         save_kwargs["persp_arena_y_range"] = perspective.arena_y_range
+
+    # Patch 122hf: persist the joint prior. Gated on has_joint_prior so
+    # older loaders ignore it and this loader treats its absence in older
+    # models as "no prior" rather than as an error.
+    save_kwargs["has_joint_prior"] = joint_prior is not None
+    if joint_prior is not None:
+        save_kwargs["jp_mu"] = np.array(
+            list(joint_prior.mu.items()), dtype=object,
+        )
+        save_kwargs["jp_kappa"] = np.array(
+            list(joint_prior.kappa.items()), dtype=object,
+        )
+        save_kwargs["jp_n_obs"] = np.array(
+            list(joint_prior.n_obs.items()), dtype=object,
+        )
 
     np.savez(path, **save_kwargs)
 
@@ -7634,6 +7978,17 @@ def load_model_v2(
             arena_y_range=float(data["persp_arena_y_range"]),
         )
 
+    # Patch 122hf: joint prior (optional, only in 122hf+ models). Absent in
+    # every earlier model, so its absence must mean "no prior", never an
+    # error — the same backward-compatibility contract perspective has.
+    joint_prior: JointPriorV2 | None = None
+    if "has_joint_prior" in data.files and bool(data["has_joint_prior"]):
+        joint_prior = JointPriorV2(
+            mu={k: float(v) for k, v in data["jp_mu"]},
+            kappa={k: float(v) for k, v in data["jp_kappa"]},
+            n_obs={k: int(v) for k, v in data["jp_n_obs"]},
+        )
+
     # Patch 119a: apply fitted marker offsets to the layout
     # so external callers (pose_viewer, downstream tools) get
     # a layout whose marker_attachment() returns the fitted
@@ -7647,7 +8002,7 @@ def load_model_v2(
 
     return (
         layout, fitted_lengths, params, fps,
-        likelihood_threshold, perspective,
+        likelihood_threshold, perspective, joint_prior,
     )
 
 
@@ -7791,6 +8146,7 @@ def smooth_pose_v2(
     enable_validation: bool = True,
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
+    enable_joint_prior: bool = False,
     enable_strict_validation: bool = False,
     device: str = "cpu",
     n_workers: int = 1,
@@ -8030,6 +8386,7 @@ def smooth_pose_v2(
     fitted_lengths = None
     params = None
     perspective: PerspectiveModelV2 | None = None
+    joint_prior: JointPriorV2 | None = None
     loaded_model = False
 
     if load_model is not None:
@@ -8042,7 +8399,7 @@ def smooth_pose_v2(
                 "it was trained with, which wins."
             )
         (
-            layout, fitted_lengths, params, _, _, perspective
+            layout, fitted_lengths, params, _, _, perspective, joint_prior
         ) = load_model_v2(load_model)
         loaded_model = True
     elif layout is None:
@@ -8202,6 +8559,7 @@ def smooth_pose_v2(
                 enable_validation=enable_validation,
                 enable_warm_start_sigma=enable_warm_start_sigma,
                 enable_perspective=enable_perspective,
+                enable_joint_prior=enable_joint_prior,
                 enable_strict_validation=enable_strict_validation,
                 verbose=verbose,
                 session_names=[s["path"].stem for s in raw_sessions],
@@ -8214,6 +8572,7 @@ def smooth_pose_v2(
             em_history = em_result.history
             converged = em_result.converged
             perspective = em_result.perspective
+            joint_prior = em_result.joint_prior
 
             if verbose:
                 print(
@@ -8260,7 +8619,7 @@ def smooth_pose_v2(
             # single bad session doesn't waste compute on the
             # 60+ that worked.
             task_args = [
-                (sess_idx, params, perspective, device)
+                (sess_idx, params, perspective, joint_prior, device)
                 for sess_idx in range(n_sess_final)
             ]
             completed = 0
@@ -8550,6 +8909,23 @@ def main(argv=None) -> int:
         help=(
             "Disable unit-norm constraint observations "
             "(not recommended; can cause orientation drift)"
+        ),
+    )
+    parser.add_argument(
+        "--joint-prior", action="store_true",
+        help=(
+            "Patch 122hf. Fit a von Mises prior on each segment's local "
+            "angle from the frames where its marker IS visible, and apply "
+            "it as a soft constraint everywhere. Matters for segments "
+            "carrying a single marker (neck, back_rear, tail_*): when that "
+            "marker drops out nothing observes the segment's angle, and "
+            "nothing constrains it either — orientation is a random walk "
+            "and cos^2+sin^2=1 fixes only the radius. Within a second the "
+            "angle is uniform and the marker is somewhere on a circle. "
+            "Segments whose angle is genuinely diffuse fit kappa below the "
+            "floor and are skipped, so this cannot make a well-observed "
+            "joint worse. Costs one extra filter+smoother pass before EM, "
+            "and zero state dimensions."
         ),
     )
     parser.add_argument(
@@ -8917,6 +9293,7 @@ def main(argv=None) -> int:
             apply_constraints=not args.no_constraints,
             enable_validation=not args.no_validate,
             enable_warm_start_sigma=not args.no_warm_start_sigma,
+            enable_joint_prior=args.joint_prior,
             enable_perspective=not args.no_perspective,
             enable_strict_validation=args.strict_validation,
             device=args.device,

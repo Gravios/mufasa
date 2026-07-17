@@ -8,6 +8,85 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hf — von Mises joint prior on segment angles.** Answers "for longer
+stretches could we constrain the markers with the prior given the current
+inter-marker relationships?" Yes, and the mechanism was already in the file.
+
+Five of the seven segments in this tree carry exactly one marker. Two-plus
+markers means losing one is free — the survivors pin the segment and FK places
+the missing marker. One marker means no redundancy: when it drops, nothing
+observes the segment's angle, and nothing constrains it either.
+`build_F_v2` makes orientation a random walk; `cos²+sin²=1` fixes the radius
+and says nothing about the angle. At the fitted `q_seg_ori` ≈ 6, the (cos,sin)
+sd passes 1.4 after one second on a circle of radius 1 — the norm constraint is
+just projecting a wild vector back at an arbitrary angle.
+
+The prior: two pseudo-observation rows per segment on the same channel that
+already carries the norm constraint, pulling `(cos_s, sin_s)` toward
+`(cos mu_s, sin mu_s)` with variance `1/kappa_s`. Linear, so the Jacobian is
+constant. The vector form rather than the tidier one-row `sin(theta-mu)=0`,
+because that is satisfied at both `mu` and `mu+pi` and would settle the tail
+folded back on itself. `mu`/`kappa` from a von Mises MLE fitted once before EM
+(same lifecycle as the perspective model) and **only from frames where the
+segment's marker was observed**. Zero extra state dims.
+
+Measured, tail tip blinded for 20 s: **115° RMSE (worst 180°) -> 18° (worst
+46°)**.
+
+The kappa floor turned out to matter as much as the prior. During a dropout
+nothing competes with it, so even a weak prior fully determines the angle —
+on a near-uniform synthetic the fitted kappas were 0.2-0.8 and applying them
+made the worst case *worse* (151° -> 180°), because mu was meaningless. At
+`kappa >= 1.0` (sigma_theta <= 57°) a diffuse joint is skipped entirely and
+the output is identical to before. Failure mode is "no help", never "wrong
+help".
+
+### Found while building it: the (L, theta) sign gauge
+
+A segment's length is a free state with process noise and **nothing holds it
+positive**. `(L, theta)` and `(-L, theta+pi)` place the marker at exactly the
+same point, so the filter is free to sit in either. Measured, tail tip blinded
+20 s: L walks through zero during the dropout (47% of frames negative),
+re-acquires the marker in the mirrored gauge, and **stays there — 100%
+negative afterwards, theta reported 180° from truth**. The user's run has
+`q_length` ≈ 105 against fitted lengths of 10-20 px, which is ample to cross
+zero.
+
+Pre-existing, not introduced here. Marker *positions* stay correct (the
+degeneracy is exact), so output isn't directly corrupted — but the RTS
+smoother can smear between the two modes through `L ≈ 0`, which puts the
+marker at the parent joint, and any consumer reading segment angles gets
+garbage. 122hf only folds the mirrored frames back before averaging, because a
+circular mean across both gauges is meaningless (measured: mu off by 177°,
+kappa collapsed 13.3 -> 1.1). **Holding L > 0 in the filter is the real fix
+and is not done.**
+
+### Correction to the record
+
+122hc and 122he both assert that `--const-accel-segments` had "never run".
+That is wrong. The broken whitelist sits inside `if enable_warm_start_sigma:`;
+verified on `5671eed` with rig-named data, `enable_warm_start_sigma=False`
+runs const-accel end-to-end through EM. The accurate claim is **unusable in
+the default configuration** — the CLI has `--no-warm-start-sigma` and the GUI
+a checkbox (`pose_cleanup.py:1259`, default checked). Every log the user
+showed has warm-start on, so it never ran *for them*. 121d wired q_jerk into
+four of the five reconstruction sites and missed only the warm-start one.
+
+### And a hole in my own verification
+
+The sweep glob is `tests/smoke_122*.py`, which misses **73 test files**.
+122he (pushed as `2859314`) rephrased the divergence message and broke
+`smoke_kalman_pose_smoother_v2.py` — 152/152 on `5671eed`, failing on
+upstream. Fixed here, and both pinned-wording assertions relaxed to pin
+behaviour. **Sweeps should cover `tests/*.py`, not `tests/smoke_122*.py`.**
+
+### Next
+* Hold `L > 0` in the filter — the sign gauge above.
+* GUI checkbox for the joint prior (CLI only for now).
+* Fit `q_length` against the gauge too; it is likely inflated by sign flips.
+
+
+
 **122he — cap iteration 0.** With the layout finally correct, the user's run
 reached the filter and the EKF diverged: "validation hook triggered at
 iteration 0", 96% NaN.
@@ -386,6 +465,25 @@ schema needs a `[roi.cue_lights]` table plus form-side writers.
 5. **Migration prompt on legacy projects** — when
    `detect_layout(project) == 'legacy'`, dialog at workbench
    launch offering migration. Small patch.
+
+**Also fixed here: a regression this session shipped.** 122he rephrased the
+divergence message and broke `tests/smoke_kalman_pose_smoother_v2.py`, which
+pinned the string "EKF has diverged". It went unnoticed because the sweep glob
+is `smoke_122*.py` and **73 test files sit outside it**, that one included. The
+suite was 152/152 before this session and 122he is already pushed. Both sweeps
+are now baseline-diffed against 5671eed (pre-session): 264 suites, no
+regressions.
+
+### Next after 122hf
+* The sweep glob is a verification hole. `smoke_122*.py` is what the handoff
+  prescribes, but it misses 73 files; the loop should cover `tests/*.py`.
+* `--joint-prior` is opt-in and unproven on real data. On strohA-kj the fit
+  would learn mu/kappa for `tail_V32` from a state its sigma=225px marker
+  barely influences; kappa may come back under the floor and disable itself.
+  Honest, but it means the sigma=225 problem has to be solved, not routed
+  around.
+* A 20 s reconstruction at 18 deg RMSE is a prior talking, not a measurement.
+  Anything scoring tail kinematics needs to know which it is looking at.
 
 ---
 
