@@ -8,6 +8,55 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122he — cap iteration 0.** With the layout finally correct, the user's run
+reached the filter and the EKF diverged: "validation hook triggered at
+iteration 0", 96% NaN.
+
+Not reproduced in-sandbox (3 GB RAM caps synthetic sessions far below their
+54k frames), so this ships a structural fix and a diagnostic, not a
+confirmed repair. **The user should drop `--const-accel-segments` first.**
+
+The structural finding: *every* q hard cap in this module was applied only
+inside `finalize_m_step_v2`. They guarded iterations 1..N and left iteration 0
+running on whatever `fit_initial_params_v2` returned. The caps encode a
+numerical stability boundary for the EKF, and the EKF does not care which
+iteration it is on. Patch 121c's own comment says the absolute caps exist to
+backstop "cases where the initial q is already large (heavy-noise sessions
+push initial fit upward)" — it saw the initial fit going large, capped the
+M-step's *use* of it, and never capped the value itself.
+
+It is not a corner case. On ordinary synthetic mouse data the initial fit
+returns `q_root_pos` ≈ 78,000–86,000 against 121c's documented boundary of
+50,000 — past the point where, in its words, "even a moderate dropout (1
+second) produces prediction covariances ... where the EKF S = HPH^T + R loses
+conditioning". `_cap_params_to_hard_limits` is now the single place that
+enforces the caps, applied to the initial fit and reported under `--verbose`.
+
+Why const-accel is the prime suspect: `q_jerk_* = q_root_* × 10` at init
+(uncapped), and jerk drives prediction variance as τ⁵ rather than τ³ across a
+dropout. A tail marker occluded for seconds costs quadratically more with
+const-accel on. And per 122hc, `--const-accel-segments` had *never run* — the
+121d whitelist bug killed it in `build_Q_v2` before any EM. 121d and 121e are
+both untested code that 122hc unblocked yesterday; 121e's jerk caps were
+sized as "roughly 10× the q_root caps", which is dimensionally naive (px²/s⁵
+vs px²/s³) and, at 500,000, sit above what the initial fit produces anyway.
+
+The divergence message also stopped speculating. It listed three candidate
+causes and told the reader to "inspect the early frames of x_smooth" — an
+array they have no access to. It now reports NaN fraction, first non-finite
+frame and its timestamp, which parameters sit on their cap, and whether
+const-accel is active.
+
+### Next
+* Ask the user for a `--verbose` run without `--const-accel-segments`. If it
+  survives, 121d's const-accel needs a properly calibrated q_jerk cap
+  (measured against the τ⁵ boundary, not scaled off the q_root cap).
+* CLI `--em-aggregation` still defaults to `pooled`; the handoff's own lesson
+  is that median is strongly preferred across many sessions. Changing a
+  default needs a decision, so it's flagged rather than done.
+
+
+
 **122hd** fixes the error message 122hc introduced. It was readable and wrong.
 Against a project that declared its own `[[pose.segments]]` and typed
 `--orient-drift-segments body,head`, it asserted the layout came from
