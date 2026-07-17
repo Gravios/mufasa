@@ -968,6 +968,36 @@ def mirror_model_to_global_cache(
         return None
 
 
+def find_project_config(start, *, max_depth: int = 6) -> Path | None:
+    """Walk *up* from a data path to the ``project.toml`` that encloses it.
+
+    Patch 122hc. :func:`resolve_v1_project_root` answers "given a config, where
+    is the root" — this answers the question tools actually have, which is
+    "given some data, which project is this?". A caller pointed at
+    ``<root>/sources/pose/`` should not have to also be told ``--config
+    <root>/project.toml``; the answer is three directories up and unambiguous.
+
+    Anything that needs marker names needs the project, and a tool that
+    silently invents them when not told is worse than one that looks.
+
+    :param start: File or directory inside a project.
+    :param max_depth: How many levels to climb. Bounded so a path outside any
+        project can't wander up and adopt an unrelated project.toml.
+    :returns: Path to the enclosing ``project.toml``, or None.
+    """
+    p = Path(start).resolve()
+    if p.is_file():
+        p = p.parent
+    for _ in range(max_depth):
+        candidate = p / PROJECT_CONFIG_FILENAME
+        if candidate.is_file():
+            return candidate
+        if p.parent == p:
+            break
+        p = p.parent
+    return None
+
+
 def resolve_v1_project_root(
     config_path: str | None,
 ) -> Path | None:
