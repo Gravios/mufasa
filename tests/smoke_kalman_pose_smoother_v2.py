@@ -636,7 +636,7 @@ def main() -> int:
         state[indices[seg_name]["cos"]] = 1.0
         state[indices[seg_name]["sin"]] = 0.0
 
-    z, h, H = _build_constraint_observations(state, layout, 0.05)
+    z, h, H, R_diag = _build_constraint_observations(state, layout, 0.05)
     # For all-unit-norm states, constraint residual h = 0
     assert np.allclose(h, 0.0), (
         f"Constraint residual should be 0 for unit-norm state; "
@@ -660,7 +660,7 @@ def main() -> int:
     # Now perturb root cos so unit norm violated → residual > 0
     state2 = state.copy()
     state2[indices["__root__"]["cos"]] = 1.5  # not unit
-    z, h, H = _build_constraint_observations(state2, layout, 0.05)
+    z, h, H, R_diag2 = _build_constraint_observations(state2, layout, 0.05)
     expected_residual = 1.5**2 + 0.8**2 - 1.0  # 1.44 + 0.64 - 1 = 1.08
     assert abs(h[0] - expected_residual) < 1e-10
 
@@ -1733,7 +1733,7 @@ def main() -> int:
             fps=30.0, likelihood_threshold=0.7,
         )
 
-        layout_l, fitted_l, params_l, fps_l, thr_l, persp_l = (
+        layout_l, fitted_l, params_l, fps_l, thr_l, persp_l, _jp2 = (
             load_model_v2(model_path)
         )
         # No perspective in pre-109 save (or non-perspective save)
@@ -2034,7 +2034,15 @@ def main() -> int:
     except RuntimeError as e:
         msg = str(e)
         assert "NaN" in msg
-        assert "EKF has diverged" in msg
+        # Patch 122hf: was `assert "EKF has diverged" in msg`. Patch 122he
+        # rewrote this message to report measurements instead of guesses and
+        # phrased it "the EKF diverged", which broke this assertion — and the
+        # breakage went unnoticed because the sweep glob is smoke_122*.py and
+        # this file isn't matched by it. Pin the behaviour (it says the filter
+        # diverged, and which iteration) rather than the sentence; smoke_122he
+        # owns the message's contents.
+        assert "diverged" in msg
+        assert "iteration 0" in msg
 
     # ---------------------------------------------------------- #
     # Patch 107: relaxed validation thresholds + range_ratio fix.
@@ -2478,7 +2486,7 @@ def main() -> int:
             perspective=fitted_persp,
         )
         (
-            layout_l, fitted_l, params_l, fps_l, thr_l, persp_l
+            layout_l, fitted_l, params_l, fps_l, thr_l, persp_l, jp_l
         ) = load_model_v2(model_path)
         assert persp_l is not None
         # Coefficients match
@@ -2499,7 +2507,7 @@ def main() -> int:
             fps=30.0, likelihood_threshold=0.5,
         )
         (
-            _, _, _, _, _, persp_none
+            _, _, _, _, _, persp_none, _jp
         ) = load_model_v2(model_path)
         assert persp_none is None, (
             "load_model_v2 should return None for perspective "
@@ -2751,7 +2759,7 @@ def main() -> int:
         )
     except RuntimeError as e:
         raised_nan = True
-        assert "EKF has diverged" in str(e)
+        assert "diverged" in str(e)   # patch 122hf: 122he rephrased this
     assert raised_nan, (
         "NaN should always raise, even in soft validation mode"
     )
@@ -4158,7 +4166,7 @@ def main() -> int:
             save_path, layout_112, fitted_112, params_112,
             fps=30.0, likelihood_threshold=0.7,
         )
-        loaded_layout, _, _, _, _, _ = _load_119a(save_path)
+        loaded_layout, _, _, _, _, _, _ = _load_119a(save_path)
         _, ear_off_loaded = loaded_layout.marker_attachment("ear_left")
         assert ear_off_loaded == (0.77, 0.99), (
             f"load_model_v2 must apply fitted offsets to the "
@@ -4547,7 +4555,7 @@ def main() -> int:
             save_path, layout_122, fitted_122, params_122,
             fps=30.0, likelihood_threshold=0.7,
         )
-        loaded_layout, loaded_fl, loaded_pp, _, _, _ = _load_120b(
+        loaded_layout, loaded_fl, loaded_pp, _, _, _, _ = _load_120b(
             save_path,
         )
         assert loaded_layout.with_drift is False
@@ -4735,7 +4743,7 @@ def main() -> int:
             save_path, layout_132, fitted_132, params_132,
             fps=30.0, likelihood_threshold=0.7,
         )
-        loaded_layout, loaded_fl, loaded_pp, _, _, _ = _load_120b(
+        loaded_layout, loaded_fl, loaded_pp, _, _, _, _ = _load_120b(
             save_path,
         )
         assert loaded_layout.orientation_drift_segments == [
@@ -4770,7 +4778,7 @@ def main() -> int:
             save_path, layout_132_empty, fitted_132,
             params_132_empty, fps=30.0, likelihood_threshold=0.7,
         )
-        loaded_layout, _, loaded_pp, _, _, _ = _load_120b(
+        loaded_layout, _, loaded_pp, _, _, _, _ = _load_120b(
             save_path,
         )
         assert loaded_layout.orientation_drift_segments == []
@@ -5628,7 +5636,7 @@ def main() -> int:
         )
         (
             loaded_layout, loaded_fitted, loaded_params,
-            loaded_fps, loaded_lt, loaded_persp,
+            loaded_fps, loaded_lt, loaded_persp, _loaded_jp,
         ) = _load_148(model_path)
         assert (
             loaded_layout.const_accel_segments
@@ -5663,7 +5671,7 @@ def main() -> int:
             fps=30.0, likelihood_threshold=0.5,
         )
         (
-            ll, _, lp, _, _, _,
+            ll, _, lp, _, _, _, _jp_extra,
         ) = _load_148(model_path_b)
         assert ll.const_accel_segments == []
         assert lp.q_jerk_root_pos is None
