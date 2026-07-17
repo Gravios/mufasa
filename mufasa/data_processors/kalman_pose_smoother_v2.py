@@ -4182,6 +4182,57 @@ _M_STEP_Q_JERK_ROOT_POS_HARD_CAP = 500000.0   # px²/s⁵
 _M_STEP_Q_JERK_ROOT_ORI_HARD_CAP = 500.0
 _M_STEP_Q_JERK_SEG_ORI_HARD_CAP = 500.0
 
+
+def _cap_params_to_hard_limits(params, layout):
+    """Clamp the absolute q hard caps onto ``params`` (patch 122he).
+
+    The caps above describe where the EKF stops being conditioned. That is a
+    property of the filter, not of which EM iteration is running — but until
+    now they were only ever applied inside :func:`finalize_m_step_v2`, so
+    iteration 0 ran on whatever :func:`fit_initial_params_v2` produced,
+    however large. This helper is the single place that enforces them, so the
+    initial fit and the M-step cannot disagree about the boundary.
+
+    :param params: The :class:`NoiseParamsV2` to clamp.
+    :param layout: Used to decide whether the jerk caps apply at all.
+    :returns: ``(params, clamped)`` where ``params`` is a new instance if
+        anything changed and ``clamped`` maps field name -> (before, after).
+        An empty ``clamped`` means the params were already inside the caps.
+    """
+    import dataclasses as _dc
+
+    clamped: dict[str, tuple[float, float]] = {}
+    changes: dict = {}
+
+    def _scalar(field: str, cap: float) -> None:
+        value = getattr(params, field, None)
+        if value is not None and value > cap:
+            clamped[field] = (float(value), cap)
+            changes[field] = cap
+
+    _scalar("q_root_pos", _M_STEP_Q_ROOT_POS_HARD_CAP)
+    _scalar("q_root_ori", _M_STEP_Q_ROOT_ORI_HARD_CAP)
+    if layout.const_accel_segments:
+        _scalar("q_jerk_root_pos", _M_STEP_Q_JERK_ROOT_POS_HARD_CAP)
+        _scalar("q_jerk_root_ori", _M_STEP_Q_JERK_ROOT_ORI_HARD_CAP)
+        seg = getattr(params, "q_jerk_seg_ori", None)
+        if seg:
+            capped = {
+                s: min(v, _M_STEP_Q_JERK_SEG_ORI_HARD_CAP)
+                for s, v in seg.items()
+            }
+            over = {s: v for s, v in seg.items() if v > capped[s]}
+            if over:
+                worst = max(over, key=over.get)
+                clamped[f"q_jerk_seg_ori[{worst}]"] = (
+                    float(over[worst]), _M_STEP_Q_JERK_SEG_ORI_HARD_CAP,
+                )
+                changes["q_jerk_seg_ori"] = capped
+
+    if not changes:
+        return params, {}
+    return _dc.replace(params, **changes), clamped
+
 # Patch 121c: adaptive jitter for the EKF/RTS solves.
 # Replaces the fixed 1e-9 used at the LinAlgError fallback,
 # which was meaningless when trace(P) ≫ 1. lam = max(floor,
@@ -5751,17 +5802,68 @@ def _validate_trajectory_v2(
     # message rather than producing all-NaN per-marker stats.
     n_nan = int(np.isnan(pred).sum())
     if n_nan > 0:
-        raise RuntimeError(
-            f"v2 EM validation hook triggered at iteration "
-            f"{iteration}: smoothed marker predictions contain "
-            f"{n_nan} NaN values out of {pred.size}. The EKF has "
-            f"diverged — likely causes: orientation state drifted "
-            f"off the unit circle (should be prevented by hard "
-            f"projection in patch 106), initial state was "
-            f"inconsistent with observations, or process noise Q "
-            f"is too large. Inspect the early frames of x_smooth "
-            f"to diagnose."
+        # Patch 122he: report, don't speculate. The previous text offered
+        # three candidate causes and told the reader to "inspect the early
+        # frames of x_smooth" — an array they have no access to. Everything
+        # below is measured from the arrays in hand.
+        finite_rows = np.all(np.isfinite(pred.reshape(pred.shape[0], -1)),
+                             axis=1)
+        first_bad = (
+            int(np.argmin(finite_rows)) if not finite_rows.all() else -1
         )
+        lines = [
+            f"v2 EM validation hook triggered at iteration {iteration}: the "
+            f"EKF diverged.",
+            f"  smoothed predictions: {n_nan}/{pred.size} NaN "
+            f"({n_nan / pred.size:.1%})",
+            f"  first non-finite frame: {first_bad} of {pred.shape[0]}"
+            + (f" ({first_bad / 30.0:.1f}s in at 30fps)"
+               if first_bad > 0 else " — bad from the very first frame"),
+        ]
+        # Which parameters are sitting on the stability boundary?
+        at_cap = []
+        for field, cap in (
+            ("q_root_pos", _M_STEP_Q_ROOT_POS_HARD_CAP),
+            ("q_root_ori", _M_STEP_Q_ROOT_ORI_HARD_CAP),
+            ("q_jerk_root_pos", _M_STEP_Q_JERK_ROOT_POS_HARD_CAP),
+            ("q_jerk_root_ori", _M_STEP_Q_JERK_ROOT_ORI_HARD_CAP),
+        ):
+            value = getattr(params, field, None)
+            if value is not None and value >= cap * 0.999:
+                at_cap.append(f"{field}={value:.4g} (cap {cap:.4g})")
+        if at_cap:
+            lines.append(
+                "  parameters pinned at their stability cap: "
+                + ", ".join(at_cap)
+                + " — hitting the cap means EM has not converged; it is a "
+                  "diagnostic, not a success."
+            )
+        else:
+            lines.append(
+                f"  q_root_pos={params.q_root_pos:.4g}, "
+                f"q_root_ori={params.q_root_ori:.4g}"
+                + (f", q_jerk_root_pos={params.q_jerk_root_pos:.4g}"
+                   if params.q_jerk_root_pos is not None else "")
+                + " (all within caps)"
+            )
+        if layout.const_accel_segments:
+            lines.append(
+                f"  const_accel_segments={list(layout.const_accel_segments)} "
+                f"is active. Const-accel makes the predictor extrapolate "
+                f"with curvature: across a dropout of length τ its position "
+                f"variance grows as τ⁵ rather than τ³, so long occlusions "
+                f"cost far more than they do without it. If this data has "
+                f"markers occluded for seconds at a time, drop "
+                f"--const-accel-segments first — it is the single most "
+                f"likely cause of this failure."
+            )
+        lines.append(
+            "  Otherwise: re-run with --em-aggregation median — the default "
+            "'pooled' lets a single outlier session set the noise scale for "
+            "all of them — and add --verbose to see the fitted initial q "
+            "and the per-session warm-start."
+        )
+        raise RuntimeError("\n".join(lines))
 
     T = positions.shape[0]
     for k, m in enumerate(marker_names):
@@ -6431,6 +6533,37 @@ def fit_noise_params_em_v2(
             first_pos, first_likes, layout, marker_names,
             fitted_lengths, fps, likelihood_threshold,
         )
+
+    # Patch 122he: apply the hard caps to iteration 0 too.
+    #
+    # Every cap in this module lived in finalize_m_step_v2 — i.e. they
+    # guarded iterations 1..N and left iteration 0 running on whatever
+    # fit_initial_params_v2 returned. That is backwards: the caps encode a
+    # numerical stability boundary for the EKF, and the EKF does not care
+    # which iteration it is on. Patch 121c's own note says the absolute caps
+    # exist to "backstop ... for cases where the initial q is already large
+    # (heavy-noise sessions push initial fit upward)" — it saw the initial
+    # fit going large, capped the M-step's use of it, and never capped the
+    # value itself.
+    #
+    # It is not a rare corner. On ordinary data the initial fit returns
+    # q_root_pos ≈ 86,500 against a documented boundary of 50,000 — past the
+    # point where, in 121c's words, "even a moderate dropout (1 second)
+    # produces prediction covariances ... where the EKF S = HPH^T + R loses
+    # conditioning". With const_accel_segments the initial q_jerk is that
+    # number × 10 and drives prediction variance as τ⁵ rather than τ³, so a
+    # long occlusion runs away far faster. The observed failure is exactly
+    # "validation hook triggered at iteration 0".
+    initial_params, clamped = _cap_params_to_hard_limits(
+        initial_params, layout,
+    )
+    if clamped and verbose:
+        print(
+            "[v2-em] initial params exceeded the EKF stability caps and were "
+            "clamped (this is a property of the data, not an error):"
+        )
+        for k, (was, now) in clamped.items():
+            print(f"           {k}: {was:.4g} -> {now:.4g}")
 
     if verbose:
         print(
