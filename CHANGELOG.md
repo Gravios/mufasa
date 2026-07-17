@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hc follows 122hb the same day**, because 122hb's fix was incomplete in a
+way worth recording: it made `smooth_pose_v2` stop assuming the built-in rig
+when `layout is None`, and added `--config` to the CLI so the layout could come
+from the project — but `main()` still *eagerly built the rig* when `--config`
+wasn't passed, so it never reached the new guard. The user's next run failed
+identically. A flag you have to know about is still a default for everyone who
+doesn't. `find_project_config` now walks up from the input path, and the CLI
+looks for the project before assuming anything.
+
+Two more bugs surfaced underneath, both previously masked by the layout failure:
+
+* `--orient-drift-segments body,head` cannot work against a `[skeleton]`-derived
+  tree, which names each segment after its distal marker (`head_mid`, `back_L2`)
+  and therefore has no `body` or `head`. That is not a bug — it's the reason
+  `[[pose.segments]]` exists — but the failure was a raw `__post_init__`
+  traceback. It now names the available segments and says to declare the tree.
+* The warm-start rebuild of `initial_params` in `fit_noise_params_em_v2` was a
+  hand-written whitelist of fields to preserve. It rotted three times: patch
+  120b added the drift trio after `with_drift` runs crashed having lost them,
+  patch 121a added the orientation-drift trio for the same reason, and patch
+  121d added const-accel and never came back — so `--const-accel-segments`
+  dropped `q_jerk_*` to None and died in `build_Q_v2`. Now a copy-every-field
+  `dataclasses.replace`, which cannot rot again.
+
+
+
 One patch, **122hb**, closing two bugs that both presented as "the smoother
 can't find my markers" and were each misdiagnosed once.
 
@@ -62,8 +88,14 @@ error, and the error names case-only differences explicitly.
 * Pre-flight block: layout, `state_dim`, markers matched, sessions, workers,
   projected GiB/worker, and which stage is about to run — printed before the
   first frame is filtered.
-* `tests/smoke_122hb_marker_case_and_layout.py` (29 checks, real parquet/CSV
-  round-trips rather than AST-only).
+* `find_project_config` in `project_layout.py`; the CLI uses it to locate the
+  project from the input path, warns when it falls back to the rig, and refuses
+  inputs spanning two projects rather than guessing between them.
+* `fit_noise_params_em_v2`'s warm-start rebuild: whitelist -> copy-everything.
+* `tests/smoke_122hb_marker_case_and_layout.py` (29 checks) and
+  `tests/smoke_122hc_project_discovery.py` (32 checks). Real tests: actual
+  parquet/CSV/DLC-header files through the actual loaders, and real subprocess
+  CLI runs against real project trees — not AST-only.
 
 ### Next
 
@@ -71,6 +103,8 @@ error, and the error names case-only differences explicitly.
   glob are still recursive and still sweep `backups/` and `derived/`. Now that
   the guard is strict this surfaces as a loud error rather than silent garbage,
   but it should be scoped or excluded outright.
+* Audit the other `NoiseParamsV2` rebuild sites (`finalize_m_step_v2`,
+  `finalize_m_step_v2_from_per_session`) for the same whitelist rot.
 * Heartbeat inside warm-start / EM — long phases are still silent between
   iterations.
 * `[pose.skeleton]` schema migration (drop `nodes`, move under `[pose]`).

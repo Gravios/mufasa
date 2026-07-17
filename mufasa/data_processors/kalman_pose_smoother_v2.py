@@ -6463,46 +6463,31 @@ def fit_noise_params_em_v2(
             device=device,
             pool=pool,
         )
-        # Update initial_params with warm-started σ. Patch
-        # 120b: preserve any drift parameters from the prior
-        # initial_params (set by fit_initial_params_v2 when
-        # layout.with_drift). Without this, with_drift=True
-        # runs after warm-start lose q_drift/alpha_drift/
-        # r_drift and crash in build_Q_v2.
-        # Patch 121a: same passthrough for orientation drift
-        # parameters.
-        initial_params = NoiseParamsV2(
-            sigma_marker=sigma_warm,
-            q_root_pos=initial_params.q_root_pos,
-            q_root_ori=initial_params.q_root_ori,
-            q_seg_ori=dict(initial_params.q_seg_ori),
-            q_length=dict(initial_params.q_length),
-            constraint_sigma=initial_params.constraint_sigma,
-            q_drift=(
-                dict(initial_params.q_drift)
-                if initial_params.q_drift is not None else None
-            ),
-            alpha_drift=(
-                dict(initial_params.alpha_drift)
-                if initial_params.alpha_drift is not None else None
-            ),
-            r_drift=(
-                dict(initial_params.r_drift)
-                if initial_params.r_drift is not None else None
-            ),
-            q_theta_drift=(
-                dict(initial_params.q_theta_drift)
-                if initial_params.q_theta_drift is not None else None
-            ),
-            alpha_theta_drift=(
-                dict(initial_params.alpha_theta_drift)
-                if initial_params.alpha_theta_drift is not None else None
-            ),
-            r_theta_drift=(
-                dict(initial_params.r_theta_drift)
-                if initial_params.r_theta_drift is not None else None
-            ),
-        )
+        # Update initial_params with warm-started σ.
+        #
+        # Patch 122hc: this used to re-list every field to preserve by
+        # hand, and the list rotted twice before it rotted a third time:
+        #   * patch 120b added q_drift/alpha_drift/r_drift after with_drift
+        #     runs crashed in build_Q_v2 having silently lost them here;
+        #   * patch 121a added the orientation-drift trio for the same
+        #     reason;
+        #   * patch 121d added const-accel and did NOT come back here, so
+        #     --const-accel-segments dropped q_jerk_root_pos/q_jerk_root_ori/
+        #     q_jerk_seg_ori to their None defaults and died in build_Q_v2
+        #     with "params.q_jerk_* fields are all None. Build params via
+        #     NoiseParamsV2.default(layout)".
+        # A whitelist that must be edited every time the dataclass grows a
+        # field is a bug waiting on a calendar. Copy every field, override
+        # sigma_marker. Mutable (dict) fields are still copied rather than
+        # aliased, which is what the hand-written version was doing.
+        import dataclasses as _dc
+        _changes = {
+            f.name: dict(value)
+            for f in _dc.fields(initial_params)
+            if isinstance(value := getattr(initial_params, f.name), dict)
+        }
+        _changes["sigma_marker"] = sigma_warm
+        initial_params = _dc.replace(initial_params, **_changes)
         if verbose:
             sigma_changes = []
             for m in layout.marker_names:
@@ -7634,11 +7619,27 @@ def _validate_layout_against_data(
         lines.append(
             "  Nothing would be filled in and every value would be NaN."
         )
-    lines.append(
-        "  Usual causes: the wrong files were discovered (pre-rename copies "
-        "under backups/, or previously-smoothed output under derived/), or "
-        "the layout was built from a different project than the data."
-    )
+
+    # Patch 122hc: name the cause that actually keeps happening. When the
+    # layout is the built-in rig and the data isn't, this is not a discovery
+    # problem and pointing at backups/ sends people the wrong way — it means
+    # no project was found and the rig got used as a fallback.
+    if set(wanted) == set(CANONICAL_LAYOUT_ROLES) and not matched:
+        lines.append(
+            "  The layout above is the BUILT-IN RAT RIG, not this project's: "
+            "those are its historical marker names. It is only reached when "
+            "no project could be found, so the fix is to point the smoother "
+            "at the project — pass --config <project.toml> on the CLI, or "
+            "config_path= to smooth_pose_v2 — and the layout will be built "
+            "from its [[pose.segments]] or [skeleton] instead."
+        )
+    else:
+        lines.append(
+            "  Usual causes: the wrong files were discovered (pre-rename "
+            "copies under backups/, or previously-smoothed output under "
+            "derived/), or the layout was built from a different project "
+            "than the data."
+        )
     raise ValueError("\n".join(lines))
 
 
@@ -7934,16 +7935,17 @@ def smooth_pose_v2(
         gib = (T_max * (4 * D * D + 2 * K * D) * 8) / (1024 ** 3)
         print(
             f"[smoother-v2] Pre-flight:\n"
-            f"    layout       : {len(layout.segments)} segments, "
-            f"{K} markers, state_dim D={D}"
+            f"    layout   : {len(layout.segments)} segments, {K} markers, "
+            f"state_dim D={D}"
             f"{' (+drift)' if layout.with_drift else ''}\n"
-            f"    markers       : {len(set(layout.marker_names) & set(marker_names_data))}"
-            f"/{K} matched to data\n"
-            f"    sessions      : {len(raw_sessions)} "
+            f"    markers  : "
+            f"{len(set(layout.marker_names) & set(marker_names_data))}/{K} "
+            f"matched to data\n"
+            f"    sessions : {len(raw_sessions)} "
             f"({total_frames} frames, longest {T_max})\n"
-            f"    workers       : {n_pool} "
-            f"(≈{gib:.1f} GiB/worker peak, ≈{gib * n_pool:.0f} GiB total)\n"
-            f"    stage         : "
+            f"    workers  : {n_pool} "
+            f"(≈{gib:.1f} GiB/worker peak, ≈{gib * n_pool:.1f} GiB total)\n"
+            f"    stage    : "
             f"{'smoothing with loaded model' if loaded_model else f'EM ({em_max_iter} iterations) then smoothing'}",
             flush=True,
         )
@@ -8352,15 +8354,15 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--config", default=None,
         help=(
-            "Patch 122hb: path to the project's project.toml. The "
-            "kinematic tree and the marker names are then taken from "
-            "the project ([[pose.segments]], else [skeleton]) instead "
-            "of the built-in rat rig, whose marker names (nose, back1, "
-            "tailbase, ...) are almost certainly not yours. Strongly "
-            "recommended for any project that renamed its markers. "
-            "Ignored with --load-model, where the model's own layout "
-            "wins. The --no-back4/--no-tail/--no-lateral/--no-center "
-            "switches only apply to the built-in rig."
+            "Path to the project's project.toml; the kinematic tree and "
+            "the marker names are taken from it ([[pose.segments]], else "
+            "[skeleton]). Patch 122hc: usually unnecessary — if the input "
+            "path sits inside a project, its project.toml is found by "
+            "walking up. Pass this to override that, or when the input "
+            "lives outside the project. Ignored with --load-model, where "
+            "the model's own layout wins. The --no-back4/--no-tail/"
+            "--no-lateral/--no-center switches only apply to the built-in "
+            "rat rig, i.e. only when no project is found at all."
         ),
     )
     parser.add_argument(
@@ -8592,11 +8594,65 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    # Patch 122hb: the built-in rig is a fallback, not a default. With
-    # --config the layout is the project's own.
-    if args.config:
-        layout = layout_from_config(args.config)
+    # Patch 122hb/122hc: the built-in rig is a last resort, not a default.
+    # 122hb made --config available; that was not enough, because a flag you
+    # have to know about is still a default for everyone who doesn't, and the
+    # rig is a *wrong* default — it names markers (nose, back1, tailbase) that
+    # a project which renamed its own has never used. So: look for the project
+    # before assuming anything, and announce which source won.
+    from mufasa.project_layout import find_project_config
+
+    config = args.config
+    if config is None:
+        found = {find_project_config(p) for p in args.pose_input}
+        found.discard(None)
+        if len(found) > 1:
+            print(
+                "[smoother-v2] ERROR: the inputs sit inside more than one "
+                f"project ({sorted(str(f) for f in found)}). Marker names "
+                "can't be resolved against two projects at once; smooth them "
+                "separately, or pass --config to name the one you mean.",
+                file=sys.stderr,
+            )
+            return 1
+        if found:
+            config = str(found.pop())
+            print(
+                f"[smoother-v2] Project: {config} (found by walking up from "
+                f"the input path; --config overrides)"
+            )
+
+    if config:
+        # A broken project.toml must not degrade into the rat rig — but it
+        # also shouldn't reach the user as a bare traceback.
+        try:
+            layout = layout_from_config(config)
+        except Exception as e:
+            print(
+                f"[smoother-v2] ERROR: could not build a layout from "
+                f"{config}: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            return 1
+        rig_switches = [
+            name for name, given in (
+                ("--no-back4", args.no_back4), ("--no-tail", args.no_tail),
+                ("--no-lateral", args.no_lateral), ("--no-center", args.no_center),
+            ) if given
+        ]
+        if rig_switches:
+            print(
+                f"[smoother-v2] WARNING: {', '.join(rig_switches)} ignored — "
+                "they trim the built-in rat rig, and the layout is coming "
+                "from the project instead."
+            )
     else:
+        print(
+            "[smoother-v2] WARNING: no project.toml found above the input "
+            "and no --config given. Falling back to the built-in rat rig "
+            "(nose, back1, ..., tailbase). This is only correct for legacy "
+            "projects that use those exact marker names."
+        )
         layout = standard_rat_layout(
             include_back4=not args.no_back4,
             include_tail=not args.no_tail,
@@ -8605,33 +8661,48 @@ def main(argv=None) -> int:
         )
     if args.with_drift:
         layout.with_drift = True
-    if args.orient_drift_segments:
-        # Parse the comma-separated list, strip whitespace
-        # per name. Empty entries (e.g. trailing comma) are
-        # filtered. Names are validated against the layout
-        # in BodyLayout.__post_init__ — but we already built
-        # the layout above, so re-attach the field and
-        # rebuild via dataclasses.replace to re-trigger
-        # __post_init__ validation.
-        import dataclasses as _dc
-        seg_names = [
-            s.strip() for s in args.orient_drift_segments.split(",")
-            if s.strip()
-        ]
-        layout = _dc.replace(
-            layout, orientation_drift_segments=seg_names,
-        )
 
+    # Patch 122hc: --orient-drift-segments / --const-accel-segments name
+    # SEGMENTS, and segment names depend on where the layout came from. A
+    # tree derived from [skeleton] names each segment after its distal
+    # marker (head_mid, back_L2, ...) — it has no "body" or "head", because
+    # a spanning tree over markers has no way to know which cluster is the
+    # trunk. Those names exist only in the built-in rig and in a project's
+    # own [[pose.segments]]. So this can legitimately fail, and when it does
+    # the fix is a real one (declare the segments), not a typo — say so.
+    def _apply_segment_flags(lay, raw, field):
+        import dataclasses as _dc
+        names = [s.strip() for s in raw.split(",") if s.strip()]
+        if not names:
+            return lay
+        unknown = [n for n in names if n not in {sg.name for sg in lay.segments}]
+        if unknown:
+            print(
+                f"[smoother-v2] ERROR: --{field.replace('_', '-')} names "
+                f"segment(s) that don't exist in this layout: {unknown}.\n"
+                f"  This layout's segments: "
+                f"{sorted(sg.name for sg in lay.segments)}\n"
+                f"  A layout derived from [skeleton] names every segment "
+                f"after its distal marker, so there is no 'body' or 'head' "
+                f"to point at. Declare the tree you mean with a "
+                f"[[pose.segments]] block in project.toml (named segments, "
+                f"rigid clusters, far fewer state dims) and re-run.",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        # Names are validated against the layout in BodyLayout.__post_init__
+        # — rebuild via dataclasses.replace to re-trigger it.
+        return _dc.replace(lay, **{field: names})
+
+    if args.orient_drift_segments:
+        layout = _apply_segment_flags(
+            layout, args.orient_drift_segments, "orientation_drift_segments",
+        )
     # Patch 121d: const-accel flag plumbing. Same pattern as
     # orient-drift above.
     if args.const_accel_segments:
-        import dataclasses as _dc
-        ca_names = [
-            s.strip() for s in args.const_accel_segments.split(",")
-            if s.strip()
-        ]
-        layout = _dc.replace(
-            layout, const_accel_segments=ca_names,
+        layout = _apply_segment_flags(
+            layout, args.const_accel_segments, "const_accel_segments",
         )
 
     try:
@@ -8639,7 +8710,7 @@ def main(argv=None) -> int:
             pose_input=args.pose_input,
             output_dir=args.output_dir,
             layout=layout,
-            config_path=args.config,
+            config_path=config,
             fps=args.fps,
             likelihood_threshold=args.likelihood_threshold,
             em_max_iter=args.em_max_iter,
