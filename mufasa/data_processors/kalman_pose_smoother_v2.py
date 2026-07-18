@@ -1098,6 +1098,134 @@ def _segment_distal_marker(layout: BodyLayout, segment_name: str) -> str | None:
     return None
 
 
+# Patch 122hh: minimum major/minor eigenvalue ratio for a root cluster's PCA
+# body axis to be trusted. A spine gives ratios in the tens to hundreds; a
+# round or near-coincident cluster gives ~1, where the principal direction is
+# just the largest noise component. Below this the axis is refused and the
+# caller falls back to the pre-122hh proxy. 4.0 is ~2:1 in physical extent —
+# comfortably elongated, well clear of both regimes.
+_ROOT_AXIS_MIN_ANISOTROPY = 4.0
+
+
+def _root_cluster_body_axis(
+    positions: np.ndarray,
+    likelihoods: np.ndarray,
+    cluster_idx: list[int],
+    likelihood_threshold: float,
+    anchor_idx: int | None = None,
+) -> np.ndarray | None:
+    """Per-frame body direction for a multi-marker ROOT cluster, from PCA.
+
+    Patch 122hh. The root segment has no parent, so unlike every other
+    segment it has no ``parent_distal -> seg_distal`` vector to define a body
+    frame. Until 122gx the code filled that gap with a hardcoded pair of the
+    old rig's marker names (``back3 -> back1``); when 122gx generalized the
+    tree to any skeleton, that proxy was left rig-specific. Any project whose
+    trunk markers aren't literally ``back1`` and ``back3`` therefore fell
+    through to ``parent_distal = None`` and skipped offset-fitting for the
+    whole cluster, leaving every non-distal trunk marker on its placeholder
+    ring offset ``(1.0, angle)`` — six markers pinned at unit radius around a
+    circle instead of strung along the spine. That is the "back markers
+    bunched even when plainly visible" report: the forward model was placing
+    them on a ring regardless of the observations.
+
+    The fix uses no marker names. Trunk markers lie along the body, so the
+    first principal component of the cluster's point cloud *is* the body axis,
+    for any rig. This computes it per frame (the animal rotates, so a single
+    axis will not do) and returns a unit ``(cos, sin)`` per frame, the same
+    interface the offset loop already expects from ``parent_distal ->
+    seg_distal``.
+
+    PCA yields an unsigned axis — the eigenvector could point head-to-tail or
+    tail-to-head, and the sign can flip frame to frame. Left alone that would
+    scatter each marker's fitted angle across two clusters 180 deg apart and
+    wreck the median. Two deterministic sign fixes, in order:
+
+      * if ``orient_toward_idx`` is given (a marker on a child segment, e.g.
+        the neck/head attachment), point the axis toward it — this fixes the
+        head/tail sense to the anatomy;
+      * otherwise, and to break residual per-frame flips, align each frame's
+        axis to the cluster's own time-averaged axis.
+
+    :param positions: (T, K, 2) marker positions.
+    :param likelihoods: (T, K) marker likelihoods.
+    :param cluster_idx: column indices of the cluster's markers.
+    :param likelihood_threshold: per-marker visibility threshold.
+    :param anchor_idx: optional cluster marker to centre on; defaults to the
+        per-frame cluster centroid.
+    :returns: (T, 2) unit body axis per frame, NaN where under-determined; or
+        None if the cluster never has enough simultaneously-visible markers.
+    """
+    T = positions.shape[0]
+    vis = likelihoods[:, cluster_idx] >= likelihood_threshold
+    finite = np.all(np.isfinite(positions[:, cluster_idx, :]), axis=2)
+    ok = vis & finite                                    # (T, n_cluster)
+    n_ok = ok.sum(axis=1)
+    usable = n_ok >= 3                                    # PCA needs >= 3 pts
+    if not np.any(usable):
+        return None
+
+    axis = np.full((T, 2), np.nan)
+    pts_all = positions[:, cluster_idx, :]               # (T, n_cluster, 2)
+    aniso = np.zeros(T)                                  # elongation per frame
+    for t in np.nonzero(usable)[0]:
+        m = ok[t]
+        q = pts_all[t, m, :]
+        q = q - q.mean(axis=0)
+        # 2x2 scatter; eigenvector of the larger eigenvalue is the body line.
+        cov = q.T @ q
+        evals, evecs = np.linalg.eigh(cov)
+        axis[t] = evecs[:, -1]
+        # Anisotropy = major/minor eigenvalue. A round cluster has ratio ~1
+        # and no meaningful principal direction; only elongated clusters
+        # (a spine) define a stable axis.
+        aniso[t] = evals[-1] / max(evals[0], 1e-9)
+
+    # If the cluster is essentially round in most frames, PCA is fitting a
+    # noise direction. Refuse — the caller then leaves offsets alone (which,
+    # for the canonical rig whose root markers are nearly coincident, is the
+    # pre-122hh behaviour) rather than fitting the whole cluster to a
+    # spurious axis. A spine gives ratios in the tens-to-hundreds; the
+    # threshold only screens out genuinely round blobs.
+    med_aniso = float(np.median(aniso[np.nonzero(usable)[0]]))
+    if med_aniso < _ROOT_AXIS_MIN_ANISOTROPY:
+        return None
+
+    # Sign disambiguation. PCA's eigenvector sign is arbitrary and can flip
+    # frame to frame; left alone that scatters each marker's fitted angle
+    # across two clusters 180 deg apart and wrecks the median.
+    #
+    # Only per-frame CONSISTENCY matters here, not which physical end is
+    # "forward": the offsets are all measured in this same frame, so a
+    # globally-consistent axis pointing tail-forward just rotates the whole
+    # offset set 180 deg, which the filter absorbs into the segment's
+    # orientation state. So there is no need to consult the anatomy — an
+    # earlier version oriented toward a child-segment marker, but for this
+    # tree that marker (back_V2) sits almost on the trunk line, making the
+    # sign test near-degenerate and reintroducing exactly the flips it was
+    # meant to remove.
+    #
+    # Fold every frame's axis into a half-plane (sign chosen by the first
+    # component, breaking ties on the second), average to get a stable
+    # reference, then align every frame to it. A raw mean would cancel
+    # opposed vectors, hence the fold.
+    valid = np.nonzero(usable)[0]
+    pool = axis[valid].copy()
+    fold = np.where(
+        np.abs(pool[:, 0]) > 1e-12,
+        np.sign(pool[:, 0]),
+        np.sign(pool[:, 1]),
+    )
+    ref = np.nanmean(pool * fold[:, None], axis=0)
+    if np.linalg.norm(ref) > 1e-9:
+        ref = ref / np.linalg.norm(ref)
+        dot = axis @ ref
+        flip = np.isfinite(dot) & (dot < 0)
+        axis[flip] = -axis[flip]
+
+    return axis
+
+
 def fit_body_lengths(
     positions: np.ndarray,
     likelihoods: np.ndarray,
@@ -1218,45 +1346,64 @@ def fit_body_lengths(
             continue
 
         # Need a frame direction. For non-root, this is
-        # parent_distal → seg_distal. For root, we don't have
-        # a frame direction from data alone, so we use the
-        # body's direction proxy: distance from one trunk
-        # marker pair (e.g., back3 → back1 if both present, or
-        # back2 → neck-attachment if neck-marker is present).
+        # parent_distal → seg_distal. For root, there is no such
+        # vector from data; patch 122hh derives a per-frame body
+        # axis from the cluster's own geometry via PCA instead of
+        # the old hardcoded back1/back3 proxy (which only ever
+        # matched the built-in rig, so any renamed project skipped
+        # root-cluster offset fitting entirely and left the trunk
+        # markers on their placeholder ring — the "bunched back
+        # markers" bug).
+        root_axis = None
         if seg.parent is not None:
             parent_distal = _segment_distal_marker(
                 layout, seg.parent,
             )
         else:
-            # Root: use a trunk-aligned proxy. Pick the most
-            # forward trunk marker available to define a body
-            # direction. For mufasa rat, the canonical front-
-            # back proxy is back1 (front) vs. back3 (back) if
-            # both are root attachments.
             parent_distal = None
-            if "back1" in seg.markers and "back3" in seg.markers:
-                # Use back3 (rear) → back1 (forward) as the body
-                # direction proxy. seg_distal is back2 (the root
-                # marker), and we treat the parent_distal proxy
-                # as back3 for the purpose of frame definition.
-                parent_distal = "back3"
-                # We'll override below to compute the body
-                # direction directly rather than using
-                # parent_distal as a true parent.
+            cluster_idx = [
+                name_to_idx[m] for m in seg.markers if m in name_to_idx
+            ]
+            if len(cluster_idx) >= 3:
+                root_axis = _root_cluster_body_axis(
+                    positions, likelihoods, cluster_idx,
+                    likelihood_threshold,
+                    anchor_idx=name_to_idx.get(seg_distal),
+                )
+            if root_axis is None:
+                # PCA declined (round / near-coincident cluster, e.g. the
+                # canonical rig whose root markers all sit near the origin).
+                # Fall back to the pre-122hh proxy: the built-in rig's
+                # back3 -> back1 body direction, when those markers exist.
+                # For any other rig neither branch fires and the cluster's
+                # offsets stay at their placeholders, exactly as before —
+                # 122hh strictly adds the elongated-cluster case, it does
+                # not remove the old one.
+                if "back1" in seg.markers and "back3" in seg.markers:
+                    parent_distal = "back3"
 
-        if parent_distal is None:
-            # Can't establish a frame direction — leave default
-            # offsets in the layout
-            continue
-        if parent_distal not in name_to_idx or seg_distal not in name_to_idx:
-            continue
+        # Root with a PCA axis takes a dedicated path below; the
+        # parent_distal machinery does not apply to it.
+        if root_axis is None:
+            if parent_distal is None:
+                # Can't establish a frame direction — leave default
+                # offsets in the layout
+                continue
+            if (
+                parent_distal not in name_to_idx
+                or seg_distal not in name_to_idx
+            ):
+                continue
 
         i_seg = name_to_idx[seg_distal]
-        i_par = name_to_idx[parent_distal]
         p_seg = positions[:, i_seg, :]
-        p_par = positions[:, i_par, :]
         l_seg = likelihoods[:, i_seg]
-        l_par = likelihoods[:, i_par]
+        # Root (patch 122hh) has no parent marker; its frame comes from
+        # root_axis, so p_par / l_par are only set on the non-root path.
+        if root_axis is None:
+            i_par = name_to_idx[parent_distal]
+            p_par = positions[:, i_par, :]
+            l_par = likelihoods[:, i_par]
 
         for marker, (default_len, default_angle) in seg.markers.items():
             if marker == seg_distal:
@@ -1269,26 +1416,45 @@ def fit_body_lengths(
             i_m = name_to_idx[marker]
             p_m = positions[:, i_m, :]
             l_m = likelihoods[:, i_m]
-            mask = (
-                (l_seg >= likelihood_threshold)
-                & (l_par >= likelihood_threshold)
-                & (l_m >= likelihood_threshold)
-                & np.all(np.isfinite(p_seg), axis=1)
-                & np.all(np.isfinite(p_par), axis=1)
-                & np.all(np.isfinite(p_m), axis=1)
-            )
+            if root_axis is None:
+                mask = (
+                    (l_seg >= likelihood_threshold)
+                    & (l_par >= likelihood_threshold)
+                    & (l_m >= likelihood_threshold)
+                    & np.all(np.isfinite(p_seg), axis=1)
+                    & np.all(np.isfinite(p_par), axis=1)
+                    & np.all(np.isfinite(p_m), axis=1)
+                )
+            else:
+                # Root path (patch 122hh): frame is the PCA body axis, so the
+                # per-frame requirement is a valid axis plus the two markers
+                # whose relative position we are measuring.
+                mask = (
+                    (l_seg >= likelihood_threshold)
+                    & (l_m >= likelihood_threshold)
+                    & np.all(np.isfinite(p_seg), axis=1)
+                    & np.all(np.isfinite(p_m), axis=1)
+                    & np.all(np.isfinite(root_axis), axis=1)
+                )
             if mask.sum() < 20:
                 marker_offsets[marker] = (default_len, default_angle)
                 continue
 
-            # Frame: x-axis points from parent_distal to seg_distal.
-            # In that frame, marker offset is computed by rotating
-            # (marker - seg_distal) by minus-frame-angle and finding
-            # the polar coords.
-            frame_dx = p_seg[mask] - p_par[mask]
-            frame_dist = np.sqrt(frame_dx[:, 0] ** 2 + frame_dx[:, 1] ** 2)
-            # Avoid division by zero
-            ok_frame = frame_dist > 1e-6
+            # Frame: x-axis points along the segment's body direction. For
+            # non-root that is parent_distal -> seg_distal; for the root
+            # cluster (patch 122hh) it is the per-frame PCA axis. In that
+            # frame the marker offset is (marker - seg_distal) rotated by
+            # minus the frame angle, in polar coords.
+            if root_axis is None:
+                frame_dx = p_seg[mask] - p_par[mask]
+                frame_dist = np.sqrt(
+                    frame_dx[:, 0] ** 2 + frame_dx[:, 1] ** 2
+                )
+                ok_frame = frame_dist > 1e-6
+            else:
+                frame_dx = root_axis[mask]                # already unit-norm
+                frame_dist = np.ones(frame_dx.shape[0])
+                ok_frame = np.all(np.isfinite(frame_dx), axis=1)
             if ok_frame.sum() < 20:
                 marker_offsets[marker] = (default_len, default_angle)
                 continue
