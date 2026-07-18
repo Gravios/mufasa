@@ -8,6 +8,43 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hh — root-cluster offsets from a PCA body axis; the bunched-back-markers fix.**
+The reported bug: back markers bunched together even when FreeDLC saw them
+clearly, and it started around 121. Traced to 122gx. Every non-root segment
+gets its body frame from `parent_distal -> seg_distal`; the root has no parent,
+so the code filled the gap with two hardcoded rig marker names (`back3 ->
+back1`). 122gx generalized the tree to any skeleton but left that proxy
+rig-specific — so `strohA-kj`, whose trunk markers are `back_T8..hip_right`,
+matched nothing, `parent_distal` stayed None, and `fit_body_lengths` skipped
+offset-fitting for the WHOLE root cluster. Every non-distal trunk marker kept
+its placeholder ring offset `(1.0, angle)`: six markers pinned at unit radius
+around a circle instead of along the spine. The forward model then placed them
+on that ring no matter what the data said — hence "bunched even when plainly
+visible." Not perspective, not convergence, not this session's patches; a
+rig-name assumption left behind by a generalization three patches back, which
+is exactly why it worked before 121.
+
+Trunk markers lie along the body, so the first principal component of the
+cluster's point cloud IS the body axis — for any rig, no names. Computed per
+frame (the animal rotates). On strohA-kj this turns the ring into real
+geometry: spine collinear (max |y| < 0.2px), lengths increasing down the back
+(0 -> 8 -> 16px), hips straddling symmetrically (+-10px). PCA's sign is
+arbitrary and can flip frame to frame, which would scatter each marker's angle
+across two clusters 180 deg apart; a mean-axis fold fixes it. Only per-frame
+consistency matters, not which end is "forward" — a globally tail-forward axis
+just rotates the whole offset set 180 deg, which the filter absorbs into the
+segment orientation. (An earlier attempt oriented toward a child marker; for
+this tree that marker sits almost on the trunk line, making the sign test
+degenerate — dropped.)
+
+Gated on cluster anisotropy. PCA needs an elongated cluster; the canonical
+rig's root markers are nearly coincident (eigenvalue ratio ~1.1, a round
+blob), where the principal axis is just noise. Below a 4:1 ratio the axis is
+refused and the code falls back to the old back3->back1 proxy, so the built-in
+rig is bit-unchanged and 122hh strictly ADDS the elongated-cluster case. The
+guard is load-bearing: disabling it reproduces the exact `r_drift` regression
+(12.19 vs [0.8,6]) it was added to prevent.
+
 **122hg — Singer acceleration: mean-reverting instead of a random walk.**
 Answers "could we use the jerk if it was conditioned on velocity and/or
 acceleration?" Conditioning Q on the state is mechanically fine — condition on
