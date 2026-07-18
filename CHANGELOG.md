@@ -8,6 +8,45 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hj — per-segment orientation-noise ceiling, for a fast head.**
+The head impulse-tracking failure, root-caused from a real 67-session EM log.
+The M-step clips each segment's fitted orientation process noise q_seg_ori to
+q_initial * _M_STEP_Q_CEILING_FACTOR (10x). The log shows the head's q_seg_ori
+pinned at exactly 20.0 (its init is 2.0, so 2.0*10) across every iteration
+while the mean rises — a segment starved by its cap. The head turns ~3x faster
+than the slowest segment (measured 6.2 vs 1.9 rad/s), so a single global
+ceiling factor can't serve both: at the value that keeps the trunk stable, the
+head is denied the process noise it needs, over-trusts its smooth prediction,
+and rejects fast high-likelihood observations at acceleration impulses — the
+head "not keeping up" with sharp movements, and exactly the user's report.
+
+Confirmed the mechanism against the data: at high-acceleration impulses where
+FreeDLC likelihood is high (p>=0.7, marker clearly visible), the smoothed head
+still misses by ~9.5px, and the miss is not a lag (min error at time-shift -1)
+and not damping (speed ratio ~1.0). The filter is rejecting good, visible, fast
+observations because its dynamics prior is too tight.
+
+The fix adds a layout field high_angular_noise_segments and a
+--high-angular-noise-segments CLI flag (mirroring --const-accel-segments):
+listed segments use a raised ceiling factor (_M_STEP_Q_CEILING_FACTOR_HIGH,
+40x), all others stay at 10x. For the head that lifts the cap from 20 to 80.
+Low-likelihood observations are still hard-gated out in the filter update
+(markers below --likelihood-threshold are dropped, not down-weighted), so a
+higher ceiling changes responsiveness only to observations that already pass
+the gate — it does NOT make the head chase spurious detections (verified on a
+real explosion frame: 11/15 markers below 0.5 there are correctly excluded).
+
+Field-whitelist-rot guard: the model save/load path hand-lists layout fields,
+so high_angular_noise_segments is persisted and restored symmetrically; pre-
+122hj model files lack the key and load empty. Only q_seg_ori uses the per-
+segment ceiling; q_length and the root ceilings keep the global factor.
+
+smoke_122hj_per_segment_ceiling: 18/18. Tripwires flip: high factor == default
+-> 16/18; selector ignores the flag -> 17/18; validation dropped -> 16/18.
+Canonical rig unchanged (152/152, it sets no flag). Both sweeps baseline-diffed
+against 5671eed: 267 suites, no regressions. F821 = 7, I001 = 1, ruff 22,
+mufasa/**/*.py = 427.
+
 **122hi — root-cluster frame from the widest chord, not PCA.**
 122hh fixed the tail but not the trunk, and testing on the user's real 54k-frame
 session showed why. 122hh derived the root cluster's body frame from per-frame

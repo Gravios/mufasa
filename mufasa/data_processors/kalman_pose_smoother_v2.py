@@ -250,6 +250,17 @@ class BodyLayout:
     # Empty list (default) preserves patch-121b/121c behavior.
     const_accel_segments: list[str] = field(default_factory=list)
 
+    # Patch 122hj: segments whose orientation process-noise M-step CEILING is
+    # raised (see _M_STEP_Q_CEILING_FACTOR_HIGH). The default per-segment
+    # ceiling is q_initial * _M_STEP_Q_CEILING_FACTOR (10x); a genuinely fast
+    # segment — measured head angular rate is ~3x the slowest segment and its
+    # q_seg_ori pins at the 10x ceiling across every EM iteration, starving it
+    # so the filter over-trusts its smooth prediction and rejects fast, high-
+    # likelihood observations at impulses — needs a higher ceiling than the
+    # trunk. A single global factor can't serve both, so this raises the cap
+    # for the named segments only. Empty (default) preserves prior behaviour.
+    high_angular_noise_segments: list[str] = field(default_factory=list)
+
     def __post_init__(self) -> None:
         # Validate exactly one root
         roots = [s for s in self.segments if s.parent is None]
@@ -306,6 +317,23 @@ class BodyLayout:
                     f"const_accel_segments"
                 )
             seen_ca.add(sname)
+
+        # Patch 122hj: validate high_angular_noise_segments
+        for sname in self.high_angular_noise_segments:
+            if sname not in seg_names:
+                raise ValueError(
+                    f"high_angular_noise_segments references unknown "
+                    f"segment {sname!r}; available: "
+                    f"{sorted(seg_names)}"
+                )
+        seen_hn = set()
+        for sname in self.high_angular_noise_segments:
+            if sname in seen_hn:
+                raise ValueError(
+                    f"Duplicate segment {sname!r} in "
+                    f"high_angular_noise_segments"
+                )
+            seen_hn.add(sname)
 
         # Validate no cycles (DFS from root, every segment
         # reachable in topo order)
@@ -4657,6 +4685,15 @@ _M_STEP_Q_FLOOR_FACTOR = 0.1
 # pass. 10× is still 3× typical converged values, so
 # adaptation room is preserved.
 _M_STEP_Q_CEILING_FACTOR = 10.0
+# Patch 122hj: raised orientation-noise ceiling for segments listed in the
+# layout's high_angular_noise_segments. Applied only to q_seg_ori, only for
+# those segments. 40x (vs the default 10x) lets a fast head's fitted
+# q_seg_ori clear the value it was pinning at, so the filter follows fast
+# high-likelihood head observations instead of rejecting them. Low-likelihood
+# observations are still hard-gated out upstream, so a higher ceiling does not
+# make the head chase spurious detections — it only changes responsiveness to
+# observations that already pass the likelihood gate.
+_M_STEP_Q_CEILING_FACTOR_HIGH = 40.0
 
 # Patch 121c: absolute hard caps on the root q parameters.
 # These backstop the relative ceiling above for cases where
@@ -5040,6 +5077,19 @@ def per_session_fit_from_stats(
     return fit
 
 
+def _seg_ori_ceiling_factor(layout: BodyLayout, seg_name: str) -> float:
+    """Orientation-noise M-step ceiling factor for a segment (patch 122hj).
+
+    Returns the raised factor for segments in the layout's
+    ``high_angular_noise_segments`` (a genuinely fast segment, e.g. the head,
+    whose fitted q_seg_ori otherwise pins at the default ceiling), else the
+    default factor. Applies only to orientation noise, not length or root.
+    """
+    if seg_name in layout.high_angular_noise_segments:
+        return _M_STEP_Q_CEILING_FACTOR_HIGH
+    return _M_STEP_Q_CEILING_FACTOR
+
+
 def finalize_m_step_v2(
     stats: _MStepStatsV2,
     layout: BodyLayout,
@@ -5169,7 +5219,11 @@ def finalize_m_step_v2(
         q_floor = max(
             _FLOOR_Q_SEG_ORI, q_initial * _M_STEP_Q_FLOOR_FACTOR,
         )
-        q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR
+        # Patch 122hj: per-segment orientation ceiling — raised for
+        # high_angular_noise_segments (e.g. a fast head).
+        q_ceiling = q_initial * _seg_ori_ceiling_factor(
+            layout, seg_name,
+        )
         q_clipped = max(q_floor, min(q_ceiling, q_raw))
         q_prev = prev_params.q_seg_ori.get(seg_name, q_initial)
         q_seg_ori[seg_name] = _damp(q_prev, q_clipped)
@@ -5562,7 +5616,11 @@ def finalize_m_step_v2_from_per_session(
         q_floor = max(
             _FLOOR_Q_SEG_ORI, q_initial * _M_STEP_Q_FLOOR_FACTOR,
         )
-        q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR
+        # Patch 122hj: per-segment orientation ceiling — raised for
+        # high_angular_noise_segments (e.g. a fast head).
+        q_ceiling = q_initial * _seg_ori_ceiling_factor(
+            layout, seg_name,
+        )
         q_clipped = max(q_floor, min(q_ceiling, q_raw))
         q_prev = prev_params.q_seg_ori.get(seg_name, q_initial)
         q_seg_ori[seg_name] = _damp(q_prev, q_clipped)
@@ -8035,6 +8093,11 @@ def save_model_v2(
     save_kwargs["layout_const_accel_segments"] = np.array(
         list(layout.const_accel_segments), dtype=object,
     )
+    # Patch 122hj: persist high_angular_noise_segments alongside the other
+    # per-segment layout flags. Absent on pre-122hj models -> loads empty.
+    save_kwargs["layout_high_angular_noise_segments"] = np.array(
+        list(layout.high_angular_noise_segments), dtype=object,
+    )
     has_const_accel = (
         params.q_jerk_root_pos is not None
         or params.q_jerk_root_ori is not None
@@ -8141,10 +8204,18 @@ def load_model_v2(
         ca_segments = [
             str(s) for s in data["layout_const_accel_segments"]
         ]
+    # Patch 122hj: high_angular_noise_segments. Same pattern; absent on
+    # pre-122hj models -> empty (all ceilings default).
+    han_segments: list[str] = []
+    if "layout_high_angular_noise_segments" in data.files:
+        han_segments = [
+            str(s) for s in data["layout_high_angular_noise_segments"]
+        ]
     layout = BodyLayout(
         segments=segments,
         orientation_drift_segments=odd_segments,
         const_accel_segments=ca_segments,
+        high_angular_noise_segments=han_segments,
     )
     # Patch 120b: layout.with_drift flag. Defaults False for
     # pre-120b model files where the field is absent.
@@ -9417,6 +9488,29 @@ def main(argv=None) -> int:
             "lagged or over-smoothed: 'body,head'."
         ),
     )
+    parser.add_argument(
+        "--high-angular-noise-segments", default="",
+        help=(
+            "Patch 122hj: raise the orientation-noise M-step "
+            "ceiling for the listed segments. Comma-separated "
+            "segment names (e.g. 'head' or 'head,neck'). The "
+            "per-segment orientation process noise q_seg_ori "
+            "is fit by EM but clipped to a ceiling of "
+            "10x its initial value. A genuinely fast segment "
+            "(a snapping head can turn ~3x faster than the "
+            "trunk) pins at that ceiling every iteration, so "
+            "the filter over-trusts its smooth prediction and "
+            "rejects fast, high-likelihood observations at "
+            "acceleration impulses (the head 'not keeping up' "
+            "with sharp movements). Listing a segment here "
+            "raises its ceiling to 40x so EM can fit the "
+            "larger q it needs. Low-likelihood observations "
+            "are still gated out, so this does not make the "
+            "segment chase spurious detections. Empty "
+            "(default) leaves all ceilings at 10x. Use for a "
+            "fast head: 'head'."
+        ),
+    )
     args = parser.parse_args(argv)
 
     # Patch 122hb/122hc: the built-in rig is a last resort, not a default.
@@ -9592,6 +9686,13 @@ def main(argv=None) -> int:
         layout = _apply_segment_flags(
             layout, args.const_accel_segments, "const_accel_segments",
             "--const-accel-segments",
+        )
+    # Patch 122hj: high-angular-noise flag plumbing. Same pattern.
+    if args.high_angular_noise_segments:
+        layout = _apply_segment_flags(
+            layout, args.high_angular_noise_segments,
+            "high_angular_noise_segments",
+            "--high-angular-noise-segments",
         )
 
     try:
