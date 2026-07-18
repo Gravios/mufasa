@@ -1098,15 +1098,6 @@ def _segment_distal_marker(layout: BodyLayout, segment_name: str) -> str | None:
     return None
 
 
-# Patch 122hh: minimum major/minor eigenvalue ratio for a root cluster's PCA
-# body axis to be trusted. A spine gives ratios in the tens to hundreds; a
-# round or near-coincident cluster gives ~1, where the principal direction is
-# just the largest noise component. Below this the axis is refused and the
-# caller falls back to the pre-122hh proxy. 4.0 is ~2:1 in physical extent —
-# comfortably elongated, well clear of both regimes.
-_ROOT_AXIS_MIN_ANISOTROPY = 4.0
-
-
 def _root_cluster_body_axis(
     positions: np.ndarray,
     likelihoods: np.ndarray,
@@ -1157,72 +1148,80 @@ def _root_cluster_body_axis(
         None if the cluster never has enough simultaneously-visible markers.
     """
     T = positions.shape[0]
+    n = len(cluster_idx)
+    if n < 3:
+        return None
+
+    P = positions[:, cluster_idx, :]                     # (T, n, 2)
     vis = likelihoods[:, cluster_idx] >= likelihood_threshold
-    finite = np.all(np.isfinite(positions[:, cluster_idx, :]), axis=2)
-    ok = vis & finite                                    # (T, n_cluster)
-    n_ok = ok.sum(axis=1)
-    usable = n_ok >= 3                                    # PCA needs >= 3 pts
-    if not np.any(usable):
+    finite = np.all(np.isfinite(P), axis=2)
+    ok = vis & finite                                    # (T, n)
+    if not np.any(ok.sum(axis=1) >= 3):
         return None
 
+    # Patch 122hi: derive the frame from the cluster's MOST-SEPARATED marker
+    # pair, not from per-frame PCA of the whole cluster.
+    #
+    # 122hh used PCA and gated it on anisotropy, on the assumption that a
+    # trunk is elongated like a spine. Measured on real top-down mouse data,
+    # it is not: the six dorsal markers project into a roughly ROUND 2D patch
+    # (~40px across but anisotropy ~1.75, i.e. no dominant axis). PCA of a
+    # round patch returns a noise direction, the anisotropy gate then rejects
+    # ~90% of frames, and the cluster falls back to the placeholder ring —
+    # the bunching, still present after 122hh for exactly this reason.
+    #
+    # But a round patch still has a well-defined FRAME: pick the two markers
+    # that are, on average, farthest apart (the widest chord of the patch),
+    # and use their per-frame vector as the body axis. That chord is long and
+    # its direction is stable frame to frame even when the cluster as a whole
+    # is round — measured angular std of the resulting per-marker offsets
+    # drops to ~15 deg, versus PCA which could not orient the patch at all.
+    # No marker names, no elongation assumption; works for a spine and a
+    # patch alike.
+    mean_xy = np.array([
+        np.nanmean(np.where(ok[:, j], P[:, j, 0], np.nan)) for j in range(n)
+    ]), np.array([
+        np.nanmean(np.where(ok[:, j], P[:, j, 1], np.nan)) for j in range(n)
+    ])
+    mx, my = mean_xy
+    if not (np.all(np.isfinite(mx)) and np.all(np.isfinite(my))):
+        # a marker never observed; fall back to co-visible-only means
+        for j in range(n):
+            if not np.isfinite(mx[j]):
+                col = ok[:, j]
+                if np.any(col):
+                    mx[j] = np.mean(P[col, j, 0])
+                    my[j] = np.mean(P[col, j, 1])
+
+    best_pair = None
+    best_d = -1.0
+    for a in range(n):
+        for b in range(a + 1, n):
+            if not (np.isfinite(mx[a]) and np.isfinite(mx[b])):
+                continue
+            d = np.hypot(mx[a] - mx[b], my[a] - my[b])
+            if d > best_d:
+                best_d = d
+                best_pair = (a, b)
+    if best_pair is None or best_d < 1e-6:
+        return None
+    ja, jb = best_pair
+
+    # Per-frame axis = unit vector from marker ja to marker jb, wherever both
+    # are observed. NaN elsewhere; the offset loop already masks on finiteness.
     axis = np.full((T, 2), np.nan)
-    pts_all = positions[:, cluster_idx, :]               # (T, n_cluster, 2)
-    aniso = np.zeros(T)                                  # elongation per frame
-    for t in np.nonzero(usable)[0]:
-        m = ok[t]
-        q = pts_all[t, m, :]
-        q = q - q.mean(axis=0)
-        # 2x2 scatter; eigenvector of the larger eigenvalue is the body line.
-        cov = q.T @ q
-        evals, evecs = np.linalg.eigh(cov)
-        axis[t] = evecs[:, -1]
-        # Anisotropy = major/minor eigenvalue. A round cluster has ratio ~1
-        # and no meaningful principal direction; only elongated clusters
-        # (a spine) define a stable axis.
-        aniso[t] = evals[-1] / max(evals[0], 1e-9)
-
-    # If the cluster is essentially round in most frames, PCA is fitting a
-    # noise direction. Refuse — the caller then leaves offsets alone (which,
-    # for the canonical rig whose root markers are nearly coincident, is the
-    # pre-122hh behaviour) rather than fitting the whole cluster to a
-    # spurious axis. A spine gives ratios in the tens-to-hundreds; the
-    # threshold only screens out genuinely round blobs.
-    med_aniso = float(np.median(aniso[np.nonzero(usable)[0]]))
-    if med_aniso < _ROOT_AXIS_MIN_ANISOTROPY:
+    both = ok[:, ja] & ok[:, jb]
+    d = P[:, jb, :] - P[:, ja, :]
+    dlen = np.hypot(d[:, 0], d[:, 1])
+    good = both & (dlen > 1e-6)
+    axis[good, 0] = d[good, 0] / dlen[good]
+    axis[good, 1] = d[good, 1] / dlen[good]
+    if not np.any(good):
         return None
 
-    # Sign disambiguation. PCA's eigenvector sign is arbitrary and can flip
-    # frame to frame; left alone that scatters each marker's fitted angle
-    # across two clusters 180 deg apart and wrecks the median.
-    #
-    # Only per-frame CONSISTENCY matters here, not which physical end is
-    # "forward": the offsets are all measured in this same frame, so a
-    # globally-consistent axis pointing tail-forward just rotates the whole
-    # offset set 180 deg, which the filter absorbs into the segment's
-    # orientation state. So there is no need to consult the anatomy — an
-    # earlier version oriented toward a child-segment marker, but for this
-    # tree that marker (back_V2) sits almost on the trunk line, making the
-    # sign test near-degenerate and reintroducing exactly the flips it was
-    # meant to remove.
-    #
-    # Fold every frame's axis into a half-plane (sign chosen by the first
-    # component, breaking ties on the second), average to get a stable
-    # reference, then align every frame to it. A raw mean would cancel
-    # opposed vectors, hence the fold.
-    valid = np.nonzero(usable)[0]
-    pool = axis[valid].copy()
-    fold = np.where(
-        np.abs(pool[:, 0]) > 1e-12,
-        np.sign(pool[:, 0]),
-        np.sign(pool[:, 1]),
-    )
-    ref = np.nanmean(pool * fold[:, None], axis=0)
-    if np.linalg.norm(ref) > 1e-9:
-        ref = ref / np.linalg.norm(ref)
-        dot = axis @ ref
-        flip = np.isfinite(dot) & (dot < 0)
-        axis[flip] = -axis[flip]
-
+    # The chord direction is inherently signed (ja->jb), so unlike PCA there
+    # is no eigenvector-sign ambiguity to fix. Frames where the pair is
+    # occluded are NaN and simply do not contribute to any marker's median.
     return axis
 
 

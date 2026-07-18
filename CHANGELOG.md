@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hi — root-cluster frame from the widest chord, not PCA.**
+122hh fixed the tail but not the trunk, and testing on the user's real 54k-frame
+session showed why. 122hh derived the root cluster's body frame from per-frame
+PCA and gated it on anisotropy, assuming a trunk is elongated like a spine.
+Measured on real top-down mouse data it is not: the six dorsal markers project
+into a roughly ROUND 2D patch — ~40px across but eigenvalue ratio ~1.75, no
+dominant axis. PCA of a round patch returns a noise direction; the anisotropy
+gate then rejected ~89% of frames; the cluster fell back to the placeholder
+ring; the trunk kept bunching exactly as before.
+
+A round patch still has a well-defined frame: the two markers farthest apart on
+average define its widest chord, whose per-frame direction is stable even when
+the cluster as a whole is round. 122hi uses that chord as the body axis — no
+marker names, no elongation assumption, works for an elongated spine and a
+round patch alike. The chord is inherently signed, so unlike a PCA eigenvector
+there is no sign-flip ambiguity to repair. The anisotropy gate is removed. The
+back1/back3 fallback stays for the canonical round cluster.
+
+Verified on the real session: fitted trunk offsets match observed inter-marker
+distances to within 1px (back_T4-back_L6 fitted 39.8 vs observed 38.6; the hip
+pair 46.9 vs 47.4), and zero markers remain on the ring. The canonical rig is
+unchanged (152/152). smoke_122hi_root_pair_axis (renamed from _pca_axis): 18/18,
+including a controlled orthogonal-pair case that detects a wrong (closest-pair)
+selection. Both sweeps baseline-diffed against 5671eed: 266 suites, no
+regressions.
+
 **122hh — root-cluster offsets from a PCA body axis; the bunched-back-markers fix.**
 The reported bug: back markers bunched together even when FreeDLC saw them
 clearly, and it started around 121. Traced to 122gx. Every non-root segment
