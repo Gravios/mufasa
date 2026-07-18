@@ -64,6 +64,7 @@ Design choices (locked in patch 99, see commit message)
 
 from __future__ import annotations
 
+import dataclasses as _dc_ms
 import math
 from dataclasses import dataclass, field
 
@@ -2894,6 +2895,17 @@ class NoiseParamsV2:
     q_jerk_root_ori: float | None = None
     q_jerk_seg_ori: dict[str, float] | None = None
 
+    # Patch 122hg (Singer model): acceleration correlation time, seconds.
+    # None (the default) means an infinite correlation time — i.e. exactly
+    # the 121d random walk on acceleration, so nothing changes unless asked.
+    # A finite value makes acceleration Ornstein-Uhlenbeck: still a tracked
+    # state, so fast motion is captured as before, but with no observations
+    # it decays toward zero with this time constant instead of persisting
+    # forever. Fixed rather than fitted, the same as alpha_drift — it is a
+    # modelling claim about how long the animal sustains an acceleration,
+    # not a noise level to be learned.
+    tau_accel: float | None = None
+
     @classmethod
     def default(
         cls,
@@ -3181,9 +3193,35 @@ def build_F_v2(
     # the new acceleration entries:
     #   x_new   = x   + vx*dt + ax*dt²/2
     #   vx_new  = vx  + ax*dt
-    #   ax_new  = ax                          (random walk)
-    # The accel diagonals are already 1.0 from np.eye(D).
+    #   ax_new  = phi * ax
+    #
+    # Patch 122hg (Singer model). That last line used to read `ax_new = ax`,
+    # i.e. phi = 1 — a random walk on acceleration, unbounded. It is why
+    # const-accel is dangerous across a dropout: with no observations the
+    # acceleration never decays, so position variance grows as tau^5 where
+    # constant-velocity grows as tau^3. At the q_jerk this project fits, a
+    # 20 s occlusion reaches ~85,000 px of prediction sd against ~5,500 for
+    # the OU. That gap is the divergence.
+    #
+    # phi = exp(-dt / tau_accel) makes acceleration Ornstein-Uhlenbeck. It is
+    # still a tracked state, so fast motion is captured exactly as before and
+    # nothing is given up at short horizons; but unobserved it decays toward
+    # zero and the extrapolation degrades gracefully CA -> CV -> CP.
+    #
+    # Fourth mean-reverting block in this file: alpha_drift (120a),
+    # orientation drift (121a) and the joint prior (122hf) all do this.
+    # Acceleration was the one place that didn't.
+    #
+    # tau_accel=None -> phi=1 -> bit-identical to 121d. The default.
     dt2_half = dt * dt / 2.0
+    phi_accel = 1.0
+    if params is not None and params.tau_accel is not None:
+        if params.tau_accel <= 0:
+            raise ValueError(
+                f"tau_accel must be > 0 seconds (or None for the 121d "
+                f"random walk); got {params.tau_accel}"
+            )
+        phi_accel = float(np.exp(-dt / params.tau_accel))
     for sname in layout.const_accel_segments:
         seg = layout.segment_by_name(sname)
         ca = layout.slice_segment_const_accel(sname)
@@ -3202,6 +3240,9 @@ def build_F_v2(
             F[5, sdd_i] = dt2_half
             F[6, cdd_i] = dt
             F[7, sdd_i] = dt
+            # Patch 122hg: OU decay on the accel diagonal (1.0 from eye(D)).
+            for i in (ax_i, ay_i, cdd_i, sdd_i):
+                F[i, i] = phi_accel
         else:
             # Non-root: only orientation accel
             cdd_i, sdd_i = ca.start, ca.start + 1
@@ -3211,6 +3252,9 @@ def build_F_v2(
             F[ori.start + 1, sdd_i] = dt2_half
             F[ori.start + 2, cdd_i] = dt
             F[ori.start + 3, sdd_i] = dt
+            # Patch 122hg: OU decay on the accel diagonal.
+            for i in (cdd_i, sdd_i):
+                F[i, i] = phi_accel
 
     return F
 
@@ -3368,6 +3412,24 @@ def build_Q_v2(
                 "None. Build params via NoiseParamsV2.default("
                 "layout) so const-accel fields are populated."
             )
+        # Patch 122hg: the noise the acceleration block receives per step.
+        #
+        #   random walk (tau_accel=None):  Var(w) = q * dt
+        #   OU          (tau_accel=T):     Var(w) = q * T/2 * (1 - e^(-2dt/T))
+        #
+        # The OU form is its stationary variance (q*T/2) times the fraction
+        # refreshed in one step. As T -> inf, (1 - e^(-2dt/T)) -> 2dt/T and
+        # the expression -> q*dt, so tau_accel=None is not approximately the
+        # 121d behaviour — it is exactly it.
+        #
+        # Expressed as a replacement for dt so the assignments below stand.
+        accel_dt = dt
+        if params.tau_accel is not None:
+            tau_a = params.tau_accel
+            accel_dt = (tau_a / 2.0) * (
+                1.0 - float(np.exp(-2.0 * dt / tau_a))
+            )
+
         for sname in layout.const_accel_segments:
             seg = layout.segment_by_name(sname)
             ca = layout.slice_segment_const_accel(sname)
@@ -3380,10 +3442,10 @@ def build_Q_v2(
                         f"q_jerk_root_pos / q_jerk_root_ori "
                         f"must be >= 0; got pos={qp}, ori={qo}"
                     )
-                Q[ca.start,     ca.start]     = qp * dt
-                Q[ca.start + 1, ca.start + 1] = qp * dt
-                Q[ca.start + 2, ca.start + 2] = qo * dt
-                Q[ca.start + 3, ca.start + 3] = qo * dt
+                Q[ca.start,     ca.start]     = qp * accel_dt
+                Q[ca.start + 1, ca.start + 1] = qp * accel_dt
+                Q[ca.start + 2, ca.start + 2] = qo * accel_dt
+                Q[ca.start + 3, ca.start + 3] = qo * accel_dt
             else:
                 # Non-root: 2 dims [cos_ddot, sin_ddot]
                 qo = (
@@ -3395,8 +3457,8 @@ def build_Q_v2(
                         f"q_jerk_seg_ori[{sname!r}] must be "
                         f">= 0; got {qo}"
                     )
-                Q[ca.start,     ca.start]     = qo * dt
-                Q[ca.start + 1, ca.start + 1] = qo * dt
+                Q[ca.start,     ca.start]     = qo * accel_dt
+                Q[ca.start + 1, ca.start + 1] = qo * accel_dt
 
     return Q
 
@@ -3672,7 +3734,10 @@ def forward_filter_v2(
             f"initial_state shape {initial_state.shape} != ({D},)"
         )
 
-    F = build_F_v2(layout, dt)
+    # Patch 122hg: pass params. build_F_v2 reads alpha_drift (120a) and
+    # tau_accel (122hg) from it; omitting it silently fell back to the
+    # hardcoded alpha=0.05 and phi=1.0.
+    F = build_F_v2(layout, dt, params)
     Q = build_Q_v2(layout, params, dt)
 
     if initial_cov is None:
@@ -4142,7 +4207,7 @@ def fit_joint_priors_v2(
             apply_constraints=apply_constraints,
             perspective=perspective,
         )
-        x = rts_smooth_v2(filt, layout, 1.0 / fps).x_smooth
+        x = rts_smooth_v2(filt, layout, 1.0 / fps, params).x_smooth
         for seg_name in layout.non_root_topo_order:
             idx = seg_marker_idx.get(seg_name, [])
             if not idx:
@@ -4225,6 +4290,7 @@ def rts_smooth_v2(
     filter_result: FilterResultV2,
     layout: BodyLayout,
     dt: float,
+    params: NoiseParamsV2 | None = None,
 ) -> SmoothResultV2:
     """RTS backward smoother for v2.
 
@@ -4253,7 +4319,7 @@ def rts_smooth_v2(
     """
     T = filter_result.x_filt.shape[0]
     D = layout.state_dim
-    F = build_F_v2(layout, dt)
+    F = build_F_v2(layout, dt, params)  # patch 122hg
 
     x_smooth = np.empty_like(filter_result.x_filt)
     P_smooth = np.empty_like(filter_result.P_filt)
@@ -4729,6 +4795,7 @@ def per_session_fit_from_stats(
     stats: _MStepStatsV2,
     layout: BodyLayout,
     dt: float,
+    params: NoiseParamsV2 | None = None,
 ) -> _PerSessionFitV2:
     """Convert a single session's accumulated stats into raw
     per-session parameter estimates.
@@ -4765,7 +4832,7 @@ def per_session_fit_from_stats(
             fit.n_obs_per_marker[m] = stats.sigma_n_obs.get(m, 0)
         return fit
 
-    F = build_F_v2(layout, dt)
+    F = build_F_v2(layout, dt, params)  # patch 122hg
     Q_hat = (
         stats.S11
         - stats.S10 @ F.T
@@ -4844,7 +4911,7 @@ def finalize_m_step_v2(
     if initial_params is None:
         initial_params = prev_params
 
-    F = build_F_v2(layout, dt)
+    F = build_F_v2(layout, dt, prev_params)  # patch 122hg
     n_pairs = max(stats.n_pairs, 1)
 
     # Q-hat = (1/n_pairs) * (S11 - S10 F^T - F S10^T + F S00 F^T)
@@ -5077,7 +5144,24 @@ def finalize_m_step_v2(
                 if s not in q_jerk_seg_ori:
                     q_jerk_seg_ori[s] = v
 
-    return NoiseParamsV2(
+    # Patch 122hg: carry forward every field of prev_params the M-step does
+    # not re-estimate, rather than hand-listing what to keep.
+    #
+    # Third time this pattern has bitten. The warm-start rebuild's own
+    # comment records the first two — 120b lost the drift trio, 121a lost
+    # orientation drift — and 121d then lost q_jerk_*, leaving
+    # --const-accel-segments dead for two patches. 122hc fixed the
+    # warm-start site and flagged these two for audit. Adding tau_accel is
+    # what called the audit in: NoiseParamsV2 has 16 fields and both of
+    # these re-listed 15.
+    #
+    # A whitelist has to be edited every time the dataclass grows a field,
+    # and forgetting is silent: the field reverts to its default and
+    # something three call-levels away fails about a name the user has never
+    # heard of. Start from prev_params, override only what was estimated.
+    # There is nothing left to forget.
+    return _dc_ms.replace(
+        prev_params,
         sigma_marker=sigma_marker,
         q_root_pos=q_root_pos,
         q_root_ori=q_root_ori,
@@ -5371,7 +5455,24 @@ def finalize_m_step_v2_from_per_session(
             prev_params.sigma_marker.get(m, 3.0), sigma_clipped,
         )
 
-    return NoiseParamsV2(
+    # Patch 122hg: carry forward every field of prev_params the M-step does
+    # not re-estimate, rather than hand-listing what to keep.
+    #
+    # Third time this pattern has bitten. The warm-start rebuild's own
+    # comment records the first two — 120b lost the drift trio, 121a lost
+    # orientation drift — and 121d then lost q_jerk_*, leaving
+    # --const-accel-segments dead for two patches. 122hc fixed the
+    # warm-start site and flagged these two for audit. Adding tau_accel is
+    # what called the audit in: NoiseParamsV2 has 16 fields and both of
+    # these re-listed 15.
+    #
+    # A whitelist has to be edited every time the dataclass grows a field,
+    # and forgetting is silent: the field reverts to its default and
+    # something three call-levels away fails about a name the user has never
+    # heard of. Start from prev_params, override only what was estimated.
+    # There is nothing left to forget.
+    return _dc_ms.replace(
+        prev_params,
         sigma_marker=sigma_marker,
         q_root_pos=q_root_pos,
         q_root_ori=q_root_ori,
@@ -5887,7 +5988,7 @@ def fit_warm_start_sigma_v2(
                 apply_constraints=apply_constraints,
                 perspective=perspective,
             )
-            smooth = rts_smooth_v2(filt, layout, dt)
+            smooth = rts_smooth_v2(filt, layout, dt, params)
 
             T = smooth.x_smooth.shape[0]
             # Predicted marker positions per frame, vectorized
@@ -6476,7 +6577,7 @@ def _pool_em_e_step(
         apply_constraints=apply_constraints,
         perspective=perspective,
     )
-    smooth = rts_smooth_v2(filt, layout, dt)
+    smooth = rts_smooth_v2(filt, layout, dt, params)
 
     # Validation hook
     violations: list[_ValidationViolation] = []
@@ -6500,7 +6601,7 @@ def _pool_em_e_step(
     # Per-session raw fit (used by per-session-median
     # aggregation in the orchestrator)
     per_session_fit = per_session_fit_from_stats(
-        stats, layout, dt,
+        stats, layout, dt, params,          # patch 122hg
     )
 
     elapsed = _t.time() - t0
@@ -6548,7 +6649,7 @@ def _pool_warm_start_pass(
         apply_constraints=apply_constraints,
         perspective=perspective,
     )
-    smooth = rts_smooth_v2(filt, layout, dt)
+    smooth = rts_smooth_v2(filt, layout, dt, params)
 
     pred_batch = state_to_marker_positions_batch(
         smooth.x_smooth, layout, perspective=perspective,
@@ -6616,7 +6717,7 @@ def _pool_perspective_pass(
         likelihood_threshold=likelihood_threshold,
         apply_constraints=apply_constraints,
     )
-    smooth = rts_smooth_v2(filt, layout, dt)
+    smooth = rts_smooth_v2(filt, layout, dt, params)
     idx_pack = _pack_state_layout_indices(layout)
 
     finite_mask = np.all(np.isfinite(smooth.x_smooth), axis=1)
@@ -6753,6 +6854,7 @@ def fit_noise_params_em_v2(
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
     enable_joint_prior: bool = False,
+    accel_tau: float | None = None,
     enable_strict_validation: bool = False,
     verbose: bool = False,
     session_names: list[str] | None = None,
@@ -6831,6 +6933,23 @@ def fit_noise_params_em_v2(
     # number × 10 and drives prediction variance as τ⁵ rather than τ³, so a
     # long occlusion runs away far faster. The observed failure is exactly
     # "validation hook triggered at iteration 0".
+    # Patch 122hg: stamp the Singer time constant onto the params. Like
+    # alpha_drift it is a fixed modelling choice, not something EM estimates
+    # — it is a claim about how long the animal sustains an acceleration, not
+    # a noise level. It rides on NoiseParamsV2 because that is what build_F_v2
+    # and build_Q_v2 receive.
+    #
+    # It survives the M-step only because 122hc replaced the hand-written
+    # field whitelist with a copy-everything dataclasses.replace. Under the
+    # old code this would have been silently dropped after warm-start, the
+    # same way q_jerk_* was — which is exactly how --const-accel-segments
+    # came to be dead for two patches without anyone noticing.
+    if accel_tau is not None:
+        import dataclasses as _dc_ct
+        initial_params = _dc_ct.replace(
+            initial_params, tau_accel=accel_tau,
+        )
+
     initial_params, clamped = _cap_params_to_hard_limits(
         initial_params, layout,
     )
@@ -7114,7 +7233,7 @@ def fit_noise_params_em_v2(
                     perspective=perspective,
                     joint_prior=joint_prior,
                 )
-                smooth = rts_smooth_v2(filt, layout, dt)
+                smooth = rts_smooth_v2(filt, layout, dt, params)
 
                 # Validation hook (soft mode by default — collects
                 # violations rather than halting EM)
@@ -7140,7 +7259,7 @@ def fit_noise_params_em_v2(
                 # Per-session fit (median aggregation arm)
                 per_session_fits.append(
                     per_session_fit_from_stats(
-                        sess_stats, layout, dt,
+                        sess_stats, layout, dt, params,   # patch 122hg
                     )
                 )
 
@@ -7581,7 +7700,7 @@ def smooth_session_v2(
         perspective=perspective,
         joint_prior=joint_prior,
     )
-    smooth = rts_smooth_v2(filt, layout, dt)
+    smooth = rts_smooth_v2(filt, layout, dt, params)
 
     # Compute marker positions and Jacobian once each from
     # smoothed body state. variances reuses the precomputed
@@ -7669,6 +7788,11 @@ def save_model_v2(
             list(params.q_length.items()), dtype=object,
         ),
         params_constraint_sigma=params.constraint_sigma,
+        # Patch 122hg: -1.0 encodes None (the 121d random walk) because
+        # np.savez has no null. Any positive value is a real tau in seconds.
+        params_tau_accel=(
+            params.tau_accel if params.tau_accel is not None else -1.0
+        ),
         fps=fps,
         likelihood_threshold=likelihood_threshold,
         has_perspective=(perspective is not None),
@@ -7906,6 +8030,11 @@ def load_model_v2(
         },
         constraint_sigma=float(data["params_constraint_sigma"]),
     )
+    # Patch 122hg: absent in pre-122hg models -> None -> random walk, which
+    # is exactly what those models were trained with.
+    if "params_tau_accel" in data.files:
+        _tau = float(data["params_tau_accel"])
+        params_kwargs["tau_accel"] = _tau if _tau > 0 else None
     # Patch 120b: NoiseParamsV2 drift fields. Pre-120b models
     # have these absent; loaded NoiseParamsV2 keeps them None.
     if (
@@ -8147,6 +8276,7 @@ def smooth_pose_v2(
     enable_warm_start_sigma: bool = True,
     enable_perspective: bool = True,
     enable_joint_prior: bool = False,
+    accel_tau: float | None = None,
     enable_strict_validation: bool = False,
     device: str = "cpu",
     n_workers: int = 1,
@@ -8560,6 +8690,7 @@ def smooth_pose_v2(
                 enable_warm_start_sigma=enable_warm_start_sigma,
                 enable_perspective=enable_perspective,
                 enable_joint_prior=enable_joint_prior,
+                accel_tau=accel_tau,
                 enable_strict_validation=enable_strict_validation,
                 verbose=verbose,
                 session_names=[s["path"].stem for s in raw_sessions],
@@ -9077,6 +9208,26 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--accel-tau", type=float, default=None,
+        help=(
+            "Patch 122hg (Singer model). Acceleration correlation time in "
+            "SECONDS, for the segments named by --const-accel-segments. "
+            "Without it, acceleration is a random walk that never decays, "
+            "so across a dropout the predictor's position variance grows as "
+            "t^5 where plain constant-velocity grows as t^3 — measured "
+            "t^5.01 vs t^3.17. That is what makes const-accel dangerous on "
+            "data with markers occluded for seconds at a time. With it, "
+            "acceleration decays toward zero with this time constant when "
+            "unobserved, so the extrapolation degrades CA -> CV -> CP. "
+            "Acceleration is still a tracked state, so nothing is given up "
+            "at short horizons: at a 1s dropout the two agree to within "
+            "1.5x, at 20s they differ by 15x. Try 0.5 (roughly how long a "
+            "mouse sustains an acceleration). Omitted (default) = the 121d "
+            "random walk, bit-for-bit. Ignored without "
+            "--const-accel-segments."
+        ),
+    )
+    parser.add_argument(
         "--const-accel-segments", default="",
         help=(
             "Patch 121d: enable constant-acceleration "
@@ -9294,6 +9445,7 @@ def main(argv=None) -> int:
             enable_validation=not args.no_validate,
             enable_warm_start_sigma=not args.no_warm_start_sigma,
             enable_joint_prior=args.joint_prior,
+            accel_tau=args.accel_tau,
             enable_perspective=not args.no_perspective,
             enable_strict_validation=args.strict_validation,
             device=args.device,
@@ -9641,7 +9793,7 @@ def fit_perspective_model_v2(
                 likelihood_threshold=likelihood_threshold,
                 apply_constraints=apply_constraints,
             )
-            smooth = rts_smooth_v2(filt, layout, dt)
+            smooth = rts_smooth_v2(filt, layout, dt, params)
             T = smooth.x_smooth.shape[0]
             idx_pack = _pack_state_layout_indices(layout)
 
