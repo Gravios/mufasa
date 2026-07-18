@@ -8,6 +8,48 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hg — Singer acceleration: mean-reverting instead of a random walk.**
+Answers "could we use the jerk if it was conditioned on velocity and/or
+acceleration?" Conditioning Q on the state is mechanically fine — condition on
+the *previous EM iteration's* smoothed state and Q_t is a known sequence, so
+the filter stays linear-Gaussian. But conditioning on velocity is backwards
+during a dropout: under const-accel with no data `v += a*dt` grows while `a`
+holds, so q_jerk(|v|) rises as the extrapolation runs away. Positive feedback
+on exactly the divergence we hit.
+
+The Singer model gets both halves without state dependence. 121d's comment
+says it plainly — "ax_new = ax (random walk)", the accel diagonal left at the
+1.0 np.eye(D) put there. Setting it to phi = exp(-dt/tau_accel) makes
+acceleration Ornstein-Uhlenbeck: still a tracked state, so fast motion is
+captured exactly as before, but unobserved it relaxes to zero and the
+extrapolation degrades CA -> CV -> CP.
+
+Measured growth exponents: **t^5.01 -> t^3.17**. At a 1s dropout the two agree
+within 1.5x (nothing given up where const-accel earns its keep); at 20s they
+differ by 15x. `tau_accel=None` is the default and reproduces 121d bit-for-bit
+— the OU noise `q*T/2*(1-e^(-2dt/T))` tends to `q*dt` as T -> inf, so this is
+an identity, not an approximation. Fourth mean-reverting block in the file
+after alpha_drift (120a), orientation drift (121a) and the joint prior (122hf).
+
+**Two latent bugs surfaced doing it.**
+
+`build_F_v2` takes a `params` argument to read `alpha_drift`. All four call
+sites — forward_filter_v2, rts_smooth_v2, per_session_fit_from_stats,
+finalize_m_step_v2 — omitted it, so it has *always* been None. `alpha_drift`
+has therefore been inert since 120a: the block silently used build_F_v2's
+hardcoded 0.05 fallback, which happens to equal the default, which is why no
+one noticed. `--accel-tau` was silently ignored the same way until this was
+fixed. rts_smooth_v2 mattered most: the RTS gain uses F, so a backward pass
+building a different F than the forward pass is wrong, not merely inert.
+
+And the whitelist, for the third time. `finalize_m_step_v2` and
+`finalize_m_step_v2_from_per_session` each hand-listed 15 of NoiseParamsV2's
+16 fields. 122hc fixed the warm-start site and flagged these two for audit;
+adding `tau_accel` is what called it in. Both now `dataclasses.replace` from
+prev_params. `fit_initial_params_v2` stays a constructor — it has no prev to
+copy from. The next field cannot be forgotten because there is nothing left
+to forget.
+
 **122hf — von Mises joint prior on segment angles.** Answers "for longer
 stretches could we constrain the markers with the prior given the current
 inter-marker relationships?" Yes, and the mechanism was already in the file.
