@@ -7853,7 +7853,7 @@ def _smoother_param_hash(
     }
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.blake2b(
-        blob.encode("utf-8"), digest_size=4,
+        blob.encode("utf-8"), digest_size=8,
     ).hexdigest()
 
 
