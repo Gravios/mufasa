@@ -83,6 +83,38 @@ check("workbench detaches on close (closeEvent)",
 check("console attach failure can't block the workbench opening",
       "console dock unavailable" in wb)
 
+# Regression guard (the closeEvent insertion once swallowed the def line of the
+# method right after it): closeEvent must be added WITHOUT damaging adjacent
+# methods. Verify every menu-referenced handler still exists as a real method
+# on MufasaWorkbench, and closeEvent itself is a sibling method (not something
+# that absorbed the next method's body).
+_wb_tree = ast.parse(wb)
+_wb_cls = next((n for n in ast.walk(_wb_tree)
+                if isinstance(n, ast.ClassDef)
+                and n.name == "MufasaWorkbench"), None)
+check("MufasaWorkbench class is parseable", _wb_cls is not None)
+_methods = {n.name for n in (_wb_cls.body if _wb_cls else [])
+            if isinstance(n, ast.FunctionDef)}
+check("closeEvent is a method of MufasaWorkbench", "closeEvent" in _methods)
+check("_launch_synced_viewer survived the closeEvent insertion",
+      "_launch_synced_viewer" in _methods)
+_bm = next((n for n in (_wb_cls.body if _wb_cls else [])
+            if isinstance(n, ast.FunctionDef) and n.name == "_build_menus"),
+           None)
+_menu_refs = set()
+if _bm is not None:
+    for node in ast.walk(_bm):
+        if (isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "self"
+                and node.attr.startswith("_")):
+            _menu_refs.add(node.attr)
+# handler-style refs (methods invoked from the menu) must all resolve
+_handlers = {r for r in _menu_refs
+             if r.startswith(("_launch", "_on", "_open", "_switch", "_show"))}
+check("every menu handler resolves to a real method (no swallowed defs)",
+      _handlers.issubset(_methods))
+
 # ------------------------------------------------------------------ #
 # 3. pure logic — _StreamRedirector protocol + _base_stream unwrap
 #    (compiled in isolation with a stub Signal)

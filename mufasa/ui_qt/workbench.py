@@ -894,6 +894,8 @@ class MufasaWorkbench(QMainWindow):
         except Exception:
             pass
         super().closeEvent(event)
+
+    def _launch_synced_viewer(self) -> None:
         """Open two or more videos in a synced, docked viewer window."""
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Select two or more videos to view together", "",
