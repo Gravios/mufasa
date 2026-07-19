@@ -7765,12 +7765,105 @@ def _arrays_to_df_v2(
     return pd.DataFrame(cols, index=np.arange(T))
 
 
+def _smoother_param_hash(
+    layout: BodyLayout,
+    params: NoiseParamsV2,
+    joint_prior: JointPriorV2 | None,
+    perspective: object | None,
+    likelihood_threshold: float,
+    fps: float,
+    apply_constraints: bool,
+) -> str:
+    """Short hex digest of the parameters that determine the smoothed output
+    (patch 122hm).
+
+    Two runs that would produce different output get different digests, so the
+    digest can go in the output filename to keep parameter variants separate
+    and to make the incremental skip (patch 122hl) parameter-aware: change a
+    setting -> different filename -> the skip re-smooths instead of leaving the
+    stale file in place.
+
+    The digest is built from the *effective* smoothing configuration as it
+    exists at write time — the fitted noise params, the layout flags and tree,
+    whether the joint prior / perspective model are present, and the
+    smoothing-time knobs. Reading from the effective objects makes it
+    mode-independent: a model trained here and the same model reloaded later
+    hash identically (their params came off the same fit), so a file produced
+    in a training run and one produced in a later load run of that model share
+    a digest. Floats are rounded to 6 significant figures so meaningless
+    last-bit differences don't perturb the digest; a genuinely different fit
+    (different data, EM settings, or config, all of which move the fitted
+    params) does change it.
+    """
+    import hashlib
+    import json
+
+    def r(x: float | None) -> float | None:
+        if x is None:
+            return None
+        # round to 6 significant figures
+        return float(f"{x:.6g}")
+
+    def rdict(d: dict | None) -> dict | None:
+        if d is None:
+            return None
+        return {k: r(v) for k, v in sorted(d.items())}
+
+    payload = {
+        # smoothing-time knobs
+        "likelihood_threshold": r(likelihood_threshold),
+        "fps": r(fps),
+        "apply_constraints": bool(apply_constraints),
+        # layout structure + flags
+        "segments": [sg.name for sg in layout.segments],
+        "markers": list(layout.marker_names),
+        "with_drift": bool(getattr(layout, "with_drift", False)),
+        "orientation_drift_segments":
+            sorted(layout.orientation_drift_segments),
+        "const_accel_segments": sorted(layout.const_accel_segments),
+        "high_angular_noise_segments":
+            sorted(layout.high_angular_noise_segments),
+        # fitted noise params
+        "q_root_pos": r(params.q_root_pos),
+        "q_root_ori": r(params.q_root_ori),
+        "q_seg_ori": rdict(params.q_seg_ori),
+        "q_length": rdict(params.q_length),
+        "sigma_marker": rdict(params.sigma_marker),
+        "constraint_sigma": r(params.constraint_sigma),
+        "tau_accel": r(params.tau_accel),
+        "q_drift": rdict(params.q_drift),
+        "alpha_drift": rdict(params.alpha_drift),
+        "r_drift": rdict(params.r_drift),
+        "q_theta_drift": rdict(params.q_theta_drift),
+        "alpha_theta_drift": rdict(params.alpha_theta_drift),
+        "r_theta_drift": rdict(params.r_theta_drift),
+        "q_jerk_root_pos": r(params.q_jerk_root_pos),
+        "q_jerk_root_ori": r(params.q_jerk_root_ori),
+        "q_jerk_seg_ori": rdict(params.q_jerk_seg_ori),
+        # presence of optional models (their fitted content is upstream of
+        # the params digest for the joint prior; keep an explicit signal too)
+        "joint_prior": (
+            {
+                "mu": rdict(joint_prior.mu),
+                "kappa": rdict(joint_prior.kappa),
+            }
+            if joint_prior is not None else None
+        ),
+        "perspective": perspective is not None,
+    }
+    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.blake2b(
+        blob.encode("utf-8"), digest_size=4,
+    ).hexdigest()
+
+
 def _build_and_write_session_output(
     s: dict,
     smooth_pos: np.ndarray,
     smooth_var: np.ndarray,
     data_to_layout: dict[str, int],
     output_dir_path: Path | None,
+    param_hash: str | None = None,
 ) -> tuple[Path | None, bool, str]:
     """Build the per-session output DataFrame in data marker
     order, write to parquet (with CSV fallback), and return
@@ -7802,13 +7895,19 @@ def _build_and_write_session_output(
         # Strip common DLC suffix patterns
         if stem.endswith("DeepCut"):
             stem = stem[: -len("DeepCut")]
-        out_name = f"{stem}_smoothed_v2.parquet"
+        # Patch 122hm: parameter hash goes before the extension, so
+        # <stem>_smoothed_v2.<hash>.parquet. Omitted (legacy name) when no
+        # hash is supplied, e.g. in-memory callers.
+        _suffix = f".{param_hash}" if param_hash else ""
+        out_name = f"{stem}_smoothed_v2{_suffix}.parquet"
         out_path = output_dir_path / out_name
         try:
             df_out.to_parquet(out_path, index=False)
         except (ImportError, Exception) as e:
             # Fallback to CSV when parquet engine is missing
-            out_path = output_dir_path / f"{stem}_smoothed_v2.csv"
+            out_path = (
+                output_dir_path / f"{stem}_smoothed_v2{_suffix}.csv"
+            )
             df_out.to_csv(out_path, index=False)
             was_csv_fallback = True
             csv_fallback_reason = type(e).__name__
@@ -8975,23 +9074,45 @@ def smooth_pose_v2(
         import time as _time_smooth
         n_sess_final = len(sessions_arr)
 
+        # Patch 122hm: parameter hash for the output filename. Computed once
+        # (the config is identical across sessions in a run) from the
+        # effective smoothing configuration, so different settings -> different
+        # filename. This also makes the incremental skip below parameter-aware:
+        # the skip looks for the CURRENT run's hash, so changing a setting
+        # re-smooths instead of leaving a stale file. Only meaningful when
+        # writing to disk.
+        param_hash: str | None = None
+        if output_dir is not None:
+            param_hash = _smoother_param_hash(
+                layout, params, joint_prior, perspective,
+                likelihood_threshold, fps, apply_constraints,
+            )
+            if verbose:
+                print(
+                    f"[smoother-v2] Parameter hash: {param_hash} "
+                    f"(output files tagged _smoothed_v2.{param_hash}."
+                    f"parquet).",
+                    flush=True,
+                )
+
         # Patch 122hl: incremental smoothing. When overwrite is False, skip
         # any session whose output file already exists, so a re-run only
-        # processes files that have no smoothed output yet. The check mirrors
-        # the exact name _build_and_write_session_output would produce
-        # (<stem>_smoothed_v2.parquet); a prior CSV-fallback output
-        # (<stem>_smoothed_v2.csv) also counts as "already smoothed". The skip
-        # is computed here, before dispatch, so skipped sessions never enter
-        # the (expensive) per-session smoother in either the parallel or
+        # processes files that have no smoothed output yet. Patch 122hm: the
+        # existence check uses the current parameter hash, so it skips only a
+        # file produced with the SAME parameters — a different setting yields a
+        # different name that won't be found, and is (correctly) re-smoothed.
+        # The skip is computed here, before dispatch, so skipped sessions never
+        # enter the (expensive) per-session smoother in either the parallel or
         # serial path. With no output_dir (in-memory use) there is nothing on
         # disk to skip, so every session is processed regardless.
         skip_session = [False] * n_sess_final
         n_skipped = 0
         if output_dir is not None and not overwrite:
+            _tag = f".{param_hash}" if param_hash else ""
             for _i in range(n_sess_final):
                 _stem = raw_sessions[_i]["path"].stem
-                _pq = output_dir_path / f"{_stem}_smoothed_v2.parquet"
-                _csv = output_dir_path / f"{_stem}_smoothed_v2.csv"
+                _pq = output_dir_path / f"{_stem}_smoothed_v2{_tag}.parquet"
+                _csv = output_dir_path / f"{_stem}_smoothed_v2{_tag}.csv"
                 if _pq.exists() or _csv.exists():
                     skip_session[_i] = True
                     n_skipped += 1
@@ -9047,6 +9168,7 @@ def smooth_pose_v2(
                         data_to_layout,
                         output_dir_path
                         if output_dir is not None else None,
+                        param_hash=param_hash,
                     )
                 )
 
@@ -9149,6 +9271,7 @@ def smooth_pose_v2(
                         data_to_layout,
                         output_dir_path
                         if output_dir is not None else None,
+                        param_hash=param_hash,
                     )
                 )
 

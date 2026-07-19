@@ -8,6 +8,42 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hm — parameter hash in the smoothed-output filename.**
+Smoothed output is now written as ``<stem>_smoothed_v2.<hash>.parquet`` (and
+the ``.csv`` fallback likewise), where ``<hash>`` is a short blake2b digest (8
+hex chars) of the smoother parameters. Two effects: parameter variants coexist
+in one output dir instead of clobbering each other, and the incremental skip
+(122hl) becomes parameter-aware — a changed setting yields a different
+filename, so the skip re-smooths rather than leaving the stale file (the exact
+gap flagged when 122hl landed).
+
+The digest is built from the effective smoothing configuration as it exists at
+write time: the fitted noise params (all numeric NoiseParamsV2 fields), the
+layout flags and tree, the joint prior (mu/kappa) and perspective presence, and
+the smoothing-time knobs (likelihood_threshold, fps, apply_constraints).
+Reading from the effective objects makes it mode-independent — a model trained
+here and the same model reloaded later produce the same digest (their params
+came off the same fit), so a file produced in a training run and one produced
+in a later load run of that model share a digest and the skip treats them as
+the same. Floats are rounded to 6 significant figures before hashing, so
+meaningless last-bit differences don't perturb the digest while a genuinely
+different fit (different data, EM settings, or config, all of which move the
+fitted params) does.
+
+Computed once per run (the config is identical across sessions), threaded into
+both the incremental skip's existence check and both writer call sites
+(parallel and serial). Legacy behaviour is preserved when no hash is supplied
+(in-memory callers with output_dir=None get the un-suffixed name). Blast radius
+checked: nothing globs or reconstructs the ``_smoothed_v2.parquet`` name;
+consumers use the returned output_path.
+
+smoke_122hm_param_hash_filename: 22/22. Tripwires flip: drop
+likelihood_threshold from the payload -> 21/22; make the writer ignore
+param_hash -> 20/22; remove the float rounding -> 21/22. 122hl still 20/20 (its
+skip is now hash-aware), canonical 152/152. Both sweeps baseline-diffed against
+5671eed: 270 suites, no regressions. F821 = 7, I001 = 1, ruff 22 (kalman),
+mufasa/**/*.py = 427.
+
 **122hl — incremental smoothing / overwrite option.**
 smooth_pose_v2 gains an ``overwrite`` parameter (default True — unchanged
 behaviour, re-smooth every input). With overwrite=False, any session whose
