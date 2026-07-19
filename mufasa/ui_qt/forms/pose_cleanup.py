@@ -1324,6 +1324,40 @@ class KalmanV2SmoothingForm(OperationForm):
         ext_form.addRow(
             "Constant-accel segments:", self.const_accel,
         )
+        # Patch 122hk: acceleration-decay time constant (Singer/OU model,
+        # patch 122hg). Only meaningful when const-accel segments are set;
+        # blank/0 leaves acceleration as a random walk (121d behaviour).
+        self.accel_tau = QDoubleSpinBox(self)
+        self.accel_tau.setRange(0.0, 10.0)
+        self.accel_tau.setDecimals(2)
+        self.accel_tau.setSingleStep(0.1)
+        self.accel_tau.setValue(0.0)
+        self.accel_tau.setSpecialValueText("off (random walk)")
+        self.accel_tau.setSuffix(" s")
+        ext_form.addRow(
+            "Accel decay τ:", self.accel_tau,
+        )
+        # Patch 122hk: segments whose orientation-noise M-step ceiling is
+        # raised (patch 122hj), for a genuinely fast segment (e.g. a snapping
+        # head) that would otherwise pin at the cap and lag on impulses.
+        self.high_angular = QLineEdit(self)
+        self.high_angular.setPlaceholderText(
+            "comma-separated, e.g. head"
+        )
+        ext_form.addRow(
+            "High-angular-noise segments:", self.high_angular,
+        )
+        # Patch 122hk: von Mises joint prior (patch 122hf). Constrains each
+        # segment's angle to its parent, bounding covariance during long
+        # marker dropouts so unobserved segments (tail tip, rear back) are
+        # held sensibly instead of diverging.
+        self.joint_prior = QCheckBox(
+            "Joint angle prior (patch 122hf — holds unobserved "
+            "segments to the body during dropouts)",
+            self,
+        )
+        self.joint_prior.setChecked(False)
+        ext_form.addRow("", self.joint_prior)
         train_form.addRow(ext_group)
 
         outer_form.addRow(self.train_group)
@@ -1604,6 +1638,15 @@ class KalmanV2SmoothingForm(OperationForm):
                     _parse_csv(self.orient_drift.text()),
                 "const_accel_segments":
                     _parse_csv(self.const_accel.text()),
+                # Patch 122hk: new smoother options.
+                "accel_tau": (
+                    float(self.accel_tau.value())
+                    if self.accel_tau.value() > 0.0 else None
+                ),
+                "high_angular_noise_segments":
+                    _parse_csv(self.high_angular.text()),
+                "enable_joint_prior":
+                    bool(self.joint_prior.isChecked()),
             }
 
         # Load mode
@@ -1709,6 +1752,13 @@ class KalmanV2SmoothingForm(OperationForm):
                 replacements["const_accel_segments"] = (
                     kwargs["const_accel_segments"]
                 )
+            # Patch 122hk: high-angular-noise segments (raised orientation
+            # ceiling, patch 122hj) are a layout property, restored from the
+            # saved model on load like the other segment flags.
+            if kwargs.get("high_angular_noise_segments"):
+                replacements["high_angular_noise_segments"] = (
+                    kwargs["high_angular_noise_segments"]
+                )
             if replacements:
                 layout = _dc.replace(layout, **replacements)
 
@@ -1742,6 +1792,8 @@ class KalmanV2SmoothingForm(OperationForm):
                     enable_warm_start_sigma=kwargs["warm_start_sigma"],
                     enable_perspective=kwargs["use_perspective"],
                     enable_validation=kwargs["use_validation"],
+                    enable_joint_prior=kwargs["enable_joint_prior"],
+                    accel_tau=kwargs["accel_tau"],
                     n_workers=kwargs["n_workers"],
                     save_model=save_path,
                     verbose=True,
@@ -1780,6 +1832,8 @@ class KalmanV2SmoothingForm(OperationForm):
                     enable_warm_start_sigma=kwargs["warm_start_sigma"],
                     enable_perspective=kwargs["use_perspective"],
                     enable_validation=kwargs["use_validation"],
+                    enable_joint_prior=kwargs["enable_joint_prior"],
+                    accel_tau=kwargs["accel_tau"],
                     n_workers=kwargs["n_workers"],
                     save_model=save_path,
                     verbose=True,

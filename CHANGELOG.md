@@ -8,6 +8,43 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hk — GUI wiring for the new smoother options + model save/load fix.**
+Exposes the three smoother options added this session in the Kalman v2 form,
+and fixes a silent correctness bug in model persistence.
+
+The save/load bug (the important half). Training a model with the joint prior
+(122hf), saving it, and loading it to smooth other sessions silently DROPPED
+the prior: the save_model_v2 call in smooth_pose_v2 passed perspective but not
+joint_prior, so save_model_v2 took its default None and wrote
+has_joint_prior=False. A loaded model then smoothed new sessions WITHOUT the
+prior — reintroducing the covariance divergence (tail tip and rear back
+markers flying off to thousands of px) that the prior is there to prevent. The
+save/load path is otherwise correct: load_model_v2 already reads the prior back
+and returns it, and the final smoothing pool already threads it to the filter;
+only the save call omitted it. One line: pass joint_prior=joint_prior. Verified
+by a round-trip (kappa/mu/n_obs preserved) and by reproducing the old loss.
+tau_accel (122hg) already round-tripped; high_angular_noise_segments (122hj)
+round-trips via the layout save/load added in that patch.
+
+GUI wiring. KalmanV2SmoothingForm exposed with-drift / orientation-drift /
+const-accel but not the joint prior, accel-tau, or high-angular-noise
+segments. Added: a joint-prior checkbox, an accel-tau spinbox (0 shows
+"off (random walk)" and maps to None, not an invalid 0.0), and a
+high-angular-noise-segments field. Threaded through collect_args into both
+train smooth_pose_v2 calls (single-pass and two-pass pass-1) and, for
+high-angular-noise, into the layout replacements so it is saved with the model
+and restored on load like the other segment flags. Load mode is unchanged —
+those settings come from the saved model, which now includes them.
+
+smoke_122hk_gui_and_model_io: 21/21. Tripwires flip: drop joint_prior from the
+save call -> 20/21; drop the enable_joint_prior collect_args key -> 20/21; drop
+accel_tau from a train smooth call -> 20/21. Directly-affected suites pass:
+smoke_pose_cleanup_v2_wiring 2/2, smoke_122hf_joint_prior 42/42,
+smoke_save_destination_validation 8/8 (smoke_model_dual_save's 22/23 is a
+pre-existing legacy-INI failure, unrelated). Canonical rig 152/152. Both sweeps
+baseline-diffed against 5671eed: 268 suites, no regressions. F821 = 7, I001 =
+1, ruff 22 (kalman) / 12 (form), mufasa/**/*.py = 427.
+
 **122hj — per-segment orientation-noise ceiling, for a fast head.**
 The head impulse-tracking failure, root-caused from a real 67-session EM log.
 The M-step clips each segment's fitted orientation process noise q_seg_ori to

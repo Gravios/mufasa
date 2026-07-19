@@ -8956,6 +8956,7 @@ def smooth_pose_v2(
                 save_model, layout, fitted_lengths, params,
                 fps, likelihood_threshold,
                 perspective=perspective,
+                joint_prior=joint_prior,
             )
 
         # ---------- Final smoother pass per session ----------
