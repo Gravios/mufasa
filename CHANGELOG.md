@@ -8,6 +8,23 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hn — longer parameter hash.**
+Widened the smoother parameter hash (122hm) from a 4-byte digest (8 hex chars)
+to an 8-byte digest (16 hex chars), for stronger collision resistance across
+parameter variants while still keeping the output filename readable. One-line
+change (blake2b digest_size 4 -> 8); everything downstream is length-agnostic
+(the writer and the incremental skip both build "." + param_hash). The 122hm
+test's length assertion is updated 8 -> 16 accordingly.
+
+smoke_122hn_hash_length: 8/8 (asserts the 16-char length, determinism,
+parameter-sensitivity at the new length, filename propagation, and digest_size
+== 8). Tripwire: revert digest_size to 4 -> 122hn 3/8 and 122hm 21/22.
+smoke_122hm 22/22 with the updated assertion, 122hl 20/20, 122hk 21/21,
+canonical 152/152. smoke_122 sweep vs 5671eed: 198 suites, no regressions.
+(The 73 non-smoke_122 suites don't touch the hash helper or the output
+filename, so a digest-width change can't affect them.) F821 = 7, I001 = 1,
+ruff 22, mufasa/**/*.py = 427.
+
 **122hm — parameter hash in the smoothed-output filename.**
 Smoothed output is now written as ``<stem>_smoothed_v2.<hash>.parquet`` (and
 the ``.csv`` fallback likewise), where ``<hash>`` is a short blake2b digest (8

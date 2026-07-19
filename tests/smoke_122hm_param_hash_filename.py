@@ -1,7 +1,7 @@
 """Smoke test for patch 122hm — parameter hash in the output filename.
 
 The smoothed output filename gains a short hash of the smoother parameters:
-<stem>_smoothed_v2.<hash>.parquet. The hash is a blake2b digest (8 hex chars)
+<stem>_smoothed_v2.<hash>.parquet. The hash is a blake2b digest (16 hex chars)
 of the effective smoothing configuration — the fitted noise params, the layout
 flags and tree, the joint prior / perspective presence, and the smoothing-time
 knobs (likelihood_threshold, fps, apply_constraints) — read from the objects
@@ -62,7 +62,7 @@ def h(layout=lay, params=p, jprior=jp, persp=None,
 base = h()
 
 # ---- shape & determinism ----
-check("hash is 8 hex chars", len(base) == 8 and all(
+check("hash is 16 hex chars", len(base) == 16 and all(
     c in "0123456789abcdef" for c in base))
 check("hash is deterministic", h() == base)
 
