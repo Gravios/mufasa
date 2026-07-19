@@ -8,6 +8,46 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hp — dockable console for verbose output.**
+Adds a read-only console docked at the bottom of the workbench that mirrors
+stdout/stderr live, so GUI users see the verbose progress (the smoother's
+[smoother-v2] lines, per-EM-iteration logs, provenance notes) that previously
+only reached the terminal.
+
+New module mufasa/ui_qt/console_dock.py: a _StreamRedirector that stands in for
+sys.stdout/stderr, tees every write to the original stream (terminal users lose
+nothing) and emits it on a Qt signal; a ConsoleDockWidget (bounded, read-only,
+with Clear / Copy / Autoscroll / Wrap); and attach/detach helpers. Because
+operations print from a ProcessorRunner worker thread and Qt widgets are
+GUI-thread-only, the signal->slot uses a queued connection so the append lands
+on the GUI thread — this is the thread-safety crux. The redirector implements
+enough of the file protocol (write/flush/isatty/writable/fileno) to be a safe
+stand-in, and a broken original stream can't lose console output or crash.
+
+Wired into MufasaWorkbench: attach_console_dock in __init__ (guarded so a
+console failure can't stop the window opening), detach in closeEvent to restore
+the streams on teardown. Project switches rebuild the workbench; attach unwraps
+any existing mufasa redirector (_base_stream) so it tees to the real terminal
+rather than chaining redirector->redirector, and detach only restores when
+still the active stream, so the rebuild doesn't duplicate output or clobber the
+new window.
+
+smoke_122hp_console_dock: 29/29. AST-checks the module structure and workbench
+wiring (queued connection, bottom dock, idempotent attach, read-only + bounded
+view, attach/detach), and exercises the pure logic in isolation (a stub
+signal): tee to both streams, empty write emits nothing, write returns length,
+_base_stream unwraps a chain to the real stream and handles None, and a broken
+original neither loses output nor crashes. Tripwires: break the tee -> 28/29;
+drop the queued connection -> 28/29; break the unwrap -> 28/29; remove the
+workbench attach -> 28/29. GUI-only, AST/pure-logic verified (PySide6 absent in
+the sandbox); the Qt widget runtime is validated on hardware.
+
+Note: this ADDS a source module, so mufasa/**/*.py goes 427 -> 428. The
+smoke_122d5_stage_b py-count ceiling is bumped 427 -> 428 to match (it is an
+explicit loose ceiling that already moved 425 -> 427 in 122gz). Sweeps vs
+5671eed: 200 smoke_122 + 73 others = no regressions after the ceiling bump.
+F821 = 7, I001 = 1, ruff 0 (new module) / 0 (workbench).
+
 **122ho — project-aware segment fields in the Kalman v2 GUI.**
 Fixes the confusing failure where the form's orientation-drift / const-accel /
 high-angular-noise fields carried a stale 'body,head' example (and persisted

@@ -215,12 +215,13 @@ def main() -> int:
     # tree had ~530 .py files (rough); after Stage B's 109-py-file
     # cull the post count is in the low 420s. Pin a loose ceiling
     # rather than an exact value (further patches may add tests
-    # or churn things slightly).
+    # or churn things slightly). Moved 425 -> 427 in 122gz, and
+    # 427 -> 428 in 122hp (added the console_dock module).
     total_py = sum(1 for _ in pkg.rglob("*.py"))
     check(
-        f"Total mufasa/**/*.py count post-Stage-B ≤ 427 "
+        f"Total mufasa/**/*.py count post-Stage-B ≤ 428 "
         f"(got {total_py}; Stage B removed ~109 .py files)",
-        total_py <= 427,
+        total_py <= 428,
     )
 
     # 14. Doc updates
