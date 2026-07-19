@@ -8,6 +8,25 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hr — hotfix: restore _launch_synced_viewer swallowed by 122hp's closeEvent.**
+Patch 122hp added a closeEvent method to MufasaWorkbench by inserting it before
+_launch_synced_viewer, but the edit consumed that method's `def` line — so
+_launch_synced_viewer's body was absorbed into closeEvent and the method
+vanished. The workbench then crashed on construction: _build_menus wires
+"Synced video viewer…" to self._launch_synced_viewer, which no longer existed
+(AttributeError, window won't open at all).
+
+Fix restores the `def _launch_synced_viewer(self) -> None:` line and its
+docstring; closeEvent and _launch_synced_viewer are again separate methods.
+
+Also hardens smoke_122hp_console_dock so this class of edit error can't recur
+silently: it now parses MufasaWorkbench and asserts closeEvent and
+_launch_synced_viewer are both real methods and that every menu handler
+(_launch*/_on*/_open*/_switch*/_show*) resolves to an existing method — i.e. no
+def was swallowed. 33/33 (was 29). Confirmed the guard catches the bug:
+reintroducing the swallowed def drops the suite to 31/33 on exactly the two new
+checks. F821 = 7, I001 = 1, ruff 0 (workbench), mufasa/**/*.py = 428.
+
 **122hq — egocentric alignment: strip smoother suffixes before the video lookup.**
 Fixes "NO FILES FOUND ERROR: could not find a video file representing
 Cacna_..._smoothed_v2.<hash>" from egocentric alignment. The aligner finds each
