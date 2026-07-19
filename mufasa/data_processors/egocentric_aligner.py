@@ -31,6 +31,42 @@ from mufasa.utils.read_write import (
 from mufasa.video_processors.egocentric_video_rotator import EgocentricVideoRotator
 
 
+def _video_base_from_pose_name(pose_stem: str) -> str:
+    """Strip smoother-added suffixes from a pose-file stem to get the video base.
+
+    The Kalman v2 smoother writes ``<video>_smoothed_v2.parquet`` and, since the
+    parameter hash was added, ``<video>_smoothed_v2.<hash>.parquet`` — so the
+    pose stem carries ``_smoothed_v2`` and possibly a trailing ``.<hash>`` that
+    the source video filename does not. Egocentric alignment needs to find the
+    original video, so it must map the pose stem back to the video base.
+
+    Handles, in order:
+      * a trailing ``.<hexhash>`` produced by the parameter-hash filename
+        (patch 122hm/hn: an 8- or 16-char hex tag after ``_smoothed_v2``);
+      * the ``_smoothed_v2`` suffix itself.
+
+    Anything it doesn't recognise is returned unchanged, so a plain video stem
+    (or a future suffix) passes through and the caller's lookup behaves as
+    before. This only affects the video lookup; output files keep the full
+    pose-derived name so they still trace to the specific smoothed input.
+    """
+    stem = pose_stem
+    # A parameter hash sits after _smoothed_v2 as ".<hex>"; splitext peels it
+    # off as an "extension". Only strip it when what's left still carries the
+    # smoother marker, so we never truncate a legitimately dotted video name.
+    root, ext = os.path.splitext(stem)
+    if (
+        ext
+        and len(ext) > 1
+        and all(c in "0123456789abcdef" for c in ext[1:].lower())
+        and root.endswith("_smoothed_v2")
+    ):
+        stem = root
+    if stem.endswith("_smoothed_v2"):
+        stem = stem[: -len("_smoothed_v2")]
+    return stem
+
+
 class EgocentricalAligner:
 
     """
@@ -111,7 +147,13 @@ class EgocentricalAligner:
             check_if_dir_exists(in_dir=videos_dir, source=f'{self.__class__.__name__} videos_dir')
             self.video_paths = find_files_of_filetypes_in_directory(directory=videos_dir, extensions=Options.ALL_VIDEO_FORMAT_OPTIONS.value)
             for file_path in self.data_paths:
-                find_video_of_file(video_dir=videos_dir, filename=get_fn_ext(file_path)[1], raise_error=True)
+                find_video_of_file(
+                    video_dir=videos_dir,
+                    filename=_video_base_from_pose_name(
+                        get_fn_ext(file_path)[1]
+                    ),
+                    raise_error=True,
+                )
         self.anchor_1_cols = [f'{anchor_1}_x'.lower(), f'{anchor_1}_y'.lower()]
         self.anchor_2_cols = [f'{anchor_2}_x'.lower(), f'{anchor_2}_y'.lower()]
         self.anchor_1, self.anchor_2, self.videos_dir = anchor_1.lower(), anchor_2.lower(), videos_dir
@@ -133,11 +175,16 @@ class EgocentricalAligner:
             # Now: file_type is derived from each input file's
             # extension, preserving format end-to-end.
             _, self.video_name, _ext = get_fn_ext(filepath=file_path)
+            # Patch 122hq: the video is named for the ORIGINAL clip, without
+            # the smoother's _smoothed_v2/.hash suffixes the pose stem carries.
+            # video_name still names the OUTPUT (so it traces to this specific
+            # smoothed input); video_base is used only to find the source video.
+            self.video_base = _video_base_from_pose_name(self.video_name)
             file_type = _ext.lstrip('.') or Formats.CSV.value
             if self.verbose:
                 print(f'Rotating data video {self.video_name}... ({file_cnt+1}/{len(self.data_paths)})')
             if self.anchor_location is None:
-                video_path = find_video_of_file(video_dir=self.videos_dir, filename=self.video_name, raise_error=False)
+                video_path = find_video_of_file(video_dir=self.videos_dir, filename=self.video_base, raise_error=False)
                 video_meta_data = get_video_meta_data(video_path=video_path)
                 self.anchor_location = (int(video_meta_data['width']/2), int(video_meta_data['height']/2))
             save_path = os.path.join(self.save_dir, f'{self.video_name}.{file_type}')
@@ -161,7 +208,7 @@ class EgocentricalAligner:
                 print(f'{self.video_name} complete, saved at {save_path} (elapsed time: {video_timer.elapsed_time_str}s)')
             if self.rotate_video:
                 if self.verbose: print(f'Rotating video {self.video_name}...')
-                video_path = find_video_of_file(video_dir=self.videos_dir, filename=self.video_name, raise_error=False)
+                video_path = find_video_of_file(video_dir=self.videos_dir, filename=self.video_base, raise_error=False)
                 save_path = os.path.join(self.save_dir, f'{self.video_name}.mp4')
                 video_rotator = EgocentricVideoRotator(video_path=video_path,
                                                        centers=self.centers,
