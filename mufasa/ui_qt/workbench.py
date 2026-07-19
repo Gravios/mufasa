@@ -702,6 +702,18 @@ class MufasaWorkbench(QMainWindow):
         self._build_menus()
         self._build_statusbar()
 
+        # Patch 122hp: dockable console at the bottom mirroring verbose
+        # stdout/stderr from operations (the smoother's [smoother-v2] logs, EM
+        # iteration output, etc.) so GUI users see progress that otherwise only
+        # went to the terminal. Installed once here; tees to the real streams.
+        from mufasa.ui_qt.console_dock import attach_console_dock
+        try:
+            attach_console_dock(self)
+        except Exception as exc:
+            # The console is a convenience; never let it block the workbench
+            # from opening.
+            print(f"[workbench] console dock unavailable: {exc}")
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
@@ -870,7 +882,18 @@ class MufasaWorkbench(QMainWindow):
         app.setProperty("_mufasa_workbenches", refs)
         self.close()
 
-    def _launch_synced_viewer(self) -> None:
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt signature)
+        # Patch 122hp: restore stdout/stderr so this window's console
+        # redirector doesn't linger as the active stream after the window is
+        # gone (e.g. a project switch rebuilds the workbench). detach only
+        # restores if we're still the active redirector, so it won't clobber a
+        # newer window that already re-redirected.
+        try:
+            from mufasa.ui_qt.console_dock import detach_console_dock
+            detach_console_dock(self)
+        except Exception:
+            pass
+        super().closeEvent(event)
         """Open two or more videos in a synced, docked viewer window."""
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Select two or more videos to view together", "",
