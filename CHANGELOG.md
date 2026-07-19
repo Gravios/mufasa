@@ -8,6 +8,35 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hq — egocentric alignment: strip smoother suffixes before the video lookup.**
+Fixes "NO FILES FOUND ERROR: could not find a video file representing
+Cacna_..._smoothed_v2.<hash>" from egocentric alignment. The aligner finds each
+pose file's source video by name, but derived the name straight from the pose
+stem — which carries _smoothed_v2 and (since the parameter hash, 122hm/hn) a
+trailing .<hash> that the source video filename does not. The _smoothed_v2
+suffix alone would already have broken this; the hash made it visible.
+
+Adds _video_base_from_pose_name(), which strips a trailing hex .<hash> (only
+when what remains still ends in _smoothed_v2, so a legitimately dotted video
+name is never truncated) and then the _smoothed_v2 suffix, returning anything
+unrecognised unchanged. Used only for the three find_video_of_file lookups (the
+pre-flight check and the two in run()); the output data/video keep the full
+pose-derived video_name, so a rotated output still traces to the specific
+smoothed input (important now that different parameter hashes are distinct
+inputs).
+
+smoke_122hq_egocentric_video_base: 16/16 (the reported 16-char-hash case, the
+8-char and no-hash cases, plain stems unchanged, and the false-positive guards:
+a dotted video name without the marker, a hex extension without _smoothed_v2, a
+non-hex suffix, and a hash-like token are all left alone; idempotent). Also
+verifies the wiring — lookups use the stripped base, outputs keep video_name,
+and no lookup still passes the raw name. Tripwires: don't strip _smoothed_v2 ->
+12/16; drop the hex-guard so it over-strips -> 15/16; use the raw video_name in
+the run() lookups -> 14/16. Existing egocentric suites pass:
+smoke_122ex_egocentric_section_id 10/10, smoke_122ez_egocentric_detect_path
+10/10. Both sweeps vs 5671eed: 201 smoke_122 + 73 others, no regressions.
+F821 = 7, I001 = 1, ruff 2 (aligner, baseline), mufasa/**/*.py = 428.
+
 **122hp — dockable console for verbose output.**
 Adds a read-only console docked at the bottom of the workbench that mirrors
 stdout/stderr live, so GUI users see the verbose progress (the smoother's
