@@ -8518,6 +8518,7 @@ def smooth_pose_v2(
     n_workers: int = 1,
     em_damping: float = 0.0,
     em_aggregation: str = "pooled",
+    overwrite: bool = True,
     verbose: bool = False,
 ) -> dict:
     """Top-level user-facing function for v2 pose smoothing.
@@ -8973,6 +8974,34 @@ def smooth_pose_v2(
 
         import time as _time_smooth
         n_sess_final = len(sessions_arr)
+
+        # Patch 122hl: incremental smoothing. When overwrite is False, skip
+        # any session whose output file already exists, so a re-run only
+        # processes files that have no smoothed output yet. The check mirrors
+        # the exact name _build_and_write_session_output would produce
+        # (<stem>_smoothed_v2.parquet); a prior CSV-fallback output
+        # (<stem>_smoothed_v2.csv) also counts as "already smoothed". The skip
+        # is computed here, before dispatch, so skipped sessions never enter
+        # the (expensive) per-session smoother in either the parallel or
+        # serial path. With no output_dir (in-memory use) there is nothing on
+        # disk to skip, so every session is processed regardless.
+        skip_session = [False] * n_sess_final
+        n_skipped = 0
+        if output_dir is not None and not overwrite:
+            for _i in range(n_sess_final):
+                _stem = raw_sessions[_i]["path"].stem
+                _pq = output_dir_path / f"{_stem}_smoothed_v2.parquet"
+                _csv = output_dir_path / f"{_stem}_smoothed_v2.csv"
+                if _pq.exists() or _csv.exists():
+                    skip_session[_i] = True
+                    n_skipped += 1
+            if verbose and n_skipped:
+                print(
+                    f"[smoother-v2] Incremental: skipping {n_skipped} of "
+                    f"{n_sess_final} session(s) with existing output "
+                    f"(pass overwrite=True to re-smooth).",
+                    flush=True,
+                )
         t_smooth_start_total = _time_smooth.time()
         smooth_times: list[float] = []
 
@@ -8989,6 +9018,7 @@ def smooth_pose_v2(
             task_args = [
                 (sess_idx, params, perspective, joint_prior, device)
                 for sess_idx in range(n_sess_final)
+                if not skip_session[sess_idx]
             ]
             completed = 0
             n_failed = 0
@@ -9075,6 +9105,11 @@ def smooth_pose_v2(
             for sess_idx, (s, (pos, likes)) in enumerate(
                 zip(raw_sessions, sessions_arr)
             ):
+                # Patch 122hl: incremental smoothing — skip sessions whose
+                # output already exists (overwrite=False), matching the
+                # parallel path's task_args filter above.
+                if skip_session[sess_idx]:
+                    continue
                 t_sess_start = _time_smooth.time()
                 if verbose:
                     print(
@@ -9366,6 +9401,30 @@ def main(argv=None) -> int:
             "first 67-session run."
         ),
     )
+    # Patch 122hl: incremental smoothing controls. Default re-smooths every
+    # input file (unchanged behaviour). --skip-existing processes only files
+    # that have no smoothed output yet; --overwrite is the explicit opposite
+    # (and the default) for when both are wired through a caller.
+    overwrite_group = parser.add_mutually_exclusive_group()
+    overwrite_group.add_argument(
+        "--skip-existing", dest="overwrite", action="store_false",
+        help=(
+            "Only smooth input files that have no smoothed output yet "
+            "(skip any <stem>_smoothed_v2.parquet/.csv already in the "
+            "output dir). Useful for resuming an interrupted batch or "
+            "adding new sessions without recomputing the finished ones. "
+            "Skipped sessions never enter the smoother, so this saves "
+            "compute, not just the write."
+        ),
+    )
+    overwrite_group.add_argument(
+        "--overwrite", dest="overwrite", action="store_true",
+        help=(
+            "Re-smooth every input file even if its output already "
+            "exists (the default)."
+        ),
+    )
+    parser.set_defaults(overwrite=True)
     parser.add_argument(
         "--device", choices=["cpu", "cuda", "auto"],
         default="cpu",
@@ -9719,6 +9778,7 @@ def main(argv=None) -> int:
             n_workers=args.workers,
             em_damping=args.em_damping,
             em_aggregation=args.em_aggregation,
+            overwrite=args.overwrite,
             verbose=args.verbose,
         )
     except Exception as e:

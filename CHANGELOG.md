@@ -8,6 +8,37 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hl — incremental smoothing / overwrite option.**
+smooth_pose_v2 gains an ``overwrite`` parameter (default True — unchanged
+behaviour, re-smooth every input). With overwrite=False, any session whose
+smoothed output already exists (``<stem>_smoothed_v2.parquet`` or the ``.csv``
+fallback in the output dir) is skipped, so a re-run only processes files that
+have no output yet — for resuming an interrupted batch or adding new sessions
+without recomputing the finished ones.
+
+The skip is computed once, before the smoothing dispatch, and applied in both
+the parallel path (filtering task_args) and the serial path (continue in the
+loop), so skipped sessions never enter the per-session smoother — it saves
+compute, not just the write. The skip is gated on output_dir being set and
+overwrite being False; with no output_dir (in-memory use) nothing is skipped.
+skip_session indexes raw_sessions / sessions_arr, which are built in lockstep,
+so the index is stable across both paths.
+
+CLI: a mutually-exclusive ``--skip-existing`` (overwrite off) / ``--overwrite``
+(the default), passed through main. GUI: an "Overwrite existing smoothed
+output" checkbox in the Kalman v2 form's common options, threaded through both
+collect_args returns into the three output-writing smooth_pose_v2 calls
+(two-pass pass-2, single-pass, load); pass-1 writes no output so it is left
+alone.
+
+smoke_122hl_incremental_overwrite: 20/20. Tripwires flip: remove the parallel
+task_args filter -> 19/20; drop the "not overwrite" gate (skip even when
+overwriting) -> 19/20; drop overwrite from a GUI output-writing call -> 19/20.
+Related suites pass: smoke_122hk 21/21, smoke_pose_cleanup_v2_wiring 2/2,
+canonical 152/152. Both sweeps baseline-diffed against 5671eed: 269 suites, no
+regressions. F821 = 7, I001 = 1, ruff 22 (kalman) / 12 (form),
+mufasa/**/*.py = 427.
+
 **122hk — GUI wiring for the new smoother options + model save/load fix.**
 Exposes the three smoother options added this session in the Kalman v2 form,
 and fixes a silent correctness bug in model persistence.

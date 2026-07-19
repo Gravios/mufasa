@@ -1157,6 +1157,18 @@ class KalmanV2SmoothingForm(OperationForm):
         self.workers.setValue(min(cpu_default, 12))
         outer_form.addRow("Worker processes:", self.workers)
 
+        # Patch 122hl: incremental smoothing. When unchecked, only files with
+        # no smoothed output yet are processed — for resuming a batch or
+        # adding new sessions without recomputing finished ones. Applies to
+        # both train and load modes (it gates the output-writing pass).
+        self.overwrite = QCheckBox(
+            "Overwrite existing smoothed output "
+            "(uncheck to only smooth files not yet done)",
+            self,
+        )
+        self.overwrite.setChecked(True)
+        outer_form.addRow("", self.overwrite)
+
         # ---- Mode selector ----
         mode_group = QGroupBox("Mode", self)
         mode_layout = QHBoxLayout(mode_group)
@@ -1647,6 +1659,7 @@ class KalmanV2SmoothingForm(OperationForm):
                     _parse_csv(self.high_angular.text()),
                 "enable_joint_prior":
                     bool(self.joint_prior.isChecked()),
+                "overwrite": bool(self.overwrite.isChecked()),
             }
 
         # Load mode
@@ -1668,6 +1681,7 @@ class KalmanV2SmoothingForm(OperationForm):
             "likelihood_threshold": float(self.lik_thr.value()),
             "n_workers":            int(self.workers.value()),
             "load_model_path":      load_path,
+            "overwrite":            bool(self.overwrite.isChecked()),
         }
 
     def target(self, *, mode: str, **kwargs) -> None:
@@ -1814,6 +1828,7 @@ class KalmanV2SmoothingForm(OperationForm):
                     likelihood_threshold=kwargs["likelihood_threshold"],
                     n_workers=kwargs["n_workers"],
                     load_model=save_path,
+                    overwrite=kwargs["overwrite"],
                     verbose=True,
                 )
             else:
@@ -1836,6 +1851,7 @@ class KalmanV2SmoothingForm(OperationForm):
                     accel_tau=kwargs["accel_tau"],
                     n_workers=kwargs["n_workers"],
                     save_model=save_path,
+                    overwrite=kwargs["overwrite"],
                     verbose=True,
                 )
                 # Patch 122b: mirror freshly-trained model.
@@ -1901,6 +1917,7 @@ class KalmanV2SmoothingForm(OperationForm):
                 likelihood_threshold=kwargs["likelihood_threshold"],
                 n_workers=kwargs["n_workers"],
                 load_model=load_path,
+                overwrite=kwargs["overwrite"],
                 verbose=True,
             )
         else:
