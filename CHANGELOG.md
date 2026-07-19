@@ -8,6 +8,35 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ho — project-aware segment fields in the Kalman v2 GUI.**
+Fixes the confusing failure where the form's orientation-drift / const-accel /
+high-angular-noise fields carried a stale 'body,head' example (and persisted
+value), and submitting it died deep in the smoother with a raw dataclasses
+ValueError stack trace: "orientation_drift_segments references unknown segment
+'body'". The rig was renamed, so this project's segments are back / back_rear /
+head / neck / tail_1.. — there is no 'body' (it became 'back').
+
+Three parts: (1) a _project_segment_names(config_path) helper resolves the
+project's actual segment names via layout_from_config, degrading to [] on any
+failure so the form never crashes when no project is loaded; (2) the form
+validates the three segment fields against those real names BEFORE
+dataclasses.replace hits the layout's own validator, raising a clear message
+that lists the available segments and notes the body->back rename — the
+smoother's __post_init__ stays as the backstop; (3) the stale 'body,head'
+examples are replaced with project-aware placeholders (the real segment names)
+and tooltips, and the stale docstrings are corrected.
+
+smoke_122ho_segment_validation: 16/16 (helper definition + safe runtime
+degradation on bad/empty paths; validation present and ahead of _dc.replace;
+correct accept/reject behaviour incl. the exact 'body' case, a typo, and empty
+lists; no 'body,head' example remains; placeholders are project-aware).
+Tripwires: remove the validation -> 13/16; hardcode the placeholders -> 15/16;
+narrow the helper's except so it no longer degrades -> the runtime check
+raises. GUI suites unchanged: smoke_pose_cleanup_v2_wiring 2/2,
+smoke_122hk_gui_and_model_io 21/21, smoke_122hd_segment_flag_errors 27/27. Both
+sweeps vs 5671eed: 271 suites, no regressions. F821 = 7, I001 = 1, ruff 12
+(form), mufasa/**/*.py = 427.
+
 **122hn — longer parameter hash.**
 Widened the smoother parameter hash (122hm) from a 4-byte digest (8 hex chars)
 to an 8-byte digest (16 hex chars), for stronger collision resistance across

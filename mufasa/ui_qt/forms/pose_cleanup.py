@@ -96,6 +96,31 @@ def _default_model_dir() -> str:
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+def _project_segment_names(config_path: str | None) -> list[str]:
+    """Return the smoother segment names for the project's skeleton, or [].
+
+    Patch 122ho: the Kalman v2 form's orientation-drift / const-accel /
+    high-angular-noise fields name *segments*, and the smoother validates them
+    against the project's actual skeleton. Those names are project-specific (a
+    renamed rig has back / back_rear / head / neck / tail_1.. rather than the
+    old body / head), so the form should show and validate against the real
+    names instead of a hardcoded example. This resolves the layout the same
+    way smooth_pose_v2 will, and returns [] on any failure so the form
+    degrades to a plain free-text field rather than crashing when no project
+    is loaded or the layout can't be built.
+    """
+    if not config_path:
+        return []
+    try:
+        from mufasa.data_processors.kalman_pose_smoother_v2 import (
+            layout_from_config,
+        )
+        layout = layout_from_config(config_path)
+        return [sg.name for sg in layout.segments]
+    except Exception:
+        return []
+
+
 def _read_outlier_settings(config_path: str) -> dict[str, Any]:
     """Return the outlier-correction settings stored in a project
     config, working for both v1 (``project.toml``) and legacy
@@ -1063,10 +1088,13 @@ class KalmanV2SmoothingForm(OperationForm):
       absorb tracker offset.
     * **per-segment orientation drift** (patch 121b) — absorb
       low-frequency angular residuals (body roll/pitch projected
-      onto the image plane). Recommended starting point: ``body``.
+      onto the image plane). Segment names come from the project
+      skeleton (e.g. ``back``; the pre-rename ``body`` is now
+      ``back``).
     * **constant-acceleration dynamics** (patch 121d/e) —
       predictor extrapolates with curvature instead of straight-
-      line velocity. Recommended if motion looks lagged: ``body,head``.
+      line velocity. Recommended if motion looks lagged, on the
+      project's own segment names (e.g. ``back,head``).
 
     The form invokes :func:`smooth_pose_v2` directly via Python
     API so errors surface cleanly in the workbench's progress
@@ -1322,17 +1350,31 @@ class KalmanV2SmoothingForm(OperationForm):
         )
         self.with_drift.setChecked(True)
         ext_form.addRow("", self.with_drift)
-        self.orient_drift = QLineEdit(self)
-        self.orient_drift.setPlaceholderText(
-            "comma-separated, e.g. body,head"
+        # Patch 122ho: show this project's real segment names in the
+        # placeholders instead of a hardcoded example naming the pre-rename
+        # 'body' segment (which no longer exists). Falls back to a generic
+        # hint when the layout can't be resolved (no project loaded).
+        _seg_names = _project_segment_names(self.config_path)
+        _seg_hint = (
+            "comma-separated, e.g. " + ",".join(_seg_names[:2])
+            if len(_seg_names) >= 2
+            else "comma-separated segment names"
         )
+        _seg_avail = (
+            "  (available: " + ", ".join(_seg_names) + ")"
+            if _seg_names else ""
+        )
+        self.orient_drift = QLineEdit(self)
+        self.orient_drift.setPlaceholderText(_seg_hint)
+        if _seg_avail:
+            self.orient_drift.setToolTip("Segments:" + _seg_avail)
         ext_form.addRow(
             "Orientation drift segments:", self.orient_drift,
         )
         self.const_accel = QLineEdit(self)
-        self.const_accel.setPlaceholderText(
-            "comma-separated, e.g. body,head"
-        )
+        self.const_accel.setPlaceholderText(_seg_hint)
+        if _seg_avail:
+            self.const_accel.setToolTip("Segments:" + _seg_avail)
         ext_form.addRow(
             "Constant-accel segments:", self.const_accel,
         )
@@ -1356,6 +1398,8 @@ class KalmanV2SmoothingForm(OperationForm):
         self.high_angular.setPlaceholderText(
             "comma-separated, e.g. head"
         )
+        if _seg_avail:
+            self.high_angular.setToolTip("Segments:" + _seg_avail)
         ext_form.addRow(
             "High-angular-noise segments:", self.high_angular,
         )
@@ -1773,6 +1817,34 @@ class KalmanV2SmoothingForm(OperationForm):
                 replacements["high_angular_noise_segments"] = (
                     kwargs["high_angular_noise_segments"]
                 )
+            # Patch 122ho: validate the segment-name fields against this
+            # project's actual skeleton BEFORE _dc.replace hits the layout's
+            # own validator, so a stale/typo'd name (e.g. the pre-rename
+            # 'body') surfaces as a clear, actionable message naming the valid
+            # segments instead of a dataclass ValueError stack trace. The
+            # smoother's __post_init__ still enforces this as the backstop;
+            # this only improves the error the user sees.
+            _valid_segs = {sg.name for sg in layout.segments}
+            _seg_fields = (
+                ("Orientation drift segments", "orientation_drift_segments"),
+                ("Constant-accel segments", "const_accel_segments"),
+                ("High-angular-noise segments",
+                 "high_angular_noise_segments"),
+            )
+            for _label, _key in _seg_fields:
+                _bad = [
+                    n for n in replacements.get(_key, [])
+                    if n not in _valid_segs
+                ]
+                if _bad:
+                    raise ValueError(
+                        f"{_label}: {', '.join(repr(n) for n in _bad)} "
+                        f"{'is' if len(_bad) == 1 else 'are'} not a segment "
+                        f"in this project's skeleton. Available segments: "
+                        f"{', '.join(sorted(_valid_segs))}. "
+                        f"(Segment names changed when markers were renamed — "
+                        f"the old 'body' is now 'back'.)"
+                    )
             if replacements:
                 layout = _dc.replace(layout, **replacements)
 
