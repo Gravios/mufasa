@@ -9756,223 +9756,256 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
 
-    # Patch 122hb/122hc: the built-in rig is a last resort, not a default.
-    # 122hb made --config available; that was not enough, because a flag you
-    # have to know about is still a default for everyone who doesn't, and the
-    # rig is a *wrong* default — it names markers (nose, back1, tailbase) that
-    # a project which renamed its own has never used. So: look for the project
-    # before assuming anything, and announce which source won.
-    from mufasa.project_layout import find_project_config
-
-    config = args.config
-    if config is None:
-        found = {find_project_config(p) for p in args.pose_input}
-        found.discard(None)
-        if len(found) > 1:
-            print(
-                "[smoother-v2] ERROR: the inputs sit inside more than one "
-                f"project ({sorted(str(f) for f in found)}). Marker names "
-                "can't be resolved against two projects at once; smooth them "
-                "separately, or pass --config to name the one you mean.",
-                file=sys.stderr,
-            )
-            return 1
-        if found:
-            config = str(found.pop())
-            print(
-                f"[smoother-v2] Project: {config} (found by walking up from "
-                f"the input path; --config overrides)"
-            )
-
-    if config:
-        # A broken project.toml must not degrade into the rat rig — but it
-        # also shouldn't reach the user as a bare traceback.
-        try:
-            layout = layout_from_config(config)
-        except Exception as e:
-            print(
-                f"[smoother-v2] ERROR: could not build a layout from "
-                f"{config}: {type(e).__name__}: {e}",
-                file=sys.stderr,
-            )
-            return 1
-        rig_switches = [
-            name for name, given in (
+    # Patch 122hv: a loaded model already carries its own layout (the fitted
+    # parameters are dimensioned to the skeleton it was trained with, and
+    # smooth_pose_v2 uses that layout, ignoring any passed one). So when
+    # --load-model is given, skip layout resolution entirely: no project
+    # search, no --config, no FreeDLC sidecar, no rig fallback, and the layout-
+    # shaping flags don't apply. This is the answer to "do I still need the
+    # inputs / a project to smooth an external file once the model is built?" —
+    # no; the model is the complete spec, only the inputs and output location
+    # are still needed.
+    config = None
+    layout = None
+    if args.load_model is not None:
+        _ignored = [
+            n for n, given in (
+                ("--config", args.config is not None),
+                ("--with-drift", args.with_drift),
+                ("--orient-drift-segments", bool(args.orient_drift_segments)),
+                ("--const-accel-segments", bool(args.const_accel_segments)),
+                ("--high-angular-noise-segments",
+                 bool(args.high_angular_noise_segments)),
                 ("--no-back4", args.no_back4), ("--no-tail", args.no_tail),
-                ("--no-lateral", args.no_lateral), ("--no-center", args.no_center),
+                ("--no-lateral", args.no_lateral),
+                ("--no-center", args.no_center),
             ) if given
         ]
-        if rig_switches:
+        if _ignored:
             print(
-                f"[smoother-v2] WARNING: {', '.join(rig_switches)} ignored — "
-                "they trim the built-in rat rig, and the layout is coming "
-                "from the project instead."
+                "[smoother-v2] NOTE: --load-model given, so "
+                + ", ".join(_ignored)
+                + (" is" if len(_ignored) == 1 else " are")
+                + " ignored — the loaded model carries its own layout."
             )
     else:
-        # Patch 122hu: before the built-in-rig fallback, try a FreeDLC
-        # skeleton sidecar (<stem>.fdlc.toml) next to the input. This is what
-        # makes "process a standalone parquet outside a project" work — the
-        # kinematic tree travels with the FreeDLC export, so a file dropped
-        # anywhere can be smoothed without a project.toml. Only attempted when
-        # every input resolves to a sidecar that agrees on the skeleton;
-        # otherwise fall through to the rig-fallback warning below.
-        fdlc_layout = None
-        sidecar_sources = set()
-        try:
-            per_input = [
-                layout_from_fdlc_sidecar(p) for p in args.pose_input
+        # Patch 122hb/122hc: the built-in rig is a last resort, not a default.
+        # 122hb made --config available; that was not enough, because a flag you
+        # have to know about is still a default for everyone who doesn't, and the
+        # rig is a *wrong* default — it names markers (nose, back1, tailbase) that
+        # a project which renamed its own has never used. So: look for the project
+        # before assuming anything, and announce which source won.
+        from mufasa.project_layout import find_project_config
+
+        config = args.config
+        if config is None:
+            found = {find_project_config(p) for p in args.pose_input}
+            found.discard(None)
+            if len(found) > 1:
+                print(
+                    "[smoother-v2] ERROR: the inputs sit inside more than one "
+                    f"project ({sorted(str(f) for f in found)}). Marker names "
+                    "can't be resolved against two projects at once; smooth them "
+                    "separately, or pass --config to name the one you mean.",
+                    file=sys.stderr,
+                )
+                return 1
+            if found:
+                config = str(found.pop())
+                print(
+                    f"[smoother-v2] Project: {config} (found by walking up from "
+                    f"the input path; --config overrides)"
+                )
+
+        if config:
+            # A broken project.toml must not degrade into the rat rig — but it
+            # also shouldn't reach the user as a bare traceback.
+            try:
+                layout = layout_from_config(config)
+            except Exception as e:
+                print(
+                    f"[smoother-v2] ERROR: could not build a layout from "
+                    f"{config}: {type(e).__name__}: {e}",
+                    file=sys.stderr,
+                )
+                return 1
+            rig_switches = [
+                name for name, given in (
+                    ("--no-back4", args.no_back4), ("--no-tail", args.no_tail),
+                    ("--no-lateral", args.no_lateral), ("--no-center", args.no_center),
+                ) if given
             ]
-        except Exception as exc:
-            print(
-                f"[smoother-v2] WARNING: could not read a FreeDLC skeleton "
-                f"sidecar ({type(exc).__name__}: {exc}); continuing.",
-                file=sys.stderr,
-            )
-            per_input = []
-        if per_input and all(lay is not None for lay in per_input):
-            marker_sets = {
-                tuple(sorted(lay.marker_names)) for lay in per_input
-            }
-            if len(marker_sets) == 1:
-                fdlc_layout = per_input[0]
-                for p in args.pose_input:
-                    sidecar_sources.add(str(Path(p).name))
-        if fdlc_layout is not None:
-            layout = fdlc_layout
-            print(
-                f"[smoother-v2] Layout from FreeDLC skeleton sidecar "
-                f"({layout.n_markers} markers, "
-                f"{len(layout.segments)} segments) — no project needed."
-            )
+            if rig_switches:
+                print(
+                    f"[smoother-v2] WARNING: {', '.join(rig_switches)} ignored — "
+                    "they trim the built-in rat rig, and the layout is coming "
+                    "from the project instead."
+                )
         else:
-            print(
-                "[smoother-v2] WARNING: no project.toml found above the input "
-                "and no --config given. Falling back to the built-in rat rig "
-                "(nose, back1, ..., tailbase). This is only correct for legacy "
-                "projects that use those exact marker names."
-            )
-            layout = standard_rat_layout(
-                include_back4=not args.no_back4,
-                include_tail=not args.no_tail,
-                include_lateral=not args.no_lateral,
-                include_center=not args.no_center,
-            )
-    if args.with_drift:
-        layout.with_drift = True
+            # Patch 122hu: before the built-in-rig fallback, try a FreeDLC
+            # skeleton sidecar (<stem>.fdlc.toml) next to the input. This is what
+            # makes "process a standalone parquet outside a project" work — the
+            # kinematic tree travels with the FreeDLC export, so a file dropped
+            # anywhere can be smoothed without a project.toml. Only attempted when
+            # every input resolves to a sidecar that agrees on the skeleton;
+            # otherwise fall through to the rig-fallback warning below.
+            fdlc_layout = None
+            sidecar_sources = set()
+            try:
+                per_input = [
+                    layout_from_fdlc_sidecar(p) for p in args.pose_input
+                ]
+            except Exception as exc:
+                print(
+                    f"[smoother-v2] WARNING: could not read a FreeDLC skeleton "
+                    f"sidecar ({type(exc).__name__}: {exc}); continuing.",
+                    file=sys.stderr,
+                )
+                per_input = []
+            if per_input and all(lay is not None for lay in per_input):
+                marker_sets = {
+                    tuple(sorted(lay.marker_names)) for lay in per_input
+                }
+                if len(marker_sets) == 1:
+                    fdlc_layout = per_input[0]
+                    for p in args.pose_input:
+                        sidecar_sources.add(str(Path(p).name))
+            if fdlc_layout is not None:
+                layout = fdlc_layout
+                print(
+                    f"[smoother-v2] Layout from FreeDLC skeleton sidecar "
+                    f"({layout.n_markers} markers, "
+                    f"{len(layout.segments)} segments) — no project needed."
+                )
+            else:
+                print(
+                    "[smoother-v2] WARNING: no project.toml found above the input "
+                    "and no --config given. Falling back to the built-in rat rig "
+                    "(nose, back1, ..., tailbase). This is only correct for legacy "
+                    "projects that use those exact marker names."
+                )
+                layout = standard_rat_layout(
+                    include_back4=not args.no_back4,
+                    include_tail=not args.no_tail,
+                    include_lateral=not args.no_lateral,
+                    include_center=not args.no_center,
+                )
+        if args.with_drift:
+            layout.with_drift = True
 
-    # Patch 122hc: --orient-drift-segments / --const-accel-segments name
-    # SEGMENTS, and segment names depend on where the layout came from. A
-    # tree derived from [skeleton] names each segment after its distal
-    # marker (head_mid, back_L2, ...) — it has no "body" or "head", because
-    # a spanning tree over markers has no way to know which cluster is the
-    # trunk. Those names exist only in the built-in rig and in a project's
-    # own [[pose.segments]]. So this can legitimately fail, and when it does
-    # the fix is a real one (declare the segments), not a typo — say so.
-    def _describe_unknown_segments(lay, unknown, flag):
-        """Explain a bad --*-segments name using only things we can check.
+        # Patch 122hc: --orient-drift-segments / --const-accel-segments name
+        # SEGMENTS, and segment names depend on where the layout came from. A
+        # tree derived from [skeleton] names each segment after its distal
+        # marker (head_mid, back_L2, ...) — it has no "body" or "head", because
+        # a spanning tree over markers has no way to know which cluster is the
+        # trunk. Those names exist only in the built-in rig and in a project's
+        # own [[pose.segments]]. So this can legitimately fail, and when it does
+        # the fix is a real one (declare the segments), not a typo — say so.
+        def _describe_unknown_segments(lay, unknown, flag):
+            """Explain a bad --*-segments name using only things we can check.
 
-        Patch 122hd. The 122hc version of this message was a canned story: it
-        asserted the layout came from [skeleton], that there was "no 'body' or
-        'head' to point at", and that the fix was to add a [[pose.segments]]
-        block. Against a project that HAD such a block and did have a 'head',
-        every one of those was false, and it told the user to do something
-        they had already done. An error that guesses is worse than one that
-        only lists facts — the whole point of it is to be trusted.
+            Patch 122hd. The 122hc version of this message was a canned story: it
+            asserted the layout came from [skeleton], that there was "no 'body' or
+            'head' to point at", and that the fix was to add a [[pose.segments]]
+            block. Against a project that HAD such a block and did have a 'head',
+            every one of those was false, and it told the user to do something
+            they had already done. An error that guesses is worse than one that
+            only lists facts — the whole point of it is to be trusted.
 
-        So: state what is missing, list what exists, and add an explanation
-        only where there is a checkable signal for it.
-        """
-        available = sorted(sg.name for sg in lay.segments)
-        lines = [
-            f"[smoother-v2] ERROR: {flag} names segment(s) that don't exist "
-            f"in this layout: {unknown}.",
-            f"  This layout's segments: {available}",
-            f"  Its root segment is: {lay.root_segment.name!r}",
-        ]
+            So: state what is missing, list what exists, and add an explanation
+            only where there is a checkable signal for it.
+            """
+            available = sorted(sg.name for sg in lay.segments)
+            lines = [
+                f"[smoother-v2] ERROR: {flag} names segment(s) that don't exist "
+                f"in this layout: {unknown}.",
+                f"  This layout's segments: {available}",
+                f"  Its root segment is: {lay.root_segment.name!r}",
+            ]
 
-        # Signal 1: the name belongs to the built-in rig. This is the actual
-        # trap — 'body' is what the rig and the docs call the root, so it is
-        # what everyone types first, against a tree that calls it something
-        # else. Checkable: compare against the rig's own segment names.
-        rig = standard_rat_layout()
-        rig_names = {sg.name for sg in rig.segments}
-        for u in unknown:
-            if u not in rig_names:
-                continue
-            if u == rig.root_segment.name:
+            # Signal 1: the name belongs to the built-in rig. This is the actual
+            # trap — 'body' is what the rig and the docs call the root, so it is
+            # what everyone types first, against a tree that calls it something
+            # else. Checkable: compare against the rig's own segment names.
+            rig = standard_rat_layout()
+            rig_names = {sg.name for sg in rig.segments}
+            for u in unknown:
+                if u not in rig_names:
+                    continue
+                if u == rig.root_segment.name:
+                    lines.append(
+                        f"  {u!r} is the built-in rat rig's name for its ROOT "
+                        f"segment. This layout's root is "
+                        f"{lay.root_segment.name!r} — try that instead."
+                    )
+                else:
+                    lines.append(
+                        f"  {u!r} is a segment name from the built-in rat rig, "
+                        f"not from this project's tree."
+                    )
+
+            # Signal 2: near-miss typo. Deliberately strict — a loose cutoff
+            # invents suggestions ('trunk' -> 'neck') that are worse than none.
+            import difflib
+            for u in unknown:
+                close = difflib.get_close_matches(u, available, n=2, cutoff=0.6)
+                if close:
+                    lines.append(
+                        f"  {u!r}: did you mean "
+                        f"{' or '.join(repr(c) for c in close)}?"
+                    )
+
+            # Signal 3: a [skeleton]-derived tree names every segment after its
+            # distal marker, so its segment names are a subset of its marker
+            # names. That is a property of the object in hand, not a guess about
+            # where it came from — which is why it's safe to assert.
+            if set(available) <= set(lay.marker_names):
                 lines.append(
-                    f"  {u!r} is the built-in rat rig's name for its ROOT "
-                    f"segment. This layout's root is "
-                    f"{lay.root_segment.name!r} — try that instead."
+                    "  Every segment here is named after a marker, which means "
+                    "this tree was derived from [skeleton] and has no named body "
+                    "parts to point at. Declare the tree you mean with a "
+                    "[[pose.segments]] block in project.toml (named segments, "
+                    "rigid clusters, far fewer state dims)."
                 )
             else:
                 lines.append(
-                    f"  {u!r} is a segment name from the built-in rat rig, "
-                    f"not from this project's tree."
+                    "  These are the names declared by [[pose.segments]] in "
+                    "project.toml. Use one of them, or rename the segment there."
                 )
+            return "\n".join(lines)
 
-        # Signal 2: near-miss typo. Deliberately strict — a loose cutoff
-        # invents suggestions ('trunk' -> 'neck') that are worse than none.
-        import difflib
-        for u in unknown:
-            close = difflib.get_close_matches(u, available, n=2, cutoff=0.6)
-            if close:
-                lines.append(
-                    f"  {u!r}: did you mean "
-                    f"{' or '.join(repr(c) for c in close)}?"
-                )
+        def _apply_segment_flags(lay, raw, field, flag):
+            import dataclasses as _dc
+            names = [s.strip() for s in raw.split(",") if s.strip()]
+            if not names:
+                return lay
+            unknown = [n for n in names if n not in {sg.name for sg in lay.segments}]
+            if unknown:
+                print(_describe_unknown_segments(lay, unknown, flag), file=sys.stderr)
+                raise SystemExit(1)
+            # Names are validated against the layout in BodyLayout.__post_init__
+            # — rebuild via dataclasses.replace to re-trigger it.
+            return _dc.replace(lay, **{field: names})
 
-        # Signal 3: a [skeleton]-derived tree names every segment after its
-        # distal marker, so its segment names are a subset of its marker
-        # names. That is a property of the object in hand, not a guess about
-        # where it came from — which is why it's safe to assert.
-        if set(available) <= set(lay.marker_names):
-            lines.append(
-                "  Every segment here is named after a marker, which means "
-                "this tree was derived from [skeleton] and has no named body "
-                "parts to point at. Declare the tree you mean with a "
-                "[[pose.segments]] block in project.toml (named segments, "
-                "rigid clusters, far fewer state dims)."
+        if args.orient_drift_segments:
+            layout = _apply_segment_flags(
+                layout, args.orient_drift_segments, "orientation_drift_segments",
+                "--orient-drift-segments",
             )
-        else:
-            lines.append(
-                "  These are the names declared by [[pose.segments]] in "
-                "project.toml. Use one of them, or rename the segment there."
+        # Patch 121d: const-accel flag plumbing. Same pattern as
+        # orient-drift above.
+        if args.const_accel_segments:
+            layout = _apply_segment_flags(
+                layout, args.const_accel_segments, "const_accel_segments",
+                "--const-accel-segments",
             )
-        return "\n".join(lines)
-
-    def _apply_segment_flags(lay, raw, field, flag):
-        import dataclasses as _dc
-        names = [s.strip() for s in raw.split(",") if s.strip()]
-        if not names:
-            return lay
-        unknown = [n for n in names if n not in {sg.name for sg in lay.segments}]
-        if unknown:
-            print(_describe_unknown_segments(lay, unknown, flag), file=sys.stderr)
-            raise SystemExit(1)
-        # Names are validated against the layout in BodyLayout.__post_init__
-        # — rebuild via dataclasses.replace to re-trigger it.
-        return _dc.replace(lay, **{field: names})
-
-    if args.orient_drift_segments:
-        layout = _apply_segment_flags(
-            layout, args.orient_drift_segments, "orientation_drift_segments",
-            "--orient-drift-segments",
-        )
-    # Patch 121d: const-accel flag plumbing. Same pattern as
-    # orient-drift above.
-    if args.const_accel_segments:
-        layout = _apply_segment_flags(
-            layout, args.const_accel_segments, "const_accel_segments",
-            "--const-accel-segments",
-        )
-    # Patch 122hj: high-angular-noise flag plumbing. Same pattern.
-    if args.high_angular_noise_segments:
-        layout = _apply_segment_flags(
-            layout, args.high_angular_noise_segments,
-            "high_angular_noise_segments",
-            "--high-angular-noise-segments",
-        )
+        # Patch 122hj: high-angular-noise flag plumbing. Same pattern.
+        if args.high_angular_noise_segments:
+            layout = _apply_segment_flags(
+                layout, args.high_angular_noise_segments,
+                "high_angular_noise_segments",
+                "--high-angular-noise-segments",
+            )
 
     # Patch 122hu: --beside-input writes each smoothed file into its input's
     # own directory. smooth_pose_v2 writes all outputs to one output_dir, so
