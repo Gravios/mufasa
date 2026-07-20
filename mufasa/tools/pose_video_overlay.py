@@ -128,6 +128,7 @@ try:
         QApplication,
         QCheckBox,
         QComboBox,
+        QFileDialog,
         QGraphicsEllipseItem,
         QGraphicsLineItem,
         QGraphicsPathItem,
@@ -568,6 +569,97 @@ class OverlayScene(QGraphicsScene):
 # ============================================================ #
 
 
+def _qimage_to_bgr(qimg) -> np.ndarray:
+    """Convert a QImage to a contiguous H×W×3 BGR uint8 array for cv2.
+
+    Patch 122hz. The scene renders in RGB (Qt), but cv2.VideoWriter wants BGR.
+    The QImage is coerced to a known 3-channel RGB format first so the buffer
+    stride is predictable, then reversed on the channel axis.
+    """
+    fmt = QImage.Format_RGB888
+    if qimg.format() != fmt:
+        qimg = qimg.convertToFormat(fmt)
+    w, h = qimg.width(), qimg.height()
+    ptr = qimg.constBits()
+    # bytesPerLine may exceed 3*w (row padding); slice to the real width.
+    bpl = qimg.bytesPerLine()
+    buf = np.frombuffer(memoryview(ptr), dtype=np.uint8, count=bpl * h)
+    arr = buf.reshape(h, bpl)[:, : 3 * w].reshape(h, w, 3)
+    return np.ascontiguousarray(arr[:, :, ::-1])  # RGB -> BGR
+
+
+def _even(n: int) -> int:
+    """Round down to an even number (many codecs require even dimensions)."""
+    return n - (n % 2)
+
+
+class _ClipRecorder:
+    """Accumulates rendered frames into a video clip via cv2.VideoWriter.
+
+    Patch 122hz. Records the *composited* overlay frames (video + pose markers
+    as shown), between the first and second press of the Record button. The
+    writer is created lazily on the first appended frame so it can size itself
+    to the actual rendered frame, and all frames are padded/cropped to that
+    first size (the scene render is a fixed size, but this guards against a
+    stray off-by-one). Dimensions are forced even for codec compatibility.
+
+    Kept free of any Qt types (it takes plain BGR arrays) so the record/stop
+    state machine and the writer handling are testable without a GUI.
+    """
+
+    def __init__(self, out_path: str, fps: float):
+        self.out_path = out_path
+        self.fps = max(1.0, float(fps))
+        self._writer = None
+        self._size = None  # (w, h) locked from the first frame
+        self.n_frames = 0
+        self.error: str | None = None
+
+    def _open(self, w: int, h: int) -> bool:
+        w, h = _even(w), _even(h)
+        if w < 2 or h < 2:
+            self.error = f"frame too small to record ({w}×{h})"
+            return False
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(self.out_path, fourcc, self.fps, (w, h))
+        if not writer.isOpened():
+            self.error = f"could not open video writer for {self.out_path}"
+            return False
+        self._writer = writer
+        self._size = (w, h)
+        return True
+
+    def append(self, frame_bgr) -> None:
+        """Append one composited BGR frame. Opens the writer on first call."""
+        if self.error is not None:
+            return
+        h, w = frame_bgr.shape[:2]
+        if self._writer is None and not self._open(w, h):
+            return
+        tw, th = self._size
+        # Conform to the locked size: crop if larger, pad if smaller.
+        if (w, h) != (tw, th):
+            fitted = np.zeros((th, tw, 3), dtype=np.uint8)
+            cw, ch = min(w, tw), min(h, th)
+            fitted[:ch, :cw] = frame_bgr[:ch, :cw]
+            frame_bgr = fitted
+        self._writer.write(frame_bgr)
+        self.n_frames += 1
+
+    def finish(self) -> tuple[bool, str]:
+        """Release the writer. Returns (ok, message)."""
+        if self._writer is not None:
+            self._writer.release()
+            self._writer = None
+        if self.error is not None:
+            return False, self.error
+        if self.n_frames == 0:
+            return False, "no frames were recorded"
+        return True, (
+            f"saved {self.n_frames} frames to {self.out_path}"
+        )
+
+
 class OverlayViewer(QMainWindow):
     """Qt main window with the OverlayScene, scrubber, and
     play / pause / step controls.
@@ -621,6 +713,18 @@ class OverlayViewer(QMainWindow):
         self.play_btn = QPushButton("Play")
         self.play_btn.clicked.connect(self.toggle_play)
         controls.addWidget(self.play_btn)
+
+        # Patch 122hz: record a clip of the composited overlay frames. First
+        # press starts (writing every frame subsequently displayed), second
+        # press stops and finalises the file. Disabled when cv2 is missing.
+        self.record_btn = QPushButton("● Record")
+        self.record_btn.setToolTip(
+            "Record a clip of the overlay. Press once to start, again to "
+            "stop; the clip contains the frames shown in between."
+        )
+        self.record_btn.clicked.connect(self.toggle_record)
+        controls.addWidget(self.record_btn)
+        self._recorder = None  # set to a _ClipRecorder while recording
 
         # Playback speed dropdown. Editable so users can type a
         # custom multiplier (e.g. "1.5×") in addition to picking
@@ -891,6 +995,13 @@ class OverlayViewer(QMainWindow):
             self.scrubber.blockSignals(False)
         self.scene_obj.update_frame(idx)
         self._update_label(idx)
+        # Patch 122hz: while recording, capture the just-rendered composited
+        # frame (video + overlay). Done here because _set_frame is the single
+        # path every displayed frame passes through — play tick, scrubber, and
+        # stepping alike — so any frame the user sees while recording is in the
+        # clip.
+        if self._recorder is not None:
+            self._capture_recording_frame()
 
     def _update_label(self, idx: int):
         t = idx / max(1.0, self.video.fps)
@@ -898,6 +1009,95 @@ class OverlayViewer(QMainWindow):
             f"frame {idx}/{self.video.n_frames - 1}  "
             f"({t:6.2f}s)"
         )
+
+    # -- recording (patch 122hz) -------------------------------------- #
+    def toggle_record(self):
+        """Start recording on the first press, stop and save on the second."""
+        if self._recorder is None:
+            self._start_recording()
+        else:
+            self._stop_recording()
+
+    def _default_clip_path(self) -> str:
+        """A clip name beside the video: <stem>_clip_<start>-....mp4 (unique)."""
+        import os
+        base = os.path.splitext(str(self.video.path))[0]
+        start = self.scrubber.value()
+        candidate = f"{base}_clip_{start}.mp4"
+        n = 1
+        while os.path.exists(candidate):
+            candidate = f"{base}_clip_{start}_{n}.mp4"
+            n += 1
+        return candidate
+
+    def _start_recording(self):
+        if cv2 is None:
+            self.statusBar().showMessage(
+                "Recording needs OpenCV (pip install opencv-python)."
+            )
+            return
+        # Let the user choose where to save; default beside the video. If the
+        # dialog is unavailable or cancelled, fall back to the default path.
+        out_path = self._default_clip_path()
+        try:
+            chosen, _ = QFileDialog.getSaveFileName(
+                self, "Save clip as", out_path, "MP4 video (*.mp4)",
+            )
+            if chosen:
+                out_path = chosen
+            elif chosen == "":
+                # Explicit cancel -> abort, don't start recording.
+                return
+        except Exception:
+            pass  # no dialog available; use the default path
+        self._recorder = _ClipRecorder(out_path, fps=self.video.fps)
+        self.record_btn.setText("■ Stop")
+        self.record_btn.setStyleSheet("color: red; font-weight: bold;")
+        self.statusBar().showMessage(f"Recording to {out_path} …")
+        # Capture the current frame immediately so a clip started while paused
+        # still contains at least the frame on screen.
+        self._capture_recording_frame()
+
+    def _stop_recording(self):
+        recorder = self._recorder
+        self._recorder = None
+        self.record_btn.setText("● Record")
+        self.record_btn.setStyleSheet("")
+        if recorder is None:
+            return
+        ok, msg = recorder.finish()
+        self.statusBar().showMessage(
+            ("Recorded — " if ok else "Recording failed — ") + msg
+        )
+
+    def _render_scene_bgr(self):
+        """Render the current scene (video + overlay) to a BGR numpy array."""
+        rect = self.scene_obj.sceneRect()
+        w, h = int(rect.width()), int(rect.height())
+        if w < 2 or h < 2:
+            return None
+        qimg = QImage(w, h, QImage.Format_RGB888)
+        qimg.fill(QColor(0, 0, 0))
+        painter = QPainter(qimg)
+        # Render the scene's own rect (the video frame extent), so the clip is
+        # the video content with overlay — not the zoomed/panned viewport.
+        self.scene_obj.render(painter, target=QRectF(0, 0, w, h), source=rect)
+        painter.end()
+        return _qimage_to_bgr(qimg)
+
+    def _capture_recording_frame(self):
+        if self._recorder is None:
+            return
+        frame = self._render_scene_bgr()
+        if frame is not None:
+            self._recorder.append(frame)
+
+    def closeEvent(self, event):  # noqa: N802 (Qt signature)
+        # Patch 122hz: finalise an in-progress recording so the file isn't left
+        # truncated if the window is closed mid-record.
+        if self._recorder is not None:
+            self._stop_recording()
+        super().closeEvent(event)
 
 
 # ============================================================ #
