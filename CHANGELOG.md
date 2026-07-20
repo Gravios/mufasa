@@ -8,6 +8,34 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hw — smoother reads a raw FreeDLC long-format parquet.**
+Fixes "Could not load .../K7_..._reduced_negate.fdlc.parquet. Tried direct read
+and DLC multi-row header parsing." when smoothing a *raw* FreeDLC file
+standalone (--load-model --beside-input). FreeDLC's native .fdlc.parquet is
+LONG/tidy — (frame, individual, bodypart, x, y, likelihood), one row per
+bodypart per frame — not the wide <bp>_x/_y/_p the loader expects. 122ht handled
+the *imported* wide MultiIndex form; a raw file that never went through the
+importer is long, has no _x columns, and fell through to the DLC parser and
+failed.
+
+Adds _pivot_fdlc_long_to_wide (mirrors the importer's long_to_wide but
+layout-independent: every bodypart -> <bp>_x/_y/_p, no project order imposed,
+-1 no-detection sentinel clipped to 0, frame index made contiguous, multi-animal
+rejected with an actionable message). The loader detects the long schema
+(non-MultiIndex columns containing frame/bodypart/x/y) and pivots before the
+marker check; wide and imported-MultiIndex inputs are untouched.
+
+smoke_122hw_fdlc_long_format: 14/14 (pivot recovers all bodyparts with case
+preserved, emits _x/_y/_p, preserves or reindexes the frame count, clips the -1
+sentinel, rejects multi-animal with the explicit message; AST confirms the long
+detection is gated to non-MultiIndex and precedes the marker check). Tripwires:
+remove the long detection -> 9/14; disable multi-animal rejection -> 13/14 (the
+strengthened check pins the explicit message, not pandas' incidental reshape
+error); break the sentinel clip -> 12/14. Canonical rig 152/152; 122ht 6/6,
+122hu 18/18, 122gm 8/8 unchanged. Both sweeps vs 5671eed: 206 smoke_122 + 73
+others, no regressions. F821 = 7, I001 = 1, ruff 22 (kalman), mufasa/**/*.py =
+428.
+
 **122hv — --load-model needs no project, --config, or skeleton.**
 Answers "do I still need the inputs / a project to smooth an external file once
 the model is built?" — no. A saved v2 model already stores its own layout
