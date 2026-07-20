@@ -8,6 +8,37 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hx — shared pose loader handles all three FreeDLC formats (dedup).**
+Fixes pose_video_overlay / pose_viewer._load_pose_file failing on a raw FreeDLC
+long-format parquet — the same shape 122hw fixed, but in a *separate* loader
+copy (the tools loader, distinct from the smoother's). Rather than copy the fix
+a third time, the two non-flat FreeDLC parquet shapes are now handled in the one
+place both loaders already fall back to: kalman_diagnostic.load_pose_file. Its
+parquet branch now flattens a 3-level MultiIndex header (imported form, 122ht)
+and pivots the long/tidy schema (raw form, 122hw) before marker detection.
+pose_viewer inherits the fix by falling through to it; the smoother keeps its
+inline copy for now.
+
+The canonical _pivot_fdlc_long_to_wide lives here now (kalman_diagnostic is the
+dependency-light shared module); the smoother's 122hw copy is an equivalent that
+a later pass can collapse onto this one. That fuller consolidation — the
+smoother and pose_viewer both delegating entirely to this loader instead of
+carrying near-identical direct-read blocks (the smoother's own code comments
+already note it duplicates pose_viewer._load_pose_file) — is a reasonable
+follow-up; this patch fixes the immediate failure and removes the *format*
+duplication without touching the smoother's hot path.
+
+smoke_122hx_shared_loader_formats: 12/12 — the shared loader reads all three
+shapes (raw long, imported MultiIndex, wide flat) with case preserved
+(back_T4); pose_viewer's direct read finds no markers on a long file (so it
+falls back) and the shared loader then loads it; and the pivot helper's
+unit behaviour (sentinel clip, multi-animal rejection). Tripwires: drop the long
+handling / drop the MultiIndex flatten -> the loader raises on that shape.
+Canonical rig 152/152; 122ht 6/6, 122hw 14/14, 122hb 29/29 unchanged. Both
+sweeps vs 5671eed: 207 smoke_122 + 73 others, no regressions (the two
+pre-existing diagnostic-suite import failures are unchanged). ruff 1 (diagnostic,
+baseline), F821 = 7, I001 = 1, mufasa/**/*.py = 428.
+
 **122hw — smoother reads a raw FreeDLC long-format parquet.**
 Fixes "Could not load .../K7_..._reduced_negate.fdlc.parquet. Tried direct read
 and DLC multi-row header parsing." when smoothing a *raw* FreeDLC file
