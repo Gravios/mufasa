@@ -8,6 +8,35 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hy — mufasa-preview: open the overlay viewer by paths or folder search.**
+Adds a mufasa-preview console command (new module mufasa/tools/pose_preview.py,
+entry point in pyproject.toml) that pairs a video with its pose files and opens
+pose_video_overlay — so the long, hash-tagged pose paths don't have to be typed
+by hand. Two modes: explicit (mufasa-preview --video rec.mp4 [--smoothed ...]
+[--raw ...]; with only --video, pose files beside it are auto-found) and folder
+search (mufasa-preview --folder .; videos paired with their pose files by name).
+
+Pairing reduces a video and its pose files to a common session stem, so rec.mp4
+matches rec.fdlc.parquet (raw) and rec.fdlc_smoothed_v2.<hash>.parquet
+(smoothed) — the parameter-hash tag (122hm/hn) and the .fdlc/_smoothed_v2
+suffixes are stripped; among several smoothed hashes the newest wins. The viewer
+runs in-process via pose_video_overlay.main (same package, no subprocess);
+--print shows the equivalent command instead of opening it; --all previews every
+match in a multi-video folder (ambiguity otherwise errors with the match list).
+
+smoke_122hy_mufasa_preview: 26/26 — stem reduction (incl. the reported real
+filename), folder discovery (pairing, no-pose skipped, newest-hash wins), argv
+construction (present/omitted opts), both --print modes, the error/ambiguity
+paths (ambiguous folder, no video, missing pose, missing video, --video/--folder
+mutual exclusion), the in-process overlay invocation with the built argv, and
+the registered entry point. Tripwires: break the hash stripping (smoothed won't
+pair); disable the ambiguity guard -> 25/26; skip the overlay call -> 24/26.
+Backend logic, tested directly (real temp folders + a stubbed overlay main).
+
+Adds a source module, so mufasa/**/*.py 428 -> 429; the smoke_122d5_stage_b
+py-count ceiling is bumped 428 -> 429 to match (26/26). Both sweeps vs 5671eed:
+208 smoke_122 + 73 others, no regressions. F821 = 7, I001 = 1, ruff 0 (module).
+
 **122hx — shared pose loader handles all three FreeDLC formats (dedup).**
 Fixes pose_video_overlay / pose_viewer._load_pose_file failing on a raw FreeDLC
 long-format parquet — the same shape 122hw fixed, but in a *separate* loader
