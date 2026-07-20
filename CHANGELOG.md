@@ -8,6 +8,33 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ia — scale pose coordinates for reduced-resolution video.**
+Pose estimated on a downscaled video (e.g. *_reduced_negate.mp4) is in
+reduced-resolution coordinates; overlaid on the full-res video the markers
+cluster in a corner. A --pose-scale FACTOR multiplies pose coordinates by the
+factor — 2 for a half-resolution pose, 4 for quarter — so they line up. The
+factor is also a live Scale selector in the viewer (presets 1×/2×/4×, editable
+for any value), so which factor aligns can be eyeballed without a restart.
+
+Scaling applies to marker positions, skeleton endpoints, and the
+variance-ellipse *centre and radii* — all in pose-pixel space, so a coordinate
+rescale scales the ellipse's std-dev linearly too. It does NOT scale the marker
+dot size, which is a fixed on-screen size (the dot's own geometry, set once;
+only setPos is scaled). Threaded through OverlayScene (pose_scale + set_pose_scale),
+the overlay CLI, and mufasa-preview (--pose-scale passthrough, omitted when 1).
+
+smoke_122ia_pose_scale: 23/23 — the scaling arithmetic (positions ×s, endpoints
+×s, ellipse centre+radii ×s, s=1 a no-op) and the scale-label helper run in
+isolation; AST confirms the dots/skeleton/ellipse scale by s while the dot
+radius definitions carry no ×s, the set_pose_scale method, the CLI arg, the live
+Scale selector (with a non-numeric entry reverting rather than crashing), and
+the mufasa-preview passthrough. Tripwires: unscale the dot positions -> 22/23;
+scale the dot radius -> 22/23 (the check pins the radius lines); unscale the
+ellipse radii -> 22/23; drop the preview passthrough -> 22/23. 122hy 26/26 and
+122hz 23/23 unchanged. Both sweeps vs 5671eed: 210 smoke_122 + 73 others, no
+regressions. ruff 1 (overlay, pre-existing) / 0 (preview), F821 = 7, I001 = 1,
+mufasa/**/*.py = 429.
+
 **122hz — record button in the overlay viewer.**
 Adds a Record button to pose_video_overlay: first press starts, second press
 stops, and the saved clip contains the composited overlay frames (video + pose

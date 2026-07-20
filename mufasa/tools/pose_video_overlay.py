@@ -266,6 +266,7 @@ class OverlayScene(QGraphicsScene):
         skeleton_color: tuple[int, int, int] = (200, 220, 255),
         ellipse_color: tuple[int, int, int] = (255, 255, 100),
         pose_offset: int = 0,
+        pose_scale: float = 1.0,
     ):
         super().__init__()
         self.video = video
@@ -278,6 +279,13 @@ class OverlayScene(QGraphicsScene):
         self.skeleton_color = skeleton_color
         self.ellipse_color = ellipse_color
         self.pose_offset = pose_offset
+        # Patch 122ia: multiply pose coordinates by this factor at draw time.
+        # Pose estimated on a downscaled video is in reduced-resolution space;
+        # a factor of 2 (half-res) or 4 (quarter-res) maps it onto a full-res
+        # video. Applies to marker positions, skeleton endpoints, and the
+        # variance-ellipse radii (all in pose-pixel space) — but NOT the marker
+        # dot size, which is a fixed on-screen size.
+        self.pose_scale = float(pose_scale) if pose_scale else 1.0
 
         # Decide a unified marker list. If both smoothed and raw
         # are loaded with different markers, take the union so
@@ -410,6 +418,14 @@ class OverlayScene(QGraphicsScene):
             self.show_ellipses = show_ellipses
         self._apply_visibility()
 
+    def set_pose_scale(self, factor: float) -> None:
+        """Set the pose-coordinate multiplier (patch 122ia).
+
+        The caller redraws the current frame; positions and ellipse radii
+        pick the new factor up on the next :meth:`_update_pose_layer`.
+        """
+        self.pose_scale = float(factor) if factor and factor > 0 else 1.0
+
     def _apply_visibility(self):
         for d in self._smoothed_dots.values():
             d.setVisible(self.show_smoothed)
@@ -497,6 +513,7 @@ class OverlayScene(QGraphicsScene):
         is_smoothed = ellipses is not None  # convention
 
         marker_to_idx = {m: i for i, m in enumerate(src.markers)}
+        s = self.pose_scale
 
         for m, dot in dots.items():
             i = marker_to_idx[m]
@@ -508,7 +525,7 @@ class OverlayScene(QGraphicsScene):
             if not valid:
                 dot.setVisible(False)
                 continue
-            dot.setPos(QPointF(float(x), float(y)))
+            dot.setPos(QPointF(float(x) * s, float(y) * s))
             dot.setVisible(
                 self.show_smoothed if is_smoothed
                 else self.show_raw
@@ -533,7 +550,8 @@ class OverlayScene(QGraphicsScene):
                 line.setVisible(False)
                 continue
             line.setLine(
-                float(xa), float(ya), float(xb), float(yb),
+                float(xa) * s, float(ya) * s,
+                float(xb) * s, float(yb) * s,
             )
             line.setVisible(skeleton_visible)
 
@@ -555,10 +573,13 @@ class OverlayScene(QGraphicsScene):
                 # Draw 2-sigma ellipse (95% confidence approx).
                 # We don't have off-diagonal cov in the saved
                 # output, so axes are coordinate-aligned.
-                sx = 2.0 * float(np.sqrt(vx))
-                sy = 2.0 * float(np.sqrt(vy))
+                # Patch 122ia: both the centre and the radii live in pose-pixel
+                # space, so both scale by pose_scale (std-dev scales linearly
+                # with a coordinate rescale).
+                sx = 2.0 * float(np.sqrt(vx)) * s
+                sy = 2.0 * float(np.sqrt(vy)) * s
                 ell.setRect(
-                    float(x) - sx, float(y) - sy,
+                    float(x) * s - sx, float(y) * s - sy,
                     2 * sx, 2 * sy,
                 )
                 ell.setVisible(self.show_ellipses and self.show_smoothed)
@@ -673,6 +694,7 @@ class OverlayViewer(QMainWindow):
         likelihood_threshold: float = 0.0,
         pose_offset: int = 0,
         start_frame: int = 0,
+        pose_scale: float = 1.0,
     ):
         super().__init__()
         self.setWindowTitle(
@@ -685,6 +707,7 @@ class OverlayViewer(QMainWindow):
             raw=raw,
             likelihood_threshold=likelihood_threshold,
             pose_offset=pose_offset,
+            pose_scale=pose_scale,
         )
         self.scene_obj.setSceneRect(
             0, 0, video.width, video.height,
@@ -725,6 +748,29 @@ class OverlayViewer(QMainWindow):
         self.record_btn.clicked.connect(self.toggle_record)
         controls.addWidget(self.record_btn)
         self._recorder = None  # set to a _ClipRecorder while recording
+
+        # Patch 122ia: runtime pose-scale selector. Pose estimated on a
+        # downscaled video needs its coordinates multiplied to line up on the
+        # full-res video; presets cover the common 2×/4× downscales, and it's
+        # editable for anything else. Starts at the --pose-scale CLI value so
+        # eyeballing which factor aligns is a live control, not a restart.
+        controls.addWidget(QLabel("Scale"))
+        self.scale_combo = QComboBox()
+        self.scale_combo.setEditable(True)
+        self.scale_combo.setInsertPolicy(QComboBox.NoInsert)
+        for factor in (1.0, 2.0, 4.0):
+            self.scale_combo.addItem(self._scale_label(factor), factor)
+        self.scale_combo.setCurrentText(self._scale_label(pose_scale))
+        self.scale_combo.setMinimumWidth(64)
+        self.scale_combo.setToolTip(
+            "Multiply pose coordinates by this factor. Use 2 or 4 when the "
+            "pose was estimated on a half- or quarter-resolution video."
+        )
+        self.scale_combo.activated.connect(self._on_scale_combo_picked)
+        self.scale_combo.lineEdit().editingFinished.connect(
+            self._on_scale_combo_edited,
+        )
+        controls.addWidget(self.scale_combo)
 
         # Playback speed dropdown. Editable so users can type a
         # custom multiplier (e.g. "1.5×") in addition to picking
@@ -1003,6 +1049,38 @@ class OverlayViewer(QMainWindow):
         if self._recorder is not None:
             self._capture_recording_frame()
 
+    # -- pose scale (patch 122ia) ------------------------------------- #
+    @staticmethod
+    def _scale_label(factor: float) -> str:
+        f = float(factor) if factor else 1.0
+        # integer factors print without a trailing .0
+        return (f"{int(f)}×" if f == int(f) else f"{f:g}×")
+
+    def _apply_scale(self, factor: float) -> None:
+        factor = float(factor) if factor else 1.0
+        if factor <= 0:
+            factor = 1.0
+        self.scene_obj.set_pose_scale(factor)
+        # redraw the current frame so the change is immediate
+        self._set_frame(self.scrubber.value())
+
+    def _on_scale_combo_picked(self, index: int) -> None:
+        factor = self.scale_combo.itemData(index)
+        if factor is not None:
+            self._apply_scale(float(factor))
+
+    def _on_scale_combo_edited(self) -> None:
+        text = self.scale_combo.currentText().strip().rstrip("×xX").strip()
+        try:
+            factor = float(text)
+        except ValueError:
+            # revert the text to the current scale
+            self.scale_combo.setCurrentText(
+                self._scale_label(self.scene_obj.pose_scale)
+            )
+            return
+        self._apply_scale(factor)
+
     def _update_label(self, idx: int):
         t = idx / max(1.0, self.video.fps)
         self.frame_label.setText(
@@ -1140,6 +1218,14 @@ def main(argv: list[str] | None = None) -> int:
         "--start-frame", type=int, default=0,
         help="Open at frame N (default 0)",
     )
+    parser.add_argument(
+        "--pose-scale", type=float, default=1.0,
+        help=(
+            "Multiply pose coordinates by this factor (default 1). Use 2 for "
+            "pose estimated on a half-resolution video, 4 for quarter. Can "
+            "also be changed live from the Scale control in the viewer."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if _QT_ERR is not None:
@@ -1201,6 +1287,7 @@ def main(argv: list[str] | None = None) -> int:
         likelihood_threshold=args.likelihood_threshold,
         pose_offset=args.pose_offset,
         start_frame=max(0, min(video.n_frames - 1, args.start_frame)),
+        pose_scale=args.pose_scale,
     )
     win.resize(1200, 800)
     win.show()
