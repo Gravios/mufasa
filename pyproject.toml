@@ -210,6 +210,7 @@ Issues        = "https://github.com/sgoldenlab/simba/issues"
 # mufasa-tk        = "mufasa.SimBA:main"          # removed 122d4
 mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench (default; env diagnostics)
 mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench launch (no env diagnostics)
+mufasa-preview   = "mufasa.tools.pose_preview:main"  # patch 122hy: pose-overlay viewer by paths or folder search
 # patch 122dx: mufasa-chooser entry point removed along with the
 # legacy Qt chooser (mufasa/ui_qt/app.py). Standalone popups can
 # still be reached via File menu items inside the workbench; the
