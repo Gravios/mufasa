@@ -8,6 +8,38 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hv — --load-model needs no project, --config, or skeleton.**
+Answers "do I still need the inputs / a project to smooth an external file once
+the model is built?" — no. A saved v2 model already stores its own layout
+(save_model_v2 serializes every segment's name/parent/markers; load_model_v2
+rebuilds the BodyLayout), and smooth_pose_v2 uses the loaded layout and ignores
+any passed one. So with --load-model the only things still needed are the input
+files and where to write.
+
+main() had been running layout resolution (project search -> FreeDLC sidecar ->
+rig fallback) unconditionally, before smooth_pose_v2, even with --load-model —
+wasted work whose result the model overrides, and for a standalone file it would
+emit the rig-fallback warning needlessly and the multi-project error could even
+block a legitimate load-model run. This guards the whole layout-resolution block
+behind `if args.load_model is None:`. With a model, config and layout are left
+None (smooth_pose_v2 supplies the model's own layout) and any layout-shaping
+flags passed anyway (--config, --with-drift, --*-segments, --no-*) are reported
+as ignored. Without a model, resolution runs exactly as before (project /
+sidecar / rig), so the 122hu standalone-sidecar path is unchanged.
+
+Net: `... --load-model model.npz some_file.parquet --beside-input` smooths an
+external file with no project and no skeleton, output beside it. Nothing needs
+to track the smoother's inputs — the model is the complete spec.
+
+smoke_122hv_load_model_skips_layout: 12/12 (the model serializes/rebuilds the
+layout and smooth_pose_v2 prefers it; the guard exists and its else-branch holds
+all of find_project_config / sidecar / rig; find_project_config runs only under
+the no-model branch; config/layout default to None; the ignored-flag reporting).
+Tripwires: disable the guard -> 8/12; drop the `config = None` default -> 11/12.
+Canonical rig 152/152 and smoke_122hu 18/18 both survive the 217-line
+re-indentation. Both sweeps vs 5671eed: 205 smoke_122 + 73 others, no
+regressions. F821 = 7, I001 = 1, ruff 22 (kalman), mufasa/**/*.py = 428.
+
 **122hu — smooth a standalone pose file in place, outside a project.**
 Two CLI additions let the smoother process a parquet that isn't in a Mufasa
 project, with output beside the input:
