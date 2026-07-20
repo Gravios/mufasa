@@ -134,6 +134,7 @@ def _build_overlay_argv(
     likelihood_threshold: float,
     pose_offset: int,
     start_frame: int,
+    pose_scale: float = 1.0,
 ) -> list[str]:
     """Build the argv list for ``pose_video_overlay.main``."""
     argv = [video]
@@ -147,6 +148,8 @@ def _build_overlay_argv(
         argv += ["--pose-offset", str(pose_offset)]
     if start_frame:
         argv += ["--start-frame", str(start_frame)]
+    if pose_scale and pose_scale != 1.0:
+        argv += ["--pose-scale", str(pose_scale)]
     return argv
 
 
@@ -199,6 +202,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Open the viewer at frame N (default 0).",
     )
     parser.add_argument(
+        "--pose-scale", type=float, default=1.0,
+        help="Multiply pose coordinates by this factor (2 for half-res pose, "
+             "4 for quarter-res). Also adjustable live in the viewer.",
+    )
+    parser.add_argument(
         "--print", dest="print_only", action="store_true",
         help="Print the equivalent overlay command(s) without opening the "
              "viewer.",
@@ -245,6 +253,7 @@ def _resolve_jobs(args: argparse.Namespace) -> tuple[list[list[str]], int]:
         argv = _build_overlay_argv(
             args.video, smoothed, raw,
             args.likelihood_threshold, args.pose_offset, args.start_frame,
+            args.pose_scale,
         )
         return [argv], 0
 
@@ -277,6 +286,7 @@ def _resolve_jobs(args: argparse.Namespace) -> tuple[list[list[str]], int]:
         _build_overlay_argv(
             g["video"], g["smoothed"], g["raw"],
             args.likelihood_threshold, args.pose_offset, args.start_frame,
+            args.pose_scale,
         )
         for g in groups
     ]
