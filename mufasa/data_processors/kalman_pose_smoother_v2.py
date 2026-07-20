@@ -8739,6 +8739,18 @@ def smooth_pose_v2(
                     df_direct = pd.read_parquet(path)
                 except Exception:
                     df_direct = pd.read_csv(path, low_memory=False)
+            # Patch 122ht: the FreeDLC/SimBA importer writes sources/pose
+            # parquets with a 3-level MultiIndex column header
+            # (scorer/bodypart/coords = IMPORTED_POSE/IMPORTED_POSE/<bp>_x).
+            # read_parquet returns those columns as tuples, so the <bp>_x
+            # marker check below finds nothing and the load wrongly falls
+            # through to the DLC CSV parser and fails. Flatten a MultiIndex to
+            # its last level, which holds the flat <bp>_x/_y/_p names. Plain
+            # (already-flat) columns are untouched.
+            if isinstance(df_direct.columns, pd.MultiIndex):
+                df_direct.columns = [
+                    col[-1] for col in df_direct.columns
+                ]
             # Patch 122hb: normalize the SUFFIX only. This used to be a
             # blanket `.lower()`, which silently renamed every marker with
             # an upper-case letter in it (back_T4 → back_t4) and made it

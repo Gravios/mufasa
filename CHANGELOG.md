@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ht — smoother reads the imported MultiIndex pose parquet.**
+Fixes "Could not load .../sources/pose/<session>.parquet. Tried direct read and
+DLC multi-row header parsing." hit when adding sessions with smoothing. The
+FreeDLC/SimBA importer writes sources/pose parquets with a 3-level MultiIndex
+column header (scorer/bodypart/coords = IMPORTED_POSE/IMPORTED_POSE/<bp>_x), via
+write_df's multi_idx_header path. The smoother's inline loader read the parquet
+then looked for columns ending in "_x"; on a MultiIndex the columns come back as
+tuples, so no markers matched, the load fell through to the DLC-CSV diagnostic
+parser, and raised.
+
+Fix: flatten a MultiIndex column header to its last level — which holds the flat
+<bp>_x/_y/_p names — immediately after the direct read and before the marker
+detection. Plain (already-flat) columns are untouched by the isinstance guard,
+so smoothed-flat parquets and pre-flattened CSVs load exactly as before; a
+header whose last level isn't <bp>_x (e.g. a 2-level DLC header) still falls
+through to the diagnostic loader as before.
+
+smoke_122ht_imported_multiindex_parquet: 6/6 — against a parquet written exactly
+as the importer writes it: all markers recovered, case preserved (back_T4 not
+back_t4), plain-column parquets still load, _var columns not mistaken for
+markers, and AST confirms the flatten sits in the loader ahead of the marker
+check. Tripwire: remove the flatten -> 4/6. Canonical rig 152/152; FDLC importer
+and pose-import suites unchanged (122gm 8/8, 122gn 9/9, 122dh 27/27, 122di
+12/12, 122dj 14/14). Both sweeps vs 5671eed: 203 smoke_122 + 73 others, no
+regressions. F821 = 7, I001 = 1, ruff 22 (kalman), mufasa/**/*.py = 428.
+
 **122hs — matplotlib 3.11 compat: replace removed cm.get_cmap.**
 Fixes "module 'matplotlib.cm' has no attribute 'get_cmap'" hit when adding
 sessions with smoothing on a recent matplotlib. cm.get_cmap was deprecated in
