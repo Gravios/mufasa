@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hs — matplotlib 3.11 compat: replace removed cm.get_cmap.**
+Fixes "module 'matplotlib.cm' has no attribute 'get_cmap'" hit when adding
+sessions with smoothing on a recent matplotlib. cm.get_cmap was deprecated in
+3.7 and removed in 3.11; the colour-palette helpers still called it. Replaced
+every cm.get_cmap(name, N) with the version-safe
+matplotlib.colormaps[name].resampled(N) across plotting_mixin.py,
+utils/data.py (create_color_palette / create_color_palettes) and
+utils/lookups.py, updating imports (colormaps added; cm dropped where no longer
+used). In lookups this also repaired a latent bug — the old branch tested an
+int index for membership in the colormap dict (never matched, always fell to
+"spring"); the new code tests the actual colormap name, so a requested map is
+used when it exists and falls back to spring otherwise.
+
+Verified the modern call is numerically identical to the old API (same N, same
+sampled colours for viridis/jet/spring/tab20) and that the fixed helpers run
+even with cm.get_cmap deleted (simulating 3.11), reproducing the documented
+create_color_palette('jet',3,hex) output.
+
+smoke_122hs_get_cmap_removal: 12/12 (no cm.get_cmap( call remains in mufasa/;
+the three files use resampled(); old/new equivalence where the old API is still
+present; resampled() palette shape; the spring fallback). Tripwires: reintro
+cm.get_cmap in data.py -> 10/12; drop the colormaps import in plotting_mixin ->
+11/12. Both sweeps vs 5671eed: 202 smoke_122 + 73 others, no regressions.
+ruff at baseline (40 plotting_mixin / 35 data / 12 lookups), F821 = 7, I001 = 1,
+mufasa/**/*.py = 428.
+
 **122hr — hotfix: restore _launch_synced_viewer swallowed by 122hp's closeEvent.**
 Patch 122hp added a closeEvent method to MufasaWorkbench by inserting it before
 _launch_synced_viewer, but the edit consumed that method's `def` line — so
