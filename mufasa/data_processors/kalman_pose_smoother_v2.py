@@ -8632,6 +8632,54 @@ def _validate_layout_against_data(
     raise ValueError("\n".join(lines))
 
 
+def _pivot_fdlc_long_to_wide(df_long):
+    """Pivot a raw FreeDLC long/tidy pose frame to the wide <bp>_x/_y/_p form.
+
+    Patch 122hw. FreeDLC's native ``.fdlc.parquet`` is long — columns
+    ``(frame, individual, bodypart, x, y, likelihood)``, one row per bodypart
+    per frame. The smoother's loader expects wide per-marker columns, so a
+    standalone raw file (never run through the importer) must be pivoted here.
+    This mirrors the importer's ``long_to_wide`` but is layout-independent:
+    every bodypart in the file becomes ``<bp>_x/_y/_p`` (downstream marker
+    detection matches these names against the model/project layout), and no
+    project body-part order is imposed. Multi-animal files (more than one
+    ``individual``) are rejected — this is the single-animal path.
+
+    :param df_long: a DataFrame with at least frame/bodypart/x/y columns.
+    :returns: a wide DataFrame indexed 0..n_frames-1.
+    :raises ValueError: if the file contains more than one individual.
+    """
+    pd = _import_io_helpers()["pd"]
+    df = df_long.copy()
+    if "individual" in df.columns:
+        individuals = list(pd.unique(df["individual"]))
+        if len(individuals) > 1:
+            raise ValueError(
+                f"FreeDLC parquet contains {len(individuals)} individuals "
+                f"({individuals}); the smoother's standalone reader is "
+                f"single-animal. Import it into a project for multi-animal "
+                f"handling."
+            )
+    value_cols = ["x", "y"]
+    if "likelihood" in df.columns:
+        # -1.0 == "no detection" sentinel -> 0.0 confidence, as the importer.
+        df["likelihood"] = df["likelihood"].clip(lower=0.0)
+        value_cols.append("likelihood")
+    wide = df.pivot(
+        index="frame", columns="bodypart", values=value_cols,
+    ).sort_index()
+    # Guarantee a contiguous 0..max frame index (gaps -> NaN -> 0 below).
+    full_idx = range(int(wide.index.min()), int(wide.index.max()) + 1)
+    wide = wide.reindex(full_idx)
+    out = pd.DataFrame(index=range(len(wide)))
+    for bp in wide["x"].columns:
+        out[f"{bp}_x"] = wide[("x", bp)].to_numpy()
+        out[f"{bp}_y"] = wide[("y", bp)].to_numpy()
+        if "likelihood" in value_cols:
+            out[f"{bp}_p"] = wide[("likelihood", bp)].to_numpy()
+    return out.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+
 def smooth_pose_v2(
     pose_input,
     output_dir=None,
@@ -8776,6 +8824,22 @@ def smooth_pose_v2(
                     df_direct = pd.read_parquet(path)
                 except Exception:
                     df_direct = pd.read_csv(path, low_memory=False)
+            # Patch 122hw: a *raw* FreeDLC .fdlc.parquet (one that was never
+            # imported into a project) is in FreeDLC's native LONG/tidy layout
+            # — columns (frame, individual, bodypart, x, y, likelihood), one
+            # row per bodypart per frame — not the wide <bp>_x/_y/_p the marker
+            # check below expects. The 122ht flatten only helps the *imported*
+            # wide MultiIndex form; a long file has plain columns and no _x, so
+            # it would fall through and fail. Detect the long schema and pivot
+            # it to wide first. (The importer does the same via long_to_wide;
+            # this is the standalone read path that has no importer/project.)
+            if (
+                not isinstance(df_direct.columns, pd.MultiIndex)
+                and {"frame", "bodypart", "x", "y"}.issubset(
+                    set(df_direct.columns)
+                )
+            ):
+                df_direct = _pivot_fdlc_long_to_wide(df_direct)
             # Patch 122ht: the FreeDLC/SimBA importer writes sources/pose
             # parquets with a 3-level MultiIndex column header
             # (scorer/bodypart/coords = IMPORTED_POSE/IMPORTED_POSE/<bp>_x).
