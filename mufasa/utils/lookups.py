@@ -25,7 +25,7 @@ except:
 import matplotlib.font_manager
 import pandas as pd
 import psutil
-from matplotlib import cm
+from matplotlib import colormaps as mpl_colormaps
 from matplotlib.colors import hsv_to_rgb, rgb2hex
 from tabulate import tabulate
 
@@ -482,10 +482,17 @@ def create_color_palettes(no_animals: int, map_size: int) -> list[list[int]]:
     ]
 
     for colormap in range(no_animals):
-        if hasattr(cm, "cmap_d") and colormap in cm.cmap_d:
-            currColorMap = cm.get_cmap(cmaps[colormap], map_size)
-        else:
-            currColorMap = cm.get_cmap("spring", map_size)
+        # Patch 122hs: cm.get_cmap was removed in matplotlib 3.11; use
+        # matplotlib.colormaps[name].resampled(N). The name is looked up in
+        # the registry, falling back to "spring" when the requested colormap
+        # isn't available. (The old code tested an int index for membership in
+        # the colormap dict, which never matched — this restores the intended
+        # "use the requested map if it exists, else spring" behaviour by
+        # testing the actual name.)
+        name = cmaps[colormap]
+        if name not in mpl_colormaps:
+            name = "spring"
+        currColorMap = mpl_colormaps[name].resampled(map_size)
         currColorList = []
         for i in range(currColorMap.N):
             rgb = list(currColorMap(i)[:3])

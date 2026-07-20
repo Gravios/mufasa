@@ -19,6 +19,7 @@ import PIL
 import plotly.graph_objs as go
 import seaborn as sns
 from matplotlib import cm
+from matplotlib import colormaps as mpl_colormaps
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
@@ -153,7 +154,10 @@ class PlottingMixin:
         """
         if as_hex:
             as_rgb_ratio = True
-        cmap = cm.get_cmap(pallete_name, increments + 1)
+        # Patch 122hs: matplotlib removed cm.get_cmap (deprecated 3.7, gone in
+        # 3.11). matplotlib.colormaps[name].resampled(N) is the modern
+        # equivalent of the old get_cmap(name, N) and works across versions.
+        cmap = mpl_colormaps[pallete_name].resampled(increments + 1)
         color_lst = []
         for i in range(cmap.N):
             rgb = list(cmap(i)[:3])

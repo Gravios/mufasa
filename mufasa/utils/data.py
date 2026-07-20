@@ -327,7 +327,10 @@ def create_color_palettes(no_animals: int, map_size: int, cmaps: list[str] | Non
             "tab20c"
         ]
     for colormap in range(no_animals):
-        currColorMap = cm.get_cmap(cmaps[colormap], map_size)
+        # Patch 122hs: cm.get_cmap removed in matplotlib 3.11.
+        currColorMap = matplotlib.colormaps[
+            cmaps[colormap]
+        ].resampled(map_size)
         currColorList = []
         for i in range(currColorMap.N):
             rgb = list(currColorMap(i)[:3])
@@ -368,7 +371,8 @@ def create_color_palette(pallete_name: str,
     """
     if as_hex:
         as_rgb_ratio = True
-    cmap = cm.get_cmap(pallete_name, increments + 1)
+    # Patch 122hs: cm.get_cmap removed in matplotlib 3.11.
+    cmap = matplotlib.colormaps[pallete_name].resampled(increments + 1)
     color_lst = []
     for i in range(cmap.N):
         rgb = list(cmap(i)[:3])
