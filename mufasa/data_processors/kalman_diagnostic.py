@@ -270,6 +270,46 @@ def _load_csv_with_header_detection(csv_path: str) -> pd.DataFrame:
     return df_multi
 
 
+def _pivot_fdlc_long_to_wide(df_long: pd.DataFrame) -> pd.DataFrame:
+    """Pivot a raw FreeDLC long/tidy pose frame to wide <bp>_x/_y/_p columns.
+
+    Patch 122hx (canonical home; the smoother's loader carries an equivalent
+    from 122hw). FreeDLC's native ``.fdlc.parquet`` is long — columns
+    ``(frame, individual, bodypart, x, y, likelihood)``, one row per bodypart
+    per frame. Downstream marker detection expects wide per-marker columns, so
+    a raw file read here (never run through the importer) is pivoted first.
+    Layout-independent: every bodypart becomes ``<bp>_x/_y/_p``; the -1.0
+    no-detection sentinel is clipped to 0.0; the frame index is made
+    contiguous; a multi-animal file is rejected with an actionable message.
+    """
+    df = df_long.copy()
+    if "individual" in df.columns:
+        individuals = list(pd.unique(df["individual"]))
+        if len(individuals) > 1:
+            raise ValueError(
+                f"FreeDLC parquet contains {len(individuals)} individuals "
+                f"({individuals}); this single-animal reader expects one. "
+                f"Import it into a project for multi-animal handling."
+            )
+    value_cols = ["x", "y"]
+    if "likelihood" in df.columns:
+        df["likelihood"] = df["likelihood"].clip(lower=0.0)
+        value_cols.append("likelihood")
+    wide = df.pivot(
+        index="frame", columns="bodypart", values=value_cols,
+    ).sort_index()
+    full_idx = range(int(wide.index.min()), int(wide.index.max()) + 1)
+    wide = wide.reindex(full_idx)
+    out = pd.DataFrame(index=range(len(wide)))
+    for bp in wide["x"].columns:
+        out[f"{bp}_x"] = wide[("x", bp)].to_numpy()
+        out[f"{bp}_y"] = wide[("y", bp)].to_numpy()
+        if "likelihood" in value_cols:
+            out[f"{bp}_p"] = wide[("likelihood", bp)].to_numpy()
+    import numpy as _np
+    return out.replace([_np.inf, -_np.inf], _np.nan).fillna(0)
+
+
 def load_pose_file(path: str) -> tuple[pd.DataFrame, list[str]]:
     """Load a single pose file (CSV or parquet) into a flat-column
     DataFrame. Returns (df, list_of_markers).
@@ -282,6 +322,18 @@ def load_pose_file(path: str) -> tuple[pd.DataFrame, list[str]]:
     ext = Path(path).suffix.lower()
     if ext == ".parquet":
         df = pd.read_parquet(path)
+        # Patch 122hx: this is the shared fallback loader that pose_viewer and
+        # the smoother both delegate to, so the two non-flat FreeDLC parquet
+        # shapes are handled here once rather than in each caller.
+        #   * imported form (patch 122ht): a 3-level MultiIndex column header
+        #     (IMPORTED_POSE/IMPORTED_POSE/<bp>_x) — flatten to the last level,
+        #     which holds the flat <bp>_x/_y/_p names;
+        #   * raw FreeDLC form (patch 122hw): long/tidy
+        #     (frame, individual, bodypart, x, y, likelihood) — pivot to wide.
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [col[-1] for col in df.columns]
+        elif {"frame", "bodypart", "x", "y"}.issubset(set(df.columns)):
+            df = _pivot_fdlc_long_to_wide(df)
         df.columns = normalize_pose_columns(df.columns)
     elif ext in (".csv", ".tsv"):
         df = _load_csv_with_header_detection(path)
