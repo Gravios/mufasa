@@ -1060,6 +1060,43 @@ def layout_from_config(config_path, **flags) -> BodyLayout:
     )
 
 
+def layout_from_fdlc_sidecar(
+    pose_path,
+    root: str | None = None,
+    **flags,
+) -> BodyLayout | None:
+    """Build a :class:`BodyLayout` from a FreeDLC ``.fdlc.toml`` sidecar.
+
+    Patch 122hu. Lets the smoother run on a standalone FreeDLC parquet that
+    isn't inside a Mufasa project: FreeDLC writes the skeleton (bodyparts +
+    edges) into ``<stem>.fdlc.toml`` next to the parquet, so the kinematic
+    tree is available beside the file without a ``project.toml``. This reads
+    that sidecar and derives the same spanning-tree layout ``layout_from_config``
+    would from a project's ``[skeleton]``.
+
+    :param pose_path: the pose file; its sidecar is resolved by
+        :func:`~mufasa.pose_importers.fdlc_parquet_importer.read_fdlc_skeleton`
+        (handles both ``<stem>.fdlc.parquet`` and a bare parquet stem).
+    :param root: optional root marker for the spanning tree; defaults to the
+        skeleton's natural root.
+    :returns: a layout, or ``None`` when no readable sidecar with edges is
+        found (so the caller can fall back to other layout sources).
+    """
+    try:
+        from mufasa.pose_importers.fdlc_parquet_importer import (
+            read_fdlc_skeleton,
+        )
+    except Exception:
+        return None
+    sk = read_fdlc_skeleton(pose_path)
+    if not sk or not sk.get("edges"):
+        return None
+    segments = segments_from_skeleton(
+        sk["nodes"], sk["edges"], root=root,
+    )
+    return BodyLayout(segments=segments, **flags)
+
+
 @dataclass
 class FittedLengths:
     """Per-segment lengths and offsets fitted from observation
@@ -9356,6 +9393,7 @@ def main(argv=None) -> int:
     io = _import_io_helpers()
     argparse = io["argparse"]
     sys = io["sys"]
+    Path = io["Path"]
 
     parser = argparse.ArgumentParser(
         description=(
@@ -9379,6 +9417,16 @@ def main(argv=None) -> int:
         help=(
             "Output directory for smoothed parquets. Files "
             "are named <stem>_smoothed_v2.parquet."
+        ),
+    )
+    parser.add_argument(
+        "--beside-input", action="store_true",
+        help=(
+            "Write each smoothed file into the SAME folder as its input "
+            "instead of --output-dir. Lets you process a standalone pose "
+            "file in place, outside any project. Inputs are grouped by "
+            "their parent directory and each group's output lands in that "
+            "directory. Overrides --output-dir."
         ),
     )
     parser.add_argument(
@@ -9761,18 +9809,54 @@ def main(argv=None) -> int:
                 "from the project instead."
             )
     else:
-        print(
-            "[smoother-v2] WARNING: no project.toml found above the input "
-            "and no --config given. Falling back to the built-in rat rig "
-            "(nose, back1, ..., tailbase). This is only correct for legacy "
-            "projects that use those exact marker names."
-        )
-        layout = standard_rat_layout(
-            include_back4=not args.no_back4,
-            include_tail=not args.no_tail,
-            include_lateral=not args.no_lateral,
-            include_center=not args.no_center,
-        )
+        # Patch 122hu: before the built-in-rig fallback, try a FreeDLC
+        # skeleton sidecar (<stem>.fdlc.toml) next to the input. This is what
+        # makes "process a standalone parquet outside a project" work — the
+        # kinematic tree travels with the FreeDLC export, so a file dropped
+        # anywhere can be smoothed without a project.toml. Only attempted when
+        # every input resolves to a sidecar that agrees on the skeleton;
+        # otherwise fall through to the rig-fallback warning below.
+        fdlc_layout = None
+        sidecar_sources = set()
+        try:
+            per_input = [
+                layout_from_fdlc_sidecar(p) for p in args.pose_input
+            ]
+        except Exception as exc:
+            print(
+                f"[smoother-v2] WARNING: could not read a FreeDLC skeleton "
+                f"sidecar ({type(exc).__name__}: {exc}); continuing.",
+                file=sys.stderr,
+            )
+            per_input = []
+        if per_input and all(lay is not None for lay in per_input):
+            marker_sets = {
+                tuple(sorted(lay.marker_names)) for lay in per_input
+            }
+            if len(marker_sets) == 1:
+                fdlc_layout = per_input[0]
+                for p in args.pose_input:
+                    sidecar_sources.add(str(Path(p).name))
+        if fdlc_layout is not None:
+            layout = fdlc_layout
+            print(
+                f"[smoother-v2] Layout from FreeDLC skeleton sidecar "
+                f"({layout.n_markers} markers, "
+                f"{len(layout.segments)} segments) — no project needed."
+            )
+        else:
+            print(
+                "[smoother-v2] WARNING: no project.toml found above the input "
+                "and no --config given. Falling back to the built-in rat rig "
+                "(nose, back1, ..., tailbase). This is only correct for legacy "
+                "projects that use those exact marker names."
+            )
+            layout = standard_rat_layout(
+                include_back4=not args.no_back4,
+                include_tail=not args.no_tail,
+                include_lateral=not args.no_lateral,
+                include_center=not args.no_center,
+            )
     if args.with_drift:
         layout.with_drift = True
 
@@ -9890,38 +9974,60 @@ def main(argv=None) -> int:
             "--high-angular-noise-segments",
         )
 
-    try:
-        smooth_pose_v2(
-            pose_input=args.pose_input,
-            output_dir=args.output_dir,
-            layout=layout,
-            config_path=config,
-            fps=args.fps,
-            likelihood_threshold=args.likelihood_threshold,
-            em_max_iter=args.em_max_iter,
-            em_tol=args.em_tol,
-            save_model=args.save_model,
-            load_model=args.load_model,
-            apply_constraints=not args.no_constraints,
-            enable_validation=not args.no_validate,
-            enable_warm_start_sigma=not args.no_warm_start_sigma,
-            enable_joint_prior=args.joint_prior,
-            accel_tau=args.accel_tau,
-            enable_perspective=not args.no_perspective,
-            enable_strict_validation=args.strict_validation,
-            device=args.device,
-            n_workers=args.workers,
-            em_damping=args.em_damping,
-            em_aggregation=args.em_aggregation,
-            overwrite=args.overwrite,
-            verbose=args.verbose,
-        )
-    except Exception as e:
+    # Patch 122hu: --beside-input writes each smoothed file into its input's
+    # own directory. smooth_pose_v2 writes all outputs to one output_dir, so
+    # group the inputs by parent directory and run once per group with that
+    # directory as the output. Without the flag it's a single group -> a single
+    # call with --output-dir, exactly as before. A directory argument (rather
+    # than a file) resolves to itself as the parent, so "smooth this folder in
+    # place" also works.
+    if args.beside_input:
+        groups: dict[str, list[str]] = {}
+        for p in args.pose_input:
+            pp = Path(p)
+            parent = str(pp if pp.is_dir() else pp.parent)
+            groups.setdefault(parent, []).append(p)
+        batches = [(inputs, out_dir) for out_dir, inputs in groups.items()]
         print(
-            f"[smoother-v2] ERROR: {type(e).__name__}: {e}",
-            file=sys.stderr,
+            f"[smoother-v2] --beside-input: writing outputs into "
+            f"{len(batches)} input folder(s)."
         )
-        return 1
+    else:
+        batches = [(list(args.pose_input), args.output_dir)]
+
+    for batch_inputs, batch_output_dir in batches:
+        try:
+            smooth_pose_v2(
+                pose_input=batch_inputs,
+                output_dir=batch_output_dir,
+                layout=layout,
+                config_path=config,
+                fps=args.fps,
+                likelihood_threshold=args.likelihood_threshold,
+                em_max_iter=args.em_max_iter,
+                em_tol=args.em_tol,
+                save_model=args.save_model,
+                load_model=args.load_model,
+                apply_constraints=not args.no_constraints,
+                enable_validation=not args.no_validate,
+                enable_warm_start_sigma=not args.no_warm_start_sigma,
+                enable_joint_prior=args.joint_prior,
+                accel_tau=args.accel_tau,
+                enable_perspective=not args.no_perspective,
+                enable_strict_validation=args.strict_validation,
+                device=args.device,
+                n_workers=args.workers,
+                em_damping=args.em_damping,
+                em_aggregation=args.em_aggregation,
+                overwrite=args.overwrite,
+                verbose=args.verbose,
+            )
+        except Exception as e:
+            print(
+                f"[smoother-v2] ERROR: {type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            return 1
     return 0
 
 

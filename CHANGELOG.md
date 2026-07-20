@@ -8,6 +8,42 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hu — smooth a standalone pose file in place, outside a project.**
+Two CLI additions let the smoother process a parquet that isn't in a Mufasa
+project, with output beside the input:
+
+* ``layout_from_fdlc_sidecar(pose_path, root=None, **flags)`` builds a
+  BodyLayout from a FreeDLC ``<stem>.fdlc.toml`` skeleton sidecar
+  (read_fdlc_skeleton -> segments_from_skeleton -> BodyLayout), so the
+  kinematic tree travels with the FreeDLC export and no project.toml is needed.
+  main() tries this before the built-in-rig fallback when no project is found
+  above the input and no --config is given — but only when every input resolves
+  to a sidecar and they agree on the marker set; otherwise it falls through to
+  the existing rig-fallback warning.
+* ``--beside-input`` writes each smoothed file into its input's own directory
+  instead of --output-dir. Inputs are grouped by parent directory and the
+  smoother is run once per group with that directory as the output; a directory
+  argument resolves to itself. Without the flag it is a single group -> a
+  single --output-dir call, exactly as before.
+
+smoke_122hu_standalone_beside_input: 18/18 — layout_from_fdlc_sidecar (defined;
+builds a full spanning-tree layout from a sidecar; flags pass through; resolves
+from either the .parquet or .toml path; None when absent so main() can fall
+back); the CLI wiring by AST including a parsed check that the beside-branch
+really builds batches from the per-directory groups (not a collapsed single
+output); and the batching algorithm across single-file/multi-folder/directory/
+no-flag cases. Tripwires: sidecar helper -> None breaks the standalone layout;
+beside-branch collapsed to one output dir -> 17/18; main() not trying the
+sidecar -> 14/15 (pre-strengthening) / caught. Canonical rig 152/152. Both
+sweeps vs 5671eed: 204 smoke_122 + 73 others, no regressions. F821 = 7, I001 =
+1, ruff 22 (kalman), mufasa/**/*.py = 428.
+
+Note: this is the smoother step in place; extending --beside-input to the later
+pipeline stages (outlier, egocentric) is a follow-up. The sidecar read uses the
+importer's read_fdlc_skeleton (works where h5py is installed — the user's
+environment); the sandbox can't exercise that import, so the layout half is
+verified with a stubbed reader mirroring the real TOML parse.
+
 **122ht — smoother reads the imported MultiIndex pose parquet.**
 Fixes "Could not load .../sources/pose/<session>.parquet. Tried direct read and
 DLC multi-row header parsing." hit when adding sessions with smoothing. The
