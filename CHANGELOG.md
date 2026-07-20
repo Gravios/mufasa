@@ -8,6 +8,38 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122hz — record button in the overlay viewer.**
+Adds a Record button to pose_video_overlay: first press starts, second press
+stops, and the saved clip contains the composited overlay frames (video + pose
+markers, exactly as shown) for every frame displayed in between — whether
+advanced by play, the scrubber, or stepping.
+
+Because the overlay is Qt-composited (markers are QGraphicsItems over the video
+pixmap, not painted into the frame pixels), the clip is captured by rendering
+the QGraphicsScene to a QImage and converting to BGR for cv2.VideoWriter — not
+from the raw cv2 frame. Capture is hooked in _set_frame, the single path every
+displayed frame passes through, so any on-screen frame during recording is in
+the clip. A _ClipRecorder (Qt-free, takes plain BGR arrays) owns the writer:
+created lazily on the first frame so it sizes to the actual render, dimensions
+forced even for codec compatibility, later frames conformed to the locked size.
+The clip is saved beside the video by default (a Save-As dialog offers a
+different path); an in-progress recording is finalised on window close so the
+file isn't truncated. Degrades gracefully (status message) when cv2 is absent.
+
+smoke_122hz_overlay_record: 23/23 — the _ClipRecorder state machine (lazy
+writer, frame count, finish message, empty-recording failure, even-dimension
+lock, size conforming) and the QImage->BGR reshape (row-padding stripped,
+channels reversed, C-contiguous) run directly against a stubbed cv2 / simulated
+buffer; AST confirms the button, the toggle_record start/stop, the capture hook
+inside _set_frame after update_frame, the scene render, the close-finalisation,
+and the no-cv2 fallback. Tripwires: drop the capture hook -> 21/23; break the
+empty-recording check -> 22/23; break the even-dimension rounding -> 21/23.
+Both sweeps vs 5671eed: 209 smoke_122 + 73 others, no regressions. ruff 1
+(overlay — one better than the pre-existing baseline of 2, a nested-if collapse
+cleared it), F821 = 7, I001 = 1, mufasa/**/*.py = 429 (edits only, no new
+module). GUI feature; the Qt-free logic is tested directly, the rest AST-checked
+(PySide6/cv2 absent in the sandbox).
+
 **122hy — mufasa-preview: open the overlay viewer by paths or folder search.**
 Adds a mufasa-preview console command (new module mufasa/tools/pose_preview.py,
 entry point in pyproject.toml) that pairs a video with its pose files and opens
