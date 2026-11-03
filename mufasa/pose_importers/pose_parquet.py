@@ -216,6 +216,27 @@ def read_pose_skeleton(path: str | os.PathLike) -> dict | None:
     return read_embedded_skeleton(path) or read_fdlc_skeleton(path)
 
 
+def skeleton_edges_for(path: str | os.PathLike, markers) -> list[tuple[str, str]]:
+    """Edges of a pose file's own skeleton between the given markers.
+
+    Patch 122ie. Used where a pose file sets up a project (create /
+    reconfigure): an edge naming a marker the project won't have can't be
+    drawn or fitted, so it's dropped. ``[]`` when the file has no skeleton
+    or isn't a parquet.
+    """
+    if not os.fspath(path).lower().endswith(".parquet"):
+        return []
+    try:
+        sk = read_pose_skeleton(path)
+    except Exception:
+        return []
+    known = set(markers)
+    return [
+        (a, b) for a, b in (sk or {}).get("edges", [])
+        if a in known and b in known
+    ]
+
+
 def resolve_skeleton(paths, *, config=None) -> dict | None:
     """Find the skeleton that applies to a set of pose/video paths.
 
@@ -562,7 +583,8 @@ __all__ = [
     "FDLC_SUFFIX", "FDLC_SKELETON_SUFFIX", "POSE_METADATA_KEY",
     "LONG_COLUMNS", "LONG_REQUIRED_COLUMNS",
     "read_fdlc_skeleton", "read_pose_metadata", "read_embedded_skeleton",
-    "read_pose_skeleton", "resolve_skeleton", "is_long_pose_parquet", "find_long_pose_parquets",
+    "read_pose_skeleton", "resolve_skeleton", "skeleton_edges_for",
+    "is_long_pose_parquet", "find_long_pose_parquets",
     "pose_parquet_video_name", "pose_parquet_bodyparts",
     "read_run_sidecar", "run_sidecar_video", "run_sidecar_video_stem",
     "pose_metadata_payload", "write_parquet_with_pose_metadata",

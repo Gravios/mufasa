@@ -3,7 +3,8 @@ mufasa.ui_qt.reconfigure_dialog
 ===============================
 
 Qt dialog for the "Reconfigure project from DLC file…" menu action.
-Pick a DLC output file (.h5 / .csv), preview the detected body parts,
+Pick a pose file (FreeDLC/DeepLabCut .parquet, or DLC .h5 / .csv),
+preview the detected body parts,
 confirm the reconfigure. All on-disk edits are atomic with respect to
 the user's choice: nothing is written until the user clicks Apply.
 
@@ -60,9 +61,9 @@ class ReconfigureProjectDialog(QDialog):
 
         # ------------------ Widgets ---------------------------------- #
         hint = QLabel(
-            "Pick a DLC output file (<code>.h5</code> or <code>.csv</code>) "
-            "from your project. Body-part names will be read from the "
-            "file in DLC's column order, and this Mufasa project will "
+            "Pick a pose file (<code>.parquet</code>, <code>.h5</code> or "
+            "<code>.csv</code>). Body-part names will be read from the "
+            "file in its own order, and this Mufasa project will "
             "be switched to <code>user_defined</code> with those body "
             "parts.<br><br>"
             "Both <code>project.toml</code> and "
@@ -75,7 +76,7 @@ class ReconfigureProjectDialog(QDialog):
         self._dlc_edit = QLineEdit()
         self._dlc_edit.setReadOnly(True)
         self._dlc_edit.setPlaceholderText(
-            "Select a .h5 or .csv file from your DLC output"
+            "Select a .parquet, .h5 or .csv pose file"
         )
         browse = QPushButton("Browse…")
         browse.clicked.connect(self._pick_file)
@@ -122,8 +123,8 @@ class ReconfigureProjectDialog(QDialog):
     # ------------------ Slots ---------------------------------------- #
     def _pick_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Pick a DLC output file", "",
-            "DLC output (*.h5 *.csv *.parquet);;All files (*)",
+            self, "Pick a pose file", "",
+            "Pose files (*.parquet *.h5 *.csv);;All files (*)",
         )
         if not path:
             return

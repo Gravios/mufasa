@@ -132,26 +132,17 @@ POSE_IMPORT_ROUTES: dict = {
         accepts_p_threshold=True,
         source_hint="Directory containing DLC .csv files",
     ),
-    # Patch 122ib: DeepLabCut's long-format parquet export (<video>.parquet,
-    # skeleton embedded in the file) uses the same importer as FreeDLC — the
-    # importer recognises the layout by schema, so either entry reads either
-    # producer's files. Listed separately so DLC users find it by name.
-    "DLC parquet (single animal)": dict(
-        backend=_lazy("mufasa.pose_importers.fdlc_parquet_importer",
-                      "FDLCParquetImporter"),
-        kwargs_map={"source_path": "data_folder"},
-        requires_animal_ids=False,
-        accepts_p_threshold=True,
-        source_hint="Folder of DeepLabCut pose parquet: <video>.parquet "
-                    "files, or run folders (pose.parquet + run .toml)",
-    ),
+    # Patch 122ie: one entry for FreeDLC (the modified DeepLabCut) parquet.
+    # Files are recognised by their long-format schema, not by name: run
+    # folders (pose.parquet + run .toml) or loose pose parquet files.
     "FreeDLC parquet (single animal)": dict(
         backend=_lazy("mufasa.pose_importers.fdlc_parquet_importer",
                       "FDLCParquetImporter"),
         kwargs_map={"source_path": "data_folder"},
         requires_animal_ids=False,
         accepts_p_threshold=True,
-        source_hint="Directory containing *.fdlc.parquet files",
+        source_hint="Folder of FreeDLC runs (pose.parquet + run .toml) "
+                    "or of pose parquet files",
     ),
     "DLC H5 (multi-animal / maDLC)": dict(
         backend=_lazy("mufasa.pose_importers.madlc_importer",

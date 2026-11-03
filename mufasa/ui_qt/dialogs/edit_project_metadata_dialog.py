@@ -237,8 +237,9 @@ class EditProjectMetadataDialog(QDialog):
             QMessageBox.warning(
                 self, "Could not parse body parts",
                 f"Couldn't extract body-part names from {Path(path).name}. "
-                "If this is a raw DLC h5/csv file the multi-index header "
-                "may be missing or in an unexpected format. Try a "
+                "Pose parquet needs a bodypart column or <marker>_x "
+                "columns; a raw DLC h5/csv needs its multi-index header. "
+                "Try a "
                 "different file, or enter the body parts manually.",
             )
             return

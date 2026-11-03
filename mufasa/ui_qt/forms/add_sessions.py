@@ -95,7 +95,7 @@ class AddSessionsForm(QWidget):
     def _pick_file(self) -> None:
         p, _ = QFileDialog.getOpenFileName(
             self, "Select a pose file", "",
-            "Pose data (*.fdlc.parquet *.parquet *.csv *.h5);;All files (*)",
+            "Pose data (*.parquet *.csv *.h5);;All files (*)",
         )
         if p:
             self.source.setText(p)

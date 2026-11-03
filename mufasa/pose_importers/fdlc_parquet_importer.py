@@ -7,12 +7,13 @@ Parquet format written by the modified DeepLabCut (FreeDLC) export:
 
     frame | individual | bodypart | x | y | likelihood
 
-one row per (frame, individual, bodypart). FreeDLC names the files
-``<video_stem>.fdlc.parquet`` (skeleton in a ``.fdlc.toml`` sidecar); the
-modified DeepLabCut exporter names them ``<video_stem>.parquet`` with the
-skeleton embedded in the parquet metadata (patch 122ib). Both are imported
-here; see :mod:`mufasa.pose_importers.pose_parquet` for the shared format
-helpers.
+one row per (frame, individual, bodypart). Files are recognised by that
+schema, not by their name (patch 122ie). FreeDLC writes one ``pose.parquet``
+per analysis run with a run ``.toml`` beside it recording the video, and the
+skeleton embedded in the parquet metadata; the video is taken from the run
+record, else from the file name. Older ``<video>.fdlc.parquet`` files with a
+``.fdlc.toml`` sidecar are still read. See
+:mod:`mufasa.pose_importers.pose_parquet` for the shared format helpers.
 
 This mirrors :class:`mufasa.pose_importers.dlc_h5_importer.DLCSingleAnimalH5Importer`
 — same project alignment, likelihood masking, multi-index output,
@@ -65,7 +66,7 @@ from mufasa.mixins.pose_importer_mixin import (
 # for existing callers.
 from mufasa.pose_importers.pose_parquet import (
     FDLC_SKELETON_SUFFIX,  # noqa: F401  (re-export)
-    FDLC_SUFFIX,
+    FDLC_SUFFIX,  # noqa: F401  (re-export)
     find_long_pose_parquets,
     is_long_pose_parquet,
     pose_parquet_video_name,
@@ -88,15 +89,15 @@ from mufasa.utils.read_write import find_all_videos_in_project, write_df
 class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
     """Import single-animal long-format pose parquet into a Mufasa project.
 
-    Patch 122ib: accepts both producers of the long layout — FreeDLC
-    ``<video>.fdlc.parquet`` and DeepLabCut ``<video>.parquet``. Files are
-    recognised by their schema (``frame``/``bodypart``/``x``/``y`` columns),
-    not their name, so wide pose files or unrelated parquets in the same
-    folder are ignored.
+    Files are recognised by their schema (``frame``/``bodypart``/``x``/``y``
+    columns), not their name (patch 122ib/122ie): FreeDLC run folders
+    (``pose.parquet`` + run ``.toml``), loose pose parquet files, and legacy
+    ``*.fdlc.parquet`` alike. Wide pose files or unrelated parquets in the
+    same folder are ignored.
 
     :param Union[str, os.PathLike] config_path: Path to project ``project.toml``.
-    :param Union[str, os.PathLike] data_folder: Directory of long-format pose
-        parquet files (``*.fdlc.parquet`` or ``<video>.parquet``).
+    :param Union[str, os.PathLike] data_folder: Folder of long-format pose
+        parquet files, or of FreeDLC run folders.
     :param Optional[list] file_paths: Import exactly these files (each must be
         a long-format pose parquet) instead of every one in ``data_folder``.
     :param Optional[Dict[str, str]] interpolation_settings: ``{'type', 'method'}``.
@@ -181,9 +182,9 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
         if not self.input_data_paths:
             raise BodypartColumnNotFoundError(
                 msg=(
-                    f"No long-format pose parquet files (*{FDLC_SUFFIX}, "
-                    f"<video>.parquet, or run folders holding pose.parquet + "
-                    f"a run .toml) found in {self.data_folder}"
+                    f"No long-format pose parquet (frame/bodypart/x/y "
+                    f"columns) found in {self.data_folder} or in run folders "
+                    f"directly below it (pose.parquet + run .toml)"
                 ),
                 source=self.__class__.__name__,
             )
@@ -209,15 +210,13 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
     # ------------------------------------------------------------------ #
     @staticmethod
     def _find_fdlc_files(directory: str | os.PathLike) -> list:
-        """Long-format pose parquets in ``directory`` (patch 122ib: by
-        schema, so DeepLabCut ``<video>.parquet`` is found as well as
-        FreeDLC ``<video>.fdlc.parquet``)."""
+        """Long-format pose parquets in ``directory`` and its run folders
+        (by schema, whatever the file is called)."""
         return find_long_pose_parquets(directory)
 
     @staticmethod
     def _video_name(path: str) -> str:
-        """Recover the video stem: ``mouse01.fdlc.parquet`` and
-        ``mouse01.parquet`` both join to ``mouse01.mp4``."""
+        """Video stem: from the run record, else the file name."""
         return pose_parquet_video_name(path)
 
     @staticmethod
@@ -293,7 +292,7 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
         Patch 122ib: resolved per file by
         :func:`~mufasa.pose_importers.pose_parquet.read_pose_skeleton` — the
         skeleton embedded in the parquet (DeepLabCut) first, then the
-        ``<stem>.fdlc.toml`` sidecar (FreeDLC).
+        legacy ``<stem>.fdlc.toml`` sidecar.
 
         The skeleton is taken **as provided** — nodes and
         edges are written verbatim, not filtered against the project

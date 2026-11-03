@@ -7,8 +7,8 @@ saves typing the long, hash-tagged pose paths by hand. Two ways to use it:
   files::
 
       mufasa-preview --video rec.mp4 \\
-          --smoothed rec.fdlc_smoothed_v2.<hash>.parquet \\
-          --raw rec.fdlc.parquet
+          --smoothed rec_smoothed_v2.<hash>.parquet \\
+          --raw run/pose.parquet
 
   If only ``--video`` is given, its folder is scanned and any pose files that
   share the video's stem are picked up automatically.
@@ -19,8 +19,10 @@ saves typing the long, hash-tagged pose paths by hand. Two ways to use it:
       mufasa-preview --folder .
 
 The pairing reduces a video and its pose files to a common *session stem*, so
-``rec.mp4`` matches ``rec.fdlc.parquet`` (raw FreeDLC) and
-``rec.fdlc_smoothed_v2.<hash>.parquet`` (smoothed, parameter-hash tagged) alike.
+``rec.mp4`` matches a FreeDLC run's ``pose.parquet`` (via the video its run
+``.toml`` records), ``rec.parquet``, and ``rec_smoothed_v2.<hash>.parquet``
+(smoothed, parameter-hash tagged) alike. Legacy ``rec.fdlc.parquet`` names
+still pair.
 When several smoothed files share a stem (different parameter hashes), the most
 recent is used.
 

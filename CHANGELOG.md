@@ -8,6 +8,26 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ie — FreeDLC parquet without `.fdlc` naming; pose-file autodetect says parquet.**
+FreeDLC (the modified DeepLabCut) now writes `pose.parquet` per run + a run
+`.toml`, skeleton embedded — not `<video>.fdlc.parquet` + `.fdlc.toml`.
+Nothing requires the old naming any more (it is still read, as legacy):
+* one parquet import route ("FreeDLC parquet (single animal)"; 122ib's
+  separate "DLC parquet" entry folded back), hint describes run folders;
+* Add-sessions file filter and ingest suffix list drop `*.fdlc.parquet`
+  (any long parquet is accepted by schema); importer/preview docs and the
+  "nothing found" message describe the run-folder layout.
+* Create-project "Auto-detect from pose file…" (renamed from "…DLC file"):
+  dialog lists `Pose files (*.parquet *.h5 *.csv)` with parquet first; the
+  skeleton filter is the shared `pose_parquet.skeleton_edges_for`.
+* File -> Reconfigure: its text and placeholder still said ".h5 or .csv";
+  now parquet too, filter `Pose files (*.parquet *.h5 *.csv)`. (Its apply step
+  is the legacy INI-only `project_reconfigure` — unchanged, pre-existing.)
+* Edit-metadata autodetect error text mentions parquet.
+smoke_122ie_freedlc_no_fdlc_names: 12/12, driving the real create-form and
+reconfigure buttons (dialogs stubbed, Qt offscreen) with a run's pose.parquet,
+with and without embedded metadata. smoke_122dj route count back to 12.
+
 **122id — pair a run's pose.parquet with its video through the run sidecar.**
 The DeepLabCut exporter writes a fixed-name `pose.parquet` per analysis run
 with a run TOML beside it (named after the video): `kind = "analyze"`,

@@ -11,7 +11,8 @@ modal expose:
 * project parent directory (Browse…)
 * project name
 * body-part preset (dropdown from pose_config_names.csv) OR
-  auto-detect body parts from a DLC output file
+  auto-detect body parts (and skeleton) from a pose file — FreeDLC /
+  DeepLabCut parquet, or DLC .h5 / .csv
 * animal count (auto-populated from no_animals.csv; editable
   unless autodetect is active, in which case forced to 1)
 * classifier names (optional; one per line)
@@ -106,7 +107,7 @@ class ProjectCreateForm(QWidget):
         # not supported by the legacy parser).
         self._autodetected_bps: list[str] = []
         # Patch 122ib: skeleton edges carried by the picked file (embedded
-        # in a DeepLabCut parquet, or a FreeDLC .fdlc.toml sidecar). Written
+        # in the pose parquet's metadata). Written
         # to the new project's [skeleton] on create.
         self._autodetected_skeleton: list[tuple[str, str]] = []
 
@@ -146,7 +147,7 @@ class ProjectCreateForm(QWidget):
         self._autodetect_label.setStyleSheet(
             "color: palette(placeholder-text);",
         )
-        autodetect_btn = QPushButton("Auto-detect from DLC file…", self)
+        autodetect_btn = QPushButton("Auto-detect from pose file…", self)
         autodetect_btn.clicked.connect(self._autodetect_from_dlc)
         clear_btn = QPushButton("Clear", self)
         clear_btn.clicked.connect(self._clear_autodetect)
@@ -228,8 +229,9 @@ class ProjectCreateForm(QWidget):
         the parsed body parts.
         """
         path, _ = QFileDialog.getOpenFileName(
-            self, "Pick a DLC output file", "",
-            "DLC output (*.h5 *.csv *.parquet);;All files (*)",
+            self, "Pick a pose file (FreeDLC/DeepLabCut parquet, .h5, .csv)",
+            "",
+            "Pose files (*.parquet *.h5 *.csv);;All files (*)",
         )
         if not path:
             return
@@ -265,25 +267,10 @@ class ProjectCreateForm(QWidget):
 
     @staticmethod
     def _skeleton_of(path: str, bps: list[str]) -> list[tuple[str, str]]:
-        """Skeleton edges carried by a picked pose file (patch 122ib).
-
-        Only edges between the file's own markers are kept — a skeleton that
-        names a marker the project won't have can't be drawn or fitted. A
-        file without a skeleton gives ``[]`` (nodes-only project, as before).
-        """
-        if not str(path).lower().endswith(".parquet"):
-            return []
-        try:
-            from mufasa.pose_importers.pose_parquet import read_pose_skeleton
-            sk = read_pose_skeleton(path)
-        except Exception:
-            return []
-        if not sk:
-            return []
-        known = set(bps)
-        return [
-            (a, b) for a, b in sk.get("edges", []) if a in known and b in known
-        ]
+        """Skeleton edges carried by a picked pose file (patch 122ib) —
+        only those between its own markers; ``[]`` when it has none."""
+        from mufasa.pose_importers.pose_parquet import skeleton_edges_for
+        return skeleton_edges_for(path, bps)
 
     def _clear_autodetect(self) -> None:
         self._autodetected_bps = []

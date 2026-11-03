@@ -32,7 +32,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-_POSE_SUFFIXES = (".fdlc.parquet", ".parquet", ".csv", ".h5")
+_POSE_SUFFIXES = (".parquet", ".csv", ".h5")
 
 
 def _candidate_files(source: str | os.PathLike) -> list[str]:
@@ -183,10 +183,10 @@ def ingest_sessions(
     # the original sessions.
     from mufasa.pose_importers.pose_parquet import is_long_pose_parquet
 
-    # Patch 122ib: route by *format*, not by the ``.fdlc.parquet`` suffix. A
-    # DeepLabCut ``<video>.parquet`` is long-format too and must go through
-    # the importer — the old suffix test copied it in untouched as if it were
-    # already Mufasa's wide layout. Each folder's importer is also handed the
+    # Patch 122ib: route by *format*, not by a file-name suffix. A long-format
+    # pose parquet (whatever it's called) must go through the importer — the
+    # old ``.fdlc.parquet`` suffix test copied anything else in untouched as
+    # if it were already Mufasa's wide layout. Each folder's importer is also handed the
     # exact accepted files, so a rejected file sitting in the same folder is
     # no longer imported along with them; and long + wide files in one batch
     # are both handled instead of the wide ones being dropped.
