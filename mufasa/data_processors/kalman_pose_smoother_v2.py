@@ -260,6 +260,14 @@ class BodyLayout:
     # trunk. A single global factor can't serve both, so this raises the cap
     # for the named segments only. Empty (default) preserves prior behaviour.
     high_angular_noise_segments: list[str] = field(default_factory=list)
+    # Patch 122ig: M-step ceiling for the ROOT process noise (q_root_pos,
+    # q_root_ori), as a multiple of their initial estimates. All whole-body
+    # motion runs through the root's constant-velocity model, so on bursty
+    # data EM asks for more than the default 10x and pins there from the
+    # first few iterations. Raising it lets EM fit that; the absolute hard
+    # caps (_M_STEP_Q_ROOT_POS_HARD_CAP / _ORI_HARD_CAP) still apply.
+    # Default 10.0 = prior behaviour.
+    root_q_ceiling_factor: float = 10.0
 
     def __post_init__(self) -> None:
         # Validate exactly one root
@@ -317,6 +325,12 @@ class BodyLayout:
                     f"const_accel_segments"
                 )
             seen_ca.add(sname)
+
+        if not (float(self.root_q_ceiling_factor) >= 1.0):
+            raise ValueError(
+                f"root_q_ceiling_factor must be >= 1, got "
+                f"{self.root_q_ceiling_factor!r}"
+            )
 
         # Patch 122hj: validate high_angular_noise_segments
         for sname in self.high_angular_noise_segments:
@@ -1305,6 +1319,48 @@ def _root_cluster_body_axis(
     # occluded are NaN and simply do not contribute to any marker's median.
     return axis
 
+
+
+def _root_axis_per_frame(
+    positions: np.ndarray,
+    likelihoods: np.ndarray,
+    layout: BodyLayout,
+    name_to_idx: dict,
+    likelihood_threshold: float,
+) -> np.ndarray | None:
+    """Per-frame (T, 2) unit body axis of the ROOT segment, or None.
+
+    Patch 122ig. The same axis the root-cluster offsets are fitted in
+    (:func:`_root_cluster_body_axis`, widest chord of the trunk markers), so
+    the root's initial orientation and its orientation-noise estimate are
+    expressed in the frame the forward model actually uses. Falls back to the
+    built-in rig's ``back3 -> back1`` direction only when the root cluster has
+    fewer than three markers and those two exist.
+    """
+    root = layout.root_segment
+    cluster_idx = [name_to_idx[m] for m in root.markers if m in name_to_idx]
+    if len(cluster_idx) >= 3:
+        axis = _root_cluster_body_axis(
+            positions, likelihoods, cluster_idx, likelihood_threshold,
+            anchor_idx=name_to_idx.get(
+                _segment_distal_marker(layout, root.name)),
+        )
+        if axis is not None:
+            return axis
+    if "back1" in name_to_idx and "back3" in name_to_idx:
+        i1, i3 = name_to_idx["back1"], name_to_idx["back3"]
+        d = positions[:, i1, :] - positions[:, i3, :]
+        ok = (
+            (likelihoods[:, i1] >= likelihood_threshold)
+            & (likelihoods[:, i3] >= likelihood_threshold)
+            & np.all(np.isfinite(d), axis=1)
+        )
+        n = np.linalg.norm(d, axis=1, keepdims=True)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            axis = d / n
+        axis[~ok | (n[:, 0] < 1e-6)] = np.nan
+        return axis
+    return None
 
 def fit_body_lengths(
     positions: np.ndarray,
@@ -2941,19 +2997,19 @@ def initial_state_from_data(
         state[indices["__root__"]["x"]] = root_pos[0]
         state[indices["__root__"]["y"]] = root_pos[1]
 
-    # Root orientation: align with body direction (back3 → back1
-    # if available, otherwise default to identity).
+    # Root orientation: the root's own body axis at t0 (patch 122ig — was
+    # the built-in rig's back3 -> back1 only, so every other rig started at
+    # identity, up to 180 deg off the frame its root offsets are fitted in).
     root_cos = 1.0
     root_sin = 0.0
-    if "back1" in name_to_idx and "back3" in name_to_idx:
-        front = positions[t0, name_to_idx["back1"], :]
-        rear = positions[t0, name_to_idx["back3"], :]
-        if np.all(np.isfinite(front)) and np.all(np.isfinite(rear)):
-            d = front - rear
-            n = np.linalg.norm(d)
-            if n > 1e-6:
-                root_cos = float(d[0] / n)
-                root_sin = float(d[1] / n)
+    _axis = _root_axis_per_frame(
+        positions, likelihoods, layout, name_to_idx, likelihood_threshold,
+    )
+    if _axis is not None:
+        _ok = np.where(np.all(np.isfinite(_axis), axis=1))[0]
+        if len(_ok):
+            _t = _ok[np.argmin(np.abs(_ok - t0))]
+            root_cos, root_sin = float(_axis[_t, 0]), float(_axis[_t, 1])
     state[indices["__root__"]["cos"]] = root_cos
     state[indices["__root__"]["sin"]] = root_sin
 
@@ -5130,6 +5186,13 @@ def per_session_fit_from_stats(
     return fit
 
 
+def _root_q_ceiling_factor(layout: BodyLayout) -> float:
+    """M-step ceiling factor for q_root_pos / q_root_ori (patch 122ig):
+    ``layout.root_q_ceiling_factor``, default 10x = _M_STEP_Q_CEILING_FACTOR."""
+    return float(getattr(layout, "root_q_ceiling_factor",
+                         _M_STEP_Q_CEILING_FACTOR))
+
+
 def _seg_ori_ceiling_factor(layout: BodyLayout, seg_name: str) -> float:
     """Orientation-noise M-step ceiling factor for a segment (patch 122hj).
 
@@ -5235,7 +5298,7 @@ def finalize_m_step_v2(
         initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
     )
     q_root_pos_ceiling = min(
-        initial_params.q_root_pos * _M_STEP_Q_CEILING_FACTOR,
+        initial_params.q_root_pos * _root_q_ceiling_factor(layout),
         # Patch 121c: absolute cap regardless of initial scale
         _M_STEP_Q_ROOT_POS_HARD_CAP,
     )
@@ -5251,7 +5314,7 @@ def finalize_m_step_v2(
         initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
     )
     q_root_ori_ceiling = min(
-        initial_params.q_root_ori * _M_STEP_Q_CEILING_FACTOR,
+        initial_params.q_root_ori * _root_q_ceiling_factor(layout),
         # Patch 121c: absolute cap regardless of initial scale
         _M_STEP_Q_ROOT_ORI_HARD_CAP,
     )
@@ -5625,7 +5688,7 @@ def finalize_m_step_v2_from_per_session(
         initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
     )
     q_root_pos_ceiling = min(
-        initial_params.q_root_pos * _M_STEP_Q_CEILING_FACTOR,
+        initial_params.q_root_pos * _root_q_ceiling_factor(layout),
         # Patch 121c: absolute cap regardless of initial scale
         _M_STEP_Q_ROOT_POS_HARD_CAP,
     )
@@ -5645,7 +5708,7 @@ def finalize_m_step_v2_from_per_session(
         initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
     )
     q_root_ori_ceiling = min(
-        initial_params.q_root_ori * _M_STEP_Q_CEILING_FACTOR,
+        initial_params.q_root_ori * _root_q_ceiling_factor(layout),
         # Patch 121c: absolute cap regardless of initial scale
         _M_STEP_Q_ROOT_ORI_HARD_CAP,
     )
@@ -5935,46 +5998,29 @@ def fit_initial_params_v2(
     # Body orientation proxy: angle of (back1 - back3) per
     # frame. Use unwrapped angle for variance computation.
     q_root_ori = _INIT_DEFAULT_Q_ROOT_ORI
-    if (
-        "back1" in name_to_idx and "back3" in name_to_idx
-    ):
-        i1 = name_to_idx["back1"]
-        i3 = name_to_idx["back3"]
-        p1 = likelihoods[:, i1]
-        p3 = likelihoods[:, i3]
-        x1 = positions[:, i1, 0]
-        y1 = positions[:, i1, 1]
-        x3 = positions[:, i3, 0]
-        y3 = positions[:, i3, 1]
-        mask = (
-            (p1 >= likelihood_threshold) & (p3 >= likelihood_threshold)
-            & np.isfinite(x1) & np.isfinite(y1)
-            & np.isfinite(x3) & np.isfinite(y3)
-        )
-        if mask.sum() >= 50:
-            dx = x1[mask] - x3[mask]
-            dy = y1[mask] - y3[mask]
-            theta = np.arctan2(dy, dx)
-            theta_unwrapped = np.unwrap(theta)
-            # Window-variance of orientation. Convert angular
-            # variance per second² to ambient (cos, sin)
-            # acceleration variance using small-angle
-            # approximation: d/dt(cos) ≈ -sin * ω, so for
-            # tracking purposes the ambient q ≈ angular q.
-            n_w = len(theta_unwrapped) // window_frames
+    # Patch 122ig: estimated from the root's own body axis for any rig. It
+    # used the built-in rig's back1/back3 by name, so every other rig kept the
+    # default 1.0 — and the M-step ceiling is 10x the initial value, so the
+    # fitted q_root_ori pinned at 10 from the third EM iteration on.
+    _axis = _root_axis_per_frame(
+        positions, likelihoods, layout, name_to_idx, likelihood_threshold,
+    )
+    if _axis is not None:
+        _ok = np.all(np.isfinite(_axis), axis=1)
+        if _ok.sum() >= 50:
+            theta = np.full(T, np.nan)
+            theta[_ok] = np.unwrap(np.arctan2(_axis[_ok, 1], _axis[_ok, 0]))
+            # Window-variance of orientation (small-angle: ambient (cos,
+            # sin) q ~ angular q). Windows need most of their frames.
+            n_w = T // window_frames
             wv: list[float] = []
             for w in range(n_w):
-                start = w * window_frames
-                end = start + window_frames
-                if end > len(theta_unwrapped):
-                    break
-                wv.append(np.var(theta_unwrapped[start:end]))
+                seg = theta[w * window_frames:(w + 1) * window_frames]
+                seg = seg[np.isfinite(seg)]
+                if len(seg) >= max(5, window_frames // 2):
+                    wv.append(float(np.var(seg)))
             if len(wv) >= 3:
-                mean_var = float(np.mean(wv))
-                # Constraint variance ≈ obs noise on θ from
-                # σ_root / d_root3-to-1. Small if back markers
-                # are several pixels apart.
-                q_est = 12.0 * mean_var / (T_w ** 3)
+                q_est = 12.0 * float(np.mean(wv)) / (T_w ** 3)
                 q_root_ori = max(q_est, _FLOOR_Q_ROOT_ORI)
 
     # ---------- q_seg_ori, q_length ----------
@@ -9879,6 +9925,17 @@ def main(argv=None) -> int:
             "fast head: 'head'."
         ),
     )
+    parser.add_argument(
+        "--root-q-ceiling", type=float, default=10.0,
+        help=(
+            "M-step ceiling for the root (whole-body) position and "
+            "orientation process noise, as a multiple of their initial "
+            "estimates (default 10). All body motion runs through the "
+            "root's constant-velocity model, so on fast, bursty movement EM "
+            "pins at 10x within a few iterations; e.g. 50 lets it fit that. "
+            "The absolute safety caps still apply."
+        ),
+    )
     args = parser.parse_args(argv)
 
     # Patch 122hv: a loaded model already carries its own layout (the fitted
@@ -9901,6 +9958,7 @@ def main(argv=None) -> int:
                 ("--const-accel-segments", bool(args.const_accel_segments)),
                 ("--high-angular-noise-segments",
                  bool(args.high_angular_noise_segments)),
+                ("--root-q-ceiling", args.root_q_ceiling != 10.0),
                 ("--no-back4", args.no_back4), ("--no-tail", args.no_tail),
                 ("--no-lateral", args.no_lateral),
                 ("--no-center", args.no_center),
@@ -10131,6 +10189,16 @@ def main(argv=None) -> int:
                 "high_angular_noise_segments",
                 "--high-angular-noise-segments",
             )
+        # Patch 122ig: root process-noise ceiling.
+        if args.root_q_ceiling != 10.0:
+            try:
+                layout = _dc_ms.replace(
+                    layout, root_q_ceiling_factor=float(args.root_q_ceiling),
+                )
+            except ValueError as exc:
+                print(f"[smoother-v2] ERROR: --root-q-ceiling: {exc}",
+                      file=sys.stderr)
+                return 1
 
     # Patch 122hu: --beside-input writes each smoothed file into its input's
     # own directory. smooth_pose_v2 writes all outputs to one output_dir, so

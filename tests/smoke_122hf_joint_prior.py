@@ -227,7 +227,7 @@ def make(T=1800, seed=3, tail_swing=0.18, other_swing=None):
     return pos, np.ones((T, len(names))), names
 
 
-def evaluate(tail_swing, other_swing=None):
+def evaluate(tail_swing, other_swing=None, only=None):
     pos, lik, names = make(tail_swing=tail_swing, other_swing=other_swing)
     fl = fit_body_lengths(pos, lik, layout, names, 0.7, dt=1 / 30)
     p0 = fit_initial_params_v2(pos, lik, layout, names, fl, 30.0,
@@ -255,7 +255,14 @@ def evaluate(tail_swing, other_swing=None):
         e = np.angle(np.exp(1j * (t - th_ref)))
         return math.degrees(np.sqrt(np.mean(e ** 2)))
 
-    return jp, rmse(None), rmse(jp)
+    pr = jp
+    if only is not None:
+        # Keep only the named segments' priors (others zeroed -> inert).
+        pr = JointPriorV2(mu=dict(jp.mu),
+                          kappa={k: (v if k in only else 0.0)
+                                 for k, v in jp.kappa.items()},
+                          n_obs=dict(jp.n_obs))
+    return jp, rmse(None), rmse(pr)
 
 
 jp_t, off_t, on_t = evaluate(tail_swing=0.18)
@@ -278,8 +285,19 @@ check(f"trailing tail: prior-off is genuinely bad ({off_t:.0f} deg RMSE), "
 jp_u, off_u, on_u = evaluate(tail_swing=1.4)
 check("near-uniform tail: tail_3 fits kappa below the floor -> inert",
       jp_u.kappa["tail_3"] == 0.0)
-check("near-uniform tail: the tail_3 dropout is UNCHANGED (no help, no harm)",
-      abs(on_u - off_u) < 2.0)
+# The property under test is that tail_3's OWN prior is inert. Compare with
+# tail_3's prior alone (every other kappa zeroed): it must change nothing.
+# (Comparing the full prior set used to pass at <2 deg only because both runs
+# sat at chance, ~105 deg. Since 122ig the root orientation noise starts from
+# the data (q_root_ori ~9 here, not the 1.0 default), and the ACTIVE back_rear
+# and neck priors now nudge the unobservable 20 s tail_3 random walk onto a
+# different path — 57 vs 114 deg, both chance-level for a free 20 s walk:
+# hold-last scores ~104, circular mean ~109.)
+_, off_u3, on_u3 = evaluate(tail_swing=1.4, only={"tail_3"})
+check("near-uniform tail: tail_3's own inert prior leaves its dropout UNCHANGED",
+      abs(on_u3 - off_u3) < 1e-6)
+check("near-uniform tail: no prior run pushes the dropout far past chance",
+      max(on_u, off_u) < 130.0)
 check("...while a genuinely tight joint elsewhere stays active",
       jp_u.kappa["head"] >= _JOINT_PRIOR_KAPPA_FLOOR)
 

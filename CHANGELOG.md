@@ -8,6 +8,37 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ig — root orientation from the trunk; root-noise ceiling as a setting.**
+* Bug: the root's initial orientation and the initial q_root_ori estimate read
+  the legacy rig's `back1`/`back3` by name. Any other rig started at identity
+  (up to 180° off the frame its root offsets are fitted in) with q_root_ori at
+  the default 1.0 — and the M-step ceiling is 10× the initial value, so the
+  fitted q_root_ori pinned at exactly 10 (seen in every strohA run). Both now
+  come from the root cluster's own body axis (`_root_axis_per_frame`, the same
+  widest-chord axis the root offsets use); back1/back3 only as fallback.
+* All whole-body motion runs through the root's constant-velocity model, so on
+  bursty movement EM pins q_root_pos / q_root_ori at the 10× ceiling within a
+  few iterations. New `BodyLayout.root_q_ceiling_factor` (default 10 = prior
+  behaviour), `--root-q-ceiling`, and "Root noise ceiling" in the Kalman v2
+  form; absolute hard caps unchanged.
+Measured on 6,000 frames of the user's strohA-xw session (drift on, back,head
+orientation drift, head high-angular, joint prior, threshold 0.5, 15 EM
+iterations): 10× -> median offset 2.36 px, worst marker 6.7 px; 50× -> 2.09 px,
+6.7 px, q_root_pos at the 50,000 hard cap, no instability. EM still does not
+converge (q_root_ori keeps rising) — a model mismatch with bursty motion, not
+fixed here.
+smoke_122ig_root_axis_and_ceiling: 19/19 (real functions, real median M-step,
+form offscreen). Tripwires: identity start, default q_root_ori, ceiling
+ignoring the layout, hard cap removed, GUI default changed — each fails.
+Canonical rig 152/152.
+smoke_122hf_joint_prior: the near-uniform-tail check compared the full prior
+set on vs off and passed at <2° only because both runs sat at chance (~105°).
+With q_root_ori now data-estimated (~9 vs 1.0 in that rig) the ACTIVE
+back_rear/neck priors steer the unobservable 20 s tail_3 walk onto another
+chance-level path (57° vs 114°; hold-last scores 104°, circular mean 109°). The
+check now tests what it meant — tail_3's own inert prior alone changes nothing
+(bit-identical) — plus a sanity bound (<130°). 43/43.
+
 **122if — remove sessions via the Data Import table.**
 The "Already imported" table (Data Import -> Import video) gains a "Pose data"
 column (the imported pose file(s) with the video's stem), multi-row selection,

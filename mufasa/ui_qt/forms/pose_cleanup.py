@@ -1403,6 +1403,23 @@ class KalmanV2SmoothingForm(OperationForm):
         ext_form.addRow(
             "High-angular-noise segments:", self.high_angular,
         )
+        # Patch 122ig: root (whole-body) process-noise ceiling. On fast,
+        # bursty movement EM pins the root noise at the default 10x within a
+        # few iterations; raising it lets the fit follow darts and turns.
+        self.root_q_ceiling = QDoubleSpinBox(self)
+        self.root_q_ceiling.setRange(1.0, 1000.0)
+        self.root_q_ceiling.setDecimals(0)
+        self.root_q_ceiling.setSingleStep(10.0)
+        self.root_q_ceiling.setValue(10.0)
+        self.root_q_ceiling.setSuffix("×")
+        self.root_q_ceiling.setToolTip(
+            "Upper limit EM may raise the whole-body position/orientation "
+            "noise to, as a multiple of its initial estimate. Default 10x; "
+            "try ~50x when the root noise pins at its ceiling (log: "
+            "q_root_pos / q_root_ori stop changing). Absolute safety caps "
+            "still apply."
+        )
+        ext_form.addRow("Root noise ceiling:", self.root_q_ceiling)
         # Patch 122hk: von Mises joint prior (patch 122hf). Constrains each
         # segment's angle to its parent, bounding covariance during long
         # marker dropouts so unobserved segments (tail tip, rear back) are
@@ -1701,6 +1718,7 @@ class KalmanV2SmoothingForm(OperationForm):
                 ),
                 "high_angular_noise_segments":
                     _parse_csv(self.high_angular.text()),
+                "root_q_ceiling": float(self.root_q_ceiling.value()),
                 "enable_joint_prior":
                     bool(self.joint_prior.isChecked()),
                 "overwrite": bool(self.overwrite.isChecked()),
@@ -1816,6 +1834,11 @@ class KalmanV2SmoothingForm(OperationForm):
             if kwargs.get("high_angular_noise_segments"):
                 replacements["high_angular_noise_segments"] = (
                     kwargs["high_angular_noise_segments"]
+                )
+            # Patch 122ig: root process-noise ceiling (default 10x).
+            if float(kwargs.get("root_q_ceiling", 10.0)) != 10.0:
+                replacements["root_q_ceiling_factor"] = float(
+                    kwargs["root_q_ceiling"]
                 )
             # Patch 122ho: validate the segment-name fields against this
             # project's actual skeleton BEFORE _dc.replace hits the layout's
