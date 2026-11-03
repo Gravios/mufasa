@@ -123,7 +123,7 @@ class ReconfigureProjectDialog(QDialog):
     def _pick_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Pick a DLC output file", "",
-            "DLC output (*.h5 *.csv);;All files (*)",
+            "DLC output (*.h5 *.csv *.parquet);;All files (*)",
         )
         if not path:
             return

@@ -105,6 +105,10 @@ class ProjectCreateForm(QWidget):
         # animal_count is pinned to 1 (multi-animal autodetect is
         # not supported by the legacy parser).
         self._autodetected_bps: list[str] = []
+        # Patch 122ib: skeleton edges carried by the picked file (embedded
+        # in a DeepLabCut parquet, or a FreeDLC .fdlc.toml sidecar). Written
+        # to the new project's [skeleton] on create.
+        self._autodetected_skeleton: list[tuple[str, str]] = []
 
         self._build_shell()
 
@@ -225,7 +229,7 @@ class ProjectCreateForm(QWidget):
         """
         path, _ = QFileDialog.getOpenFileName(
             self, "Pick a DLC output file", "",
-            "DLC output (*.h5 *.csv);;All files (*)",
+            "DLC output (*.h5 *.csv *.parquet);;All files (*)",
         )
         if not path:
             return
@@ -248,15 +252,42 @@ class ProjectCreateForm(QWidget):
             return
 
         self._autodetected_bps = bps
+        self._autodetected_skeleton = self._skeleton_of(path, bps)
+        n_edges = len(self._autodetected_skeleton)
         self._autodetect_label.setText(
-            f"{len(bps)} body-parts from {Path(path).name}",
+            f"{len(bps)} body-parts"
+            + (f", {n_edges} skeleton edges" if n_edges else "")
+            + f" from {Path(path).name}",
         )
         self._preset_combo.setEnabled(False)
         self._animal_count.setValue(1)
         self._animal_count.setEnabled(False)
 
+    @staticmethod
+    def _skeleton_of(path: str, bps: list[str]) -> list[tuple[str, str]]:
+        """Skeleton edges carried by a picked pose file (patch 122ib).
+
+        Only edges between the file's own markers are kept — a skeleton that
+        names a marker the project won't have can't be drawn or fitted. A
+        file without a skeleton gives ``[]`` (nodes-only project, as before).
+        """
+        if not str(path).lower().endswith(".parquet"):
+            return []
+        try:
+            from mufasa.pose_importers.pose_parquet import read_pose_skeleton
+            sk = read_pose_skeleton(path)
+        except Exception:
+            return []
+        if not sk:
+            return []
+        known = set(bps)
+        return [
+            (a, b) for a, b in sk.get("edges", []) if a in known and b in known
+        ]
+
     def _clear_autodetect(self) -> None:
         self._autodetected_bps = []
+        self._autodetected_skeleton = []
         self._autodetect_label.setText("—")
         self._preset_combo.setEnabled(True)
         self._animal_count.setEnabled(True)
@@ -356,6 +387,24 @@ class ProjectCreateForm(QWidget):
                 f"{type(exc).__name__}: {exc}",
             )
             return None
+
+        if self._autodetected_bps and self._autodetected_skeleton:
+            # Patch 122ib: the detected skeleton becomes the project's
+            # [skeleton], from which the smoother derives its kinematic tree
+            # and the viewers draw their lines.
+            try:
+                from mufasa.project_layout import write_skeleton
+                write_skeleton(
+                    creator.config_path,
+                    nodes=list(self._autodetected_bps),
+                    edges=list(self._autodetected_skeleton),
+                )
+            except Exception as exc:
+                QMessageBox.warning(
+                    self, "Skeleton not saved",
+                    "The project was created, but its skeleton could not be "
+                    f"written: {type(exc).__name__}: {exc}",
+                )
 
         self.project_created.emit(creator.config_path)
         return creator.config_path

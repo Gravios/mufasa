@@ -22,10 +22,8 @@ Functional checks run in-sandbox (project_layout imports cleanly;
 read_fdlc_skeleton is exec'd from source since the module needs heavy deps).
 """
 import ast
-import os
 import sys
 import tempfile
-import tomllib
 import warnings
 from pathlib import Path
 
@@ -47,14 +45,11 @@ def check(label, cond, *, detail=""):
 
 
 def _load_reader(src):
-    tree = ast.parse(src)
-    ns = {"os": os, "warnings": warnings, "tomllib": tomllib}
-    for n in tree.body:
-        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "").startswith("FDLC"):
-            exec(compile(ast.Module([n], []), "<c>", "exec"), ns)
-        if isinstance(n, ast.FunctionDef) and n.name == "read_fdlc_skeleton":
-            exec(compile(ast.Module([n], []), "<f>", "exec"), ns)
-    return ns["read_fdlc_skeleton"]
+    """Patch 122ib: read_fdlc_skeleton moved to the dependency-light
+    mufasa.pose_importers.pose_parquet (the importer re-exports it), so the
+    real function is imported instead of exec'd out of the importer source."""
+    from mufasa.pose_importers.pose_parquet import read_fdlc_skeleton
+    return read_fdlc_skeleton
 
 
 def main():

@@ -7,8 +7,12 @@ Parquet format written by the modified DeepLabCut (FreeDLC) export:
 
     frame | individual | bodypart | x | y | likelihood
 
-one row per (frame, individual, bodypart). Files are named
-``<video_stem>.fdlc.parquet``.
+one row per (frame, individual, bodypart). FreeDLC names the files
+``<video_stem>.fdlc.parquet`` (skeleton in a ``.fdlc.toml`` sidecar); the
+modified DeepLabCut exporter names them ``<video_stem>.parquet`` with the
+skeleton embedded in the parquet metadata (patch 122ib). Both are imported
+here; see :mod:`mufasa.pose_importers.pose_parquet` for the shared format
+helpers.
 
 This mirrors :class:`mufasa.pose_importers.dlc_h5_importer.DLCSingleAnimalH5Importer`
 — same project alignment, likelihood masking, multi-index output,
@@ -41,8 +45,6 @@ from __future__ import annotations
 __author__ = "Gravio"
 
 import os
-import tomllib
-import warnings
 from typing import Any
 
 import numpy as np
@@ -55,6 +57,22 @@ from mufasa.mixins.pose_importer_mixin import (
     PoseImporterMixin,
     validate_pose_markers,
 )
+
+# Patch 122ib: the long-format helpers (sidecar reader, embedded-metadata
+# reader, format detection) live in the dependency-light pose_parquet module so
+# the smoother and viewers can use them without this module's h5py/cv2 chain.
+# FDLC_SUFFIX / FDLC_SKELETON_SUFFIX / read_fdlc_skeleton are re-exported here
+# for existing callers.
+from mufasa.pose_importers.pose_parquet import (
+    FDLC_SKELETON_SUFFIX,  # noqa: F401  (re-export)
+    FDLC_SUFFIX,
+    find_long_pose_parquets,
+    is_long_pose_parquet,
+    pose_parquet_video_name,
+    read_fdlc_skeleton,  # noqa: F401  (re-export)
+    read_pose_skeleton,
+)
+from mufasa.pose_importers.pose_parquet import LONG_COLUMNS as _LONG_COLUMNS
 from mufasa.utils.checks import (
     check_file_exist_and_readable,
     check_if_dir_exists,
@@ -64,99 +82,23 @@ from mufasa.utils.checks import (
 )
 from mufasa.utils.errors import BodypartColumnNotFoundError
 from mufasa.utils.printing import SimbaTimer, stdout_success
-from mufasa.utils.read_write import find_all_videos_in_project, get_fn_ext, write_df
-
-FDLC_SUFFIX = ".fdlc.parquet"
-FDLC_SKELETON_SUFFIX = ".fdlc.toml"
-_LONG_COLUMNS = ("frame", "individual", "bodypart", "x", "y", "likelihood")
-
-
-def read_fdlc_skeleton(path: str | os.PathLike) -> dict | None:
-    """Read a FreeDLC skeleton sidecar and return its nodes and edges.
-
-    FreeDLC writes ``<stem>.fdlc.toml`` next to ``<stem>.fdlc.parquet`` in
-    the same folder. This resolves the sidecar from either path and parses
-    it, tolerantly:
-
-    * nodes come from top-level ``bodyparts`` (FreeDLC's key); ``nodes`` or
-      a ``[skeleton]`` table's ``nodes`` are also accepted;
-    * edges come from the top-level ``skeleton`` list (FreeDLC's key); a
-      ``[skeleton]`` table's ``edges`` or a top-level ``edges`` also work;
-    * edges may be **name** pairs (``[["nose", "headmid"], ...]``) or
-      integer **index** pairs (``[[0, 1], ...]``, mapped through nodes);
-    * unknown keys are ignored.
-
-    :returns: ``{'nodes': [...], 'edges': [(a, b), ...], 'source': <path>}``
-        with edges normalised to name pairs, or ``None`` when the sidecar is
-        absent or unparseable (a warning is emitted on parse failure). This
-        graceful ``None`` keeps pose import working for files that predate
-        the sidecar (nodes-only behaviour).
-    """
-    p = os.fspath(path)
-    low = p.lower()
-    if low.endswith(FDLC_SUFFIX):
-        toml_path = p[: -len(FDLC_SUFFIX)] + FDLC_SKELETON_SUFFIX
-    elif low.endswith(FDLC_SKELETON_SUFFIX):
-        toml_path = p
-    else:
-        toml_path = os.path.splitext(p)[0] + FDLC_SKELETON_SUFFIX
-    if not os.path.isfile(toml_path):
-        return None
-    try:
-        with open(toml_path, "rb") as f:
-            data = tomllib.load(f)
-    except (tomllib.TOMLDecodeError, OSError) as exc:
-        warnings.warn(
-            f"Could not parse FreeDLC skeleton {toml_path}: {exc}", stacklevel=2
-        )
-        return None
-
-    # Nodes: FreeDLC writes top-level `bodyparts`. Also accept a `nodes`
-    # key or a [skeleton] table's `nodes` (tolerant).
-    sk = data.get("skeleton")
-    table = sk if isinstance(sk, dict) else {}
-    nodes_src = (
-        data.get("bodyparts")
-        or table.get("nodes")
-        or data.get("nodes")
-        or []
-    )
-    nodes = [str(n) for n in nodes_src if str(n)]
-
-    # Edges: FreeDLC writes a top-level `skeleton` list of pairs. Also
-    # accept a [skeleton] table's `edges` or a top-level `edges` (tolerant).
-    if isinstance(sk, list):
-        raw_edges = sk
-    elif isinstance(table.get("edges"), list):
-        raw_edges = table["edges"]
-    elif isinstance(data.get("edges"), list):
-        raw_edges = data["edges"]
-    else:
-        raw_edges = []
-
-    edges: list[tuple[str, str]] = []
-    for e in raw_edges:
-        if not isinstance(e, (list, tuple)) or len(e) < 2:
-            continue
-        a, b = e[0], e[1]
-        if isinstance(a, int) and isinstance(b, int) and not isinstance(a, bool):
-            if nodes and 0 <= a < len(nodes) and 0 <= b < len(nodes):
-                edges.append((nodes[a], nodes[b]))
-            # index pair with no/short node list is unmappable -> skip
-        else:
-            edges.append((str(a), str(b)))
-    if not nodes and not edges:
-        return None
-    return {"nodes": nodes, "edges": edges, "source": toml_path}
-
+from mufasa.utils.read_write import find_all_videos_in_project, write_df
 
 
 class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
-    """Import single-animal FreeDLC ``*.fdlc.parquet`` pose data into a
-    Mufasa project.
+    """Import single-animal long-format pose parquet into a Mufasa project.
+
+    Patch 122ib: accepts both producers of the long layout — FreeDLC
+    ``<video>.fdlc.parquet`` and DeepLabCut ``<video>.parquet``. Files are
+    recognised by their schema (``frame``/``bodypart``/``x``/``y`` columns),
+    not their name, so wide pose files or unrelated parquets in the same
+    folder are ignored.
 
     :param Union[str, os.PathLike] config_path: Path to project ``project.toml``.
-    :param Union[str, os.PathLike] data_folder: Directory of ``*.fdlc.parquet`` files.
+    :param Union[str, os.PathLike] data_folder: Directory of long-format pose
+        parquet files (``*.fdlc.parquet`` or ``<video>.parquet``).
+    :param Optional[list] file_paths: Import exactly these files (each must be
+        a long-format pose parquet) instead of every one in ``data_folder``.
     :param Optional[Dict[str, str]] interpolation_settings: ``{'type', 'method'}``.
     :param Optional[Dict[str, Any]] smoothing_settings: ``{'time_window', 'method'}``.
     :param float p_threshold: Confidence below which (x, y) is masked. Default 0.0.
@@ -169,6 +111,7 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
         interpolation_settings: dict[str, str] | None = None,
         smoothing_settings: dict[str, Any] | None = None,
         p_threshold: float = 0.0,
+        file_paths: list | None = None,
     ) -> None:
         check_file_exist_and_readable(file_path=config_path)
         check_if_dir_exists(in_dir=data_folder)
@@ -217,35 +160,49 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
         self.video_paths = find_all_videos_in_project(
             videos_dir=self.video_dir, raise_error=False,
         )
-        self.input_data_paths = self._find_fdlc_files(self.data_folder)
+        if file_paths is not None:
+            # Patch 122ib: an explicit list (session ingest) imports exactly
+            # the accepted files — not every pose file that happens to share
+            # their folder.
+            self.input_data_paths = [os.fspath(f) for f in file_paths]
+            not_long = [
+                f for f in self.input_data_paths if not is_long_pose_parquet(f)
+            ]
+            if not_long:
+                raise BodypartColumnNotFoundError(
+                    msg=(
+                        "Not long-format pose parquet (needs frame/bodypart/x/y "
+                        f"columns): {[os.path.basename(f) for f in not_long]}"
+                    ),
+                    source=self.__class__.__name__,
+                )
+        else:
+            self.input_data_paths = self._find_fdlc_files(self.data_folder)
         if not self.input_data_paths:
             raise BodypartColumnNotFoundError(
-                msg=f"No {FDLC_SUFFIX} files found in {self.data_folder}",
+                msg=(
+                    f"No long-format pose parquet files (*{FDLC_SUFFIX} or "
+                    f"<video>.parquet) found in {self.data_folder}"
+                ),
                 source=self.__class__.__name__,
             )
-        print(f"Importing {len(self.input_data_paths)} FreeDLC parquet file(s)...")
+        print(f"Importing {len(self.input_data_paths)} pose parquet file(s)...")
 
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
     @staticmethod
     def _find_fdlc_files(directory: str | os.PathLike) -> list:
-        out = []
-        for name in sorted(os.listdir(directory)):
-            if name.startswith("."):
-                continue
-            if name.lower().endswith(FDLC_SUFFIX):
-                out.append(os.path.join(directory, name))
-        return out
+        """Long-format pose parquets in ``directory`` (patch 122ib: by
+        schema, so DeepLabCut ``<video>.parquet`` is found as well as
+        FreeDLC ``<video>.fdlc.parquet``)."""
+        return find_long_pose_parquets(directory)
 
     @staticmethod
     def _video_name(path: str) -> str:
-        """Strip ``.fdlc`` (and the ``.parquet`` ext) to recover the video
-        stem, so ``mouse01.fdlc.parquet`` joins to ``mouse01.mp4``."""
-        stem = get_fn_ext(filepath=path)[1]
-        if stem.lower().endswith(".fdlc"):
-            stem = stem[: -len(".fdlc")]
-        return stem
+        """Recover the video stem: ``mouse01.fdlc.parquet`` and
+        ``mouse01.parquet`` both join to ``mouse01.mp4``."""
+        return pose_parquet_video_name(path)
 
     @staticmethod
     def long_to_wide(
@@ -314,10 +271,15 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
     # Public API
     # ------------------------------------------------------------------ #
     def _import_skeleton(self) -> None:
-        """Discover a FreeDLC skeleton sidecar next to the parquet files and
-        persist it project-wide to ``project.toml``.
+        """Discover the skeleton of the imported files and persist it
+        project-wide to ``project.toml``.
 
-        The skeleton is taken **as provided in the sidecar** — nodes and
+        Patch 122ib: resolved per file by
+        :func:`~mufasa.pose_importers.pose_parquet.read_pose_skeleton` — the
+        skeleton embedded in the parquet (DeepLabCut) first, then the
+        ``<stem>.fdlc.toml`` sidecar (FreeDLC).
+
+        The skeleton is taken **as provided** — nodes and
         edges are written verbatim, not filtered against the project
         body-parts. The first sidecar carrying a skeleton wins (all sessions
         share one rig). Any edge names that are not among the nodes /
@@ -327,7 +289,7 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
         backward-compatible with pre-sidecar files).
         """
         for path in self.input_data_paths:
-            sk = read_fdlc_skeleton(path)
+            sk = read_pose_skeleton(path)
             if sk is None:
                 continue
             nodes = sk["nodes"] or list(self.body_parts_lst)
@@ -341,7 +303,7 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
             if unknown:
                 print(
                     f"Skeleton: note — {len(unknown)} edge name(s) are not "
-                    f"among the body-parts and won't render until the FreeDLC "
+                    f"among the body-parts and won't render until the "
                     f"skeleton is renamed to match: {unknown}. Importing all "
                     f"{len(edges)} edges as provided."
                 )
@@ -352,7 +314,7 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
             return
 
     def run(self) -> None:
-        """Import every ``*.fdlc.parquet`` found in ``self.data_folder``."""
+        """Import every long-format pose parquet selected at construction."""
         self._import_skeleton()
         import_log_rows = []
         mask_totals: dict[str, dict[str, int]] = {}
@@ -438,7 +400,7 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
 
         self.timer.stop_timer()
         stdout_success(
-            msg=f"All FreeDLC parquet data files imported to {self.input_csv_dir} directory",
+            msg=f"All pose parquet data files imported to {self.input_csv_dir} directory",
             elapsed_time=self.timer.elapsed_time_str,
         )
 

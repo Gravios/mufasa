@@ -176,20 +176,34 @@ def ingest_sessions(
     # Import through the project's own importer so alignment, likelihood
     # handling and the skeleton sidecar are treated exactly as they were for
     # the original sessions.
-    from mufasa.pose_importers.fdlc_parquet_importer import FDLCParquetImporter
+    from mufasa.pose_importers.pose_parquet import is_long_pose_parquet
 
-    fdlc = [f for f in report["accepted"] if f.lower().endswith(".fdlc.parquet")]
-    if fdlc:
-        staging = {os.path.dirname(f) for f in fdlc}
-        for folder in sorted(staging):
+    # Patch 122ib: route by *format*, not by the ``.fdlc.parquet`` suffix. A
+    # DeepLabCut ``<video>.parquet`` is long-format too and must go through
+    # the importer — the old suffix test copied it in untouched as if it were
+    # already Mufasa's wide layout. Each folder's importer is also handed the
+    # exact accepted files, so a rejected file sitting in the same folder is
+    # no longer imported along with them; and long + wide files in one batch
+    # are both handled instead of the wide ones being dropped.
+    long_files = [f for f in report["accepted"] if is_long_pose_parquet(f)]
+    wide_files = [f for f in report["accepted"] if f not in long_files]
+    if long_files:
+        from mufasa.pose_importers.fdlc_parquet_importer import (
+            FDLCParquetImporter,
+        )
+        by_folder: dict[str, list[str]] = {}
+        for f in long_files:
+            by_folder.setdefault(os.path.dirname(os.path.abspath(f)), []).append(f)
+        for folder in sorted(by_folder):
             FDLCParquetImporter(
                 config_path=os.fspath(config_path), data_folder=folder,
+                file_paths=by_folder[folder],
             ).run()
-        summary["imported"].extend(fdlc)
-    else:
+        summary["imported"].extend(long_files)
+    if wide_files:
         # Already in Mufasa's wide layout — copy into the project untouched.
         import shutil
-        for f in report["accepted"]:
+        for f in wide_files:
             dest = os.path.join(input_dir, os.path.basename(f))
             shutil.copy2(f, dest)
             summary["imported"].append(dest)
@@ -206,8 +220,11 @@ def ingest_sessions(
         )
         return summary
 
+    from mufasa.pose_importers.pose_parquet import pose_parquet_video_name
+
     stems = [
-        os.path.splitext(os.path.basename(f))[0].replace(".fdlc", "")
+        pose_parquet_video_name(f) if f.lower().endswith(".parquet")
+        else os.path.splitext(os.path.basename(f))[0]
         for f in summary["imported"]
     ]
     ft = str(

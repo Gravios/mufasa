@@ -8,6 +8,44 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ib — DeepLabCut long-format parquet with an embedded skeleton.**
+The modified DeepLabCut exporter writes the same long table as FreeDLC
+(frame | individual | bodypart | x | y | likelihood) but names it
+`<video>.parquet` and carries the skeleton inside the file: parquet key/value
+metadata `b"pose"` = JSON `{"version", "bodyparts", "skeleton"}` (DLC's own
+config.yaml keys; edges as name or index pairs). New dependency-light module
+`mufasa/pose_importers/pose_parquet.py` is the shared layer: schema-based
+detection (`is_long_pose_parquet`, non-recursive `find_long_pose_parquets`),
+`read_pose_skeleton` (embedded first, then the FreeDLC `.fdlc.toml` sidecar),
+`pose_parquet_bodyparts`, `embed_pose_metadata` + a CLI
+(`python -m mufasa.pose_importers.pose_parquet FILE... --skeleton-from
+project.toml|config.yaml|x.fdlc.toml|x.parquet`) to stamp existing files.
+`read_fdlc_skeleton` moved here (re-exported by the importer) so the smoother
+and viewers no longer drag in the importer's h5py chain.
+
+* Import: FDLCParquetImporter finds long parquets by schema, so `<video>.parquet`
+  is picked up beside `*.fdlc.parquet` while wide/smoothed/unrelated parquets
+  are ignored; the video stem works for both names; the embedded skeleton is
+  written to project.toml [skeleton]; new `file_paths=` imports exactly the
+  given files. "DLC parquet (single animal)" added to the pose-import list.
+* Project creation: "Auto-detect from DLC file" accepts .parquet
+  (`extract_bodyparts_from_parquet`), keeps the file's skeleton (edges between
+  its own markers) and writes it to the new project's [skeleton].
+* Add sessions: long parquet routed by format, not by the `.fdlc.parquet`
+  suffix — a `<video>.parquet` used to be copied in raw as if already wide.
+  The importer now receives the accepted files only, so a rejected file in the
+  same folder is no longer imported with them (that aborted the whole ingest).
+
+smoke_122ib_dlc_parquet: 37/37, run for real (pyarrow, the importer, the create
+form offscreen, session ingest). Tripwires: suffix-only discovery, embedded
+skeleton ignored, suffix-based ingest routing, whole-folder ingest import,
+form not writing the skeleton, parquet missing from autodetect — each fails the
+suite. Real data: the user's 108,030-frame × 15-marker export, with the
+project's 24-edge skeleton embedded (0.3 s, data byte-identical), imports to a
+108,030 × 45 wide file and a 24-edge project [skeleton]. Test harnesses of
+smoke_122gm / smoke_122gn now take `_LONG_COLUMNS` / `read_fdlc_skeleton` from
+the new module. mufasa/**/*.py 429 -> 430 (smoke_122d5 ceiling bumped).
+
 **122ia — scale pose coordinates for reduced-resolution video.**
 Pose estimated on a downscaled video (e.g. *_reduced_negate.mp4) is in
 reduced-resolution coordinates; overlaid on the full-res video the markers

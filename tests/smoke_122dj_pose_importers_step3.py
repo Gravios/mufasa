@@ -78,13 +78,15 @@ def main() -> int:
     src = pose_form.read_text()
     tree = ast.parse(src)
 
-    # 1. Route count = 12 (11 through step 3 + FreeDLC parquet, patch 122gm)
+    # 1. Route count = 13 (11 through step 3 + FreeDLC parquet, patch 122gm,
+    #    + DLC parquet, patch 122ib)
     labels = re.findall(r'^    "([^"]+)":\s*dict\(',
                          src, re.MULTILINE)
     check(
-        f"POSE_IMPORT_ROUTES has 12 entries "
-        f"(11 through step 3 + FreeDLC parquet; got {len(labels)})",
-        len(labels) == 12,
+        f"POSE_IMPORT_ROUTES has 13 entries "
+        f"(11 through step 3 + FreeDLC parquet + DLC parquet; "
+        f"got {len(labels)})",
+        len(labels) == 13,
     )
 
     # Find the POSE_IMPORT_ROUTES dict

@@ -51,6 +51,10 @@ def _load_pure(src):
             super().__init__(msg)
 
     ns["BodypartColumnNotFoundError"] = BodypartColumnNotFoundError
+    # Patch 122ib: _LONG_COLUMNS is now imported from the dependency-light
+    # pose_parquet module rather than defined here; seed it the same way.
+    from mufasa.pose_importers.pose_parquet import LONG_COLUMNS
+    ns["_LONG_COLUMNS"] = LONG_COLUMNS
     for n in tree.body:
         if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", None) == "_LONG_COLUMNS":
             exec(compile(ast.Module([n], []), "<c>", "exec"), ns)

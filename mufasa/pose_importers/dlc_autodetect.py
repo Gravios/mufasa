@@ -2,7 +2,7 @@
 mufasa.pose_importers.dlc_autodetect
 ====================================
 
-Body-part auto-detection from DeepLabCut output files (.h5 or .csv).
+Body-part auto-detection from DeepLabCut output files (.h5, .csv or .parquet).
 
 Purpose: Mufasa's built-in body-part presets cap at 9 per single animal,
 and many DLC projects either exceed that count or use bodypart names
@@ -139,9 +139,34 @@ def extract_bodyparts_from_csv(csv_path: str | os.PathLike) -> list[str]:
     return bps
 
 
+def extract_bodyparts_from_parquet(parquet_path: str | os.PathLike) -> list[str]:
+    """Read body-part names from a pose parquet (patch 122ib).
+
+    Long-format DeepLabCut / FreeDLC parquet: the embedded ``bodyparts``
+    metadata if present, else the ``bodypart`` column in first-seen order.
+    A wide pose parquet is read from its ``<bp>_x`` columns.
+    """
+    from mufasa.pose_importers.pose_parquet import pose_parquet_bodyparts
+
+    p = Path(parquet_path)
+    try:
+        bps = pose_parquet_bodyparts(p)
+    except Exception as exc:
+        raise DLCAutodetectError(
+            f"Could not read parquet file {p.name}: {type(exc).__name__}: "
+            f"{exc}"
+        ) from exc
+    if not bps:
+        raise DLCAutodetectError(
+            f"{p.name}: no body-parts found (expected a 'bodypart' column "
+            f"or <bodypart>_x columns)."
+        )
+    return bps
+
+
 def extract_bodyparts(dlc_path: str | os.PathLike) -> list[str]:
     """Extract body-part names from a DLC output file, dispatching on
-    extension. Supported: ``.h5``, ``.csv``.
+    extension. Supported: ``.h5``, ``.csv``, ``.parquet``.
     """
     p = Path(dlc_path)
     ext = p.suffix.lower()
@@ -149,10 +174,12 @@ def extract_bodyparts(dlc_path: str | os.PathLike) -> list[str]:
         return extract_bodyparts_from_h5(p)
     elif ext == ".csv":
         return extract_bodyparts_from_csv(p)
+    elif ext == ".parquet":
+        return extract_bodyparts_from_parquet(p)
     else:
         raise DLCAutodetectError(
-            f"{p.name}: unsupported extension {ext!r}. Expected .h5 "
-            f"or .csv."
+            f"{p.name}: unsupported extension {ext!r}. Expected .h5, "
+            f".csv or .parquet."
         )
 
 
@@ -161,4 +188,5 @@ __all__ = [
     "extract_bodyparts",
     "extract_bodyparts_from_h5",
     "extract_bodyparts_from_csv",
+    "extract_bodyparts_from_parquet",
 ]

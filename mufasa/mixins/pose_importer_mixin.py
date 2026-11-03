@@ -46,16 +46,11 @@ def markers_from_pose_file(path: str | os.PathLike) -> list[str]:
     p = os.fspath(path)
     low = p.lower()
     if low.endswith(".parquet"):
-        import pyarrow.compute as pc
-        import pyarrow.parquet as pq
-        pf = pq.ParquetFile(p)
-        if "bodypart" in pf.schema_arrow.names:
-            col = pq.read_table(p, columns=["bodypart"]).column("bodypart")
-            return [str(v) for v in pc.unique(col).to_pylist()]
-        try:
-            cols = next(pf.iter_batches(batch_size=1)).to_pandas().columns
-        except StopIteration:
-            cols = pd.Index(pf.schema_arrow.names)
+        # Patch 122ib: one parquet reader for every caller — it prefers the
+        # embedded ``bodyparts`` of a DeepLabCut long parquet (footer only),
+        # then the ``bodypart`` column, then the wide ``<bp>_x`` columns.
+        from mufasa.pose_importers.pose_parquet import pose_parquet_bodyparts
+        return pose_parquet_bodyparts(p)
     elif low.endswith(".csv"):
         cols = pd.read_csv(p, nrows=1).columns
     else:
