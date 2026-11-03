@@ -8,6 +8,28 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122id — pair a run's pose.parquet with its video through the run sidecar.**
+The DeepLabCut exporter writes a fixed-name `pose.parquet` per analysis run
+with a run TOML beside it (named after the video): `kind = "analyze"`,
+`inputs = ["…/<video>.mp4"]`, `outputs = ["pose.parquet"]`, model/snapshot
+provenance. No skeleton in it. `pose_parquet.read_run_sidecar` finds the
+record whose `outputs` names the file (other TOMLs ignored);
+`pose_parquet_video_name` returns the recorded video's stem first.
+* Discovery descends one level into run folders (only where a run sidecar
+  names a long parquet) — importer and Add-sessions alike.
+* Importer names each import after the run's video and refuses two files that
+  map to one video (they would overwrite each other).
+* Smoother names output `<video>_smoothed_v2.<hash>.parquet` for run files
+  (`_session_output_stem`, shared by writer and incremental skip); other
+  files keep their names.
+* mufasa-preview pairs the run with the recorded video even outside the folder.
+smoke_122id_run_sidecar_pairing: 17/17 (real importer, writer, preview).
+Tripwires: name ignores sidecar, no run-folder descent, no clash check,
+smoother stem from file name, preview ignores sidecar — each fails. Real data:
+the user's run TOML beside a slice as `pose.parquet` -> named
+`K7_cam_20251124_1510_A10-0-051_640x360-triplet`, found from the parent folder,
+smoothed standalone to `K7_cam_…_640x360-triplet_smoothed_v2.<hash>.parquet`.
+
 **122ic — processing and viewing use the data's own skeleton.**
 `pose_parquet.resolve_skeleton(paths, config=None)`: explicit project.toml, then
 the pose files' own skeleton (embedded / `.fdlc.toml`; a folder is probed

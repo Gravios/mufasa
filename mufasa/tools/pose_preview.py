@@ -96,6 +96,7 @@ def _discover(folder: str) -> list[dict]:
     videos: dict[str, str] = {}
     raws: dict[str, str] = {}
     smoothed: dict[str, list[str]] = {}
+    recorded_videos: dict[str, str] = {}
 
     for entry in sorted(os.listdir(folder)):
         path = os.path.join(folder, entry)
@@ -109,7 +110,26 @@ def _discover(folder: str) -> list[dict]:
             if _is_smoothed(entry):
                 smoothed.setdefault(stem, []).append(path)
             else:
+                # Patch 122id: a run's fixed-name pose.parquet is paired by
+                # the video its run sidecar records; that video is used even
+                # when it lives elsewhere (the run folder holds no video).
+                run_video = None
+                if low.endswith(".parquet"):
+                    try:
+                        from mufasa.pose_importers.pose_parquet import (
+                            run_sidecar_video,
+                        )
+                        run_video = run_sidecar_video(path)
+                    except Exception:
+                        run_video = None
+                if run_video:
+                    stem = _video_stem(os.path.basename(run_video))
+                    if os.path.isfile(run_video):
+                        recorded_videos.setdefault(stem, run_video)
                 raws.setdefault(stem, path)
+
+    for stem, vpath in recorded_videos.items():
+        videos.setdefault(stem, vpath)
 
     groups: list[dict] = []
     for stem in sorted(videos):

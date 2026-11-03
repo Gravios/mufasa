@@ -67,6 +67,7 @@ POSE_METADATA_VERSION = 1
 LONG_REQUIRED_COLUMNS = ("frame", "bodypart", "x", "y")
 LONG_COLUMNS = ("frame", "individual", "bodypart", "x", "y", "likelihood")
 _WIDE_SUFFIXES = ("_x", "_y", "_p", "_likelihood")
+_VIDEO_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".m4v", ".mpg", ".mpeg")
 
 
 # --------------------------------------------------------------------------- #
@@ -258,6 +259,72 @@ def resolve_skeleton(paths, *, config=None) -> dict | None:
 
 
 # --------------------------------------------------------------------------- #
+# Run sidecar (analysis provenance)
+# --------------------------------------------------------------------------- #
+def read_run_sidecar(path: str | os.PathLike) -> dict | None:
+    """The analysis-run record that produced a pose parquet, or ``None``.
+
+    Patch 122id. The DeepLabCut exporter writes a fixed ``pose.parquet`` and,
+    beside it, a run TOML (named after the video) recording what it did::
+
+        kind = "analyze"
+        inputs = ["/data/.../<video>.mp4"]
+        outputs = ["pose.parquet"]
+        model_id = "...", snapshot = "...", ...
+
+    The record is matched by its ``outputs`` naming this file (relative to
+    the TOML's folder, or absolute), so the TOML's own name doesn't matter
+    and unrelated TOMLs (``project.toml``, ``*.fdlc.toml``) are ignored.
+
+    :returns: the parsed TOML plus ``'source'`` (its path), or ``None``.
+    """
+    p = os.path.abspath(os.fspath(path))
+    folder = os.path.dirname(p)
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return None
+    for name in names:
+        low = name.lower()
+        if not low.endswith(".toml") or low.endswith(FDLC_SKELETON_SUFFIX):
+            continue
+        if name == "project.toml":
+            continue
+        full = os.path.join(folder, name)
+        try:
+            with open(full, "rb") as f:
+                data = tomllib.load(f)
+        except (tomllib.TOMLDecodeError, OSError):
+            continue
+        outs, ins = data.get("outputs"), data.get("inputs")
+        if not isinstance(outs, list) or not isinstance(ins, list) or not ins:
+            continue
+        for o in outs:
+            o = str(o)
+            op = o if os.path.isabs(o) else os.path.join(folder, o)
+            if os.path.abspath(op) == p:
+                return {**data, "source": full}
+    return None
+
+
+def run_sidecar_video(path: str | os.PathLike) -> str | None:
+    """Video path recorded by a pose parquet's run sidecar (first input with
+    a video extension, else the first input), or ``None``."""
+    run = read_run_sidecar(path)
+    if not run:
+        return None
+    ins = [str(i) for i in run["inputs"]]
+    vids = [i for i in ins if i.lower().endswith(_VIDEO_EXTS)]
+    return (vids or ins)[0]
+
+
+def run_sidecar_video_stem(path: str | os.PathLike) -> str | None:
+    """Stem of the video a run sidecar records for this parquet, or ``None``."""
+    v = run_sidecar_video(path)
+    return os.path.splitext(os.path.basename(v))[0] if v else None
+
+
+# --------------------------------------------------------------------------- #
 # Format detection / names
 # --------------------------------------------------------------------------- #
 def is_long_pose_parquet(path: str | os.PathLike) -> bool:
@@ -279,12 +346,16 @@ def is_long_pose_parquet(path: str | os.PathLike) -> bool:
 
 
 def find_long_pose_parquets(directory: str | os.PathLike) -> list[str]:
-    """Long-format pose parquets directly inside ``directory`` (not recursive).
+    """Long-format pose parquets in ``directory``.
 
-    Accepts FreeDLC ``*.fdlc.parquet`` and DeepLabCut ``<video>.parquet``
-    alike — the schema decides, not the name. Hidden files are skipped.
-    Non-recursive on purpose: a project tree holds backups and derived
-    outputs below the source folder that must not be swept up.
+    Accepts FreeDLC ``*.fdlc.parquet`` and DeepLabCut parquets alike — the
+    schema decides, not the name. Hidden files are skipped.
+
+    Not a recursive sweep (a project tree holds backups and derived outputs
+    that must not be picked up). One exception, patch 122id: an immediate
+    subfolder is included when it is an analysis-run folder — a long parquet
+    there whose run sidecar names it as an output — since the DeepLabCut
+    exporter writes one fixed-name ``pose.parquet`` per run folder.
     """
     out = []
     d = os.fspath(directory)
@@ -294,14 +365,29 @@ def find_long_pose_parquets(directory: str | os.PathLike) -> list[str]:
         full = os.path.join(d, name)
         if os.path.isfile(full) and is_long_pose_parquet(full):
             out.append(full)
+        elif os.path.isdir(full):
+            for sub in sorted(os.listdir(full)):
+                cand = os.path.join(full, sub)
+                if (
+                    not sub.startswith(".")
+                    and os.path.isfile(cand)
+                    and is_long_pose_parquet(cand)
+                    and read_run_sidecar(cand) is not None
+                ):
+                    out.append(cand)
     return out
 
 
 def pose_parquet_video_name(path: str | os.PathLike) -> str:
     """Video stem a pose parquet belongs to.
 
-    ``<video>.parquet`` -> ``<video>``; ``<video>.fdlc.parquet`` -> ``<video>``.
+    The run sidecar's recorded video wins (patch 122id: a fixed-name
+    ``pose.parquet`` says nothing about its video); otherwise from the file
+    name: ``<video>.parquet`` / ``<video>.fdlc.parquet`` -> ``<video>``.
     """
+    from_run = run_sidecar_video_stem(path)
+    if from_run:
+        return from_run
     stem = os.path.basename(os.fspath(path))
     if stem.lower().endswith(".parquet"):
         stem = stem[: -len(".parquet")]
@@ -478,6 +564,7 @@ __all__ = [
     "read_fdlc_skeleton", "read_pose_metadata", "read_embedded_skeleton",
     "read_pose_skeleton", "resolve_skeleton", "is_long_pose_parquet", "find_long_pose_parquets",
     "pose_parquet_video_name", "pose_parquet_bodyparts",
+    "read_run_sidecar", "run_sidecar_video", "run_sidecar_video_stem",
     "pose_metadata_payload", "write_parquet_with_pose_metadata",
     "embed_pose_metadata", "skeleton_from_source", "main",
 ]

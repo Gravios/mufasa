@@ -142,8 +142,8 @@ POSE_IMPORT_ROUTES: dict = {
         kwargs_map={"source_path": "data_folder"},
         requires_animal_ids=False,
         accepts_p_threshold=True,
-        source_hint="Directory containing <video>.parquet files "
-                    "(DeepLabCut long-format export)",
+        source_hint="Folder of DeepLabCut pose parquet: <video>.parquet "
+                    "files, or run folders (pose.parquet + run .toml)",
     ),
     "FreeDLC parquet (single animal)": dict(
         backend=_lazy("mufasa.pose_importers.fdlc_parquet_importer",

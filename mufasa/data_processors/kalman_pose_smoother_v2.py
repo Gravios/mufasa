@@ -7910,6 +7910,31 @@ def _smoother_param_hash(
     ).hexdigest()
 
 
+def _session_output_stem(path) -> str:
+    """Stem a session's smoothed output is named after.
+
+    Patch 122id: a pose parquet produced by an analysis run (fixed name
+    ``pose.parquet`` + run sidecar) is named after the video its sidecar
+    records, so outputs from different runs don't all become
+    ``pose_smoothed_v2.*`` and downstream video lookups still work. Otherwise
+    the file stem, minus a legacy ``DeepCut`` suffix. Used by both the writer
+    and the incremental-skip check so they always agree.
+    """
+    try:
+        from mufasa.pose_importers.pose_parquet import run_sidecar_video_stem
+        from_run = run_sidecar_video_stem(path)
+    except Exception:
+        from_run = None
+    if from_run:
+        return from_run
+    from pathlib import Path
+
+    stem = Path(path).stem
+    if stem.endswith("DeepCut"):
+        stem = stem[: -len("DeepCut")]
+    return stem
+
+
 def _build_and_write_session_output(
     s: dict,
     smooth_pos: np.ndarray,
@@ -7944,10 +7969,7 @@ def _build_and_write_session_output(
     was_csv_fallback = False
     csv_fallback_reason = ""
     if output_dir_path is not None:
-        stem = s["path"].stem
-        # Strip common DLC suffix patterns
-        if stem.endswith("DeepCut"):
-            stem = stem[: -len("DeepCut")]
+        stem = _session_output_stem(s["path"])
         # Patch 122hm: parameter hash goes before the extension, so
         # <stem>_smoothed_v2.<hash>.parquet. Omitted (legacy name) when no
         # hash is supplied, e.g. in-memory callers.
@@ -9262,7 +9284,7 @@ def smooth_pose_v2(
         if output_dir is not None and not overwrite:
             _tag = f".{param_hash}" if param_hash else ""
             for _i in range(n_sess_final):
-                _stem = raw_sessions[_i]["path"].stem
+                _stem = _session_output_stem(raw_sessions[_i]["path"])
                 _pq = output_dir_path / f"{_stem}_smoothed_v2{_tag}.parquet"
                 _csv = output_dir_path / f"{_stem}_smoothed_v2{_tag}.csv"
                 if _pq.exists() or _csv.exists():

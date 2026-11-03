@@ -47,6 +47,11 @@ def _candidate_files(source: str | os.PathLike) -> list[str]:
         for f in sorted(os.listdir(s))
         if not f.startswith(".") and f.lower().endswith(_POSE_SUFFIXES)
     ]
+    # Patch 122id: analysis-run subfolders (one pose.parquet + run sidecar
+    # each) are picked up the same way the importer finds them.
+    from mufasa.pose_importers.pose_parquet import find_long_pose_parquets
+
+    out += [f for f in find_long_pose_parquets(s) if f not in out]
     return out
 
 

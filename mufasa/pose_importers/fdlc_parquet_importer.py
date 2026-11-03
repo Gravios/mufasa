@@ -181,8 +181,24 @@ class FDLCParquetImporter(ConfigReader, PoseImporterMixin):
         if not self.input_data_paths:
             raise BodypartColumnNotFoundError(
                 msg=(
-                    f"No long-format pose parquet files (*{FDLC_SUFFIX} or "
-                    f"<video>.parquet) found in {self.data_folder}"
+                    f"No long-format pose parquet files (*{FDLC_SUFFIX}, "
+                    f"<video>.parquet, or run folders holding pose.parquet + "
+                    f"a run .toml) found in {self.data_folder}"
+                ),
+                source=self.__class__.__name__,
+            )
+        # Patch 122id: names can now come from a run sidecar (pose.parquet ->
+        # its recorded video), so two runs over one video would silently
+        # overwrite each other's import. Refuse and say which.
+        by_video: dict[str, list[str]] = {}
+        for f in self.input_data_paths:
+            by_video.setdefault(self._video_name(f), []).append(f)
+        clashes = {v: fs for v, fs in by_video.items() if len(fs) > 1}
+        if clashes:
+            raise BodypartColumnNotFoundError(
+                msg=(
+                    "Several pose files belong to the same video and would "
+                    f"overwrite each other: {clashes}. Import one per video."
                 ),
                 source=self.__class__.__name__,
             )
