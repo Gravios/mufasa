@@ -8,6 +8,31 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ic — processing and viewing use the data's own skeleton.**
+`pose_parquet.resolve_skeleton(paths, config=None)`: explicit project.toml, then
+the pose files' own skeleton (embedded / `.fdlc.toml`; a folder is probed
+through its long parquets), then the project enclosing the files.
+* Smoother: `layout_from_fdlc_sidecar` reads the embedded skeleton too (and a
+  folder of agreeing files; nodes taken from the edges if `bodyparts` is
+  absent), so `--beside-input` on a standalone DeepLabCut parquet builds its
+  tree with no project. Imports the light module, not the importer.
+* Smoothed output keeps the input's skeleton (`b"pose"` metadata, edges
+  between its markers), so a standalone smoothed file stays self-describing.
+* Overlay viewer: draws the resolved skeleton (new `--config`) instead of
+  `DEFAULT_SKELETON_EDGES`, the legacy rat-rig names, which drew nothing for
+  any other rig. pose_viewer auto-resolves when `--config` isn't given.
+* Fix: pose_viewer's direct-read loader blanket-lower-cased columns (the
+  122hb bug, flagged in 122hx), so every smoothed file's back_T4 became
+  back_t4 — smoothed markers stopped matching the raw file and the skeleton
+  (10 of 24 edges drawn on the real rig). Now suffix-only normalisation.
+smoke_122ic_skeleton_downstream: 20/20 (real writer, real overlay main()
+offscreen). Tripwires: layout ignores embedded, writer drops skeleton, loader
+lower-cases, overlay ignores resolution, no project walk-up — each fails.
+Real data: a 1,500-frame slice of the user's export smoothed standalone
+(`--beside-input`, no project) — layout "from the pose files' own skeleton
+(15 markers)", output carries 24 edges; overlay draws 24/24 raw and 24/24
+smoothed lines (10/24 smoothed before the case fix).
+
 **122ib — DeepLabCut long-format parquet with an embedded skeleton.**
 The modified DeepLabCut exporter writes the same long table as FreeDLC
 (frame | individual | bodypart | x | y | likelihood) but names it

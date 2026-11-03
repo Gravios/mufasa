@@ -1048,8 +1048,9 @@ def layout_from_config(config_path, **flags) -> BodyLayout:
         "[skeleton] connections to derive a kinematic tree from, no "
         "[[pose.segments]] tree of its own, and its markers "
         f"({body_parts}) aren't the built-in rat rig. Add skeleton "
-        "connections (importing FreeDLC pose brings them in from the "
-        "<video>.fdlc.toml sidecar), or define the tree explicitly:\n\n"
+        "connections (importing FreeDLC or DeepLabCut parquet pose brings "
+        "them in from the .fdlc.toml sidecar / the parquet's embedded "
+        "skeleton), or define the tree explicitly:\n\n"
         "    [[pose.segments]]\n"
         '    name    = "body"\n'
         '    markers = ["<centre marker>", "<other rigid trunk markers>"]\n\n'
@@ -1065,35 +1066,50 @@ def layout_from_fdlc_sidecar(
     root: str | None = None,
     **flags,
 ) -> BodyLayout | None:
-    """Build a :class:`BodyLayout` from a FreeDLC ``.fdlc.toml`` sidecar.
+    """Build a :class:`BodyLayout` from the skeleton a pose file carries.
 
-    Patch 122hu. Lets the smoother run on a standalone FreeDLC parquet that
-    isn't inside a Mufasa project: FreeDLC writes the skeleton (bodyparts +
-    edges) into ``<stem>.fdlc.toml`` next to the parquet, so the kinematic
-    tree is available beside the file without a ``project.toml``. This reads
-    that sidecar and derives the same spanning-tree layout ``layout_from_config``
-    would from a project's ``[skeleton]``.
+    Patch 122hu (FreeDLC sidecar), 122ic (embedded skeleton). Lets the
+    smoother run on a standalone pose parquet that isn't inside a Mufasa
+    project: the skeleton travels with the file — embedded in a DeepLabCut
+    ``<video>.parquet`` (``b"pose"`` metadata) or in FreeDLC's
+    ``<stem>.fdlc.toml`` sidecar — so the kinematic tree is available without
+    a ``project.toml``. Derives the same spanning-tree layout
+    ``layout_from_config`` would from a project's ``[skeleton]``.
 
-    :param pose_path: the pose file; its sidecar is resolved by
-        :func:`~mufasa.pose_importers.fdlc_parquet_importer.read_fdlc_skeleton`
-        (handles both ``<stem>.fdlc.parquet`` and a bare parquet stem).
+    :param pose_path: a pose file, or a folder whose long-format parquets all
+        carry the same skeleton (resolved by
+        :func:`~mufasa.pose_importers.pose_parquet.read_pose_skeleton`).
     :param root: optional root marker for the spanning tree; defaults to the
         skeleton's natural root.
-    :returns: a layout, or ``None`` when no readable sidecar with edges is
-        found (so the caller can fall back to other layout sources).
+    :returns: a layout, or ``None`` when no skeleton with edges is found (or
+        a folder's files disagree), so the caller can fall back.
     """
-    try:
-        from mufasa.pose_importers.fdlc_parquet_importer import (
-            read_fdlc_skeleton,
-        )
-    except Exception:
-        return None
-    sk = read_fdlc_skeleton(pose_path)
+    import os
+
+    from mufasa.pose_importers.pose_parquet import (
+        find_long_pose_parquets,
+        read_pose_skeleton,
+    )
+
+    p = os.fspath(pose_path)
+    if os.path.isdir(p):
+        found = [read_pose_skeleton(f) for f in find_long_pose_parquets(p)]
+        if not found or any(not sk or not sk.get("edges") for sk in found):
+            return None
+        shapes = {
+            (tuple(sk["nodes"]), tuple(map(tuple, sk["edges"]))) for sk in found
+        }
+        if len(shapes) != 1:
+            return None
+        sk = found[0]
+    else:
+        sk = read_pose_skeleton(p)
     if not sk or not sk.get("edges"):
         return None
-    segments = segments_from_skeleton(
-        sk["nodes"], sk["edges"], root=root,
+    nodes = sk["nodes"] or list(
+        dict.fromkeys(n for edge in sk["edges"] for n in edge)
     )
+    segments = segments_from_skeleton(nodes, sk["edges"], root=root)
     return BodyLayout(segments=segments, **flags)
 
 
@@ -7939,7 +7955,30 @@ def _build_and_write_session_output(
         out_name = f"{stem}_smoothed_v2{_suffix}.parquet"
         out_path = output_dir_path / out_name
         try:
-            df_out.to_parquet(out_path, index=False)
+            # Patch 122ic: a smoothed file keeps the skeleton its input
+            # carried (embedded in a DeepLabCut parquet or in a FreeDLC
+            # sidecar), so a standalone smoothed file stays self-describing
+            # for the viewers. Only edges between output markers are kept.
+            pose_sk = None
+            try:
+                from mufasa.pose_importers.pose_parquet import (
+                    read_pose_skeleton,
+                    write_parquet_with_pose_metadata,
+                )
+                pose_sk = read_pose_skeleton(s["path"])
+            except Exception:
+                pose_sk = None
+            out_markers = [str(m) for m in s["markers"]]
+            kept = [
+                (a, b) for a, b in (pose_sk or {}).get("edges", [])
+                if a in out_markers and b in out_markers
+            ]
+            if kept:
+                write_parquet_with_pose_metadata(
+                    df_out, out_path, out_markers, kept,
+                )
+            else:
+                df_out.to_parquet(out_path, index=False)
         except (ImportError, Exception) as e:
             # Fallback to CSV when parquet engine is missing
             out_path = (
@@ -9921,8 +9960,8 @@ def main(argv=None) -> int:
                 ]
             except Exception as exc:
                 print(
-                    f"[smoother-v2] WARNING: could not read a FreeDLC skeleton "
-                    f"sidecar ({type(exc).__name__}: {exc}); continuing.",
+                    f"[smoother-v2] WARNING: could not read the pose files' "
+                    f"skeleton ({type(exc).__name__}: {exc}); continuing.",
                     file=sys.stderr,
                 )
                 per_input = []
@@ -9937,7 +9976,7 @@ def main(argv=None) -> int:
             if fdlc_layout is not None:
                 layout = fdlc_layout
                 print(
-                    f"[smoother-v2] Layout from FreeDLC skeleton sidecar "
+                    f"[smoother-v2] Layout from the pose files' own skeleton "
                     f"({layout.n_markers} markers, "
                     f"{len(layout.segments)} segments) — no project needed."
                 )

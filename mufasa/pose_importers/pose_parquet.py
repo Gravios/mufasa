@@ -50,7 +50,8 @@ Skeleton resolution (:func:`read_pose_skeleton`)
 1. embedded ``b"pose"`` metadata in the parquet;
 2. the FreeDLC ``<stem>.fdlc.toml`` sidecar next to it;
 3. otherwise ``None`` — the caller falls back (project ``[skeleton]``, or
-   nodes-only).
+   nodes-only). :func:`resolve_skeleton` adds that project step for tools
+   that are handed loose files (the viewers).
 """
 from __future__ import annotations
 
@@ -212,6 +213,48 @@ def read_pose_skeleton(path: str | os.PathLike) -> dict | None:
         carries no skeleton by either route.
     """
     return read_embedded_skeleton(path) or read_fdlc_skeleton(path)
+
+
+def resolve_skeleton(paths, *, config=None) -> dict | None:
+    """Find the skeleton that applies to a set of pose/video paths.
+
+    Patch 122ic. Order, most specific first:
+
+    1. ``config`` — an explicit ``project.toml`` (the user said so);
+    2. each pose file's own skeleton (:func:`read_pose_skeleton`: embedded,
+       then ``.fdlc.toml`` sidecar) — a pose *directory* is probed through
+       the long-format parquets directly inside it;
+    3. the ``project.toml`` enclosing any of the paths (walked up a bounded
+       number of levels), e.g. a smoothed file under ``derived/``.
+
+    :param paths: pose files, pose folders and/or the video; ``None`` entries
+        are skipped.
+    :returns: ``{'nodes', 'edges', 'source'}`` with at least one edge, or
+        ``None`` — the caller keeps its own default.
+    """
+    from mufasa.project_layout import find_project_config, read_skeleton
+
+    def _ok(sk):
+        return sk if sk and sk.get("edges") else None
+
+    if config:
+        sk = _ok(read_skeleton(config))
+        if sk:
+            return {**sk, "source": os.fspath(config)}
+    candidates = [os.fspath(p) for p in paths if p]
+    for p in candidates:
+        probes = find_long_pose_parquets(p) if os.path.isdir(p) else [p]
+        for f in probes:
+            sk = _ok(read_pose_skeleton(f))
+            if sk:
+                return sk
+    for p in candidates:
+        cfg = find_project_config(p)
+        if cfg is not None:
+            sk = _ok(read_skeleton(cfg))
+            if sk:
+                return {**sk, "source": os.fspath(cfg)}
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -433,7 +476,7 @@ __all__ = [
     "FDLC_SUFFIX", "FDLC_SKELETON_SUFFIX", "POSE_METADATA_KEY",
     "LONG_COLUMNS", "LONG_REQUIRED_COLUMNS",
     "read_fdlc_skeleton", "read_pose_metadata", "read_embedded_skeleton",
-    "read_pose_skeleton", "is_long_pose_parquet", "find_long_pose_parquets",
+    "read_pose_skeleton", "resolve_skeleton", "is_long_pose_parquet", "find_long_pose_parquets",
     "pose_parquet_video_name", "pose_parquet_bodyparts",
     "pose_metadata_payload", "write_parquet_with_pose_metadata",
     "embed_pose_metadata", "skeleton_from_source", "main",

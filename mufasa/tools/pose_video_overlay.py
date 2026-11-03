@@ -695,6 +695,7 @@ class OverlayViewer(QMainWindow):
         pose_offset: int = 0,
         start_frame: int = 0,
         pose_scale: float = 1.0,
+        skeleton_edges: list[tuple[str, str]] | None = None,
     ):
         super().__init__()
         self.setWindowTitle(
@@ -708,6 +709,10 @@ class OverlayViewer(QMainWindow):
             likelihood_threshold=likelihood_threshold,
             pose_offset=pose_offset,
             pose_scale=pose_scale,
+            skeleton_edges=(
+                skeleton_edges if skeleton_edges is not None
+                else DEFAULT_SKELETON_EDGES
+            ),
         )
         self.scene_obj.setSceneRect(
             0, 0, video.width, video.height,
@@ -1219,6 +1224,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Open at frame N (default 0)",
     )
     parser.add_argument(
+        "--config", default=None,
+        help=(
+            "Project project.toml whose [skeleton] to draw. Without it the "
+            "skeleton is detected: embedded in the pose parquet, a FreeDLC "
+            ".fdlc.toml sidecar, or the project enclosing the files; the "
+            "built-in default only if none is found."
+        ),
+    )
+    parser.add_argument(
         "--pose-scale", type=float, default=1.0,
         help=(
             "Multiply pose coordinates by this factor (default 1). Use 2 for "
@@ -1261,6 +1275,25 @@ def main(argv: list[str] | None = None) -> int:
     if args.raw:
         raw_pose = _load_pose_file(args.raw)
 
+    # Patch 122ic: draw the skeleton the data actually has. The built-in
+    # DEFAULT_SKELETON_EDGES names the legacy rat rig (nose, back1, tailbase,
+    # ...), so for any other marker set it drew no lines at all.
+    skeleton_edges = None
+    try:
+        from mufasa.pose_importers.pose_parquet import resolve_skeleton
+        sk = resolve_skeleton(
+            [args.raw, args.smoothed, args.video], config=args.config,
+        )
+    except Exception as exc:
+        print(f"Note: skeleton lookup failed ({type(exc).__name__}: {exc}); "
+              f"using default edges.")
+        sk = None
+    if sk:
+        skeleton_edges = [tuple(e) for e in sk["edges"]]
+        print(f"Skeleton: {len(skeleton_edges)} edges from {sk['source']}")
+    else:
+        print("Skeleton: none found with the data; using default edges.")
+
     # Open video
     video = VideoSource(args.video)
 
@@ -1288,6 +1321,7 @@ def main(argv: list[str] | None = None) -> int:
         pose_offset=args.pose_offset,
         start_frame=max(0, min(video.n_frames - 1, args.start_frame)),
         pose_scale=args.pose_scale,
+        skeleton_edges=skeleton_edges,
     )
     win.resize(1200, 800)
     win.show()

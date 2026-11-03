@@ -250,7 +250,15 @@ def _load_pose_file(path) -> PoseFrame:
                 df_direct = pd.read_parquet(path)
             except Exception:
                 df_direct = pd.read_csv(path, low_memory=False)
-        df_direct.columns = [str(c).lower() for c in df_direct.columns]
+        # Patch 122ic: normalise the *suffix* only (the 122hb rule). The
+        # blanket .lower() here renamed back_T4 -> back_t4 for every file read
+        # directly (all smoothed outputs), so smoothed markers no longer
+        # matched the raw file's or the skeleton's names — only the edges
+        # between all-lower-case markers were drawn.
+        from mufasa.data_processors.kalman_diagnostic import (
+            normalize_pose_columns,
+        )
+        df_direct.columns = normalize_pose_columns(df_direct.columns)
         # Did this give us markers?
         if _detect_markers(df_direct):
             df = df_direct
@@ -1089,7 +1097,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--config", default=None,
         help="Project project.toml; if given, use its stored [skeleton] "
-             "edges instead of the built-in default.",
+             "edges. Otherwise the skeleton is detected from the pose files "
+             "(embedded / .fdlc.toml sidecar / enclosing project) before the "
+             "built-in default.",
     )
     args = parser.parse_args(argv)
 
@@ -1141,6 +1151,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  using project skeleton: {len(skeleton_edges)} edges")
         else:
             print("  no [skeleton] in project.toml; using default edges")
+    else:
+        # Patch 122ic: without --config, use the skeleton that travels with
+        # the data (embedded parquet metadata / .fdlc.toml sidecar) or the
+        # enclosing project's, before the legacy rat-rig default.
+        try:
+            from mufasa.pose_importers.pose_parquet import resolve_skeleton
+            sk = resolve_skeleton([args.input, args.raw])
+        except Exception:
+            sk = None
+        if sk:
+            skeleton_edges = [tuple(e) for e in sk["edges"]]
+            print(f"  using skeleton from {sk['source']}: "
+                  f"{len(skeleton_edges)} edges")
 
     app = QApplication(sys.argv)
     viewer = PoseViewer(
