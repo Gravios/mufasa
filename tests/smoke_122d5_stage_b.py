@@ -218,12 +218,13 @@ def main() -> int:
     # or churn things slightly). Moved 425 -> 427 in 122gz, and
     # 427 -> 428 in 122hp (added the console_dock module), and
     # 428 -> 429 in 122hy (added the pose_preview module), and
-    # 429 -> 430 in 122ib (added the pose_parquet module).
+    # 429 -> 430 in 122ib (added the pose_parquet module), and
+    # 430 -> 431 in 122if (added the session_removal module).
     total_py = sum(1 for _ in pkg.rglob("*.py"))
     check(
-        f"Total mufasa/**/*.py count post-Stage-B ≤ 430 "
+        f"Total mufasa/**/*.py count post-Stage-B ≤ 431 "
         f"(got {total_py}; Stage B removed ~109 .py files)",
-        total_py <= 430,
+        total_py <= 431,
     )
 
     # 14. Doc updates

@@ -39,6 +39,13 @@ Patch history
   current project video tree (filename, size, modified date,
   symlink target if applicable) and refreshes after each
   successful import.
+* **122if**: the table is also where sessions are removed. It gains a
+  "Pose data" column (the imported pose file(s) with the video's stem),
+  multi-row selection, and *Remove selected…* (button, Delete key, or
+  right-click). Removal moves the video (a symlink as the link), its pose
+  file(s) if ticked, and its ``video_info.csv`` row into
+  ``backups/removed_sessions-<run_id>/`` with a manifest — nothing is
+  deleted. See :mod:`mufasa.model.session_removal`.
 """
 from __future__ import annotations
 
@@ -47,6 +54,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
@@ -58,6 +66,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QRadioButton,
@@ -167,25 +176,47 @@ class VideoImportForm(OperationForm):
         refresh_btn = QPushButton("Refresh", self)
         refresh_btn.clicked.connect(self._refresh_table)
         header_row.addWidget(refresh_btn)
+        # Patch 122if: remove sessions from the project via the table.
+        self._remove_btn = QPushButton("Remove selected…", self)
+        self._remove_btn.setToolTip(
+            "Move the selected sessions' video (and, optionally, their "
+            "imported pose data) out of the project into backups/. "
+            "Nothing is deleted. Also: Delete key, or right-click."
+        )
+        self._remove_btn.setEnabled(False)
+        self._remove_btn.clicked.connect(self._remove_selected)
+        header_row.addWidget(self._remove_btn)
         self.body_layout.addLayout(header_row)
 
-        self._table = QTableWidget(0, 4, self)
-        self._table.setHorizontalHeaderLabels([
-            "Filename", "Size", "Modified", "Symlink target",
-        ])
+        columns = ["Filename", "Pose data", "Size", "Modified",
+                   "Symlink target"]
+        self._table = QTableWidget(0, len(columns), self)
+        self._table.setHorizontalHeaderLabels(columns)
         self._table.setEditTriggers(
             QAbstractItemView.NoEditTriggers,
         )
         self._table.setSelectionBehavior(
             QAbstractItemView.SelectRows,
         )
+        self._table.setSelectionMode(
+            QAbstractItemView.ExtendedSelection,
+        )
         self._table.verticalHeader().setVisible(False)
         hh = self._table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.Stretch)
         hh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         hh.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        hh.setSectionResizeMode(3, QHeaderView.Stretch)
+        hh.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(4, QHeaderView.Stretch)
         self._table.setMinimumHeight(140)
+        self._table.itemSelectionChanged.connect(self._update_remove_btn)
+        self._table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(self._table_menu)
+        self._del_shortcut = QShortcut(
+            QKeySequence(Qt.Key_Delete), self._table,
+        )
+        self._del_shortcut.setContext(Qt.WidgetShortcut)
+        self._del_shortcut.activated.connect(self._remove_selected)
         self.body_layout.addWidget(self._table)
 
         self._on_mode_changed()
@@ -315,6 +346,7 @@ class VideoImportForm(OperationForm):
         if not vd.is_dir():
             self._set_placeholder_row(f"(no videos directory at {vd})")
             return
+        pose_by_stem = self._pose_files_by_stem()
         rows = []
         for p in sorted(vd.iterdir()):
             if not p.is_file():
@@ -332,9 +364,11 @@ class VideoImportForm(OperationForm):
                         target = "(broken symlink)"
                 else:
                     target = ""
-                rows.append((p.name, size, mtime, target))
+                rows.append((p.name, pose_by_stem.get(p.stem, "—"),
+                             size, mtime, target))
             except OSError:
-                rows.append((p.name, "?", "?", ""))
+                rows.append((p.name, pose_by_stem.get(p.stem, "—"),
+                             "?", "?", ""))
         if not rows:
             self._set_placeholder_row("(no videos imported yet)")
             return
@@ -342,7 +376,7 @@ class VideoImportForm(OperationForm):
         for r, row in enumerate(rows):
             for c, val in enumerate(row):
                 item = QTableWidgetItem(val)
-                if c == 3 and val.startswith("("):
+                if c == 4 and val.startswith("("):
                     # broken-symlink hint stays grey
                     item.setForeground(Qt.GlobalColor.gray)
                 self._table.setItem(r, c, item)
@@ -353,7 +387,117 @@ class VideoImportForm(OperationForm):
         item = QTableWidgetItem(text)
         item.setForeground(Qt.GlobalColor.gray)
         self._table.setItem(0, 0, item)
-        self._table.setSpan(0, 0, 1, 4)
+        self._table.setSpan(0, 0, 1, self._table.columnCount())
+        self._update_remove_btn()
+
+    def _pose_files_by_stem(self) -> dict[str, str]:
+        """Imported pose file name(s) per stem, for the Pose data column."""
+        if not self.config_path:
+            return {}
+        try:
+            from mufasa.project_layout import project_paths_from_config
+            pdir = Path(project_paths_from_config(self.config_path)
+                        ["input_pose_dir"])
+        except Exception:
+            return {}
+        if not pdir.is_dir():
+            return {}
+        out: dict[str, list[str]] = {}
+        for f in sorted(pdir.iterdir()):
+            if f.is_file() and f.suffix.lower() in (".parquet", ".csv", ".h5"):
+                out.setdefault(f.stem, []).append(f.name)
+        return {k: ", ".join(v) for k, v in out.items()}
+
+    # ------------------------------------------------------------------ #
+    # Removing sessions (patch 122if)
+    # ------------------------------------------------------------------ #
+    def _selected_video_names(self) -> list[str]:
+        """File names of the selected rows (placeholder rows excluded)."""
+        names = []
+        for r in sorted({i.row() for i in self._table.selectedIndexes()}):
+            item = self._table.item(r, 0)
+            if item is None or self._table.columnSpan(r, 0) > 1:
+                continue
+            names.append(item.text())
+        return names
+
+    def _update_remove_btn(self) -> None:
+        self._remove_btn.setEnabled(bool(self._selected_video_names()))
+
+    def _table_menu(self, pos) -> None:
+        if not self._selected_video_names():
+            return
+        menu = QMenu(self._table)
+        act = menu.addAction("Remove selected…")
+        act.triggered.connect(self._remove_selected)
+        menu.exec(self._table.viewport().mapToGlobal(pos))
+
+    def _confirm_removal(self, plan: dict) -> bool | None:
+        """Ask before removing. Returns include-pose (True/False), or None
+        when cancelled."""
+        names = list(plan)
+        n_pose = sum(len(s["pose"]) for s in plan.values())
+        head = names[:15]
+        body = (
+            f"Remove {len(names)} session"
+            f"{'s' if len(names) != 1 else ''} from this project?\n\n"
+            + "\n".join(f"  • {n}" for n in head)
+            + (f"\n  … and {len(names) - len(head)} more"
+               if len(names) > len(head) else "")
+            + "\n\nThe videos (symlinks as links — the footage itself is "
+            "not touched) and their video_info rows are moved to the "
+            "project's backups/ folder, with a manifest to undo it. "
+            "Nothing is deleted. Derived outputs (smoothed, features, …) "
+            "are not touched."
+        )
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle("Remove sessions")
+        box.setText(body)
+        pose_cb = QCheckBox(
+            f"Also remove their imported pose data ({n_pose} file"
+            f"{'s' if n_pose != 1 else ''})", box,
+        )
+        pose_cb.setChecked(n_pose > 0)
+        pose_cb.setEnabled(n_pose > 0)
+        box.setCheckBox(pose_cb)
+        box.setStandardButtons(QMessageBox.Yes | QMessageBox.Cancel)
+        box.setDefaultButton(QMessageBox.Cancel)
+        if box.exec() != QMessageBox.Yes:
+            return None
+        return pose_cb.isChecked()
+
+    def _remove_selected(self) -> None:
+        names = self._selected_video_names()
+        if not names or not self.config_path:
+            return
+        from mufasa.model.session_removal import (
+            remove_sessions,
+            session_files,
+        )
+        plan = session_files(self.config_path, names)
+        include_pose = self._confirm_removal(plan)
+        if include_pose is None:
+            return
+        try:
+            res = remove_sessions(
+                self.config_path, names, include_pose=include_pose,
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self, "Remove failed", f"{type(exc).__name__}: {exc}",
+            )
+            return
+        self._refresh_table()
+        QMessageBox.information(
+            self, "Sessions removed",
+            f"Moved {len(res['moved'])} file"
+            f"{'s' if len(res['moved']) != 1 else ''} and "
+            f"{res['video_info_rows']} video_info row"
+            f"{'s' if res['video_info_rows'] != 1 else ''} to:\n"
+            f"{res['backup_dir']}\n\n"
+            "Undo by moving the files back (see manifest.toml there).",
+        )
 
     # ------------------------------------------------------------------ #
     # OperationForm contract

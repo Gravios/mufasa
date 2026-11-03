@@ -8,6 +8,23 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122if — remove sessions via the Data Import table.**
+The "Already imported" table (Data Import -> Import video) gains a "Pose data"
+column (the imported pose file(s) with the video's stem), multi-row selection,
+and *Remove selected…* — button, Delete key, or right-click. Confirmation lists
+the sessions, with "Also remove their imported pose data" (ticked when there is
+any). New Qt-free `mufasa/model/session_removal.py` (`session_files`,
+`remove_sessions`): nothing is deleted — the video (a symlink as the link; the
+footage is never touched), the pose file(s) if chosen, and the session's
+`video_info.csv` row go to `backups/removed_sessions-<run_id>/` (rename on the
+same disk, so instant for large videos) with a full `video_info.csv` copy and
+a `manifest.toml` of from -> to. Derived outputs are left alone.
+smoke_122if_remove_sessions: 21/21 (real backend on a ProjectConfigCreator
+project; the real form offscreen, message boxes stubbed). Tripwires: delete
+instead of move; following the symlink; video_info not cleaned; pose box
+ignored; single selection; placeholder row removable — each fails.
+mufasa/**/*.py 430 -> 431 (smoke_122d5 ceiling bumped).
+
 **122ie — FreeDLC parquet without `.fdlc` naming; pose-file autodetect says parquet.**
 FreeDLC (the modified DeepLabCut) now writes `pose.parquet` per run + a run
 `.toml`, skeleton embedded — not `<video>.fdlc.parquet` + `.fdlc.toml`.
