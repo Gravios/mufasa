@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ih — no blocking progress dialog.**
+Running an operation opened a window-modal QProgressDialog that froze the whole
+workbench — including the console dock showing that run's own output (e.g. the
+Kalman v2 EM iterations), which couldn't be scrolled until the run ended.
+`run_with_progress` now shows progress inline in the main window's status bar
+(label, bar, Cancel; busy until the first progress report) and opens no dialog.
+Parents outside a QMainWindow get a NON-modal dialog. Since nothing is modal,
+`OperationForm._lock_run_button()` disables Run while the form's operation is
+in flight (base `on_run`, Features, Video filters); the heatmap popup disables
+its two run buttons the same way. New `on_finished` callback on
+`run_with_progress`.
+smoke_122ih_inline_progress: 18/18 (real OperationForm in a QMainWindow,
+offscreen, blocking worker). Tripwires: modal fallback, no status-bar path,
+no Run lock, indicator left behind — each fails. Suites touching the
+workbench/progress/forms: no change vs the previous sweep.
+
 **122ig — root orientation from the trunk; root-noise ceiling as a setting.**
 * Bug: the root's initial orientation and the initial q_root_ori estimate read
   the legacy rig's `back1`/`back3` by name. Any other rig started at identity

@@ -690,6 +690,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             parent=self.window(),
             title=f"{self.title}…",
             target=_work,
+            on_finished=self._lock_run_button(),
             on_success=lambda: (
                 self._refresh_computed_badges(),
                 self.completed.emit(),

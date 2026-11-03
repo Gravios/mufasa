@@ -452,6 +452,7 @@ class VideoFiltersForm(OperationForm):
             parent=self.window(),
             title=f"{self.title}…",
             target=_work,
+            on_finished=self._lock_run_button(),
             on_success=lambda: (
                 self.completed.emit(),
                 QMessageBox.information(self, self.title, "Done."),

@@ -378,6 +378,16 @@ class HeatmapClfPopUp(MufasaDialog):
             core_cnt=core_cnt,
         )
 
+    def _lock_run_buttons(self):
+        """Patch 122ih: the progress window is no longer modal, so disable
+        both run buttons until the render finishes."""
+        btns = [b for b in (getattr(self, "run_single_btn", None),
+                            getattr(self, "run_multi_btn", None))
+                if hasattr(b, "setEnabled")]
+        for b in btns:
+            b.setEnabled(False)
+        return lambda: [b.setEnabled(True) for b in btns]
+
     def _dispatch(self, multiple_videos: bool) -> None:
         try:
             kwargs = self._collect_args(multiple_videos=multiple_videos)
@@ -404,6 +414,7 @@ class HeatmapClfPopUp(MufasaDialog):
             title="Generating heatmaps…",
             target=_run,
             label_template=f"Rendering {n} video{'s' if n > 1 else ''}…",
+            on_finished=self._lock_run_buttons(),
             on_success=lambda: QMessageBox.information(
                 self, "Done", f"Heatmap generation complete ({n} video{'s' if n > 1 else ''})."
             ),

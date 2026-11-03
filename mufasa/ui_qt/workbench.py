@@ -230,7 +230,24 @@ class OperationForm(QWidget):
             title=f"{self.title}…",
             target=_work,
             on_success=_on_success,
+            on_finished=self._lock_run_button(),
         )
+
+    def _lock_run_button(self):
+        """Disable Run while this form's operation is in flight.
+
+        Patch 122ih: progress shows inline in the status bar now — nothing
+        is modal — so without this the same form could be started twice.
+        Returns the callback that re-enables it (pass as ``on_finished``).
+        """
+        self.run_btn.setEnabled(False)
+        self.run_btn.setText("  Running…")
+
+        def _unlock() -> None:
+            self.run_btn.setEnabled(True)
+            self.run_btn.setText("  Run")
+
+        return _unlock
 
     def _record_provenance(self) -> str | None:
         """Patch 122dt — write [provenance.<section_id>] and (if
