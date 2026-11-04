@@ -18,9 +18,12 @@ Tools (patch 122ij redesign)
 The canvas has one active *tool* at a time, chosen by the panel:
 
 ``select``
-    Click a shape to select it (top-most wins). Drag its body to move it;
-    drag a handle to reshape it — the 4 corners and 4 edge midpoints of a
-    rectangle, the rim of a circle, any vertex of a polygon. On a selected
+    Click a shape to select it. Nothing is hidden by drawing order: handles
+    (vertices, corners) and outlines (rectangle sides, circle rims, polygon
+    edges) of every ROI are grabbable even where another ROI covers them,
+    and a click inside overlapping ROIs picks the smallest — click again on
+    the same spot to cycle to the next one (patch 122im). Drag the inside to
+    move; drag a vertex, corner, side, rim or polygon edge to reshape. On a selected
     polygon, double-click an edge to insert a vertex there and right-click a
     vertex to remove it. Arrow keys nudge the selection by 1 px (Shift: 10).
     Delete/Backspace removes it; Esc deselects.
@@ -139,10 +142,10 @@ _HANDLE_CURSORS = {
 }
 
 _TOOL_HINTS = {
-    SELECT: ("Select: click a shape · drag to move · drag a handle to "
+    SELECT: ("Select: click a shape (click again to reach the one beneath) · "
+             "drag inside to move · drag a vertex, corner, side or edge to "
              "reshape · polygon: double-click an edge to add a vertex, "
-             "right-click a vertex to remove it · arrows nudge · Del "
-             "deletes"),
+             "right-click a vertex to remove it · arrows nudge · Del deletes"),
     RECTANGLE: "Rectangle: press and drag",
     CIRCLE: "Circle: press at the centre and drag out the radius",
     POLYGON: "Polygon: click to place vertices (no limit)",
@@ -275,6 +278,8 @@ class ROICanvas(QWidget):
         self._drag_offset_frame: tuple[float, float] | None = None
         self._pre_drag_geom: dict | None = None
         self._drag_anchor_geom: dict | None = None
+        self._press_frame: tuple[int, int] | None = None
+        self._cycle_from: int | None = None
 
         # View state: zoom relative to fit, pan in widget px.
         self._zoom = 1.0
@@ -457,62 +462,125 @@ class ROICanvas(QWidget):
                     for i, v in enumerate(geom["vertices"])}
         return {}
 
-    def _body_hit(self, kind: str, geom: dict, fx: float, fy: float) -> bool:
-        edge_tol = self._tol_frame(_EDGE_HIT_TOLERANCE_WIDGET_PX)
+    def _edge_hit(self, kind: str, geom: dict, fx: float, fy: float,
+                  tol: float) -> tuple[float, str] | None:
+        """Nearest point of the shape's OUTLINE within ``tol``: returns
+        (distance, handle) — a rectangle side ("n"/"e"/"s"/"w"), the
+        circle rim ("edge") or a polygon edge ("pe<i>": vertex i to i+1)."""
+        best: tuple[float, str] | None = None
+
+        def consider(d: float, h: str) -> None:
+            nonlocal best
+            if d <= tol and (best is None or d < best[0]):
+                best = (d, h)
+
         if kind == RECTANGLE:
             (x1, y1), (x2, y2) = geom["top_left"], geom["bottom_right"]
-            return (x1 - edge_tol <= fx <= x2 + edge_tol
-                    and y1 - edge_tol <= fy <= y2 + edge_tol)
+            for h, a_, b_ in (("n", (x1, y1), (x2, y1)), ("s", (x1, y2), (x2, y2)),
+                              ("w", (x1, y1), (x1, y2)), ("e", (x2, y1), (x2, y2))):
+                consider(_dist_point_segment((fx, fy), a_, b_)[0], h)
+        elif kind == CIRCLE:
+            c, r = geom["center"], geom["radius"]
+            consider(abs(math.hypot(fx - c[0], fy - c[1]) - r), "edge")
+        elif kind == POLYGON:
+            v = geom["vertices"]
+            n = len(v)
+            for i in range(n):
+                consider(_dist_point_segment((fx, fy), v[i], v[(i + 1) % n])[0],
+                         f"pe{i}")
+        return best
+
+    def _interior_hit(self, kind: str, geom: dict, fx: float, fy: float) -> bool:
+        if kind == RECTANGLE:
+            (x1, y1), (x2, y2) = geom["top_left"], geom["bottom_right"]
+            return x1 <= fx <= x2 and y1 <= fy <= y2
         if kind == CIRCLE:
             c, r = geom["center"], geom["radius"]
-            return math.hypot(fx - c[0], fy - c[1]) <= r + edge_tol
+            return math.hypot(fx - c[0], fy - c[1]) <= r
         if kind == POLYGON:
-            verts = geom["vertices"]
-            if self._point_in_polygon(fx, fy, verts):
-                return True
-            n = len(verts)
-            return any(
-                _dist_point_segment((fx, fy), verts[i], verts[(i + 1) % n])[0]
-                <= edge_tol for i in range(n))
+            return self._point_in_polygon(fx, fy, geom["vertices"])
         return False
+
+    @staticmethod
+    def _area(kind: str, geom: dict) -> float:
+        if kind == RECTANGLE:
+            (x1, y1), (x2, y2) = geom["top_left"], geom["bottom_right"]
+            return float((x2 - x1) * (y2 - y1))
+        if kind == CIRCLE:
+            return math.pi * geom["radius"] ** 2
+        v = np.asarray(geom["vertices"], float)
+        if len(v) < 3:
+            return 0.0
+        x, y = v[:, 0], v[:, 1]
+        return float(0.5 * abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1))))
+
+    def _interior_candidates(self, frame_pt) -> list[int]:
+        """Shapes whose interior contains the point, smallest first (so a
+        small ROI under a larger, newer one is still reachable)."""
+        fx, fy = frame_pt
+        hits = []
+        for idx in range(len(self._existing_rois)):
+            kind, geom = self._geom(idx)
+            if self._interior_hit(kind, geom, fx, fy):
+                hits.append((self._area(kind, geom), -idx, idx))
+        return [idx for _, _, idx in sorted(hits)]
 
     def _hit_test(
         self, frame_pt: tuple[float, float]
     ) -> tuple[int | None, str | None]:
         """Shape (and handle) under the cursor.
 
-        The selected shape's handles are tested first, then rectangle /
-        circle handles of every shape, then bodies top-most first.
-        Returns (idx, handle) with handle None for a body hit, or
+        Patch 122im — z-order no longer hides anything. Priority:
+
+        1. vertex / corner / rim handles (the selected shape's first, then
+           every shape's) — a handle is always grabbable;
+        2. the nearest OUTLINE of any shape — rectangle sides, circle rims,
+           polygon edges — so an edge can be dragged even where another ROI
+           covers it;
+        3. interiors, smallest area first, so an ROI inside a larger, newer
+           one is selected by clicking inside it. Clicking the same spot
+           again cycles through the overlapping shapes (see
+           mouseReleaseEvent).
+
+        Returns (idx, handle) — handle None for an interior hit — or
         (None, None) on a miss.
         """
         if self._mapping is None:
             return (None, None)
         fx, fy = frame_pt
         tol = self._tol_frame(_HANDLE_HIT_TOLERANCE_WIDGET_PX)
+        n = len(self._existing_rois)
 
         def handle_at(idx: int) -> str | None:
             kind, geom = self._geom(idx)
+            best = None
             for name, (hx, hy) in self._handles(kind, geom).items():
-                if abs(fx - hx) <= tol and abs(fy - hy) <= tol:
-                    return name
-            return None
+                d = max(abs(fx - hx), abs(fy - hy))
+                if d <= tol and (best is None or d < best[0]):
+                    best = (d, name)
+            return best[1] if best else None
 
-        n = len(self._existing_rois)
+        order = list(range(n - 1, -1, -1))
         if self._selected_idx is not None and self._selected_idx < n:
-            h = handle_at(self._selected_idx)
+            order.remove(self._selected_idx)
+            order.insert(0, self._selected_idx)
+        for idx in order:
+            h = handle_at(idx)
             if h is not None:
-                return (self._selected_idx, h)
-        for idx in range(n - 1, -1, -1):
-            if self._existing_rois[idx].get("kind") in (RECTANGLE, CIRCLE):
-                h = handle_at(idx)
-                if h is not None:
-                    return (idx, h)
-        for idx in range(n - 1, -1, -1):
+                return (idx, h)
+
+        edge_tol = self._tol_frame(_EDGE_HIT_TOLERANCE_WIDGET_PX)
+        best_edge: tuple[float, int, str] | None = None
+        for idx in order:
             kind, geom = self._geom(idx)
-            if self._body_hit(kind, geom, fx, fy):
-                return (idx, None)
-        return (None, None)
+            e = self._edge_hit(kind, geom, fx, fy, edge_tol)
+            if e is not None and (best_edge is None or e[0] < best_edge[0]):
+                best_edge = (e[0], idx, e[1])
+        if best_edge is not None:
+            return (best_edge[1], best_edge[2])
+
+        cands = self._interior_candidates(frame_pt)
+        return (cands[0], None) if cands else (None, None)
 
     @staticmethod
     def _point_in_polygon(px: float, py: float, verts: list) -> bool:
@@ -806,6 +874,16 @@ class ROICanvas(QWidget):
                     self.shape_selected.emit(-1)
                 self.update()
                 return
+            # Clicking again inside the selected shape (not on a handle or
+            # outline) may mean "the one underneath": decided on release,
+            # if the mouse didn't move.
+            self._cycle_from = (idx if handle is None
+                                and self._selected_idx is not None
+                                and self._selected_idx in
+                                self._interior_candidates(frame_pt) else None)
+            if self._cycle_from is not None:
+                idx = self._selected_idx
+            self._press_frame = frame_pt
             if idx != self._selected_idx:
                 self._selected_idx = idx
                 self.shape_selected.emit(idx)
@@ -999,6 +1077,17 @@ class ROICanvas(QWidget):
             verts = geom["vertices"]
             verts[int(h[1:])] = [fx, fy]
             new = {"vertices": verts}
+        elif kind == POLYGON and h.startswith("pe"):
+            # Drag a polygon edge: both its vertices follow the cursor.
+            a = (self._drag_anchor_geom or geom)["vertices"]
+            px, py = self._press_frame or (fx, fy)
+            dx, dy = int(round(fx - px)), int(round(fy - py))
+            i = int(h[2:])
+            j = (i + 1) % len(a)
+            verts = [list(v) for v in a]
+            verts[i] = [a[i][0] + dx, a[i][1] + dy]
+            verts[j] = [a[j][0] + dx, a[j][1] + dy]
+            new = {"vertices": verts}
         else:
             return
         self._apply_edit_geom(idx, new)
@@ -1018,6 +1107,16 @@ class ROICanvas(QWidget):
             if self._selected_idx is not None:
                 idx = self._selected_idx
                 kind, final_geom = self._geom(idx)
+                moved = (self._pre_drag_geom is not None and
+                         canonical_geometry(kind, self._pre_drag_geom)
+                         != final_geom)
+                if not moved and getattr(self, "_cycle_from", None) is not None:
+                    cands = self._interior_candidates(self._press_frame)
+                    if len(cands) > 1:
+                        nxt = cands[(cands.index(idx) + 1) % len(cands)]
+                        self._selected_idx = nxt
+                        self.shape_selected.emit(nxt)
+                self._cycle_from = None
                 if (self._pre_drag_geom is not None
                         and canonical_geometry(kind, self._pre_drag_geom)
                         != final_geom):
@@ -1182,6 +1281,8 @@ class ROICanvas(QWidget):
                 self.setCursor(Qt.SizeAllCursor)
             elif hover is not None and hover.startswith("v"):
                 self.setCursor(Qt.PointingHandCursor)
+            elif hover is not None and hover.startswith("pe"):
+                self.setCursor(Qt.SizeAllCursor)
             elif hover in _HANDLE_CURSORS:
                 self.setCursor(_HANDLE_CURSORS[hover])
             else:

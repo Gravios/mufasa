@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122im — overlapping ROIs stay reachable.**
+The Select tool resolved a click to the top-most (most recently drawn) ROI
+whose area contained it, so an ROI under a newer one could not be selected,
+and its sides / polygon vertices could not be dragged where the newer ROI
+covered them. `ROICanvas._hit_test` priority is now:
+1. handles of every ROI (polygon vertices, rectangle corners / side
+   midpoints, circle rim handle), the selected ROI's first;
+2. the nearest outline of any ROI — rectangle sides (resize that side),
+   circle rims (radius), polygon edges (new: drag moves both vertices);
+3. interiors, smallest area first; clicking the same spot again (without
+   dragging) cycles through the overlapping ROIs.
+smoke_122im_roi_overlap: 13/13 (editor offscreen via QTest: small rectangle,
+polygon and circle under a newer large rectangle). Tripwires (top-most
+interior wins, no outline priority, no cycling) each fail it. 122ij, 122dm,
+122fd and smoke_roi_canvas unchanged.
+
 **122il — ROIs stored in `logs/measures/rois.json`; SimBA H5 dropped.**
 The project's ROIs move from SimBA's `ROI_definitions.h5` (three pickled HDF5
 tables: Python/pandas-version fragile, needs pytables, opaque, stores
