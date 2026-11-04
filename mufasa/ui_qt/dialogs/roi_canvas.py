@@ -2,80 +2,81 @@
 mufasa.ui_qt.dialogs.roi_canvas
 ===============================
 
-Native Qt drawing canvas for ROI definition. Replaces the OpenCV
-subprocess-based approach in earlier versions of the panel.
+Native Qt drawing canvas for ROI definition.
 
-Why this exists
----------------
+Why native Qt
+-------------
 
-OpenCV's pip wheel on Linux is built with the Qt GUI backend
-(``window_QT.cpp``). Running OpenCV's drawing windows from inside
-a host PySide6 application produces a long tail of conflicts:
+OpenCV's pip wheel on Linux is built with the Qt GUI backend. Running its
+drawing windows from inside a PySide6 application produced a long tail of
+conflicts (NULL mouse-callback handles, visibility races on X11/Wayland), so
+the canvas is a plain ``QWidget`` that paints the frame and the ROIs itself.
 
-* ``cv2.namedWindow`` succeeding but ``cv2.setMouseCallback`` failing
-  with NULL handle errors.
-* ``cv2.getWindowProperty(WND_PROP_VISIBLE)`` race conditions on
-  X11 / Wayland that close the window before the user can interact.
-* Subprocess isolation works for some shapes but not others.
+Tools (patch 122ij redesign)
+----------------------------
 
-After 5 iterations of working around these issues, the cumulative
-fragility outweighed the cost of a from-scratch native Qt
-implementation. This is that implementation.
+The canvas has one active *tool* at a time, chosen by the panel:
 
-Design
-------
+``select``
+    Click a shape to select it (top-most wins). Drag its body to move it;
+    drag a handle to reshape it — the 4 corners and 4 edge midpoints of a
+    rectangle, the rim of a circle, any vertex of a polygon. On a selected
+    polygon, double-click an edge to insert a vertex there and right-click a
+    vertex to remove it. Arrow keys nudge the selection by 1 px (Shift: 10).
+    Delete/Backspace removes it; Esc deselects.
+``rectangle`` / ``circle``
+    Press and drag. Circles are drawn from the centre outward.
+``polygon``
+    Click to place vertices — **any number of them**. Finish by clicking the
+    first vertex, double-clicking, or pressing Enter. Backspace removes the
+    last vertex; Esc abandons the polygon.
 
-Single ``ROICanvas`` widget that:
+Drawing tools are *sticky*: after a shape is committed the same tool stays
+armed, so several shapes can be drawn in a row. Esc during a draw abandons
+only the shape in progress.
 
-1. Renders the current video frame as a ``QPixmap`` via ``paintEvent``.
-2. Renders existing ROIs (rectangles / circles / polygons) on top.
-3. Accepts mouse + keyboard events for drawing new shapes.
-4. Maintains a small state machine per shape type (idle / dragging /
-   vertexing).
-5. Emits ``shape_committed`` carrying the captured geometry in
-   ORIGINAL FRAME pixel coordinates (not widget coordinates) when
-   the user finishes drawing.
+Before 122ij, committing a polygon ran it through
+``shapely.simplify(tolerance=20)``, which silently deleted every vertex lying
+within 20 frame pixels of the line through its neighbours. On a 640x360
+frame that capped real polygons at roughly 4-8 vertices however many were
+clicked. Vertices are now kept exactly as placed (only exact consecutive
+duplicates are dropped).
 
-Coordinate spaces
------------------
+View
+----
 
-Two coordinate systems coexist:
+Mouse wheel zooms about the cursor, middle-drag pans, ``F`` (or ``0``) fits
+the frame back into the widget. ROI geometry is always held in *frame*
+pixels; :class:`_ImageMapping` converts to and from widget pixels.
 
-* **Frame coords**: pixel positions in the original image. ROIs are
-  stored and persisted in these.
-* **Widget coords**: pixel positions in the displayed widget. The
-  frame is scaled with aspect-preservation to fit the widget, with
-  black bars top/bottom or left/right.
+Signals
+-------
 
-Mouse events come in widget coords; we translate to frame coords via
-``_widget_to_frame()``. Painting goes the other way via
-``_frame_to_widget()``.
+* ``shape_committed(kind, geometry)`` — a new shape was drawn.
+* ``shape_cancelled()`` — a shape in progress was abandoned.
+* ``shape_edited(idx, geometry)`` — an existing shape was moved/reshaped.
+* ``shape_deleted(idx)`` — Delete pressed on the selected shape.
+* ``shape_selected(idx)`` — selection changed by a click (-1 = none).
+* ``hint_changed(text)`` — what the current tool expects next.
+* ``zoom_changed(factor)`` — 1.0 = fit to widget.
 
-Failure modes I expect (and have tried to prevent)
---------------------------------------------------
-
-* **Off-by-one bugs** in coordinate transforms — visible in saved H5
-  ROIs that are subtly wrong size.
-* **Black bar clicks** — when the widget is wider than the frame
-  aspect, clicks in the side bars should be ignored. Handled by
-  ``_widget_to_frame`` returning None outside the frame area.
-* **Resize-during-draw** — if the widget resizes mid-draw, the
-  in-progress shape's widget coords become stale. State is stored
-  in frame coords; re-paint translates back to widget coords.
-* **Focus stealing** — keyboard shortcuts (ESC, Space, etc.) need
-  the canvas to have focus. ``setFocus()`` is called when entering
-  drawing mode.
+Geometry dicts are canonical: ``{"top_left", "bottom_right"}`` for
+rectangles, ``{"center", "radius"}`` for circles, ``{"vertices"}`` for
+polygons. Legacy per-axis keys (``topLeftX``, ``centerX``, ...) are accepted
+on input.
 """
 from __future__ import annotations
 
 import enum
+import math
 from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
-from PySide6.QtCore import QPoint, QRect, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QRect, Qt, Signal
 from PySide6.QtGui import (
     QColor,
+    QFont,
     QImage,
     QKeyEvent,
     QMouseEvent,
@@ -83,56 +84,69 @@ from PySide6.QtGui import (
     QPaintEvent,
     QPen,
     QPixmap,
+    QPolygonF,
+    QWheelEvent,
 )
 from PySide6.QtWidgets import QWidget
 
 from mufasa.roi_tools.roi_logic import CIRCLE, POLYGON, RECTANGLE
 
+SELECT = "select"
+TOOLS = (SELECT, RECTANGLE, CIRCLE, POLYGON)
+
 
 class _DrawMode(enum.Enum):
-    """Active drawing state of the canvas."""
-    IDLE = "idle"               # not drawing; preview is read-only
-    RECT_PENDING = "rect_pending"     # tool selected, waiting for mouse-down
-    RECT_DRAGGING = "rect_dragging"   # mouse down, capturing rectangle
+    """Active interaction state of the canvas."""
+    IDLE = "idle"                       # no tool; read-only preview
+    RECT_PENDING = "rect_pending"       # rectangle tool, waiting for press
+    RECT_DRAGGING = "rect_dragging"
     CIRCLE_PENDING = "circle_pending"
     CIRCLE_DRAGGING = "circle_dragging"
-    POLY_PENDING = "poly_pending"     # tool selected, waiting for first vertex
-    POLY_VERTEXING = "poly_vertexing" # accumulating polygon vertices
-    # Patch 122dm — select / edit modes for drag-to-adjust placed
-    # shapes. See docs/roi_enhancements_proposal.md Proposal 2.
-    SELECT = "select"                 # edit tool active; hover/click
-                                      # placed shapes
-    SHAPE_MOVING = "shape_moving"     # dragging body of selected shape
-    HANDLE_DRAGGING = "handle_dragging"  # resizing via corner/edge handle
+    POLY_PENDING = "poly_pending"       # polygon tool, no vertex yet
+    POLY_VERTEXING = "poly_vertexing"   # accumulating vertices
+    SELECT = "select"                   # select tool, nothing being dragged
+    SHAPE_MOVING = "shape_moving"       # dragging a shape's body
+    HANDLE_DRAGGING = "handle_dragging"  # dragging a corner/edge/rim/vertex
 
 
-# Visual constants
+_PENDING_FOR_TOOL = {
+    RECTANGLE: _DrawMode.RECT_PENDING,
+    CIRCLE: _DrawMode.CIRCLE_PENDING,
+    POLYGON: _DrawMode.POLY_PENDING,
+    SELECT: _DrawMode.SELECT,
+}
+
+# Visual / interaction constants (widget pixels).
 _LIVE_LINE_WIDTH = 2
-_VERTEX_DOT_RADIUS = 5
-# Distance (in widget pixels) within which a polygon click is treated
-# as "snap to existing vertex" — clicking on the first vertex closes
-# the polygon, clicking on an existing vertex is a no-op (avoids
-# accidental degenerate edges).
-_VERTEX_SNAP_DISTANCE_WIDGET_PX = 10
-
-# Patch 122dm — handle hit-test tolerance (widget pixels). 8 px is
-# a typical UI affordance for resize handles; smaller values make
-# handles hard to grab, larger values cause body-drag to be hijacked
-# accidentally.
+_VERTEX_DOT_RADIUS = 4
+# Clicking within this distance of the first vertex closes the polygon.
+_CLOSE_SNAP_WIDGET_PX = 10
+# A click this close to the previous vertex is ignored (stray double hits).
+_DUPLICATE_SNAP_WIDGET_PX = 3
 _HANDLE_HIT_TOLERANCE_WIDGET_PX = 8
-# Visual size of resize handles (widget pixels).
 _HANDLE_BOX_HALF_PX = 5
+_EDGE_HIT_TOLERANCE_WIDGET_PX = 6
+_MIN_ZOOM, _MAX_ZOOM = 1.0, 32.0
+_SELECTION_COLOR = QColor(255, 215, 0)
 
-# NOTE on update strategy:
-# The canvas uses full-widget self.update() calls rather than
-# update(QRect) for bounding-rect updates. Region-based updates would
-# be faster on slow X11 connections (ThinLinc, especially) but require
-# tracking previous-position rects to invalidate both old and new
-# locations. Getting that wrong leaves drawing artifacts.
-# If repaint flicker becomes a real problem, the right place to
-# implement is in mouseMoveEvent (rect_dragging / circle_dragging /
-# poly rubber-band updates): compute oldRect.united(newRect).adjusted(-pad)
-# and pass to update(). Until then, full repaint is safer.
+_RECT_HANDLES = ("nw", "n", "ne", "e", "se", "s", "sw", "w")
+_HANDLE_CURSORS = {
+    "nw": Qt.SizeFDiagCursor, "se": Qt.SizeFDiagCursor,
+    "ne": Qt.SizeBDiagCursor, "sw": Qt.SizeBDiagCursor,
+    "n": Qt.SizeVerCursor, "s": Qt.SizeVerCursor,
+    "e": Qt.SizeHorCursor, "w": Qt.SizeHorCursor,
+    "edge": Qt.SizeHorCursor,
+}
+
+_TOOL_HINTS = {
+    SELECT: ("Select: click a shape · drag to move · drag a handle to "
+             "reshape · polygon: double-click an edge to add a vertex, "
+             "right-click a vertex to remove it · arrows nudge · Del "
+             "deletes"),
+    RECTANGLE: "Rectangle: press and drag",
+    CIRCLE: "Circle: press at the centre and drag out the radius",
+    POLYGON: "Polygon: click to place vertices (no limit)",
+}
 
 
 @dataclass
@@ -147,7 +161,7 @@ class _ImageMapping:
     def widget_to_frame(self, wx: int, wy: int
                         ) -> tuple[int, int] | None:
         """Convert widget coords to frame coords. Returns None if the
-        widget point is in the black bars (outside the frame)."""
+        widget point is outside the frame (black bars / panned away)."""
         if self.scale <= 0:
             return None
         fx = (wx - self.offset_x) / self.scale
@@ -167,15 +181,11 @@ class _ImageMapping:
 
 @dataclass
 class _DrawState:
-    """All currently-being-drawn shape state. Coordinates are
-    always in FRAME pixel space, never widget pixel space."""
-    # Rectangle: corner anchors
+    """The shape being drawn. Coordinates are FRAME pixels."""
     rect_start: tuple[int, int] | None = None
     rect_end: tuple[int, int] | None = None
-    # Circle: center + current radius point
     circle_center: tuple[int, int] | None = None
     circle_edge: tuple[int, int] | None = None
-    # Polygon: committed vertices + current rubber-band end point
     poly_vertices: list[tuple[int, int]] = field(default_factory=list)
     poly_rubber_end: tuple[int, int] | None = None
 
@@ -188,100 +198,103 @@ class _DrawState:
         self.poly_rubber_end = None
 
 
+def canonical_geometry(kind: str, geom: dict) -> dict:
+    """Normalise legacy per-axis geometry keys to the canonical form."""
+    if kind == RECTANGLE:
+        tl = geom.get("top_left") or (
+            geom.get("topLeftX", 0), geom.get("topLeftY", 0))
+        br = geom.get("bottom_right") or (
+            geom.get("Bottom_right_X", 0), geom.get("Bottom_right_Y", 0))
+        x1, x2 = sorted((int(tl[0]), int(br[0])))
+        y1, y2 = sorted((int(tl[1]), int(br[1])))
+        return {"top_left": [x1, y1], "bottom_right": [x2, y2]}
+    if kind == CIRCLE:
+        c = geom.get("center") or (
+            geom.get("centerX", 0), geom.get("centerY", 0))
+        return {"center": [int(c[0]), int(c[1])],
+                "radius": int(geom.get("radius", 0))}
+    if kind == POLYGON:
+        return {"vertices": [[int(v[0]), int(v[1])]
+                             for v in (geom.get("vertices") or [])]}
+    return dict(geom)
+
+
+def _dedupe_consecutive(verts: list) -> list[tuple[int, int]]:
+    """Drop exact consecutive duplicates (incl. last == first)."""
+    out: list[tuple[int, int]] = []
+    for v in verts:
+        t = (int(v[0]), int(v[1]))
+        if not out or out[-1] != t:
+            out.append(t)
+    while len(out) > 1 and out[-1] == out[0]:
+        out.pop()
+    return out
+
+
+def _dist_point_segment(p, a, b) -> tuple[float, float]:
+    """Distance from p to segment ab, and the projection parameter t."""
+    ax, ay = a
+    bx, by = b
+    px, py = p
+    dx, dy = bx - ax, by - ay
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / L2))
+    cx, cy = ax + t * dx, ay + t * dy
+    return math.hypot(px - cx, py - cy), t
+
+
 class ROICanvas(QWidget):
-    """Native Qt widget for drawing ROIs on a video frame.
+    """Native Qt widget for drawing and editing ROIs on a video frame."""
 
-    Usage from the panel::
-
-        canvas = ROICanvas(self)
-        canvas.shape_committed.connect(self._on_shape_committed)
-        canvas.set_frame(frame_bgr_array)
-
-        # Later, when user clicks Draw → in the panel:
-        canvas.start_draw(kind=RECTANGLE, color_bgr=(0, 0, 255),
-                          thickness=3)
-
-        # User draws on the canvas. shape_committed fires with the
-        # captured geometry, or shape_cancelled fires on ESC.
-    """
-
-    # Emitted on successful shape capture. Args: kind, geometry dict
-    # in frame-pixel coords. Geometry shape mirrors what
-    # _run_selector_in_process used to return, for drop-in replacement:
-    #   rectangle: {"top_left": [x, y], "bottom_right": [x, y]}
-    #   circle:    {"center": [x, y], "radius": int}
-    #   polygon:   {"vertices": [[x, y], ...]}
     shape_committed = Signal(str, dict)
-
-    # Emitted on user cancel (ESC outside dragging, or window close).
     shape_cancelled = Signal()
-
-    # Patch 122dm — edit signals for drag-to-adjust placed shapes.
-    # Args of shape_edited: (idx_in_existing_rois, new_geometry_dict).
-    # The geometry dict matches the shape_committed dict format
-    # (canonical form: top_left/bottom_right, center/radius, vertices).
-    # Args of shape_deleted: (idx_in_existing_rois,).
     shape_edited = Signal(int, dict)
     shape_deleted = Signal(int)
-
-    # Patch 122fd — emitted when the user clicks an ROI in select
-    # mode (or clicks empty space to deselect). The panel uses
-    # this to highlight the corresponding row in the ROI table.
-    # idx = -1 means "deselected" (clicked empty space). User
-    # request (May 26, 2026): "Clicking an ROI should also
-    # select/highlight it in the table."
     shape_selected = Signal(int)
+    hint_changed = Signal(str)
+    zoom_changed = Signal(float)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._frame_bgr: np.ndarray | None = None
         self._frame_pixmap: QPixmap | None = None
         self._mapping: _ImageMapping | None = None
-
-        # Existing ROIs to display (overlay only, not editable here).
-        # List of dicts: {"kind": str, "color_bgr": (b,g,r), "thickness": int,
-        #                 "geometry": dict (same shape as committed signal)}
+        # [{kind, color_bgr, thickness, geometry, name?}]
         self._existing_rois: list[dict] = []
+        self._show_labels = True
 
-        # Active draw state
+        self._tool: str | None = None
         self._mode = _DrawMode.IDLE
-
-        # Patch 122dm — edit state (Proposal 2: drag-to-adjust).
-        # Tracks which placed shape (if any) is currently selected,
-        # which handle on it (None = body), the cursor offset at
-        # drag-start, and the pre-drag geometry (for potential
-        # rollback if a future undo lands).
-        self._selected_idx: int | None = None
-        self._selected_handle: str | None = None
-        self._drag_offset_frame: tuple[float, float] | None = None
-        self._pre_drag_geom: dict | None = None
-        self.setFocusPolicy(Qt.StrongFocus)  # for Delete key
         self._draw_state = _DrawState()
         self._draw_color_bgr: tuple[int, int, int] = (0, 0, 255)
         self._draw_thickness: int = 3
 
-        # Widget config
-        self.setMinimumSize(640, 360)
+        # Selection / edit state.
+        self._selected_idx: int | None = None
+        self._selected_handle: str | None = None
+        self._drag_offset_frame: tuple[float, float] | None = None
+        self._pre_drag_geom: dict | None = None
+        self._drag_anchor_geom: dict | None = None
+
+        # View state: zoom relative to fit, pan in widget px.
+        self._zoom = 1.0
+        self._pan = QPointF(0.0, 0.0)
+        self._pan_last: QPointF | None = None
+
+        self.setMinimumSize(480, 270)
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
-        self.setStyleSheet(
-            "background: #1a1a1a; border: 1px solid palette(mid);"
-        )
+        self.setStyleSheet("background: #1a1a1a;")
 
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
     def set_frame(self, bgr: np.ndarray | None) -> None:
-        """Replace the displayed frame.
-
-        Importantly, this does NOT cancel any in-progress drawing.
-        Frame nav (slider, +1f, +1s, etc.) often happens during a
-        polygon draw — the user navigates to the right frame to
-        place vertices around a feature visible only there. ROI
-        geometry is stored in frame-pixel space, not widget-pixel
-        space, so the in-progress shape stays correct across frame
-        changes; only the underlying frame image changes.
-        """
+        """Replace the displayed frame. Does NOT cancel an in-progress
+        draw — geometry is in frame pixels, so a polygon can be continued
+        after stepping to another frame."""
+        same_size = (self._frame_bgr is not None and bgr is not None
+                     and self._frame_bgr.shape[:2] == bgr.shape[:2])
         self._frame_bgr = bgr
         if bgr is None:
             self._frame_pixmap = None
@@ -290,197 +303,220 @@ class ROICanvas(QWidget):
             h, w = rgb.shape[:2]
             qimg = QImage(rgb.data, w, h, w * 3, QImage.Format_RGB888).copy()
             self._frame_pixmap = QPixmap.fromImage(qimg)
+        if not same_size:
+            self._zoom, self._pan = 1.0, QPointF(0.0, 0.0)
+            self.zoom_changed.emit(self._zoom)
         self._recompute_mapping()
         self.update()
 
     def set_existing_rois(self, rois: list[dict]) -> None:
-        """Replace the list of ROIs displayed as overlays.
-
-        Each dict: {kind, color_bgr (B,G,R tuple), thickness, geometry}.
-        The geometry shape matches the shape_committed signal payload.
-        """
-        self._existing_rois = list(rois)
+        """Replace the displayed ROIs. Each dict: ``kind``, ``color_bgr``
+        (B,G,R), ``thickness``, ``geometry`` and optionally ``name``."""
+        self._existing_rois = [dict(r) for r in rois]
+        if (self._selected_idx is not None
+                and self._selected_idx >= len(self._existing_rois)):
+            self._selected_idx = None
         self.update()
 
-    def start_draw(self, kind: str,
-                   color_bgr: tuple[int, int, int],
-                   thickness: int) -> None:
-        """Enter drawing mode for ``kind`` (one of RECTANGLE / CIRCLE /
-        POLYGON from mufasa.roi_tools.roi_logic).
+    def set_show_labels(self, show: bool) -> None:
+        self._show_labels = bool(show)
+        self.update()
 
-        After this call, the next user mouse/keyboard interaction
-        starts capturing a shape. The canvas grabs keyboard focus so
-        ESC/Q/Space work.
+    def set_tool(self, tool: str | None,
+                 color_bgr: tuple[int, int, int] | None = None,
+                 thickness: int | None = None) -> None:
+        """Arm a tool: ``"select"``, RECTANGLE, CIRCLE, POLYGON or None.
+
+        Switching tools abandons a shape in progress (without emitting
+        ``shape_cancelled``) and clears the selection when leaving select.
         """
-        if self._mode != _DrawMode.IDLE:
-            self._cancel_draw(emit_signal=False)
-        self._draw_color_bgr = color_bgr
+        if color_bgr is not None:
+            self._draw_color_bgr = tuple(color_bgr)
+        if thickness is not None:
+            self._draw_thickness = max(1, int(thickness))
+        self._draw_state.reset()
+        if tool not in TOOLS:
+            tool = None
+        if tool != SELECT and self._selected_idx is not None:
+            self._selected_idx = None
+            self.shape_selected.emit(-1)
+        self._selected_handle = None
+        self._tool = tool
+        self._mode = _PENDING_FOR_TOOL.get(tool, _DrawMode.IDLE)
+        self._update_cursor()
+        self._emit_hint()
+        if tool is not None:
+            self.setFocus(Qt.OtherFocusReason)
+        self.update()
+
+    def tool(self) -> str | None:
+        return self._tool
+
+    def set_draw_style(self, color_bgr: tuple[int, int, int],
+                       thickness: int) -> None:
+        """Colour / thickness used for the live preview of new shapes."""
+        self._draw_color_bgr = tuple(color_bgr)
         self._draw_thickness = max(1, int(thickness))
-        if kind == RECTANGLE:
-            self._mode = _DrawMode.RECT_PENDING
-        elif kind == CIRCLE:
-            self._mode = _DrawMode.CIRCLE_PENDING
-        elif kind == POLYGON:
-            self._mode = _DrawMode.POLY_PENDING
-        else:
-            return
-        self.setFocus(Qt.OtherFocusReason)
-        self.setCursor(Qt.CrossCursor)
         self.update()
+
+    def start_draw(self, kind: str, color_bgr: tuple[int, int, int],
+                   thickness: int) -> None:
+        """Compatibility alias for :meth:`set_tool` with a drawing tool."""
+        self.set_tool(kind, color_bgr, thickness)
 
     def is_drawing(self) -> bool:
-        """True when a shape capture is in progress (any non-IDLE)."""
-        return self._mode != _DrawMode.IDLE
+        """True while a shape is actually being drawn (not merely armed)."""
+        return self._mode in (_DrawMode.RECT_DRAGGING,
+                              _DrawMode.CIRCLE_DRAGGING,
+                              _DrawMode.POLY_VERTEXING)
 
     def cancel_draw(self) -> None:
-        """Abort any in-progress draw. Emits shape_cancelled."""
-        if self._mode != _DrawMode.IDLE:
-            self._cancel_draw(emit_signal=True)
+        """Abandon the shape in progress; the tool stays armed."""
+        if self.is_drawing():
+            self._abandon_shape(emit_signal=True)
 
-    # ------------------------------------------------------------------ #
-    # Patch 122dm — Edit / select mode (Proposal 2: drag-to-adjust)
-    # ------------------------------------------------------------------ #
     def start_select(self) -> None:
-        """Enter select / edit mode for placed shapes.
-
-        Cancels any in-progress draw first. While in select mode:
-        * Click on a placed shape → selects it (draws selection chrome).
-        * Click + drag the body → moves the shape.
-        * Click + drag a corner handle (rect) / radius handle (circle)
-          → resizes the shape.
-        * Click on empty space → deselects.
-        * Delete key on a selected shape → emits shape_deleted.
-        """
-        if self._mode != _DrawMode.IDLE:
-            self._cancel_draw(emit_signal=False)
-        self._mode = _DrawMode.SELECT
-        self._selected_idx = None
-        self._selected_handle = None
-        self._drag_offset_frame = None
-        self._pre_drag_geom = None
-        self.update()
-        self.setFocus()
+        self.set_tool(SELECT)
 
     def stop_select(self) -> None:
-        """Leave select / edit mode (back to IDLE)."""
-        if self._mode in (_DrawMode.SELECT,
-                          _DrawMode.SHAPE_MOVING,
-                          _DrawMode.HANDLE_DRAGGING):
-            self._mode = _DrawMode.IDLE
-            self._selected_idx = None
-            self._selected_handle = None
-            self.update()
+        if self.is_selecting():
+            self.set_tool(None)
 
     def is_selecting(self) -> bool:
-        """True when select / edit mode is active (any of SELECT,
-        SHAPE_MOVING, HANDLE_DRAGGING)."""
-        return self._mode in (_DrawMode.SELECT,
-                              _DrawMode.SHAPE_MOVING,
+        return self._mode in (_DrawMode.SELECT, _DrawMode.SHAPE_MOVING,
                               _DrawMode.HANDLE_DRAGGING)
 
-    # -- Geometry helpers ------------------------------------------------ #
-    def _canonical_geom(self, kind: str, geom: dict) -> dict:
-        """Normalize geometry to the canonical form used by
-        shape_committed / shape_edited.
+    def select_shape(self, idx: int | None) -> None:
+        """Select a shape programmatically (e.g. from the ROI table).
+        Does not emit ``shape_selected``."""
+        if idx is not None and not (0 <= idx < len(self._existing_rois)):
+            idx = None
+        self._selected_idx = idx
+        self._selected_handle = None
+        self.update()
 
-        Mufasa stores shapes loaded from older H5 files using legacy
-        per-axis keys (topLeftX, topLeftY, Bottom_right_X,
-        Bottom_right_Y, centerX, centerY). The painter accepts both
-        but edit operations always produce the canonical form
-        (top_left/bottom_right, center/radius, vertices).
-        """
+    def selected_index(self) -> int | None:
+        return self._selected_idx
+
+    def fit_view(self) -> None:
+        self._zoom, self._pan = 1.0, QPointF(0.0, 0.0)
+        self._recompute_mapping()
+        self.zoom_changed.emit(self._zoom)
+        self.update()
+
+    def zoom_by(self, factor: float, anchor: QPointF | None = None) -> None:
+        """Zoom by ``factor`` keeping the frame point under ``anchor``
+        (widget coords; default: widget centre) fixed."""
+        if self._frame_bgr is None or self._mapping is None:
+            return
+        new_zoom = max(_MIN_ZOOM, min(_MAX_ZOOM, self._zoom * factor))
+        if new_zoom == self._zoom:
+            return
+        if anchor is None:
+            anchor = QPointF(self.width() / 2.0, self.height() / 2.0)
+        m = self._mapping
+        fx = (anchor.x() - m.offset_x) / m.scale
+        fy = (anchor.y() - m.offset_y) / m.scale
+        self._zoom = new_zoom
+        self._recompute_mapping()
+        m2 = self._mapping
+        self._pan += QPointF(anchor.x() - (fx * m2.scale + m2.offset_x),
+                             anchor.y() - (fy * m2.scale + m2.offset_y))
+        self._recompute_mapping()
+        self.zoom_changed.emit(self._zoom)
+        self.update()
+
+    # ------------------------------------------------------------------ #
+    # Geometry helpers
+    # ------------------------------------------------------------------ #
+    def _canonical_geom(self, kind: str, geom: dict) -> dict:
+        return canonical_geometry(kind, geom)
+
+    def _geom(self, idx: int) -> tuple[str, dict]:
+        roi = self._existing_rois[idx]
+        kind = roi.get("kind")
+        return kind, canonical_geometry(kind, roi.get("geometry", {}))
+
+    def _tol_frame(self, widget_px: float) -> float:
+        m = self._mapping
+        return widget_px / max(m.scale, 1e-6) if m else widget_px
+
+    def _handles(self, kind: str, geom: dict) -> dict[str, tuple[float, float]]:
+        """Handle name -> frame position, for the given shape."""
         if kind == RECTANGLE:
-            tl = geom.get("top_left") or (
-                geom.get("topLeftX", 0), geom.get("topLeftY", 0),
-            )
-            br = geom.get("bottom_right") or (
-                geom.get("Bottom_right_X", 0),
-                geom.get("Bottom_right_Y", 0),
-            )
-            return {"top_left": [int(tl[0]), int(tl[1])],
-                    "bottom_right": [int(br[0]), int(br[1])]}
+            (x1, y1), (x2, y2) = geom["top_left"], geom["bottom_right"]
+            mx, my = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+            return {"nw": (x1, y1), "n": (mx, y1), "ne": (x2, y1),
+                    "e": (x2, my), "se": (x2, y2), "s": (mx, y2),
+                    "sw": (x1, y2), "w": (x1, my)}
         if kind == CIRCLE:
-            c = geom.get("center") or (
-                geom.get("centerX", 0), geom.get("centerY", 0),
-            )
-            r = int(geom.get("radius", 0))
-            return {"center": [int(c[0]), int(c[1])], "radius": r}
+            c, r = geom["center"], geom["radius"]
+            return {"edge": (c[0] + r, c[1])}
         if kind == POLYGON:
-            verts = geom.get("vertices") or []
-            return {"vertices": [[int(v[0]), int(v[1])]
-                                  for v in verts]}
-        return dict(geom)
+            return {f"v{i}": (v[0], v[1])
+                    for i, v in enumerate(geom["vertices"])}
+        return {}
+
+    def _body_hit(self, kind: str, geom: dict, fx: float, fy: float) -> bool:
+        edge_tol = self._tol_frame(_EDGE_HIT_TOLERANCE_WIDGET_PX)
+        if kind == RECTANGLE:
+            (x1, y1), (x2, y2) = geom["top_left"], geom["bottom_right"]
+            return (x1 - edge_tol <= fx <= x2 + edge_tol
+                    and y1 - edge_tol <= fy <= y2 + edge_tol)
+        if kind == CIRCLE:
+            c, r = geom["center"], geom["radius"]
+            return math.hypot(fx - c[0], fy - c[1]) <= r + edge_tol
+        if kind == POLYGON:
+            verts = geom["vertices"]
+            if self._point_in_polygon(fx, fy, verts):
+                return True
+            n = len(verts)
+            return any(
+                _dist_point_segment((fx, fy), verts[i], verts[(i + 1) % n])[0]
+                <= edge_tol for i in range(n))
+        return False
 
     def _hit_test(
         self, frame_pt: tuple[float, float]
     ) -> tuple[int | None, str | None]:
-        """Find the placed shape under the cursor in select mode.
+        """Shape (and handle) under the cursor.
 
-        Iterates back-to-front (top-most first; matches z-order
-        rendering) so overlapping shapes resolve to the most recent.
-        For each shape: tests handles first (handles are smaller
-        click targets that take precedence over body-clicks), then
-        the body.
-
-        Returns
-        -------
-        (shape_idx, handle_name): tuple
-            shape_idx is the index into self._existing_rois or None
-            on miss. handle_name is "nw" / "ne" / "sw" / "se" for
-            rectangle corners, "edge" for circle radius, or None
-            for body-hit / miss.
-
-        Polygon vertex-drag is deferred per the proposal (Proposal 2,
-        "What this proposal does NOT cover"). Polygon body-drag is
-        supported.
+        The selected shape's handles are tested first, then rectangle /
+        circle handles of every shape, then bodies top-most first.
+        Returns (idx, handle) with handle None for a body hit, or
+        (None, None) on a miss.
         """
         if self._mapping is None:
             return (None, None)
-        m = self._mapping
-        # Tolerance in frame coords (scaled by widget→frame ratio).
-        tol = _HANDLE_HIT_TOLERANCE_WIDGET_PX / max(m.scale, 1e-6)
         fx, fy = frame_pt
-        # Reverse-iterate for top-most-first hit semantics.
-        for idx in range(len(self._existing_rois) - 1, -1, -1):
-            roi = self._existing_rois[idx]
-            kind = roi.get("kind")
-            geom = self._canonical_geom(kind, roi.get("geometry", {}))
-            if kind == RECTANGLE:
-                tl, br = geom["top_left"], geom["bottom_right"]
-                x1, y1 = min(tl[0], br[0]), min(tl[1], br[1])
-                x2, y2 = max(tl[0], br[0]), max(tl[1], br[1])
-                # 4 corner handles
-                corners = {
-                    "nw": (x1, y1), "ne": (x2, y1),
-                    "sw": (x1, y2), "se": (x2, y2),
-                }
-                for name, (hx, hy) in corners.items():
-                    if abs(fx - hx) <= tol and abs(fy - hy) <= tol:
-                        return (idx, name)
-                # Body
-                if x1 <= fx <= x2 and y1 <= fy <= y2:
-                    return (idx, None)
-            elif kind == CIRCLE:
-                c, r = geom["center"], geom["radius"]
-                dx, dy = fx - c[0], fy - c[1]
-                dist = (dx * dx + dy * dy) ** 0.5
-                # East-edge radius handle.
-                if abs(dist - r) <= tol:
-                    return (idx, "edge")
-                # Body
-                if dist <= r:
-                    return (idx, None)
-            elif kind == POLYGON:
-                # Body-hit via simple point-in-polygon (ray-cast).
-                verts = geom["vertices"]
-                if self._point_in_polygon(fx, fy, verts):
-                    return (idx, None)
+        tol = self._tol_frame(_HANDLE_HIT_TOLERANCE_WIDGET_PX)
+
+        def handle_at(idx: int) -> str | None:
+            kind, geom = self._geom(idx)
+            for name, (hx, hy) in self._handles(kind, geom).items():
+                if abs(fx - hx) <= tol and abs(fy - hy) <= tol:
+                    return name
+            return None
+
+        n = len(self._existing_rois)
+        if self._selected_idx is not None and self._selected_idx < n:
+            h = handle_at(self._selected_idx)
+            if h is not None:
+                return (self._selected_idx, h)
+        for idx in range(n - 1, -1, -1):
+            if self._existing_rois[idx].get("kind") in (RECTANGLE, CIRCLE):
+                h = handle_at(idx)
+                if h is not None:
+                    return (idx, h)
+        for idx in range(n - 1, -1, -1):
+            kind, geom = self._geom(idx)
+            if self._body_hit(kind, geom, fx, fy):
+                return (idx, None)
         return (None, None)
 
     @staticmethod
-    def _point_in_polygon(px: float, py: float,
-                          verts: list) -> bool:
-        """Ray-cast point-in-polygon test. O(n) in vertex count."""
+    def _point_in_polygon(px: float, py: float, verts: list) -> bool:
+        """Ray-cast point-in-polygon test."""
         n = len(verts)
         if n < 3:
             return False
@@ -490,23 +526,40 @@ class ROICanvas(QWidget):
             xi, yi = verts[i][0], verts[i][1]
             xj, yj = verts[j][0], verts[j][1]
             if ((yi > py) != (yj > py)) and (
-                px < (xj - xi) * (py - yi) / max(yj - yi, 1e-9) + xi
+                px < (xj - xi) * (py - yi) / ((yj - yi) or 1e-9) + xi
             ):
                 inside = not inside
             j = i
         return inside
 
     def _apply_edit_geom(self, idx: int, new_geom: dict) -> None:
-        """Mutate the indexed shape's geometry IN PLACE (so the
-        next paintEvent renders the updated shape) and update the
-        canonical form. Does NOT emit shape_edited yet — that
-        happens on mouseRelease so panels only see committed
-        end-states, not every intermediate frame during a drag."""
+        """Update the displayed shape during a drag (emitted on release)."""
         if 0 <= idx < len(self._existing_rois):
             roi = self._existing_rois[idx]
-            kind = roi.get("kind")
-            roi["geometry"] = self._canonical_geom(kind, new_geom)
+            roi["geometry"] = canonical_geometry(roi.get("kind"), new_geom)
             self.update()
+
+    def _commit_edit(self, idx: int, new_geom: dict) -> None:
+        """Apply and emit an edit in one step (keyboard / vertex ops)."""
+        self._apply_edit_geom(idx, new_geom)
+        kind, geom = self._geom(idx)
+        self.shape_edited.emit(idx, geom)
+
+    def _clamp_frame(self, fx: float, fy: float) -> tuple[int, int]:
+        m = self._mapping
+        return (int(round(max(0, min(m.frame_w, fx)))),
+                int(round(max(0, min(m.frame_h, fy)))))
+
+    def _event_frame_pt(self, ev, clamp: bool) -> tuple[int, int] | None:
+        m = self._mapping
+        if m is None:
+            return None
+        wx, wy = ev.position().x(), ev.position().y()
+        pt = m.widget_to_frame(wx, wy)
+        if pt is None and clamp:
+            pt = self._clamp_frame((wx - m.offset_x) / m.scale,
+                                   (wy - m.offset_y) / m.scale)
+        return pt
 
     # ------------------------------------------------------------------ #
     # Coordinate mapping
@@ -516,15 +569,21 @@ class ROICanvas(QWidget):
             self._mapping = None
             return
         h, w = self._frame_bgr.shape[:2]
-        wW = max(1, self.width())
-        wH = max(1, self.height())
-        scale = min(wW / w, wH / h)
-        new_w = int(round(w * scale))
-        new_h = int(round(h * scale))
-        offset_x = (wW - new_w) // 2
-        offset_y = (wH - new_h) // 2
+        wW, wH = max(1, self.width()), max(1, self.height())
+        scale = min(wW / w, wH / h) * self._zoom
+        new_w, new_h = w * scale, h * scale
+        if self._zoom <= 1.0:
+            self._pan = QPointF(0.0, 0.0)
+        else:
+            # Keep at least half the widget covered by the frame.
+            max_px = max(0.0, (new_w - wW) / 2.0 + wW / 2.0)
+            max_py = max(0.0, (new_h - wH) / 2.0 + wH / 2.0)
+            self._pan = QPointF(max(-max_px, min(max_px, self._pan.x())),
+                                max(-max_py, min(max_py, self._pan.y())))
         self._mapping = _ImageMapping(
-            scale=scale, offset_x=offset_x, offset_y=offset_y,
+            scale=scale,
+            offset_x=int(round((wW - new_w) / 2.0 + self._pan.x())),
+            offset_y=int(round((wH - new_h) / 2.0 + self._pan.y())),
             frame_w=w, frame_h=h,
         )
 
@@ -536,536 +595,464 @@ class ROICanvas(QWidget):
     # ------------------------------------------------------------------ #
     # Painting
     # ------------------------------------------------------------------ #
+    def _pen_width(self, thickness: int) -> int:
+        """ROI thickness is in frame px; show it scaled, within reason."""
+        s = self._mapping.scale if self._mapping else 1.0
+        return max(1, int(round(thickness * min(s, 2.0))))
+
     def paintEvent(self, ev: QPaintEvent) -> None:
         p = QPainter(self)
         try:
-            # 1. Background
             p.fillRect(self.rect(), QColor(26, 26, 26))
-
-            # 2. Frame (aspect-preserving scaled)
-            if self._frame_pixmap is not None and self._mapping is not None:
-                m = self._mapping
-                target = QRect(
-                    m.offset_x, m.offset_y,
-                    int(round(m.frame_w * m.scale)),
-                    int(round(m.frame_h * m.scale)),
-                )
-                p.drawPixmap(target, self._frame_pixmap,
-                             self._frame_pixmap.rect())
-
-                # 3. Existing ROIs overlay
-                for idx, roi in enumerate(self._existing_rois):
-                    self._paint_existing_roi(p, roi)
-                    # Patch 122dm — selection chrome for the
-                    # currently-selected shape (SELECT modes only).
-                    if (self.is_selecting()
-                            and idx == self._selected_idx):
-                        self._paint_selection_chrome(p, roi)
-
-                # 4. In-progress drawing
-                self._paint_in_progress(p)
+            if self._frame_pixmap is None or self._mapping is None:
+                p.setPen(QColor(140, 140, 140))
+                p.drawText(self.rect(), Qt.AlignCenter, "No frame")
+                return
+            m = self._mapping
+            p.setRenderHint(QPainter.SmoothPixmapTransform, m.scale < 4.0)
+            p.drawPixmap(QRect(m.offset_x, m.offset_y,
+                               int(round(m.frame_w * m.scale)),
+                               int(round(m.frame_h * m.scale))),
+                         self._frame_pixmap, self._frame_pixmap.rect())
+            p.setRenderHint(QPainter.Antialiasing, True)
+            for idx, roi in enumerate(self._existing_rois):
+                self._paint_existing_roi(p, roi)
+                if self.is_selecting() and idx == self._selected_idx:
+                    self._paint_selection_chrome(p, roi)
+            self._paint_in_progress(p)
         finally:
             p.end()
 
     def _paint_existing_roi(self, p: QPainter, roi: dict) -> None:
-        kind = roi.get("kind")
-        color_bgr = roi.get("color_bgr", (0, 0, 255))
-        thickness = roi.get("thickness", 2)
-        geom = roi.get("geometry", {})
         m = self._mapping
-        if m is None:
-            return
-        pen = QPen(self._bgr_to_qcolor(color_bgr))
-        pen.setWidth(max(1, int(thickness)))
+        kind = roi.get("kind")
+        geom = canonical_geometry(kind, roi.get("geometry", {}))
+        color = self._bgr_to_qcolor(roi.get("color_bgr", (0, 0, 255)))
+        pen = QPen(color)
+        pen.setWidth(self._pen_width(roi.get("thickness", 2)))
         p.setPen(pen)
         p.setBrush(Qt.NoBrush)
-
+        label_at: tuple[int, int] | None = None
         if kind == RECTANGLE:
-            tl = geom.get("top_left") or (
-                geom.get("topLeftX", 0), geom.get("topLeftY", 0),
-            )
-            br = geom.get("bottom_right") or (
-                geom.get("Bottom_right_X", 0), geom.get("Bottom_right_Y", 0),
-            )
-            x1, y1 = m.frame_to_widget(tl[0], tl[1])
-            x2, y2 = m.frame_to_widget(br[0], br[1])
-            p.drawRect(QRect(min(x1, x2), min(y1, y2),
-                             abs(x2 - x1), abs(y2 - y1)))
+            x1, y1 = m.frame_to_widget(*geom["top_left"])
+            x2, y2 = m.frame_to_widget(*geom["bottom_right"])
+            p.drawRect(QRect(x1, y1, x2 - x1, y2 - y1))
+            label_at = (x1 + 3, y1 - 4)
         elif kind == CIRCLE:
-            cx, cy = geom.get("center") or (
-                geom.get("centerX", 0), geom.get("centerY", 0),
-            )
-            r = geom.get("radius", 0)
-            wcx, wcy = m.frame_to_widget(cx, cy)
-            wr = int(round(r * m.scale))
+            wcx, wcy = m.frame_to_widget(*geom["center"])
+            wr = int(round(geom["radius"] * m.scale))
             p.drawEllipse(QPoint(wcx, wcy), wr, wr)
-        elif kind == POLYGON:
-            verts = geom.get("vertices") or []
-            if len(verts) >= 2:
-                pts = [QPoint(*m.frame_to_widget(v[0], v[1])) for v in verts]
-                # Closed polygon — connect last to first too
-                p.drawPolygon(pts)
-
-    # ------------------------------------------------------------------ #
-    # Patch 122dm — selection chrome (Proposal 2)
-    # ------------------------------------------------------------------ #
-    def _paint_selection_chrome(self, p: QPainter, roi: dict) -> None:
-        """Render selection indicator + drag/resize handles for the
-        currently-selected shape. Drawn AFTER the shape itself so
-        chrome sits on top.
-
-        Visuals: a thick yellow dashed outline (or a halo on circles)
-        plus small filled squares at each resize handle. The halo
-        is the simplest visual that signals "selected" without
-        depending on contrast against arbitrary frame backgrounds.
-        """
-        m = self._mapping
-        if m is None:
-            return
-        kind = roi.get("kind")
-        geom = self._canonical_geom(kind, roi.get("geometry", {}))
-
-        # Selection outline
-        sel_pen = QPen(QColor(255, 215, 0))  # gold-ish yellow
-        sel_pen.setWidth(2)
-        sel_pen.setStyle(Qt.DashLine)
-        p.setPen(sel_pen)
-        p.setBrush(Qt.NoBrush)
-
-        # Handle painter (small filled squares).
-        handle_brush = QColor(255, 215, 0)
-
-        def _draw_handle(wx: float, wy: float) -> None:
-            p.fillRect(QRect(
-                int(wx - _HANDLE_BOX_HALF_PX),
-                int(wy - _HANDLE_BOX_HALF_PX),
-                _HANDLE_BOX_HALF_PX * 2,
-                _HANDLE_BOX_HALF_PX * 2,
-            ), handle_brush)
-
-        if kind == RECTANGLE:
-            tl, br = geom["top_left"], geom["bottom_right"]
-            x1, y1 = m.frame_to_widget(min(tl[0], br[0]),
-                                        min(tl[1], br[1]))
-            x2, y2 = m.frame_to_widget(max(tl[0], br[0]),
-                                        max(tl[1], br[1]))
-            # Outline (slightly inflated so it doesn't overlap the
-            # main shape stroke; +2 pixels)
-            p.drawRect(QRect(x1 - 2, y1 - 2,
-                             (x2 - x1) + 4, (y2 - y1) + 4))
-            # Corner handles
-            for (hx, hy) in [(x1, y1), (x2, y1),
-                              (x1, y2), (x2, y2)]:
-                _draw_handle(hx, hy)
-        elif kind == CIRCLE:
-            c, r = geom["center"], geom["radius"]
-            wcx, wcy = m.frame_to_widget(c[0], c[1])
-            wr = int(round(r * m.scale))
-            # Halo: a slightly larger dashed circle.
-            p.drawEllipse(QPoint(wcx, wcy), wr + 3, wr + 3)
-            # East radius handle.
-            _draw_handle(wcx + wr, wcy)
+            label_at = (wcx - wr + 3, wcy - wr - 4)
         elif kind == POLYGON:
             verts = geom["vertices"]
             if len(verts) >= 2:
-                pts = [QPoint(*m.frame_to_widget(v[0], v[1]))
-                       for v in verts]
-                p.drawPolygon(pts)
-                # Polygon vertex-drag is deferred per the proposal;
-                # don't draw vertex handles to avoid suggesting
-                # they're interactive. Body-drag works without
-                # handle hints.
+                p.drawPolygon(QPolygonF([QPointF(*m.frame_to_widget(*v))
+                                         for v in verts]))
+                top = min(verts, key=lambda v: v[1])
+                wx, wy = m.frame_to_widget(*top)
+                label_at = (wx + 3, wy - 4)
+        name = roi.get("name")
+        if self._show_labels and name and label_at is not None:
+            f = QFont(self.font())
+            f.setPointSizeF(max(7.0, f.pointSizeF() - 1))
+            f.setBold(True)
+            p.setFont(f)
+            x, y = label_at
+            y = max(y, 12)
+            p.setPen(QColor(0, 0, 0, 200))
+            p.drawText(QPoint(x + 1, y + 1), name)
+            p.setPen(color)
+            p.drawText(QPoint(x, y), name)
+
+    def _draw_handle(self, p: QPainter, wx: float, wy: float,
+                     filled: bool = True) -> None:
+        r = QRect(int(wx - _HANDLE_BOX_HALF_PX), int(wy - _HANDLE_BOX_HALF_PX),
+                  _HANDLE_BOX_HALF_PX * 2, _HANDLE_BOX_HALF_PX * 2)
+        p.setPen(QPen(QColor(0, 0, 0), 1))
+        p.setBrush(_SELECTION_COLOR if filled else Qt.NoBrush)
+        p.drawRect(r)
+        p.setBrush(Qt.NoBrush)
+
+    def _paint_selection_chrome(self, p: QPainter, roi: dict) -> None:
+        """Dashed outline plus the shape's handles."""
+        m = self._mapping
+        kind = roi.get("kind")
+        geom = canonical_geometry(kind, roi.get("geometry", {}))
+        pen = QPen(_SELECTION_COLOR)
+        pen.setWidth(1)
+        pen.setStyle(Qt.DashLine)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        if kind == RECTANGLE:
+            x1, y1 = m.frame_to_widget(*geom["top_left"])
+            x2, y2 = m.frame_to_widget(*geom["bottom_right"])
+            p.drawRect(QRect(x1 - 3, y1 - 3, (x2 - x1) + 6, (y2 - y1) + 6))
+        elif kind == CIRCLE:
+            wcx, wcy = m.frame_to_widget(*geom["center"])
+            wr = int(round(geom["radius"] * m.scale))
+            p.drawEllipse(QPoint(wcx, wcy), wr + 3, wr + 3)
+            p.drawLine(QPoint(wcx - 4, wcy), QPoint(wcx + 4, wcy))
+            p.drawLine(QPoint(wcx, wcy - 4), QPoint(wcx, wcy + 4))
+        elif kind == POLYGON and len(geom["vertices"]) >= 2:
+            p.drawPolygon(QPolygonF([QPointF(*m.frame_to_widget(*v))
+                                     for v in geom["vertices"]]))
+        for name, (hx, hy) in self._handles(kind, geom).items():
+            wx, wy = m.frame_to_widget(hx, hy)
+            self._draw_handle(p, wx, wy, filled=name != self._selected_handle)
 
     def _paint_in_progress(self, p: QPainter) -> None:
         m = self._mapping
-        if m is None:
-            return
-        pen = QPen(self._bgr_to_qcolor(self._draw_color_bgr))
+        color = self._bgr_to_qcolor(self._draw_color_bgr)
+        pen = QPen(color)
         pen.setWidth(_LIVE_LINE_WIDTH)
         p.setPen(pen)
         p.setBrush(Qt.NoBrush)
+        s = self._draw_state
 
-        if self._mode == _DrawMode.RECT_DRAGGING:
-            s = self._draw_state
-            if s.rect_start is not None and s.rect_end is not None:
-                x1, y1 = m.frame_to_widget(s.rect_start[0], s.rect_start[1])
-                x2, y2 = m.frame_to_widget(s.rect_end[0], s.rect_end[1])
-                p.drawRect(QRect(min(x1, x2), min(y1, y2),
-                                 abs(x2 - x1), abs(y2 - y1)))
+        if self._mode == _DrawMode.RECT_DRAGGING and s.rect_start and s.rect_end:
+            x1, y1 = m.frame_to_widget(*s.rect_start)
+            x2, y2 = m.frame_to_widget(*s.rect_end)
+            p.drawRect(QRect(min(x1, x2), min(y1, y2),
+                             abs(x2 - x1), abs(y2 - y1)))
+            self._paint_readout(p, (max(x1, x2), max(y1, y2)),
+                                f"{abs(s.rect_end[0] - s.rect_start[0])} × "
+                                f"{abs(s.rect_end[1] - s.rect_start[1])} px")
 
-        elif self._mode == _DrawMode.CIRCLE_DRAGGING:
-            s = self._draw_state
-            if s.circle_center is not None and s.circle_edge is not None:
-                cx, cy = m.frame_to_widget(*s.circle_center)
-                ex, ey = m.frame_to_widget(*s.circle_edge)
-                r = int(round(((ex - cx) ** 2 + (ey - cy) ** 2) ** 0.5))
-                p.drawEllipse(QPoint(cx, cy), r, r)
-                # also draw a tiny center marker
-                p.drawEllipse(QPoint(cx, cy), 2, 2)
+        elif (self._mode == _DrawMode.CIRCLE_DRAGGING
+              and s.circle_center and s.circle_edge):
+            cx, cy = m.frame_to_widget(*s.circle_center)
+            r_frame = math.hypot(s.circle_edge[0] - s.circle_center[0],
+                                 s.circle_edge[1] - s.circle_center[1])
+            r = int(round(r_frame * m.scale))
+            p.drawEllipse(QPoint(cx, cy), r, r)
+            p.drawLine(QPoint(cx - 4, cy), QPoint(cx + 4, cy))
+            p.drawLine(QPoint(cx, cy - 4), QPoint(cx, cy + 4))
+            self._paint_readout(p, (cx + r, cy), f"r = {int(round(r_frame))} px")
 
-        elif self._mode == _DrawMode.POLY_VERTEXING:
-            s = self._draw_state
-            verts = s.poly_vertices
-            if len(verts) >= 1:
-                # Draw committed segments
-                for i in range(len(verts) - 1):
-                    a = m.frame_to_widget(*verts[i])
-                    b = m.frame_to_widget(*verts[i + 1])
-                    p.drawLine(QPoint(*a), QPoint(*b))
-                # Vertex markers
-                for v in verts:
-                    wx, wy = m.frame_to_widget(*v)
-                    p.drawEllipse(QPoint(wx, wy),
-                                  _VERTEX_DOT_RADIUS, _VERTEX_DOT_RADIUS)
-                # Closing-edge preview when polygon would already be
-                # valid (≥3 vertices). Faint dashed line back to the
-                # first vertex shows what shape will commit. Without
-                # this, drawing a triangle looks like an open V-shape
-                # until ESC, which is confusing.
-                if len(verts) >= 3:
-                    first = m.frame_to_widget(*verts[0])
-                    last = m.frame_to_widget(*verts[-1])
-                    closing_pen = QPen(self._bgr_to_qcolor(
-                        self._draw_color_bgr))
-                    closing_pen.setWidth(_LIVE_LINE_WIDTH)
-                    closing_pen.setStyle(Qt.DotLine)
-                    p.setPen(closing_pen)
-                    p.drawLine(QPoint(*last), QPoint(*first))
-                # Rubber band — dashed line from last vertex to mouse
-                if s.poly_rubber_end is not None:
-                    last = m.frame_to_widget(*verts[-1])
-                    end = m.frame_to_widget(*s.poly_rubber_end)
-                    rubber_pen = QPen(self._bgr_to_qcolor(
-                        self._draw_color_bgr))
-                    rubber_pen.setWidth(_LIVE_LINE_WIDTH)
-                    rubber_pen.setStyle(Qt.DashLine)
-                    p.setPen(rubber_pen)
-                    p.drawLine(QPoint(*last), QPoint(*end))
+        elif self._mode == _DrawMode.POLY_VERTEXING and s.poly_vertices:
+            pts = [QPointF(*m.frame_to_widget(*v)) for v in s.poly_vertices]
+            for a, b in zip(pts, pts[1:], strict=False):
+                p.drawLine(a, b)
+            if s.poly_rubber_end is not None:
+                rubber = QPen(color)
+                rubber.setWidth(_LIVE_LINE_WIDTH)
+                rubber.setStyle(Qt.DashLine)
+                p.setPen(rubber)
+                end = QPointF(*m.frame_to_widget(*s.poly_rubber_end))
+                p.drawLine(pts[-1], end)
+                if len(pts) >= 2:
+                    closing = QPen(color)
+                    closing.setWidth(1)
+                    closing.setStyle(Qt.DotLine)
+                    p.setPen(closing)
+                    p.drawLine(end, pts[0])
+            p.setPen(QPen(color, 1))
+            p.setBrush(color)
+            for pt in pts:
+                p.drawEllipse(pt, _VERTEX_DOT_RADIUS, _VERTEX_DOT_RADIUS)
+            p.setBrush(Qt.NoBrush)
+            # Ring around the first vertex when a click would close.
+            if len(pts) >= 3 and self._near_first_vertex(s.poly_rubber_end):
+                ring = QPen(_SELECTION_COLOR)
+                ring.setWidth(2)
+                p.setPen(ring)
+                p.drawEllipse(pts[0], _CLOSE_SNAP_WIDGET_PX,
+                              _CLOSE_SNAP_WIDGET_PX)
+            self._paint_readout(p, (int(pts[-1].x()), int(pts[-1].y())),
+                                f"{len(pts)} vertices")
+
+    def _paint_readout(self, p: QPainter, at: tuple[int, int],
+                       text: str) -> None:
+        x, y = at[0] + 8, at[1] + 16
+        fm = p.fontMetrics()
+        r = fm.boundingRect(text).adjusted(-4, -2, 4, 2)
+        r.moveTo(x - 4, y - fm.ascent() - 2)
+        p.fillRect(r, QColor(0, 0, 0, 170))
+        p.setPen(QColor(235, 235, 235))
+        p.drawText(QPoint(x, y), text)
+
+    def _near_first_vertex(self, frame_pt) -> bool:
+        verts = self._draw_state.poly_vertices
+        if frame_pt is None or not verts or self._mapping is None:
+            return False
+        a = self._mapping.frame_to_widget(*verts[0])
+        b = self._mapping.frame_to_widget(*frame_pt)
+        return math.hypot(a[0] - b[0], a[1] - b[1]) <= _CLOSE_SNAP_WIDGET_PX
 
     # ------------------------------------------------------------------ #
-    # Mouse events
+    # Mouse
     # ------------------------------------------------------------------ #
     def mousePressEvent(self, ev: QMouseEvent) -> None:
-        if self._mapping is None or ev.button() != Qt.LeftButton:
+        if self._mapping is None:
             return
-        frame_pt = self._mapping.widget_to_frame(ev.position().x(),
-                                                  ev.position().y())
+        if ev.button() == Qt.MiddleButton:
+            self._pan_last = ev.position()
+            self.setCursor(Qt.ClosedHandCursor)
+            return
+        if ev.button() == Qt.RightButton:
+            self._on_right_click(ev)
+            return
+        if ev.button() != Qt.LeftButton:
+            return
+        self.setFocus(Qt.MouseFocusReason)
+
+        if self._mode == _DrawMode.SELECT:
+            frame_pt = self._event_frame_pt(ev, clamp=True)
+            idx, handle = self._hit_test(frame_pt)
+            if idx is None:
+                if self._selected_idx is not None:
+                    self._selected_idx = None
+                    self._selected_handle = None
+                    self.shape_selected.emit(-1)
+                self.update()
+                return
+            if idx != self._selected_idx:
+                self._selected_idx = idx
+                self.shape_selected.emit(idx)
+            self._selected_handle = handle
+            kind, geom = self._geom(idx)
+            self._pre_drag_geom = dict(geom)
+            self._drag_anchor_geom = dict(geom)
+            if handle is None:
+                ref = self._reference_point_for_drag(idx)
+                self._drag_offset_frame = (frame_pt[0] - ref[0],
+                                           frame_pt[1] - ref[1])
+                self._mode = _DrawMode.SHAPE_MOVING
+            else:
+                self._drag_offset_frame = None
+                self._mode = _DrawMode.HANDLE_DRAGGING
+            self._update_cursor(handle if handle is not None else "body")
+            self.update()
+            return
+
+        frame_pt = self._event_frame_pt(ev, clamp=False)
         if frame_pt is None:
-            # Click outside the frame area (in black bars)
-            return
+            if self._mode != _DrawMode.POLY_VERTEXING:
+                return
+            frame_pt = self._event_frame_pt(ev, clamp=True)
 
         if self._mode == _DrawMode.RECT_PENDING:
             self._draw_state.rect_start = frame_pt
             self._draw_state.rect_end = frame_pt
             self._mode = _DrawMode.RECT_DRAGGING
-            self.update()
-
         elif self._mode == _DrawMode.CIRCLE_PENDING:
             self._draw_state.circle_center = frame_pt
             self._draw_state.circle_edge = frame_pt
             self._mode = _DrawMode.CIRCLE_DRAGGING
-            self.update()
-
         elif self._mode == _DrawMode.POLY_PENDING:
             self._draw_state.poly_vertices = [frame_pt]
             self._draw_state.poly_rubber_end = frame_pt
             self._mode = _DrawMode.POLY_VERTEXING
-            self.update()
-
+            self._emit_hint()
         elif self._mode == _DrawMode.POLY_VERTEXING:
-            # Snap to first vertex if clicked nearby — closes polygon.
-            # Snap to last vertex if clicked nearby — no-op (avoids
-            # accidental duplicate edges from double-clicks landing
-            # on the same place).
             verts = self._draw_state.poly_vertices
-            if verts:
-                # Distance computed in widget pixels for predictable
-                # snap behavior regardless of frame zoom level.
-                wx_click = ev.position().x()
-                wy_click = ev.position().y()
-                m = self._mapping
-                wx_first, wy_first = m.frame_to_widget(*verts[0])
-                wx_last, wy_last = m.frame_to_widget(*verts[-1])
-                d_first = ((wx_click - wx_first) ** 2
-                           + (wy_click - wy_first) ** 2) ** 0.5
-                d_last = ((wx_click - wx_last) ** 2
-                          + (wy_click - wy_last) ** 2) ** 0.5
-                # First-vertex snap: close polygon if ≥3 vertices
-                if (d_first <= _VERTEX_SNAP_DISTANCE_WIDGET_PX
-                        and len(verts) >= 3):
-                    self._commit_polygon()
-                    return
-                # Last-vertex snap: ignore (no degenerate edge)
-                if d_last <= _VERTEX_SNAP_DISTANCE_WIDGET_PX:
-                    return
-            # Otherwise add another vertex
-            self._draw_state.poly_vertices.append(frame_pt)
-            self.update()
-
-        elif self._mode == _DrawMode.SELECT:
-            # Patch 122dm — Proposal 2: pick a placed shape, start
-            # dragging body or handle.
-            idx, handle = self._hit_test(frame_pt)
-            if idx is None:
-                # Click on empty space → deselect.
-                self._selected_idx = None
-                self._selected_handle = None
-                # Patch 122fd — notify listeners (panel) of the
-                # deselection so the table's row-highlight clears.
-                self.shape_selected.emit(-1)
-                self.update()
+            if len(verts) >= 3 and self._near_first_vertex(frame_pt):
+                self._commit_polygon()
                 return
-            self._selected_idx = idx
-            self._selected_handle = handle
-            # Patch 122fd — notify listeners (panel) of the new
-            # selection so the corresponding table row gets
-            # highlighted.
-            self.shape_selected.emit(idx)
-            # Save pre-drag geometry for potential undo later.
-            geom = self._existing_rois[idx].get("geometry", {})
-            self._pre_drag_geom = dict(geom)
-            if handle is None:
-                # Body click → store offset so the shape doesn't
-                # jump under the cursor; transition to SHAPE_MOVING.
-                ref = self._reference_point_for_drag(idx)
-                if ref is not None:
-                    self._drag_offset_frame = (
-                        frame_pt[0] - ref[0],
-                        frame_pt[1] - ref[1],
-                    )
-                self._mode = _DrawMode.SHAPE_MOVING
-            else:
-                # Handle click → transition to HANDLE_DRAGGING.
-                self._drag_offset_frame = None
-                self._mode = _DrawMode.HANDLE_DRAGGING
-            self.update()
+            last_w = self._mapping.frame_to_widget(*verts[-1])
+            if math.hypot(ev.position().x() - last_w[0],
+                          ev.position().y() - last_w[1]) <= _DUPLICATE_SNAP_WIDGET_PX:
+                return
+            verts.append(frame_pt)
+            self._emit_hint()
+        self.update()
 
-    def _reference_point_for_drag(
-        self, idx: int
-    ) -> tuple[float, float] | None:
-        """Reference point for body-drag offset (so the cursor stays
-        relative to the same point on the shape during the drag).
+    def _on_right_click(self, ev: QMouseEvent) -> None:
+        """Right-click: remove a vertex of the selected polygon; while
+        drawing a polygon, remove the last vertex."""
+        if self._mode == _DrawMode.POLY_VERTEXING:
+            self._pop_vertex()
+            return
+        if self._mode != _DrawMode.SELECT or self._selected_idx is None:
+            return
+        frame_pt = self._event_frame_pt(ev, clamp=True)
+        idx, handle = self._hit_test(frame_pt)
+        if idx != self._selected_idx or not (handle or "").startswith("v"):
+            return
+        kind, geom = self._geom(idx)
+        verts = geom["vertices"]
+        if len(verts) <= 3:
+            self.hint_changed.emit("A polygon needs at least 3 vertices.")
+            return
+        del verts[int(handle[1:])]
+        self._commit_edit(idx, {"vertices": verts})
 
-        For rectangle: top_left. For circle: center. For polygon:
-        first vertex (we shift all vertices by the same delta).
-        """
-        if not (0 <= idx < len(self._existing_rois)):
-            return None
-        roi = self._existing_rois[idx]
-        kind = roi.get("kind")
-        geom = self._canonical_geom(kind, roi.get("geometry", {}))
+    def _reference_point_for_drag(self, idx: int) -> tuple[float, float]:
+        kind, geom = self._geom(idx)
         if kind == RECTANGLE:
             return tuple(geom["top_left"])
         if kind == CIRCLE:
             return tuple(geom["center"])
-        if kind == POLYGON and geom["vertices"]:
-            return tuple(geom["vertices"][0])
-        return None
+        verts = geom.get("vertices") or [[0, 0]]
+        return tuple(verts[0])
 
     def mouseDoubleClickEvent(self, ev: QMouseEvent) -> None:
-        """Double-click commits the polygon if it has ≥3 vertices.
-
-        This matches the convention from many polygon-drawing tools
-        (GIMP's Free Select, image-annotation tools, etc.). Without
-        this, users frequently try double-click and are confused
-        when nothing happens — they only learn ESC/Q/Space close
-        from documentation.
-        """
-        if (self._mode == _DrawMode.POLY_VERTEXING
-                and ev.button() == Qt.LeftButton
-                and len(self._draw_state.poly_vertices) >= 3):
-            # The single-click that started this double-click already
-            # added a vertex via mousePressEvent. Now commit; the
-            # extra vertex is fine (it's just before the close).
-            self._commit_polygon()
+        if ev.button() != Qt.LeftButton or self._mapping is None:
+            return super().mouseDoubleClickEvent(ev)
+        if self._mode == _DrawMode.POLY_VERTEXING:
+            # The first click of the double-click already placed a vertex.
+            if len(self._draw_state.poly_vertices) >= 3:
+                self._commit_polygon()
+            return
+        if self._mode == _DrawMode.SELECT and self._selected_idx is not None:
+            kind, geom = self._geom(self._selected_idx)
+            if kind != POLYGON:
+                return
+            pt = self._event_frame_pt(ev, clamp=True)
+            verts = geom["vertices"]
+            n = len(verts)
+            best = min(range(n), key=lambda i: _dist_point_segment(
+                pt, verts[i], verts[(i + 1) % n])[0])
+            d, _ = _dist_point_segment(pt, verts[best], verts[(best + 1) % n])
+            if d <= self._tol_frame(_EDGE_HIT_TOLERANCE_WIDGET_PX):
+                verts.insert(best + 1, [int(pt[0]), int(pt[1])])
+                self._selected_handle = f"v{best + 1}"
+                self._commit_edit(self._selected_idx, {"vertices": verts})
             return
         super().mouseDoubleClickEvent(ev)
 
     def mouseMoveEvent(self, ev: QMouseEvent) -> None:
         if self._mapping is None:
             return
-        # Skip the coordinate transform entirely when not drawing.
-        # mouseMoveEvent fires on every mouse motion (setMouseTracking
-        # is on); the panel doesn't care about IDLE motion.
-        #
-        # Patch 122fd-hotfix — the allowlist below was missing
-        # SHAPE_MOVING and HANDLE_DRAGGING, which were added in
-        # 122dm. The dispatch code below at lines 902+ was
-        # therefore DEAD — every time the user pressed + dragged
-        # an ROI in edit mode, mouseMoveEvent returned at this
-        # guard before reaching the SHAPE_MOVING translation
-        # branch. Symptom: "I can select objects in the edit
-        # mode but I cannot move them" (reported in three
-        # consecutive user messages over four days).
-        #
-        # The fix: include the two missing modes. Now the
-        # translation and resize handlers below actually fire.
+        if self._pan_last is not None:
+            d = ev.position() - self._pan_last
+            self._pan_last = ev.position()
+            self._pan += d
+            self._recompute_mapping()
+            self.update()
+            return
+        if self._mode == _DrawMode.SELECT:
+            pt = self._event_frame_pt(ev, clamp=True)
+            idx, handle = self._hit_test(pt)
+            self._update_cursor(None if idx is None
+                                else (handle if handle is not None else "body"))
+            return
         if self._mode not in (_DrawMode.RECT_DRAGGING,
                               _DrawMode.CIRCLE_DRAGGING,
                               _DrawMode.POLY_VERTEXING,
                               _DrawMode.SHAPE_MOVING,
                               _DrawMode.HANDLE_DRAGGING):
             return
-        frame_pt = self._mapping.widget_to_frame(ev.position().x(),
-                                                  ev.position().y())
-        # For move events we DO want updates even when mouse leaves
-        # the frame — clamp to frame bounds rather than ignore.
-        if frame_pt is None:
-            # Use the closest frame edge
-            wx, wy = ev.position().x(), ev.position().y()
-            m = self._mapping
-            fx = (wx - m.offset_x) / m.scale
-            fy = (wy - m.offset_y) / m.scale
-            fx = max(0, min(m.frame_w, fx))
-            fy = max(0, min(m.frame_h, fy))
-            frame_pt = (int(round(fx)), int(round(fy)))
+        frame_pt = self._event_frame_pt(ev, clamp=True)
 
         if self._mode == _DrawMode.RECT_DRAGGING:
             self._draw_state.rect_end = frame_pt
-            self.update()
         elif self._mode == _DrawMode.CIRCLE_DRAGGING:
             self._draw_state.circle_edge = frame_pt
-            self.update()
         elif self._mode == _DrawMode.POLY_VERTEXING:
             self._draw_state.poly_rubber_end = frame_pt
-            self.update()
         elif self._mode == _DrawMode.SHAPE_MOVING:
-            # Patch 122dm — translate the entire selected shape so
-            # that the original-reference-point under the cursor
-            # follows the cursor's frame coordinate, preserving the
-            # offset captured at mouse-down.
-            if (self._selected_idx is None
-                    or self._drag_offset_frame is None):
-                return
-            idx = self._selected_idx
-            roi = self._existing_rois[idx]
-            kind = roi.get("kind")
-            geom = self._canonical_geom(kind, roi.get("geometry", {}))
-            dx_off, dy_off = self._drag_offset_frame
-            target = (frame_pt[0] - dx_off, frame_pt[1] - dy_off)
-            if kind == RECTANGLE:
-                tl, br = geom["top_left"], geom["bottom_right"]
-                w = br[0] - tl[0]; h = br[1] - tl[1]
-                new_tl = [int(round(target[0])), int(round(target[1]))]
-                new_geom = {
-                    "top_left": new_tl,
-                    "bottom_right": [new_tl[0] + w, new_tl[1] + h],
-                }
-            elif kind == CIRCLE:
-                r = geom["radius"]
-                new_geom = {
-                    "center": [int(round(target[0])),
-                                int(round(target[1]))],
-                    "radius": r,
-                }
-            elif kind == POLYGON:
-                verts = geom["vertices"]
-                if not verts:
-                    return
-                first = verts[0]
-                dx = int(round(target[0] - first[0]))
-                dy = int(round(target[1] - first[1]))
-                new_geom = {
-                    "vertices": [[v[0] + dx, v[1] + dy]
-                                  for v in verts],
-                }
-            else:
-                return
-            self._apply_edit_geom(idx, new_geom)
+            self._move_selected_to(frame_pt)
+            return
         elif self._mode == _DrawMode.HANDLE_DRAGGING:
-            # Patch 122dm — resize via the selected handle.
-            if (self._selected_idx is None
-                    or self._selected_handle is None):
-                return
-            idx = self._selected_idx
-            handle = self._selected_handle
-            roi = self._existing_rois[idx]
-            kind = roi.get("kind")
-            geom = self._canonical_geom(kind, roi.get("geometry", {}))
-            if kind == RECTANGLE:
-                tl = list(geom["top_left"])
-                br = list(geom["bottom_right"])
-                fx_clamped = max(0, min(self._mapping.frame_w,
-                                          frame_pt[0]))
-                fy_clamped = max(0, min(self._mapping.frame_h,
-                                          frame_pt[1]))
-                # Move only the dragged corner; the opposite corner
-                # stays anchored. Re-normalize so top_left is min,
-                # bottom_right is max (handles dragging a corner
-                # PAST the opposite corner).
-                if handle == "nw":
-                    tl = [int(round(fx_clamped)), int(round(fy_clamped))]
-                elif handle == "ne":
-                    br = [int(round(fx_clamped)), br[1]]
-                    tl = [tl[0], int(round(fy_clamped))]
-                elif handle == "sw":
-                    tl = [int(round(fx_clamped)), tl[1]]
-                    br = [br[0], int(round(fy_clamped))]
-                elif handle == "se":
-                    br = [int(round(fx_clamped)), int(round(fy_clamped))]
-                x1, y1 = min(tl[0], br[0]), min(tl[1], br[1])
-                x2, y2 = max(tl[0], br[0]), max(tl[1], br[1])
-                new_geom = {
-                    "top_left": [x1, y1],
-                    "bottom_right": [x2, y2],
-                }
-            elif kind == CIRCLE and handle == "edge":
-                c = geom["center"]
-                dx, dy = frame_pt[0] - c[0], frame_pt[1] - c[1]
-                r = int(round((dx * dx + dy * dy) ** 0.5))
-                new_geom = {
-                    "center": list(c), "radius": max(1, r),
-                }
-            else:
-                # Polygon vertex-drag is deferred (Proposal 2
-                # explicitly defers per-vertex polygon adjustment).
-                return
-            self._apply_edit_geom(idx, new_geom)
+            self._drag_handle_to(frame_pt)
+            return
+        self.update()
+
+    def _move_selected_to(self, frame_pt) -> None:
+        if self._selected_idx is None or self._drag_offset_frame is None:
+            return
+        kind, geom = self._geom(self._selected_idx)
+        ref = self._reference_point_for_drag(self._selected_idx)
+        tx = frame_pt[0] - self._drag_offset_frame[0]
+        ty = frame_pt[1] - self._drag_offset_frame[1]
+        dx, dy = int(round(tx - ref[0])), int(round(ty - ref[1]))
+        self._apply_edit_geom(self._selected_idx,
+                              self._translated(kind, geom, dx, dy))
+
+    @staticmethod
+    def _translated(kind: str, geom: dict, dx: int, dy: int) -> dict:
+        if kind == RECTANGLE:
+            (x1, y1), (x2, y2) = geom["top_left"], geom["bottom_right"]
+            return {"top_left": [x1 + dx, y1 + dy],
+                    "bottom_right": [x2 + dx, y2 + dy]}
+        if kind == CIRCLE:
+            c = geom["center"]
+            return {"center": [c[0] + dx, c[1] + dy], "radius": geom["radius"]}
+        return {"vertices": [[v[0] + dx, v[1] + dy] for v in geom["vertices"]]}
+
+    def _drag_handle_to(self, frame_pt) -> None:
+        if self._selected_idx is None or self._selected_handle is None:
+            return
+        idx, h = self._selected_idx, self._selected_handle
+        kind, geom = self._geom(idx)
+        fx, fy = self._clamp_frame(*frame_pt)
+        if kind == RECTANGLE:
+            # Resize against the geometry captured at press time so a
+            # handle dragged past the opposite edge flips cleanly.
+            a = self._drag_anchor_geom or geom
+            (x1, y1), (x2, y2) = a["top_left"], a["bottom_right"]
+            if "w" in h:
+                x1 = fx
+            if "e" in h:
+                x2 = fx
+            if "n" in h:
+                y1 = fy
+            if "s" in h:
+                y2 = fy
+            new = {"top_left": [x1, y1], "bottom_right": [x2, y2]}
+        elif kind == CIRCLE:
+            c = geom["center"]
+            new = {"center": c,
+                   "radius": max(1, int(round(math.hypot(fx - c[0], fy - c[1]))))}
+        elif kind == POLYGON and h.startswith("v"):
+            verts = geom["vertices"]
+            verts[int(h[1:])] = [fx, fy]
+            new = {"vertices": verts}
+        else:
+            return
+        self._apply_edit_geom(idx, new)
 
     def mouseReleaseEvent(self, ev: QMouseEvent) -> None:
+        if ev.button() == Qt.MiddleButton and self._pan_last is not None:
+            self._pan_last = None
+            self._update_cursor()
+            return
         if ev.button() != Qt.LeftButton:
             return
-        # Rectangle and circle commit on release.
-        # Polygon stays in vertexing mode — no commit on release.
         if self._mode == _DrawMode.RECT_DRAGGING:
             self._commit_rectangle()
         elif self._mode == _DrawMode.CIRCLE_DRAGGING:
             self._commit_circle()
-        elif self._mode in (_DrawMode.SHAPE_MOVING,
-                            _DrawMode.HANDLE_DRAGGING):
-            # Patch 122dm — commit the edit. Emit shape_edited with
-            # the final canonical geometry, then return to SELECT
-            # idle (shape stays selected — users often want to
-            # nudge again immediately).
+        elif self._mode in (_DrawMode.SHAPE_MOVING, _DrawMode.HANDLE_DRAGGING):
             if self._selected_idx is not None:
                 idx = self._selected_idx
-                roi = self._existing_rois[idx]
-                final_geom = self._canonical_geom(
-                    roi.get("kind"), roi.get("geometry", {}),
-                )
-                # Only emit if the geometry actually changed.
-                if self._pre_drag_geom is not None:
-                    pre_canon = self._canonical_geom(
-                        roi.get("kind"), self._pre_drag_geom)
-                    if pre_canon != final_geom:
-                        self.shape_edited.emit(idx, final_geom)
+                kind, final_geom = self._geom(idx)
+                if (self._pre_drag_geom is not None
+                        and canonical_geometry(kind, self._pre_drag_geom)
+                        != final_geom):
+                    self.shape_edited.emit(idx, final_geom)
             self._mode = _DrawMode.SELECT
-            self._selected_handle = None
             self._drag_offset_frame = None
             self._pre_drag_geom = None
+            self._drag_anchor_geom = None
+            self._update_cursor()
             self.update()
 
+    def wheelEvent(self, ev: QWheelEvent) -> None:
+        steps = ev.angleDelta().y() / 120.0
+        if steps == 0 or self._mapping is None:
+            return super().wheelEvent(ev)
+        self.zoom_by(1.25 ** steps, ev.position())
+        ev.accept()
+
     # ------------------------------------------------------------------ #
-    # Keyboard events
+    # Keyboard
     # ------------------------------------------------------------------ #
     def keyPressEvent(self, ev: QKeyEvent) -> None:
         key = ev.key()
-        # Patch 122dm — SELECT-mode keyboard handling. Delete /
-        # Backspace on the selected shape emits shape_deleted; ESC
-        # deselects without leaving select mode.
+        if key in (Qt.Key_F, Qt.Key_0) and not ev.modifiers():
+            self.fit_view()
+            return
+        if key in (Qt.Key_Plus, Qt.Key_Equal):
+            self.zoom_by(1.25)
+            return
+        if key == Qt.Key_Minus:
+            self.zoom_by(0.8)
+            return
+
         if self._mode == _DrawMode.SELECT:
-            if (key in (Qt.Key_Delete, Qt.Key_Backspace)
-                    and self._selected_idx is not None):
+            if key in (Qt.Key_Delete, Qt.Key_Backspace) and self._selected_idx is not None:
                 idx = self._selected_idx
                 self._selected_idx = None
                 self._selected_handle = None
@@ -1073,131 +1060,139 @@ class ROICanvas(QWidget):
                 self.shape_deleted.emit(idx)
                 return
             if key == Qt.Key_Escape:
-                # ESC in select mode: deselect; stay in select mode.
-                self._selected_idx = None
-                self._selected_handle = None
-                self.update()
+                if self._selected_idx is not None:
+                    self._selected_idx = None
+                    self._selected_handle = None
+                    self.shape_selected.emit(-1)
+                    self.update()
                 return
-            super().keyPressEvent(ev)
-            return
-
-        if self._mode == _DrawMode.IDLE:
-            super().keyPressEvent(ev)
-            return
-
-        # ESC commits polygon if ≥3 vertices, cancels otherwise.
-        # For rectangle/circle modes ESC always cancels.
-        if key == Qt.Key_Escape:
-            if self._mode == _DrawMode.POLY_VERTEXING and \
-                    len(self._draw_state.poly_vertices) >= 3:
-                # In polygon mode, ESC also commits if we have enough
-                # vertices (consistent with the legacy OpenCV behavior).
-                self._commit_polygon()
-            else:
-                self._cancel_draw(emit_signal=True)
-            return
+            arrows = {Qt.Key_Left: (-1, 0), Qt.Key_Right: (1, 0),
+                      Qt.Key_Up: (0, -1), Qt.Key_Down: (0, 1)}
+            if key in arrows and self._selected_idx is not None:
+                step = 10 if ev.modifiers() & Qt.ShiftModifier else 1
+                dx, dy = arrows[key]
+                kind, geom = self._geom(self._selected_idx)
+                self._commit_edit(self._selected_idx,
+                                  self._translated(kind, geom, dx * step, dy * step))
+                return
+            return super().keyPressEvent(ev)
 
         if self._mode == _DrawMode.POLY_VERTEXING:
-            if key in (Qt.Key_Q, Qt.Key_Space, Qt.Key_Return,
-                        Qt.Key_Enter):
+            if key in (Qt.Key_Return, Qt.Key_Enter):
                 if len(self._draw_state.poly_vertices) >= 3:
                     self._commit_polygon()
                 else:
-                    self._cancel_draw(emit_signal=True)
+                    self.hint_changed.emit(
+                        "A polygon needs at least 3 vertices — keep "
+                        "clicking, or Esc to abandon it.")
                 return
             if key == Qt.Key_Backspace:
-                if self._draw_state.poly_vertices:
-                    self._draw_state.poly_vertices.pop()
-                    if not self._draw_state.poly_vertices:
-                        # Removed the last vertex — back to pending
-                        self._mode = _DrawMode.POLY_PENDING
-                self.update()
+                self._pop_vertex()
                 return
-
+        if key == Qt.Key_Escape and self.is_drawing():
+            self._abandon_shape(emit_signal=True)
+            return
         super().keyPressEvent(ev)
+
+    def _pop_vertex(self) -> None:
+        verts = self._draw_state.poly_vertices
+        if verts:
+            verts.pop()
+        if not verts:
+            self._mode = _DrawMode.POLY_PENDING
+            self._draw_state.reset()
+        self._emit_hint()
+        self.update()
 
     # ------------------------------------------------------------------ #
     # Commit / cancel
     # ------------------------------------------------------------------ #
+    def _rearm(self) -> None:
+        """Back to the armed state of the current tool (sticky tools)."""
+        self._draw_state.reset()
+        self._mode = _PENDING_FOR_TOOL.get(self._tool, _DrawMode.IDLE)
+        self._update_cursor()
+        self._emit_hint()
+        self.update()
+
     def _commit_rectangle(self) -> None:
         s = self._draw_state
-        if s.rect_start is None or s.rect_end is None:
-            self._cancel_draw(emit_signal=True)
-            return
-        x1, y1 = s.rect_start
-        x2, y2 = s.rect_end
+        (x1, y1), (x2, y2) = s.rect_start, s.rect_end
         if abs(x2 - x1) < 2 or abs(y2 - y1) < 2:
-            # Too small — treat as a click rather than a drag
-            self._cancel_draw(emit_signal=True)
+            self._abandon_shape(emit_signal=True)
             return
-        geom = {
-            "top_left": [int(min(x1, x2)), int(min(y1, y2))],
-            "bottom_right": [int(max(x1, x2)), int(max(y1, y2))],
-        }
-        self._reset_state()
+        geom = {"top_left": [min(x1, x2), min(y1, y2)],
+                "bottom_right": [max(x1, x2), max(y1, y2)]}
+        self._rearm()
         self.shape_committed.emit(RECTANGLE, geom)
 
     def _commit_circle(self) -> None:
         s = self._draw_state
-        if s.circle_center is None or s.circle_edge is None:
-            self._cancel_draw(emit_signal=True)
-            return
-        cx, cy = s.circle_center
-        ex, ey = s.circle_edge
-        r = int(round(((ex - cx) ** 2 + (ey - cy) ** 2) ** 0.5))
+        (cx, cy), (ex, ey) = s.circle_center, s.circle_edge
+        r = int(round(math.hypot(ex - cx, ey - cy)))
         if r < 2:
-            self._cancel_draw(emit_signal=True)
+            self._abandon_shape(emit_signal=True)
             return
-        geom = {
-            "center": [int(cx), int(cy)],
-            "radius": r,
-        }
-        self._reset_state()
-        self.shape_committed.emit(CIRCLE, geom)
+        self._rearm()
+        self.shape_committed.emit(CIRCLE, {"center": [cx, cy], "radius": r})
 
     def _commit_polygon(self) -> None:
-        verts = self._draw_state.poly_vertices
+        # Patch 122ij: no simplification. Shapely's simplify(tolerance=20)
+        # used to run here and silently delete vertices — the cause of the
+        # "polygon can only have ~6 vertices" behaviour.
+        verts = _dedupe_consecutive(self._draw_state.poly_vertices)
         if len(verts) < 3:
-            self._cancel_draw(emit_signal=True)
+            self._abandon_shape(emit_signal=True)
             return
-        # Optional Shapely simplification — matches the legacy
-        # OpenCV path's polygon vertex tolerance handling.
-        try:
-            from shapely.geometry import Polygon as _Poly
-            simp = _Poly(verts).simplify(tolerance=20,
-                                          preserve_topology=True)
-            if simp.is_valid and not simp.is_empty:
-                # exterior.coords includes a closing duplicate; drop it
-                final = [(int(x), int(y))
-                         for x, y in list(simp.exterior.coords)[:-1]]
-                if len(final) >= 3:
-                    verts = final
-        except Exception:
-            # Shapely failed (degenerate polygon, etc.); use raw verts
-            pass
+        self._rearm()
+        self.shape_committed.emit(
+            POLYGON, {"vertices": [[x, y] for x, y in verts]})
 
-        geom = {"vertices": [[int(x), int(y)] for x, y in verts]}
-        self._reset_state()
-        self.shape_committed.emit(POLYGON, geom)
-
-    def _cancel_draw(self, emit_signal: bool) -> None:
-        self._reset_state()
+    def _abandon_shape(self, emit_signal: bool) -> None:
+        self._rearm()
         if emit_signal:
             self.shape_cancelled.emit()
 
-    def _reset_state(self) -> None:
-        self._draw_state.reset()
-        self._mode = _DrawMode.IDLE
-        self.unsetCursor()
-        self.update()
+    # Kept for older callers.
+    def _cancel_draw(self, emit_signal: bool) -> None:
+        self._abandon_shape(emit_signal)
 
     # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    def _emit_hint(self) -> None:
+        if self._mode == _DrawMode.POLY_VERTEXING:
+            n = len(self._draw_state.poly_vertices)
+            text = (f"Polygon: {n} {'vertex' if n == 1 else 'vertices'} — keep "
+                    f"clicking; " + ("finish: click the first vertex, "
+                                     "double-click or Enter · "
+                                     if n >= 3 else "")
+                    + "Backspace/right-click removes the last · Esc abandons")
+        else:
+            text = _TOOL_HINTS.get(self._tool, "")
+        if text:
+            text += " · wheel zooms, middle-drag pans, F fits"
+        self.hint_changed.emit(text)
+
+    def _update_cursor(self, hover: str | None = None) -> None:
+        if self._tool in (RECTANGLE, CIRCLE, POLYGON):
+            self.setCursor(Qt.CrossCursor)
+        elif self._tool == SELECT:
+            if hover == "body":
+                self.setCursor(Qt.SizeAllCursor)
+            elif hover is not None and hover.startswith("v"):
+                self.setCursor(Qt.PointingHandCursor)
+            elif hover in _HANDLE_CURSORS:
+                self.setCursor(_HANDLE_CURSORS[hover])
+            else:
+                self.setCursor(Qt.ArrowCursor)
+        else:
+            self.unsetCursor()
+
     @staticmethod
     def _bgr_to_qcolor(bgr: tuple[int, int, int]) -> QColor:
         b, g, r = bgr
         return QColor(int(r), int(g), int(b))
 
 
-__all__ = ["ROICanvas"]
+__all__ = ["ROICanvas", "SELECT", "TOOLS", "canonical_geometry"]

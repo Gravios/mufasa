@@ -8,6 +8,46 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ij — ROI editor redesign; polygons have no vertex limit.**
+* Bug: `ROICanvas._commit_polygon` ran every polygon through
+  `shapely.simplify(tolerance=20)`, silently deleting each vertex within 20
+  frame px of the line through its neighbours. On a 640×360 frame that capped
+  polygons at ~4–8 vertices however many were clicked (measured: a 30- or
+  60-vertex ring of radius 80 px → 8). Vertices are now kept as placed; only
+  exact consecutive duplicates are dropped.
+* Logic: Esc now abandons a polygon in progress (it used to commit it with
+  ≥3 vertices). Finish with a click on the first vertex, double-click or
+  Enter; Backspace / right-click removes the last vertex.
+* Workflow: no more "type a name → pick a tool → press Draw → draw one shape".
+  Tools (Select V / Rectangle R / Circle C / Polygon P) are one exclusive group
+  and drawing tools are sticky; new shapes are named from an optional Name box
+  or automatically (`polygon_1`…). The separate Edit toggle that disabled Draw
+  is replaced by the Select tool.
+* Editing: rectangles get edge-midpoint handles too; polygon vertices can be
+  dragged, inserted (double-click an edge) and removed (right-click); arrow
+  keys nudge (Shift: 10 px). Name (double-click), colour and line width are
+  editable per row in the table (`ROILogic.update_style`). Duplicate / Delete
+  buttons; undo / redo (Ctrl+Z / Ctrl+Shift+Z, `ROILogic.snapshot/restore`).
+* View: wheel zoom about the cursor, middle-drag pan, F to fit; ROI names drawn
+  on the frame (toggle); live size / radius / vertex-count readouts; a hint
+  line says what the current tool expects.
+* Layout: three panes — videos (with filter) | tools + canvas + frame nav |
+  ROI table, new-shape style, copy-to-videos, import, clear; unsaved-changes
+  indicator, Save (Ctrl+S). `,` / `.` step frames.
+* "Apply to all…" now confirms and names how many other videos' existing ROIs
+  `multiply_ROIs` will replace (it rewrites the whole H5). Import /
+  standardize now reloads the current video so imported ROIs appear.
+smoke_122ij_roi_editor: 32/32 — real project, generated videos, the widget
+offscreen driven by QTest mouse/key events, saved H5 read back by a fresh
+ROILogic. Tripwires (simplify restored, Esc commits, no undo, no apply-all
+confirmation, non-sticky tool) each fail it. smoke_122dm updated: the Edit
+toggle checks now pin the Select tool; move/resize bodies moved into
+`_move_selected_to` / `_drag_handle_to`. Other ROI suites unchanged.
+Note: smoke_roi_logic case 19 had been skipping for lack of pytables in the
+sandbox; with pytables installed it fails (missing `import os`, then
+`other_video_rois` empty in its stub harness) on the old roi_logic as well —
+pre-existing, not touched here.
+
 **122ii — the joint-prior fit uses the worker pool.**
 `fit_joint_priors_v2` accepted `pool` and ignored it: its pass (a filter +
 smoother per session, the cost of one EM E-step) ran every session serially in

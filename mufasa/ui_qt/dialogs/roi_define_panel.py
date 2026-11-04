@@ -4,64 +4,72 @@ mufasa.ui_qt.dialogs.roi_define_panel
 
 Unified Qt panel for defining ROIs across all videos in a project.
 
-Layout
-------
+Layout (patch 122ij redesign)
+-----------------------------
 
 ::
 
-    ┌─────────────────────────────────────────────────────────────┐
-    │ Tools: [▭][◯][△]  Color:[Red ▾]  Thickness:3  Marker:8       │
-    │        Name:[___________]  [Draw →]                          │
-    ├──────────────────┬──────────────────────────────────────────┤
-    │ Project videos   │ [⏮][−1s][−1f] ━━●━━ [+1f][+1s][⏭] 47/60  │
-    │                  ├──────────────────────────────────────────┤
-    │ vid_01           │                                          │
-    │ vid_02 ✓         │   [video frame with ROI overlays]        │
-    │ vid_03 ✓ ←       │                                          │
-    │ vid_04 ✓         │                                          │
-    │ vid_05           │                                          │
-    │ ...              │                                          │
-    │                  ├──────────────────────────────────────────┤
-    │                  │ # Type     Name        Color    ✕        │
-    │                  │ 1 Rectangle center_zone Red     ✕        │
-    │                  │ 2 Circle   left_obj    Blue     ✕        │
-    ├──────────────────┴──────────────────────────────────────────┤
-    │ status flash    [Reset] [Apply to all] [Save] [Save&close]   │
-    └─────────────────────────────────────────────────────────────┘
+    ┌ Videos ──────┬ [Select V][Rect R][Circle C][Polygon P]  Fit 100% ☑Labels ┬ ROIs on this video ─────────┐
+    │ filter…      │                                                         │ Name     Type   Colour  Px │
+    │ ✓ vid_01  3  │                                                         │ arena    Rect   Red     3  │
+    │   vid_02     │                    video frame + ROIs                   │ nest     Poly   Blue    3  │
+    │ ✓ vid_03  2  │                                                         │ [Duplicate] [Delete]       │
+    │              │ hint: what the current tool expects next                │ New shape                  │
+    │              │ ⏮ −1s −1f ━━━━━━●━━━━━━━ +1f +1s ⏭   Frame 47 / 900     │  Name  [auto]              │
+    │              │                                                         │  Colour [Red ▾] Width [3]  │
+    │              │                                                         │ Copy to other videos       │
+    │              │                                                         │  [Apply to all…]           │
+    │              │                                                         │  [Apply to selected…]      │
+    │              │                                                         │ [Import / standardize…]    │
+    │              │                                                         │ [Clear this video…]        │
+    ├──────────────┴─────────────────────────────────────────────────────────┴────────────────────────────┤
+    │ status                         ● Unsaved changes   [Undo] [Redo]    [Close] [Save] [Save && close]  │
+    └──────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
-Differences from the previous version
--------------------------------------
+How it works
+------------
 
-* **Single window**. The video table dialog is gone; the panel
-  contains a project-wide video list as a left sidebar.
-* **Page Up / Page Down** step between videos.
-* **Auto-save on video switch**. Switching videos with unsaved
-  changes saves them silently before loading the next video.
-* **Synchronous OpenCV drawing**. The selector runs on the main
-  thread (cv2.imshow / cv2.waitKey are not thread-safe on Linux/X11
-  — running them in a QThread caused a black canvas in earlier
-  versions). The Qt panel is briefly frozen during drawing, but the
-  user is interacting with the OpenCV window during that time
-  anyway.
+* **Pick a tool and draw.** Rectangle / circle / polygon tools are sticky —
+  draw as many shapes as you like. Each new shape is named from the
+  "New shape → Name" box, or automatically (``polygon_1``, ``polygon_2``…)
+  when the box is empty. Rename any ROI by double-clicking its name.
+* **Polygons have no vertex limit.** (Before 122ij the canvas simplified
+  every polygon with a 20 px tolerance, which silently capped them at a
+  handful of vertices.)
+* **Select tool** moves / reshapes shapes, including individual polygon
+  vertices; colour and line width are edited per row in the table.
+* **Undo / redo** (Ctrl+Z / Ctrl+Shift+Z) cover every change on the current
+  video since it was opened.
+* Switching videos auto-saves. "Apply to all…" now says how many other
+  videos' existing ROIs it will replace before doing it.
+
+Keyboard: V/R/C/P tools · , / . step a frame (Shift: a second) · PgUp/PgDn
+switch video · Ctrl+S save · F fit · wheel zoom · middle-drag pan.
 
 Compatibility
 -------------
 
-* Same H5 file format as the previous version (``project_folder/
-  logs/measures/ROI_definitions.h5``).
-* Same shape constants and ROILogic backend.
+Same H5 file (``ROI_definitions.h5``), same :class:`ROILogic` backend, same
+public API (:class:`ROIDefineWidget`, :class:`ROIDefinePanel`,
+``rois_modified``, ``set_config_path``, ``set_embedded_mode``).
 """
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QKeySequence, QShortcut
+from PySide6.QtCore import QSignalBlocker, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QButtonGroup,
+    QCheckBox,
     QComboBox,
     QDialog,
+    QFormLayout,
+    QFrame,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -82,13 +90,11 @@ from PySide6.QtWidgets import (
 )
 
 from mufasa.roi_tools.roi_logic import CIRCLE, POLYGON, RECTANGLE, ROILogic
-from mufasa.ui_qt.dialogs.roi_canvas import ROICanvas
+from mufasa.ui_qt.dialogs.roi_canvas import SELECT, ROICanvas, canonical_geometry
 
-# Patch 122ag (hotfix on 122ab): the v1-awareness rename of
-# _project_path_from_config → _project_paths_lite (returns a paths
-# dict instead of a bare string) and the signature change of
-# _list_project_videos (now takes a video_dir directly) missed this
-# import call site. Updated to use the new helper API.
+# Patch 122ag: project paths resolve through the v1-aware layout helper
+# (_project_paths_lite returns a paths dict; _list_project_videos takes the
+# video directory directly).
 from mufasa.ui_qt.dialogs.roi_video_table import (
     _list_project_videos,
     _project_paths_lite,
@@ -107,6 +113,11 @@ _COLORS: list[tuple[str, tuple[int, int, int]]] = [
     ("Orange",  (0, 165, 255)),
     ("Pink",    (203, 192, 255)),
 ]
+_KIND_LABEL = {RECTANGLE: "Rectangle", CIRCLE: "Circle", POLYGON: "Polygon"}
+_UNDO_LIMIT = 100
+
+# Shape-table columns.
+_COL_NAME, _COL_TYPE, _COL_COLOR, _COL_WIDTH = range(4)
 
 
 def _bgr_to_qcolor(bgr: tuple[int, int, int]) -> QColor:
@@ -114,38 +125,43 @@ def _bgr_to_qcolor(bgr: tuple[int, int, int]) -> QColor:
     return QColor(r, g, b)
 
 
+def _swatch(bgr: tuple[int, int, int]) -> QIcon:
+    pm = QPixmap(12, 12)
+    pm.fill(_bgr_to_qcolor(bgr))
+    return QIcon(pm)
+
+
+def _color_combo(parent: QWidget) -> QComboBox:
+    cb = QComboBox(parent)
+    for name, bgr in _COLORS:
+        cb.addItem(_swatch(bgr), name)
+    return cb
+
+
+def _color_bgr(name: str) -> tuple[int, int, int]:
+    return next((b for n, b in _COLORS if n == name), (0, 0, 255))
+
+
+def _section_label(text: str, parent: QWidget) -> QLabel:
+    lbl = QLabel(text, parent)
+    lbl.setStyleSheet("font-weight: bold; padding: 2px 0;")
+    return lbl
+
+
 class ROIDefineWidget(QWidget):
     """Unified Qt widget for ROI definition across an entire project.
 
-    Patch 122dn refactor — was previously `ROIDefinePanel(QDialog)`.
-    Split into a content-only ``QWidget`` (this class) plus a thin
-    ``ROIDefinePanel(QDialog)`` wrapper (defined at the bottom of
-    this module) so the panel can be embedded inline in the ROI
-    page's Definitions section while existing popup callers keep
-    working unchanged.
-
-    Open with ``ROIDefineWidget(config_path, video_path=None)`` to
-    start on the first video, or pass a specific ``video_path`` to
-    start there. If ``config_path`` is None or points to a project
-    with no videos, the widget renders a placeholder ("Open a
-    project first") instead of throwing — required so the workbench
-    can include this in the page layout at startup without a
-    project loaded.
-
-    Page Up / Page Down step between videos. Switching videos with
-    unsaved changes auto-saves them first.
+    Construct with ``ROIDefineWidget(config_path, video_path=None)``. With no
+    project, or a project without videos, it shows a placeholder instead of
+    raising, so the workbench can lay it out at startup.
     """
 
-    rois_modified = Signal()   # emitted when any save / reset happens
+    rois_modified = Signal()   # emitted when ROIs are written to disk
 
     def __init__(self, config_path: str | None = None,
                  video_path: str | None = None,
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        # Patch 122dn — graceful no-project handling. The widget
-        # can be constructed without a project (workbench startup
-        # without an open project) and just shows a placeholder.
-        # All real init happens inside _initialize_for_project().
         self.config_path: str | None = config_path
         self.project_path: str = ""
         self.video_dir: str = ""
@@ -153,33 +169,27 @@ class ROIDefineWidget(QWidget):
         self._cur_idx: int = 0
         self.logic: ROILogic | None = None
         self._dirty = False
-        # Track our own layout so we can swap between the
-        # placeholder and the full UI without leaks.
+        self._undo: list = []
+        self._redo: list = []
+        self._overlay_idx_to_kind_name: list[tuple[str, str]] = []
         self._root_layout = QVBoxLayout(self)
         self._root_layout.setContentsMargins(0, 0, 0, 0)
         self._root_layout.setSpacing(0)
         self._content_widget: QWidget | None = None
-        # Stash the requested starting video so it survives a
-        # set_config_path call (used by the dialog wrapper).
         self._requested_video_path = video_path
-
-        # Try to populate; falls back to placeholder if anything
-        # is missing (no config, no project, no videos).
         self._initialize_for_project()
 
+    # ------------------------------------------------------------------ #
+    # Project lifecycle
+    # ------------------------------------------------------------------ #
     def _initialize_for_project(self) -> None:
-        """Try to bring up the full UI for the current config_path.
-        Falls back to a no-project placeholder on any failure.
-        """
+        """Bring up the full UI for ``config_path`` or a placeholder."""
         if not self.config_path:
             self._show_placeholder(
                 "No project loaded. Use <b>File → Open project…</b> "
                 "to load a project with videos, then return here."
             )
             return
-        # Patch 122ag: resolve project paths through the layout
-        # helper so v1 (project.toml) and legacy (project.toml)
-        # both work.
         try:
             paths = _project_paths_lite(self.config_path)
         except Exception as exc:
@@ -190,10 +200,6 @@ class ROIDefineWidget(QWidget):
             return
         self.project_path = paths.get("project_root", "")
         self.video_dir = paths.get("video_dir", "")
-
-        # Discover videos — _list_project_videos takes the video
-        # directory directly (post-122ab signature change), so we
-        # pass video_dir rather than project_path + 'videos/'.
         try:
             self._videos = _list_project_videos(self.video_dir)
         except Exception as exc:
@@ -208,83 +214,47 @@ class ROIDefineWidget(QWidget):
                 "Import videos via <b>Data Import → Video Parameters</b> first."
             )
             return
-
-        # Pick starting video
         video_path = self._requested_video_path
-        if video_path is not None and video_path in self._videos:
-            self._cur_idx = self._videos.index(video_path)
-        else:
-            self._cur_idx = 0
+        self._cur_idx = (self._videos.index(video_path)
+                         if video_path in self._videos else 0)
         self.logic = None
         self._dirty = False
-
-        # Clear placeholder (if any) and build the full UI.
         self._clear_content()
         self._build_ui()
         self._refresh_video_list()
         self._load_video(self._cur_idx)
 
     def set_config_path(self, config_path: str | None) -> None:
-        """Switch to a different project (or to no-project mode).
-        Rebuilds the UI in place. Used by the page wrapper when a
-        new project is loaded after the widget was already built.
-        """
+        """Switch to a different project (or to no-project mode)."""
         self.config_path = config_path
         self._requested_video_path = None
         self._initialize_for_project()
 
     def set_embedded_mode(self, embedded: bool) -> None:
-        """Toggle UI affordances appropriate for embedded vs popup
-        contexts.
-
-        When embedded in a workbench page (Definitions section):
-            * Hide "Close" and "Save && close" buttons — there's no
-              window to close.
-            * The page's collapsible section is the dismiss
-              affordance.
-        When in a popup dialog (legacy entry points):
-            * Show "Close" and "Save && close" buttons.
-
-        Idempotent. Safe to call before _build_ui — visibility is
-        re-applied when buttons are created.
-        """
+        """Embedded in a workbench page: hide "Close" / "Save && close"."""
         self._embedded = bool(embedded)
         if hasattr(self, "close_btn"):
             self._apply_embedded_visibility()
 
     def _apply_embedded_visibility(self) -> None:
-        """Apply current _embedded flag to button visibility."""
-        if getattr(self, "_embedded", False):
-            self.close_btn.hide()
-            self.save_close_btn.hide()
-        else:
-            self.close_btn.show()
-            self.save_close_btn.show()
+        embedded = getattr(self, "_embedded", False)
+        self.close_btn.setVisible(not embedded)
+        self.save_close_btn.setVisible(not embedded)
 
     def _clear_content(self) -> None:
-        """Remove the current placeholder / content widget so the
-        next builder can populate fresh. We delete the immediate
-        child of _root_layout; child widgets are reparented to
-        None (deleted on next Qt event loop pass)."""
         if self._content_widget is not None:
             self._root_layout.removeWidget(self._content_widget)
             self._content_widget.deleteLater()
             self._content_widget = None
 
     def _show_placeholder(self, message_html: str) -> None:
-        """Display a centered placeholder message instead of the
-        full ROI UI. Called when there's nothing to operate on."""
         self._clear_content()
-        # Also reset state so any subsequent operations on this
-        # widget fail gracefully rather than half-execute against
-        # stale state from a previous project.
         self.project_path = ""
         self.video_dir = ""
         self._videos = []
         self._cur_idx = 0
         self.logic = None
         self._dirty = False
-
         host = QWidget(self)
         layout = QVBoxLayout(host)
         layout.setContentsMargins(40, 60, 40, 60)
@@ -293,10 +263,8 @@ class ROIDefineWidget(QWidget):
         lbl.setTextFormat(Qt.RichText)
         lbl.setWordWrap(True)
         lbl.setAlignment(Qt.AlignCenter)
-        lbl.setStyleSheet(
-            "color: palette(placeholder-text); "
-            "font-size: 11pt; padding: 12px;"
-        )
+        lbl.setStyleSheet("color: palette(placeholder-text); "
+                          "font-size: 11pt; padding: 12px;")
         layout.addWidget(lbl)
         layout.addStretch()
         self._root_layout.addWidget(host)
@@ -306,352 +274,392 @@ class ROIDefineWidget(QWidget):
     # UI construction
     # ------------------------------------------------------------------ #
     def _build_ui(self) -> None:
-        # Patch 122dn — build the full UI into a `content` widget
-        # that gets added to self._root_layout, so the
-        # placeholder/content swap in _initialize_for_project /
-        # _show_placeholder works cleanly. Pre-122dn this method
-        # built directly into self (as the only direct child of
-        # the QDialog).
         self._clear_content()
         content = QWidget(self)
         outer = QVBoxLayout(content)
         outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(6)
 
-        # ---- Tool palette + options (top row, full width) ---- #
-        tool_row = QHBoxLayout()
-        tool_row.setSpacing(2)
-        self._tool_buttons: dict[str, QToolButton] = {}
-        self._tool_group = QButtonGroup(self)
-        self._tool_group.setExclusive(True)
-        for kind, glyph, tip in (
-            (RECTANGLE, "▭", "Rectangle (R)"),
-            (CIRCLE,    "◯", "Circle (C)"),
-            (POLYGON,   "△", "Polygon (P)"),
-        ):
-            btn = QToolButton(self)
-            btn.setText(glyph)
-            btn.setToolTip(tip)
-            btn.setCheckable(True)
-            btn.setFixedSize(32, 32)
-            btn.setStyleSheet(
-                "QToolButton { font-size: 18pt; padding: 0; }"
-                "QToolButton:checked { background: palette(highlight); "
-                "color: palette(highlighted-text); }"
-            )
-            self._tool_buttons[kind] = btn
-            self._tool_group.addButton(btn)
-            tool_row.addWidget(btn)
-        self._tool_buttons[RECTANGLE].setChecked(True)
-        tool_row.addSpacing(20)
-
-        tool_row.addWidget(QLabel("Color:"))
-        self.color_cb = QComboBox(self)
-        for name, _ in _COLORS:
-            self.color_cb.addItem(name)
-        self.color_cb.setCurrentText("Red")
-        tool_row.addWidget(self.color_cb)
-
-        tool_row.addWidget(QLabel("Thickness:"))
-        self.thickness_spin = QSpinBox(self)
-        self.thickness_spin.setRange(1, 30)
-        self.thickness_spin.setValue(3)
-        self.thickness_spin.setFixedWidth(60)
-        tool_row.addWidget(self.thickness_spin)
-
-        tool_row.addWidget(QLabel("Marker:"))
-        self.marker_spin = QSpinBox(self)
-        self.marker_spin.setRange(2, 30)
-        self.marker_spin.setValue(8)
-        self.marker_spin.setFixedWidth(60)
-        self.marker_spin.setToolTip("Vertex marker size for polygons")
-        tool_row.addWidget(self.marker_spin)
-
-        tool_row.addStretch(1)
-
-        tool_row.addWidget(QLabel("Name:"))
-        self.name_edit = QLineEdit(self)
-        self.name_edit.setPlaceholderText("e.g. center_zone")
-        self.name_edit.setMinimumWidth(160)
-        tool_row.addWidget(self.name_edit)
-
-        self.draw_btn = QPushButton("Draw  →", self)
-        self.draw_btn.setStyleSheet("font-weight: bold; padding: 4px 12px;")
-        self.draw_btn.clicked.connect(self._on_draw_clicked)
-        tool_row.addWidget(self.draw_btn)
-
-        # Patch 122dm — Edit / Select toggle. When checked, the
-        # canvas enters select mode: click a placed shape to
-        # select it, then drag the body to move or drag a
-        # corner / radius handle to resize. Delete key on a
-        # selected shape removes it. See
-        # docs/roi_enhancements_proposal.md Proposal 2.
-        self.edit_btn = QPushButton("Edit", self)
-        self.edit_btn.setCheckable(True)
-        self.edit_btn.setToolTip(
-            "Toggle edit mode — click placed ROIs to select, "
-            "drag body to move, drag corner/radius handle to "
-            "resize, press Delete to remove."
-        )
-        self.edit_btn.setStyleSheet("padding: 4px 10px;")
-        self.edit_btn.clicked.connect(self._on_edit_toggled)
-        tool_row.addWidget(self.edit_btn)
-
-        # Patch 122fb — "Import / standardize…" launcher. Opens the
-        # ROIManageForm in a modal popup. Replaces the standalone
-        # "Maintenance" section that was removed in this same patch
-        # (option (b) of the three options discussed in 122ex's
-        # commit thread; the user picked it). The popup hosts the
-        # form's CSV-import and size-standardize actions. The
-        # form's third action ("Draw ROIs (interactive)") is
-        # redundant with the Definitions panel's own Draw button
-        # but is left in place; deferred clean-up.
-        self.maintenance_btn = QPushButton("Import / standardize…", self)
-        self.maintenance_btn.setToolTip(
-            "Bulk operations on ROIs: import definitions from CSV "
-            "or standardize all ROIs to a reference video's "
-            "pixels-per-mm calibration."
-        )
-        self.maintenance_btn.setStyleSheet("padding: 4px 10px;")
-        self.maintenance_btn.clicked.connect(
-            self._on_maintenance_clicked,
-        )
-        tool_row.addWidget(self.maintenance_btn)
-
-        outer.addLayout(tool_row)
-
-        # ---- Splitter: video list (left) | preview/table (right) ---- #
-        splitter = QSplitter(Qt.Horizontal, self)
+        splitter = QSplitter(Qt.Horizontal, content)
         splitter.setChildrenCollapsible(False)
+        splitter.addWidget(self._build_video_pane(content))
+        splitter.addWidget(self._build_canvas_pane(content))
+        splitter.addWidget(self._build_roi_pane(content))
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 0)
+        splitter.setSizes([220, 900, 320])
+        outer.addWidget(splitter, 1)
+        outer.addLayout(self._build_bottom_bar(content))
 
-        # Left: video list
-        left_panel = QWidget(self)
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(2)
-        left_label = QLabel("Project videos (PgUp/PgDn to nav)")
-        left_label.setStyleSheet("font-weight: bold; padding: 2px 4px;")
-        left_layout.addWidget(left_label)
-        self.video_list = QListWidget(self)
+        self._root_layout.addWidget(content)
+        self._content_widget = content
+        if getattr(self, "_embedded", False):
+            self._apply_embedded_visibility()
+        self._build_shortcuts()
+        self._set_tool(SELECT)
+
+    def _build_video_pane(self, parent: QWidget) -> QWidget:
+        pane = QWidget(parent)
+        lay = QVBoxLayout(pane)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addWidget(_section_label("Videos", pane))
+        self.video_filter = QLineEdit(pane)
+        self.video_filter.setPlaceholderText("Filter…")
+        self.video_filter.setClearButtonEnabled(True)
+        self.video_filter.textChanged.connect(self._apply_video_filter)
+        lay.addWidget(self.video_filter)
+        self.video_list = QListWidget(pane)
         self.video_list.setAlternatingRowColors(True)
         self.video_list.currentRowChanged.connect(self._on_video_picked)
-        left_layout.addWidget(self.video_list)
-        splitter.addWidget(left_panel)
+        lay.addWidget(self.video_list, 1)
+        hint = QLabel("✓ = has ROIs · PgUp / PgDn to switch\n"
+                      "Switching saves automatically.", pane)
+        hint.setStyleSheet("color: palette(placeholder-text); font-size: 9pt;")
+        lay.addWidget(hint)
+        pane.setMinimumWidth(160)
+        return pane
 
-        # Right: frame nav + preview + shape table
-        right_panel = QWidget(self)
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(4)
+    def _build_canvas_pane(self, parent: QWidget) -> QWidget:
+        pane = QWidget(parent)
+        lay = QVBoxLayout(pane)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
 
-        # Frame nav
-        nav_row = QHBoxLayout()
-        nav_row.setSpacing(2)
+        # Tool bar.
+        bar = QHBoxLayout()
+        bar.setSpacing(4)
+        self._tool_group = QButtonGroup(pane)
+        self._tool_group.setExclusive(True)
+        self._tool_buttons: dict[str, QToolButton] = {}
+        for tool, text, key, tip in (
+            (SELECT,    "Select",    "V", "Select, move and reshape ROIs"),
+            (RECTANGLE, "Rectangle", "R", "Draw rectangles"),
+            (CIRCLE,    "Circle",    "C", "Draw circles (centre, then radius)"),
+            (POLYGON,   "Polygon",   "P", "Draw polygons — any number of vertices"),
+        ):
+            btn = QToolButton(pane)
+            btn.setText(f"{text}  {key}")
+            btn.setToolTip(f"{tip} ({key})")
+            btn.setCheckable(True)
+            btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+            btn.setStyleSheet(
+                "QToolButton { padding: 4px 10px; }"
+                "QToolButton:checked { background: palette(highlight); "
+                "color: palette(highlighted-text); }")
+            btn.clicked.connect(lambda _=False, t=tool: self._set_tool(t))
+            self._tool_group.addButton(btn)
+            self._tool_buttons[tool] = btn
+            bar.addWidget(btn)
+        bar.addStretch(1)
+        self.fit_btn = QToolButton(pane)
+        self.fit_btn.setText("Fit")
+        self.fit_btn.setToolTip("Fit the frame to the view (F)")
+        bar.addWidget(self.fit_btn)
+        self.zoom_label = QLabel("100%", pane)
+        self.zoom_label.setMinimumWidth(48)
+        self.zoom_label.setStyleSheet("color: palette(placeholder-text);")
+        bar.addWidget(self.zoom_label)
+        self.labels_cb = QCheckBox("Labels", pane)
+        self.labels_cb.setChecked(True)
+        self.labels_cb.setToolTip("Show ROI names on the frame")
+        bar.addWidget(self.labels_cb)
+        lay.addLayout(bar)
 
-        self.first_btn = QToolButton(self); self.first_btn.setText("⏮")
-        self.first_btn.setToolTip("First frame")
-        self.first_btn.clicked.connect(self._first_frame)
-        nav_row.addWidget(self.first_btn)
-
-        self.back_s_btn = QToolButton(self); self.back_s_btn.setText("−1s")
-        self.back_s_btn.clicked.connect(lambda: self._step_seconds(-1.0))
-        nav_row.addWidget(self.back_s_btn)
-
-        self.back_f_btn = QToolButton(self); self.back_f_btn.setText("−1f")
-        self.back_f_btn.clicked.connect(lambda: self._step_frames(-1))
-        nav_row.addWidget(self.back_f_btn)
-
-        self.frame_slider = QSlider(Qt.Horizontal, self)
-        self.frame_slider.valueChanged.connect(self._on_slider_changed)
-        nav_row.addWidget(self.frame_slider, 1)
-
-        self.fwd_f_btn = QToolButton(self); self.fwd_f_btn.setText("+1f")
-        self.fwd_f_btn.clicked.connect(lambda: self._step_frames(1))
-        nav_row.addWidget(self.fwd_f_btn)
-
-        self.fwd_s_btn = QToolButton(self); self.fwd_s_btn.setText("+1s")
-        self.fwd_s_btn.clicked.connect(lambda: self._step_seconds(1.0))
-        nav_row.addWidget(self.fwd_s_btn)
-
-        self.last_btn = QToolButton(self); self.last_btn.setText("⏭")
-        self.last_btn.clicked.connect(self._last_frame)
-        nav_row.addWidget(self.last_btn)
-
-        self.frame_label = QLabel("Frame 0", self)
-        self.frame_label.setMinimumWidth(120)
-        self.frame_label.setStyleSheet("color: palette(placeholder-text);")
-        nav_row.addWidget(self.frame_label)
-
-        right_layout.addLayout(nav_row)
-
-        # Canvas — native Qt. Replaces the OpenCV subprocess approach.
-        # The canvas displays the current frame, overlays existing
-        # ROIs, and accepts mouse/keyboard input for drawing new ROIs.
-        self.preview = ROICanvas(self)
-        self.preview.setSizePolicy(QSizePolicy.Expanding,
-                                   QSizePolicy.Expanding)
+        # Canvas.
+        self.preview = ROICanvas(pane)
+        self.preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.preview.shape_committed.connect(self._on_shape_committed)
         self.preview.shape_cancelled.connect(self._on_shape_cancelled)
-        # Patch 122dm — edit signals (drag-to-adjust + delete).
         self.preview.shape_edited.connect(self._on_shape_edited)
         self.preview.shape_deleted.connect(self._on_shape_deleted)
-        # Patch 122fd — clicking an ROI in select mode highlights
-        # the corresponding row in the table below.
         self.preview.shape_selected.connect(self._on_shape_selected)
-        right_layout.addWidget(self.preview, 1)
+        self.preview.hint_changed.connect(self._on_hint)
+        self.preview.zoom_changed.connect(
+            lambda z: self.zoom_label.setText(f"{z * 100:.0f}%"))
+        self.fit_btn.clicked.connect(self.preview.fit_view)
+        self.labels_cb.toggled.connect(self.preview.set_show_labels)
+        lay.addWidget(self.preview, 1)
 
-        # Shape table
-        self.shape_table = QTableWidget(self)
-        self.shape_table.setColumnCount(5)
+        self.hint_label = QLabel("", pane)
+        self.hint_label.setWordWrap(True)
+        self.hint_label.setStyleSheet(
+            "color: palette(placeholder-text); font-size: 9pt; padding: 0 2px;")
+        lay.addWidget(self.hint_label)
+
+        # Frame navigation.
+        nav = QHBoxLayout()
+        nav.setSpacing(2)
+
+        def tb(text: str, tip: str, slot) -> QToolButton:
+            b = QToolButton(pane)
+            b.setText(text)
+            b.setToolTip(tip)
+            b.clicked.connect(slot)
+            nav.addWidget(b)
+            return b
+
+        self.first_btn = tb("⏮", "First frame", self._first_frame)
+        self.back_s_btn = tb("−1s", "Back one second (Shift+,)",
+                             lambda: self._step_seconds(-1.0))
+        self.back_f_btn = tb("−1f", "Back one frame (,)",
+                             lambda: self._step_frames(-1))
+        self.frame_slider = QSlider(Qt.Horizontal, pane)
+        self.frame_slider.valueChanged.connect(self._on_slider_changed)
+        nav.addWidget(self.frame_slider, 1)
+        self.fwd_f_btn = tb("+1f", "Forward one frame (.)",
+                            lambda: self._step_frames(1))
+        self.fwd_s_btn = tb("+1s", "Forward one second (Shift+.)",
+                            lambda: self._step_seconds(1.0))
+        self.last_btn = tb("⏭", "Last frame", self._last_frame)
+        self.frame_label = QLabel("Frame 0", pane)
+        self.frame_label.setMinimumWidth(150)
+        self.frame_label.setStyleSheet("color: palette(placeholder-text);")
+        nav.addWidget(self.frame_label)
+        lay.addLayout(nav)
+        return pane
+
+    def _build_roi_pane(self, parent: QWidget) -> QWidget:
+        pane = QWidget(parent)
+        lay = QVBoxLayout(pane)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(6)
+
+        lay.addWidget(_section_label("ROIs on this video", pane))
+        self.shape_table = QTableWidget(pane)
+        self.shape_table.setColumnCount(4)
         self.shape_table.setHorizontalHeaderLabels(
-            ["#", "Type", "Name", "Color", ""],
-        )
+            ["Name", "Type", "Colour", "Width"])
         self.shape_table.verticalHeader().setVisible(False)
-        self.shape_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.shape_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.shape_table.setMaximumHeight(150)
+        self.shape_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.shape_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.shape_table.setEditTriggers(QAbstractItemView.DoubleClicked
+                                         | QAbstractItemView.EditKeyPressed)
         h = self.shape_table.horizontalHeader()
-        h.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(2, QHeaderView.Stretch)
-        h.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        right_layout.addWidget(self.shape_table)
+        h.setSectionResizeMode(_COL_NAME, QHeaderView.Stretch)
+        for c in (_COL_TYPE, _COL_COLOR, _COL_WIDTH):
+            h.setSectionResizeMode(c, QHeaderView.ResizeToContents)
+        self.shape_table.itemChanged.connect(self._on_table_item_changed)
+        self.shape_table.itemSelectionChanged.connect(
+            self._on_table_selection_changed)
+        lay.addWidget(self.shape_table, 1)
 
-        splitter.addWidget(right_panel)
-        splitter.setSizes([260, 1040])   # left:right = 1:4
-        outer.addWidget(splitter, 1)
+        row = QHBoxLayout()
+        self.duplicate_btn = QPushButton("Duplicate", pane)
+        self.duplicate_btn.setToolTip("Copy the selected ROI, offset by 20 px")
+        self.duplicate_btn.clicked.connect(self._on_duplicate_clicked)
+        row.addWidget(self.duplicate_btn)
+        self.delete_btn = QPushButton("Delete", pane)
+        self.delete_btn.setToolTip("Delete the selected ROI (Del)")
+        self.delete_btn.clicked.connect(self._on_delete_selected)
+        row.addWidget(self.delete_btn)
+        lay.addLayout(row)
 
-        # ---- Bottom action bar ---- #
-        bot = QHBoxLayout()
+        new_box = QGroupBox("New shape", pane)
+        form = QFormLayout(new_box)
+        form.setContentsMargins(8, 6, 8, 6)
+        self.name_edit = QLineEdit(new_box)
+        self.name_edit.setPlaceholderText("auto (e.g. polygon_1)")
+        self.name_edit.setToolTip(
+            "Name for the next shape you draw. Leave empty to name it "
+            "automatically; rename any time by double-clicking in the table.")
+        form.addRow("Name", self.name_edit)
+        self.color_cb = _color_combo(new_box)
+        self.color_cb.setCurrentText("Red")
+        form.addRow("Colour", self.color_cb)
+        self.thickness_spin = QSpinBox(new_box)
+        self.thickness_spin.setRange(1, 30)
+        self.thickness_spin.setValue(3)
+        self.thickness_spin.setSuffix(" px")
+        form.addRow("Line width", self.thickness_spin)
+        self.marker_spin = QSpinBox(new_box)
+        self.marker_spin.setRange(2, 30)
+        self.marker_spin.setValue(8)
+        self.marker_spin.setSuffix(" px")
+        self.marker_spin.setToolTip(
+            "Size of the corner/centre tags drawn on ROI visualisations")
+        form.addRow("Tag size", self.marker_spin)
+        self.color_cb.currentTextChanged.connect(self._push_draw_style)
+        self.thickness_spin.valueChanged.connect(self._push_draw_style)
+        lay.addWidget(new_box)
 
-        self.reset_btn = QPushButton("Reset video", self)
-        self.reset_btn.setToolTip("Delete all ROIs from the current video")
-        self.reset_btn.clicked.connect(self._on_reset_clicked)
-        bot.addWidget(self.reset_btn)
-
-        self.apply_all_btn = QPushButton("Apply to all", self)
+        copy_box = QGroupBox("Copy to other videos", pane)
+        cl = QVBoxLayout(copy_box)
+        cl.setContentsMargins(8, 6, 8, 6)
+        self.apply_all_btn = QPushButton("Apply to all…", copy_box)
         self.apply_all_btn.setToolTip(
-            "Copy this video's ROIs to every other video in the project"
-        )
+            "Replace the ROIs of every other video with this video's ROIs")
         self.apply_all_btn.clicked.connect(self._on_apply_all_clicked)
-        bot.addWidget(self.apply_all_btn)
-
-        # Patch 122dl: subset-apply button. Solves the multi-
-        # condition pain — users with two arena layouts can copy
-        # the current video's ROIs only to videos that share the
-        # same condition (typically a name-prefix subset). Opens
-        # the existing DuplicateRoisDialog with the current video
-        # pre-selected as the source and a friendlier titlebar.
-        # See docs/roi_enhancements_proposal.md (Proposal 1).
-        self.apply_selected_btn = QPushButton(
-            "Apply to selected…", self)
+        cl.addWidget(self.apply_all_btn)
+        # Patch 122dl: subset-apply via DuplicateRoisDialog.
+        self.apply_selected_btn = QPushButton("Apply to selected…", copy_box)
         self.apply_selected_btn.setToolTip(
-            "Copy this video's ROIs to a subset of other videos "
-            "you pick by name / filter."
-        )
-        self.apply_selected_btn.clicked.connect(
-            self._on_apply_selected_clicked)
-        bot.addWidget(self.apply_selected_btn)
+            "Copy this video's ROIs to videos you pick by name / filter")
+        self.apply_selected_btn.clicked.connect(self._on_apply_selected_clicked)
+        cl.addWidget(self.apply_selected_btn)
+        lay.addWidget(copy_box)
 
-        bot.addStretch(1)
+        # Patch 122fb: bulk import / standardize lives in a popup.
+        self.maintenance_btn = QPushButton("Import / standardize…", pane)
+        self.maintenance_btn.setToolTip(
+            "Import ROI definitions from CSV, or standardize all ROIs to a "
+            "reference video's pixels-per-mm calibration")
+        self.maintenance_btn.clicked.connect(self._on_maintenance_clicked)
+        lay.addWidget(self.maintenance_btn)
 
-        self.save_status = QLabel("", self)
+        self.reset_btn = QPushButton("Clear this video…", pane)
+        self.reset_btn.setToolTip("Delete every ROI on the current video")
+        self.reset_btn.clicked.connect(self._on_reset_clicked)
+        lay.addWidget(self.reset_btn)
+        pane.setMinimumWidth(260)
+        return pane
+
+    def _build_bottom_bar(self, parent: QWidget) -> QHBoxLayout:
+        bot = QHBoxLayout()
+        self.save_status = QLabel("", parent)
         self.save_status.setStyleSheet("color: palette(placeholder-text);")
-        bot.addWidget(self.save_status)
-        bot.addSpacing(20)
-
-        # Close + save buttons. Patch 122dn promoted to instance
-        # attrs so set_embedded_mode() can hide the dialog-only
-        # affordances ("Close", "Save && close") when the widget
-        # is embedded in a workbench page rather than a popup.
-        self.close_btn = QPushButton("Close", self)
+        bot.addWidget(self.save_status, 1)
+        self.dirty_label = QLabel("● Unsaved changes", parent)
+        self.dirty_label.setStyleSheet("color: #d08a00; font-weight: bold;")
+        self.dirty_label.setVisible(False)
+        bot.addWidget(self.dirty_label)
+        bot.addSpacing(12)
+        self.undo_btn = QPushButton("Undo", parent)
+        self.undo_btn.setToolTip("Undo (Ctrl+Z)")
+        self.undo_btn.clicked.connect(self._undo_action)
+        bot.addWidget(self.undo_btn)
+        self.redo_btn = QPushButton("Redo", parent)
+        self.redo_btn.setToolTip("Redo (Ctrl+Shift+Z)")
+        self.redo_btn.clicked.connect(self._redo_action)
+        bot.addWidget(self.redo_btn)
+        sep = QFrame(parent)
+        sep.setFrameShape(QFrame.VLine)
+        bot.addWidget(sep)
+        self.close_btn = QPushButton("Close", parent)
         self.close_btn.clicked.connect(self._on_close_clicked)
         bot.addWidget(self.close_btn)
-
-        self.save_btn = QPushButton("Save", self)
+        self.save_btn = QPushButton("Save", parent)
+        self.save_btn.setToolTip("Save (Ctrl+S)")
         self.save_btn.clicked.connect(self._on_save_clicked)
         bot.addWidget(self.save_btn)
-
-        self.save_close_btn = QPushButton("Save && close", self)
+        self.save_close_btn = QPushButton("Save && close", parent)
         self.save_close_btn.setDefault(True)
         self.save_close_btn.clicked.connect(self._on_save_and_close)
         bot.addWidget(self.save_close_btn)
-        outer.addLayout(bot)
-        if getattr(self, "_embedded", False):
-            self._apply_embedded_visibility()
+        return bot
 
-        # Patch 122dn — mount the content widget into root.
-        self._root_layout.addWidget(content)
-        self._content_widget = content
+    def _build_shortcuts(self) -> None:
+        def sc(seq: str, slot, widget: QWidget | None = None,
+               ctx=Qt.WidgetWithChildrenShortcut) -> QShortcut:
+            s = QShortcut(QKeySequence(seq), widget or self, activated=slot)
+            s.setContext(ctx)
+            return s
 
-        # Keyboard shortcuts: R/C/P switch tools; PgUp/PgDn nav videos
-        QShortcut(QKeySequence("R"), self,
-                  activated=lambda: self._tool_buttons[RECTANGLE].setChecked(True))
-        QShortcut(QKeySequence("C"), self,
-                  activated=lambda: self._tool_buttons[CIRCLE].setChecked(True))
-        QShortcut(QKeySequence("P"), self,
-                  activated=lambda: self._tool_buttons[POLYGON].setChecked(True))
-        QShortcut(QKeySequence("PgUp"), self,
-                  activated=self._prev_video)
-        QShortcut(QKeySequence("PgDown"), self,
-                  activated=self._next_video)
+        for tool, key in ((SELECT, "V"), (RECTANGLE, "R"),
+                          (CIRCLE, "C"), (POLYGON, "P")):
+            sc(key, lambda t=tool: self._set_tool(t))
+        sc("PgUp", self._prev_video)
+        sc("PgDown", self._next_video)
+        sc(",", lambda: self._step_frames(-1))
+        sc(".", lambda: self._step_frames(1))
+        sc("Shift+,", lambda: self._step_seconds(-1.0))
+        sc("Shift+.", lambda: self._step_seconds(1.0))
+        sc("Ctrl+Z", self._undo_action)
+        sc("Ctrl+Shift+Z", self._redo_action)
+        sc("Ctrl+Y", self._redo_action)
+        sc("Ctrl+S", self._on_save_clicked)
+        sc("Del", self._on_delete_selected, self.shape_table, Qt.WidgetShortcut)
+
+    # ------------------------------------------------------------------ #
+    # Tools
+    # ------------------------------------------------------------------ #
+    def _selected_color(self) -> tuple[str, tuple[int, int, int]]:
+        name = self.color_cb.currentText()
+        return name, _color_bgr(name)
+
+    def _set_tool(self, tool: str) -> None:
+        btn = self._tool_buttons.get(tool)
+        if btn is not None and not btn.isChecked():
+            btn.setChecked(True)
+        _, bgr = self._selected_color()
+        self.preview.set_tool(tool, bgr, self.thickness_spin.value())
+        if tool == SELECT:
+            row = self._selected_row()
+            self.preview.select_shape(row)
+
+    def _push_draw_style(self, *_args) -> None:
+        _, bgr = self._selected_color()
+        self.preview.set_draw_style(bgr, self.thickness_spin.value())
+
+    def _on_hint(self, text: str) -> None:
+        self.hint_label.setText(text)
 
     # ------------------------------------------------------------------ #
     # Video list
     # ------------------------------------------------------------------ #
     def _refresh_video_list(self) -> None:
-        """Rebuild the left-side video list with current ROI status."""
-        self.video_list.blockSignals(True)
-        self.video_list.clear()
-        # Patch 122ag: resolve through the layout helper rather than
-        # hardcoding 'logs/measures/' — the helper already returns
-        # the right path for both v1 and legacy layouts.
+        """Rebuild the video list with each video's ROI status."""
+        # Patch 122ag: the layout helper gives the right H5 path for v1
+        # and legacy projects alike.
         roi_h5 = _project_paths_lite(self.config_path).get(
-            "roi_definitions_path", "",
-        )
+            "roi_definitions_path", "")
         videos_with_rois = _videos_with_rois(roi_h5)
-        for vpath in self._videos:
-            stem = Path(vpath).stem
-            has_rois = stem in videos_with_rois
-            mark = "✓ " if has_rois else "  "
-            item = QListWidgetItem(f"{mark}{stem}")
-            if has_rois:
-                f = item.font(); f.setBold(True); item.setFont(f)
-                item.setForeground(Qt.darkGreen)
-            self.video_list.addItem(item)
-        self.video_list.setCurrentRow(self._cur_idx)
-        self.video_list.blockSignals(False)
+        with QSignalBlocker(self.video_list):
+            self.video_list.clear()
+            for vpath in self._videos:
+                stem = Path(vpath).stem
+                has_rois = stem in videos_with_rois
+                item = QListWidgetItem(f"{'✓' if has_rois else '  '}  {stem}")
+                item.setToolTip(vpath)
+                if has_rois:
+                    f = item.font()
+                    f.setBold(True)
+                    item.setFont(f)
+                self.video_list.addItem(item)
+            self.video_list.setCurrentRow(self._cur_idx)
+        self._apply_video_filter(self.video_filter.text())
+
+    def _apply_video_filter(self, text: str) -> None:
+        t = text.strip().lower()
+        for i in range(self.video_list.count()):
+            item = self.video_list.item(i)
+            stem = Path(self._videos[i]).stem.lower()
+            item.setHidden(bool(t) and t not in stem and i != self._cur_idx)
 
     def _on_video_picked(self, row: int) -> None:
         if row < 0 or row >= len(self._videos) or row == self._cur_idx:
             return
-        # Auto-save before switching
         if self._dirty and self.logic is not None:
             try:
                 self.logic.save()
-                self._dirty = False
+                self._set_dirty(False)
                 self._flash_status("Auto-saved.")
             except Exception as exc:
-                # Save failed — abort the switch and keep the user on
-                # the current video so their work isn't silently lost.
                 QMessageBox.critical(
                     self, "Auto-save failed",
                     f"Could not save current video before switching: "
                     f"{type(exc).__name__}: {exc}\n\n"
                     f"Staying on the current video.",
                 )
-                self.video_list.blockSignals(True)
-                self.video_list.setCurrentRow(self._cur_idx)
-                self.video_list.blockSignals(False)
+                with QSignalBlocker(self.video_list):
+                    self.video_list.setCurrentRow(self._cur_idx)
                 return
+            self._refresh_video_list_marks()
         self._cur_idx = row
         self._load_video(row)
 
-    def _load_video(self, idx: int) -> None:
-        """Construct a fresh ROILogic for video[idx] and rebuild the
-        preview / table."""
+    def _refresh_video_list_marks(self) -> None:
+        """Update the ✓ marks without losing the user's position."""
+        cur = self._cur_idx
+        self._refresh_video_list()
+        with QSignalBlocker(self.video_list):
+            self.video_list.setCurrentRow(cur)
+
+    def _load_video(self, idx: int, keep_frame: bool = False) -> None:
+        """Open video[idx]: fresh ROILogic, preview and table."""
         vpath = self._videos[idx]
+        frame = self.logic.frame_idx if (keep_frame and self.logic) else 0
         try:
             self.logic = ROILogic(config_path=self.config_path,
                                   video_path=vpath)
@@ -662,15 +670,18 @@ class ROIDefineWidget(QWidget):
                 f"{type(exc).__name__}: {exc}",
             )
             return
-        self._dirty = False
-        self.setWindowTitle(
-            f"ROI Definitions — {self.logic.video_name}"
-        )
-        # Update slider range for this video
-        self.frame_slider.blockSignals(True)
-        self.frame_slider.setRange(0, max(0, self.logic.frame_count - 1))
-        self.frame_slider.setValue(0)
-        self.frame_slider.blockSignals(False)
+        if frame:
+            self.logic.goto_frame(frame)
+        self._set_dirty(False)
+        self._undo.clear()
+        self._redo.clear()
+        self._update_undo_buttons()
+        self.setWindowTitle(f"ROI Definitions — {self.logic.video_name}")
+        with QSignalBlocker(self.frame_slider):
+            self.frame_slider.setRange(0, max(0, self.logic.frame_count - 1))
+            self.frame_slider.setValue(self.logic.frame_idx)
+        # Abandon a shape in progress from the previous video.
+        self._set_tool(self.preview.tool() or SELECT)
         self._sync_preview()
         self._sync_table()
 
@@ -683,413 +694,407 @@ class ROIDefineWidget(QWidget):
             self.video_list.setCurrentRow(self._cur_idx + 1)
 
     # ------------------------------------------------------------------ #
-    # Preview / shape table sync
+    # Preview / table sync
     # ------------------------------------------------------------------ #
+    def _roi_entries(self) -> list[tuple[str, str, object]]:
+        """(kind, name, ROIDefinition) in display order. The canvas overlay
+        index and the table row index are both positions in this list."""
+        if self.logic is None:
+            return []
+        return [(kind, name, roi)
+                for kind, d in self.logic.defs.items()
+                for name, roi in d.items()]
+
     def _sync_preview(self) -> None:
         if self.logic is None:
             return
-        # The canvas now renders ROIs natively; pass the RAW frame
-        # (no overlays) and let the canvas draw the ROIs on top via
-        # set_existing_rois.
         if self.logic.current_frame is not None:
             self.preview.set_frame(self.logic.current_frame)
-        # Build the overlay list for the canvas
         overlay_rois = []
-        # Patch 122dm — track which overlay-index corresponds to
-        # which (kind, name) so canvas signals (shape_edited,
-        # shape_deleted) can map back to the logic. Must match
-        # the iteration order used to build overlay_rois.
-        self._overlay_idx_to_kind_name: list[tuple[str, str]] = []
-        for kind, d in self.logic.defs.items():
-            for name, roi in d.items():
-                overlay_rois.append({
-                    "kind": kind,
-                    "color_bgr": roi.color_bgr,
-                    "thickness": roi.thickness,
-                    "geometry": roi.geometry,
-                })
-                self._overlay_idx_to_kind_name.append((kind, name))
+        self._overlay_idx_to_kind_name = []
+        for kind, name, roi in self._roi_entries():
+            overlay_rois.append({
+                "kind": kind, "name": name,
+                "color_bgr": roi.color_bgr,
+                "thickness": roi.thickness,
+                "geometry": roi.geometry,
+            })
+            self._overlay_idx_to_kind_name.append((kind, name))
         self.preview.set_existing_rois(overlay_rois)
+        self._update_frame_label()
+
+    def _update_frame_label(self) -> None:
+        lg = self.logic
+        if lg is None:
+            return
+        secs = lg.frame_idx / lg.fps if lg.fps else 0.0
         self.frame_label.setText(
-            f"Frame {self.logic.frame_idx} / "
-            f"{self.logic.frame_count - 1}"
-        )
+            f"Frame {lg.frame_idx} / {lg.frame_count - 1}  ({secs:.1f} s)")
 
     def _sync_preview_and_slider(self) -> None:
         if self.logic is None:
             return
-        self.frame_slider.blockSignals(True)
-        self.frame_slider.setValue(self.logic.frame_idx)
-        self.frame_slider.blockSignals(False)
+        with QSignalBlocker(self.frame_slider):
+            self.frame_slider.setValue(self.logic.frame_idx)
         self._sync_preview()
 
-    def _sync_table(self) -> None:
-        if self.logic is None:
-            self.shape_table.setRowCount(0)
-            return
-        all_rois = []
-        for kind, d in self.logic.defs.items():
-            for name, roi in d.items():
-                all_rois.append((kind, name, roi))
-        self.shape_table.setRowCount(len(all_rois))
-        for i, (kind, name, roi) in enumerate(all_rois):
-            idx_item = QTableWidgetItem(str(i + 1))
-            idx_item.setTextAlignment(Qt.AlignCenter)
-            self.shape_table.setItem(i, 0, idx_item)
-            self.shape_table.setItem(i, 1, QTableWidgetItem(kind.capitalize()))
-            self.shape_table.setItem(i, 2, QTableWidgetItem(name))
-            clr_item = QTableWidgetItem(roi.color_name)
-            clr_item.setForeground(_bgr_to_qcolor(roi.color_bgr))
-            self.shape_table.setItem(i, 3, clr_item)
-            del_btn = QPushButton("✕", self)
-            del_btn.setFixedWidth(28)
-            del_btn.setToolTip(f"Delete {name}")
-            del_btn.clicked.connect(
-                lambda _=False, n=name: self._on_delete_roi(n),
-            )
-            self.shape_table.setCellWidget(i, 4, del_btn)
+    def _sync_table(self, select_name: str | None = None) -> None:
+        if select_name is None:
+            row = self._selected_row()
+            if row is not None and row < len(self._overlay_idx_to_kind_name):
+                select_name = self._overlay_idx_to_kind_name[row][1]
+        entries = self._roi_entries()
+        with QSignalBlocker(self.shape_table):
+            self.shape_table.clearContents()
+            self.shape_table.setRowCount(len(entries))
+            for i, (kind, name, roi) in enumerate(entries):
+                name_item = QTableWidgetItem(name)
+                name_item.setData(Qt.UserRole, name)
+                name_item.setToolTip("Double-click to rename")
+                self.shape_table.setItem(i, _COL_NAME, name_item)
+                type_item = QTableWidgetItem(self._describe(kind, roi))
+                type_item.setFlags(type_item.flags() & ~Qt.ItemIsEditable)
+                self.shape_table.setItem(i, _COL_TYPE, type_item)
+                cb = _color_combo(self.shape_table)
+                if roi.color_name not in [c for c, _ in _COLORS]:
+                    cb.addItem(_swatch(roi.color_bgr), roi.color_name)
+                cb.setCurrentText(roi.color_name)
+                cb.currentTextChanged.connect(
+                    lambda text, n=name: self._on_row_color(n, text))
+                self.shape_table.setCellWidget(i, _COL_COLOR, cb)
+                sp = QSpinBox(self.shape_table)
+                sp.setRange(1, 30)
+                sp.setValue(int(roi.thickness))
+                sp.valueChanged.connect(
+                    lambda v, n=name: self._on_row_width(n, v))
+                self.shape_table.setCellWidget(i, _COL_WIDTH, sp)
+            row = next((i for i, (_, n, _r) in enumerate(entries)
+                        if n == select_name), None)
+            if row is not None:
+                self.shape_table.selectRow(row)
+            else:
+                self.shape_table.clearSelection()
+        self._update_row_buttons()
+
+    @staticmethod
+    def _describe(kind: str, roi) -> str:
+        if kind == POLYGON:
+            n = len(roi.geometry.get("vertices") or [])
+            return f"Polygon ({n})"
+        return _KIND_LABEL.get(kind, kind)
+
+    def _selected_row(self) -> int | None:
+        rows = self.shape_table.selectionModel().selectedRows() \
+            if self.shape_table.selectionModel() else []
+        return rows[0].row() if rows else None
+
+    def _selected_name(self) -> str | None:
+        row = self._selected_row()
+        if row is None or row >= len(self._overlay_idx_to_kind_name):
+            return None
+        return self._overlay_idx_to_kind_name[row][1]
+
+    def _update_row_buttons(self) -> None:
+        has = self._selected_row() is not None
+        self.duplicate_btn.setEnabled(has)
+        self.delete_btn.setEnabled(has)
 
     # ------------------------------------------------------------------ #
-    # Frame nav
+    # Undo / dirty state
+    # ------------------------------------------------------------------ #
+    def _push_undo(self) -> None:
+        if self.logic is None:
+            return
+        self._undo.append(self.logic.snapshot())
+        del self._undo[:-_UNDO_LIMIT]
+        self._redo.clear()
+        self._last_width_edit = None
+        self._update_undo_buttons()
+
+    def _changed(self, message: str, select_name: str | None = None) -> None:
+        """Common tail of every edit: mark dirty, resync, report."""
+        self._set_dirty(True)
+        self._sync_preview()
+        self._sync_table(select_name)
+        if self.preview.is_selecting():
+            self.preview.select_shape(self._selected_row())
+        self._flash_status(message)
+
+    def _undo_action(self) -> None:
+        if self.logic is None or not self._undo:
+            return
+        if self.preview.is_drawing():
+            self.preview.cancel_draw()
+            return
+        self._redo.append(self.logic.snapshot())
+        self.logic.restore(self._undo.pop())
+        self._update_undo_buttons()
+        self._changed("Undone.")
+
+    def _redo_action(self) -> None:
+        if self.logic is None or not self._redo:
+            return
+        self._undo.append(self.logic.snapshot())
+        self.logic.restore(self._redo.pop())
+        self._update_undo_buttons()
+        self._changed("Redone.")
+
+    def _update_undo_buttons(self) -> None:
+        if hasattr(self, "undo_btn"):
+            self.undo_btn.setEnabled(bool(self._undo))
+            self.redo_btn.setEnabled(bool(self._redo))
+
+    def _set_dirty(self, dirty: bool) -> None:
+        self._dirty = bool(dirty)
+        if hasattr(self, "dirty_label"):
+            self.dirty_label.setVisible(self._dirty)
+
+    # ------------------------------------------------------------------ #
+    # Frame navigation
     # ------------------------------------------------------------------ #
     def _step_frames(self, n: int) -> None:
-        if self.logic is None: return
+        if self.logic is None:
+            return
         self.logic.advance_frame(n)
         self._sync_preview_and_slider()
 
     def _step_seconds(self, s: float) -> None:
-        if self.logic is None: return
+        if self.logic is None:
+            return
         self.logic.jump_seconds(s)
         self._sync_preview_and_slider()
 
     def _first_frame(self) -> None:
-        if self.logic is None: return
+        if self.logic is None:
+            return
         self.logic.first_frame()
         self._sync_preview_and_slider()
 
     def _last_frame(self) -> None:
-        if self.logic is None: return
+        if self.logic is None:
+            return
         self.logic.last_frame()
         self._sync_preview_and_slider()
 
     def _on_slider_changed(self, val: int) -> None:
-        if self.logic is None: return
+        if self.logic is None:
+            return
         self.logic.goto_frame(val)
         self._sync_preview()
 
     # ------------------------------------------------------------------ #
-    # Drawing — synchronous on the main thread
+    # Drawing
     # ------------------------------------------------------------------ #
-    def _selected_kind(self) -> str:
-        for kind, btn in self._tool_buttons.items():
-            if btn.isChecked():
-                return kind
-        return RECTANGLE
-
-    def _selected_color(self) -> tuple[str, tuple[int, int, int]]:
-        name = self.color_cb.currentText()
-        bgr = next((b for n, b in _COLORS if n == name), (0, 0, 255))
-        return name, bgr
-
-    def _on_draw_clicked(self) -> None:
-        if self.logic is None:
-            return
-        name = self.name_edit.text().strip()
-        if not name:
-            self._flash_status("Type a shape name first.", error=True)
-            self.name_edit.setFocus()
-            return
-        if self.logic.has_roi(name):
-            self._flash_status(
-                f"An ROI named {name!r} already exists for this video.",
-                error=True,
-            )
-            return
-        if self.preview.is_drawing():
-            self._flash_status(
-                "A draw is already in progress. Press ESC to cancel "
-                "the current one before starting a new shape.",
-                error=True,
-            )
-            return
-        kind = self._selected_kind()
-        clr_name, bgr = self._selected_color()
-        thickness = self.thickness_spin.value()
-
-        # Stash params for the commit callback to consume
-        self._pending_shape = {
-            "name": name, "kind": kind,
-            "color_name": clr_name, "bgr": bgr,
-            "thickness": thickness,
-            "ear_tag_size": self.marker_spin.value(),
-        }
-
-        # Hand off to the canvas. The next mouse interaction starts
-        # capturing the shape; ESC/Q/Space cancel/commit per shape
-        # type. shape_committed (or shape_cancelled) fires when done.
-        self.preview.start_draw(kind=kind, color_bgr=bgr,
-                                thickness=thickness)
-        self._flash_status(
-            {
-                RECTANGLE: f"Drawing rectangle: {name} — "
-                           f"drag to define, ESC to cancel",
-                CIRCLE: f"Drawing circle: {name} — "
-                        f"click center, drag radius, ESC to cancel",
-                POLYGON: f"Drawing polygon: {name} — "
-                         f"click vertices, ESC/Q/Space to close",
-            }.get(kind, f"Drawing {kind}: {name}…"),
-        )
+    def _next_auto_name(self, kind: str) -> str:
+        i = 1
+        while self.logic.has_roi(f"{kind}_{i}"):
+            i += 1
+        return f"{kind}_{i}"
 
     def _on_shape_committed(self, kind: str, geom: dict) -> None:
-        """Slot for ROICanvas.shape_committed. Adds the captured shape
-        to the logic, refreshes preview + table."""
-        params = getattr(self, "_pending_shape", None)
-        if params is None:
-            self._flash_status(
-                "Got a shape but had no pending request — ignoring.",
-                error=True,
-            )
+        """A new shape was drawn: name it, style it, add it."""
+        if self.logic is None:
             return
-        name = params["name"]
-        clr_name = params["color_name"]
-        bgr = params["bgr"]
-        thickness = params["thickness"]
-        marker = params["ear_tag_size"]
+        typed = self.name_edit.text().strip()
+        if typed and self.logic.has_roi(typed):
+            self._flash_status(
+                f"An ROI named {typed!r} already exists — the new shape was "
+                f"named automatically instead.", error=True)
+            typed = ""
+        name = typed or self._next_auto_name(kind)
+        clr_name, bgr = self._selected_color()
+        style = dict(color_name=clr_name, bgr=bgr,
+                     thickness=self.thickness_spin.value(),
+                     ear_tag_size=self.marker_spin.value())
+        self._push_undo()
         try:
             if kind == RECTANGLE:
                 self.logic.add_rectangle(
                     name=name, top_left=geom["top_left"],
-                    bottom_right=geom["bottom_right"],
-                    color_name=clr_name, bgr=bgr,
-                    thickness=thickness, ear_tag_size=marker,
-                )
+                    bottom_right=geom["bottom_right"], **style)
             elif kind == CIRCLE:
                 self.logic.add_circle(
                     name=name, center=geom["center"],
-                    radius=geom["radius"],
-                    color_name=clr_name, bgr=bgr,
-                    thickness=thickness, ear_tag_size=marker,
-                )
+                    radius=geom["radius"], **style)
             elif kind == POLYGON:
                 self.logic.add_polygon(
-                    name=name, vertices=geom["vertices"],
-                    color_name=clr_name, bgr=bgr,
-                    thickness=thickness, ear_tag_size=marker,
-                )
+                    name=name, vertices=geom["vertices"], **style)
         except Exception as exc:
+            self._undo.pop()
+            self._update_undo_buttons()
             self._flash_status(f"Add failed: {exc}", error=True)
             return
-        self._dirty = True
         self.name_edit.clear()
-        self._pending_shape = None
-        self._sync_preview()
-        self._sync_table()
-        self._flash_status(f"Added {kind}: {name}")
+        extra = (f" ({len(geom['vertices'])} vertices)"
+                 if kind == POLYGON else "")
+        self._changed(f"Added {name}{extra} — double-click its name to "
+                      f"rename.", select_name=name)
 
     def _on_shape_cancelled(self) -> None:
-        """Slot for ROICanvas.shape_cancelled."""
-        self._pending_shape = None
-        self._flash_status("Drawing cancelled.")
+        self._flash_status("Shape abandoned.")
 
     # ------------------------------------------------------------------ #
-    # Patch 122dm — Edit / select-mode handlers (Proposal 2)
+    # Editing placed shapes
     # ------------------------------------------------------------------ #
-    def _on_edit_toggled(self, checked: bool) -> None:
-        """Toggle the canvas's select / edit mode. While in edit
-        mode the Draw button is disabled (the two modes don't
-        compose cleanly — you can't be both placing and selecting)."""
-        if checked:
-            # Cancel any in-progress draw, then enter select mode.
-            self._pending_shape = None
-            self.preview.start_select()
-            self.draw_btn.setEnabled(False)
-            self._flash_status(
-                "Edit mode: click a placed ROI to select; "
-                "drag to move; Delete to remove."
-            )
-        else:
-            self.preview.stop_select()
-            self.draw_btn.setEnabled(True)
-            self._flash_status("Edit mode off.")
-
-    # ------------------------------------------------------------------ #
-    # Patch 122fb — Import / standardize popup launcher
-    # ------------------------------------------------------------------ #
-    def _on_maintenance_clicked(self) -> None:
-        """Open the ROIManageForm in a modal popup. Replaces the
-        standalone "Maintenance" section that was removed in
-        122fb. The popup hosts CSV-import and size-standardize
-        actions (the form's "Draw ROIs (interactive)" action is
-        redundant with the Definitions panel's own Draw button
-        but is left in place; deferred clean-up).
-        """
-        from PySide6.QtWidgets import QDialog, QVBoxLayout
-
-        from mufasa.ui_qt.forms.roi import ROIManageForm
-
-        # ROIManageForm requires a config_path; if we don't have
-        # one yet (rare — the panel is usually shown only after
-        # a project is loaded), bail with a status message.
-        cfg = (getattr(self.logic, "config_path", None)
-               if self.logic is not None else None)
-        if not cfg:
-            self._flash_status(
-                "No project loaded — open a project before "
-                "importing or standardizing ROIs.",
-                error=True,
-            )
-            return
-
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Import ROIs / Standardize sizes")
-        dlg.setMinimumSize(640, 420)
-        layout = QVBoxLayout(dlg)
-        layout.setContentsMargins(8, 8, 8, 8)
-        form = ROIManageForm(parent=dlg, config_path=cfg)
-        # When the form completes, close the dialog and refresh
-        # the panel so any newly-imported ROIs appear immediately.
-        try:
-            form.completed.connect(dlg.accept)
-        except Exception:
-            # If completed signal isn't wired the user can close
-            # via the title bar — not catastrophic.
-            pass
-        layout.addWidget(form)
-        dlg.exec()
-        # After the dialog closes, resync so any new ROIs the user
-        # imported show up in the preview / table immediately.
-        try:
-            self._sync_preview_and_slider()
-        except Exception:
-            # Don't fail the click handler if resync fails — the
-            # user can navigate to another video and back to refresh.
-            pass
-
     def _on_shape_edited(self, idx: int, geom: dict) -> None:
-        """Slot for ROICanvas.shape_edited. Pushes the new geometry
-        into the logic so save-time writes the edit back to H5.
-
-        idx maps to self._overlay_idx_to_kind_name (built by
-        _sync_preview); the canvas's internal _existing_rois list
-        is parallel to it.
-        """
+        """Canvas moved / reshaped overlay ``idx``: write it to the logic."""
         if self.logic is None:
             return
         if not (0 <= idx < len(self._overlay_idx_to_kind_name)):
             return
         kind, name = self._overlay_idx_to_kind_name[idx]
+        geom = canonical_geometry(kind, geom)
+        self._push_undo()
         ok = False
         try:
             if kind == RECTANGLE:
                 ok = self.logic.update_rectangle_geometry(
-                    name=name,
-                    top_left=tuple(geom["top_left"]),
-                    bottom_right=tuple(geom["bottom_right"]),
-                )
+                    name=name, top_left=tuple(geom["top_left"]),
+                    bottom_right=tuple(geom["bottom_right"]))
             elif kind == CIRCLE:
                 ok = self.logic.update_circle_geometry(
-                    name=name,
-                    center=tuple(geom["center"]),
-                    radius=int(geom["radius"]),
-                )
+                    name=name, center=tuple(geom["center"]),
+                    radius=int(geom["radius"]))
             elif kind == POLYGON:
                 ok = self.logic.update_polygon_geometry(
-                    name=name,
-                    vertices=[tuple(v) for v in geom["vertices"]],
-                )
+                    name=name, vertices=[tuple(v) for v in geom["vertices"]])
         except Exception as exc:
-            self._flash_status(
-                f"Edit failed: {exc}", error=True)
-            return
+            ok = False
+            self._flash_status(f"Edit failed: {exc}", error=True)
         if not ok:
-            self._flash_status(
-                f"Could not update {name}", error=True)
+            self._undo.pop()
+            self._update_undo_buttons()
+            self._sync_preview()
             return
-        self._dirty = True
-        # Re-sync the table so any derived numbers (width, height,
-        # center coords) reflect the new geometry. Don't re-sync
-        # preview here — the canvas already mutated its overlay
-        # copy in place during the drag; calling _sync_preview
-        # would rebuild from logic and force a repaint which is
-        # fine but unnecessary churn at this point.
-        self._sync_table()
-        self._flash_status(f"Adjusted {name}")
+        self._changed(f"Adjusted {name}.", select_name=name)
 
     def _on_shape_deleted(self, idx: int) -> None:
-        """Slot for ROICanvas.shape_deleted (Delete key in edit
-        mode). Removes the ROI from the logic + refreshes preview
-        + table.
-        """
+        """Delete pressed on the canvas selection."""
         if self.logic is None:
             return
         if not (0 <= idx < len(self._overlay_idx_to_kind_name)):
             return
         _kind, name = self._overlay_idx_to_kind_name[idx]
-        if self.logic.delete_roi(name):
-            self._dirty = True
-            self._sync_preview()
-            self._sync_table()
-            self._flash_status(f"Deleted {name}.")
+        self._delete_names([name])
 
     def _on_shape_selected(self, idx: int) -> None:
-        """Slot for ROICanvas.shape_selected. Highlights the
-        corresponding row in the shape table. ``idx == -1`` means
-        the user clicked empty space (deselect → clear table
-        selection). Patch 122fd.
-
-        The overlay index from the canvas matches the table row
-        because ``_sync_table`` and ``_sync_preview`` iterate
-        ``self.logic.defs`` in the same order and both populate
-        their indexes in lockstep (see line 723 ``_sync_table``
-        and line 700 ``_sync_preview``).
-        """
-        if idx < 0:
-            self.shape_table.clearSelection()
-            return
-        if 0 <= idx < self.shape_table.rowCount():
-            self.shape_table.selectRow(idx)
-            # Scroll the row into view if necessary so the user
-            # always sees the highlighted row even on small tables.
-            try:
+        """Canvas click selected overlay ``idx`` (-1 = none): mirror it in
+        the table."""
+        with QSignalBlocker(self.shape_table):
+            if idx < 0:
+                self.shape_table.clearSelection()
+            elif 0 <= idx < self.shape_table.rowCount():
+                self.shape_table.selectRow(idx)
                 item = self.shape_table.item(idx, 0)
                 if item is not None:
                     self.shape_table.scrollToItem(item)
-            except Exception:
-                # Scrolling failure is non-fatal — selection is
-                # what matters.
-                pass
+        self._update_row_buttons()
+
+    def _on_table_selection_changed(self) -> None:
+        """Table row picked: select that shape on the canvas."""
+        row = self._selected_row()
+        if row is not None and not self.preview.is_selecting():
+            self._set_tool(SELECT)
+        self.preview.select_shape(row)
+        self._update_row_buttons()
+
+    def _on_table_item_changed(self, item: QTableWidgetItem) -> None:
+        """Name cell edited: rename the ROI (or revert on a bad name)."""
+        if self.logic is None or item.column() != _COL_NAME:
+            return
+        old = item.data(Qt.UserRole)
+        new = item.text().strip()
+        if not old or new == old:
+            return
+        if not new or self.logic.has_roi(new):
+            self._flash_status(
+                "Name can't be empty." if not new
+                else f"An ROI named {new!r} already exists.", error=True)
+            with QSignalBlocker(self.shape_table):
+                item.setText(old)
+            return
+        self._push_undo()
+        self.logic.rename_roi(old, new)
+        # Rebuild after this signal returns: the table must not delete the
+        # item that is emitting itemChanged.
+        QTimer.singleShot(0, lambda: self._changed(
+            f"Renamed {old} → {new}.", select_name=new))
+
+    def _on_row_color(self, name: str, color_name: str) -> None:
+        if self.logic is None or not self.logic.has_roi(name):
+            return
+        self._push_undo()
+        self.logic.update_style(name, color_name=color_name,
+                                bgr=_color_bgr(color_name))
+        # The combo box stays (no table rebuild while it is emitting).
+        self._set_dirty(True)
+        self._sync_preview()
+        self._flash_status(f"{name}: colour {color_name}.")
+
+    def _on_row_width(self, name: str, width: int) -> None:
+        if self.logic is None or not self.logic.has_roi(name):
+            return
+        # Coalesce spin-box scrubbing into a single undo step.
+        last = getattr(self, "_last_width_edit", None)
+        if last != name or not self._undo:
+            self._push_undo()
+        self._last_width_edit = name
+        self.logic.update_style(name, thickness=width)
+        self._set_dirty(True)
+        self._sync_preview()
+        self._flash_status(f"{name}: line width {width} px.")
+
+    def _on_duplicate_clicked(self) -> None:
+        name = self._selected_name()
+        if self.logic is None or name is None:
+            return
+        i, base = 2, f"{name}_copy"
+        new = base
+        while self.logic.has_roi(new):
+            new = f"{base}{i}"
+            i += 1
+        self._push_undo()
+        self.logic.duplicate_roi(name, new)
+        self._changed(f"Duplicated {name} → {new}.", select_name=new)
+
+    def _on_delete_selected(self) -> None:
+        name = self._selected_name()
+        if name is not None:
+            self._delete_names([name])
 
     def _on_delete_roi(self, name: str) -> None:
+        """Delete one ROI by name (undoable, so no confirmation)."""
+        self._delete_names([name])
+
+    def _delete_names(self, names: list[str]) -> None:
         if self.logic is None:
             return
-        if QMessageBox.question(
-            self, "Delete ROI", f"Delete ROI {name!r}?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
-        ) != QMessageBox.Yes:
+        names = [n for n in names if self.logic.has_roi(n)]
+        if not names:
             return
-        self.logic.delete_roi(name)
-        self._dirty = True
-        self._sync_preview()
-        self._sync_table()
-        self._flash_status(f"Deleted {name}.")
+        self._push_undo()
+        for n in names:
+            self.logic.delete_roi(n)
+        self.preview.select_shape(None)
+        self._changed(f"Deleted {', '.join(names)} (Ctrl+Z to undo).")
 
     # ------------------------------------------------------------------ #
-    # Bottom-bar actions
+    # Project-wide actions
     # ------------------------------------------------------------------ #
     def _on_reset_clicked(self) -> None:
-        if self.logic is None:
+        if self.logic is None or not self.logic.all_roi_names:
             return
         if QMessageBox.question(
-            self, "Reset video",
-            f"Delete every ROI for <b>{self.logic.video_name}</b>?",
+            self, "Clear this video",
+            f"Delete all {len(self.logic.all_roi_names)} ROIs on "
+            f"<b>{self.logic.video_name}</b>? (Undo is available until you "
+            f"switch video.)",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
         ) != QMessageBox.Yes:
             return
+        self._push_undo()
         self.logic.delete_all()
-        self._dirty = True
-        self._sync_preview()
-        self._sync_table()
-        self._flash_status("All ROIs cleared.")
+        self._changed("All ROIs on this video cleared (Ctrl+Z to undo).")
 
     def _on_apply_all_clicked(self) -> None:
         if self.logic is None:
@@ -1097,33 +1102,44 @@ class ROIDefineWidget(QWidget):
         if not self.logic.all_roi_names:
             self._flash_status("No ROIs to apply.", error=True)
             return
-        # Save first so the H5 has the source ROIs, then call the
-        # existing multiply_ROIs backend (it reads the H5).
+        others = [Path(v).stem for v in self._videos
+                  if Path(v).stem != self.logic.video_name]
+        roi_h5 = _project_paths_lite(self.config_path).get(
+            "roi_definitions_path", "")
+        overwritten = sorted(set(others) & set(_videos_with_rois(roi_h5)))
+        msg = (f"Copy the {len(self.logic.all_roi_names)} ROIs of "
+               f"<b>{self.logic.video_name}</b> to all {len(others)} other "
+               f"videos?")
+        if overwritten:
+            msg += (f"<br><br><b>This replaces the existing ROIs of "
+                    f"{len(overwritten)} video(s)</b>, e.g. "
+                    f"{', '.join(overwritten[:3])}"
+                    f"{'…' if len(overwritten) > 3 else ''}. "
+                    f"Use <i>Apply to selected…</i> to pick videos instead.")
+        if QMessageBox.question(
+            self, "Apply to all videos", msg,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        ) != QMessageBox.Yes:
+            return
         try:
             self.logic.save()
-            self._dirty = False
+            self._set_dirty(False)
             self._flash_status("Saved — applying to all videos…")
             QApplication.processEvents()
             from mufasa.roi_tools.roi_utils import multiply_ROIs
             multiply_ROIs(config_path=self.config_path,
                           filename=self._videos[self._cur_idx])
-            self._refresh_video_list()
+            self._refresh_video_list_marks()
             self.rois_modified.emit()
-            self._flash_status("Applied ROIs to every video.")
+            self._flash_status(f"Applied ROIs to {len(others)} videos.")
         except Exception as exc:
             QMessageBox.critical(
                 self, "Apply-all failed",
                 f"Could not apply ROIs: {type(exc).__name__}: {exc}",
             )
 
-    # Patch 122dl: subset-apply handler. Opens the existing
-    # DuplicateRoisDialog with the current video pre-selected as
-    # the source. The dialog's source-combo defaults to alphabetic-
-    # first; we override with the current video so users coming
-    # from this button don't have to re-pick. They CAN still
-    # change the source inside the dialog if they want — the
-    # default_source is just the pre-fill, not a constraint.
     def _on_apply_selected_clicked(self) -> None:
+        """Patch 122dl: copy this video's ROIs to a chosen subset."""
         if self.logic is None:
             return
         if not self.logic.all_roi_names:
@@ -1132,7 +1148,7 @@ class ROIDefineWidget(QWidget):
         # Save first so the dialog reads the freshest H5 state.
         try:
             self.logic.save()
-            self._dirty = False
+            self._set_dirty(False)
             QApplication.processEvents()
         except Exception as exc:
             QMessageBox.critical(
@@ -1142,28 +1158,58 @@ class ROIDefineWidget(QWidget):
                 f"{type(exc).__name__}: {exc}",
             )
             return
-
-        # Lazy import keeps the dialog out of the panel's import
-        # graph at module load time (matches the pattern used by
-        # _on_apply_all_clicked above).
-        from pathlib import Path as _Path
-
         from mufasa.ui_qt.dialogs.duplicate_rois_source_target import DuplicateRoisDialog
-        cur_video_name = _Path(
-            self._videos[self._cur_idx]).stem
         dlg = DuplicateRoisDialog(
             config_path=self.config_path,
             parent=self,
-            default_source=cur_video_name,
+            default_source=Path(self._videos[self._cur_idx]).stem,
             window_title="Apply ROIs to selected videos",
         )
         if dlg.init_failed():
             return
         if dlg.exec() == QDialog.Accepted:
-            self._refresh_video_list()
+            self._refresh_video_list_marks()
             self.rois_modified.emit()
+            self._flash_status("Applied ROIs to selected videos.")
+
+    def _on_maintenance_clicked(self) -> None:
+        """Patch 122fb: ROIManageForm (CSV import / standardize) in a
+        popup. Afterwards the current video is reloaded from disk so
+        imported ROIs appear."""
+        from mufasa.ui_qt.forms.roi import ROIManageForm
+
+        cfg = (getattr(self.logic, "config_path", None)
+               if self.logic is not None else None)
+        if not cfg:
             self._flash_status(
-                "Applied ROIs to selected videos.")
+                "No project loaded — open a project before "
+                "importing or standardizing ROIs.", error=True)
+            return
+        if self._dirty:
+            try:
+                self.logic.save()
+                self._set_dirty(False)
+            except Exception as exc:
+                QMessageBox.critical(
+                    self, "Save failed",
+                    f"Could not save current ROIs first: "
+                    f"{type(exc).__name__}: {exc}")
+                return
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Import ROIs / Standardize sizes")
+        dlg.setMinimumSize(640, 420)
+        layout = QVBoxLayout(dlg)
+        layout.setContentsMargins(8, 8, 8, 8)
+        form = ROIManageForm(parent=dlg, config_path=cfg)
+        with contextlib.suppress(Exception):
+            form.completed.connect(dlg.accept)
+        layout.addWidget(form)
+        dlg.exec()
+        try:
+            self._load_video(self._cur_idx, keep_frame=True)
+            self._refresh_video_list_marks()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ #
     # Save / close
@@ -1173,9 +1219,9 @@ class ROIDefineWidget(QWidget):
             return
         try:
             self.logic.save()
-            self._dirty = False
+            self._set_dirty(False)
             self._flash_status("Saved.")
-            self._refresh_video_list()
+            self._refresh_video_list_marks()
             self.rois_modified.emit()
         except Exception as exc:
             QMessageBox.critical(
@@ -1186,7 +1232,7 @@ class ROIDefineWidget(QWidget):
     def _on_save_and_close(self) -> None:
         self._on_save_clicked()
         if not self._dirty:
-            self.close()
+            self._close_window()
 
     def _on_close_clicked(self) -> None:
         if self._dirty:
@@ -1203,13 +1249,18 @@ class ROIDefineWidget(QWidget):
                     return
             elif ans == QMessageBox.Cancel:
                 return
-        self.close()
+            else:
+                self._set_dirty(False)   # discarded: don't ask again
+        self._close_window()
+
+    def _close_window(self) -> None:
+        """Close the enclosing dialog (popup mode) or this widget."""
+        win = self.window()
+        (win if isinstance(win, QDialog) else self).close()
 
     def _flash_status(self, msg: str, error: bool = False) -> None:
-        if error:
-            self.save_status.setStyleSheet("color: #c44;")
-        else:
-            self.save_status.setStyleSheet("color: palette(placeholder-text);")
+        self.save_status.setStyleSheet(
+            "color: #c44;" if error else "color: palette(placeholder-text);")
         self.save_status.setText(msg)
 
 
@@ -1217,30 +1268,11 @@ class ROIDefineWidget(QWidget):
 # Patch 122dn — backward-compatible QDialog wrapper.
 # --------------------------------------------------------------------------- #
 class ROIDefinePanel(QDialog):
-    """Thin QDialog wrapper around :class:`ROIDefineWidget`.
+    """Thin QDialog wrapper around :class:`ROIDefineWidget` for the popup
+    entry points (``roi_video_table`` and ``ROIManageForm``).
 
-    Preserves the pre-122dn entry-point API so callers that opened
-    the panel as a popup (``roi_video_table.py:_action_define_rois``
-    and ``forms/roi.py:ROIManageForm.on_run``) keep working
-    unchanged. The new embedded-in-page path uses
-    :class:`ROIDefineWidget` directly via
-    :func:`WorkflowPage.add_section_widget`.
-
-    Forwarded API
-    -------------
-    * ``rois_modified`` signal — re-emitted from the wrapped widget.
-    * ``config_path`` attribute — copy of the wrapped widget's.
-    * Same constructor signature as the pre-122dn dialog
-      (``config_path``, ``video_path=None``, ``parent=None``).
-
-    Raises
-    ------
-    RuntimeError
-        If the project has no videos. Preserves the pre-122dn
-        contract — popup callers expected this exception and
-        handled it (showing a QMessageBox). The new embedded
-        widget displays a placeholder instead; the dialog wrapper
-        keeps the raise-on-empty contract for legacy callers.
+    Raises ``RuntimeError`` when the project has no videos, as the
+    pre-122dn dialog did.
     """
 
     rois_modified = Signal()
@@ -1251,34 +1283,42 @@ class ROIDefinePanel(QDialog):
         super().__init__(parent)
         self.setWindowTitle("ROI Definitions — Mufasa")
         self.setWindowFlags(self.windowFlags() | Qt.Window)
-        self.resize(1300, 850)
+        self.resize(1440, 860)
         self.config_path = config_path
-
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-
         self.widget = ROIDefineWidget(
-            config_path=config_path,
-            video_path=video_path,
-            parent=self,
-        )
+            config_path=config_path, video_path=video_path, parent=self)
         outer.addWidget(self.widget)
-
-        # Forward the signal so existing callers can do
-        # `dlg.rois_modified.connect(...)`.
         self.widget.rois_modified.connect(self.rois_modified)
-
-        # Preserve the pre-122dn contract: callers expected a
-        # RuntimeError when there were no videos. The widget now
-        # renders a placeholder instead — check for that case
-        # after construction and raise to match legacy callers'
-        # exception-handler paths.
         if not self.widget._videos:
             raise RuntimeError(
                 f"No videos found in "
                 f"{self.widget.video_dir or '<no project>'}"
             )
+
+    def closeEvent(self, ev) -> None:
+        """Window-manager close: same unsaved-changes prompt as Close."""
+        w = self.widget
+        if getattr(w, "_dirty", False):
+            ans = QMessageBox.question(
+                self, "Unsaved changes",
+                "You have unsaved ROI changes for the current video. "
+                "Save before closing?",
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+                QMessageBox.Save,
+            )
+            if ans == QMessageBox.Cancel:
+                ev.ignore()
+                return
+            if ans == QMessageBox.Save:
+                w._on_save_clicked()
+                if w._dirty:
+                    ev.ignore()
+                    return
+            w._set_dirty(False)
+        super().closeEvent(ev)
 
 
 __all__ = ["ROIDefinePanel", "ROIDefineWidget"]

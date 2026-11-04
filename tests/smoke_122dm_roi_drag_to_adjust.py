@@ -229,7 +229,14 @@ def main() -> int:
             "branches",
             "_DrawMode.SHAPE_MOVING" in mme_src
             and "_DrawMode.HANDLE_DRAGGING" in mme_src
-            and "_apply_edit_geom" in mme_src,
+            # 122ij: the move / resize bodies became helpers
+            # (_move_selected_to / _drag_handle_to); both must still
+            # route through _apply_edit_geom.
+            and "_move_selected_to" in mme_src
+            and "_drag_handle_to" in mme_src
+            and all("_apply_edit_geom" in ast.unparse(get_method(
+                canvas_cls, h) or ast.parse(""))
+                for h in ("_move_selected_to", "_drag_handle_to")),
         )
 
     # 9. mouseReleaseEvent emits shape_edited
@@ -308,30 +315,22 @@ def main() -> int:
          if isinstance(m, ast.FunctionDef)}
         if panel_cls else set()
     )
-    # 14. edit_btn (checkable)
+    # 14-15. Patch 122ij replaced the separate "Edit" toggle (which
+    # disabled Draw) with a Select tool in the same exclusive tool group
+    # as Rectangle / Circle / Polygon. Pin that instead.
     check(
-        "ROIDefinePanel has edit_btn (checkable QPushButton) "
-        "with the right label",
-        "edit_btn" in panel_src
-        and 'QPushButton("Edit"' in panel_src
-        and "setCheckable(True)" in panel_src,
+        "ROIDefineWidget has a Select tool in the exclusive tool group",
+        "(SELECT," in panel_src and '"Select",' in panel_src
+        and "self._tool_group.setExclusive(True)" in panel_src,
     )
-    # 15. _on_edit_toggled wires start_select / stop_select
+    st = get_method(panel_cls, "_set_tool")
     check(
-        "ROIDefinePanel has _on_edit_toggled method that wires "
-        "start_select / stop_select",
-        "_on_edit_toggled" in panel_methods,
+        "_set_tool arms the canvas tool via preview.set_tool and syncs "
+        "the canvas selection with the table",
+        st is not None
+        and "preview.set_tool" in ast.unparse(st)
+        and "select_shape" in ast.unparse(st),
     )
-    oet = get_method(panel_cls, "_on_edit_toggled")
-    if oet is not None:
-        oet_src = ast.unparse(oet)
-        check(
-            "_on_edit_toggled body calls start_select / stop_select "
-            "and toggles Draw button enabled state",
-            "start_select" in oet_src
-            and "stop_select" in oet_src
-            and "draw_btn.setEnabled" in oet_src,
-        )
 
     # 16. signal-handler methods exist
     check(

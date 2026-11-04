@@ -393,6 +393,37 @@ class ROILogic:
         }
         return True
 
+    def update_style(
+        self, name: str, *,
+        color_name: str | None = None,
+        bgr: tuple[int, int, int] | None = None,
+        thickness: int | None = None,
+        ear_tag_size: int | None = None,
+    ) -> bool:
+        """Change an ROI's colour / line thickness / tag size in place
+        (patch 122ij — the redesigned panel edits these per row).
+        Returns False if no ROI has that name."""
+        roi = self.get_roi(name)
+        if roi is None:
+            return False
+        if color_name is not None:
+            roi.color_name = str(color_name)
+        if bgr is not None:
+            roi.color_bgr = tuple(int(c) for c in bgr)
+        if thickness is not None:
+            roi.thickness = max(1, int(thickness))
+        if ear_tag_size is not None:
+            roi.ear_tag_size = max(1, int(ear_tag_size))
+        return True
+
+    def snapshot(self) -> dict[str, dict[str, ROIDefinition]]:
+        """Deep copy of this video's ROI definitions, for undo."""
+        return copy.deepcopy(self.defs)
+
+    def restore(self, snap: dict[str, dict[str, ROIDefinition]]) -> None:
+        """Replace this video's ROI definitions with a :meth:`snapshot`."""
+        self.defs = copy.deepcopy(snap)
+
     def delete_all(self) -> None:
         for d in self.defs.values():
             d.clear()
