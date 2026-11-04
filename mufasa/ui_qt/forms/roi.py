@@ -491,7 +491,7 @@ class ROIManageForm(OperationForm):
         "stay consistent across recordings. "
         "Source videos are read from <code>sources/videos/</code> "
         "(v1) or <code>videos/</code> (legacy); ROI definitions "
-        "persist to <code>logs/measures/ROI_definitions.h5</code> "
+        "persist to <code>logs/measures/rois.json</code> "
         "under the project root in both layouts."
     )
 
@@ -520,7 +520,7 @@ class ROIManageForm(OperationForm):
         # with the mouse. Mixing Tk and Qt event loops in the same
         # process is fragile, so we launch the picker as a separate
         # python subprocess. ROI definitions get saved to
-        # <project>/logs/measures/ROI_definitions.h5 (same path in
+        # <project>/logs/measures/rois.json (same path in
         # both layouts) and are immediately picked up by the rest of
         # the ROI page on next access.
         draw_host = QWidget()
@@ -533,7 +533,7 @@ class ROIManageForm(OperationForm):
             "the OpenCV canvas, draw rectangles, circles, or "
             "polygons with the mouse, save, and close. ROI "
             "definitions persist in <code>logs/measures/"
-            "ROI_definitions.h5</code> under the project root."
+            "rois.json</code> under the project root."
         )
         draw_note.setTextFormat(Qt.RichText)
         draw_note.setWordWrap(True)
@@ -563,7 +563,7 @@ class ROIManageForm(OperationForm):
             "EXPECTED_POLY_COLS). Easiest way to get a correct file "
             "is: draw ROIs once on one video, then export the "
             "auto-generated CSV from "
-            "<code>logs/measures/ROI_definitions.h5</code> and adapt "
+            "<code>logs/measures/rois.json</code> and adapt "
             "it for other videos."
         )
         fmt_hint.setTextFormat(Qt.RichText)

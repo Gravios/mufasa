@@ -471,13 +471,13 @@ SECTIONS: dict[str, SectionSpec] = {
         page="ROI",
         section_title="Definitions",
         depends_on=("pixels_per_mm",),
-        # Patch 122ep — points at logs/measures/ROI_definitions.h5
+        # Patch 122ep / 122il — points at logs/measures/rois.json
         # (the SINGLE FILE the ROI definitions live in, per 122eh +
         # 122en's centralized layout). _path_mtime_if_has_content
         # handles file targets via the ``path.is_file()`` branch.
         # Detection signal: "the user has saved any ROIs at all."
         detect_path=lambda root: (
-            root / "logs" / "measures" / "ROI_definitions.h5"
+            root / "logs" / "measures" / "rois.json"
         ),
     ),
     "features_subject": SectionSpec(

@@ -74,6 +74,15 @@ def _build_logic_class():
     sys.modules.setdefault("mufasa.roi_tools",
                            ModuleType("mufasa.roi_tools"))
 
+    # Patch 122il: roi_logic persists through roi_store (stdlib + numpy
+    # + pandas only); load the real module from its file.
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location(
+        "mufasa.roi_tools.roi_store", "mufasa/roi_tools/roi_store.py")
+    _store = _ilu.module_from_spec(_spec)
+    sys.modules["mufasa.roi_tools.roi_store"] = _store
+    _spec.loader.exec_module(_store)
+
     # Read the file directly and exec in a fresh namespace, so we don't
     # trigger any sibling-module imports inside mufasa.roi_tools/.
     src = Path("mufasa/roi_tools/roi_logic.py").read_text()
@@ -244,13 +253,13 @@ def main() -> int:
     assert rendered.sum() > 0
 
     # ------------------------------------------------------------------ #
-    # Case 16: BGR parser handles tuple, list, string, garbage
+    # Case 16: colours are stored as #rrggbb (122il roi_store)
     # ------------------------------------------------------------------ #
-    assert ROILogic._parse_bgr((1, 2, 3)) == (1, 2, 3)
-    assert ROILogic._parse_bgr([4, 5, 6]) == (4, 5, 6)
-    assert ROILogic._parse_bgr("(7, 8, 9)") == (7, 8, 9)
-    assert ROILogic._parse_bgr("garbage") == (0, 0, 255)
-    assert ROILogic._parse_bgr(None) == (0, 0, 255)
+    st = sys.modules["mufasa.roi_tools.roi_store"]
+    assert st.bgr_to_hex((0, 0, 255)) == "#ff0000"
+    assert st.hex_to_bgr("#00ff7f") == (127, 255, 0)
+    assert st.color_name((255, 0, 0)) == "Blue"
+    assert st.color_name((1, 2, 3)) == "#030201"
 
     # ------------------------------------------------------------------ #
     # Case 17: project_path read from config (issue 5)
@@ -276,8 +285,8 @@ def main() -> int:
         assert l2.project_path == str(good_proj), (
             f"case 17: project_path={l2.project_path}, want={good_proj}"
         )
-        assert l2.roi_h5_path == str(
-            good_proj / "logs" / "measures" / "ROI_definitions.h5"
+        assert l2.roi_path == str(
+            good_proj / "logs" / "measures" / "rois.json"
         )
 
         # Missing project_path falls back to config's directory
@@ -288,49 +297,18 @@ def main() -> int:
         assert l3.project_path == str(tmp_root)
 
         # ------------------------------------------------------------ #
-        # Case 18: polygon vertices parsed via ast.literal_eval (issue 6)
+        # Case 18: a malformed rois.json is reported, never executed
+        # or treated as empty (122il)
         # ------------------------------------------------------------ #
-        # Simulate a polygon row with vertices stored as a Python-list
-        # string (the SimBA H5 convention)
-        fake_poly_row = pd.Series({
-            "Video": "test_video",
-            "Name": "imported_poly",
-            "Color name": "Green",
-            "Color BGR": "(0, 255, 0)",
-            "Thickness": 2,
-            "Ear_tag_size": 8,
-            "vertices": "[[10, 20], [30, 40], [50, 60]]",
-            "Center_X": 30,
-            "Center_Y": 40,
-        })
-        roi = ROILogic._row_to_definition(fake_poly_row, POLYGON)
-        assert roi is not None, "case 18: parse should succeed"
-        assert roi.geometry["vertices"] == [[10, 20], [30, 40], [50, 60]]
-
-        # Malicious vertices string — ast.literal_eval refuses
-        # arbitrary code; the row parser should return None rather
-        # than execute it.
-        evil_row = pd.Series({
-            "Video": "test_video",
-            "Name": "evil",
-            "Color name": "Red",
-            "Color BGR": "(0, 0, 255)",
-            "Thickness": 2,
-            "Ear_tag_size": 8,
-            "vertices": "__import__('os').system('echo PWNED')",
-            "Center_X": 0,
-            "Center_Y": 0,
-        })
-        roi = ROILogic._row_to_definition(evil_row, POLYGON)
-        # Either None (rejected) or a valid ROIDefinition with no
-        # side effects — the test passes as long as the function
-        # didn't execute the injected expression. Since the function
-        # catches all exceptions and returns None, that's our
-        # expected outcome.
-        assert roi is None, (
-            f"case 18: malicious string should not produce a valid "
-            f"ROI, got {roi}"
-        )
+        bad = tmp_root / "bad_rois.json"
+        bad.write_text('{"format": "mufasa-rois", "version": 1, "videos": '
+                       '{"v": {"rois": [{"name": "p", "type": "polygon", '
+                       '"vertices": "__import__(\'os\').system(\'x\')"}]}}}')
+        try:
+            st.load_rois(bad)
+            raise AssertionError("case 18: malformed file should raise")
+        except st.RoiFileError:
+            pass
 
         # ------------------------------------------------------------ #
         # Case 19: save preserves other-video rows (issue 7 supports)
@@ -376,7 +354,7 @@ def main() -> int:
                 thickness=2, ear_tag_size=8,
             )
             la.save()
-            assert os.path.isfile(la.roi_h5_path), "save A didn't create file"
+            assert os.path.isfile(la.roi_path), "save A didn't create file"
 
             lb = ROILogic2(config_path=str(save_cfg),
                            video_path="/tmp/video_b.mp4")

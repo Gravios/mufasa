@@ -89,7 +89,6 @@ from mufasa.roi_tools.roi_utils import (
     get_roi_data_for_video_name,
     get_roi_df_from_dict,
 )
-from mufasa.utils.enums import Keys
 from mufasa.utils.errors import NoFilesFoundError
 from mufasa.utils.read_write import find_all_videos_in_directory
 
@@ -400,15 +399,12 @@ class DuplicateRoisDialog(QDialog):
                     [self._reader.polygon_df, video_polygon_df],
                     axis=0).reset_index(drop=True)
 
-            store = pd.HDFStore(self._reader.roi_coordinates_path,
-                                mode="w")
-            try:
-                store[Keys.ROI_RECTANGLES.value] = (
-                    self._reader.rectangles_df)
-                store[Keys.ROI_CIRCLES.value] = self._reader.circles_df
-                store[Keys.ROI_POLYGONS.value] = self._reader.polygon_df
-            finally:
-                store.close()
+            # Patch 122il: rois.json, locked update.
+            from mufasa.roi_tools.roi_store import write_frames
+            write_frames(self._reader.roi_coordinates_path,
+                         self._reader.rectangles_df,
+                         self._reader.circles_df,
+                         self._reader.polygon_df, whole_project=True)
         except Exception as exc:
             self._set_status(
                 f"Duplicate failed: {type(exc).__name__}: {exc}",

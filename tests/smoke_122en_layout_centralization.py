@@ -100,7 +100,7 @@ Functional agreement (3 checks):
     for a synthetic v1 project (tempdir-based).
 8.  ``v1_project_paths`` returns a Path-shaped dict
     (``roi_definitions_path`` ends in
-    ``logs/measures/ROI_definitions.h5`` — same value the
+    ``logs/measures/rois.json`` — same value the
     Duplicate ROIs dialog reads).
 9.  ``v1_project_paths`` resolves relative paths to absolute
     (the .resolve() call is correct).
@@ -282,10 +282,10 @@ def main() -> int:
     check(
         "v1_project_paths returns "
         "roi_definitions_path ending in "
-        "logs/measures/ROI_definitions.h5 (pinning the value "
+        "logs/measures/rois.json (pinning the value "
         "122eh-hotfix established)",
         paths["roi_definitions_path"].endswith(
-            "logs/measures/ROI_definitions.h5"
+            "logs/measures/rois.json"
         ),
         detail=(f"got {paths['roi_definitions_path']!r}"),
     )

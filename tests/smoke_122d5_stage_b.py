@@ -220,11 +220,12 @@ def main() -> int:
     # 428 -> 429 in 122hy (added the pose_preview module), and
     # 429 -> 430 in 122ib (added the pose_parquet module), and
     # 430 -> 431 in 122if (added the session_removal module).
+    # 431 -> 432 in 122il (added roi_tools/roi_store.py).
     total_py = sum(1 for _ in pkg.rglob("*.py"))
     check(
-        f"Total mufasa/**/*.py count post-Stage-B ≤ 431 "
+        f"Total mufasa/**/*.py count post-Stage-B ≤ 432 "
         f"(got {total_py}; Stage B removed ~109 .py files)",
-        total_py <= 431,
+        total_py <= 432,
     )
 
     # 14. Doc updates

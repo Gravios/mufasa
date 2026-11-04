@@ -92,7 +92,7 @@ def main() -> int:
             f"case 1: video_dir mismatch — got {out!r}"
         )
         assert out.get("roi_definitions_path") == str(
-            proj / "logs" / "measures" / "ROI_definitions.h5"
+            proj / "logs" / "measures" / "rois.json"
         ), f"case 1: roi_definitions_path mismatch — got {out!r}"
 
         # ------------------------------------------------------------ #

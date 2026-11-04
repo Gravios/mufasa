@@ -123,7 +123,7 @@ def main() -> int:
         "roi_logic.py preserves defensive fallback (for malformed "
         "configs)",
         "except Exception" in rl_src
-        and "ROI_definitions.h5" in rl_src,
+        and "rois.json" in rl_src,
     )
 
     # ==================================================================

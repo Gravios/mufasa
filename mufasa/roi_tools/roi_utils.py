@@ -5,7 +5,7 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 import math
 import os
 import warnings
-from copy import copy, deepcopy
+from copy import copy
 from tkinter import *
 from typing import TYPE_CHECKING
 
@@ -24,18 +24,16 @@ from mufasa.utils.checks import (
     check_int,
     check_str,
     check_valid_array,
-    check_valid_dataframe,
     check_valid_tuple,
     check_video_and_data_frm_count_align,
 )
-from mufasa.utils.enums import ROI_SETTINGS, ConfigKey, Formats, Keys, Options
+from mufasa.utils.enums import ROI_SETTINGS, Formats, Options
 from mufasa.utils.errors import InvalidInputError, NoROIDataError, NotDirectoryError
 from mufasa.utils.printing import stdout_success, stdout_trash
 from mufasa.utils.read_write import (
     find_files_of_filetypes_in_directory,
     get_fn_ext,
     get_video_meta_data,
-    read_config_file,
     read_df,
     read_roi_data,
 )
@@ -531,167 +529,50 @@ def multiply_ROIs(filename: str | os.PathLike,
                   config_path: str | os.PathLike | None = None,
                   roi_coordinates_path: str | os.PathLike | None = None,
                   videos_dir: str | os.PathLike | None = None) -> None:
+    """Copy one video's ROIs to every other video in the project.
 
-    r"""
-    Reproduce ROIs in one video to all other videos in SimBA project.
+    Each other video's own ROIs are replaced. ROIs are rescaled when a
+    target video's frame size differs from the source's (patch 122il).
 
-    :param Union[str, os.PathLike] config_path: Path to SimBA project config file.
-    :param Union[str, os.PathLike] filename: Path to video in project for which ROIs should be duplicated in the other videos in the project
-    :return: None. The results are stored in the ``/project_folder/logs/measures\ROI_definitions.h5`` of the SimBA project
-
-    :example:
-    >>> multiply_ROIs(config_path=r"C:\troubleshooting\mitra\project_folder\project.toml", filename=r"C:\troubleshooting\mitra\project_folder\videos\501_MA142_Gi_CNO_0514.mp4")
+    :param filename: path of the source video.
+    :param config_path: project config; resolves the ROI file and videos dir.
     """
-
+    from mufasa.roi_tools.roi_store import load_rois, read_frame_sizes, update_rois
     if config_path is not None:
         check_file_exist_and_readable(file_path=config_path)
-        config = read_config_file(config_path=config_path)
-        project_path = config.get(ConfigKey.GENERAL_SETTINGS.value, ConfigKey.PROJECT_PATH.value)
-        # Patch 122d9 (QWI-1) + 122da (sibling): resolve both
-        # videos_dir AND roi_coordinates_path via the layout-
-        # agnostic helper. 122d9 fixed only videos_dir; the
-        # roi_coordinates_path line below was a sibling miss —
-        # same root cause (hardcoded legacy join), different
-        # subpath. Caught by the 122da hardwired-paths audit.
         from mufasa.project_layout import project_paths_from_config
         _paths = project_paths_from_config(config_path=config_path)
         videos_dir = _paths["video_dir"]
         roi_coordinates_path = _paths["roi_definitions_path"]
-
     check_file_exist_and_readable(file_path=filename)
-    _, video_name, video_ext = get_fn_ext(filename)
-
+    _, video_name, _ = get_fn_ext(filename)
     if not os.path.isdir(videos_dir):
-        # Patch 122d9 (QWI-1): error message updated. Pre-fix the
-        # "SimBA expected a directory" wording was both stale
-        # ("Mufasa", not "SimBA") and unhelpful for v1 users who
-        # would see the legacy path here and not understand why.
         raise NotDirectoryError(msg=f'Could not find the videos directory in the Mufasa project. Mufasa expected a directory at location: {videos_dir}')
-    if not os.path.isfile(roi_coordinates_path):
-        raise NoROIDataError(msg=f"Cannot multiply ROI definitions: no ROI definitions exist in Mufasa project. Could find find a file at expected location {roi_coordinates_path}", source=multiply_ROIs.__name__)
-
-    with pd.HDFStore(roi_coordinates_path) as hdf: roi_data_keys = [x[1:] for x in hdf.keys()]
-    missing_keys = [x for x in roi_data_keys if x not in [Keys.ROI_RECTANGLES.value, Keys.ROI_CIRCLES.value, Keys.ROI_POLYGONS.value]]
-    if len(missing_keys) > 0:
-        raise NoROIDataError(msg=f'The ROI data file {roi_coordinates_path} is corrupted. Missing the following keys: {missing_keys}', source=multiply_ROIs.__name__)
-
-    rectangles_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_RECTANGLES.value)
-    circles_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_CIRCLES.value)
-    polygon_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_POLYGONS.value)
-
-    # Patch 122ek — only apply check_valid_dataframe to non-empty
-    # frames. roi_logic.RoiLogic writes all three HDF keys even
-    # when the user only drew one shape type; the unused-shape
-    # frames come back as empty with no columns at all, and the
-    # check would otherwise raise InvalidInputError "missing
-    # required columns" on a legitimate "no shapes of this type"
-    # state. See the module-level note above safe_filter_by_video
-    # for the broader rationale.
-    if len(rectangles_df) > 0:
-        check_valid_dataframe(df=rectangles_df, source=f'{multiply_ROIs.__name__} rectangles_df', required_fields=['Video', 'Name'])
-    if len(circles_df) > 0:
-        check_valid_dataframe(df=circles_df, source=f'{multiply_ROIs.__name__} circles_df', required_fields=['Video', 'Name'])
-    if len(polygon_df) > 0:
-        check_valid_dataframe(df=polygon_df, source=f'{multiply_ROIs.__name__} polygon_df', required_fields=['Video', 'Name'])
-
-    videos_w_rectangles = safe_videos_in(rectangles_df)
-    videos_w_circles = safe_videos_in(circles_df)
-    videos_w_polygons = safe_videos_in(polygon_df)
-    videos_w_shapes = list(set(videos_w_rectangles + videos_w_circles + videos_w_polygons))
-    if video_name not in videos_w_shapes:
-        raise NoROIDataError(msg=f"Cannot replicate ROIs to all other videos: no ROI records exist for {video_name}. Create ROIs for for video {video_name}", source=multiply_ROIs.__name__)
-
-    other_video_file_paths = find_files_of_filetypes_in_directory(directory=videos_dir, extensions=Options.ALL_VIDEO_FORMAT_OPTIONS.value)
-    other_video_file_paths = [x for x in other_video_file_paths if x != filename]
-    if len(other_video_file_paths) == 0:
+    if not load_rois(roi_coordinates_path).rois(video_name):
+        raise NoROIDataError(msg=f"Cannot replicate ROIs to all other videos: {video_name} has no ROIs.", source=multiply_ROIs.__name__)
+    others = [x for x in find_files_of_filetypes_in_directory(directory=videos_dir, extensions=Options.ALL_VIDEO_FORMAT_OPTIONS.value)
+              if get_fn_ext(x)[1] != video_name]
+    if not others:
         raise NoROIDataError(msg=f"Cannot replicate ROIs to other videos. No other videos exist in project {videos_dir} directory.", source=multiply_ROIs.__name__)
+    sizes = read_frame_sizes(others + [os.fspath(filename)])
+    targets = [get_fn_ext(x)[1] for x in others]
+    update_rois(roi_coordinates_path, lambda st: st.copy_video(video_name, targets, sizes))
+    stdout_success(msg=f"ROIs of {video_name} copied to {len(targets)} other videos.")
 
-    r_df = [pd.DataFrame(columns=get_rectangle_df_headers()) if video_name not in videos_w_rectangles else safe_filter_by_video(rectangles_df, video_name)][0]
-    c_df = [pd.DataFrame(columns=get_circle_df_headers()) if video_name not in videos_w_circles else safe_filter_by_video(circles_df, video_name)][0]
-    p_df = [pd.DataFrame(columns=get_polygon_df_headers()) if video_name not in videos_w_polygons else safe_filter_by_video(polygon_df, video_name)][0]
-
-    rectangle_results, circle_results, polygon_results = deepcopy(r_df), deepcopy(c_df), deepcopy(p_df)
-    for other_video_file_name in other_video_file_paths:
-        _, other_vid_name, ext = get_fn_ext(other_video_file_name)
-        if len(r_df) > 0:
-            x = deepcopy(r_df); x['Video'] = other_vid_name
-            rectangle_results = pd.concat([rectangle_results, x], axis=0)
-        if len(circle_results) > 0:
-            x = deepcopy(c_df); x['Video'] = other_vid_name
-            circle_results = pd.concat([circle_results, x], axis=0)
-        if len(polygon_results) > 0:
-            x = deepcopy(p_df); x['Video'] = other_vid_name
-            polygon_results = pd.concat([polygon_results, x], axis=0)
-
-    rectangle_results = rectangle_results.drop_duplicates(subset=["Video", "Name"], keep="first")
-    circle_results = circle_results.drop_duplicates(subset=["Video", "Name"], keep="first")
-    polygon_results = polygon_results.drop_duplicates(subset=["Video", "Name"], keep="first")
-
-    store = pd.HDFStore(roi_coordinates_path, mode="w")
-    store[Keys.ROI_RECTANGLES.value] = rectangle_results
-    store[Keys.ROI_CIRCLES.value] = circle_results
-    store[Keys.ROI_POLYGONS.value] = polygon_results
-    store.close()
-    stdout_success(msg=f"ROIs for {video_name} applied to a further {len(other_video_file_paths)} videos (Duplicated rectangles count: {len(r_df)}, circles: {len(c_df)}, polygons: {len(p_df)}).")
-    #print('Next, click on "DRAW" to modify ROI location(s) or click on "RESET" to remove ROI drawing(s)')
 
 def reset_video_ROIs(config_path: str | os.PathLike,
                      filename: str | os.PathLike) -> None:
-
-    r"""
-    Delete drawn ROIs for a single video in a SimBA project.
-
-    :param Union[str, os.PathLike] config_path: Path to SimBA project config file.
-    :param Union[str, os.PathLike] filename: Path to video in project for which ROIs should be duplicated in the other videos in the project
-    :return: None. The results are stored in the ``/project_folder/logs/measures\ROI_definitions.h5`` of the SimBA project
-
-    :example:
-    >>> reset_video_ROIs(config_path=r"C:\troubleshooting\mitra\project_folder\project.toml", filename=r"C:\troubleshooting\mitra\project_folder\videos\501_MA142_Gi_CNO_0514.mp4")
-    """
-
-    check_file_exist_and_readable(file_path=config_path)
-    check_file_exist_and_readable(file_path=filename)
-    _, video_name, video_ext = get_fn_ext(filename)
-    config = read_config_file(config_path=config_path)
-    project_path = config.get(ConfigKey.GENERAL_SETTINGS.value, ConfigKey.PROJECT_PATH.value)
-    # Patch 122da: same layout-agnostic fix as multiply_ROIs.
-    # Pre-122da this hardcoded the legacy
-    # `<project_path>/logs/measures/ROI_definitions.h5`; v1
-    # projects have a different project root.
+    """Delete all ROIs of one video."""
     from mufasa.project_layout import project_paths_from_config
-    roi_coordinates_path = project_paths_from_config(
-        config_path=config_path)["roi_definitions_path"]
-    if not os.path.isfile(roi_coordinates_path):
-        raise NoROIDataError(msg=f"Cannot reset/delete ROI definitions: no ROI definitions exist in Mufasa project. Could find find a file at expected location {roi_coordinates_path}. Create ROIs before deleting ROIs.", source=reset_video_ROIs.__name__)
-    with pd.HDFStore(roi_coordinates_path) as hdf: roi_data_keys = [x[1:] for x in hdf.keys()]
-    missing_keys = [x for x in roi_data_keys if x not in [Keys.ROI_RECTANGLES.value, Keys.ROI_CIRCLES.value, Keys.ROI_POLYGONS.value]]
-    if len(missing_keys) > 0:
-        raise NoROIDataError(msg=f'The ROI data file {roi_coordinates_path} is corrupted. Missing the following keys: {missing_keys}', source=reset_video_ROIs.__name__)
-
-    rectangles_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_RECTANGLES.value)
-    circles_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_CIRCLES.value)
-    polygon_df = pd.read_hdf(path_or_buf=roi_coordinates_path, key=Keys.ROI_POLYGONS.value)
-    # Patch 122ek — guard column-required checks on empty
-    # DataFrames (see multiply_ROIs above for rationale).
-    if len(rectangles_df) > 0:
-        check_valid_dataframe(df=rectangles_df, source=f'{reset_video_ROIs.__name__} rectangles_df', required_fields=['Video'])
-    if len(circles_df) > 0:
-        check_valid_dataframe(df=circles_df, source=f'{reset_video_ROIs.__name__} circles_df', required_fields=['Video'])
-    if len(polygon_df) > 0:
-        check_valid_dataframe(df=polygon_df, source=f'{reset_video_ROIs.__name__} polygon_df', required_fields=['Video'])
-    video_rectangle_roi_records = safe_filter_by_video(rectangles_df, video_name)
-    video_circle_roi_records = safe_filter_by_video(circles_df, video_name)
-    video_polygon_roi_records = safe_filter_by_video(polygon_df, video_name)
-    video_roi_cnt = len(video_rectangle_roi_records) + len(video_circle_roi_records) + len(video_polygon_roi_records)
-    if video_roi_cnt == 0:
-        raise NoROIDataError(msg=f"Cannot delete ROIs for video {video_name}: no ROI records exist for {video_name}. Create ROIs for for video {video_name} first", source=reset_video_ROIs.__name__)
-
-    store = pd.HDFStore(roi_coordinates_path, mode="w")
-    store[Keys.ROI_RECTANGLES.value] = safe_filter_video_neq(rectangles_df, video_name)
-    store[Keys.ROI_CIRCLES.value] = safe_filter_video_neq(circles_df, video_name)
-    store[Keys.ROI_POLYGONS.value] = safe_filter_video_neq(polygon_df, video_name)
-    store.close()
-    stdout_trash(msg=f"Deleted ROI records for video {video_name}. Deleted rectangle count: {len(video_rectangle_roi_records)}, circles: {len(video_circle_roi_records)}, polygons: {len(video_polygon_roi_records)}.")
+    from mufasa.roi_tools.roi_store import load_rois, update_rois
+    check_file_exist_and_readable(file_path=config_path)
+    _, video_name, _ = get_fn_ext(filename)
+    roi_path = project_paths_from_config(config_path=config_path)["roi_definitions_path"]
+    n = len(load_rois(roi_path).rois(video_name))
+    if n == 0:
+        raise NoROIDataError(msg=f"Cannot delete ROIs for video {video_name}: it has none.", source=reset_video_ROIs.__name__)
+    update_rois(roi_path, lambda st: st.remove_video(video_name))
+    stdout_trash(msg=f"Deleted {n} ROI(s) of video {video_name}.")
 
 def get_image_from_label(tk_lbl: Label) -> np.ndarray:
     """ Given a tkinter label with an image, retrieve image in array format"""

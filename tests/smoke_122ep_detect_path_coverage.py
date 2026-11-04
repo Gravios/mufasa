@@ -21,7 +21,7 @@ What the audit found
 Of the 10 sections still without ``detect_path`` post-122ei:
 
 * **Have natural file outputs** (4 — wired here):
-  - ``roi_definitions`` → ``logs/measures/ROI_definitions.h5``
+  - ``roi_definitions`` → ``logs/measures/rois.json``
     (single file, written by RoiLogic)
   - ``annotation`` → ``derived/labels/``
     (per-video labels parquets)
@@ -92,7 +92,7 @@ Coverage
 --------
 New detect_path wiring (4 checks):
 1.  ``SECTIONS["roi_definitions"].detect_path`` is callable
-    and resolves to ``logs/measures/ROI_definitions.h5``.
+    and resolves to ``logs/measures/rois.json``.
 2.  ``SECTIONS["annotation"].detect_path`` is callable and
     resolves to ``derived/labels``.
 3.  ``SECTIONS["classifier_train"].detect_path`` is callable
@@ -165,7 +165,7 @@ def main() -> int:
     # -----------------------------------------------------------------
     new_wirings = [
         ("roi_definitions",  ("logs", "measures",
-                              "ROI_definitions.h5")),
+                              "rois.json")),
         ("annotation",       ("derived", "labels")),
         ("classifier_train", ("models",)),
         ("classifier_run",   ("derived", "classifications")),
@@ -249,11 +249,11 @@ def main() -> int:
         # roi_definitions: a single file
         (root / "logs" / "measures").mkdir(parents=True)
         (root / "logs" / "measures"
-         / "ROI_definitions.h5").write_text("h5")
+         / "rois.json").write_text("h5")
         s = get_status(str(cfg), "roi_definitions")
         check(
             "roi_definitions with logs/measures/"
-            "ROI_definitions.h5 present reads CURRENT (file "
+            "rois.json present reads CURRENT (file "
             "detection branch of _path_mtime_if_has_content)",
             s == SectionStatus.CURRENT,
             detail=(f"got {s.value!r}"),

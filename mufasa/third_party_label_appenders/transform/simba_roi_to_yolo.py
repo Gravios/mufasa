@@ -50,10 +50,10 @@ class SimBAROI2Yolo:
     >>> SimBAROI2Yolo(config_path=r"C:/troubleshooting/RAT_NOR/project.toml").run()
 
     :example II:
-    >>> SimBAROI2Yolo(config_path=r"C:/troubleshooting/RAT_NOR/project.toml", save_dir=r"C:/troubleshooting/RAT_NOR/project_folder/logs/yolo", video_dir=r"C:/troubleshooting/RAT_NOR/project_folder/videos", roi_path=r"C:/troubleshooting/RAT_NOR/project_folder/logs/measures/ROI_definitions.h5").run()
+    >>> SimBAROI2Yolo(config_path=r"C:/troubleshooting/RAT_NOR/project.toml", save_dir=r"C:/troubleshooting/RAT_NOR/project_folder/logs/yolo", video_dir=r"C:/troubleshooting/RAT_NOR/project_folder/videos", roi_path=r"C:/troubleshooting/RAT_NOR/project_folder/logs/measures/rois.json").run()
 
     :example III:
-    >>> SimBAROI2Yolo(video_dir=r"C:/troubleshooting/RAT_NOR/project_folder/videos", roi_path=r"C:/troubleshooting/RAT_NOR/project_folder/logs/measures/ROI_definitions.h5", save_dir=r'C:/troubleshooting/RAT_NOR/project_folder/yolo', verbose=True, roi_frm_cnt=20, obb=True).run()
+    >>> SimBAROI2Yolo(video_dir=r"C:/troubleshooting/RAT_NOR/project_folder/videos", roi_path=r"C:/troubleshooting/RAT_NOR/project_folder/logs/measures/rois.json", save_dir=r'C:/troubleshooting/RAT_NOR/project_folder/yolo', verbose=True, roi_frm_cnt=20, obb=True).run()
     """
 
 

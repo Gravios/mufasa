@@ -731,9 +731,9 @@ def convert_roi_definitions(
     roi_definitions_path: str | os.PathLike, save_dir: str | os.PathLike
 ) -> None:
     """
-    Helper to convert SimBA `ROI_definitions.h5` file into human-readable CSV format.
+    Helper to convert Mufasa `rois.json` file into human-readable CSV format.
 
-    :param Union[str, os.PathLike] roi_definitions_path: Path to SimBA `ROI_definitions.h5` on disk.
+    :param Union[str, os.PathLike] roi_definitions_path: Path to Mufasa `rois.json` on disk.
     :param Union[str, os.PathLike] save_dir: Directory location where the output data should be stored
     """
 

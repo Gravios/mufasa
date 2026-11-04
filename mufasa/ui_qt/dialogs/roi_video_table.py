@@ -17,7 +17,7 @@ A modal-but-not-blocking dialog that lists every video in
   a subprocess; they can be ported to Qt later if needed.
 
 The dialog auto-refreshes its ROI status column when
-``ROI_definitions.h5`` changes on disk (via :class:`QFileSystemWatcher`),
+``rois.json`` changes on disk (via :class:`QFileSystemWatcher`),
 so closing the OpenCV window after drawing visibly flips the status
 from "NO ROIs" to "ROIs defined" without manual reload.
 
@@ -34,7 +34,7 @@ to QGraphicsView.
 Compatibility
 -------------
 
-* Reads the same ``project_folder/logs/measures/ROI_definitions.h5``.
+* Reads the same ``project_folder/logs/measures/rois.json``.
 * Calls the same backend functions for reset
   (:func:`reset_video_ROIs`) and apply-all (:func:`multiply_ROIs`).
 * Subprocess-launched ``ROI_ui`` writes to the same file as before.
@@ -122,24 +122,14 @@ def _list_project_videos(project_path: str) -> list[str]:
     return out
 
 
-def _videos_with_rois(roi_h5_path: str) -> set[str]:
-    """Read ``ROI_definitions.h5`` and return the set of video stems
-    that have at least one ROI of any kind defined.
-
-    Returns empty set if the file doesn't exist or is unreadable —
-    same as "no ROIs defined for any video"."""
-    if not os.path.isfile(roi_h5_path):
-        return set()
+def _videos_with_rois(roi_path: str) -> set[str]:
+    """Video names that have at least one ROI in the project's
+    ``rois.json`` (patch 122il). Missing or unreadable file -> empty."""
+    from mufasa.roi_tools.roi_store import RoiFileError, load_rois
     try:
-        from mufasa.utils.read_write import read_roi_data
-        rect_df, circ_df, poly_df = read_roi_data(roi_path=roi_h5_path)
-    except Exception:
+        return set(load_rois(roi_path).videos_with_rois())
+    except RoiFileError:
         return set()
-    out: set[str] = set()
-    for df in (rect_df, circ_df, poly_df):
-        if df is not None and "Video" in df.columns:
-            out.update(df["Video"].dropna().astype(str).unique().tolist())
-    return out
 
 
 def _build_thumbnail(video_path: str,
@@ -203,7 +193,7 @@ class ROIVideoTableDialog(QDialog):
         paths = _project_paths_lite(config_path)
         self.project_path = paths.get("project_root", "")
         self.video_dir = paths.get("video_dir", "")
-        self.roi_h5_path = paths.get(
+        self.roi_path = paths.get(
             "roi_definitions_path",
             # Worst-case fallback: empty so the watcher's missing-
             # file branch fires cleanly.
@@ -218,7 +208,7 @@ class ROIVideoTableDialog(QDialog):
         self._build_ui()
         self._populate_table()
 
-        # Auto-refresh status column when ROI_definitions.h5 changes.
+        # Auto-refresh status column when rois.json changes.
         # The watcher needs the file to exist; if it doesn't yet, watch
         # the parent directory and re-arm once the file appears.
         self._watcher = QFileSystemWatcher(self)
@@ -269,7 +259,7 @@ class ROIVideoTableDialog(QDialog):
             header.setText(
                 f"<b>Project:</b> <code>{self.project_path}</code><br>"
                 f"<b>ROI definitions file:</b> "
-                f"<code>{self.roi_h5_path}</code>"
+                f"<code>{self.roi_path}</code>"
             )
         else:
             header.setText("<b>No project loaded.</b>")
@@ -314,7 +304,7 @@ class ROIVideoTableDialog(QDialog):
         videos = _list_project_videos(self.video_dir)
         if not videos:
             return
-        videos_with_rois = _videos_with_rois(self.roi_h5_path)
+        videos_with_rois = _videos_with_rois(self.roi_path)
         self.table.setRowCount(len(videos))
         for row, vpath in enumerate(videos):
             stem = Path(vpath).stem
@@ -372,15 +362,15 @@ class ROIVideoTableDialog(QDialog):
         self.table.setItem(row, COL_STATUS, status_item)
 
     # ------------------------------------------------------------------ #
-    # Watcher — auto-refresh on ROI_definitions.h5 change
+    # Watcher — auto-refresh on rois.json change
     # ------------------------------------------------------------------ #
     def _wire_watcher(self) -> None:
         # Watch the file if it exists; otherwise watch its parent dir
         # so we get notified when it's first created.
         watch_targets = []
-        if os.path.isfile(self.roi_h5_path):
-            watch_targets.append(self.roi_h5_path)
-        parent_dir = os.path.dirname(self.roi_h5_path)
+        if os.path.isfile(self.roi_path):
+            watch_targets.append(self.roi_path)
+        parent_dir = os.path.dirname(self.roi_path)
         if os.path.isdir(parent_dir):
             watch_targets.append(parent_dir)
         if watch_targets:
@@ -399,9 +389,9 @@ class ROIVideoTableDialog(QDialog):
 
     def _do_watcher_refresh(self) -> None:
         # Re-arm watcher on the file if it was just created.
-        if (os.path.isfile(self.roi_h5_path)
-                and self.roi_h5_path not in self._watcher.files()):
-            self._watcher.addPath(self.roi_h5_path)
+        if (os.path.isfile(self.roi_path)
+                and self.roi_path not in self._watcher.files()):
+            self._watcher.addPath(self.roi_path)
         self._populate_table()
 
     # ------------------------------------------------------------------ #
@@ -421,7 +411,7 @@ class ROIVideoTableDialog(QDialog):
 
         Multiple panels can be open simultaneously — one per video.
         Each saves to the same project_folder/logs/measures/
-        ROI_definitions.h5; the QFileSystemWatcher on this dialog
+        rois.json; the QFileSystemWatcher on this dialog
         refreshes the status column when any of them save.
         """
         try:
@@ -568,8 +558,8 @@ class ROIVideoTableDialog(QDialog):
         # confirmation again. We've already confirmed; just delete the
         # file directly. Faster, no second confirmation prompt.
         try:
-            if os.path.isfile(self.roi_h5_path):
-                os.remove(self.roi_h5_path)
+            if os.path.isfile(self.roi_path):
+                os.remove(self.roi_path)
             self._populate_table()
             self.rois_modified.emit()
         except Exception as exc:

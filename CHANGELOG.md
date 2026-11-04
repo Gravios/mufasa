@@ -8,6 +8,40 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122il — ROIs stored in `logs/measures/rois.json`; SimBA H5 dropped.**
+The project's ROIs move from SimBA's `ROI_definitions.h5` (three pickled HDF5
+tables: Python/pandas-version fragile, needs pytables, opaque, stores
+derived values) to one JSON file. No legacy compatibility, by request: the H5
+is neither read nor written.
+* New `mufasa/roi_tools/roi_store.py`: `Roi` / `VideoRois` / `RoiStore`;
+  per video `frame_size` + ROIs in drawing order; geometry + style only
+  (rectangle x/y/w/h, circle center/radius, polygon vertices — any number —,
+  `#rrggbb` colour, line width, tag size). `load_rois` (invalid file →
+  `RoiFileError`, never "empty"), `save_rois`, `update_rois` (locked
+  read-modify-write, atomic temp+rename), `rois_to_frames` (the three
+  analysis tables with every derived column computed on read, cm sizes from
+  the CURRENT video_info pixels/mm), `frames_to_store` / `write_frames`.
+* `project_paths_from_config()["roi_definitions_path"]` → `rois.json` (v1
+  and legacy layouts); section provenance and `Paths.ROI_DEFINITIONS` too.
+* Readers: `read_write.read_roi_data` and `ConfigReader.read_roi_data` read
+  rois.json, so every analysis / plotting / feature module keeps working
+  unchanged (verified: ROIAggregateStatisticsAnalyzer on a 30-vertex polygon,
+  a circle and a rectangle gives the right times).
+* Writers: `ROILogic.save` (editor) is a locked update of its own video —
+  two editors open at once can't drop each other's work; `multiply_ROIs`
+  now rescales copied ROIs to each target's frame size; `reset_video_ROIs`,
+  the duplicate dialog, CSV import (append keeps other videos) and the size
+  standardizer all write through `write_frames`.
+* Removed the 122ik SimBA-row normalisation (and its test) — moot without H5.
+smoke_122il_roi_store: 21/21 (real project with two resolutions, two
+editors at once, ConfigReader, multiply with rescale, reset, write_frames,
+corrupt file, a real ROI aggregate analysis). Tripwires (save without
+re-read, no rescale, bad file read as empty) each fail it. Path pins updated
+in 122ai/122eh/122en/122ep/layout_paths_extension/roi_definitions_description/
+roi_video_table_helpers; 122ek/122er now pin the store-based multiply/reset;
+smoke_roi_logic loads roi_store and replaces its H5-specific cases; 122d5
+module ceiling 431 → 432. Full sweep: no other change.
+
 **122ik — saving ROIs no longer loses other videos' ROIs.**
 `ROILogic.save` rewrites the whole ROI_definitions.h5. It read the existing
 file through `read_roi_data` (drops every rectangle / circle row with a NaN),

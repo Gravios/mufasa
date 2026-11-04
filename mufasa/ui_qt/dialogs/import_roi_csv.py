@@ -28,7 +28,7 @@ Functional differences from the Tk original
   the Run button enables.
 * **Append toggle** as a ``QCheckBox`` (was a TRUE/FALSE
   dropdown). The checkbox is disabled if no existing
-  ROI_definitions.h5 exists (nothing to append to).
+  rois.json exists (nothing to append to).
 * **Run button** lives inside ``QDialogButtonBox`` alongside
   Cancel, and starts disabled — gets enabled once at least
   one CSV path resolves to an existing file.
@@ -157,7 +157,7 @@ class ImportRoiCsvDialog(QDialog):
         self._append_cb.setEnabled(self._has_existing)
         if not self._has_existing:
             self._append_cb.setToolTip(
-                "No existing ROI_definitions.h5 in the project — "
+                "No existing rois.json in the project — "
                 "import always writes fresh.")
         settings_layout.addWidget(self._append_cb)
         settings_layout.addStretch(1)

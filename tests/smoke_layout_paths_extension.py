@@ -100,9 +100,9 @@ def main() -> int:
         # the keys are gone.
         check(
             "v1 roi_definitions_path is "
-            "<root>/logs/measures/ROI_definitions.h5",
+            "<root>/logs/measures/rois.json",
             v1.get("roi_definitions_path", "").replace("\\", "/").endswith(
-                "/logs/measures/ROI_definitions.h5"
+                "/logs/measures/rois.json"
             ),
         )
         # Anchored under the project root — switched from
@@ -154,10 +154,10 @@ def main() -> int:
         )
         check(
             "legacy roi_definitions_path is "
-            "<project>/logs/measures/ROI_definitions.h5",
+            "<project>/logs/measures/rois.json",
             legacy.get("roi_definitions_path", "")
                   .replace("\\", "/")
-                  .endswith("/logs/measures/ROI_definitions.h5"),
+                  .endswith("/logs/measures/rois.json"),
         )
 
     # ----- Empty INI raises ValueError -----

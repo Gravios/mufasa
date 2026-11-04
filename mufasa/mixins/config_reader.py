@@ -41,7 +41,6 @@ from mufasa.utils.errors import (
     DuplicationError,
     InvalidInputError,
     MissingProjectConfigEntryError,
-    MufasaPackageVersionError,
     NoFilesFoundError,
     NoROIDataError,
     NotDirectoryError,
@@ -285,7 +284,7 @@ class ConfigReader:
           ``measures/``), while the actual ROI save location used
           by :mod:`mufasa.roi_tools.roi_logic` (via
           ``project_paths_from_config``) is
-          ``<root>/logs/measures/ROI_definitions.h5``. Reader-side
+          ``<root>/logs/measures/rois.json``. Reader-side
           consumers crashed on the missing file even when ROIs had
           been defined. The root issue — two helpers
           (``ConfigReader._resolve_v1_paths`` and
@@ -321,7 +320,7 @@ class ConfigReader:
         * ``input_frames_dir``     → ``<root>/derived/frames/extracted/``
         * ``frames_output_dir``    → ``<root>/derived/frames/annotated/``
         * ``logs_path``            → ``<root>/logs/``
-        * ``roi_coordinates_path`` → ``<root>/logs/measures/ROI_definitions.h5``
+        * ``roi_coordinates_path`` → ``<root>/logs/measures/rois.json``
 
         Plot output dirs — coalesced under ``derived/plots/``:
 
@@ -572,19 +571,10 @@ class ConfigReader:
         if not os.path.isfile(self.roi_coordinates_path):
             raise NoROIDataError(msg="No ROI definitions were found in your Mufasa project. Please draw some ROIs before analyzing your ROI data", source=self.__class__.__name__)
         else:
-            try:
-                self.rectangles_df = pd.read_hdf(self.roi_coordinates_path, key=Keys.ROI_RECTANGLES.value)
-            except ValueError:
-                raise MufasaPackageVersionError(msg=f'Could not read {self.roi_coordinates_path}. Did you create the file in a different version of Python? For example, was the file created in a SimBA python 3.6 version while you currently are in Python 3.10 or vice versa?', source=self.__class__.__name__)
-            if ("Center_X" in self.rectangles_df.columns) and (self.rectangles_df["Center_X"].isnull().values.any()):
-                for idx, row in self.rectangles_df.iterrows():
-                    self.rectangles_df.loc[idx]["Center_X"] = row["Tags"]["Center tag"][0]
-                    self.rectangles_df.loc[idx]["Center_Y"] = row["Tags"]["Center tag"][1]
-            self.circles_df = pd.read_hdf(self.roi_coordinates_path, key=Keys.ROI_CIRCLES.value).dropna(how="any")
-            self.polygon_df = pd.read_hdf(self.roi_coordinates_path, key=Keys.ROI_POLYGONS.value)
-            if "Center_XCenter_Y" in self.polygon_df.columns:
-                self.polygon_df = self.polygon_df.drop(["Center_XCenter_Y"], axis=1)
-            self.polygon_df = self.polygon_df.dropna(how="any")
+            # Patch 122il: ROIs live in rois.json; read_roi_data returns
+            # the three analysis tables with every derived column filled.
+            from mufasa.utils.read_write import read_roi_data as _read_rois
+            self.rectangles_df, self.circles_df, self.polygon_df = _read_rois(self.roi_coordinates_path)
             # Patch 122ej-hotfix — guard against empty DataFrames
             # without a "Name" / "Video" column. roi_logic.RoiLogic
             # writes all three keys; a user who has only drawn
@@ -1173,7 +1163,7 @@ class ConfigReader:
 
         .. note::
            ROI-based features are identified based on the combined criteria of (i) The prefix of the field is a named ROI in
-           the ``project_folder/logs/ROI_definitions.h5`` file, and (ii) the suffix of the field is contained in the ['in zone',
+           the ``project_folder/logs/measures/rois.json`` file, and (ii) the suffix of the field is contained in the ['in zone',
            'n zone_cumulative_time', 'in zone_cumulative_percent', 'distance', 'facing']
 
         :param Union[str, os.PathLike] data_dir: directory with data to remove ROi features from.

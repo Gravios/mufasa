@@ -287,14 +287,11 @@ def main() -> int:
         mt = ast.unparse(multiply)
         rt = ast.unparse(reset)
         check(
-            "122ek state preserved: multiply_ROIs uses "
-            "safe_videos_in and safe_filter_by_video; "
-            "reset_video_ROIs uses safe_filter_by_video and "
-            "safe_filter_video_neq",
-            ("safe_videos_in" in mt
-             and "safe_filter_by_video" in mt
-             and "safe_filter_by_video" in rt
-             and "safe_filter_video_neq" in rt),
+            # 122il: both now edit rois.json via roi_store.update_rois.
+            "multiply_ROIs / reset_video_ROIs edit rois.json through "
+            "roi_store.update_rois (no DataFrame round-trip)",
+            ("update_rois" in mt and "copy_video" in mt
+             and "update_rois" in rt and "remove_video" in rt),
         )
     else:
         check("(122ek check skipped — functions missing)",

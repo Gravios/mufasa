@@ -225,21 +225,21 @@ def main() -> int:
     multiply_src = ast.unparse(multiply)
     reset_src = ast.unparse(reset)
 
+    # Patch 122il: multiply_ROIs / reset_video_ROIs no longer touch
+    # DataFrames at all — they edit rois.json through roi_store's locked
+    # update_rois, which has no empty-table failure mode. Pin that.
     check(
-        "multiply_ROIs uses safe_videos_in (replaces the 3 "
-        "naked ['Video'].unique() reads)",
-        "safe_videos_in" in multiply_src,
+        "multiply_ROIs copies via roi_store (update_rois + copy_video)",
+        "update_rois" in multiply_src and "copy_video" in multiply_src,
     )
     check(
-        "multiply_ROIs uses safe_filter_by_video (replaces "
-        "the naked df[df['Video'] == ...] filters)",
-        "safe_filter_by_video" in multiply_src,
+        "multiply_ROIs refuses a source video without ROIs",
+        "load_rois" in multiply_src and "NoROIDataError" in multiply_src,
     )
     check(
-        "reset_video_ROIs uses BOTH safe_filter_by_video AND "
-        "safe_filter_video_neq (the read-then-rewrite pattern)",
-        "safe_filter_by_video" in reset_src
-        and "safe_filter_video_neq" in reset_src,
+        "reset_video_ROIs removes the video via roi_store (update_rois "
+        "+ remove_video)",
+        "update_rois" in reset_src and "remove_video" in reset_src,
     )
 
     # -----------------------------------------------------------------
@@ -270,17 +270,13 @@ def main() -> int:
     # Simplest pinning: the check_valid_dataframe lines are now
     # preceded by `if len(...) > 0:` blocks.
     check(
-        "multiply_ROIs guards check_valid_dataframe with "
-        "`if len(rectangles_df) > 0`/etc (so empty DataFrames "
-        "don't raise on missing-required-columns)",
-        "if len(rectangles_df) > 0:" in multiply_src
-        and "check_valid_dataframe" in multiply_src,
+        "multiply_ROIs / reset_video_ROIs no longer read HDF tables",
+        "read_hdf" not in multiply_src and "HDFStore" not in multiply_src
+        and "read_hdf" not in reset_src and "HDFStore" not in reset_src,
     )
     check(
-        "reset_video_ROIs similarly guards "
-        "check_valid_dataframe with `if len(...) > 0`",
-        "if len(rectangles_df) > 0:" in reset_src
-        and "check_valid_dataframe" in reset_src,
+        "multiply_ROIs no longer calls check_valid_dataframe (no tables)",
+        "check_valid_dataframe" not in multiply_src,
     )
 
     # -----------------------------------------------------------------

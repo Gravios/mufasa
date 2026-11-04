@@ -80,7 +80,6 @@ from mufasa.utils.enums import (
     Defaults,
     Dtypes,
     Formats,
-    Keys,
     Links,
     Options,
     Paths,
@@ -1804,46 +1803,44 @@ def find_time_stamp_from_frame_numbers(start_frame: int, end_frame: int, fps: fl
 
 
 def read_roi_data(roi_path: str | os.PathLike) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    Method to read in ROI definitions from SimBA project.
+    """Read the project's ROI definitions (``rois.json``, patch 122il) as the
+    (rectangles, circles, polygons) tables the analysis code uses, with all
+    derived columns computed (cm sizes from the project's video_info.csv when
+    it can be found next to the file).
 
-    :param Union[str, os.PathLike] roi_path: path to `ROI_definitions.h5` on disk.
-    :return: 3-part Tuple of dataframes representing rectangles, circles, polygons.
-    :rtype: Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
-
+    A missing file gives three empty tables; an invalid one raises
+    :class:`~mufasa.utils.errors.InvalidFileTypeError`.
     """
-    check_file_exist_and_readable(file_path=roi_path)
+    from mufasa.roi_tools.roi_store import RoiFileError, load_rois, rois_to_frames
     try:
-        rectangles_df = pd.read_hdf(roi_path, key=Keys.ROI_RECTANGLES.value).dropna(how="any")
-        circles_df = pd.read_hdf(roi_path, key=Keys.ROI_CIRCLES.value).dropna(how="any")
-        polygon_df = pd.read_hdf(roi_path, key=Keys.ROI_POLYGONS.value)
-    except (pickle.UnpicklingError, ValueError) as e:
-        if "unsupported pickle protocol" in str(e).lower():
-            print(e.args)
-            raise MufasaPackageVersionError(msg=f'Pickle VERSION ERROR. The ROIs where likely drawn using a SimBA installation that was built in a **Python** version different from the current Python version (e.g., 3.10 vs 3.6). You currently have Python version {OS.PYTHON_VER.value}. You may have drawn the ROIs in SimBA using Python version >3.8 and now you have Python version <3.8. To fix, use the same Python version as you used when drawing the ROIs')
-        else:
-            print(e.args)
-            raise InvalidFileTypeError(msg=f"{roi_path} is not a valid SimBA ROI definitions file. See above for more detailed error cause.", source=read_roi_data.__name__)
-    except Exception as e:
-        print(e.args)
-        raise InvalidFileTypeError(msg=f"{roi_path} is not a valid SimBA ROI definitions file. See above for more detailed error cause.", source=read_roi_data.__name__)
+        store = load_rois(roi_path)
+    except RoiFileError as e:
+        raise InvalidFileTypeError(msg=f"{roi_path} is not a valid Mufasa ROI file: {e}", source=read_roi_data.__name__)
+    return rois_to_frames(store, px_per_mm=_px_per_mm_near(roi_path))
 
-    if "Center_XCenter_Y" in polygon_df.columns:
-        polygon_df = polygon_df.drop(["Center_XCenter_Y"], axis=1)
-    if 'Center_X' not in rectangles_df.columns:
-        if len(rectangles_df) > 0:
-            rectangles_df['Center_X'] = rectangles_df['topLeftX'] + round(rectangles_df['width']/2)
-        else:
-            rectangles_df['Center_X'] = pd.Series(dtype='int')
-    if 'Center_Y' not in rectangles_df.columns:
-        if len(rectangles_df) > 0:
-            rectangles_df['Center_Y'] = rectangles_df['topLeftY'] + round(rectangles_df['height']/2)
-        else:
-            rectangles_df['Center_Y'] = pd.Series(dtype='int')
-    #circles_df['Video'] = circles_df['Video'].replace('Trial     1_dSLR1_sample_A1_na', '501_MA142_Gi_Saline_0513')
-    return rectangles_df, circles_df, polygon_df
 
-#read_roi_data(roi_path=r"C:\troubleshooting\mitra\project_folder\logs\measures\ROI_definitions.h5")
+def _px_per_mm_near(roi_path: str | os.PathLike) -> dict[str, float]:
+    """Best effort: pixels/mm per video from the video_info.csv of the
+    project that contains ``roi_path`` (empty when not found)."""
+    try:
+        from pathlib import Path as _P
+
+        from mufasa.project_layout import project_paths_from_config
+        for d in _P(roi_path).resolve().parents:
+            cfg = d / "project.toml"
+            if cfg.is_file():
+                vi = project_paths_from_config(str(cfg))["video_info_path"]
+                if not os.path.isfile(vi):
+                    return {}
+                df = pd.read_csv(vi)
+                if "Video" not in df.columns or "pixels/mm" not in df.columns:
+                    return {}
+                return {str(v): float(p) for v, p in zip(df["Video"], df["pixels/mm"], strict=False)
+                        if pd.notna(p) and float(p) > 0}
+    except Exception:
+        pass
+    return {}
+
 
 
 

@@ -202,9 +202,8 @@ class ROISizeStandardizer(ConfigReader, FeatureExtractionMixin):
             self.circles_df.update(updated_circles)
 
     def save(self):
-        store = pd.HDFStore(self.roi_coordinates_path, mode="w")
-        store["rectangles"] = self.rectangles_df
-        store["circleDf"] = self.circles_df
-        store["polygons"] = self.polygon_df
-        store.close()
+        # Patch 122il: rois.json, locked update.
+        from mufasa.roi_tools.roi_store import write_frames
+        write_frames(self.roi_coordinates_path, self.rectangles_df,
+                     self.circles_df, self.polygon_df, whole_project=True)
         stdout_success(msg=f"ROI size definitions standardized according to pixels per millimeter in video {self.reference_video_name}", source=self.__class__.__name__)

@@ -13,7 +13,6 @@ from mufasa.roi_tools.roi_utils import (
     get_rectangle_df_headers,
 )
 from mufasa.utils.checks import check_file_exist_and_readable, check_valid_boolean
-from mufasa.utils.enums import Keys
 from mufasa.utils.errors import InvalidInputError
 from mufasa.utils.printing import stdout_success
 from mufasa.utils.read_write import find_all_videos_in_directory
@@ -41,7 +40,7 @@ class ROIDefinitionsCSVImporter(ConfigReader):
     :param Optional[Union[str, os.PathLike]] rectangles_path: Path to CSV file containing rectangle ROI definitions. If None, no rectangles will be imported.
     :param Optional[Union[str, os.PathLike]] circles_path: Path to CSV file containing circle ROI definitions. If None, no circles will be imported.
     :param Optional[Union[str, os.PathLike]] polygon_path: Path to CSV file containing polygon ROI definitions. If None, no polygons will be imported.
-    :param bool append: If True, append ROI definitions to existing ROI_definitions.h5 file. If False, overwrite existing file. Default: False.
+    :param bool append: If True, keep the ROIs of videos not in the CSVs. If False, the CSVs replace all ROIs. Default: False.
 
     :example:
     >>> importer = ROIDefinitionsCSVImporter(
@@ -114,14 +113,13 @@ class ROIDefinitionsCSVImporter(ConfigReader):
             self.polygon_df = pd.DataFrame(columns=get_polygon_df_headers())
 
     def run(self):
-        store = pd.HDFStore(self.roi_coordinates_path, mode=self.write_mode)
-        store[Keys.ROI_RECTANGLES.value] = self.rectangles_df
-        store[Keys.ROI_CIRCLES.value] = self.circles_df
-        store[Keys.ROI_POLYGONS.value] = self.polygon_df
-        store[Keys.ROI_RECTANGLES.value]  = store[Keys.ROI_RECTANGLES.value].drop_duplicates()
-        store[Keys.ROI_CIRCLES.value] = store[Keys.ROI_CIRCLES.value].drop_duplicates()
-        store[Keys.ROI_POLYGONS.value] = store[Keys.ROI_POLYGONS.value].drop_duplicates()
-        store.close()
+        # Patch 122il: rois.json. Videos in the CSVs replace those videos'
+        # ROIs; with append=False every other video's ROIs are cleared too.
+        from mufasa.roi_tools.roi_store import write_frames
+        dedupe = lambda df: df.drop_duplicates(subset=["Video", "Name"], keep="last") if len(df) else df  # noqa: E731
+        write_frames(self.roi_coordinates_path, dedupe(self.rectangles_df),
+                     dedupe(self.circles_df), dedupe(self.polygon_df),
+                     whole_project=(self.write_mode == "w"))
 
         new_roi_cnt = self.new_poly_cnt + self.new_rect_cnt + self.new_circ_cnt
         new_video_names = list(self.new_video_names)

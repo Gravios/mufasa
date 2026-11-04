@@ -106,7 +106,7 @@ class Paths(Enum):
     PATH_PLOT_DIR = Path("frames/output/path_plots")
     ABOUT_ME = Path("assets/img/about_me.png")
     PROBABILITY_PLOTS_DIR = Path("frames/output/probability_plots/")
-    ROI_DEFINITIONS = Path("measures/ROI_definitions.h5")
+    ROI_DEFINITIONS = Path("measures/rois.json")
     DETAILED_ROI_DATA_DIR = Path("logs/Detailed_ROI_data/")
     SHAP_LOGS = Path("logs/shap/")
     SPLASH_PATH_WINDOWS = Path("assets/img/splash.png")

@@ -1074,7 +1074,7 @@ def v1_project_paths(root: Path) -> dict[str, str]:
     * Patch 122eh fixed ``roi_coordinates_path`` which had drifted
       to ``<root>/logs/roi_definitions.h5`` in ConfigReader while
       project_paths kept the correct
-      ``<root>/logs/measures/ROI_definitions.h5``. Reader-side
+      ``<root>/logs/measures/rois.json`` (122il; was ROI_definitions.h5). Reader-side
       consumers (Duplicate ROIs dialog, ROI size standardizer)
       crashed with NoFilesFoundError on projects with ROIs
       defined.
@@ -1103,7 +1103,7 @@ def v1_project_paths(root: Path) -> dict[str, str]:
         * ``video_info_path`` — ``<root>/sources/video_info.csv``
         * ``models_dir`` — ``<root>/models``
         * ``roi_definitions_path`` —
-          ``<root>/logs/measures/ROI_definitions.h5``
+          ``<root>/logs/measures/rois.json`` (122il; was ROI_definitions.h5)
         * ``derived_features_dir`` — ``<root>/derived/features``
         * ``derived_labels_dir`` — ``<root>/derived/labels``
         * ``derived_classifications_dir`` —
@@ -1129,7 +1129,7 @@ def v1_project_paths(root: Path) -> dict[str, str]:
         "video_info_path":        str(root / "sources" / "video_info.csv"),
         "models_dir":             str(root / "models"),
         "roi_definitions_path":   str(root / "logs" / "measures"
-                                      / "ROI_definitions.h5"),
+                                      / "rois.json"),
         "derived_features_dir":   str(root / "derived" / "features"),
         "derived_labels_dir":     str(root / "derived" / "labels"),
         "derived_classifications_dir":
@@ -1173,7 +1173,7 @@ def project_paths_from_config(
       ``derived_classifications_dir``. Consumers reading this key
       should use ``.get("machine_results_dir")`` and handle None.
       (both layouts).
-    * ``roi_definitions_path`` — ``<root>/logs/measures/ROI_definitions.h5``
+    * ``roi_definitions_path`` — ``<root>/logs/measures/rois.json`` (122il; was ROI_definitions.h5)
       (both layouts).
 
     Rationale for the v1 paths: hand-edited annotations, ROI
@@ -1265,7 +1265,7 @@ def project_paths_from_config(
         # for rationale.
         "machine_results_dir":    str(proj / "csv" / "machine_results"),
         "roi_definitions_path":   str(proj / "logs" / "measures"
-                                      / "ROI_definitions.h5"),
+                                      / "rois.json"),
         # Patch 122ae-1: per-family parquet trees for derived data.
         "derived_features_dir":   str(proj / "derived" / "features"),
         "derived_labels_dir":     str(proj / "derived" / "labels"),

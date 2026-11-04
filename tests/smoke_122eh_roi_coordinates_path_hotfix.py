@@ -27,11 +27,11 @@ path and disagreed on v1 projects:
 
 * ``mufasa.project_layout.project_paths_from_config`` returned::
     "roi_definitions_path": root / "logs" / "measures"
-                            / "ROI_definitions.h5"
+                            / "rois.json"
 
 The save-side code (``mufasa.roi_tools.roi_logic.RoiLogic``) goes
 through ``project_paths_from_config`` — writes to
-``<root>/logs/measures/ROI_definitions.h5``.
+``<root>/logs/measures/rois.json``.
 
 The reader-side code (duplicate dialog, ROI size standardizer,
 ``ConfigReader.read_roi_data``) goes through ConfigReader's
@@ -47,7 +47,7 @@ Pre-122dy, ``ConfigReader.__init__`` had a line AFTER
         self.logs_path, Paths.ROI_DEFINITIONS.value,
     )
 
-with ``Paths.ROI_DEFINITIONS = "measures/ROI_definitions.h5"``.
+with ``Paths.ROI_DEFINITIONS = "measures/rois.json"``.
 This OVERWROTE the v1-path-override's wrong value with the
 legacy-flavored path that happened to match the save location.
 
@@ -79,7 +79,7 @@ mufasa/mixins/config_reader.py — single attribute change in
 ``_resolve_v1_paths``:
 
 * ``self.roi_coordinates_path`` now resolves to
-  ``<root>/logs/measures/ROI_definitions.h5`` (matches
+  ``<root>/logs/measures/rois.json`` (matches
   ``project_paths_from_config``'s ``roi_definitions_path``).
 * Docstring path-mapping line updated.
 * Method history-bullets section gained a 122eh entry
@@ -92,7 +92,7 @@ Coverage
 --------
 1.  ``ConfigReader._resolve_v1_paths`` sets
     ``roi_coordinates_path`` to a path ending in
-    ``logs/measures/ROI_definitions.h5`` (with capital R, O,
+    ``logs/measures/rois.json`` (with capital R, O,
     I and the ``measures/`` subdirectory).
 2.  The ConfigReader-side path matches
     ``project_paths_from_config``'s
@@ -175,7 +175,7 @@ def main() -> int:
         "roi_coordinates_path from "
         "_paths['roi_definitions_path'] (the canonical helper "
         "key from 122en). Pre-122en this was an inline "
-        "str(root / 'logs' / 'measures' / 'ROI_definitions.h5') "
+        "str(root / 'logs' / 'measures' / 'rois.json') "
         "construction; centralization moved the literal into "
         "v1_project_paths.",
         routes_via_helper,
@@ -196,11 +196,11 @@ def main() -> int:
         b = pl_roi_match.group(0)
         pl_has_correct = (
             '"logs"' in b and '"measures"' in b
-            and '"ROI_definitions.h5"' in b
+            and '"rois.json"' in b
         )
     check(
         "project_paths_from_config's roi_definitions_path also "
-        "resolves to logs/measures/ROI_definitions.h5 (verifies "
+        "resolves to logs/measures/rois.json (verifies "
         "the two helpers are in agreement post-hotfix; if a "
         "future patch changes one helper, this check surfaces "
         "the drift)",
@@ -213,8 +213,8 @@ def main() -> int:
     method_doc = ast.get_docstring(method) or ""
     check(
         "_resolve_v1_paths docstring path-mapping line cites "
-        "'logs/measures/ROI_definitions.h5'",
-        "logs/measures/ROI_definitions.h5" in method_doc,
+        "'logs/measures/rois.json'",
+        "logs/measures/rois.json" in method_doc,
     )
 
     # 4. History section mentions 122eh.

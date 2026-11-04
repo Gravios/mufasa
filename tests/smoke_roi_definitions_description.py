@@ -10,7 +10,7 @@ Coverage:
 1. Form description mentions BOTH ``sources/videos/`` (v1) and
    ``videos/`` (legacy).
 2. Form description mentions
-   ``logs/measures/ROI_definitions.h5`` (the persistence path
+   ``logs/measures/rois.json`` (the persistence path
    shared by both layouts).
 3. Draw-action note mentions both layouts.
 4. The patch note appears in the class docstring.
@@ -72,8 +72,8 @@ def main() -> int:
         )
         check(
             "ROIManageForm description mentions "
-            "'ROI_definitions.h5' persistence file",
-            "ROI_definitions.h5" in class_src,
+            "'rois.json' persistence file",
+            "rois.json" in class_src,
         )
         check(
             "ROIManageForm description mentions "

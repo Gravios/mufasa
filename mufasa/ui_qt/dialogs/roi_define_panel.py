@@ -49,7 +49,8 @@ switch video · Ctrl+S save · F fit · wheel zoom · middle-drag pan.
 Compatibility
 -------------
 
-Same H5 file (``ROI_definitions.h5``), same :class:`ROILogic` backend, same
+ROIs are stored in ``logs/measures/rois.json`` (patch 122il, see
+:mod:`mufasa.roi_tools.roi_store`); same :class:`ROILogic` backend, same
 public API (:class:`ROIDefineWidget`, :class:`ROIDefinePanel`,
 ``rois_modified``, ``set_config_path``, ``set_embedded_mode``).
 """
@@ -90,6 +91,7 @@ from PySide6.QtWidgets import (
 )
 
 from mufasa.roi_tools.roi_logic import CIRCLE, POLYGON, RECTANGLE, ROILogic
+from mufasa.roi_tools.roi_store import COLORS as _COLORS
 from mufasa.ui_qt.dialogs.roi_canvas import SELECT, ROICanvas, canonical_geometry
 
 # Patch 122ag: project paths resolve through the v1-aware layout helper
@@ -101,18 +103,6 @@ from mufasa.ui_qt.dialogs.roi_video_table import (
     _videos_with_rois,
 )
 
-# Standard color palette (BGR for OpenCV consistency).
-_COLORS: list[tuple[str, tuple[int, int, int]]] = [
-    ("Red",     (0, 0, 255)),
-    ("Green",   (0, 255, 0)),
-    ("Blue",    (255, 0, 0)),
-    ("Yellow",  (0, 255, 255)),
-    ("Cyan",    (255, 255, 0)),
-    ("Magenta", (255, 0, 255)),
-    ("White",   (255, 255, 255)),
-    ("Orange",  (0, 165, 255)),
-    ("Pink",    (203, 192, 255)),
-]
 _KIND_LABEL = {RECTANGLE: "Rectangle", CIRCLE: "Circle", POLYGON: "Polygon"}
 _UNDO_LIMIT = 100
 
