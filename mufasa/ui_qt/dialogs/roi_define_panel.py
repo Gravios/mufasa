@@ -672,6 +672,15 @@ class ROIDefineWidget(QWidget):
             return
         if frame:
             self.logic.goto_frame(frame)
+        if getattr(self.logic, "load_error", None):
+            # Patch 122ik: an unreadable ROI file used to look like "no ROIs
+            # yet" — and the next save would have replaced it.
+            QMessageBox.warning(
+                self, "ROI file unreadable",
+                f"Could not read the project's ROI file:\n\n"
+                f"{self.logic.load_error}\n\n"
+                f"Existing ROIs are not shown, and saving is blocked so the "
+                f"file isn't overwritten. Back it up and check it.")
         self._set_dirty(False)
         self._undo.clear()
         self._redo.clear()

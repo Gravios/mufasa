@@ -12,6 +12,7 @@ same pattern used by other smoke tests in this directory.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace

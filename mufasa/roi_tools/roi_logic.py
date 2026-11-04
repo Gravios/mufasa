@@ -50,7 +50,6 @@ from mufasa.utils.read_write import (
     get_fn_ext,
     get_video_meta_data,
     read_frm_of_video,
-    read_roi_data,
 )
 
 # Shape-type constants. Mirror the values used by the legacy code so
@@ -508,29 +507,43 @@ class ROILogic:
     # Persistence
     # ------------------------------------------------------------------ #
     def _load_existing_definitions(self) -> None:
-        """Read project_folder/logs/measures/ROI_definitions.h5, filter by
-        this video, and populate ``self.defs``. ROIs for other videos
-        are stashed in ``self.other_video_rois`` for the
-        'apply-from-other-video' action."""
+        """Read ROI_definitions.h5, keep this video's ROIs in ``self.defs``
+        and stash the others in ``self.other_video_rois``.
+
+        Patch 122ik: read raw instead of through :func:`read_roi_data`,
+        whose NaN-dropping hid rows from mixed-format files; each row is
+        normalised with :func:`_to_native_row` first. An unreadable file is
+        recorded in ``self.load_error`` (and :meth:`save` refuses to
+        overwrite it)."""
+        self.load_error: str | None = None
         if not os.path.isfile(self.roi_h5_path):
             return
         try:
-            rect_df, circ_df, poly_df = read_roi_data(roi_path=self.roi_h5_path)
-        except Exception:
+            with pd.HDFStore(self.roi_h5_path, mode="r") as store:
+                keys = {k.lstrip("/") for k in store}
+                frames = {key: (store[key] if key in keys else pd.DataFrame())
+                          for key in (KEY_RECT, KEY_CIRC, KEY_POLY)}
+        except Exception as exc:
+            self.load_error = f"{type(exc).__name__}: {exc}"
             return
-        for df, key in ((rect_df, RECTANGLE), (circ_df, CIRCLE),
-                        (poly_df, POLYGON)):
+        for key, kind in ((KEY_RECT, RECTANGLE), (KEY_CIRC, CIRCLE),
+                          (KEY_POLY, POLYGON)):
+            df = frames[key]
             if df is None or "Video" not in df.columns:
                 continue
             for _, row in df.iterrows():
                 video = row.get("Video", "")
                 if not isinstance(video, str):
                     continue
-                roi = self._row_to_definition(row, key)
+                try:
+                    native = pd.Series(_to_native_row(kind, dict(row)))
+                except Exception:
+                    native = row
+                roi = self._row_to_definition(native, kind)
                 if roi is None:
                     continue
                 if video == self.video_name:
-                    self.defs[key][roi.name] = roi
+                    self.defs[kind][roi.name] = roi
                 else:
                     self.other_video_rois.setdefault(video, {})[roi.name] = roi
 
@@ -563,8 +576,10 @@ class ROILogic:
                     "centerX": int(row["centerX"]),
                     "centerY": int(row["centerY"]),
                     "radius": int(row["radius"]),
-                    "Center_X": int(row.get("Center_X", row["centerX"])),
-                    "Center_Y": int(row.get("Center_Y", row["centerY"])),
+                    # 122ik: a mixed file can hold NaN here; the centre is
+                    # authoritative anyway.
+                    "Center_X": int(row["centerX"]),
+                    "Center_Y": int(row["centerY"]),
                 }
             elif shape_type == POLYGON:
                 v = row["vertices"]
@@ -631,133 +646,250 @@ class ROILogic:
                 fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
 
     def _save_locked(self) -> None:
-        """The actual read-modify-write. Caller holds the lock."""
-        # Read existing data so we can preserve other-video rows.
-        # This re-read is intentional (and within the lock): the on-
-        # disk state may have changed since __init__ if another panel
-        # for a different video saved while ours was open.
-        rect_existing, circ_existing, poly_existing = (
-            pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        )
+        """The actual read-modify-write. Caller holds the lock.
+
+        Patch 122ik — this used to lose other videos' ROIs:
+
+        * The existing file was read with :func:`read_roi_data`, which
+          drops every rectangle / circle row containing a NaN, and any read
+          failure was swallowed (``except Exception: pass``) so the save
+          went on to write a file holding only this video.
+        * Rows were written in a private format (``Color BGR`` / ``Tags`` /
+          ``vertices`` as strings, circles with extra ``Center_X`` /
+          ``Center_Y`` columns). Concatenating them with SimBA-format rows
+          left NaN in the columns one side lacked, and the next read
+          silently dropped those rows — saving one circle on video A
+          deleted video B's circles. String ``vertices`` / ``Tags`` also
+          broke ROI analysis and visualisation (``vertices.astype``,
+          ``Tags.items()``).
+
+        Now: the file is read raw (no NaN dropping) and an unreadable file
+        aborts the save; every row — ours and the existing ones — is written
+        in SimBA's native shape (tuple colour, dict tags, ndarray vertices,
+        SimBA's column set); missing standard values are filled rather than
+        left NaN; and a non-standard column is kept only if no row lacks it.
+        """
+        existing = {KEY_RECT: pd.DataFrame(), KEY_CIRC: pd.DataFrame(),
+                    KEY_POLY: pd.DataFrame()}
         if os.path.isfile(self.roi_h5_path):
             try:
-                r, c, p = read_roi_data(roi_path=self.roi_h5_path)
-                rect_existing = r if r is not None else pd.DataFrame()
-                circ_existing = c if c is not None else pd.DataFrame()
-                poly_existing = p if p is not None else pd.DataFrame()
-            except Exception:
-                pass
-        # Drop our video's rows from the existing frames
-        for df in (rect_existing, circ_existing, poly_existing):
+                with pd.HDFStore(self.roi_h5_path, mode="r") as store:
+                    keys = {k.lstrip("/") for k in store}
+                    for key in existing:
+                        if key in keys:
+                            existing[key] = store[key]
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Could not read the existing ROI file "
+                    f"{self.roi_h5_path} ({type(exc).__name__}: {exc}). "
+                    f"Not saving, so the ROIs of other videos in it are not "
+                    f"overwritten. Back the file up and check it.") from exc
+
+        new_rows = {
+            KEY_RECT: [self._rect_row(r) for r in self.defs[RECTANGLE].values()],
+            KEY_CIRC: [self._circ_row(r) for r in self.defs[CIRCLE].values()],
+            KEY_POLY: [self._poly_row(r) for r in self.defs[POLYGON].values()],
+        }
+        out = {}
+        for key, kind in ((KEY_RECT, RECTANGLE), (KEY_CIRC, CIRCLE),
+                          (KEY_POLY, POLYGON)):
+            df = existing[key]
             if "Video" in df.columns:
-                df.drop(df[df["Video"] == self.video_name].index,
-                        inplace=True)
-
-        # Build new rows from our in-memory state
-        new_rect_rows = [self._rect_row(r) for r in self.defs[RECTANGLE].values()]
-        new_circ_rows = [self._circ_row(r) for r in self.defs[CIRCLE].values()]
-        new_poly_rows = [self._poly_row(r) for r in self.defs[POLYGON].values()]
-
-        rect_out = pd.concat(
-            [rect_existing, pd.DataFrame(new_rect_rows)], ignore_index=True,
-        ) if new_rect_rows else rect_existing
-        circ_out = pd.concat(
-            [circ_existing, pd.DataFrame(new_circ_rows)], ignore_index=True,
-        ) if new_circ_rows else circ_existing
-        poly_out = pd.concat(
-            [poly_existing, pd.DataFrame(new_poly_rows)], ignore_index=True,
-        ) if new_poly_rows else poly_existing
+                df = df[df["Video"].astype(str) != self.video_name]
+            others = [_to_native_row(kind, dict(row)) for _, row in df.iterrows()]
+            out[key] = _conform_table(kind, others + new_rows[key])
 
         # Write atomically — to a tmp path then rename. Prevents
         # corrupt H5 on power loss / crash mid-write.
         tmp_path = self.roi_h5_path + ".tmp"
         if os.path.isfile(tmp_path):
             os.remove(tmp_path)
-        rect_out.to_hdf(tmp_path, key=KEY_RECT, mode="w")
-        circ_out.to_hdf(tmp_path, key=KEY_CIRC, mode="a")
-        poly_out.to_hdf(tmp_path, key=KEY_POLY, mode="a")
+        out[KEY_RECT].to_hdf(tmp_path, key=KEY_RECT, mode="w")
+        out[KEY_CIRC].to_hdf(tmp_path, key=KEY_CIRC, mode="a")
+        out[KEY_POLY].to_hdf(tmp_path, key=KEY_POLY, mode="a")
         os.replace(tmp_path, self.roi_h5_path)
 
     @staticmethod
     def _rect_row(r: ROIDefinition) -> dict[str, Any]:
         g = r.geometry
-        # Compute area in cm² (best-effort; uses px_per_mm if known)
-        area_cm = 0.0
-        if r.px_per_mm and r.px_per_mm > 0:
-            area_cm = (g["width"] / (r.px_per_mm * 10.0)) * \
-                      (g["height"] / (r.px_per_mm * 10.0))
-        return {
+        return _to_native_row(RECTANGLE, {
             "Video": r.video, "Shape_type": "Rectangle", "Name": r.name,
-            "Color name": r.color_name, "Color BGR": str(r.color_bgr),
+            "Color name": r.color_name, "Color BGR": r.color_bgr,
             "Thickness": r.thickness,
-            "Center_X": g["Center_X"], "Center_Y": g["Center_Y"],
             "topLeftX": g["topLeftX"], "topLeftY": g["topLeftY"],
             "Bottom_right_X": g["Bottom_right_X"],
             "Bottom_right_Y": g["Bottom_right_Y"],
-            "width": g["width"], "height": g["height"],
-            "width_cm": g["width"] / (r.px_per_mm * 10.0)
-                if r.px_per_mm else 0.0,
-            "height_cm": g["height"] / (r.px_per_mm * 10.0)
-                if r.px_per_mm else 0.0,
-            "area_cm": area_cm,
-            "Tags": str({"Center tag": (g["Center_X"], g["Center_Y"]),
-                         "Top left tag": (g["topLeftX"], g["topLeftY"]),
-                         "Bottom right tag": (g["Bottom_right_X"],
-                                              g["Bottom_right_Y"])}),
             "Ear_tag_size": r.ear_tag_size,
-        }
+        }, px_per_mm=r.px_per_mm)
 
     @staticmethod
     def _circ_row(r: ROIDefinition) -> dict[str, Any]:
         g = r.geometry
-        area_cm = 0.0
-        if r.px_per_mm and r.px_per_mm > 0:
-            radius_cm = g["radius"] / (r.px_per_mm * 10.0)
-            area_cm = float(np.pi * radius_cm ** 2)
-        return {
+        return _to_native_row(CIRCLE, {
             "Video": r.video, "Shape_type": "Circle", "Name": r.name,
-            "Color name": r.color_name, "Color BGR": str(r.color_bgr),
+            "Color name": r.color_name, "Color BGR": r.color_bgr,
             "Thickness": r.thickness,
             "centerX": g["centerX"], "centerY": g["centerY"],
-            "radius": g["radius"],
-            "radius_cm": g["radius"] / (r.px_per_mm * 10.0)
-                if r.px_per_mm else 0.0,
-            "area_cm": area_cm,
-            "Tags": str({"Center tag": (g["centerX"], g["centerY"])}),
-            "Ear_tag_size": r.ear_tag_size,
-            "Center_X": g["Center_X"], "Center_Y": g["Center_Y"],
-        }
+            "radius": g["radius"], "Ear_tag_size": r.ear_tag_size,
+        }, px_per_mm=r.px_per_mm)
 
     @staticmethod
     def _poly_row(r: ROIDefinition) -> dict[str, Any]:
-        g = r.geometry
-        verts = np.asarray(g["vertices"], dtype=np.int32)
-        # Polygon area via shoelace
-        x = verts[:, 0]; y = verts[:, 1]
-        area_px2 = 0.5 * abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
-        area_cm = 0.0
-        if r.px_per_mm and r.px_per_mm > 0:
-            area_cm = float(area_px2 / ((r.px_per_mm * 10.0) ** 2))
-        # Max distance between any two vertices
-        max_dist = 0.0
-        for i in range(len(verts)):
-            for j in range(i + 1, len(verts)):
-                d = float(np.linalg.norm(verts[i] - verts[j]))
-                if d > max_dist:
-                    max_dist = d
-        return {
+        return _to_native_row(POLYGON, {
             "Video": r.video, "Shape_type": "Polygon", "Name": r.name,
-            "Color name": r.color_name, "Color BGR": str(r.color_bgr),
+            "Color name": r.color_name, "Color BGR": r.color_bgr,
             "Thickness": r.thickness,
-            "Center_X": g["Center_X"], "Center_Y": g["Center_Y"],
-            "vertices": str(g["vertices"]),
-            "center": str((g["Center_X"], g["Center_Y"])),
-            "area": float(area_px2),
-            "max_vertice_distance": float(max_dist),
-            "area_cm": area_cm,
-            "Tags": str({"Center tag": (g["Center_X"], g["Center_Y"])}),
+            "vertices": r.geometry["vertices"],
             "Ear_tag_size": r.ear_tag_size,
-        }
+        }, px_per_mm=r.px_per_mm)
+
+
+# --------------------------------------------------------------------------- #
+# Patch 122ik — SimBA-native ROI rows.
+# --------------------------------------------------------------------------- #
+_HEADERS = {
+    RECTANGLE: ['Video', 'Shape_type', 'Name', 'Color name', 'Color BGR',
+                'Thickness', 'Center_X', 'Center_Y', 'topLeftX', 'topLeftY',
+                'Bottom_right_X', 'Bottom_right_Y', 'width', 'height',
+                'width_cm', 'height_cm', 'area_cm', 'Tags', 'Ear_tag_size'],
+    CIRCLE: ['Video', 'Shape_type', 'Name', 'Color name', 'Color BGR',
+             'Thickness', 'centerX', 'centerY', 'radius', 'radius_cm',
+             'area_cm', 'Tags', 'Ear_tag_size'],
+    POLYGON: ['Video', 'Shape_type', 'Name', 'Color name', 'Color BGR',
+              'Thickness', 'Center_X', 'Center_Y', 'vertices', 'center',
+              'area', 'max_vertice_distance', 'area_cm', 'Tags',
+              'Ear_tag_size'],
+}
+_SHAPE_TYPE = {RECTANGLE: "Rectangle", CIRCLE: "Circle", POLYGON: "Polygon"}
+
+
+def _missing(v: Any) -> bool:
+    if v is None:
+        return True
+    try:
+        return bool(pd.isna(v)) if np.ndim(v) == 0 else False
+    except (TypeError, ValueError):
+        return False
+
+
+def _literal(v: Any) -> Any:
+    """Parse the string form older Mufasa versions wrote; else return v."""
+    if isinstance(v, str):
+        import ast
+        try:
+            return ast.literal_eval(v)
+        except (ValueError, SyntaxError):
+            return v
+    return v
+
+
+def _to_native_row(kind: str, row: dict[str, Any],
+                   px_per_mm: float | None = None) -> dict[str, Any]:
+    """Return ``row`` in SimBA's native shape for ``kind``.
+
+    Converts string-encoded ``Color BGR`` / ``Tags`` / ``vertices`` /
+    ``center`` back to tuple / dict / ndarray / tuple, and fills every
+    standard column that is missing or NaN from the geometry (or a neutral
+    default), so no row ever carries a NaN that a reader would drop.
+    Derived metric columns are recomputed only when absent.
+    """
+    r = dict(row)
+    r["Shape_type"] = _SHAPE_TYPE[kind]
+    for col in ("Color BGR", "Tags", "vertices", "center"):
+        if col in r and not _missing(r[col]):
+            r[col] = _literal(r[col])
+    bgr = r.get("Color BGR")
+    r["Color BGR"] = (tuple(int(c) for c in bgr)
+                      if isinstance(bgr, (tuple, list, np.ndarray)) and len(bgr) == 3
+                      else (0, 0, 255))
+    defaults = {"Color name": "Red", "Thickness": 3, "Ear_tag_size": 15}
+    for col, val in defaults.items():
+        if _missing(r.get(col)):
+            r[col] = val
+    r["Thickness"] = int(r["Thickness"])
+    r["Ear_tag_size"] = int(r["Ear_tag_size"])
+    mm = (px_per_mm * 10.0) if px_per_mm else None
+
+    def need(col: str) -> bool:
+        return _missing(r.get(col))
+
+    if kind == RECTANGLE:
+        x1, y1 = int(r["topLeftX"]), int(r["topLeftY"])
+        x2, y2 = int(r["Bottom_right_X"]), int(r["Bottom_right_Y"])
+        w, h = abs(x2 - x1), abs(y2 - y1)
+        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        r.update(topLeftX=x1, topLeftY=y1, Bottom_right_X=x2, Bottom_right_Y=y2)
+        for col, val in (("width", w), ("height", h),
+                         ("Center_X", cx), ("Center_Y", cy)):
+            if need(col):
+                r[col] = val
+        if need("width_cm"):
+            r["width_cm"] = w / mm if mm else 0.0
+        if need("height_cm"):
+            r["height_cm"] = h / mm if mm else 0.0
+        if need("area_cm"):
+            r["area_cm"] = (w / mm) * (h / mm) if mm else 0.0
+        if not isinstance(r.get("Tags"), dict):
+            tags = {
+                "Center tag": (cx, cy), "Top left tag": (x1, y1),
+                "Bottom right tag": (x2, y2), "Top right tag": (x2, y1),
+                "Bottom left tag": (x1, y2), "Top tag": (cx, y1),
+                "Right tag": (x2, cy), "Left tag": (x1, cy),
+                "Bottom tag": (cx, y2),
+            }
+            r["Tags"] = tags
+    elif kind == CIRCLE:
+        cx, cy, rad = int(r["centerX"]), int(r["centerY"]), int(r["radius"])
+        r.update(centerX=cx, centerY=cy, radius=rad)
+        if need("radius_cm"):
+            r["radius_cm"] = rad / mm if mm else 0.0
+        if need("area_cm"):
+            r["area_cm"] = float(np.pi * (rad / mm) ** 2) if mm else 0.0
+        if not isinstance(r.get("Tags"), dict):
+            r["Tags"] = {"Center tag": (cx, cy), "Border tag": (cx - rad, cy)}
+    elif kind == POLYGON:
+        verts = np.asarray(r["vertices"], dtype=np.int32).reshape(-1, 2)
+        r["vertices"] = verts
+        cx, cy = (int(v) for v in verts.mean(axis=0))
+        for col, val in (("Center_X", cx), ("Center_Y", cy)):
+            if need(col):
+                r[col] = val
+        if not isinstance(r.get("center"), (tuple, list, np.ndarray)):
+            r["center"] = (int(r["Center_X"]), int(r["Center_Y"]))
+        x, y = verts[:, 0].astype(float), verts[:, 1].astype(float)
+        area_px2 = 0.5 * abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+        if need("area"):
+            r["area"] = float(area_px2)
+        if need("max_vertice_distance"):
+            d = verts[:, None, :].astype(float) - verts[None, :, :]
+            r["max_vertice_distance"] = int(np.sqrt((d ** 2).sum(-1)).max())
+        if need("area_cm"):
+            r["area_cm"] = float(area_px2 / mm ** 2) if mm else 0.0
+        if not isinstance(r.get("Tags"), dict):
+            tags = {f"Tag_{i}": (int(v[0]), int(v[1]))
+                    for i, v in enumerate(verts)}
+            tags["Center_tag"] = (int(r["Center_X"]), int(r["Center_Y"]))
+            r["Tags"] = tags
+    return r
+
+
+def _conform_table(kind: str, rows: list[dict[str, Any]]) -> pd.DataFrame:
+    """One H5 table: SimBA's columns first, then any extra column that every
+    row has a value for. An extra column some rows lack is dropped rather
+    than written with NaN (readers drop NaN rows)."""
+    headers = _HEADERS[kind]
+    if not rows:
+        return pd.DataFrame(columns=headers)
+    extra: list[str] = []
+    for row in rows:
+        for c in row:
+            if c not in headers and c not in extra:
+                extra.append(c)
+    extra = [c for c in extra
+             if all(c in row and not _missing(row[c]) for row in rows)]
+    cols = headers + extra
+    return pd.DataFrame([{c: row.get(c) for c in cols} for row in rows],
+                        columns=cols)
 
 
 __all__ = ["ROILogic", "ROIDefinition", "RECTANGLE", "CIRCLE", "POLYGON"]

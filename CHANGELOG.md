@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ik — saving ROIs no longer loses other videos' ROIs.**
+`ROILogic.save` rewrites the whole ROI_definitions.h5. It read the existing
+file through `read_roi_data` (drops every rectangle / circle row with a NaN),
+swallowed read errors and then wrote a file holding only the current video,
+and wrote its own rows in a private format: `Color BGR` / `Tags` / `vertices`
+as strings, circles with extra `Center_X` / `Center_Y` columns. Mixed with
+SimBA-format rows that left NaN cells, so the next read dropped rows —
+measured: saving one circle on video A deleted video B's SimBA circle on the
+first save. String vertices / tags also broke ROI analysis
+(`vertices.astype`) and visualisation (`Tags.items()`).
+* Save reads the file raw; an unreadable file aborts the save
+  (`RuntimeError`) instead of being replaced.
+* Every row — new and existing — is written SimBA-native (tuple colour, dict
+  tags incl. the full rectangle tag set and circle 'Border tag', ndarray
+  vertices) with SimBA's column set; missing standard values are filled;
+  an extra column is kept only if no row lacks it. Old-Mufasa rows are
+  repaired on the next save.
+* Load reads raw as well and normalises each row, so mixed files show every
+  ROI; an unreadable file sets `ROILogic.load_error` and the panel warns.
+smoke_122ik_roi_save_preserves: 15/15 (real H5 files in SimBA and old-Mufasa
+format, ROILogic load/save, read_roi_data, multiply_ROIs, corrupt file).
+Tripwires (swallowed read error, extra NaN columns, string vertices) each
+fail it. smoke_roi_logic: added its missing `import os`; its cross-video save
+case (19), which had only been skipping for lack of pytables, fails on the
+old code and passes now (20/20).
+
 **122ij — ROI editor redesign; polygons have no vertex limit.**
 * Bug: `ROICanvas._commit_polygon` ran every polygon through
   `shapely.simplify(tolerance=20)`, silently deleting each vertex within 20
