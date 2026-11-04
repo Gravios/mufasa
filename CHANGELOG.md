@@ -8,6 +8,20 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ii — the joint-prior fit uses the worker pool.**
+`fit_joint_priors_v2` accepted `pool` and ignored it: its pass (a filter +
+smoother per session, the cost of one EM E-step) ran every session serially in
+the main process on one core, while the perspective pass just before it used
+all workers. EM also called it with `verbose=False`, so it sat silent. The
+per-session work is now `_joint_prior_session_samples`, shared by the serial
+path and a new `_pool_joint_prior_pass` worker; results are accumulated in
+session order, so the pooled fit is identical to the serial one. Progress
+prints per session (`[v2-jprior] n/N … ETA`).
+smoke_122ii_joint_prior_pool: 5/5 (real multiprocessing pool via
+`_pool_init`; pooled == serial exactly; nothing runs in the main process).
+Tripwire: forcing the serial path fails it. smoke_122hf's source check now
+reads the helper. Every Kalman v2 suite passes.
+
 **122ih — no blocking progress dialog.**
 Running an operation opened a window-modal QProgressDialog that froze the whole
 workbench — including the console dock showing that run's own output (e.g. the

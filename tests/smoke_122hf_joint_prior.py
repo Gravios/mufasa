@@ -386,7 +386,11 @@ check("the prior is fitted ONCE before the iterations, after perspective",
                "for iteration in range(", hay=em))
 check("the fit pass itself runs WITHOUT a prior (no chasing its own tail)",
       "joint_prior" not in
-      src[src.index("def fit_joint_priors_v2("):src.index("def fit_joint_priors_v2(") + src[src.index("def fit_joint_priors_v2("):].index("return JointPriorV2")].split("filt = forward_filter_v2")[1].split(")")[0])
+      # 122ii: the per-session pass moved into a helper shared by the
+      # serial path and the pool worker.
+      src[src.index("def _joint_prior_session_samples("):
+          src.index("def fit_joint_priors_v2(")
+          ].split("filt = forward_filter_v2")[1].split(")")[0])
 check("warm-start does NOT receive a prior (it runs before the fit)",
       "joint_prior" not in
       src[src.index("def _pool_warm_start_pass("):

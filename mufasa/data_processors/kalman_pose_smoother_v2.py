@@ -4455,6 +4455,78 @@ def _fit_von_mises(cos_vals: np.ndarray, sin_vals: np.ndarray) -> tuple[float, f
     return mu, kappa
 
 
+def _joint_prior_session_samples(
+    pos, likes, layout: BodyLayout, marker_names: list[str], fitted_lengths,
+    params: NoiseParamsV2, fps: float, likelihood_threshold: float,
+    apply_constraints: bool, perspective: PerspectiveModelV2 | None,
+) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """One session's contribution to the joint-prior fit.
+
+    Filter + smooth WITHOUT a joint prior (the prior is what we are trying to
+    measure, so applying it here would just return it to us), then return the
+    (cos, sin) of each non-root segment's local angle on the frames where
+    that segment's own markers were observed, sign-gauge canonicalized.
+    Shared by the serial path and the pool worker (patch 122ii).
+    """
+    seg_marker_idx = {
+        seg.name: [marker_names.index(m) for m in seg.markers
+                   if m in marker_names]
+        for seg in layout.segments
+    }
+    x0 = initial_state_from_data(
+        pos, likes, layout, marker_names, fitted_lengths,
+        likelihood_threshold,
+    )
+    filt = forward_filter_v2(
+        pos, likes, layout, params, 1.0 / fps,
+        initial_state=x0,
+        likelihood_threshold=likelihood_threshold,
+        apply_constraints=apply_constraints,
+        perspective=perspective,
+    )
+    x = rts_smooth_v2(filt, layout, 1.0 / fps, params).x_smooth
+    out: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    for seg_name in layout.non_root_topo_order:
+        idx = seg_marker_idx.get(seg_name, [])
+        if not idx:
+            continue
+        # A frame counts only if this segment's own geometry was seen.
+        observed = np.any(likes[:, idx] >= likelihood_threshold, axis=1)
+        if not np.any(observed):
+            continue
+        sl = layout.slice_segment_orientation(seg_name)
+        block = x[observed, sl]
+        cos_v = block[:, 0].copy()
+        sin_v = block[:, 1].copy()
+
+        # Patch 122hf: canonicalize the (L, theta) sign gauge.
+        #
+        # A segment's length is a free state with process noise and
+        # nothing holds it positive. (L, theta) and (-L, theta+pi) place
+        # the marker at exactly the same point, so the two are
+        # observationally identical and the filter is free to sit in
+        # either. Measured on a synthetic tail with the tip blinded for
+        # 20s: L walks through zero during the dropout (47% of frames
+        # negative), re-acquires the marker in the mirrored gauge, and
+        # stays there — 100% negative afterwards, with theta reported
+        # 180 degrees away from the truth.
+        #
+        # That is a pre-existing property of the state, not something
+        # this prior introduces, and fixing it properly means holding
+        # L > 0 in the filter (see CHANGELOG). But a circular mean taken
+        # across both gauges is meaningless — it drags mu by ~180 deg and
+        # collapses kappa (13.3 -> 1.1 measured) — so the fit has to fold
+        # the mirrored frames back before averaging.
+        length_sl = layout.slice_segment_length(seg_name)
+        lengths = x[observed, length_sl][:, 0]
+        flipped = lengths < 0.0
+        cos_v[flipped] *= -1.0
+        sin_v[flipped] *= -1.0
+
+        out[seg_name] = (cos_v, sin_v)
+    return out
+
+
 def fit_joint_priors_v2(
     sessions,
     layout: BodyLayout,
@@ -4482,75 +4554,53 @@ def fit_joint_priors_v2(
     prior from the very dropout stretches the prior exists to constrain, and
     would return "uniform" for precisely the joints that need help most.
     """
-    from collections import defaultdict
+    import time as _time_jp
 
-    cos_acc: dict[str, list] = defaultdict(list)
-    sin_acc: dict[str, list] = defaultdict(list)
+    n_sess = len(sessions)
+    per_session: dict[int, dict[str, tuple[np.ndarray, np.ndarray]]] = {}
+    times: list[float] = []
 
-    seg_marker_idx = {
-        seg.name: [marker_names.index(m) for m in seg.markers
-                   if m in marker_names]
-        for seg in layout.segments
-    }
+    def _report(done: int, sess_idx: int, dt_s: float) -> None:
+        if not verbose:
+            return
+        label = (session_names[sess_idx]
+                 if session_names is not None and sess_idx < len(session_names)
+                 else f"session_{sess_idx}")
+        workers = max(1, getattr(pool, "_processes", 1) or 1)
+        eta = (n_sess - done) * (sum(times) / len(times)) / workers
+        print(f"[v2-jprior]  {done:3d}/{n_sess} {label} "
+              f"(T={sessions[sess_idx][0].shape[0]}) ... {dt_s:.1f}s "
+              f"(ETA {eta / 60:.1f}min wall)", flush=True)
 
-    for i, (pos, likes) in enumerate(sessions):
-        # Same shape of pass as fit_warm_start_sigma_v2 / the perspective
-        # fit: filter + smooth with the current params, and read the state.
-        # Deliberately WITHOUT joint_prior — the prior is what we are trying
-        # to measure, so applying it here would just return it to us.
-        x0 = initial_state_from_data(
-            pos, likes, layout, marker_names, fitted_lengths,
-            likelihood_threshold,
-        )
-        filt = forward_filter_v2(
-            pos, likes, layout, params, 1.0 / fps,
-            initial_state=x0,
-            likelihood_threshold=likelihood_threshold,
-            apply_constraints=apply_constraints,
-            perspective=perspective,
-        )
-        x = rts_smooth_v2(filt, layout, 1.0 / fps, params).x_smooth
-        for seg_name in layout.non_root_topo_order:
-            idx = seg_marker_idx.get(seg_name, [])
-            if not idx:
-                continue
-            # A frame counts only if this segment's own geometry was seen.
-            observed = np.any(likes[:, idx] >= likelihood_threshold, axis=1)
-            if not np.any(observed):
-                continue
-            sl = layout.slice_segment_orientation(seg_name)
-            block = x[observed, sl]
-            cos_v = block[:, 0].copy()
-            sin_v = block[:, 1].copy()
+    if pool is not None:
+        # Patch 122ii: the pool was accepted but never used, so this pass ran
+        # every session serially in the main process while the perspective
+        # pass just before it used all workers. Workers hold the sessions
+        # (_pool_init); only the session index, params and perspective travel.
+        for done, (sess_idx, samples, dt_s) in enumerate(pool.imap_unordered(
+            _pool_joint_prior_pass,
+            [(i, params, perspective) for i in range(n_sess)],
+        ), start=1):
+            per_session[sess_idx] = samples
+            times.append(dt_s)
+            _report(done, sess_idx, dt_s)
+    else:
+        for i, (pos, likes) in enumerate(sessions):
+            t0 = _time_jp.time()
+            per_session[i] = _joint_prior_session_samples(
+                pos, likes, layout, marker_names, fitted_lengths, params,
+                fps, likelihood_threshold, apply_constraints, perspective,
+            )
+            times.append(_time_jp.time() - t0)
+            _report(i + 1, i, times[-1])
 
-            # Patch 122hf: canonicalize the (L, theta) sign gauge.
-            #
-            # A segment's length is a free state with process noise and
-            # nothing holds it positive. (L, theta) and (-L, theta+pi) place
-            # the marker at exactly the same point, so the two are
-            # observationally identical and the filter is free to sit in
-            # either. Measured on a synthetic tail with the tip blinded for
-            # 20s: L walks through zero during the dropout (47% of frames
-            # negative), re-acquires the marker in the mirrored gauge, and
-            # stays there — 100% negative afterwards, with theta reported
-            # 180 degrees away from the truth.
-            #
-            # That is a pre-existing property of the state, not something
-            # this prior introduces, and fixing it properly means holding
-            # L > 0 in the filter (see CHANGELOG). But a circular mean taken
-            # across both gauges is meaningless — it drags mu by ~180 deg and
-            # collapses kappa (13.3 -> 1.1 measured) — so the fit has to fold
-            # the mirrored frames back before averaging.
-            length_sl = layout.slice_segment_length(seg_name)
-            lengths = x[observed, length_sl][:, 0]
-            flipped = lengths < 0.0
-            cos_v[flipped] *= -1.0
-            sin_v[flipped] *= -1.0
-
-            cos_acc[seg_name].append(cos_v)
-            sin_acc[seg_name].append(sin_v)
-        if verbose and session_names:
-            print(f"[v2-jprior] {i + 1}/{len(sessions)} {session_names[i]}")
+    # Accumulate in session order so pooled and serial fits are identical.
+    cos_acc: dict[str, list] = {}
+    sin_acc: dict[str, list] = {}
+    for i in range(n_sess):
+        for seg_name, (c, s_) in per_session[i].items():
+            cos_acc.setdefault(seg_name, []).append(c)
+            sin_acc.setdefault(seg_name, []).append(s_)
 
     mu: dict[str, float] = {}
     kappa: dict[str, float] = {}
@@ -6996,6 +7046,27 @@ def _pool_warm_start_pass(
     return sess_idx, sums, counts, elapsed
 
 
+def _pool_joint_prior_pass(
+    args: tuple[int, NoiseParamsV2, PerspectiveModelV2 | None],
+) -> tuple[int, dict[str, tuple[np.ndarray, np.ndarray]], float]:
+    """Per-session joint-prior samples in a worker (patch 122ii).
+
+    Returns (sess_idx, {segment: (cos, sin)}, elapsed_s).
+    """
+    import time as _t
+    sess_idx, params, perspective = args
+    state = _POOL_WORKER_STATE
+    pos, likes = state["sessions_arr"][sess_idx]
+    t0 = _t.time()
+    samples = _joint_prior_session_samples(
+        pos, likes, state["layout"], state["marker_names"],
+        state["fitted_lengths"], params, state["fps"],
+        state["likelihood_threshold"], state["apply_constraints"],
+        perspective,
+    )
+    return sess_idx, samples, _t.time() - t0
+
+
 def _pool_perspective_pass(
     args: tuple[
         int, NoiseParamsV2, float, float, float, float,
@@ -7411,7 +7482,7 @@ def fit_noise_params_em_v2(
             likelihood_threshold=likelihood_threshold,
             apply_constraints=apply_constraints,
             perspective=perspective,
-            verbose=False, session_names=session_names, pool=pool,
+            verbose=verbose, session_names=session_names, pool=pool,
         )
         if verbose:
             active, inert = [], []
