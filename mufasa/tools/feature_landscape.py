@@ -26,7 +26,8 @@ samples frames from all of them, then:
 Outputs go to ``derived/plots/feature_landscape/<run_id>/``: ``pairs.csv``
 (every screened pair), ``jpdf_top.png`` (grid), ``jpdf_pairs.pdf`` (one page
 per plotted pair), ``tsne.png``, ``tsne.parquet`` (embedding with session and
-frame index) and ``run.toml``.
+frame index), ``tsne_samples.parquet`` (the embedded frames' column values,
+row-aligned, for ``mufasa-landscape-animate``) and ``run.toml``.
 
 Usage::
 
@@ -687,10 +688,13 @@ def main(argv: list[str] | None = None) -> int:
         pd.DataFrame({"tsne_1": E[:, 0], "tsne_2": E[:, 1],
                       "session": [names[i] for i in sess[idx]],
                       "frame": frame[idx]}).to_parquet(out / "tsne.parquet")
+        # raw values of the embedded frames, row-aligned with tsne.parquet:
+        # what mufasa-landscape-animate morphs between
+        X[cols].iloc[idx].reset_index(drop=True).to_parquet(out / "tsne_samples.parquet")
         counts = pd.concat([top.feature_a, top.feature_b]).value_counts()
         plot_tsne(E, sess[idx], names, X[cols].iloc[idx].reset_index(drop=True),
                   list(counts.index[:5]), out)
-        print("[landscape] wrote tsne.png and tsne.parquet")
+        print("[landscape] wrote tsne.png, tsne.parquet and tsne_samples.parquet")
         results["tsne_frames"] = int(len(idx))
 
     write_run_toml(out / "run.toml", stage="feature_landscape", run_id=run_id,

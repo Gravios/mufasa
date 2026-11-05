@@ -8,6 +8,31 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122iy — `mufasa-landscape-animate`: frames gliding between t-SNE and feature spaces.**
+New `mufasa/tools/landscape_animate.py` (console script
+`mufasa-landscape-animate`) renders a presentation GIF (`--mp4` adds an MP4)
+from a `mufasa-landscape` run: the sampled frames move from the t-SNE map
+into the joint scatter of each chosen pair and back (t-SNE → p1 → p2 → … →
+t-SNE, or `--through-tsne` to return between pairs), with a hold on each
+space and cubic ease-in-out moves. Colour stays fixed per point — by default
+its position in the t-SNE map (hue = direction, saturation = distance from
+the centre), so each map region can be followed into every feature space;
+`--color session|<column>` otherwise. Each space is shown in its own units
+(0.5–99.5 percentile range; t-SNE keeps its aspect); title, axis labels,
+ticks and a faint density backdrop cross-fade with the motion. Pairs: `--top
+N` from `pairs.csv` (same ranking, `--max-per-feature` default 1) or
+`--pair A B` (repeatable). One shared palette for all GIF frames (no
+flicker); `--theme dark|light`, `--size`, `--n-points`, `--fps`, `--hold`,
+`--transition`. Run found from a run dir or the project (latest run).
+`mufasa-landscape` now also writes `tsne_samples.parquet` (the embedded
+frames' column values, row-aligned with `tsne.parquet`), which the
+animation reads — no recomputation; runs from 122ix lack it and get a
+clear "re-run mufasa-landscape" error.
+smoke_122iy_landscape_animate: 20/20 (timeline and easing, GIF size / loop
+/ duration, start = end, exact point positions at the end and middle of a
+move, aspect, colour modes, --top / --through-tsne / project discovery,
+MP4, error paths). 122ix, 122iw, 122gs pass.
+
 **122ix — `mufasa-landscape`: dipsplit joint PDFs and t-SNE across sessions.**
 New `mufasa/tools/feature_landscape.py` (console script `mufasa-landscape`,
 needs the new `analysis` extra = `diptest`). Loads, for every session, the
