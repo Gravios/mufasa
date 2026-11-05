@@ -8,6 +8,20 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ja — fix: HEAD VELOCITY IN BODY FRAME failed with NameError 'warnings'.**
+User report: every video failed with "NameError: name 'warnings' is not
+defined". `feature_subset_kernels` imported `warnings` only inside the
+fallback branch taken when the compiled (Cython) kernels are missing; the
+122iz kernel used it at module scope. Without compiled kernels (the
+development sandbox) the fallback ran and the name existed, so 122iz's tests
+passed; on an installed copy the compiled kernels load and the name was
+never bound. `warnings` is now imported at top level.
+smoke_122ja_kernels_module_imports: 4/4 — AST check that every module global
+a kernel function uses is bound on both import paths (would have caught
+this), plus a run-time import with a stub `mufasa._native` (the compiled
+path) and a head-velocity call; fails 1/4 on the 122iz file. 122iz, kernel
+and Compute Features suites as before.
+
 **122iz — head velocity in the body frame; landscape: angles, -1 placeholders, per-family log.**
 User report: mufasa-landscape "only used the angles". All families were
 loaded (checked on a real Compute Features output), but angle columns

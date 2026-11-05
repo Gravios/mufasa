@@ -58,6 +58,7 @@ are battle-tested.
 """
 from __future__ import annotations
 
+import warnings
 from collections.abc import Iterable, Mapping
 
 import numpy as np
@@ -117,7 +118,6 @@ except ImportError as _native_import_error:
     # Fall back to numba for every kernel. A missing _native is
     # almost always "user updated the source but didn't reinstall
     # the package" — print a hint so they know how to fix it.
-    import warnings
     warnings.warn(
         f"mufasa._native Cython kernels unavailable "
         f"({_native_import_error}); falling back to numba "
