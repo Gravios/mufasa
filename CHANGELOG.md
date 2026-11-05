@@ -8,6 +8,31 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122je — Features → Feature Visualization.**
+New section on the Features page (`FeatureVisualizationForm`). Pick a video,
+filter features by family and by search words, tick any number (the
+selection survives filtering), then:
+*Distributions* — histogram per feature (≤ 12), this video or all videos
+pooled; with *Colour by* a behaviour, labelled frames vs the rest with the
+feature's AUC for that behaviour in each panel and the best-separating
+features summarised (videos with no labels for it are left out of the split
+and reported). *Joint* — two features as a 2-D log density with behaviour
+frames overlaid. *Over time* — whole session per feature (min/max decimated)
+with behaviour bouts shaded; double-click opens the video there. *Open with
+video* — `FeatureViewerWidget` in a floating dock: the scrubber with one
+trace lane per feature under it (each scaled to its 0.5–99.5 % range over
+the session, value at the cursor beside the name), a behaviour strip,
+click / drag to seek, wheel or the ±window box to zoom.
+Only the selected columns are read: `feature_io.feature_catalog` (schemas
+only) and `feature_io.load_feature_columns` (parquet column projection).
+Plot drawing is Qt-free in `mufasa/tools/feature_plots.py` (`auc`,
+`plot_distributions`, `plot_joint`, `plot_over_time`).
+smoke_122je_feature_visualization: 31/31 (offscreen on a generated project
+with real videos, two feature families and labels: catalogue / projection,
+AUC vs sklearn, filtering and selection, every plot, scope and the
+unlabelled-video rule, guards, viewer seek / drag / wheel / spin, page
+registration). Page / section / feature-I/O suites as before.
+
 **122jd — Frame Labeling table: "Frames labelled" column.**
 New column after Status: frames carrying at least one behaviour, out of the
 video's frames, with the percentage (a frame with two behaviours counts

@@ -60,8 +60,11 @@ import pandas as pd
 from mufasa.project_layout import project_paths_from_config
 
 __all__ = [
+    "WIDE_FAMILY",
     "family_slug",
+    "feature_catalog",
     "list_video_stems_with_features",
+    "load_feature_columns",
     "load_features_for_video",
     "write_wide_features_v1",
 ]
@@ -343,6 +346,78 @@ def write_wide_features_v1(
     out_path = os.path.join(derived_features_dir, f"{stem}.parquet")
     df.to_parquet(out_path, index=False)
     return out_path
+
+
+# ---------------------------------------------------------------------- #
+# Patch 122je — column catalogue and projected loads (Feature
+# Visualization). Read parquet schemas / only the requested columns, so
+# browsing hundreds of features across dozens of sessions stays cheap.
+# ---------------------------------------------------------------------- #
+WIDE_FAMILY = "(wide feature file)"
+
+
+def _feature_files(video_name: str, config_path: str) -> list[tuple[str, str]]:
+    """[(family, parquet path)] for one video: per-family files first
+    (family = folder name), then the wide sidecar."""
+    stem = _strip_video_ext(video_name)
+    try:
+        root = project_paths_from_config(config_path).get("derived_features_dir")
+    except Exception:
+        root = None
+    out: list[tuple[str, str]] = []
+    if root and os.path.isdir(root):
+        for sub in sorted(os.listdir(root)):
+            f = os.path.join(root, sub, f"{stem}.parquet")
+            if os.path.isdir(os.path.join(root, sub)) and os.path.isfile(f):
+                out.append((sub, f))
+        wide = os.path.join(root, f"{stem}.parquet")
+        if os.path.isfile(wide):
+            out.append((WIDE_FAMILY, wide))
+    return out
+
+
+def feature_catalog(video_name: str, config_path: str) -> dict[str, list[str]]:
+    """{family: [columns]} for one video, from parquet schemas only (no
+    data read). A column in both a family file and the wide file is
+    listed under the family (per-family wins, as in
+    :func:`load_features_for_video`)."""
+    import pyarrow.parquet as pq
+    seen: set[str] = set()
+    out: dict[str, list[str]] = {}
+    for fam, path in _feature_files(video_name, config_path):
+        try:
+            names = [c for c in pq.read_schema(path).names
+                     if c not in seen and not c.startswith("__index")]
+        except Exception:
+            continue
+        if names:
+            out[fam] = names
+            seen.update(names)
+    return out
+
+
+def load_feature_columns(video_name: str, config_path: str,
+                         columns: list[str]) -> pd.DataFrame:
+    """Only ``columns`` for one video, reading just the files and columns
+    that hold them. Missing columns are absent from the result (not an
+    error); order follows ``columns``."""
+    import pyarrow.parquet as pq
+    want = list(dict.fromkeys(columns))
+    got: dict[str, pd.Series] = {}
+    for _fam, path in _feature_files(video_name, config_path):
+        todo = [c for c in want if c not in got]
+        if not todo:
+            break
+        try:
+            have = set(pq.read_schema(path).names)
+        except Exception:
+            continue
+        cols = [c for c in todo if c in have]
+        if cols:
+            df = pd.read_parquet(path, columns=cols)
+            for c in cols:
+                got[c] = df[c].reset_index(drop=True)
+    return pd.DataFrame({c: got[c] for c in want if c in got})
 
 
 def list_video_stems_with_features(
