@@ -8,6 +8,19 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122in — a click is not a drag (ROI cycling with a real mouse).**
+User report after 122im: the ROI under another still couldn't be selected.
+Cause: no drag threshold. A real click moves the cursor a pixel or two
+between press and release; the Select tool treated that as a drag, nudged
+the selected ROI by that amount and, since it "moved", never cycled to the
+ROI beneath. 122im's test used QTest.mouseClick, which never moves, so it
+passed. Moving / reshaping now starts only once the cursor has travelled
+`QApplication.startDragDistance()` (default 10 px); below that the press is
+a click.
+smoke_122im_roi_overlap: +4 checks with realistic clicks (2 px jitter):
+cycling works, ROIs and sides are not nudged. On the 122im canvas those
+fail (12/17); now 17/17. 122ij, 122dm, 122fd, smoke_roi_canvas unchanged.
+
 **122im — overlapping ROIs stay reachable.**
 The Select tool resolved a click to the top-most (most recently drawn) ROI
 whose area contained it, so an ROI under a newer one could not be selected,

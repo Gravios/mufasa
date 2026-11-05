@@ -98,6 +98,16 @@ def drag(a, b):
     QTest.mouseRelease(C, Qt.LeftButton, Qt.NoModifier, wpt(*b))
 
 
+def wobbly_click(fx, fy, jitter=(2, 1)):
+    """A real click: the mouse moves a pixel or two between press and
+    release (QTest.mouseClick never moves, which hid the 122in bug)."""
+    p = wpt(fx, fy)
+    QTest.mousePress(C, Qt.LeftButton, Qt.NoModifier, p)
+    QTest.mouseMove(C, p + QPoint(1, 0))
+    QTest.mouseMove(C, p + QPoint(*jitter))
+    QTest.mouseRelease(C, Qt.LeftButton, Qt.NoModifier, p + QPoint(*jitter))
+
+
 def selected() -> str | None:
     i = C.selected_index()
     return None if i is None else W._overlay_idx_to_kind_name[i][1]
@@ -117,6 +127,21 @@ check("clicking the same spot again cycles to the ROI beneath",
       selected() == "big")
 click(130, 130)
 check("…and around again", selected() == "small")
+
+# 122in: the same with realistic, slightly moving clicks.
+before = (dict(g("small")), dict(g("big")))
+wobbly_click(130, 130)
+check("a wobbly click (cursor moves 2 px) still cycles to the ROI beneath",
+      selected() == "big")
+wobbly_click(130, 130)
+check("…and back", selected() == "small")
+check("wobbly clicks never nudge the ROIs",
+      (dict(g("small")), dict(g("big"))) == before)
+wobbly_click(160, 130)                # on small's right side
+check("a wobbly click on a side doesn't resize it",
+      dict(g("small")) == before[0])
+wobbly_click(130, 130)                # 'small' is selected: cycle to 'big'
+wobbly_click(130, 130)                # and back to 'small'
 
 drag((130, 130), (140, 135))
 check("dragging inside moves the covered ROI, not the newer one on top",

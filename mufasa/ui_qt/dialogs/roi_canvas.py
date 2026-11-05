@@ -90,7 +90,7 @@ from PySide6.QtGui import (
     QPolygonF,
     QWheelEvent,
 )
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QApplication, QWidget
 
 from mufasa.roi_tools.roi_logic import CIRCLE, POLYGON, RECTANGLE
 
@@ -280,6 +280,8 @@ class ROICanvas(QWidget):
         self._drag_anchor_geom: dict | None = None
         self._press_frame: tuple[int, int] | None = None
         self._cycle_from: int | None = None
+        self._press_widget: QPointF | None = None
+        self._drag_started = False
 
         # View state: zoom relative to fit, pan in widget px.
         self._zoom = 1.0
@@ -884,6 +886,8 @@ class ROICanvas(QWidget):
             if self._cycle_from is not None:
                 idx = self._selected_idx
             self._press_frame = frame_pt
+            self._press_widget = ev.position()
+            self._drag_started = False
             if idx != self._selected_idx:
                 self._selected_idx = idx
                 self.shape_selected.emit(idx)
@@ -1019,11 +1023,21 @@ class ROICanvas(QWidget):
             self._draw_state.circle_edge = frame_pt
         elif self._mode == _DrawMode.POLY_VERTEXING:
             self._draw_state.poly_rubber_end = frame_pt
-        elif self._mode == _DrawMode.SHAPE_MOVING:
-            self._move_selected_to(frame_pt)
-            return
-        elif self._mode == _DrawMode.HANDLE_DRAGGING:
-            self._drag_handle_to(frame_pt)
+        elif self._mode in (_DrawMode.SHAPE_MOVING, _DrawMode.HANDLE_DRAGGING):
+            # Patch 122in: a click is not a drag. Real mouse clicks wobble a
+            # pixel or two between press and release; without a threshold
+            # every click nudged the selected ROI and was never treated as a
+            # click, so clicking again never reached the ROI beneath.
+            if not self._drag_started:
+                if self._press_widget is None or (
+                        (ev.position() - self._press_widget).manhattanLength()
+                        < QApplication.startDragDistance()):
+                    return
+                self._drag_started = True
+            if self._mode == _DrawMode.SHAPE_MOVING:
+                self._move_selected_to(frame_pt)
+            else:
+                self._drag_handle_to(frame_pt)
             return
         self.update()
 
@@ -1110,13 +1124,15 @@ class ROICanvas(QWidget):
                 moved = (self._pre_drag_geom is not None and
                          canonical_geometry(kind, self._pre_drag_geom)
                          != final_geom)
-                if not moved and getattr(self, "_cycle_from", None) is not None:
+                if (not moved and not self._drag_started
+                        and getattr(self, "_cycle_from", None) is not None):
                     cands = self._interior_candidates(self._press_frame)
                     if len(cands) > 1:
                         nxt = cands[(cands.index(idx) + 1) % len(cands)]
                         self._selected_idx = nxt
                         self.shape_selected.emit(nxt)
                 self._cycle_from = None
+                self._drag_started = False
                 if (self._pre_drag_geom is not None
                         and canonical_geometry(kind, self._pre_drag_geom)
                         != final_geom):
