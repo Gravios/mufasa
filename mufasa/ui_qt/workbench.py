@@ -694,7 +694,9 @@ class MufasaWorkbench(QMainWindow):
             f"Mufasa — {project_config_path}" if project_config_path
             else "Mufasa"
         )
-        self.setWindowIcon(icon("SimBA_logo_3_small"))
+        # Patch 122it: Mufasa lion icon (was the SimBA logo).
+        from mufasa.ui_qt.branding import app_icon
+        self.setWindowIcon(app_icon())
         self.resize(1440, 900)
 
         # Central split: sidebar | content stack

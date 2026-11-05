@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122it — Mufasa lion logo: app icon and startup splash.**
+New `mufasa/assets/branding/`: the lion-head symbol (`mufasa_icon_<16…512>.png`,
+`.svg`, `.ico`, transparent background) and the symbol + MUFASA wordmark
+(`mufasa_splash.png`, `mufasa_wordmark.svg`). New `mufasa.ui_qt.branding`:
+`app_icon()` (all sizes in one QIcon), `splash_pixmap()` (opaque dark card —
+no reliance on window translucency, which remote X11 often lacks),
+`MufasaSplash`, `show_splash()` (skipped with MUFASA_NO_SPLASH=1 and on
+offscreen/minimal platforms). The workbench entry point sets the app icon
+and desktop file name, shows the splash with "Opening <project>…" while the
+workbench is built and closes it when the window appears; the main window
+icon is the lion instead of the SimBA logo; `Paths.LOGO_ICON_*` point at the
+new files.
+smoke_122it_branding: 10/10 (assets + transparency, icon sizes, splash,
+a real workbench window's icon, entry-point wiring). 122d5 module ceiling
+432 → 433. Workbench suites unchanged.
+
 **122is — parallel feature extraction: spawn workers, not fork.**
 User report: Compute Features with 16 workers → every video "BrokenProcessPool:
 A process in the process pool was terminated abruptly". Reproduced here: the

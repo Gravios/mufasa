@@ -202,6 +202,13 @@ def main(argv: list[str] | None = None) -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Mufasa")
     app.setOrganizationName("Mufasa")
+    app.setDesktopFileName("mufasa")
+
+    # Patch 122it: lion icon for every window, and the startup splash while
+    # the workbench is built (MUFASA_NO_SPLASH=1 skips it).
+    from mufasa.ui_qt.branding import app_icon, show_splash
+    app.setWindowIcon(app_icon())
+    splash = show_splash(app)
 
     # Patch 122cj: install the Qt-native confirm override so any
     # subsequent backend call to mufasa.utils.confirm.confirm_two_option
@@ -255,6 +262,10 @@ def main(argv: list[str] | None = None) -> int:
     if project_config_path is not None:
         _save_recent_project(project_config_path)
 
+    if splash is not None:
+        splash.message(
+            f"Opening {Path(project_config_path).parent.name}…"
+            if project_config_path else "Building workbench…")
     wb = build_workbench(project_config_path=project_config_path)
     # Track the workbench on the QApplication so File → New/Open project
     # (which builds a fresh window and closes the old one) doesn't leak
@@ -263,6 +274,8 @@ def main(argv: list[str] | None = None) -> int:
     refs.append(wb)
     app.setProperty("_mufasa_workbenches", refs)
     wb.show()
+    if splash is not None:
+        splash.finish(wb)
     return app.exec()
 
 
