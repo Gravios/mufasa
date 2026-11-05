@@ -313,6 +313,32 @@ class RoiStore:
             done.append(t)
         return done
 
+    def copy_roi(self, source: str, name: str, targets: Iterable[str],
+                 frame_sizes: dict[str, tuple[int, int]] | None = None) -> list[str]:
+        """Give each target video a copy of one ROI of ``source`` (patch
+        122jh). A target ROI with the same name is replaced in place; the
+        target's other ROIs are kept. Rescaled like :meth:`copy_video`.
+        Returns the targets."""
+        src = self.videos.get(source)
+        roi = next((r for r in (src.rois if src else []) if r.name == name), None)
+        if roi is None:
+            raise ValueError(f"{source} has no ROI named {name!r}")
+        done = []
+        for t in targets:
+            if t == source:
+                continue
+            dst_size = (frame_sizes or {}).get(t) or self.frame_size(t) or src.frame_size
+            new = _rescaled(roi, src.frame_size, dst_size)
+            rois = self.rois(t)
+            idx = next((i for i, r in enumerate(rois) if r.name == name), None)
+            if idx is None:
+                rois.append(new)
+            else:
+                rois[idx] = new
+            self.set_video(t, rois, dst_size)
+            done.append(t)
+        return done
+
     # ---- (de)serialisation -------------------------------------------- #
     def to_json(self) -> dict[str, Any]:
         return {

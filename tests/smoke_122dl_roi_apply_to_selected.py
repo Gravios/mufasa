@@ -188,7 +188,8 @@ def main() -> int:
         "ROIDefinePanel.build() creates apply_selected_btn "
         "with the right label",
         "apply_selected_btn" in panel_src
-        and '"Apply to selected…"' in panel_src,
+        # 122jh renamed it: "Apply to all…" now copies one selected ROI.
+        and '"Copy all ROIs to chosen videos…"' in panel_src,
     )
     # 7. _on_apply_selected_clicked method exists
     check(

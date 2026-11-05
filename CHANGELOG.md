@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jh — ROI "Apply to all" copies only the selected ROI; Manage classifiers above Features.**
+ROI editor: the button is now "Apply '<roi>' to all…", enabled only with a
+ROI selected. It copies that one ROI to every other video, rescaled to each
+video's frame size; a ROI with the same name there is replaced in place,
+their other ROIs are kept, the source video is unchanged. The confirmation
+names the ROI and lists videos that already have one of that name. New
+`RoiStore.copy_roi` and `roi_utils.copy_roi_to_all`. The subset button is
+relabelled "Copy all ROIs to chosen videos…" (behaviour unchanged).
+Workbench: the Manage classifiers page is built right after ROI, above
+Features (Annotation / Train / Validate / Inference still follow Features).
+smoke_122jh_roi_apply_one_and_page_order: 18/18 (copy_roi in-place replace,
+keep, add, rescale, error; editor: disabled without selection, question
+text, decline, apply across a mixed-resolution project, status; page order
+by AST). 122ij and 122dl updated to the new button behaviour / label; ROI
+and page-order suites otherwise as before.
+
 **122jg — feature tree compacted by shared name parts.**
 Inside each family the wording all its features share is dropped from the
 leaves and shown once beside the family (`Angle (degrees) …`,

@@ -560,6 +560,29 @@ def multiply_ROIs(filename: str | os.PathLike,
     stdout_success(msg=f"ROIs of {video_name} copied to {len(targets)} other videos.")
 
 
+def copy_roi_to_all(filename: str | os.PathLike, roi_name: str,
+                    config_path: str | os.PathLike) -> list[str]:
+    """Copy ONE ROI of a video to every other video of the project (patch
+    122jh). A same-named ROI in another video is replaced; that video's
+    other ROIs are kept. Rescaled to each video's frame size. Returns the
+    target video names."""
+    from mufasa.project_layout import project_paths_from_config
+    from mufasa.roi_tools.roi_store import read_frame_sizes, update_rois
+    paths = project_paths_from_config(config_path=config_path)
+    videos_dir, roi_path = paths["video_dir"], paths["roi_definitions_path"]
+    _, video_name, _ = get_fn_ext(filename)
+    others = [x for x in find_files_of_filetypes_in_directory(
+        directory=videos_dir, extensions=Options.ALL_VIDEO_FORMAT_OPTIONS.value)
+        if get_fn_ext(x)[1] != video_name]
+    if not others:
+        raise NoROIDataError(msg="No other videos in the project.",
+                             source=copy_roi_to_all.__name__)
+    sizes = read_frame_sizes(others + [os.fspath(filename)])
+    targets = [get_fn_ext(x)[1] for x in others]
+    update_rois(roi_path, lambda st: st.copy_roi(video_name, roi_name, targets, sizes))
+    return targets
+
+
 def reset_video_ROIs(config_path: str | os.PathLike,
                      filename: str | os.PathLike) -> None:
     """Delete all ROIs of one video."""

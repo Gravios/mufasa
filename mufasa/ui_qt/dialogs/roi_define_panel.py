@@ -18,8 +18,8 @@ Layout (patch 122ij redesign)
     │              │ ⏮ −1s −1f ━━━━━━●━━━━━━━ +1f +1s ⏭   Frame 47 / 900     │  Name  [auto]              │
     │              │                                                         │  Colour [Red ▾] Width [3]  │
     │              │                                                         │ Copy to other videos       │
-    │              │                                                         │  [Apply to all…]           │
-    │              │                                                         │  [Apply to selected…]      │
+    │              │                                                         │  [Apply 'roi' to all…]     │
+    │              │                                                         │  [Copy all ROIs to chosen…]│
     │              │                                                         │ [Import / standardize…]    │
     │              │                                                         │ [Clear this video…]        │
     ├──────────────┴─────────────────────────────────────────────────────────┴────────────────────────────┤
@@ -40,7 +40,8 @@ How it works
   vertices; colour and line width are edited per row in the table.
 * **Undo / redo** (Ctrl+Z / Ctrl+Shift+Z) cover every change on the current
   video since it was opened.
-* Switching videos auto-saves. "Apply to all…" now says how many other
+* Switching videos auto-saves. (122jh: "Apply to all…" now copies only
+  the selected ROI.) "Apply to all…" now says how many other
   videos' existing ROIs it will replace before doing it.
 
 Keyboard: V/R/C/P tools · , / . step a frame (Shift: a second) · PgUp/PgDn
@@ -477,15 +478,20 @@ class ROIDefineWidget(QWidget):
         copy_box = QGroupBox("Copy to other videos", pane)
         cl = QVBoxLayout(copy_box)
         cl.setContentsMargins(8, 6, 8, 6)
-        self.apply_all_btn = QPushButton("Apply to all…", copy_box)
+        # Patch 122jh: copies only the selected ROI; other videos keep
+        # their other ROIs (a same-named ROI there is replaced).
+        self.apply_all_btn = QPushButton("Apply selected ROI to all…", copy_box)
         self.apply_all_btn.setToolTip(
-            "Replace the ROIs of every other video with this video's ROIs")
+            "Copy the selected ROI to every other video. A ROI with the same "
+            "name there is replaced; their other ROIs are kept.")
+        self.apply_all_btn.setEnabled(False)
         self.apply_all_btn.clicked.connect(self._on_apply_all_clicked)
         cl.addWidget(self.apply_all_btn)
         # Patch 122dl: subset-apply via DuplicateRoisDialog.
-        self.apply_selected_btn = QPushButton("Apply to selected…", copy_box)
+        self.apply_selected_btn = QPushButton("Copy all ROIs to chosen videos…", copy_box)
         self.apply_selected_btn.setToolTip(
-            "Copy this video's ROIs to videos you pick by name / filter")
+            "Copy all of this video's ROIs to videos you pick by name / filter "
+            "(replacing their ROIs)")
         self.apply_selected_btn.clicked.connect(self._on_apply_selected_clicked)
         cl.addWidget(self.apply_selected_btn)
         lay.addWidget(copy_box)
@@ -797,6 +803,11 @@ class ROIDefineWidget(QWidget):
         has = self._selected_row() is not None
         self.duplicate_btn.setEnabled(has)
         self.delete_btn.setEnabled(has)
+        if hasattr(self, "apply_all_btn"):
+            self.apply_all_btn.setEnabled(has)
+            name = self._selected_name() if has else None
+            self.apply_all_btn.setText(
+                f"Apply '{name}' to all…" if name else "Apply selected ROI to all…")
 
     # ------------------------------------------------------------------ #
     # Undo / dirty state
@@ -1096,45 +1107,52 @@ class ROIDefineWidget(QWidget):
         self._changed("All ROIs on this video cleared (Ctrl+Z to undo).")
 
     def _on_apply_all_clicked(self) -> None:
+        """Patch 122jh: copy the *selected* ROI to every other video. A ROI
+        of the same name there is replaced; their other ROIs are kept."""
         if self.logic is None:
             return
-        if not self.logic.all_roi_names:
-            self._flash_status("No ROIs to apply.", error=True)
+        name = self._selected_name()
+        if name is None or not self.logic.has_roi(name):
+            self._flash_status("Select the ROI to copy first.", error=True)
             return
         others = [Path(v).stem for v in self._videos
                   if Path(v).stem != self.logic.video_name]
-        roi_h5 = _project_paths_lite(self.config_path).get(
-            "roi_definitions_path", "")
-        overwritten = sorted(set(others) & set(_videos_with_rois(roi_h5)))
-        msg = (f"Copy the {len(self.logic.all_roi_names)} ROIs of "
-               f"<b>{self.logic.video_name}</b> to all {len(others)} other "
-               f"videos?")
-        if overwritten:
-            msg += (f"<br><br><b>This replaces the existing ROIs of "
-                    f"{len(overwritten)} video(s)</b>, e.g. "
-                    f"{', '.join(overwritten[:3])}"
-                    f"{'…' if len(overwritten) > 3 else ''}. "
-                    f"Use <i>Apply to selected…</i> to pick videos instead.")
+        if not others:
+            self._flash_status("No other videos in the project.", error=True)
+            return
+        roi_path = _project_paths_lite(self.config_path).get("roi_definitions_path", "")
+        try:
+            from mufasa.roi_tools.roi_store import RoiFileError, load_rois
+            store = load_rois(roi_path)
+            replaced = sorted(v for v in others if name in [r.name for r in store.rois(v)])
+        except (RoiFileError, OSError):
+            replaced = []
+        msg = (f"Copy ROI <b>{name}</b> of <b>{self.logic.video_name}</b> to all "
+               f"{len(others)} other videos? Their other ROIs are kept.")
+        if replaced:
+            msg += (f"<br><br><b>{len(replaced)} video(s) already have a ROI named "
+                    f"'{name}'</b> — it will be replaced, e.g. "
+                    f"{', '.join(replaced[:3])}{'…' if len(replaced) > 3 else ''}.")
         if QMessageBox.question(
-            self, "Apply to all videos", msg,
+            self, "Apply ROI to all videos", msg,
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
         ) != QMessageBox.Yes:
             return
         try:
             self.logic.save()
             self._set_dirty(False)
-            self._flash_status("Saved — applying to all videos…")
+            self._flash_status(f"Saved — copying '{name}' to all videos…")
             QApplication.processEvents()
-            from mufasa.roi_tools.roi_utils import multiply_ROIs
-            multiply_ROIs(config_path=self.config_path,
-                          filename=self._videos[self._cur_idx])
+            from mufasa.roi_tools.roi_utils import copy_roi_to_all
+            done = copy_roi_to_all(self._videos[self._cur_idx], name, self.config_path)
             self._refresh_video_list_marks()
             self.rois_modified.emit()
-            self._flash_status(f"Applied ROIs to {len(others)} videos.")
+            self._flash_status(f"Copied '{name}' to {len(done)} videos"
+                               + (f" ({len(replaced)} replaced)." if replaced else "."))
         except Exception as exc:
             QMessageBox.critical(
-                self, "Apply-all failed",
-                f"Could not apply ROIs: {type(exc).__name__}: {exc}",
+                self, "Apply-to-all failed",
+                f"Could not copy ROI '{name}': {type(exc).__name__}: {exc}",
             )
 
     def _on_apply_selected_clicked(self) -> None:

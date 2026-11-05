@@ -77,6 +77,12 @@ def build_workbench(project_config_path: str | None = None
     from mufasa.ui_qt.pages.roi_page import build_roi_page
     build_roi_page(wb, config_path=project_config_path)
 
+    # Patch 122jh — Manage classifiers moved above Features (user
+    # request): the classifier set is project setup, decided before
+    # computing and inspecting features.
+    from mufasa.ui_qt.pages.classifier_page import build_manage_classifiers_page
+    build_manage_classifiers_page(wb, config_path=project_config_path)
+
     from mufasa.ui_qt.pages.features_page import build_features_page
     build_features_page(wb, config_path=project_config_path)
 
@@ -88,13 +94,11 @@ def build_workbench(project_config_path: str | None = None
     # labelling); training / validation / inference AFTER Annotation
     # (need labels first); YOLO at the tail (independent workflow).
     from mufasa.ui_qt.pages.classifier_page import (
-        build_manage_classifiers_page,
         build_run_inference_page,
         build_train_classifier_page,
         build_validate_classifier_page,
         build_yolo_pose_page,
     )
-    build_manage_classifiers_page(wb, config_path=project_config_path)
 
     from mufasa.ui_qt.pages.annotation_page import build_annotation_page
     build_annotation_page(wb, config_path=project_config_path)

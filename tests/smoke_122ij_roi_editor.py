@@ -251,10 +251,12 @@ W._on_save_clicked()
 W._load_video(0)
 asked.clear()
 answer["q"] = QMessageBox.No
+# 122jh: Apply to all copies the *selected* ROI only.
+W.shape_table.selectRow(0)
 W._on_apply_all_clicked()
 vb = ROILogic(config_path=cfg, video_path=str(vd / "vidB.mp4"))
-check("Apply to all asks first and says it replaces existing ROIs",
-      asked and "replaces the existing ROIs of 1 video" in asked[-1])
+check("Apply to all asks first and says the other ROIs are kept",
+      asked and "Their other ROIs are kept" in asked[-1])
 check("declining leaves the other videos untouched",
       vb.all_roi_names == ["rectangle_1"]
       and vb.get_roi("rectangle_1").geometry["topLeftX"] == 10)
