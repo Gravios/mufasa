@@ -8,6 +8,29 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122iw — README brought up to date with the project.**
+The README described an older Mufasa. Corrected against the code:
+license (said GPL v3; LICENSE is SimBA's BSD 3-Clause, modified, academic
+use only — badge and section fixed); install (`pip install -e .` gave no Qt —
+PySide6 is in the `qt` extra — now `.[qt]`, with the other extras listed and
+the Cython build noted; clone URL Gravios/mufasa; TensorFlow mention
+dropped); commands (`mufasa-preview` added, removed-command history cut to
+one line); a table of the workbench pages; the standalone Kalman v2 command;
+project tree (`derived/pose|interpolated|smoothed/kalman_v2/<run_id>`,
+publishing into `outlier_corrected`, per-family features, flat labels /
+classifications, `models/` for Kalman models + classifiers,
+`logs/measures/rois.json`, `backups/`); importers (FreeDLC first); docs
+table (Kalman design docs, testing workflow, CHANGELOG); "Relationship to
+SimBA" now says how Mufasa diverged (own formats, no SimBA projects) instead
+of "core algorithms are identical"; citation asks for SimBA for the
+classifier pipeline. `docs/v1_project_layout.md` got the same tree, a
+corrected `derived/` table and `models/` section, rois.json, and lost
+"Both layouts remain supported".
+smoke_122iw_readme_current: 22/22 — each README fact checked against its
+source (pyproject scripts and extras, page titles, import form, layout code,
+LICENSE, smoother flags, links). 122df's GPL check now checks the README
+names LICENSE's license. README/doc tripwires pass; 122cn as before.
+
 **122iv — banner tool icons head their doc sections.**
 The banner's three tool tiles are standalone SVGs: `docs/images/icon_smoothing.svg`,
 `icon_roi.svg`, `icon_classifiers.svg`. As in neurosuite-3's README, a new

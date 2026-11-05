@@ -15,26 +15,25 @@ A v1 Mufasa project is a directory containing a `project.toml` file plus a struc
 ```
 my_project/
 ├── project.toml                    ← project metadata; layout marker
-├── sources/                        ← inputs you provide
+├── sources/                        ← inputs you provide; never written
 │   ├── videos/
 │   ├── pose/
 │   ├── annotations/                ← optional, for supervised training
-│   └── video_info.csv
-├── derived/                        ← pipeline-stage outputs (per-run)
-│   ├── outlier_corrected/
-│   │   └── 20260319-104230-a3f1b9/
-│   ├── features/
-│   │   └── 20260319-110045-c8d2e7/
-│   ├── labels/                     ← supervised training targets
-│   ├── classifications/            ← per-video predictions (flat)
-│   ├── directionality/
-│   └── frames/
-│       ├── extracted/
-│       └── annotated/
-├── models/                         ← trained classifiers
-└── logs/                           ← run logs, ROI definitions, measures
-    └── measures/
-        └── ROI_definitions.h5
+│   └── video_info.csv              ← calibration: fps, resolution, pixels/mm
+├── derived/                        ← pipeline-stage outputs
+│   ├── pose/20260319-104230-a3f1b9/            ← import run (links to sources/pose)
+│   ├── interpolated/<run_id>/
+│   ├── smoothed/kalman_v2/<run_id>/
+│   ├── outlier_corrected/<run_id>/             ← downstream input; runs published here
+│   ├── features/<family>/<video>.parquet
+│   ├── labels/<video>.parquet
+│   ├── classifications/<video>.parquet
+│   └── plots/ · frames/{extracted,annotated}/ · directionality/ · …
+├── models/                         ← Kalman models and classifiers
+├── logs/                           ← run logs and project-wide measures
+│   └── measures/
+│       └── rois.json               ← ROI definitions for every video
+└── backups/                        ← snapshots before in-place edits
 ```
 
 Compare to the legacy SimBA layout, where everything lives flat under `<project>/csv/`, `<project>/videos/`, etc., with no run separation.
@@ -48,7 +47,7 @@ The legacy layout has two problems v1 fixes:
 * **No run separation.** Re-running outlier correction with different parameters overwrites the previous output. v1's per-run subdirectories (`derived/<stage>/<run_id>/`) preserve every run; the latest is the default unless code explicitly picks an older one.
 * **Inconsistent grouping.** Legacy mixes inputs (`videos/`), intermediate pipeline outputs (`csv/features_extracted/`), final outputs (`csv/machine_results/`), and provenance (`logs/`) in a single flat tree. v1 separates them into `sources/` (inputs you provide), `derived/` (computed), `models/` (trained), `logs/` (provenance).
 
-Both layouts remain supported. The detection rule everywhere is the config-file extension: `.toml` → v1, `.ini` → legacy.
+Only the v1 layout is supported; legacy SimBA projects (`project_config.ini`) are not read (support removed in patches 122dw–122dz).
 
 ---
 
@@ -63,7 +62,7 @@ Inputs you provide. Pipeline reads these; never writes to them.
 | `sources/videos/` | Video files. Subdirectories OK; the workbench's video picker recurses. |
 | `sources/pose/` | Raw pose estimation outputs (DLC, SLEAP, MARS, etc.) prior to outlier correction. |
 | `sources/annotations/` | Per-video annotation CSVs (one row per frame) used as training targets. Optional. |
-| `sources/video_info.csv` | Per-video metadata: pixels/mm, fps, resolution. Edited via Data Import → Video parameters. |
+| `sources/video_info.csv` | Per-video metadata: pixels/mm, fps, resolution. Edited via Preprocessing → Video Calibration ("Save calibration"). |
 
 ### `derived/`
 
@@ -71,9 +70,12 @@ Pipeline-stage outputs. Each major stage has its own subdirectory; within most o
 
 | Stage | Path | Run-scoped? | Notes |
 |---|---|---|---|
-| Outlier correction | `derived/outlier_corrected/<run_id>/` | Yes | Movement + location outlier-corrected pose. |
-| Feature extraction | `derived/features/<run_id>/` | Yes | Per-frame feature vectors. |
-| Labels (targets) | `derived/labels/<run_id>/` | Yes | Inserted training targets aligned with features. |
+| Pose import | `derived/pose/<run_id>/` | Yes | Relative links to the imported files in `sources/pose/`. |
+| Interpolation | `derived/interpolated/<run_id>/` | Yes | Missing frames filled. |
+| Kalman v2 smoothing | `derived/smoothed/kalman_v2/<run_id>/` | Yes | `<video>_smoothed_v2.<hash>.parquet` plus `run.toml`. |
+| Outlier correction | `derived/outlier_corrected/<run_id>/` | Yes | The pose that downstream stages read. Import, interpolation and smoothing runs are *published* here as relative links, renamed to plain video names so ROIs and calibration match. |
+| Feature extraction | `derived/features/<family>/<video>.parquet` | No (per family) | One subtree per feature family, so families can be added incrementally (122ae). |
+| Labels (targets) | `derived/labels/<video>.parquet` | No (flat) | Training targets aligned with features; edited in place. |
 | Classifications | `derived/classifications/` | No (flat) | Per-video predictions; one parquet per video. Patch 122ax decision: flat for simpler downstream reads. |
 | Directionality | `derived/directionality/` | No (flat) | Animal-to-animal directing data. |
 | Frame extraction | `derived/frames/extracted/<video>/` | No | Per-video extracted frame dumps. |
@@ -83,17 +85,17 @@ When a backend needs the "current data" for a stage, it picks the latest run (le
 
 ### `models/`
 
-Trained classifiers. One subdirectory per model:
+Trained models.
 
 ```
 models/
-└── attack_v3/
-    ├── model.npz              ← the trained model
-    ├── training.toml          ← hyperparameters used (saved at train time)
-    └── inference.toml         ← inference settings (threshold, min-bout-len, etc.)
+├── 20260319-104230-a3f1b9/
+│   ├── model.npz              ← fitted Kalman v2 smoother model
+│   └── card.toml              ← where it came from (source path, hash)
+└── attack.sav                 ← trained classifier (or .onnx with the onnx extra)
 ```
 
-Models can also live in a global cache at `~/.config/mufasa/models/<name>.npz`; `mufasa.project_layout.import_model_into_project` mirrors between the two.
+Kalman models are mirrored to a global cache at `~/.config/mufasa/models/` so a model fitted in one project can be loaded in another (`import_model_into_project` / `mirror_model_to_global_cache` in `mufasa.project_layout`). Classifier training and inference settings are not separate files; they live in `project.toml` under `[classifier_training]` and `[classifier_inference.<name>]`.
 
 ### `logs/`
 
@@ -101,7 +103,7 @@ Run-level logs and project-wide measures.
 
 | Path | Contents |
 |---|---|
-| `logs/measures/ROI_definitions.h5` | User-defined ROI shapes. |
+| `logs/measures/rois.json` | ROI shapes for every video, keyed by video name (122il; replaces SimBA's `ROI_definitions.h5`). |
 | `logs/measures/pose_configs/` | Pose configuration metadata. |
 | `logs/<run_id>/run.toml` | Per-run provenance (parameters, input refs, completion status). |
 
@@ -181,7 +183,7 @@ paths = project_paths_from_config(config_path="my_project/project.toml")
 #   "logs_dir":                      "/abs/path/to/my_project/logs",
 #   "video_info_path":               "/abs/path/to/my_project/sources/video_info.csv",
 #   "models_dir":                    "/abs/path/to/my_project/models",
-#   "roi_definitions_path":          ".../logs/measures/ROI_definitions.h5",
+#   "roi_definitions_path":          ".../logs/measures/rois.json",
 #   "derived_features_dir":          ".../derived/features",
 #   "derived_labels_dir":            ".../derived/labels",
 #   "derived_classifications_dir":   ".../derived/classifications",

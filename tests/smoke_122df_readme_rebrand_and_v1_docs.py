@@ -85,9 +85,15 @@ def main() -> int:
     )
 
     # 3. License preserved
+    # Patch 122iw: the README said GPL v3, but LICENSE is SimBA's BSD
+    # 3-Clause (modified, academic use only). Check the README names
+    # the license LICENSE actually holds.
+    license_src = (REPO_ROOT / "LICENSE").read_text()
     check(
-        "README has License section with GPL v3",
-        "## License" in readme and "GPL v3" in readme,
+        "README License section matches LICENSE (BSD 3-Clause, academic)",
+        "## License" in readme
+        and "BSD 3-Clause" in license_src and "BSD 3-Clause" in readme
+        and "GPL" not in readme,
     )
 
     # 4. Acknowledgments

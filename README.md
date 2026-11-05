@@ -7,18 +7,19 @@
   </picture>
 </p>
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: BSD-3-Clause (academic use)](https://img.shields.io/badge/License-BSD--3--Clause%20(academic)-blue.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![GUI: PySide6 / Qt 6.8](https://img.shields.io/badge/GUI-PySide6%2FQt%206.8-green.svg)](https://www.qt.io/)
 [![Platform: Linux](https://img.shields.io/badge/Platform-Linux-orange.svg)](#)
 
-Mufasa is a fork of [SimBA (sgoldenlab/simba)](https://github.com/sgoldenlab/simba) targeting Linux, Python ≥ 3.11, and PySide6 (Qt 6.8). The legacy Tkinter GUI has been retired; the Qt workbench is the only supported entry surface.
+Mufasa smooths pose-tracking data and analyses animal behavior from it: Kalman smoothing of tracked markers, regions of interest, feature extraction and supervised behavior classifiers, in one Qt workbench for Linux. It works with any animal a pose tracker can follow, from invertebrates to humans.
 
-It provides:
+Mufasa began as a fork of [SimBA](https://github.com/sgoldenlab/simba) and keeps its classification pipeline, but has its own project layout and file formats and does not read SimBA projects.
 
-* **Pose-data import** from many trackers (DLC, SLEAP, MARS, TRK, FaceMap, YOLO, SuperAnimal-TopView, SimBA blob).
-* **Pipeline stages** — outlier correction, feature extraction, supervised classifier training and inference, ROI analysis, directionality, classification visualization.
-* **v1 project layout** (`project.toml`-driven, run-id-scoped) — the only supported layout. Run separation under `derived/<stage>/<run_id>/` makes provenance, diffing, and parallel exploration straightforward. (Legacy SimBA `project_config.ini` support was removed across patches 122dw–122dz; see CHANGELOG for details.)
+* **Pose import** from FreeDLC, DeepLabCut (CSV / H5, single- and multi-animal), SLEAP (.slp / H5 / CSV), MARS, TRK, FaceMap, YOLO-pose and SuperAnimal-TopView.
+* **Preprocessing**: video calibration, interpolation of missing frames, Kalman v2 smoothing, outlier correction and egocentric alignment.
+* **Analysis**: ROIs, feature extraction, behavior labelling, classifier training, validation and inference, visualizations, and add-ons (cue lights, Kleinberg burst smoothing, pup retrieval, spontaneous alternation and more).
+* **Projects** with separate read-only inputs (`sources/`) and regenerable outputs (`derived/`); each run of the pose stages (import, interpolation, smoothing, outlier correction) gets its own directory and a `run.toml` recording what produced it.
 
 ## The tools
 
@@ -60,56 +61,89 @@ Docs: [workflows.md (Stages 5–8)](docs/workflows.md) · [workflow_recipes.md](
 
 ## Running Mufasa
 
-After `pip install -e .`, two console entry points are installed:
-
 | Command | What it does |
 |---|---|
-| `mufasa` | Smart launcher with environment diagnostics; opens the Qt workbench. |
-| `mufasa-workbench` | Direct workbench launch (no env diagnostics). |
+| `mufasa` | Opens the Qt workbench after checking the environment (OpenCV, FFmpeg, …) and reporting anything missing. |
+| `mufasa-workbench` | Opens the workbench directly, without the environment check. |
+| `mufasa-preview` | Pose-overlay viewer: plays a video with its raw and smoothed markers, pairing files by session name (`--video`, or `--folder` to search a directory). |
 
-The legacy `mufasa-tk` Tkinter launcher was **Removed in patch 122d4**; the `python -m mufasa.SimBA` entry point followed in patch 122d5. The Qt workbench replaces both. The `mufasa-migrate-project` entry point (added in patch 122dp) was **Removed in patch 122dw** along with the entire migration tool — v1 is the only supported project layout going forward. The `mufasa-chooser` entry point (the legacy Qt chooser at `mufasa.ui_qt.app:main`) was **Removed in patch 122dx** — the workbench's Projects page covers create/load/recent-project flows so a separate chooser surface was redundant.
+The workbench sidebar follows the pipeline:
+
+| Page | What it covers |
+|---|---|
+| Projects | Create, open and inspect projects. |
+| Data Import · Data inspector · Model modifications | Import pose data and videos, check column names, rename markers. |
+| Preprocessing | Video preprocessing and calibration, interpolation, Kalman v2 smoothing, outlier correction, egocentric alignment. |
+| ROI | Draw ROIs, analyse and visualise them, compute ROI features. |
+| Features | Compute feature families from the smoothed pose. |
+| Manage classifiers · Annotation · Train · Validate · Inference | Behavior labelling and the classifier workflow. |
+| YOLO pose | Train and run YOLO pose models. |
+| Analysis · Visualizations | Statistics over movement and classifications (aggregates, time bins, severity), plots and videos. |
+| Video Processing · Add-ons · Tools | Video utilities, task-specific analyses, format conversion. |
+
+The Kalman v2 smoother also runs without a project:
+
+```bash
+python -m mufasa.data_processors.kalman_pose_smoother_v2 session.parquet --beside-input
+```
+
+It takes CSV or parquet pose files (including FreeDLC runs), finds the project's skeleton when the file sits inside a project, and writes `<stem>_smoothed_v2.<hash>.parquet` next to the input. `--save-model` / `--load-model` save a fitted model and reuse it on other sessions.
+
+Removed commands: `mufasa-tk` (Removed in patch 122d4, along with the Tk GUI), `mufasa-migrate-project` (122dw; only the v1 layout is supported) and `mufasa-chooser` (122dx; replaced by the workbench's Projects page).
 
 ## Project layout
 
-Mufasa uses the v1 project layout. Projects are configured via `project.toml`.
-
-**v1 layout:**
+Mufasa uses the v1 layout, configured by `project.toml`:
 
 ```
 my_project/
-├── project.toml                ← layout marker + metadata
-├── sources/
+├── project.toml                    ← project metadata, pose config, skeleton, settings
+├── sources/                        ← inputs; never written by the pipeline
 │   ├── videos/
-│   ├── pose/
-│   ├── annotations/            (optional, for training)
-│   └── video_info.csv
-├── derived/
-│   ├── outlier_corrected/<run_id>/
-│   ├── features/<run_id>/
-│   ├── labels/<run_id>/
-│   ├── classifications/        (flat; one parquet per video)
-│   ├── directionality/
-│   └── frames/{extracted,annotated}/
-├── models/
-└── logs/
-    └── measures/ROI_definitions.h5
+│   ├── pose/                       ← tracker output as imported
+│   ├── annotations/                ← optional
+│   └── video_info.csv              ← calibration: fps, resolution, pixels/mm
+├── derived/                        ← generated; safe to delete and regenerate
+│   ├── pose/<run_id>/              ← import runs (links into sources/pose)
+│   ├── interpolated/<run_id>/
+│   ├── smoothed/kalman_v2/<run_id>/
+│   ├── outlier_corrected/<run_id>/ ← what downstream stages read; smoothing and
+│   │                                 interpolation runs are published here
+│   ├── features/<family>/<video>.parquet
+│   ├── labels/<video>.parquet
+│   ├── classifications/<video>.parquet
+│   └── plots/ · frames/ · …        ← visualisation and analysis outputs
+├── models/                         ← Kalman models (model.npz + card.toml), classifiers
+├── logs/
+│   └── measures/rois.json          ← ROI definitions for every video
+└── backups/                        ← snapshots taken before in-place edits (e.g. marker renames)
 ```
 
-See [`docs/v1_project_layout.md`](docs/v1_project_layout.md) for the full v1 reference (directory contents, run-id semantics, the path-abstraction layer for backend code).
+Run ids are `YYYYMMDD-HHMMSS-<6 hex>`, so the latest run sorts last; downstream stages read the latest run unless told otherwise. Derived data is stored as parquet. Fitted Kalman models are also mirrored to `~/.config/mufasa/models/` so they can be reused across projects.
+
+See [`docs/v1_project_layout.md`](docs/v1_project_layout.md) for the full reference.
 
 ## Installation
 
 ```bash
-git clone https://github.com/<your-fork>/mufasa.git
+git clone https://github.com/Gravios/mufasa.git
 cd mufasa
-python3.11 -m venv .venv
+python3 -m venv .venv            # Python 3.11 or later
 source .venv/bin/activate
-pip install -e .
+pip install -e ".[qt]"
 ```
 
-Requires Python 3.11 or later. Optional dependencies: GPU-enabled PyTorch / TensorFlow / FFmpeg for video-heavy workflows.
+The `qt` extra installs PySide6, which the workbench needs. Native Cython kernels are compiled during install, so a C compiler must be available. Other extras:
 
-After install, run `mufasa` to open the workbench. On first launch the smart launcher checks for missing native deps (OpenCV, FFmpeg, etc.) and prints what's missing if anything; the workbench still loads regardless.
+| Extra | Adds |
+|---|---|
+| `gpu` | CuPy for CUDA 12 (Numba's CUDA backend is used as well). |
+| `onnx` | ONNX export and onnxruntime inference for classifiers. |
+| `nvenc` | Marker only: hardware video encoding needs a system FFmpeg built with NVENC. |
+| `dev` | pytest, pytest-qt, ruff, mypy, pre-commit. |
+| `all` | All of the above. |
+
+Run `mufasa` to open the workbench.
 
 ## Documentation
 
@@ -119,34 +153,35 @@ User-facing:
 
 | Doc | When to read |
 |---|---|
-| [`docs/v1_project_layout.md`](docs/v1_project_layout.md) | Creating a v1 project, understanding the directory layout. |
+| [`docs/v1_project_layout.md`](docs/v1_project_layout.md) | Project layout, run ids, where each stage writes. |
 | [`docs/workflow_recipes.md`](docs/workflow_recipes.md) | Eleven end-to-end recipes for common experimental setups. |
-| [`docs/data_source_guides.md`](docs/data_source_guides.md) | Per-tracker import guide (DLC, SLEAP, MARS, etc.). |
+| [`docs/data_source_guides.md`](docs/data_source_guides.md) | Per-tracker import guide. |
+| [`docs/testing_workflow.md`](docs/testing_workflow.md) | Walking a parquet-pose project through the pipeline. |
 
-Developer-facing:
+Design and developer-facing:
 
 | Doc | When to read |
 |---|---|
-| [`docs/workflows.md`](docs/workflows.md) | Codebase audit: which workflow lives where, port status, known gaps. |
-| [`docs/hardwired_paths_audit.md`](docs/hardwired_paths_audit.md) | Path-abstraction triage rules + the 107-hit audit. |
+| [`docs/kalman_smoother_design.md`](docs/kalman_smoother_design.md) · [`docs/joint_model_design.md`](docs/joint_model_design.md) · [`docs/v2_next_steps_design.md`](docs/v2_next_steps_design.md) | How the Kalman smoother works and why. |
+| [`docs/workflows.md`](docs/workflows.md) | Which workflow lives where, port status, known gaps. |
 | [`docs/workflow_audit.md`](docs/workflow_audit.md) | Topological view of the system (pages, forms, backends, pipeline). |
-| [`docs/simba_death_cascade.md`](docs/simba_death_cascade.md) | Tk surface removal plan (now complete). |
-| [`docs/qt_workbench_known_issues.md`](docs/qt_workbench_known_issues.md) | QWI tracker. |
+| [`docs/qt_workbench_known_issues.md`](docs/qt_workbench_known_issues.md) | Known workbench issues. |
+| [`CHANGELOG.md`](CHANGELOG.md) | What landed in each patch. |
 
 ## Relationship to SimBA
 
-Mufasa is a soft fork of SimBA — the scientific intent, behavioral-analysis pipeline, and core algorithms are identical. The differences are infrastructural:
+Mufasa started as a fork of SimBA and has since diverged:
 
-* **GUI:** Qt (PySide6) instead of Tkinter. The Tk surface is entirely removed.
-* **Project layout:** v1 layout with per-run separation under `derived/<stage>/<run_id>/`.
-* **Platform:** Linux + Python 3.11+ only. Windows / macOS / older Pythons not supported.
-* **No PyPI distribution.** Mufasa is install-from-source. The SimBA `simba-uw-tf-dev` PyPI package is unaffected and remains the canonical SimBA distribution.
+* **GUI:** Qt (PySide6) workbench; the Tkinter GUI is gone.
+* **Smoothing:** a joint-state Kalman smoother over a kinematic skeleton, fit per video, replaces moving-average smoothing.
+* **Formats:** `project.toml` projects with `sources/` / `derived/` separation and per-run provenance, parquet throughout, ROIs in `rois.json`. SimBA projects (`project_config.ini`, `ROI_definitions.h5`) are not read.
+* **Platform:** Linux and Python 3.11+ only; install from source.
 
-If you're starting a new project and want the cross-platform GUI, PyPI distribution, and the broader SimBA tutorial ecosystem, use SimBA. If you're on Linux and want Qt + the v1 layout, use Mufasa.
+The feature extraction and random-forest classification pipeline is SimBA's. If you want SimBA's cross-platform GUI, PyPI package and tutorials, use [SimBA](https://github.com/sgoldenlab/simba).
 
 ## Citation
 
-If you use Mufasa in published work, **cite the original SimBA paper** — Mufasa is a re-skin of SimBA's pipeline, not a separate scientific contribution.
+If you use the feature-extraction or classifier pipeline in published work, cite the SimBA paper:
 
 ```bibtex
 @article{Goodwin2024,
@@ -168,17 +203,13 @@ If you use Mufasa in published work, **cite the original SimBA paper** — Mufas
 }
 ```
 
-Optional acknowledgment for Mufasa-specific features (v1 layout, Qt workbench, etc.) is welcome but not required.
-
 ## License
 
-GPL v3 — see [`LICENSE`](LICENSE).
-
-Inherited from SimBA's GPL v3 license; this is a derivative work.
+BSD 3-Clause License, modified for academic and research use only, inherited from SimBA. See [`LICENSE`](LICENSE); for commercial licensing contact the copyright holder named there.
 
 ## Acknowledgments
 
-Mufasa builds on the work of the SimBA project at the [Golden Lab, University of Washington](https://goldenneurolab.com/). Mufasa-specific changes are documented in the patch series (see `docs/simba_death_cascade.md` for the v1 migration history).
+Mufasa builds on the work of the SimBA project at the [Golden Lab, University of Washington](https://goldenneurolab.com/). Mufasa-specific changes are recorded patch by patch in [`CHANGELOG.md`](CHANGELOG.md).
 
 Original SimBA contributors:
 
@@ -186,4 +217,4 @@ Original SimBA contributors:
 * [Jia Jie Choong](https://github.com/inoejj)
 * [Sophia Hwang](https://github.com/sophihwang26)
 
-See [github.com/sgoldenlab/simba](https://github.com/sgoldenlab/simba) for the upstream project, the full contributor list, and the original SimBA documentation, tutorials, and scientific references.
+See [github.com/sgoldenlab/simba](https://github.com/sgoldenlab/simba) for the upstream project, the full contributor list, and the original SimBA documentation, tutorials and scientific references.
