@@ -4,8 +4,9 @@ mufasa.ui_qt.forms.feature_visualization
 
 Features → **Feature Visualization** (patch 122je).
 
-Pick a video and any computed features (filter by family, search by
-name), then:
+Pick a video and any computed features — shown as a tree, one branch per
+feature family (tick a family to take all its shown features; search
+filters across families) — then:
 
 * **Distributions** — a histogram per feature, for this video or pooled
   over all videos. With *Colour by* set to a behaviour, labelled frames
@@ -31,8 +32,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
     QMessageBox,
     QPushButton,
     QSizePolicy,
@@ -85,24 +86,29 @@ class FeatureVisualizationForm(OperationForm):
         self.body_layout.addLayout(row)
 
         frow = QHBoxLayout()
-        frow.addWidget(QLabel("Family:", self))
-        self.family_cb = QComboBox(self)
-        self.family_cb.currentIndexChanged.connect(self._fill_list)
-        frow.addWidget(self.family_cb, 2)
         self.search = QLineEdit(self)
         self.search.setPlaceholderText("Search features (space-separated words)…")
-        self.search.textChanged.connect(self._fill_list)
+        self.search.setClearButtonEnabled(True)
+        self.search.textChanged.connect(self._apply_filter)
         frow.addWidget(self.search, 3)
-        clear = QPushButton("Clear selection", self)
-        clear.clicked.connect(self._clear_selection)
-        frow.addWidget(clear)
+        for text, slot in (("Expand all", lambda: self.tree.expandAll()),
+                           ("Collapse all", lambda: self.tree.collapseAll()),
+                           ("Clear selection", self._clear_selection)):
+            b = QPushButton(text, self)
+            b.clicked.connect(slot)
+            frow.addWidget(b)
         self.body_layout.addLayout(frow)
 
-        self.list = QListWidget(self)
-        self.list.setMinimumHeight(150)
-        self.list.setMaximumHeight(220)
-        self.list.itemChanged.connect(self._on_item_changed)
-        self.body_layout.addWidget(self.list)
+        # Patch 122jf: features as a tree — one branch per feature family.
+        self.tree = QTreeWidget(self)
+        self.tree.setHeaderHidden(True)
+        self.tree.setColumnCount(1)
+        self.tree.setUniformRowHeights(True)
+        self.tree.setMinimumHeight(180)
+        self.tree.setMaximumHeight(300)
+        self.tree.itemChanged.connect(self._on_item_changed)
+        self._syncing = False
+        self.body_layout.addWidget(self.tree)
         self.sel_label = QLabel("", self)
         self.sel_label.setWordWrap(True)
         self.sel_label.setStyleSheet("color: palette(placeholder-text);")
@@ -184,19 +190,9 @@ class FeatureVisualizationForm(OperationForm):
         if video and self.config_path:
             from mufasa.utils.feature_io import feature_catalog
             self._catalog = feature_catalog(video, self.config_path)
-        self.family_cb.blockSignals(True)
-        fam = self.family_cb.currentData()
-        self.family_cb.clear()
-        n_all = sum(len(v) for v in self._catalog.values())
-        self.family_cb.addItem(f"All families ({n_all})", None)
-        for f, cols in self._catalog.items():
-            self.family_cb.addItem(f"{f.replace('_', ' ')} ({len(cols)})", f)
-        i = self.family_cb.findData(fam)
-        self.family_cb.setCurrentIndex(max(0, i))
-        self.family_cb.blockSignals(False)
         have = {c for cols in self._catalog.values() for c in cols}
         self._checked = [c for c in self._checked if c in have]
-        self._fill_list()
+        self._build_tree()
         self.video_btn.setEnabled(bool(self._videos.get(video)))
         self.video_btn.setToolTip("" if self._videos.get(video) else
                                   "This video is not in sources/videos")
@@ -207,42 +203,109 @@ class FeatureVisualizationForm(OperationForm):
                 return f
         return ""
 
-    def _fill_list(self, *_a) -> None:
-        from mufasa.tools.feature_plots import short_name
-        fam = self.family_cb.currentData()
-        words = [w.lower() for w in self.search.text().split()]
-        cols = self._catalog.get(fam, []) if fam else \
-            [c for cs in self._catalog.values() for c in cs]
-        self.list.blockSignals(True)
-        self.list.clear()
-        shown = 0
-        for c in cols:
-            low = c.lower()
-            if words and not all(w in low for w in words):
-                continue
-            it = QListWidgetItem(short_name(c))
-            it.setData(Qt.UserRole, c)
-            it.setToolTip(f"{c}\nfamily: {self._family_of(c)}")
-            it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
-            it.setCheckState(Qt.Checked if c in self._checked else Qt.Unchecked)
-            self.list.addItem(it)
-            shown += 1
-            if shown >= 3000:
-                break
-        self.list.blockSignals(False)
-        self._update_sel_label(shown, len(cols))
+    @staticmethod
+    def family_title(family: str) -> str:
+        return family.replace("_", " ")
 
-    def _on_item_changed(self, it: QListWidgetItem) -> None:
-        c = it.data(Qt.UserRole)
-        if it.checkState() == Qt.Checked and c not in self._checked:
-            self._checked.append(c)
-        elif it.checkState() != Qt.Checked and c in self._checked:
-            self._checked.remove(c)
+    def _build_tree(self) -> None:
+        """One top-level item per family, one checkable child per feature.
+        Expansion state is kept per family across rebuilds."""
+        from mufasa.tools.feature_plots import short_name
+        expanded = {self.tree.topLevelItem(i).data(0, Qt.UserRole)
+                    for i in range(self.tree.topLevelItemCount())
+                    if self.tree.topLevelItem(i).isExpanded()}
+        self._syncing = True
+        self.tree.clear()
+        for fam, cols in self._catalog.items():
+            top = QTreeWidgetItem([self.family_title(fam)])
+            top.setData(0, Qt.UserRole, fam)
+            top.setFlags(top.flags() | Qt.ItemIsUserCheckable)
+            top.setToolTip(0, f"{fam}\nTick to select every (shown) feature of this family")
+            f = top.font(0)
+            f.setBold(True)
+            top.setFont(0, f)
+            for c in cols:
+                ch = QTreeWidgetItem([short_name(c)])
+                ch.setData(0, Qt.UserRole, c)
+                ch.setToolTip(0, c)
+                ch.setFlags(ch.flags() | Qt.ItemIsUserCheckable)
+                ch.setCheckState(0, Qt.Checked if c in self._checked else Qt.Unchecked)
+                top.addChild(ch)
+            self.tree.addTopLevelItem(top)
+            top.setExpanded(fam in expanded)
+        self._syncing = False
+        self._apply_filter()
+
+    def _children(self, top: QTreeWidgetItem) -> list[QTreeWidgetItem]:
+        return [top.child(i) for i in range(top.childCount())]
+
+    def _refresh_family(self, top: QTreeWidgetItem) -> None:
+        """Family checkbox (checked / partial / empty) and title counts."""
+        kids = self._children(top)
+        n_on = sum(k.checkState(0) == Qt.Checked for k in kids)
+        n_vis = sum(not k.isHidden() for k in kids)
+        fam = top.data(0, Qt.UserRole)
+        shown = f"{n_vis}/{len(kids)} shown · " if n_vis != len(kids) else ""
+        top.setText(0, f"{self.family_title(fam)}   ({shown}{n_on}/{len(kids)} selected)"
+                    if n_on else f"{self.family_title(fam)}   ({shown}{len(kids)})")
+        top.setCheckState(0, Qt.Checked if kids and n_on == len(kids)
+                          else Qt.PartiallyChecked if n_on else Qt.Unchecked)
+
+    def _apply_filter(self, *_a) -> None:
+        """Hide features not matching every search word; hide families with
+        no match; expand the families that match while searching."""
+        words = [w.lower() for w in self.search.text().split()]
+        self._syncing = True
+        shown = total = 0
+        for i in range(self.tree.topLevelItemCount()):
+            top = self.tree.topLevelItem(i)
+            n = 0
+            fam = (top.data(0, Qt.UserRole) or "").lower()
+            for ch in self._children(top):
+                low = ch.data(0, Qt.UserRole).lower() + " " + fam
+                hit = not words or all(w in low for w in words)
+                ch.setHidden(not hit)
+                n += hit
+            total += top.childCount()
+            shown += n
+            top.setHidden(n == 0)
+            if words and n:
+                top.setExpanded(True)
+            self._refresh_family(top)
+        self._syncing = False
+        self._update_sel_label(shown, total)
+
+    def _on_item_changed(self, it: QTreeWidgetItem, _col: int = 0) -> None:
+        if self._syncing:
+            return
+        self._syncing = True
+        try:
+            if it.parent() is None:
+                # family checkbox: (un)select its *shown* features
+                on = it.checkState(0) != Qt.Unchecked
+                for ch in self._children(it):
+                    if ch.isHidden():
+                        continue
+                    ch.setCheckState(0, Qt.Checked if on else Qt.Unchecked)
+                    self._track(ch)
+                self._refresh_family(it)
+            else:
+                self._track(it)
+                self._refresh_family(it.parent())
+        finally:
+            self._syncing = False
         self._update_sel_label()
+
+    def _track(self, ch: QTreeWidgetItem) -> None:
+        c = ch.data(0, Qt.UserRole)
+        if ch.checkState(0) == Qt.Checked and c not in self._checked:
+            self._checked.append(c)
+        elif ch.checkState(0) != Qt.Checked and c in self._checked:
+            self._checked.remove(c)
 
     def _clear_selection(self) -> None:
         self._checked = []
-        self._fill_list()
+        self._build_tree()
 
     def _update_sel_label(self, shown: int | None = None, total: int | None = None) -> None:
         from mufasa.tools.feature_plots import short_name
@@ -262,7 +325,7 @@ class FeatureVisualizationForm(OperationForm):
 
     def set_selected(self, cols: list[str]) -> None:
         self._checked = list(cols)
-        self._fill_list()
+        self._build_tree()
 
     # ------------------------------------------------------------------ #
     # Data

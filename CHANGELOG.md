@@ -8,6 +8,19 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jf — Feature Visualization: features as a tree by family.**
+The family drop-down and flat list are replaced by a tree: one bold branch
+per feature family, its features as checkable leaves. A family's checkbox
+shows none / some / all selected and its title the counts ("1/3
+selected", "2/455 shown" while searching); ticking a family takes all its
+*shown* features, so search + family tick selects a subset. Search matches
+every word against feature and family names, hides families with no
+match and expands the rest. Expand all / Collapse all; expansion and
+selection survive rebuilds (video change, Clear selection).
+smoke_122je_feature_visualization: 38/38 (tree structure, counts,
+partial / full family states, family tick under a search, search over
+family names, rebuild persistence).
+
 **122je — Features → Feature Visualization.**
 New section on the Features page (`FeatureVisualizationForm`). Pick a video,
 filter features by family and by search words, tick any number (the

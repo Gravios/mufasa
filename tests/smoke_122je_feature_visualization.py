@@ -112,25 +112,65 @@ form.show()
 app.processEvents()
 check("videos with features are listed", [form.video_cb.itemText(i)
       for i in range(form.video_cb.count())] == ["v1", "v2", "v3"])
-check("families are offered with column counts",
-      [form.family_cb.itemText(i) for i in range(form.family_cb.count())]
-      == ["All families (3)", "head velocity in body frame mm s (1)",
-          "two point body part distances mm (2)"])
+T = form.tree
+
+
+def tops():
+    return [T.topLevelItem(i) for i in range(T.topLevelItemCount())]
+
+
+def kids(top):
+    return [top.child(i) for i in range(top.childCount())]
+
+
+def visible_features():
+    return [k.data(0, Qt.UserRole) for t_ in tops() if not t_.isHidden()
+            for k in kids(t_) if not k.isHidden()]
+
+
+check("features are a tree: one branch per family, columns underneath",
+      [t_.data(0, Qt.UserRole) for t_ in tops()]
+      == ["head_velocity_in_body_frame_mm_s", "two_point_body_part_distances_mm"]
+      and [len(kids(t_)) for t_ in tops()] == [1, 2])
+check("family titles show the feature count",
+      tops()[1].text(0) == "two point body part distances mm   (2)")
 check("behaviours offered for colouring",
       [form.colour_cb.itemText(i) for i in range(form.colour_cb.count())] == ["(none)", "rear"])
-check("list shows names without the _FEATURE_SUBSET suffix",
-      form.list.item(0).text() == H_COL.replace("_FEATURE_SUBSET", ""))
+check("features shown without the _FEATURE_SUBSET suffix",
+      kids(tops()[0])[0].text(0) == H_COL.replace("_FEATURE_SUBSET", ""))
 form.search.setText("distance nose")
-check("search matches all words", form.list.count() == 1
-      and form.list.item(0).data(Qt.UserRole).endswith("a nose_FEATURE_SUBSET"))
+check("search matches all words and hides empty families",
+      visible_features() == ["Animal_1 distance (mm) a nose_FEATURE_SUBSET"]
+      and tops()[0].isHidden() and tops()[1].isExpanded()
+      and "1/2 shown" in tops()[1].text(0))
+form.search.setText("velocity")
+check("search also matches the family name",
+      visible_features() == [H_COL])
 form.search.setText("")
-form.family_cb.setCurrentIndex(2)
-check("family filter", form.list.count() == 2)
-form.list.item(0).setCheckState(Qt.Checked)
-form.family_cb.setCurrentIndex(1)
-form.list.item(0).setCheckState(Qt.Checked)
-form.family_cb.setCurrentIndex(0)
-check("selection survives filtering, in tick order", form.selected_features() == [D_COL, H_COL])
+dist, hv = tops()[1], tops()[0]
+kids(dist)[0].setCheckState(0, Qt.Checked)
+check("ticking one feature makes its family partially checked, with a count",
+      dist.checkState(0) == Qt.PartiallyChecked and "1/2 selected" in dist.text(0))
+hv.setCheckState(0, Qt.Checked)
+check("ticking a family selects all its features",
+      kids(hv)[0].checkState(0) == Qt.Checked and hv.checkState(0) == Qt.Checked)
+check("selection keeps tick order across families", form.selected_features() == [D_COL, H_COL])
+form.search.setText("nose")
+dist.setCheckState(0, Qt.Checked)
+form.search.setText("")
+check("ticking a family while searching takes only its shown features",
+      form.selected_features() == [D_COL, H_COL, "Animal_1 distance (mm) a nose_FEATURE_SUBSET"]
+      and dist.checkState(0) == Qt.Checked)
+dist.setCheckState(0, Qt.Unchecked)
+check("unticking a family clears its features", form.selected_features() == [H_COL])
+form.set_selected([D_COL, H_COL])
+check("selection survives rebuilding the tree",
+      tops()[1].checkState(0) == Qt.PartiallyChecked and tops()[0].checkState(0) == Qt.Checked)
+form.tree.collapseAll()
+form.tree.topLevelItem(1).setExpanded(True)
+form.set_selected([D_COL, H_COL])
+check("expansion state survives a rebuild", form.tree.topLevelItem(1).isExpanded()
+      and not form.tree.topLevelItem(0).isExpanded())
 check("selection summary", "2 selected" in form.sel_label.text())
 
 form.colour_cb.setCurrentText("rear")
