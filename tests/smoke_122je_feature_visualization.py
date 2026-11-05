@@ -129,7 +129,7 @@ def visible_features():
 
 
 check("features are a tree: one branch per family, columns underneath",
-      [t_.data(0, Qt.UserRole) for t_ in tops()]
+      [t_.data(0, Qt.UserRole + 1)[1] for t_ in tops()]
       == ["head_velocity_in_body_frame_mm_s", "two_point_body_part_distances_mm"]
       and [len(kids(t_)) for t_ in tops()] == [1, 2])
 check("family titles show the feature count",
@@ -139,14 +139,17 @@ check("behaviours offered for colouring",
 check("features shown without the _FEATURE_SUBSET suffix",
       kids(tops()[0])[0].text(0) == H_COL.replace("_FEATURE_SUBSET", ""))
 form.search.setText("distance nose")
+form._apply_filter()
 check("search matches all words and hides empty families",
       visible_features() == ["Animal_1 distance (mm) a nose_FEATURE_SUBSET"]
       and tops()[0].isHidden() and tops()[1].isExpanded()
       and "1/2 shown" in tops()[1].text(0))
 form.search.setText("velocity")
+form._apply_filter()
 check("search also matches the family name",
       visible_features() == [H_COL])
 form.search.setText("")
+form._apply_filter()
 dist, hv = tops()[1], tops()[0]
 kids(dist)[0].setCheckState(0, Qt.Checked)
 check("ticking one feature makes its family partially checked, with a count",
@@ -156,8 +159,10 @@ check("ticking a family selects all its features",
       kids(hv)[0].checkState(0) == Qt.Checked and hv.checkState(0) == Qt.Checked)
 check("selection keeps tick order across families", form.selected_features() == [D_COL, H_COL])
 form.search.setText("nose")
+form._apply_filter()
 dist.setCheckState(0, Qt.Checked)
 form.search.setText("")
+form._apply_filter()
 check("ticking a family while searching takes only its shown features",
       form.selected_features() == [D_COL, H_COL, "Animal_1 distance (mm) a nose_FEATURE_SUBSET"]
       and dist.checkState(0) == Qt.Checked)

@@ -8,6 +8,26 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jg — feature tree compacted by shared name parts.**
+Inside each family the wording all its features share is dropped from the
+leaves and shown once beside the family (`Angle (degrees) …`,
+`Animal_1 … video edge distance (mm)`), and features are grouped by their
+first differing component — the first body part — with a second level when
+a group would still hold more than 24 (455 three-point angles of 15 markers
+→ 13 body-part groups → sub-groups by the second body part; 1365 four-point
+hulls likewise). Singletons and small families stay flat. Groups and
+sub-groups have their own none / some / all checkbox with counts; a tick
+selects their shown features. Search matches feature, group and family
+names. "Group by name parts" switches to flat leaves (still without the
+shared wording). Expansion is remembered by node path across rebuilds and
+view toggles. Search is debounced (200 ms); building / ticking a 2455-leaf
+tree takes < 1 s / ~0.1 s.
+Qt-free grouping in `feature_plots.compact_family` / `Node`.
+smoke_122jg_feature_tree_compact: 20/20 (real feature-name shapes of the
+15-marker layout: templates, grouping levels, loose leaves, every column
+once; tree states, counts, group / family ticks under search, flat toggle,
+expansion memory, debounce). smoke_122je_feature_visualization 38/38.
+
 **122jf — Feature Visualization: features as a tree by family.**
 The family drop-down and flat list are replaced by a tree: one bold branch
 per feature family, its features as checkable leaves. A family's checkbox

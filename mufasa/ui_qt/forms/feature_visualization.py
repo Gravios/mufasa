@@ -89,8 +89,23 @@ class FeatureVisualizationForm(OperationForm):
         self.search = QLineEdit(self)
         self.search.setPlaceholderText("Search features (space-separated words)…")
         self.search.setClearButtonEnabled(True)
-        self.search.textChanged.connect(self._apply_filter)
+        # debounce: re-filter 200 ms after the last keystroke (big trees)
+        from PySide6.QtCore import QTimer
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(200)
+        self._search_timer.timeout.connect(self._apply_filter)
+        self.search.textChanged.connect(lambda _t: self._search_timer.start())
         frow.addWidget(self.search, 3)
+        from PySide6.QtWidgets import QCheckBox
+        self.compact_cb = QCheckBox("Group by name parts", self)
+        self.compact_cb.setChecked(True)
+        self.compact_cb.setToolTip(
+            "Inside each family, group features by the parts of their names "
+            "they share (usually the first body part), dropping the wording "
+            "every feature of the family has in common")
+        self.compact_cb.toggled.connect(lambda _on: self._build_tree())
+        frow.addWidget(self.compact_cb)
         for text, slot in (("Expand all", lambda: self.tree.expandAll()),
                            ("Collapse all", lambda: self.tree.collapseAll()),
                            ("Clear selection", self._clear_selection)):
@@ -102,11 +117,18 @@ class FeatureVisualizationForm(OperationForm):
         # Patch 122jf: features as a tree — one branch per feature family.
         self.tree = QTreeWidget(self)
         self.tree.setHeaderHidden(True)
-        self.tree.setColumnCount(1)
+        self.tree.setColumnCount(2)
+        from PySide6.QtWidgets import QHeaderView
+        self.tree.header().setStretchLastSection(True)
+        self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.tree.setUniformRowHeights(True)
         self.tree.setMinimumHeight(180)
         self.tree.setMaximumHeight(300)
         self.tree.itemChanged.connect(self._on_item_changed)
+        # expansion remembered by node path across rebuilds and view toggles
+        self._expanded: set[tuple] = set()
+        self.tree.itemExpanded.connect(self._on_expanded)
+        self.tree.itemCollapsed.connect(self._on_collapsed)
         self._syncing = False
         self.body_layout.addWidget(self.tree)
         self.sel_label = QLabel("", self)
@@ -207,94 +229,167 @@ class FeatureVisualizationForm(OperationForm):
     def family_title(family: str) -> str:
         return family.replace("_", " ")
 
+    # Tree: family → [component group → [sub-group →]] feature. Leaves carry
+    # the column in UserRole; families carry ("family", name) and groups
+    # ("group", label) in UserRole + 1.  (122jf / 122jg)
+    _KIND = Qt.UserRole + 1
+
     def _build_tree(self) -> None:
-        """One top-level item per family, one checkable child per feature.
-        Expansion state is kept per family across rebuilds."""
-        from mufasa.tools.feature_plots import short_name
-        expanded = {self.tree.topLevelItem(i).data(0, Qt.UserRole)
-                    for i in range(self.tree.topLevelItemCount())
-                    if self.tree.topLevelItem(i).isExpanded()}
+        """Families as branches; inside each, features grouped by shared
+        name components (patch 122jg, ``compact_family``). Expansion is
+        kept per node path across rebuilds."""
+        from mufasa.tools.feature_plots import compact_family
+        expanded = self._expanded
         self._syncing = True
         self.tree.clear()
         for fam, cols in self._catalog.items():
-            top = QTreeWidgetItem([self.family_title(fam)])
-            top.setData(0, Qt.UserRole, fam)
+            template, nodes = compact_family(cols) if self.compact_cb.isChecked() \
+                else compact_family(cols, min_family=10 ** 9)
+            top = QTreeWidgetItem([self.family_title(fam), template])
+            top.setData(0, self._KIND, ("family", fam))
             top.setFlags(top.flags() | Qt.ItemIsUserCheckable)
-            top.setToolTip(0, f"{fam}\nTick to select every (shown) feature of this family")
+            top.setToolTip(0, f"{fam}\nnames: {template or '(various)'}\n"
+                              "Tick to select every shown feature of this family")
+            top.setForeground(1, self.palette().placeholderText())
             f = top.font(0)
             f.setBold(True)
             top.setFont(0, f)
-            for c in cols:
-                ch = QTreeWidgetItem([short_name(c)])
-                ch.setData(0, Qt.UserRole, c)
-                ch.setToolTip(0, c)
-                ch.setFlags(ch.flags() | Qt.ItemIsUserCheckable)
-                ch.setCheckState(0, Qt.Checked if c in self._checked else Qt.Unchecked)
-                top.addChild(ch)
+            self._add_nodes(top, nodes)
             self.tree.addTopLevelItem(top)
-            top.setExpanded(fam in expanded)
+        for it in self._walk():
+            it.setExpanded(self._path(it) in expanded)
         self._syncing = False
         self._apply_filter()
 
-    def _children(self, top: QTreeWidgetItem) -> list[QTreeWidgetItem]:
-        return [top.child(i) for i in range(top.childCount())]
+    def _on_expanded(self, it: QTreeWidgetItem) -> None:
+        if not self._syncing:
+            self._expanded.add(self._path(it))
 
-    def _refresh_family(self, top: QTreeWidgetItem) -> None:
-        """Family checkbox (checked / partial / empty) and title counts."""
-        kids = self._children(top)
-        n_on = sum(k.checkState(0) == Qt.Checked for k in kids)
-        n_vis = sum(not k.isHidden() for k in kids)
-        fam = top.data(0, Qt.UserRole)
-        shown = f"{n_vis}/{len(kids)} shown · " if n_vis != len(kids) else ""
-        top.setText(0, f"{self.family_title(fam)}   ({shown}{n_on}/{len(kids)} selected)"
-                    if n_on else f"{self.family_title(fam)}   ({shown}{len(kids)})")
-        top.setCheckState(0, Qt.Checked if kids and n_on == len(kids)
-                          else Qt.PartiallyChecked if n_on else Qt.Unchecked)
+    def _on_collapsed(self, it: QTreeWidgetItem) -> None:
+        if not self._syncing:
+            self._expanded.discard(self._path(it))
+
+    def _add_nodes(self, parent: QTreeWidgetItem, nodes) -> None:
+        for n in nodes:
+            it = QTreeWidgetItem([n.label])
+            it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
+            if n.col is not None:
+                it.setData(0, Qt.UserRole, n.col)
+                it.setToolTip(0, n.col)
+                it.setCheckState(0, Qt.Checked if n.col in self._checked else Qt.Unchecked)
+            else:
+                it.setData(0, self._KIND, ("group", n.label))
+                it.setToolTip(0, f"{n.label}: {len(n.leaves())} features — tick to "
+                                 "select every shown one")
+                self._add_nodes(it, n.children)
+            parent.addChild(it)
+
+    def _walk(self, root: QTreeWidgetItem | None = None):
+        """Every item, depth first."""
+        items = ([self.tree.topLevelItem(i) for i in range(self.tree.topLevelItemCount())]
+                 if root is None else [root.child(i) for i in range(root.childCount())])
+        for it in items:
+            yield it
+            yield from self._walk(it)
+
+    def _path(self, it: QTreeWidgetItem) -> tuple:
+        out = []
+        while it is not None:
+            out.append(it.data(0, self._KIND) or it.data(0, Qt.UserRole))
+            it = it.parent()
+        return tuple(reversed(out))
+
+    @staticmethod
+    def _is_leaf(it: QTreeWidgetItem) -> bool:
+        return it.data(0, Qt.UserRole) is not None
+
+    def _children(self, it: QTreeWidgetItem) -> list[QTreeWidgetItem]:
+        return [it.child(i) for i in range(it.childCount())]
+
+    def _leaves(self, it: QTreeWidgetItem) -> list[QTreeWidgetItem]:
+        return [x for x in self._walk(it) if self._is_leaf(x)]
+
+    def _refresh_node(self, it: QTreeWidgetItem) -> None:
+        """Checkbox (none / some / all) and counts of a family or group."""
+        leaves = self._leaves(it)
+        n_on = sum(x.checkState(0) == Qt.Checked for x in leaves)
+        n_vis = sum(not x.isHidden() for x in leaves)
+        kind, name = it.data(0, self._KIND)
+        label = self.family_title(name) if kind == "family" else name
+        shown = f"{n_vis}/{len(leaves)} shown · " if n_vis != len(leaves) else ""
+        it.setText(0, f"{label}   ({shown}{n_on}/{len(leaves)} selected)" if n_on
+                   else f"{label}   ({shown}{len(leaves)})")
+        it.setCheckState(0, Qt.Checked if leaves and n_on == len(leaves)
+                         else Qt.PartiallyChecked if n_on else Qt.Unchecked)
+
+    def _refresh_up(self, it: QTreeWidgetItem | None) -> None:
+        while it is not None:
+            self._refresh_node(it)
+            it = it.parent()
+
+    def _refresh_all(self) -> None:
+        # deepest first so parents see their children's states
+        nodes = [it for it in self._walk() if not self._is_leaf(it)]
+        depth = {id(it): len(self._path(it)) for it in nodes}
+        for it in sorted(nodes, key=lambda x: -depth[id(x)]):
+            self._refresh_node(it)
 
     def _apply_filter(self, *_a) -> None:
-        """Hide features not matching every search word; hide families with
-        no match; expand the families that match while searching."""
+        """Hide features not matching every search word (feature, group and
+        family names all count); hide empty groups / families; open the
+        branches that hold matches while searching."""
         words = [w.lower() for w in self.search.text().split()]
         self._syncing = True
         shown = total = 0
-        for i in range(self.tree.topLevelItemCount()):
-            top = self.tree.topLevelItem(i)
-            n = 0
-            fam = (top.data(0, Qt.UserRole) or "").lower()
-            for ch in self._children(top):
-                low = ch.data(0, Qt.UserRole).lower() + " " + fam
-                hit = not words or all(w in low for w in words)
-                ch.setHidden(not hit)
-                n += hit
-            total += top.childCount()
-            shown += n
-            top.setHidden(n == 0)
-            if words and n:
-                top.setExpanded(True)
-            self._refresh_family(top)
+        for it in self._walk():
+            if not self._is_leaf(it):
+                continue
+            ctx = " ".join(str(p) for p in self._path(it)).lower()
+            hit = not words or all(w in ctx for w in words)
+            it.setHidden(not hit)
+            total += 1
+            shown += hit
+        nodes = [it for it in self._walk() if not self._is_leaf(it)]
+        for it in reversed(nodes):                   # children before parents
+            vis = any(not x.isHidden() for x in self._leaves(it))
+            it.setHidden(not vis)
+            if words and vis:
+                it.setExpanded(True)
+        self._refresh_all()
         self._syncing = False
         self._update_sel_label(shown, total)
 
     def _on_item_changed(self, it: QTreeWidgetItem, _col: int = 0) -> None:
-        if self._syncing:
+        if self._syncing or _col != 0:
             return
         self._syncing = True
         try:
-            if it.parent() is None:
-                # family checkbox: (un)select its *shown* features
-                on = it.checkState(0) != Qt.Unchecked
-                for ch in self._children(it):
-                    if ch.isHidden():
-                        continue
-                    ch.setCheckState(0, Qt.Checked if on else Qt.Unchecked)
-                    self._track(ch)
-                self._refresh_family(it)
-            else:
+            if self._is_leaf(it):
                 self._track(it)
-                self._refresh_family(it.parent())
+                self._refresh_up(it.parent())
+            else:
+                # family / group checkbox: (un)select its *shown* features
+                on = it.checkState(0) != Qt.Unchecked
+                for leaf in self._leaves(it):
+                    if self._hidden_in(leaf, it):
+                        continue
+                    leaf.setCheckState(0, Qt.Checked if on else Qt.Unchecked)
+                    self._track(leaf)
+                for sub in [x for x in self._walk(it) if not self._is_leaf(x)][::-1]:
+                    self._refresh_node(sub)
+                self._refresh_up(it)
         finally:
             self._syncing = False
         self._update_sel_label()
+
+    @staticmethod
+    def _hidden_in(leaf: QTreeWidgetItem, root: QTreeWidgetItem) -> bool:
+        x = leaf
+        while x is not None and x is not root:
+            if x.isHidden():
+                return True
+            x = x.parent()
+        return False
 
     def _track(self, ch: QTreeWidgetItem) -> None:
         c = ch.data(0, Qt.UserRole)

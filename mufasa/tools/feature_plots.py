@@ -20,6 +20,8 @@ workbench canvas and scripts / tests.
 from __future__ import annotations
 
 import math
+import re
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -189,4 +191,103 @@ def plot_over_time(fig, data: dict[str, np.ndarray], fps: float, *,
     return list(axes)
 
 
-__all__ = ["auc", "plot_distributions", "plot_joint", "plot_over_time", "short_name"]
+# ---------------------------------------------------------------------- #
+# Compact naming for the feature tree (patch 122jg)
+# ---------------------------------------------------------------------- #
+_SEP = re.compile(r"(\s+|-)")
+
+
+def _tokens(s: str) -> list[str]:
+    """Split on spaces and '-', keeping the separators (so the pieces
+    re-join to the original string)."""
+    return [t for t in _SEP.split(s) if t != ""]
+
+
+def _common_prefix(seqs: list[list[str]]) -> int:
+    n = min(len(x) for x in seqs)
+    k = 0
+    while k < n and all(x[k] == seqs[0][k] for x in seqs):
+        k += 1
+    return k
+
+
+@dataclass
+class Node:
+    """Feature-tree node: a group (``col`` None, ``children``) or a leaf."""
+    label: str
+    col: str | None = None
+    children: list["Node"] = field(default_factory=list)
+
+    def leaves(self) -> list["Node"]:
+        if self.col is not None:
+            return [self]
+        return [x for c in self.children for x in c.leaves()]
+
+
+def _group(items: list[tuple[str, str]], *, min_group: int, max_leaves: int,
+           depth: int) -> list[Node]:
+    """``items`` = [(label core, column)]; group by first component, and
+    re-group a group that is still large by its next component."""
+    keyed: dict[str, list[tuple[str, str]]] = {}
+    for core, col in items:
+        parts = _tokens(core)
+        keyed.setdefault(parts[0], []).append(
+            ("".join(parts[1:]).strip(" -") or core, col))
+    if len(keyed) in (1, len(items)):        # would not compact anything
+        return [Node(core, col) for core, col in items]
+    nodes: list[Node] = []
+    loose: list[Node] = []
+    by_col = dict((col, core) for core, col in items)
+    for key, members in keyed.items():
+        if len(members) < min_group:
+            loose += [Node(by_col[col], col) for _r, col in members]
+            continue
+        if len(members) > max_leaves and depth < 2:
+            kids = _group(members, min_group=min_group, max_leaves=max_leaves,
+                          depth=depth + 1)
+        else:
+            kids = [Node(r, col) for r, col in members]
+        nodes.append(Node(key, None, kids))
+    return nodes + loose
+
+
+def compact_family(cols: list[str], *, min_group: int = 2, min_family: int = 6,
+                   max_leaves: int = 24) -> tuple[str, list[Node]]:
+    """Group one family's columns by shared name components.
+
+    The words every name in the family shares at the start and end (e.g.
+    ``"Animal_1 three-point convex hull perimeter (mm)"``) are dropped, and
+    the rest is grouped by its first component — for body-part features
+    the first body part — and, where a group still has more than
+    ``max_leaves`` members, by the next one (two levels at most):
+
+    ``Distance (mm) center-ear_l``, ``… center-nose``, ``… ear_l-nose`` →
+    ``center ▸ ear_l, nose`` · ``ear_l ▸ nose``
+
+    Returns ``(template, nodes)``: ``template`` is the shared wording with
+    ``…`` where names differ; ``nodes`` the top level under the family.
+    Singletons and families smaller than ``min_family`` stay flat.
+    """
+    if not cols:
+        return "", []
+    shorts = [short_name(c) for c in cols]
+    if len(cols) == 1:
+        return shorts[0], [Node(shorts[0], cols[0])]
+    toks = [_tokens(x) for x in shorts]
+    pre = _common_prefix(toks)
+    suf = min(_common_prefix([t[::-1] for t in toks]),
+              min(len(t) for t in toks) - pre)
+    cores = ["".join(t[pre: len(t) - suf if suf else None]).strip(" -") for t in toks]
+    head = "".join(toks[0][:pre]).strip()
+    tail = "".join(toks[0][len(toks[0]) - suf:]).strip() if suf else ""
+    template = " ".join(x for x in (head, "…", tail) if x)
+    if any(not c for c in cores):
+        cores, template = shorts, ""
+    items = list(zip(cores, cols))
+    if len(cols) < min_family:
+        return template, [Node(c, col) for c, col in items]
+    return template, _group(items, min_group=min_group, max_leaves=max_leaves, depth=1)
+
+
+__all__ = ["Node", "auc", "compact_family", "plot_distributions", "plot_joint", "plot_over_time",
+           "short_name"]
