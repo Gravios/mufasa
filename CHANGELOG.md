@@ -8,6 +8,14 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jd — Frame Labeling table: "Frames labelled" column.**
+New column after Status: frames carrying at least one behaviour, out of the
+video's frames, with the percentage (a frame with two behaviours counts
+once). The per-behaviour breakdown moves to "Per behaviour". Sorts by count.
+`VideoAnnotation.any_labelled` in `mufasa.utils.annotation_status`.
+smoke_122jc_labeling_status_complete_plot_seek: 32/32 (column position,
+union counting, sorting, live refresh).
+
 **122jc — Frame Labeling: annotation status table, "Mark video complete", click-to-seek in the label plot.**
 Frame Labeling page: a table of every project video with its status
 (✓ complete / ● in progress / ○ saved, empty / — not started), labelled

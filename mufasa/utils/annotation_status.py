@@ -28,6 +28,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from mufasa.project_layout import project_paths_from_config, write_project_toml
@@ -98,6 +99,7 @@ class VideoAnnotation:
     has_labels: bool
     n_frames: int = 0
     labelled: dict[str, int] = field(default_factory=dict)   # behaviour → frames
+    any_labelled: int = 0                                    # frames with ≥ 1 behaviour
     complete: bool = False
     saved: float | None = None                               # labels mtime
 
@@ -141,8 +143,11 @@ def summarize(config_path, classifiers: list[str] | None = None) -> list[VideoAn
                 df = pd.read_parquet(p)
                 row.n_frames = len(df)
                 cols = classifiers if classifiers else list(df.columns)
-                row.labelled = {c: int((pd.to_numeric(df[c], errors="coerce") == 1).sum())
-                                for c in cols if c in df.columns}
+                hit = {c: (pd.to_numeric(df[c], errors="coerce") == 1).to_numpy()
+                       for c in cols if c in df.columns}
+                row.labelled = {c: int(v.sum()) for c, v in hit.items()}
+                if hit:
+                    row.any_labelled = int(np.logical_or.reduce(list(hit.values())).sum())
             except Exception:
                 pass
         rows.append(row)

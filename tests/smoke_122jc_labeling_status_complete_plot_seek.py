@@ -141,9 +141,14 @@ check("one row per video", set(tb) == {"v_done", "v_prog", "v.new"})
 check("status column shows complete / in progress / not started",
       tb["v_done"][1].endswith("complete") and tb["v_prog"][1].endswith("in progress")
       and tb["v.new"][1].endswith("not started"))
-check("labelled-frames column shows counts and percentages",
-      tb["v_done"][2] == "rear 30 (25.0%) · head dip 0 (0.0%)" and tb["v.new"][2] == "")
-check("last-saved shown for labelled videos only", tb["v_done"][3] and not tb["v.new"][3])
+check("frames-labelled column (after Status): frames with any behaviour / total",
+      t.horizontalHeaderItem(2).text() == "Frames labelled"
+      and tb["v_done"][2] == "30 / 120 (25.0%)" and tb["v.new"][2] == "")
+check("…a frame carrying two behaviours counts once (v_prog: 6 + 6 on the same frames → 6)",
+      tb["v_prog"][2] == "6 / 120 (5.0%)" and rows["v_prog"].any_labelled == 6)
+check("per-behaviour column shows counts and percentages",
+      tb["v_done"][3] == "rear 30 (25.0%) · head dip 0 (0.0%)" and tb["v.new"][3] == "")
+check("last-saved shown for labelled videos only", tb["v_done"][4] and not tb["v.new"][4])
 check("summary line counts the states",
       "3</b> videos" in form.status_summary.text() and "1</b> complete" in form.status_summary.text()
       and "1</b> in progress" in form.status_summary.text())
@@ -151,7 +156,8 @@ t.sortItems(1, Qt.DescendingOrder)
 check("status sorts by progress (complete first, descending)",
       t.item(0, 0).text() == "v_done" and t.item(2, 0).text() == "v.new")
 t.sortItems(2, Qt.DescendingOrder)
-check("labelled frames sort numerically", t.item(0, 0).text() == "v_done")
+check("frames labelled sorts numerically", t.item(0, 0).text() == "v_done"
+      and t.item(1, 0).text() == "v_prog")
 
 launched = []
 FLB_launch = FLB.launch_frame_labeller
@@ -196,7 +202,8 @@ check("marking complete saves the unsaved labels first",
       and int(pd.read_parquet(ld / "v.new.parquet")["rear"].sum()) == 10)
 check("…and records it in annotation_status.toml", AS.is_complete(cfg, "v.new"))
 check("the open Frame Labeling table refreshes live",
-      table()["v.new"][1].endswith("complete") and table()["v.new"][2].startswith("rear 10"))
+      table()["v.new"][1].endswith("complete") and table()["v.new"][2] == "10 / 120 (8.3%)"
+      and table()["v.new"][3].startswith("rear 10"))
 W.complete_cb.setChecked(False)
 app.processEvents()
 check("unchecking reopens it", not AS.is_complete(cfg, "v.new")

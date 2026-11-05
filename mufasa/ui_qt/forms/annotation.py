@@ -195,7 +195,7 @@ class FrameLabellingLauncher(OperationForm):
     # ------------------------------------------------------------------ #
     # Patch 122jc — annotation status table
     # ------------------------------------------------------------------ #
-    STATUS_COLUMNS = ("Video", "Status", "Labelled frames", "Last saved")
+    STATUS_COLUMNS = ("Video", "Status", "Frames labelled", "Per behaviour", "Last saved")
     _STATE_STYLE = {
         "complete":    ("✓ complete",    "#2e7d32"),
         "in progress": ("● in progress", "#b26a00"),
@@ -292,10 +292,21 @@ class FrameLabellingLauncher(OperationForm):
             else:
                 lab = QTableWidgetItem("")
                 lab.setData(_SORT_ROLE, -1)
+            # Frames carrying at least one behaviour (a frame with two
+            # behaviours counts once), out of the video's frames.
+            if r.has_labels and r.n_frames:
+                anyl = QTableWidgetItem(
+                    f"{r.any_labelled:,} / {r.n_frames:,} "
+                    f"({100 * r.any_labelled / r.n_frames:.1f}%)")
+                anyl.setData(_SORT_ROLE, r.any_labelled)
+            else:
+                anyl = QTableWidgetItem("")
+                anyl.setData(_SORT_ROLE, -1)
+            anyl.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             saved = QTableWidgetItem(
                 datetime.fromtimestamp(r.saved).strftime("%Y-%m-%d %H:%M") if r.saved else "")
             saved.setData(_SORT_ROLE, r.saved or 0.0)
-            for c, it in enumerate((name, st, lab, saved)):
+            for c, it in enumerate((name, st, anyl, lab, saved)):
                 t.setItem(i, c, it)
         t.setSortingEnabled(True)
         n_done = sum(r.state == "complete" for r in rows)
