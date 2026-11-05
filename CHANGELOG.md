@@ -8,6 +8,38 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ix — `mufasa-landscape`: dipsplit joint PDFs and t-SNE across sessions.**
+New `mufasa/tools/feature_landscape.py` (console script `mufasa-landscape`,
+needs the new `analysis` extra = `diptest`). Loads, for every session, the
+latest Kalman v2 run's smoothed pose (x/y, prefixed `kfv2.`; `--pose-cols all`
+adds p and variances) and all feature families, samples
+`--frames-per-session` frames from each, and keeps the columns all sessions
+share. Sessions lacking a requested source (`--sources`) are skipped and
+named; pose/feature length mismatches are reported and truncated.
+Screen: columns that are mostly NaN, near-discrete (flags such as inside-ROI
+0/1, which are trivially "bimodal") or near-duplicates (|r| > 0.98) are
+dropped; every remaining pair is robust-z-scored and projected on the two
+axes, both diagonals and both principal axes. dipsplit counts modes per
+projection: Hartigan's dip test (p ≤ `--alpha` and dip ≥ `--min-dip`, an
+effect-size floor because at tens of thousands of frames the test alone
+flags skewed/heavy-tailed unimodal data) decides, the deepest valley of the
+smoothed density is the cut, both halves are re-tested. Pairs are ranked
+emergent (both columns unimodal, a joint projection not) → adds modes (more
+modes jointly than in either column) → by dip. Plots: joint log-density with
+marginals and split boundaries (joint splits drawn as lines in raw units) for
+the top `--n-plot` pairs, at most `--max-per-feature` per column
+(`jpdf_top.png`, `jpdf_pairs.pdf`); t-SNE (PCA to 50, perplexity 30) on
+`--tsne-sample` frames coloured by session and by the columns most frequent
+among the plotted pairs (`tsne.png`, `tsne.parquet`). All screened pairs in
+`pairs.csv`; provenance in `run.toml`; output under
+`derived/plots/feature_landscape/<run_id>/`. About 3 ms per pair on 20k
+frames (300 columns ≈ 2.5 CPU-minutes, parallel over `--n-jobs`).
+smoke_122ix_feature_landscape: 24/24 (dipsplit mode counts on normal,
+lognormal, t3, uniform, 2- and 3-component mixtures; a generated project
+with a planted emergent pair, a bimodal column, a 0/1 flag, an orphan
+session, a stale run and a length mismatch; every output). README command
+and extras tables updated (122iw tripwire passes).
+
 **122iw — README brought up to date with the project.**
 The README described an older Mufasa. Corrected against the code:
 license (said GPL v3; LICENSE is SimBA's BSD 3-Clause, modified, academic

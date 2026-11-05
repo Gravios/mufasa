@@ -159,6 +159,11 @@ onnx = [
     "skl2onnx>=1.17",
 ]
 
+# Exploratory analysis (mufasa-landscape): Hartigan's dip test.
+analysis = [
+    "diptest>=0.8",
+]
+
 # Development tooling.
 dev = [
     "pytest>=8.0",
@@ -183,6 +188,8 @@ all = [
     "onnx>=1.16",
     "onnxruntime>=1.18",
     "skl2onnx>=1.17",
+    # analysis
+    "diptest>=0.8",
     # dev
     "pytest>=8.0",
     "pytest-qt>=4.4",
@@ -211,6 +218,7 @@ Issues        = "https://github.com/sgoldenlab/simba/issues"
 mufasa           = "mufasa.cli.workbench_launcher:main"  # smart launcher → workbench (default; env diagnostics)
 mufasa-workbench = "mufasa.ui_qt.workbench_app:main"  # direct workbench launch (no env diagnostics)
 mufasa-preview   = "mufasa.tools.pose_preview:main"  # patch 122hy: pose-overlay viewer by paths or folder search
+mufasa-landscape = "mufasa.tools.feature_landscape:main"  # patch 122ix: dipsplit joint PDFs + t-SNE of pose/features
 # patch 122dx: mufasa-chooser entry point removed along with the
 # legacy Qt chooser (mufasa/ui_qt/app.py). Standalone popups can
 # still be reached via File menu items inside the workbench; the

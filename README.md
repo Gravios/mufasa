@@ -66,6 +66,7 @@ Docs: [workflows.md (Stages 5–8)](docs/workflows.md) · [workflow_recipes.md](
 | `mufasa` | Opens the Qt workbench after checking the environment (OpenCV, FFmpeg, …) and reporting anything missing. |
 | `mufasa-workbench` | Opens the workbench directly, without the environment check. |
 | `mufasa-preview` | Pose-overlay viewer: plays a video with its raw and smoothed markers, pairing files by session name (`--video`, or `--folder` to search a directory). |
+| `mufasa-landscape` | Exploratory map of a project: loads the Kalman v2 pose and features of every session, finds column pairs with multimodal joint distributions (dip-test splitting) and plots their joint PDFs, and runs t-SNE on a frame sample. Needs the `analysis` extra. |
 
 The workbench sidebar follows the pipeline:
 
@@ -140,6 +141,7 @@ The `qt` extra installs PySide6, which the workbench needs. Native Cython kernel
 | `gpu` | CuPy for CUDA 12 (Numba's CUDA backend is used as well). |
 | `onnx` | ONNX export and onnxruntime inference for classifiers. |
 | `nvenc` | Marker only: hardware video encoding needs a system FFmpeg built with NVENC. |
+| `analysis` | `diptest`, for `mufasa-landscape`. |
 | `dev` | pytest, pytest-qt, ruff, mypy, pre-commit. |
 | `all` | All of the above. |
 
