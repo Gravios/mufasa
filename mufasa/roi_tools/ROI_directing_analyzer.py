@@ -95,7 +95,7 @@ class DirectingROIAnalyzer(ConfigReader, FeatureExtractionMixin):
             eye, roi = eye_lines[i][0:2], eye_lines[i][2:4]
             min_distance = np.inf
 
-            if shape_type == "Circle":
+            if shape_type == "circle":
                 reversed_roi_lines = roi_lines[::-1]
                 for j in prange(roi_lines.shape[0]):
                     dist_1 = np.sqrt((eye[0] - roi_lines[j][0]) ** 2 + (eye[1] - roi_lines[j][1]) ** 2)
@@ -142,7 +142,7 @@ class DirectingROIAnalyzer(ConfigReader, FeatureExtractionMixin):
             roi_lines[0] = np.array([center[0], center[1] - shape_info["radius"], center[0], center[1] + shape_info["radius"]])
             roi_lines[1] = np.array([center[0] - shape_info["radius"], center[1], center[0] + shape_info["radius"], center[1]])
 
-        return self.ccw(roi_lines=roi_lines, eye_lines=eye_lines, shape_type=shape_info["Shape_type"])
+        return self.ccw(roi_lines=roi_lines, eye_lines=eye_lines, shape_type=str(shape_info["Shape_type"]).lower())
 
     def run(self):
         self.results = []

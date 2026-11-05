@@ -20,14 +20,13 @@ from datetime import datetime
 from itertools import repeat
 from json import loads
 from subprocess import call
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import shap
 
 # dtreeviz 2.0 (Feb 2023) reorganised its API. The old top-level
 # dtreeviz() function is still available via ``from dtreeviz import *``
@@ -138,6 +137,10 @@ plt.switch_backend("agg")
 
 CUML = 'cuml'
 SKLEARN = 'sklearn'
+
+if TYPE_CHECKING:  # annotations only; shap is imported where it is used
+    import shap
+
 
 class TrainModelMixin:
     """Train model methods"""
@@ -1630,6 +1633,10 @@ class TrainModelMixin:
                               feature_perturbation: str = "tree_path_dependent") -> shap.TreeExplainer:
 
         check_instance(source=f'{TrainModelMixin.define_tree_explainer.__name__} rf_clf', instance=clf, accepted_types=(RandomForestClassifier,))
+        # Patch 122io: shap is imported only when SHAP is actually used, so
+        # modules that merely inherit this mixin (e.g. feature computation)
+        # don't need it installed.
+        import shap
         return shap.TreeExplainer(clf, data=data, model_output=model_output, feature_perturbation=feature_perturbation)
 
     def clf_define(self,

@@ -71,7 +71,10 @@ ROI_TYPES = (RECTANGLE, CIRCLE, POLYGON)
 
 # Keys of the analysis-facing table dict (ConfigReader.roi_dict).
 FRAME_KEYS = {RECTANGLE: "rectangles", CIRCLE: "circleDf", POLYGON: "polygons"}
-_SHAPE_TYPE = {RECTANGLE: "Rectangle", CIRCLE: "Circle", POLYGON: "Polygon"}
+# Lower-case, as SimBA's own writers produce and the feature / ROI-classifier
+# kernels compare against (ROI_SETTINGS.*.value). Capitalised values made the
+# "body-parts inside ROIs" feature silently produce nothing (patch 122io).
+_SHAPE_TYPE = {RECTANGLE: "rectangle", CIRCLE: "circle", POLYGON: "polygon"}
 
 # Named colours offered by the editor (BGR).
 COLORS: list[tuple[str, tuple[int, int, int]]] = [

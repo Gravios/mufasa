@@ -4,7 +4,6 @@ __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import numpy as np
 from numba import jit, njit, prange
-from numba.np.extensions import cross2d
 
 from mufasa.utils.checks import check_float, check_str, check_valid_array
 from mufasa.utils.enums import Formats
@@ -16,7 +15,12 @@ def process(S, P, a, b):
     One step of the quickhull algorithm: partition points by signed distance to line (a,b), recurse on the subset above the line.
     Uses 2D cross product for signed distance; farthest point becomes new hull vertex. Returns hull vertex indices from a to b (excluding b).
     """
-    signed_dist = cross2d(S[P] - S[a], S[b] - S[a])
+    # Patch 122io: 2-D cross product written out. numba.np.extensions.cross2d
+    # is gone in recent numba (0.68), which made this module — and with it
+    # every feature computation — fail to import.
+    u = S[P] - S[a]
+    v = S[b] - S[a]
+    signed_dist = u[:, 0] * v[1] - u[:, 1] * v[0]
     K = np.array(
         [i for s, i in zip(signed_dist, P) if s > 0 and i != a and i != b],
         dtype=np.int64,

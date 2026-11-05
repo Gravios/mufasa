@@ -8,6 +8,29 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122io — Compute Features runs again (shap, numba cross2d, ROI shape types).**
+User report: Compute Features → "preflight failed … No module named 'shap'".
+* `train_model_mixin` imported `shap` at module level; shap was dropped from
+  the dependencies, and feature computation (`FeatureSubsetsCalculator`)
+  inherits the mixin. shap is now imported inside the SHAP helper only
+  (annotations via `TYPE_CHECKING`). Feature computation, training,
+  inference and result plotting all import without it.
+* `perimeter_jit` imported `numba.np.extensions.cross2d`, gone in numba 0.68
+  (pyproject allows any numba ≥ 0.60) — the convex-hull families failed to
+  import. The 2-D cross product is written out; results match scipy's
+  ConvexHull to 1e-11.
+* ROI tables said `Shape_type` "Rectangle" / "Circle" / "Polygon" (inherited
+  from the old ROILogic writer); the inside-ROI feature kernel and the ROI
+  classifier code compare to SimBA's lower-case values, so "body-parts
+  inside ROIs" silently wrote no file for Mufasa-drawn ROIs. `roi_store` now
+  emits lower-case; `ROI_directing_analyzer` (the one consumer expecting
+  "Circle") compares case-insensitively.
+smoke_122io_compute_features: 8/8 — shap blocked via a meta-path finder,
+a generated project with ROIs, preflight + every family, inside-ROI booleans
+checked against the geometry. Tripwires: top-level `import shap` and
+capitalised shape types each fail it (cross2d is absent from this numba, so
+the old perimeter_jit fails too). Full sweep: no regression.
+
 **122in — a click is not a drag (ROI cycling with a real mouse).**
 User report after 122im: the ROI under another still couldn't be selected.
 Cause: no drag threshold. A real click moves the cursor a pixel or two
