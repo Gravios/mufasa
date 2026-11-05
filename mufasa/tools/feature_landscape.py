@@ -212,7 +212,12 @@ def load_sessions(config: Path, *, sources: set[str], kfv2_run: str | None,
             + (" …" if len(skipped) > 8 else ""))
     rng = np.random.default_rng(seed)
     sessions: list[Session] = []
+    global COLUMN_FAMILY
+    COLUMN_FAMILY = {}
     for name in sorted(names):
+        if not COLUMN_FAMILY:
+            COLUMN_FAMILY = column_families(paths, name, pose_files.get(name),
+                                            pose_cols, sources)
         parts = []
         if "pose" in sources:
             pose = pd.read_parquet(pose_files[name])
@@ -237,6 +242,98 @@ def load_sessions(config: Path, *, sources: set[str], kfv2_run: str | None,
     return sessions
 
 
+COLUMN_FAMILY: dict[str, str] = {}
+
+
+def column_families(paths: ProjectPaths, name: str, pose_file: Path | None,
+                    pose_cols: str, sources: set[str]) -> dict[str, str]:
+    """{column: family} for one session, from the per-family parquet
+    schemas (no data read), so the log can say what each family
+    contributed and what survived the column filters."""
+    import pyarrow.parquet as pq
+    fam: dict[str, str] = {}
+    if pose_file is not None and "pose" in sources:
+        for c in _pose_columns(pq.read_schema(pose_file).names, pose_cols):
+            fam[POSE_PREFIX + c] = "kfv2 pose"
+    root = paths.derived_dir / "features"
+    if "features" in sources and root.is_dir():
+        for d in sorted(p for p in root.iterdir() if p.is_dir()):
+            f = d / f"{name}.parquet"
+            if f.is_file():
+                for c in pq.read_schema(f).names:
+                    fam.setdefault(c, d.name)
+        wide = root / f"{name}.parquet"
+        if wide.is_file():
+            for c in pq.read_schema(wide).names:
+                fam.setdefault(c, "(wide feature file)")
+    return fam
+
+
+def family_counts(cols) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for c in cols:
+        f = COLUMN_FAMILY.get(c, "(other)")
+        out[f] = out.get(f, 0) + 1
+    return out
+
+
+def log_families(title: str, cols, ref=None, log=print) -> None:
+    now = family_counts(cols)
+    base = family_counts(ref) if ref is not None else None
+    log(f"[landscape] {title}:")
+    for f in sorted(set(now) | set(base or {})):
+        n = now.get(f, 0)
+        log(f"[landscape]   {f:<55} {n:>4}" + (f" / {base[f]}" if base else ""))
+
+
+def clean_columns(X: pd.DataFrame, log=print) -> pd.DataFrame:
+    """Undo two artefacts that would otherwise show up as 'modes':
+
+    * the feature writer stores missing values as -1; in a column whose
+      other values are all >= 0 (distances, areas, movements, angles) a
+      -1 is a missing value, not a measurement → NaN;
+    * angles wrap at 0/360°: an angle hovering around 0° splits into a
+      lump near 0 and a lump near 360. Each angle column is rotated so its
+      wrap point falls at its least-populated direction (values then run
+      from that cut through 360° further, still in degrees).
+    """
+    X = X.copy()
+    n_sent = n_ang = 0
+    for c in X.columns:
+        v = X[c].to_numpy(np.float64, copy=True)
+        fin = np.isfinite(v)
+        sent = fin & (v == -1)
+        if sent.any() and (v[fin & ~sent] >= 0).all():
+            v[sent] = np.nan
+            n_sent += 1
+        if "angle" in c.lower():
+            w = v[np.isfinite(v)]
+            if w.size and w.min() >= -360 and w.max() <= 360:
+                v = unwrap_angle(v)
+                n_ang += 1
+        X[c] = v.astype(np.float32)
+    if n_sent:
+        log(f"[landscape] -1 placeholders read as missing in {n_sent} non-negative column(s)")
+    if n_ang:
+        log(f"[landscape] {n_ang} angle column(s) rotated so the 0/360° wrap sits at "
+            "their emptiest direction")
+    return X
+
+
+def unwrap_angle(v: np.ndarray, n_bins: int = 72) -> np.ndarray:
+    """Rotate degrees so the cut lies at the least-populated direction."""
+    fin = np.isfinite(v)
+    a = np.mod(v[fin], 360.0)
+    if a.size == 0:
+        return v
+    h, _ = np.histogram(a, bins=n_bins, range=(0, 360))
+    hs = np.convolve(np.r_[h[-2:], h, h[:2]], np.ones(5) / 5, mode="valid")
+    cut = (int(np.argmin(hs)) + 0.5) * 360.0 / n_bins
+    out = np.full_like(v, np.nan, dtype=np.float64)
+    out[fin] = cut + np.mod(a - cut, 360.0)
+    return out
+
+
 def stack(sessions: list[Session], log=print) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     """Concatenate session samples on the columns all sessions share."""
     common = set(sessions[0].data.columns)
@@ -247,6 +344,9 @@ def stack(sessions: list[Session], log=print) -> tuple[pd.DataFrame, np.ndarray,
     if dropped:
         log(f"[landscape] {len(dropped)} column(s) missing in some sessions "
             "were dropped")
+    if dropped:
+        lost = family_counts(dropped)
+        log("[landscape]   by family: " + ", ".join(f"{f}: {n}" for f, n in sorted(lost.items())))
     X = pd.concat([s.data[order] for s in sessions], ignore_index=True)
     sess = np.concatenate([[i] * len(s.data) for i, s in enumerate(sessions)])
     frame = np.concatenate([s.frames for s in sessions])
@@ -657,8 +757,10 @@ def main(argv: list[str] | None = None) -> int:
                              pose_cols=a.pose_cols,
                              frames_per_session=a.frames_per_session, seed=a.seed)
     X, sess, frame = stack(sessions)
+    X = clean_columns(X)
     cols = select_columns(X, max_nan=a.max_nan, min_unique=a.min_unique,
                           max_corr=a.max_corr, max_features=a.max_features)
+    log_families("columns screened per family (kept / loaded)", cols, list(X.columns))
     if len(cols) < 2:
         raise SystemExit("fewer than two usable columns")
     Z = robust_z(X[cols])

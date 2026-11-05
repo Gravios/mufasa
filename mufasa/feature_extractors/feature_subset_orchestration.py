@@ -49,6 +49,7 @@ from mufasa.feature_extractors.feature_subset_kernels import (
     compute_distances_to_frame_edge,
     compute_four_point_hulls,
     compute_framewise_movement,
+    compute_head_velocity_body_frame,
     compute_inside_roi,
     compute_roi_center_distances,
     compute_three_point_angles,
@@ -91,6 +92,12 @@ FRAME_BP_INSIDE_ROI = (
 ARENA_EDGE = (
     'BODY-PART DISTANCES TO VIDEO FRAME EDGE (MM)'
 )
+HEAD_VELOCITY_BODY_FRAME = (
+    'HEAD VELOCITY IN BODY FRAME (MM/S)'
+)
+# Families whose values can be negative: their per-family parquet keeps NaN
+# for missing values instead of the legacy -1.
+SIGNED_FAMILIES = frozenset({HEAD_VELOCITY_BODY_FRAME})
 
 
 @dataclass(frozen=True)
@@ -134,6 +141,12 @@ class VideoProcessingConfig:
     # legacy-append paths (features_extracted / targets_inserted)
     # keep working during the migration window. None disables it.
     derived_features_dir: str | None = None
+
+    # Patch 122iz: {animal: (head_markers, body_markers, how)} for the
+    # HEAD VELOCITY IN BODY FRAME family; resolved once per run from
+    # project.toml (see resolve_head_body_markers). None when the
+    # family isn't requested.
+    head_body_markers: Mapping[str, tuple] | None = None
 
 
 def _read_video_info_for(
@@ -317,6 +330,15 @@ def process_one_video(
                 video_roi_dict=config.roi_dict[video_name],
                 source=str(file_path),
             )
+        elif family == HEAD_VELOCITY_BODY_FRAME:
+            if not config.head_body_markers:
+                raise RuntimeError(
+                    "HEAD_VELOCITY_BODY_FRAME requested but no head/body "
+                    "markers were resolved for this run.")
+            fam_result = compute_head_velocity_body_frame(
+                df=df, head_body=config.head_body_markers,
+                px_per_mm=px_per_mm, fps=fps, source=str(file_path),
+            )
         elif family == ARENA_EDGE:
             fam_result = compute_distances_to_frame_edge(
                 df=df, animal_bps=config.animal_bps,
@@ -365,7 +387,11 @@ def process_one_video(
             fam_df = pd.DataFrame(fam_columns)
             fam_df = fam_df.add_suffix("_FEATURE_SUBSET")
             fam_df = fam_df[sorted(fam_df.columns)]
-            fam_df = fam_df.fillna(-1)
+            # -1 marks "missing" in the legacy schema; that is ambiguous
+            # for signed quantities, so the head-velocity family (122iz)
+            # keeps NaN.
+            if family not in SIGNED_FAMILIES:
+                fam_df = fam_df.fillna(-1)
             fam_df.to_parquet(
                 os.path.join(out_dir, f"{video_name}.parquet"),
                 index=False,
@@ -392,4 +418,5 @@ __all__ = [
     "FRAME_BP_TO_ROI_CENTER",
     "FRAME_BP_INSIDE_ROI",
     "ARENA_EDGE",
+    "HEAD_VELOCITY_BODY_FRAME",
 ]

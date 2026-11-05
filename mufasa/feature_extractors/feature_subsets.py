@@ -92,6 +92,8 @@ FRAME_BP_MOVEMENT = "FRAME-BY-FRAME BODY-PART MOVEMENTS (MM)"
 FRAME_BP_TO_ROI_CENTER = "FRAME-BY-FRAME BODY-PART DISTANCES TO ROI CENTERS (MM)"
 FRAME_BP_INSIDE_ROI = "FRAME-BY-FRAME BODY-PARTS INSIDE ROIS (BOOLEAN)"
 ARENA_EDGE = "BODY-PART DISTANCES TO VIDEO FRAME EDGE (MM)"
+# Patch 122iz: head velocity decomposed on the body→head axis.
+HEAD_VELOCITY_BODY_FRAME = "HEAD VELOCITY IN BODY FRAME (MM/S)"
 
 
 class FeatureFamily(Enum):
@@ -127,6 +129,7 @@ class FeatureFamily(Enum):
     FRAME_BP_TO_ROI_CENTER = FRAME_BP_TO_ROI_CENTER
     FRAME_BP_INSIDE_ROI = FRAME_BP_INSIDE_ROI
     ARENA_EDGE = ARENA_EDGE
+    HEAD_VELOCITY_BODY_FRAME = HEAD_VELOCITY_BODY_FRAME
 
 
 
@@ -140,7 +143,8 @@ FEATURE_FAMILIES = [TWO_POINT_BP_DISTANCES,
                     FRAME_BP_MOVEMENT,
                     FRAME_BP_TO_ROI_CENTER,
                     FRAME_BP_INSIDE_ROI,
-                    ARENA_EDGE]
+                    ARENA_EDGE,
+                    HEAD_VELOCITY_BODY_FRAME]
 
 
 def _explain_no_roi_coverage(video_names: list[str], roi_dict: dict,
@@ -424,6 +428,29 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             ]
             self.video_names = target_video_names
         self.__get_bp_combinations()
+        if HEAD_VELOCITY_BODY_FRAME in self.feature_families:
+            self._resolve_head_body()
+
+    def _resolve_head_body(self):
+        """Patch 122iz: head / body markers per animal for the head-velocity
+        family, from project.toml ([features], [[pose.segments]]) or the
+        marker names. Raises InvalidInputError saying what to set."""
+        from pathlib import Path
+
+        from mufasa.feature_extractors.feature_subset_kernels import (
+            resolve_head_body_markers,
+        )
+        from mufasa.project_layout import read_project_toml
+        try:
+            project = read_project_toml(Path(self.config_path))
+        except Exception:
+            project = {}
+        try:
+            self.head_body_markers = resolve_head_body_markers(project, self.animal_bps)
+        except ValueError as exc:
+            raise InvalidInputError(msg=str(exc), source=self.__class__.__name__)
+        for animal, (head, body, how) in self.head_body_markers.items():
+            print(f"Head velocity ({animal}, from {how}): head = {head}; body = {body}")
 
     def __get_bp_combinations(self):
         ordered_bps = sorted(self.project_bps, key=str.lower)
@@ -547,6 +574,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             # None disables the new branch; legacy callers see no
             # change.
             derived_features_dir=self.derived_features_dir,
+            head_body_markers=getattr(self, "head_body_markers", None),
         )
 
     def preflight_check(self) -> dict[str, list[str]]:

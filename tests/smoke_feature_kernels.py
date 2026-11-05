@@ -141,6 +141,7 @@ def main() -> int:
         "compute_roi_center_distances",
         "compute_distances_to_frame_edge",
         "compute_inside_roi",
+        "compute_head_velocity_body_frame",   # patch 122iz
     }
     found_kernels = set()
     for node in tree.body:

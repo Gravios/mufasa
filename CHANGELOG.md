@@ -8,6 +8,35 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122iz — head velocity in the body frame; landscape: angles, -1 placeholders, per-family log.**
+User report: mufasa-landscape "only used the angles". All families were
+loaded (checked on a real Compute Features output), but angle columns
+crowded every plot for two artefacts the screen took for modes: angles wrap
+at 0/360° (an angle near 0° splits into lumps at 0 and 360), and the feature
+writer stores missing values as -1. Now `clean_columns` reads -1 in
+non-negative columns as missing and rotates each angle column so its wrap
+falls at its emptiest direction (still degrees); both are logged, and the
+log lists columns kept / loaded per feature family (from the per-family
+parquet schemas), plus which families lost columns missing in some sessions.
+New feature family **HEAD VELOCITY IN BODY FRAME (MM/S)**
+(`compute_head_velocity_body_frame`): head point = mean of the head markers,
+body point = mean of the body markers, axis = body → head; the head point's
+velocity (central differences, mm/s from px/mm and fps) split into
+*forward* (along the axis) and *lateral* (to the animal's left, image y
+down). Markers from project.toml `[features] head_markers/body_markers`,
+else `[[pose.segments]]` (segment `head` / `[features] head_segment`, root
+segment / `body_segment`), else marker names; the run prints which and from
+where, and an unresolvable set raises saying what to add. Signed, so its
+parquet keeps NaN instead of the -1 placeholder (`SIGNED_FAMILIES`). Listed
+in Compute Features automatically. `[features]` documented in
+docs/v1_project_layout.md.
+smoke_122iz_head_velocity_and_landscape_columns: 24/24 (kernel geometry:
+forward/lateral sign and magnitude, |v|² = f² + l², rotation invariance,
+missing markers; resolution order and errors; a real FeatureSubsetsCalculator
+run on a [[pose.segments]] project; the form's family list; angle unwrap,
+-1 handling, family log). smoke_feature_kernels' documented-kernel list
+gains the new kernel. Feature/landscape suites as before.
+
 **122iy — `mufasa-landscape-animate`: frames gliding between t-SNE and feature spaces.**
 New `mufasa/tools/landscape_animate.py` (console script
 `mufasa-landscape-animate`) renders a presentation GIF (`--mp4` adds an MP4)

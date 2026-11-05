@@ -124,6 +124,17 @@ body_parts     = ["nose", "left_ear", "right_ear", "tail_base", ...]
 
 [settings]
 # Per-project overrides for inference / training defaults.
+
+[features]
+# Optional (122iz): which markers the HEAD VELOCITY IN BODY FRAME family
+# treats as head and body. Without these, the "head" segment and the root
+# segment of [[pose.segments]] are used, else marker names (head / nose /
+# ear vs back / body / center / spine …).
+head_markers = ["head_front", "head_back"]
+body_markers = ["back_T4", "back_T8"]
+# or pick segments of [[pose.segments]] by name:
+# head_segment = "head"
+# body_segment = "back"
 ```
 
 Backends read this via `mufasa.project_layout.read_project_toml(path)`.

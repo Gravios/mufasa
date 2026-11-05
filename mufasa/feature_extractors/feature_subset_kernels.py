@@ -48,6 +48,8 @@ Coverage
 7. ``compute_roi_center_distances`` — replaces ``__get_roi_center_distances``
 8. ``compute_distances_to_frame_edge`` — replaces ``__get_distances_to_frm_edge``
 9. ``compute_inside_roi`` — replaces ``__get_inside_roi``
+10. ``compute_head_velocity_body_frame`` — head velocity on the body→head
+    axis (forward / lateral); no legacy counterpart (122iz)
 
 The class methods are not removed in this patch — the class
 delegates to the kernels but keeps its public surface intact.
@@ -502,6 +504,129 @@ def compute_inside_roi(
     return out
 
 
+# ---------------------------------------------------------------------- #
+# Kernel 10: head velocity in the body frame (patch 122iz)
+# ---------------------------------------------------------------------- #
+HEAD_NAME_HINTS = ("head", "nose", "snout", "ear", "eye")
+BODY_NAME_HINTS = ("back", "body", "center", "centre", "spine", "trunk",
+                   "torso", "lateral", "hip", "shoulder")
+
+
+def resolve_head_body_markers(
+    project: Mapping,
+    animal_bps: Mapping[str, list],
+) -> dict[str, tuple[list[str], list[str], str]]:
+    """Which markers form the head and the body of each animal.
+
+    ``project`` is the parsed ``project.toml``. Resolution order, most
+    explicit first:
+
+    1. ``[features] head_markers`` / ``body_markers`` — explicit lists;
+    2. ``[[pose.segments]]`` — the segment named ``[features]
+       head_segment`` (default ``"head"``) and the segment named
+       ``[features] body_segment`` (default: the root segment, the one
+       without a parent);
+    3. marker names: head = names containing head / nose / snout / ear /
+       eye, body = back / body / center / spine / trunk / lateral / hip …
+
+    Returns ``{animal: (head_markers, body_markers, how)}`` restricted to
+    each animal's markers. Raises ``ValueError`` naming what to set when
+    either group comes out empty or the two overlap.
+    """
+    feats = project.get("features") if isinstance(project.get("features"), Mapping) else {}
+    pose = project.get("pose") if isinstance(project.get("pose"), Mapping) else {}
+    segs = pose.get("segments") if isinstance(pose.get("segments"), list) else []
+    explicit = (list(feats.get("head_markers") or []), list(feats.get("body_markers") or []))
+    from_segments = ([], [])
+    if segs:
+        by_name = {str(s.get("name")): [str(m) for m in (s.get("markers") or [])]
+                   for s in segs if isinstance(s, Mapping)}
+        head_seg = str(feats.get("head_segment", "head"))
+        body_seg = feats.get("body_segment")
+        if body_seg is None:
+            roots = [str(s.get("name")) for s in segs
+                     if isinstance(s, Mapping) and not s.get("parent")]
+            body_seg = roots[0] if roots else None
+        from_segments = (by_name.get(head_seg, []), by_name.get(str(body_seg), []))
+    out: dict[str, tuple[list[str], list[str], str]] = {}
+    for animal, bps in animal_bps.items():
+        have = list(bps)
+        for how, (h, b) in (("[features] head_markers/body_markers", explicit),
+                            ("[[pose.segments]]", from_segments)):
+            h, b = [m for m in h if m in have], [m for m in b if m in have]
+            if h and b:
+                break
+        else:
+            how = "marker names"
+            low = {m: m.lower() for m in have}
+            h = [m for m in have if any(k in low[m] for k in HEAD_NAME_HINTS)]
+            b = [m for m in have if m not in h
+                 and any(k in low[m] for k in BODY_NAME_HINTS)]
+        if not h or not b:
+            raise ValueError(
+                f"HEAD VELOCITY IN BODY FRAME: cannot tell the head and body "
+                f"markers of {animal} apart (markers: {have}). Name them in "
+                f"project.toml, e.g.\n  [features]\n  head_markers = [...]\n"
+                f"  body_markers = [...]\nor define [[pose.segments]] with a "
+                f"'head' segment.")
+        if set(h) & set(b):
+            raise ValueError(
+                f"HEAD VELOCITY IN BODY FRAME: {animal}'s head and body marker "
+                f"sets overlap ({sorted(set(h) & set(b))}); fix [features] / "
+                f"[[pose.segments]] in project.toml.")
+        out[animal] = (h, b, how)
+    return out
+
+
+def compute_head_velocity_body_frame(
+    df: pd.DataFrame,
+    head_body: Mapping[str, tuple],
+    px_per_mm: float,
+    fps: float,
+    source: str = "compute_head_velocity_body_frame",
+) -> dict[str, np.ndarray]:
+    """Head velocity decomposed on the body→head axis, in mm/s.
+
+    Per frame: head point = mean of the head markers, body point = mean of
+    the body markers (markers missing in a frame are skipped), axis
+    ``u`` = unit vector body → head. The head point's velocity (central
+    differences, one-sided at the ends) is split into
+
+    * **forward** = v · u — positive when the head moves the way it points;
+    * **lateral** = v · l, ``l`` = ``u`` turned to the animal's left
+      (image y points down, so l = (u_y, -u_x)) — positive to the left.
+
+    Frames where either point or the axis is undefined are NaN.
+    """
+    out: dict[str, np.ndarray] = {}
+    for animal, (head, body, *_rest) in head_body.items():
+        cols = [c for m in list(head) + list(body) for c in _bp_xy_columns(m)]
+        check_valid_dataframe(df=df, source=source, required_fields=cols)
+
+        def centroid(markers):
+            xs = df[[_bp_xy_columns(m)[0] for m in markers]].to_numpy(np.float64)
+            ys = df[[_bp_xy_columns(m)[1] for m in markers]].to_numpy(np.float64)
+            with np.errstate(invalid="ignore"), warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                return np.stack([np.nanmean(xs, 1), np.nanmean(ys, 1)], 1)
+
+        h, b = centroid(head), centroid(body)
+        axis = h - b
+        norm = np.hypot(axis[:, 0], axis[:, 1])
+        with np.errstate(invalid="ignore", divide="ignore"):
+            u = axis / norm[:, None]
+        u[~(norm > 0)] = np.nan
+        if len(df) >= 2:
+            v = np.gradient(h, axis=0) * (float(fps) / float(px_per_mm))
+        else:
+            v = np.full_like(h, np.nan)
+        fwd = v[:, 0] * u[:, 0] + v[:, 1] * u[:, 1]
+        lat = v[:, 0] * u[:, 1] - v[:, 1] * u[:, 0]
+        out[f"{animal} head velocity forward along body-head axis (mm/s)"] = fwd
+        out[f"{animal} head velocity lateral to body-head axis, left positive (mm/s)"] = lat
+    return out
+
+
 __all__ = [
     "compute_two_point_distances",
     "compute_three_point_angles",
@@ -512,4 +637,6 @@ __all__ = [
     "compute_roi_center_distances",
     "compute_distances_to_frame_edge",
     "compute_inside_roi",
+    "compute_head_velocity_body_frame",
+    "resolve_head_body_markers",
 ]
