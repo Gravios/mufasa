@@ -107,7 +107,7 @@ Read this when adding a new form to remember to wire it; the smoke test will fai
 
 ---
 
-## Kalman smoother — design track
+## <img src="images/icon_smoothing.svg" width="24" align="center" alt=""> Kalman smoother — design track
 
 These four documents are a separate concern (the Kalman v2 smoother design + audit). Not workflow-related; kept in `docs/` for proximity to the rest of the technical writing.
 

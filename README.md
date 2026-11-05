@@ -20,6 +20,44 @@ It provides:
 * **Pipeline stages** — outlier correction, feature extraction, supervised classifier training and inference, ROI analysis, directionality, classification visualization.
 * **v1 project layout** (`project.toml`-driven, run-id-scoped) — the only supported layout. Run separation under `derived/<stage>/<run_id>/` makes provenance, diffing, and parallel exploration straightforward. (Legacy SimBA `project_config.ini` support was removed across patches 122dw–122dz; see CHANGELOG for details.)
 
+## The tools
+
+<details>
+<summary><img src="docs/images/icon_smoothing.svg" width="28" align="center" alt=""> <b>Pose smoothing</b>: Kalman smoothing of tracked markers</summary>
+
+- Kalman v2 treats markers as observations of a kinematic tree (rigid segments joined by free joints, with slowly varying segment lengths), so a marker with low likelihood follows the body instead of wandering
+- noise and segment parameters are fit to each video by EM; a fitted model can be saved and reused with `--load-model`
+- runs inside a project (Preprocessing → Kalman v2 smoothing) or standalone on a pose file, writing beside the input
+- `mufasa-preview` overlays the markers on the video
+
+Docs: [workflows.md (Smooth pose)](docs/workflows.md) · [kalman_smoother_design.md](docs/kalman_smoother_design.md) · [v2_next_steps_design.md](docs/v2_next_steps_design.md)
+
+</details>
+
+<details>
+<summary><img src="docs/images/icon_roi.svg" width="28" align="center" alt=""> <b>ROI analysis</b>: regions of interest and what the animal does in them</summary>
+
+- editor for rectangles, circles and polygons with any number of vertices; drag vertices, edges and corners, undo/redo, zoom, copy ROIs to other videos
+- every video's ROIs live in one file, `logs/measures/rois.json`
+- time spent and entries per ROI, in aggregate or in time bins; directionality toward ROIs
+- inside-ROI and distance-to-ROI features feed the classifiers
+
+Docs: [workflows.md (Stage 4)](docs/workflows.md) · [roi_enhancements_proposal.md](docs/roi_enhancements_proposal.md)
+
+</details>
+
+<details>
+<summary><img src="docs/images/icon_classifiers.svg" width="28" align="center" alt=""> <b>Classifiers</b>: supervised behavior classification</summary>
+
+- feature extraction from the smoothed pose, computed per feature family in parallel worker processes
+- behavior labelling, including pseudo-labelling and a targeted clip annotator
+- random-forest training (single behavior, one per behavior, hyperparameter search)
+- validation on a single video, batch inference, and per-bout analysis of the results
+
+Docs: [workflows.md (Stages 5–8)](docs/workflows.md) · [workflow_recipes.md](docs/workflow_recipes.md)
+
+</details>
+
 ## Running Mufasa
 
 After `pip install -e .`, two console entry points are installed:

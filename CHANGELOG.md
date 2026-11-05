@@ -8,6 +8,18 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122iv — banner tool icons head their doc sections.**
+The banner's three tool tiles are standalone SVGs: `docs/images/icon_smoothing.svg`,
+`icon_roi.svg`, `icon_classifiers.svg`. As in neurosuite-3's README, a new
+"The tools" section has one collapsible `<details>` block per tool — icon and
+bold name in the `<summary>`, four bullets, doc links. The icons also head
+the matching sections of `docs/workflows.md` (Smooth pose; Stages 4–8) and
+the Kalman design track in `docs/README.md`. Links into workflows.md point at
+the file, not at heading anchors, since an image in a heading changes
+GitHub's anchor.
+smoke_122iv_docs_section_icons: 9/9. Doc tripwires unchanged (122cn fails
+as before).
+
 **122iu — README / docs banner (wide + mobile, dark + light).**
 New `docs/images/`: the Mufasa banner in the neurosuite-3 layout and the lion
 palette — `mufasa_banner_{dark,light}` (2560x800), a stacked narrow-screen

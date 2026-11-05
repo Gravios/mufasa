@@ -288,7 +288,7 @@ is `None`).
   If your downstream code assumes float64, you'd see precision
   divergence. Mufasa's own pipeline tolerates float32 fine.
 
-## Smooth pose 🟢
+## <img src="images/icon_smoothing.svg" width="24" align="center" alt=""> Smooth pose 🟢
 **Tk entry**: Further imports → SMOOTH POSE IN SIMBA PROJECT
 (`SmoothingPopUp` from `mufasa/ui/pop_ups/smoothing_popup.py`)
 **Qt entry**: not ported
@@ -639,7 +639,7 @@ users hit.
 
 ---
 
-# Stage 4: ROI definitions and analysis
+# <img src="images/icon_roi.svg" width="24" align="center" alt=""> Stage 4: ROI definitions and analysis
 
 (Covered comprehensively by the Qt ROI page after patches
 qt_roi_*. The legacy Tk ROI tab and Qt ROI page diverge significantly.)
@@ -726,7 +726,7 @@ and would be valuable Qt port targets.
 
 ---
 
-# Stage 5: Feature extraction
+# <img src="images/icon_classifiers.svg" width="24" align="center" alt=""> Stage 5: Feature extraction
 
 ## Extract features 🟢
 **Tk entry**: Tab "Extract features" → EXTRACT FEATURES (config-
@@ -768,7 +768,7 @@ when no ROIs are defined (`feature_skip_missing_rois_fix` patch).
 
 ---
 
-# Stage 6: Behavior labelling
+# <img src="images/icon_classifiers.svg" width="24" align="center" alt=""> Stage 6: Behavior labelling
 
 ## Label behavior 🟡
 **Tk entry**: Tab "Label behavior" → LABEL BEHAVIOR (entry to
@@ -817,7 +817,7 @@ these matter for your workflow.
 
 ---
 
-# Stage 7: Train machine model
+# <img src="images/icon_classifiers.svg" width="24" align="center" alt=""> Stage 7: Train machine model
 
 ## Train single classifier 🟡
 **Tk entry**: Tab "Train machine model" → TRAIN SINGLE MODEL
@@ -855,7 +855,7 @@ to a CSV; user then trains a final model with those params.
 
 ---
 
-# Stage 8: Run machine model
+# <img src="images/icon_classifiers.svg" width="24" align="center" alt=""> Stage 8: Run machine model
 
 ## Validate model on single video 🟡
 **Tk entry**: Tab "Run machine model" → VALIDATE MODEL ON SINGLE VIDEO
