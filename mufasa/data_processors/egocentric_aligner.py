@@ -50,21 +50,9 @@ def _video_base_from_pose_name(pose_stem: str) -> str:
     before. This only affects the video lookup; output files keep the full
     pose-derived name so they still trace to the specific smoothed input.
     """
-    stem = pose_stem
-    # A parameter hash sits after _smoothed_v2 as ".<hex>"; splitext peels it
-    # off as an "extension". Only strip it when what's left still carries the
-    # smoother marker, so we never truncate a legitimately dotted video name.
-    root, ext = os.path.splitext(stem)
-    if (
-        ext
-        and len(ext) > 1
-        and all(c in "0123456789abcdef" for c in ext[1:].lower())
-        and root.endswith("_smoothed_v2")
-    ):
-        stem = root
-    if stem.endswith("_smoothed_v2"):
-        stem = stem[: -len("_smoothed_v2")]
-    return stem
+    from mufasa.project_layout import video_name_from_pose_stem
+
+    return video_name_from_pose_stem(pose_stem)
 
 
 class EgocentricalAligner:

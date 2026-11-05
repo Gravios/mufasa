@@ -8,6 +8,29 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ir — published Kalman runs appear under video names.**
+User report (via 122iq's new message): ROIs defined for 39 videos
+(`K7_cam_…-triplet`), tracking files named `K7_cam_…-triplet_smoothed_v2.
+4d4273a837d0cc40`. Kalman v2 writes `<video>_smoothed_v2.<hash>.parquet`;
+`publish_to_stage` linked the whole run directory into
+derived/outlier_corrected/, and every downstream tool (features, ROI
+analysis, classifiers, plots) takes the file name as the video name — so
+nothing keyed by video (ROIs, video_info calibration) matched. Only the
+egocentric aligner had a private suffix-stripping helper.
+* `project_layout.video_name_from_pose_stem` (moved from the egocentric
+  aligner, which now uses it).
+* `publish_to_stage`: when a run's pose files carry the smoother suffix, the
+  published run is a real directory of relative per-file links named
+  `<video>.parquet` (+ a `.published_from` marker), built in a temp dir and
+  swapped in; idempotent; other runs keep the plain directory link; real
+  data directories are still never clobbered.
+* `refresh_published_runs`, called by ConfigReader when a project is
+  opened, upgrades runs published the old way (links only, never data).
+smoke_122ir_published_video_names: 12/12 — the user's layout (directory
+symlink to a run of `_smoothed_v2.<hash>` files), ROI + calibration features
+computed for every video with correct values. Tripwire: without the refresh
+on open the publish checks fail. Full sweep: no regression.
+
 **122iq — ROI-feature "no coverage" error says why.**
 User report: "NO ROI DATA ERROR: … none of the 39 videos have all required
 ROIs defined." ROI features need, for every tracking file, a video with the

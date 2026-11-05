@@ -199,6 +199,122 @@ def latest_populated_run_or_parent(
 # Stage-symlink publishing (patch 122ds)
 # ---------------------------------------------------------------------------
 
+_PUBLISH_MARKER = ".published_from"
+
+
+def video_name_from_pose_stem(stem: str) -> str:
+    """Video name for a pose-file stem: strips the Kalman v2 smoother's
+    ``_smoothed_v2`` suffix and its ``.<hexhash>`` parameter tag
+    (``rec_smoothed_v2.4d4273a8`` -> ``rec``). Anything else is returned
+    unchanged, so plain ``<video>`` stems and dotted video names pass.
+    Patch 122ir (was private to the egocentric aligner)."""
+    root, ext = os.path.splitext(stem)
+    if (ext and len(ext) > 1
+            and all(c in "0123456789abcdef" for c in ext[1:].lower())
+            and root.endswith("_smoothed_v2")):
+        stem = root
+    if stem.endswith("_smoothed_v2"):
+        stem = stem[: -len("_smoothed_v2")]
+    return stem
+
+
+def _published_names(source: Path) -> dict[str, str]:
+    """{file in the source run: name to publish it under}. Pose files get
+    their video name; everything else keeps its name. Two files mapping to
+    the same name keep their original names (never silently shadowed)."""
+    out: dict[str, str] = {}
+    for f in sorted(source.iterdir()):
+        if f.name.startswith(".") or f.is_dir():
+            continue
+        suffix = f.suffix
+        new = (video_name_from_pose_stem(f.name[: -len(suffix)]) + suffix
+               if suffix.lower() in (".parquet", ".csv") else f.name)
+        out[f.name] = new
+    counts: dict[str, int] = {}
+    for v in out.values():
+        counts[v] = counts.get(v, 0) + 1
+    return {k: (v if counts[v] == 1 else k) for k, v in out.items()}
+
+
+def _publish_renamed(final: Path, relative_target: Path,
+                     names: dict[str, str]) -> Path:
+    """Make ``final`` a real directory of relative per-file symlinks
+    (``<video>.parquet`` -> ``../<relative_target>/<pose file>``), replacing
+    an earlier publish of the same kind or a directory symlink. Built in a
+    temp directory and swapped in, so readers never see a partial run."""
+    import secrets
+    import shutil
+
+    parent = final.parent
+    up = Path("..") / relative_target       # from inside final/
+    marker = str(relative_target)
+    if final.is_dir() and not final.is_symlink():
+        mk = final / _PUBLISH_MARKER
+        if not mk.is_file():
+            raise FileExistsError(
+                f"refusing to publish over non-symlink at {final}; "
+                f"remove it explicitly to replace")
+        current = {p.name: os.readlink(p) for p in final.iterdir()
+                   if p.is_symlink()}
+        wanted = {new: str(up / old) for old, new in names.items()}
+        if mk.read_text().strip() == marker and current == wanted:
+            return final
+    tmp = parent / f".__publish_tmp_{secrets.token_hex(4)}"
+    tmp.mkdir()
+    try:
+        for old, new in names.items():
+            (tmp / new).symlink_to(up / old)
+        (tmp / _PUBLISH_MARKER).write_text(marker + "\n")
+        if final.is_symlink() or final.exists():
+            old_dir = parent / f".__publish_old_{secrets.token_hex(4)}"
+            os.replace(final, old_dir)
+            os.replace(tmp, final)
+            if old_dir.is_symlink():
+                old_dir.unlink()
+            else:
+                shutil.rmtree(old_dir)
+        else:
+            os.replace(tmp, final)
+    except Exception:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    return final
+
+
+def refresh_published_runs(stage_dir: Path) -> list[Path]:
+    """Re-publish runs in ``stage_dir`` whose pose files carry smoother
+    suffixes, so they appear under their video names (patch 122ir).
+
+    Converts directory symlinks made by older ``publish_to_stage`` calls
+    (and refreshes per-file publishes). Idempotent; never touches real
+    data directories. Returns the runs it changed."""
+    changed: list[Path] = []
+    if not stage_dir.is_dir():
+        return changed
+    for entry in sorted(stage_dir.iterdir()):
+        if entry.name.startswith("."):
+            continue
+        if entry.is_symlink():
+            rel = Path(os.readlink(entry))
+        elif (entry / _PUBLISH_MARKER).is_file():
+            rel = Path((entry / _PUBLISH_MARKER).read_text().strip())
+        else:
+            continue
+        source = (stage_dir / rel).resolve()
+        if not source.is_dir():
+            continue
+        names = _published_names(source)
+        if all(k == v for k, v in names.items()):
+            continue
+        before = (entry.is_symlink(),
+                  sorted(p.name for p in entry.iterdir()) if entry.is_dir() else [])
+        _publish_renamed(entry, rel, names)
+        after = (entry.is_symlink(), sorted(p.name for p in entry.iterdir()))
+        if before != after:
+            changed.append(entry)
+    return changed
+
+
 def publish_to_stage(
     project_root: Path,
     source_stage: str,
@@ -322,6 +438,15 @@ def publish_to_stage(
         )
     else:
         relative_target = Path("..") / source_stage / run_id
+
+    # Patch 122ir: pose files that carry the smoother's suffix
+    # (``<video>_smoothed_v2.<hash>.parquet``) are published under their
+    # video name, as a directory of per-file links — every downstream tool
+    # takes the file name as the video name, which then never matched the
+    # project's ROIs / calibration.
+    names = _published_names(source)
+    if any(k != v for k, v in names.items()):
+        return _publish_renamed(final, relative_target, names)
 
     # If the final path already exists, branch on what it is.
     if final.is_symlink():

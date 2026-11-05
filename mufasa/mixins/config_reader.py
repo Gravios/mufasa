@@ -398,6 +398,16 @@ class ConfigReader:
                 stage_parent, self.file_type,
             )
 
+        # Patch 122ir: runs published before 122ir linked the Kalman v2
+        # run directory as a whole, so files kept their smoother names
+        # (``<video>_smoothed_v2.<hash>.parquet``) and every analysis took
+        # that as the video name. Re-publish them under video names
+        # (idempotent; only rewrites links, never data).
+        try:
+            from mufasa.project_layout import refresh_published_runs
+            refresh_published_runs(root / "derived" / "outlier_corrected")
+        except Exception as _exc:  # never block opening a project
+            print(f"[config_reader] could not refresh published runs: {_exc}")
         self.outlier_corrected_dir = _latest_run_or_parent(
             root / "derived" / "outlier_corrected",
         )
