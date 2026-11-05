@@ -143,6 +143,41 @@ FEATURE_FAMILIES = [TWO_POINT_BP_DISTANCES,
                     ARENA_EDGE]
 
 
+def _explain_no_roi_coverage(video_names: list[str], roi_dict: dict,
+                             skipped: dict[str, list[str]]) -> str:
+    """Say WHY no video qualifies for ROI features (patch 122iq).
+
+    Two causes, which need different fixes: the ROI video names don't
+    match the tracking files' names at all, or they match but every video
+    lacks some ROI name used on another video (every video must carry the
+    same set of ROI names, since each ROI becomes a feature column).
+    """
+    data = sorted(set(video_names))
+    roi_videos = sorted(roi_dict)
+    matched = sorted(set(roi_videos) & set(data))
+
+    def few(xs, n=3):
+        xs = list(xs)
+        return ", ".join(xs[:n]) + (f" … (+{len(xs) - n})" if len(xs) > n else "")
+
+    head = (f"Cannot compute ROI features: none of the {len(data)} tracking "
+            f"files has a complete set of ROIs. ")
+    if not matched:
+        return head + (
+            f"ROIs are defined for {len(roi_videos)} video(s) ({few(roi_videos)}), "
+            f"but no tracking file has one of those names (tracking files: "
+            f"{few(data)}). ROIs are stored per video file name; the tracking "
+            f"files must have the same names.")
+    names = sorted({str(n) for d in roi_dict.values() for n in d})
+    examples = "; ".join(f"{v} lacks {few(sorted(skipped[v]), 4)}"
+                         for v in matched[:3] if skipped.get(v))
+    return head + (
+        f"Every video needs the same ROI names, because each ROI becomes a "
+        f"feature column. The project uses {len(names)} name(s): {few(names, 8)}. "
+        f"{examples}. Rename ROIs in the ROI table so all videos match, or "
+        f"use Apply to all / Apply to selected.")
+
+
 class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
     """
     Computes a subset of features from pose for non-ML downstream purposes.
@@ -345,12 +380,8 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             ]
             if not target_video_names:
                 raise NoROIDataError(
-                    msg=(
-                        "Cannot compute ROI features: none of the "
-                        f"{len(self.video_names)} videos have all "
-                        "required ROIs defined. Define ROIs on at "
-                        "least one video before running ROI features."
-                    ),
+                    msg=_explain_no_roi_coverage(
+                        self.video_names, self.roi_dict, videos_skipped),
                     source=self.__class__.__name__,
                 )
 

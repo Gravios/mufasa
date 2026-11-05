@@ -8,6 +8,20 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122iq — ROI-feature "no coverage" error says why.**
+User report: "NO ROI DATA ERROR: … none of the 39 videos have all required
+ROIs defined." ROI features need, for every tracking file, a video with the
+same name in rois.json carrying every ROI name used in the project (each ROI
+is a feature column). The message didn't say which condition failed. Now
+`_explain_no_roi_coverage` reports either that no ROI video name matches a
+tracking file (showing both sides' names), or the project's ROI names and
+what each video lacks (with the fix: rename in the ROI table, or Apply to
+all / selected) — the latter is easy to hit with the editor's automatic
+names.
+smoke_122iq_roi_coverage_message: 5/5 (real projects, FeatureSubsetsCalculator
+with the ROI families: name mismatch, inconsistent names, consistent names →
+features written). On the previous code 1/5.
+
 **122ip — the calibration is actually saved.**
 User report: calibrated in Preprocessing → Video Calibration, yet Compute
 Features said video_info.csv was missing. `VideoInfoForm` inherited the
