@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122is — parallel feature extraction: spawn workers, not fork.**
+User report: Compute Features with 16 workers → every video "BrokenProcessPool:
+A process in the process pool was terminated abruptly". Reproduced here: the
+workers print "Terminating: fork() called from a process already using GNU
+OpenMP, this is unsafe." `FeatureSubsetsCalculator._run_parallel` used a
+plain ProcessPoolExecutor (Linux default start method: fork) from a process
+that had already run numba-parallel kernels (OpenMP threading layer), and a
+forked child of a process with live GNU OpenMP threads aborts; one dead
+worker breaks the whole pool. It also forked the Qt GUI process from its
+worker thread. The pool now uses `mp_context=get_context("spawn")`; the
+console-script launchers guard `main()`, so spawned workers don't re-run the
+app. Not a leftover pool from an earlier attempt — each run makes a new one.
+smoke_122is_feature_pool_spawn: 4/4 — OpenMP threads started first, then a
+2-worker run, output identical to sequential (~16 s). On the fork pool:
+0/4 with the same "fork() … GNU OpenMP" abort. Feature suites unchanged.
+
 **122ir — published Kalman runs appear under video names.**
 User report (via 122iq's new message): ROIs defined for 39 videos
 (`K7_cam_…-triplet`), tracking files named `K7_cam_…-triplet_smoothed_v2.

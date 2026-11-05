@@ -701,7 +701,15 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             f"across {n_workers} workers..."
         )
         failures: list[tuple[str, str]] = []  # (video_name, error_msg)
-        with ProcessPoolExecutor(max_workers=n_workers) as pool:
+        # Patch 122is: start workers with "spawn", not the Linux default
+        # "fork". The parent has already run numba-parallel kernels, which
+        # start GNU OpenMP threads; a forked child of such a process aborts
+        # ("fork() called from a process already using GNU OpenMP, this is
+        # unsafe"), so every video failed with BrokenProcessPool. Forking
+        # the Qt GUI process from its worker thread is unsafe as well.
+        import multiprocessing as _mp
+        with ProcessPoolExecutor(max_workers=n_workers,
+                                 mp_context=_mp.get_context("spawn")) as pool:
             futures = {
                 pool.submit(
                     process_one_video,
