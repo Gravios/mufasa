@@ -8,6 +8,19 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122iu — README / docs banner (wide + mobile, dark + light).**
+New `docs/images/`: the Mufasa banner in the neurosuite-3 layout and the lion
+palette — `mufasa_banner_{dark,light}` (2560x800), a stacked narrow-screen
+version `mufasa_banner_mobile_{dark,light}` (1200x820) and a GitHub social
+preview (1280x640), each as PNG plus SVG source. The README and the docs
+index open with a `<picture>` that picks mobile vs wide by viewport width
+(`max-width: 700px`, listed first because the first matching source wins)
+and light vs dark by `prefers-color-scheme`; the dark wide banner is the
+fallback `<img>`. Tagline: "Kalman pose smoothing and animal behavior
+analysis from video pose-tracking data".
+smoke_122iu_readme_banner: 11/11. 122cn (docs index lists 5 unlisted docs)
+and 122br (SimBA.py gone) fail as before.
+
 **122it — Mufasa lion logo: app icon and startup splash.**
 New `mufasa/assets/branding/`: the lion-head symbol (`mufasa_icon_<16…512>.png`,
 `.svg`, `.ico`, transparent background) and the symbol + MUFASA wordmark

@@ -1,3 +1,12 @@
+<p align="center">
+  <picture>
+    <source media="(max-width: 700px) and (prefers-color-scheme: light)" srcset="images/mufasa_banner_mobile_light.png">
+    <source media="(max-width: 700px)" srcset="images/mufasa_banner_mobile_dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="images/mufasa_banner_light.png">
+    <img alt="Mufasa" src="images/mufasa_banner_dark.png" width="100%">
+  </picture>
+</p>
+
 # Mufasa documentation
 
 Index of documents in `docs/`. Three tracks: **workflow / user-facing**, **Tk → Qt migration & audits** (developer-facing), and **Kalman smoother design** (separate concern). Each doc states its audience and scope in its first lines.

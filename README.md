@@ -1,4 +1,11 @@
-# Mufasa
+<p align="center">
+  <picture>
+    <source media="(max-width: 700px) and (prefers-color-scheme: light)" srcset="docs/images/mufasa_banner_mobile_light.png">
+    <source media="(max-width: 700px)" srcset="docs/images/mufasa_banner_mobile_dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/images/mufasa_banner_light.png">
+    <img alt="Mufasa — Kalman pose smoothing and animal behavior analysis from video pose-tracking data" src="docs/images/mufasa_banner_dark.png" width="100%">
+  </picture>
+</p>
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
