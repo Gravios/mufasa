@@ -8,6 +8,24 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ip — the calibration is actually saved.**
+User report: calibrated in Preprocessing → Video Calibration, yet Compute
+Features said video_info.csv was missing. `VideoInfoForm` inherited the
+standard Run button; Run called its no-op `target()` and reported "Done.",
+while only a separate "Save to video_info.csv" button in the action row wrote
+the file (the form's comments claimed there was no Run button and that
+on_run was overridden — neither was true). Now:
+* Run is labelled "Save calibration" and saves (`on_run` → `_save`).
+* Edits and per-row calibrations flag "● Unsaved changes" with the target
+  path until saved; a fresh load is not an edit.
+* The missing-file error (read_video_info_csv / ConfigReader) names
+  Preprocessing → Video Calibration instead of SimBA's "[Video parameters]
+  tab"; stale logs/video_info.csv wording in the form fixed.
+smoke_122ip_calibration_save: 12/12 (form offscreen on a generated project,
+saved CSV read by read_video_info_csv and ConfigReader). Tripwire: removing
+only the Run→save override reproduces the report (file never written).
+smoke_video_info_form, 122ag, 122er unchanged.
+
 **122io — Compute Features runs again (shap, numba cross2d, ROI shape types).**
 User report: Compute Features → "preflight failed … No module named 'shap'".
 * `train_model_mixin` imported `shap` at module level; shap was dropped from

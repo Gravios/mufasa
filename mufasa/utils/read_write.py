@@ -484,7 +484,7 @@ def read_video_info_csv(file_path: str | os.PathLike, raise_error: bool = True) 
     EXPECTED_FLOAT_COLS = ["fps", "Resolution_width", "Resolution_height", "Distance_in_mm", "pixels/mm"]
 
     if not os.path.isfile(file_path):
-        raise NoFilesFoundError(msg=f"Could not find the video_info.csv table in your Mufasa project. Create it using the [Video parameters] tab. Mufasa expects the file at location {file_path}. See SimBA documentation for more info: https://t.ly/OtY79", source=read_video_info_csv.__name__)
+        raise NoFilesFoundError(msg=f"Could not find the video_info.csv table in your Mufasa project. Create it in Preprocessing → Video Calibration (fps and pixels/mm for every video). Mufasa expects the file at {file_path}.", source=read_video_info_csv.__name__)
     info_df = pd.read_csv(file_path)
     for c in EXPECTED_COLS:
         if c not in info_df.columns:

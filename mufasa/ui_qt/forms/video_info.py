@@ -111,7 +111,7 @@ class VideoInfoForm(OperationForm):
         self.btn_reload.clicked.connect(self._reload)
         self.btn_reload.setToolTip(
             "Re-scan the project's videos/ directory and load any "
-            "existing values from logs/video_info.csv. Discards "
+            "existing values from the project's video_info.csv. Discards "
             "unsaved edits."
         )
         action_row.addWidget(self.btn_reload)
@@ -144,8 +144,8 @@ class VideoInfoForm(OperationForm):
         self.btn_save = QPushButton("Save to video_info.csv", self)
         self.btn_save.clicked.connect(self._save)
         self.btn_save.setToolTip(
-            "Validate all rows and write the table to "
-            "project_folder/logs/video_info.csv. Required before "
+            "Validate all rows and write the project's video_info.csv "
+            "(sources/video_info.csv). Required before "
             "any distance-based feature extraction will produce "
             "valid mm-scaled values."
         )
@@ -177,13 +177,36 @@ class VideoInfoForm(OperationForm):
         self.status_label.setWordWrap(True)
         self.body_layout.addWidget(self.status_label)
 
+        self._dirty = False
         self._populate_if_possible()
+        self._set_dirty(False)
+        self.table.itemChanged.connect(lambda _item: self._set_dirty(True))
+
+        # Patch 122ip: the base form's Run button used to call a no-op
+        # target() and report "Done." — calibrating and pressing Run
+        # (as on every other form) saved nothing. Run now saves.
+        self.run_btn.setText("  Save calibration")
+        self.run_btn.setToolTip(
+            "Validate all rows and write the project's video_info.csv "
+            "(needed by feature computation, ROI analysis, ...)")
+
+    def on_run(self) -> None:
+        """The form's Run button saves the calibration table."""
+        self._save()
+
+    def _set_dirty(self, dirty: bool) -> None:
+        self._dirty = bool(dirty)
+        if dirty:
+            self.status_label.setText(
+                "<b style='color:#d08a00'>● Unsaved changes</b> — press "
+                "<b>Save calibration</b> to write "
+                f"{self._video_info_path()}")
+        elif getattr(self, "_saved_path", None):
+            self.status_label.setText(f"Saved to {self._saved_path}")
 
     # --------------------------------------------------------------- #
-    # OperationForm doesn't apply to this form — there's no run
-    # button (saving happens via the Save button inside the form).
-    # We override on_run to no-op so the parent's auto-Run button
-    # doesn't fire collect_args / target.
+    # collect_args / target are part of the OperationForm API but are
+    # not used: on_run above saves directly.
     # --------------------------------------------------------------- #
     def collect_args(self) -> dict:  # pragma: no cover — not used
         # Required override; never called because we don't use
@@ -240,8 +263,11 @@ class VideoInfoForm(OperationForm):
         else:
             self.status_label.setText(
                 f"No existing video_info.csv found at {info_path}. "
-                f"Fill in calibration values and Save to create it."
+                f"Fill in calibration values and press Save calibration "
+                f"to create it."
             )
+        # Filling the table fires itemChanged; a fresh load is not an edit.
+        self._dirty = False
 
     def _video_info_path(self) -> str:
         """Path to the project's video_info.csv. v1 keeps it at
@@ -579,7 +605,7 @@ class VideoInfoForm(OperationForm):
     # Save
     # --------------------------------------------------------------- #
     def _save(self) -> None:
-        """Validate all rows and write logs/video_info.csv."""
+        """Validate all rows and write the project's video_info.csv."""
         if not self.config_path:
             QMessageBox.warning(
                 self, self.title, "No project loaded.",
@@ -650,6 +676,8 @@ class VideoInfoForm(OperationForm):
             )
             return
 
+        self._saved_path = info_path
+        self._set_dirty(False)
         QMessageBox.information(
             self, self.title,
             f"Saved {len(records)} row(s) to:\n{info_path}",
