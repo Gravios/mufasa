@@ -230,7 +230,7 @@ check("-1 in a signed column is left alone",
       (Y.iloc[:5, 2] == -1).all())
 check("both cleanings are reported",
       "-1 placeholders read as missing in 1" in log.getvalue()
-      and "1 angle column(s) rotated" in log.getvalue())
+      and "angle columns (unwrap): 1 unwrapped" in log.getvalue())
 
 # ---- per-family log on a real feature tree ------------------------------------
 fam = Path(P["derived_features_dir"]) / "within_animal_three_point_body_part_angles_degrees"

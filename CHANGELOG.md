@@ -8,6 +8,29 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jb — mufasa-landscape: angles stop taking over; family filters and caps.**
+User report (after 122iz): still only angle pairs. With 15 markers the
+three-point-angle family has one column per marker triple (455), and much
+of their structure is circular in ways rotating the 0/360° cut cannot fix:
+angles covering the whole circle (no empty direction) and mirror images
+(bent left / bent right). Now:
+`--angles unwrap` (default) also drops full-circle angles (emptiest
+direction > 25 % of the mean density); `--angles fold` maps a → min(a,
+360 − a) so mirror images coincide; `--angles drop`.
+`--include-families` / `--exclude-families` (substrings of the family folder
+name; `kfv2` = pose) restrict the screen.
+Plot selection caps pairs touching any one family (`--max-per-family`,
+default 6; animate default 2) on top of the per-column cap; the run says
+when the caps leave slots empty.
+`pairs.csv` gains `family_a` / `family_b`; the log counts multimodal pairs
+per family.
+smoke_122jb_landscape_angles_and_families: 14/14 (unwrap / fold / drop on
+mirror, full-circle and wrap-around angles; a project with a 40-column
+circular angle family beside distance / movement / head-velocity families
+sharing a two-state structure: families spread in the plots, head velocity
+among them, fold cuts angle×angle multimodal pairs 231 → 0, include /
+exclude / drop). 122ix / 122iy / 122iz pass.
+
 **122ja — fix: HEAD VELOCITY IN BODY FRAME failed with NameError 'warnings'.**
 User report: every video failed with "NameError: name 'warnings' is not
 defined". `feature_subset_kernels` imported `warnings` only inside the

@@ -18,7 +18,14 @@ samples frames from all of them, then:
 2. **Plots the joint PDF** (2-D log-density histogram, marginal densities,
    dipsplit mode boundaries) of the top-ranked pairs: emergent first, then
    pairs that add modes, then the rest by dip statistic, with at most
-   ``--max-per-feature`` pairs per column.
+   ``--max-per-feature`` pairs per column and ``--max-per-family`` per
+   feature family (so a family with hundreds of columns — three-point
+   angles, one per marker triple — cannot take every slot).
+
+Angles are circular; ``--angles`` picks how they enter (rotate the cut to
+the emptiest direction and drop full-circle angles, fold mirror images,
+or drop them), and ``--include-families`` / ``--exclude-families`` restrict
+the screen by family.
 3. **Runs t-SNE** on a random sample of frames (robust z-scored, PCA to 50
    dimensions first) and plots it coloured by session and by the features
    that appear most often in the multimodal pairs.
@@ -286,19 +293,39 @@ def log_families(title: str, cols, ref=None, log=print) -> None:
         log(f"[landscape]   {f:<55} {n:>4}" + (f" / {base[f]}" if base else ""))
 
 
-def clean_columns(X: pd.DataFrame, log=print) -> pd.DataFrame:
-    """Undo two artefacts that would otherwise show up as 'modes':
+ANGLE_MODES = ("unwrap", "fold", "drop")
 
-    * the feature writer stores missing values as -1; in a column whose
+
+def is_angle_column(name: str, v: np.ndarray) -> bool:
+    w = v[np.isfinite(v)]
+    return "angle" in name.lower() and bool(w.size) and w.min() >= -360 and w.max() <= 360
+
+
+def clean_columns(X: pd.DataFrame, angles: str = "unwrap", log=print) -> pd.DataFrame:
+    """Undo artefacts that would otherwise show up as 'modes'.
+
+    * The feature writer stores missing values as -1; in a column whose
       other values are all >= 0 (distances, areas, movements, angles) a
-      -1 is a missing value, not a measurement → NaN;
-    * angles wrap at 0/360°: an angle hovering around 0° splits into a
-      lump near 0 and a lump near 360. Each angle column is rotated so its
-      wrap point falls at its least-populated direction (values then run
-      from that cut through 360° further, still in degrees).
+      -1 is a missing value, not a measurement → NaN.
+    * Angles are circular, and a dip test on a line cannot read them.
+      ``angles`` picks the treatment:
+
+      - ``unwrap`` (default): rotate each angle so its 0/360° cut falls at
+        its emptiest direction (values stay in degrees). An angle with no
+        empty direction — it covers the whole circle, so any cut splits a
+        lump — is dropped;
+      - ``fold``: replace a by min(a, 360 - a) (0–180°): mirror-image
+        configurations (bent left / bent right, a marker on either side)
+        become one value, so left/right symmetry no longer reads as two
+        modes;
+      - ``drop``: leave angles out.
     """
+    if angles not in ANGLE_MODES:
+        raise ValueError(f"angles must be one of {ANGLE_MODES}")
     X = X.copy()
-    n_sent = n_ang = 0
+    n_sent = 0
+    ang: dict[str, int] = {"unwrapped": 0, "folded": 0, "dropped": 0, "full-circle": 0}
+    drop = []
     for c in X.columns:
         v = X[c].to_numpy(np.float64, copy=True)
         fin = np.isfinite(v)
@@ -306,32 +333,69 @@ def clean_columns(X: pd.DataFrame, log=print) -> pd.DataFrame:
         if sent.any() and (v[fin & ~sent] >= 0).all():
             v[sent] = np.nan
             n_sent += 1
-        if "angle" in c.lower():
-            w = v[np.isfinite(v)]
-            if w.size and w.min() >= -360 and w.max() <= 360:
-                v = unwrap_angle(v)
-                n_ang += 1
+        if is_angle_column(c, v):
+            if angles == "drop":
+                drop.append(c)
+                ang["dropped"] += 1
+                continue
+            if angles == "fold":
+                a = np.mod(v, 360.0)
+                v = np.minimum(a, 360.0 - a)
+                ang["folded"] += 1
+            else:
+                v, gap = unwrap_angle(v, return_gap=True)
+                if gap > 0.25:
+                    drop.append(c)
+                    ang["full-circle"] += 1
+                    continue
+                ang["unwrapped"] += 1
         X[c] = v.astype(np.float32)
+    X = X.drop(columns=drop)
     if n_sent:
         log(f"[landscape] -1 placeholders read as missing in {n_sent} non-negative column(s)")
-    if n_ang:
-        log(f"[landscape] {n_ang} angle column(s) rotated so the 0/360° wrap sits at "
-            "their emptiest direction")
+    if any(ang.values()):
+        parts = [f"{n} {k}" for k, n in ang.items() if n]
+        log(f"[landscape] angle columns ({angles}): " + ", ".join(parts)
+            + (" — full-circle angles have no gap to cut at and are left out"
+               if ang["full-circle"] else ""))
     return X
 
 
-def unwrap_angle(v: np.ndarray, n_bins: int = 72) -> np.ndarray:
-    """Rotate degrees so the cut lies at the least-populated direction."""
+def unwrap_angle(v: np.ndarray, n_bins: int = 72, return_gap: bool = False):
+    """Rotate degrees so the cut lies at the least-populated direction.
+
+    With ``return_gap`` also returns the emptiest direction's density
+    relative to the mean (0 = a real gap, ~1 = uniform around the circle).
+    """
     fin = np.isfinite(v)
     a = np.mod(v[fin], 360.0)
     if a.size == 0:
-        return v
+        return (v, 0.0) if return_gap else v
     h, _ = np.histogram(a, bins=n_bins, range=(0, 360))
     hs = np.convolve(np.r_[h[-2:], h, h[:2]], np.ones(5) / 5, mode="valid")
-    cut = (int(np.argmin(hs)) + 0.5) * 360.0 / n_bins
+    k = int(np.argmin(hs))
+    cut = (k + 0.5) * 360.0 / n_bins
     out = np.full_like(v, np.nan, dtype=np.float64)
     out[fin] = cut + np.mod(a - cut, 360.0)
-    return out
+    gap = float(hs[k] / max(hs.mean(), 1e-12))
+    return (out, gap) if return_gap else out
+
+
+def keep_families(X: pd.DataFrame, include: str | None, exclude: str | None,
+                  log=print) -> pd.DataFrame:
+    """Restrict columns by family (comma-separated substrings of the family
+    directory name, e.g. ``angles,edge``; the pose is family ``kfv2 pose``)."""
+    def match(c, spec):
+        fam = COLUMN_FAMILY.get(c, "(other)")
+        return any(t.strip() and t.strip().lower() in fam.lower() for t in spec.split(","))
+    cols = list(X.columns)
+    if include:
+        cols = [c for c in cols if match(c, include)]
+    if exclude:
+        cols = [c for c in cols if not match(c, exclude)]
+    if len(cols) < X.shape[1]:
+        log(f"[landscape] family filter: {len(cols)}/{X.shape[1]} columns kept")
+    return X[cols]
 
 
 def stack(sessions: list[Session], log=print) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
@@ -499,20 +563,36 @@ def screen_pairs(Z: pd.DataFrame, *, dp: dict, n_jobs: int,
                            "dip_max"], ascending=False, ignore_index=True)
 
 
-def pick_pairs(pairs: pd.DataFrame, n: int, max_per_feature: int) -> pd.DataFrame:
-    """Top-ranked multimodal pairs, at most ``max_per_feature`` per column so
-    one bimodal column does not fill the page with its pairings."""
+def pick_pairs(pairs: pd.DataFrame, n: int, max_per_feature: int,
+               max_per_family: int | None = None) -> pd.DataFrame:
+    """Top-ranked multimodal pairs for plotting, spread out:
+
+    * at most ``max_per_feature`` pairs containing any one column, so one
+      bimodal column does not fill the page with its pairings;
+    * at most ``max_per_family`` pairs touching any one feature family
+      (needs the ``family_a`` / ``family_b`` columns), so a family with
+      hundreds of columns (three-point angles: one per marker triple)
+      cannot take every slot. Fewer than ``n`` pairs come back when the
+      caps run out; raise them to see more.
+    """
+    has_fam = bool(max_per_family) and {"family_a", "family_b"} <= set(pairs.columns)
     seen: dict[str, int] = {}
-    keep = []
+    fseen: dict[str, int] = {}
+    keep: list = []
     for i, r in pairs[pairs["multimodal"]].iterrows():
+        if len(keep) == n:
+            break
         if seen.get(r.feature_a, 0) >= max_per_feature or \
                 seen.get(r.feature_b, 0) >= max_per_feature:
+            continue
+        fams = {r.family_a, r.family_b} if has_fam else set()
+        if any(fseen.get(f, 0) >= max_per_family for f in fams):
             continue
         keep.append(i)
         seen[r.feature_a] = seen.get(r.feature_a, 0) + 1
         seen[r.feature_b] = seen.get(r.feature_b, 0) + 1
-        if len(keep) == n:
-            break
+        for f in fams:
+            fseen[f] = fseen.get(f, 0) + 1
     return pairs.loc[keep]
 
 
@@ -723,6 +803,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="cap the screen to this many columns")
     p.add_argument("--n-plot", type=int, default=24,
                    help="joint PDFs plotted (top-ranked multimodal pairs)")
+    p.add_argument("--angles", choices=ANGLE_MODES, default="unwrap",
+                   help="angle columns: unwrap (rotate the 0/360 cut to the emptiest "
+                        "direction; full-circle angles dropped), fold (min(a, 360-a): "
+                        "left/right mirror images merged) or drop")
+    p.add_argument("--include-families", default=None,
+                   help="only these families (comma-separated parts of the family "
+                        "folder name, e.g. 'distances,movements,head_velocity'; "
+                        "'kfv2' = the pose)")
+    p.add_argument("--exclude-families", default=None,
+                   help="leave these families out (same matching, e.g. 'angles,edge')")
+    p.add_argument("--max-per-family", type=int, default=6,
+                   help="plot at most this many pairs touching any one feature family "
+                        "(default 6)")
     p.add_argument("--max-per-feature", type=int, default=3,
                    help="plot at most this many pairs containing any one column")
     p.add_argument("--bins", type=int, default=80)
@@ -757,7 +850,8 @@ def main(argv: list[str] | None = None) -> int:
                              pose_cols=a.pose_cols,
                              frames_per_session=a.frames_per_session, seed=a.seed)
     X, sess, frame = stack(sessions)
-    X = clean_columns(X)
+    X = clean_columns(X, angles=a.angles)
+    X = keep_families(X, a.include_families, a.exclude_families)
     cols = select_columns(X, max_nan=a.max_nan, min_unique=a.min_unique,
                           max_corr=a.max_corr, max_features=a.max_features)
     log_families("columns screened per family (kept / loaded)", cols, list(X.columns))
@@ -770,14 +864,25 @@ def main(argv: list[str] | None = None) -> int:
     dp = dict(alpha=a.alpha, min_n=a.min_mode_n, min_dip=a.min_dip,
               max_valley=a.max_valley)
     pairs = screen_pairs(Z.iloc[sidx], dp=dp, n_jobs=a.n_jobs)
+    pairs.insert(2, "family_a", [COLUMN_FAMILY.get(c, "(other)") for c in pairs.feature_a])
+    pairs.insert(3, "family_b", [COLUMN_FAMILY.get(c, "(other)") for c in pairs.feature_b])
     pairs.to_csv(out / "pairs.csv", index=False)
+    mm = pairs[pairs["multimodal"]]
+    if len(mm):
+        fc = pd.concat([mm.family_a, mm.family_b]).value_counts()
+        print("[landscape] multimodal pairs per family: "
+              + ", ".join(f"{f} {n}" for f, n in fc.items()))
     n_multi = int(pairs["multimodal"].sum())
     n_emerg = int(pairs["emergent"].sum())
     n_adds = int(pairs["adds_modes"].sum())
     print(f"[landscape] {n_multi}/{len(pairs)} pairs multimodal; {n_adds} with more "
           f"modes jointly than in either column, {n_emerg} of them emergent "
           f"(unimodal columns)")
-    top = pick_pairs(pairs, a.n_plot, a.max_per_feature)
+    top = pick_pairs(pairs, a.n_plot, a.max_per_feature, a.max_per_family)
+    if 0 < len(top) < min(a.n_plot, n_multi):
+        print(f"[landscape] plotting {len(top)} pairs: the per-family "
+              f"(--max-per-family {a.max_per_family}) and per-column "
+              f"(--max-per-feature {a.max_per_feature}) caps leave no more")
     plot_pairs(X[cols], top, out, bins=a.bins, dp=dp)
 
     results = {"sessions": len(sessions), "frames": int(len(X)),

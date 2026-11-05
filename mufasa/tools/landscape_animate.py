@@ -298,6 +298,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="without --pair: visit the N top-ranked pairs of pairs.csv (default 4)")
     p.add_argument("--max-per-feature", type=int, default=1,
                    help="with --top: at most this many pairs per column (default 1)")
+    p.add_argument("--max-per-family", type=int, default=2,
+                   help="with --top: at most this many pairs touching any one feature "
+                        "family (default 2)")
     p.add_argument("--through-tsne", action="store_true",
                    help="return to the t-SNE map between pairs")
     p.add_argument("--color", default="tsne",
@@ -334,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         from mufasa.tools.feature_landscape import pick_pairs
         table = pd.read_csv(run / "pairs.csv")
-        top = pick_pairs(table, a.top, a.max_per_feature)
+        top = pick_pairs(table, a.top, a.max_per_feature, a.max_per_family)
         pairs = list(zip(top.feature_a, top.feature_b))
         if not pairs:
             raise SystemExit("pairs.csv has no multimodal pairs; name some with --pair A B")
