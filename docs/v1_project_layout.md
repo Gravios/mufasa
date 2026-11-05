@@ -75,7 +75,7 @@ Pipeline-stage outputs. Each major stage has its own subdirectory; within most o
 | Kalman v2 smoothing | `derived/smoothed/kalman_v2/<run_id>/` | Yes | `<video>_smoothed_v2.<hash>.parquet` plus `run.toml`. |
 | Outlier correction | `derived/outlier_corrected/<run_id>/` | Yes | The pose that downstream stages read. Import, interpolation and smoothing runs are *published* here as relative links, renamed to plain video names so ROIs and calibration match. |
 | Feature extraction | `derived/features/<family>/<video>.parquet` | No (per family) | One subtree per feature family, so families can be added incrementally (122ae). |
-| Labels (targets) | `derived/labels/<video>.parquet` | No (flat) | Training targets aligned with features; edited in place. |
+| Labels (targets) | `derived/labels/<video>.parquet` | No (flat) | Training targets aligned with features; edited in place. `derived/labels/annotation_status.toml` records which videos the annotator marked complete (122jc). |
 | Classifications | `derived/classifications/` | No (flat) | Per-video predictions; one parquet per video. Patch 122ax decision: flat for simpler downstream reads. |
 | Directionality | `derived/directionality/` | No (flat) | Animal-to-animal directing data. |
 | Frame extraction | `derived/frames/extracted/<video>/` | No | Per-video extracted frame dumps. |

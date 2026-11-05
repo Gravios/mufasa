@@ -8,6 +8,34 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jc — Frame Labeling: annotation status table, "Mark video complete", click-to-seek in the label plot.**
+Frame Labeling page: a table of every project video with its status
+(✓ complete / ● in progress / ○ saved, empty / — not started), labelled
+frames per behaviour (count and %), and last save; a summary line; numeric
+sorting; Refresh, plus live refresh whenever a labeller saves or changes a
+complete mark (`annotation_events()` signal). **Label** (or double-click)
+opens the selected video directly; with no selection it still asks for a
+file. Choosing *New labeling* for a video that already has labels asks
+first and offers Continue (New would start empty and overwrite on save).
+Labeller: **Mark video complete** checkbox next to Save, initialised from
+and written to `derived/labels/annotation_status.toml` (new
+`mufasa.utils.annotation_status`); checking it saves unsaved labels first.
+Label plot: left-click (or drag) inside the lanes moves the video to that
+frame, using the same window maths as the drawing; clicks on the name
+column are ignored; seeks clamp to the video.
+Two fixes found on the way: the TOML writer emitted every key bare, so a
+key with a dot or space (a dotted video name, a classifier called "head
+dip" in `[classifiers.keys]`) produced a project.toml that could not be read
+back — keys are now quoted when needed (`_toml_key`); and the label /
+feature / classification / CSV-export helpers stripped "extensions" with
+`Path.stem`, so labels for a video named `rec.v2` were saved as `rec` — they
+now strip only real video / table extensions (`strip_media_ext`).
+smoke_122jc_labeling_status_complete_plot_seek: 30/30 (offscreen form +
+labeller on real video files: table, sorting, launch / guard / double-click,
+complete mark incl. save-first and live refresh, plot click / name column /
+edge / drag / clamp, TOML keys, extension stripping). Labelling, label /
+feature / classification I/O and project-layout suites as before.
+
 **122jb — mufasa-landscape: angles stop taking over; family filters and caps.**
 User report (after 122iz): still only angle pairs. With 15 markers the
 three-point-angle family has one column per marker triple (455), and much

@@ -50,7 +50,9 @@ __all__ = [
 
 
 def _strip_video_ext(video_name: str) -> str:
-    return Path(video_name).stem
+    # Patch 122jc: only real video / table extensions (keeps dotted names).
+    from mufasa.utils.annotation_status import strip_media_ext
+    return strip_media_ext(video_name)
 
 
 def _write_csv(df: pd.DataFrame, dest_path: str,

@@ -35,7 +35,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import numpy as np
-from PySide6.QtCore import QRect, Qt
+from PySide6.QtCore import QRect, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -66,6 +66,11 @@ _LANE_COLORS: Sequence[tuple[int, int, int]] = (
 
 
 class LabelTimeseriesPlot(QWidget):
+    #: Patch 122jc — emitted with a frame index when the user left-clicks
+    #: (or drags with the left button held) inside the plot area; the
+    #: labeller seeks the video there.
+    frame_clicked = Signal(int)
+
     """Patch 122fg — Active ±-N-seconds plot of label state.
 
     The plot has one horizontal lane per classifier. Within each
@@ -92,6 +97,8 @@ class LabelTimeseriesPlot(QWidget):
         self._bot_pad: int = 18
 
         self.setMinimumHeight(80)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip("Click (or drag) to move to that time")
         self.setSizePolicy(QSizePolicy.Expanding,
                             QSizePolicy.Minimum)
 
@@ -144,6 +151,50 @@ class LabelTimeseriesPlot(QWidget):
         if seconds > 0:
             self._window_seconds = float(seconds)
             self.update()
+
+    # ------------------------------------------------------------------ #
+    # Mouse: click / drag to seek (patch 122jc)
+    # ------------------------------------------------------------------ #
+    def frame_at(self, x: float) -> int | None:
+        """Frame under horizontal widget position ``x``, or None when
+        ``x`` is in the lane-name column. Uses the same window maths
+        as :meth:`paintEvent`, so a click lands on the drawn frame."""
+        plot_x = self._label_col_w
+        plot_w = max(40, self.width() - plot_x - 8)
+        if x < plot_x:
+            return None
+        half = max(1, int(round(self._window_seconds * self._fps)))
+        start_f = self._current_frame - half
+        total = 2 * half
+        f = start_f + (min(x, plot_x + plot_w) - plot_x) * total / plot_w
+        return max(0, int(round(f)))
+
+    def mousePressEvent(self, ev) -> None:  # noqa: ANN001
+        if ev.button() == Qt.LeftButton:
+            f = self.frame_at(ev.position().x())
+            if f is not None:
+                self._drag_anchor = (ev.position().x(), f)
+                self.frame_clicked.emit(f)
+                ev.accept()
+                return
+        super().mousePressEvent(ev)
+
+    def mouseMoveEvent(self, ev) -> None:  # noqa: ANN001
+        if ev.buttons() & Qt.LeftButton and getattr(self, "_drag_anchor", None):
+            # Dragging scrubs relative to where the drag started, so the
+            # window re-centring on every seek doesn't make it run away.
+            x0, f0 = self._drag_anchor
+            plot_w = max(40, self.width() - self._label_col_w - 8)
+            half = max(1, int(round(self._window_seconds * self._fps)))
+            f = f0 + (ev.position().x() - x0) * (2 * half) / plot_w
+            self.frame_clicked.emit(max(0, int(round(f))))
+            ev.accept()
+            return
+        super().mouseMoveEvent(ev)
+
+    def mouseReleaseEvent(self, ev) -> None:  # noqa: ANN001
+        self._drag_anchor = None
+        super().mouseReleaseEvent(ev)
 
     # ------------------------------------------------------------------ #
     # Rendering

@@ -58,7 +58,7 @@ import os
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -76,6 +76,25 @@ from PySide6.QtWidgets import (
 
 from mufasa.ui_qt.forms.analysis import _load_classifier_names
 from mufasa.ui_qt.frame_scrubber import FrameScrubberWidget
+
+
+# --------------------------------------------------------------------------- #
+# Annotation-change events (patch 122jc)
+# --------------------------------------------------------------------------- #
+class _AnnotationEvents(QObject):
+    """Process-wide notice that a video's labels or complete mark changed,
+    so views such as the Frame Labeling table refresh without polling."""
+    changed = Signal(str, str)      # (config_path, video name)
+
+
+_EVENTS: _AnnotationEvents | None = None
+
+
+def annotation_events() -> _AnnotationEvents:
+    global _EVENTS
+    if _EVENTS is None:
+        _EVENTS = _AnnotationEvents()
+    return _EVENTS
 
 
 # --------------------------------------------------------------------------- #
@@ -267,6 +286,8 @@ class FrameLabellerWidget(QWidget):
             LabelTimeseriesPlot,
         )
         self.timeseries_plot = LabelTimeseriesPlot(self)
+        # Patch 122jc: left-click / drag in the plot moves the video there.
+        self.timeseries_plot.frame_clicked.connect(self._seek_from_plot)
         outer.addWidget(self.timeseries_plot)
 
         # Patch 122ff — per-classifier checkbox bar shows the
@@ -302,6 +323,7 @@ class FrameLabellerWidget(QWidget):
             "Space = pause · "
             "↑ / ↓ = playback rate ×1.25 / ÷1.25 · "
             "PgUp / PgDn = jump to prev / next label transition · "
+            "click the label plot = go to that time · "
             "Shift+← / Shift+→ = jog 10 frames · "
             "Ctrl+S = save</i>",
             self,
@@ -330,13 +352,31 @@ class FrameLabellerWidget(QWidget):
         # Save button (always visible) + Close button (hidden in
         # dock mode by set_in_dock)
         btns = QDialogButtonBox(self)
+        # Patch 122jc: "Mark video complete" — recorded in
+        # derived/labels/annotation_status.toml and shown in the Frame
+        # Labeling table. Checking it saves the labels first.
+        from mufasa.utils.annotation_status import is_complete
+        self.complete_cb = QCheckBox("Mark video complete", self)
+        self.complete_cb.setToolTip(
+            "Mark this video's annotation as finished (saves the labels). "
+            "Shown in the Frame Labeling table; uncheck to reopen.")
+        try:
+            self.complete_cb.setChecked(is_complete(self.config_path, self.video_name))
+        except Exception:
+            pass
+        self.complete_cb.toggled.connect(self._on_complete_toggled)
+
         self.save_btn = btns.addButton("Save", QDialogButtonBox.ApplyRole)
         self.save_btn.clicked.connect(self._save)
         self._close_btn = btns.addButton(
             "Close", QDialogButtonBox.RejectRole,
         )
         self._close_btn.clicked.connect(self._request_close)
-        outer.addWidget(btns)
+        bottom = QHBoxLayout()
+        bottom.addWidget(self.complete_cb)
+        bottom.addStretch()
+        bottom.addWidget(btns)
+        outer.addLayout(bottom)
 
     def _setup_shortcuts(self) -> None:
         """Patch 122ff — rewired keyboard shortcuts to match the
@@ -765,6 +805,43 @@ class FrameLabellerWidget(QWidget):
         if plot is not None:
             plot.set_current_frame(frame_idx)
 
+    def _seek_from_plot(self, frame_idx: int) -> None:
+        """Patch 122jc: label-plot click / drag → move the video there."""
+        n = self.scrubber.total_frames
+        if n <= 0:
+            return
+        target = max(0, min(int(frame_idx), n - 1))
+        if target != self.scrubber.current_frame:
+            self.scrubber.seek(target)
+
+    def _on_complete_toggled(self, checked: bool) -> None:
+        """Patch 122jc: record the complete mark. Marking complete saves
+        the labels first, so 'complete' never refers to unsaved work."""
+        from mufasa.utils.annotation_status import set_complete
+        if checked and (self._dirty or not self._labels_file_exists()):
+            if not self._save():
+                self.complete_cb.blockSignals(True)
+                self.complete_cb.setChecked(False)
+                self.complete_cb.blockSignals(False)
+                return
+        try:
+            set_complete(self.config_path, self.video_name, checked)
+        except Exception as exc:
+            QMessageBox.critical(self, "Could not record status", str(exc))
+            return
+        self.status.setText(
+            f"'{self.video_name}' marked complete." if checked
+            else f"'{self.video_name}' reopened (no longer marked complete).")
+        annotation_events().changed.emit(str(self.config_path), self.video_name)
+
+    def _labels_file_exists(self) -> bool:
+        try:
+            from mufasa.project_layout import project_paths_from_config
+            d = project_paths_from_config(self.config_path)["derived_labels_dir"]
+            return os.path.isfile(os.path.join(d, f"{self.video_name}.parquet"))
+        except Exception:
+            return False
+
     def _toggle_clf(self, name: str) -> None:
         cb = self._clf_cbs.get(name)
         if cb is not None:
@@ -780,7 +857,7 @@ class FrameLabellerWidget(QWidget):
     # ------------------------------------------------------------------ #
     # Save
     # ------------------------------------------------------------------ #
-    def _save(self) -> None:
+    def _save(self) -> bool:
         """Write the label matrix to derived/labels/<video>.parquet
         via save_labels_for_video. Labels-only — features stay in
         derived/features/ where the bulk extractor put them, and
@@ -803,11 +880,14 @@ class FrameLabellerWidget(QWidget):
             )
             self._dirty = False
             self.status.setText(f"Saved → {out_path}")
+            annotation_events().changed.emit(str(self.config_path), self.video_name)
+            return True
         except Exception as exc:
             QMessageBox.critical(
                 self, "Save failed",
                 f"Could not save labels: {exc}",
             )
+            return False
 
     def _request_close(self) -> None:
         """Close button clicked. Walk up to the host container and
@@ -958,7 +1038,8 @@ def open_frame_labeller_dock(parent: QWidget,
 # --------------------------------------------------------------------------- #
 def launch_frame_labeller(parent: QWidget,
                           config_path: str,
-                          mode: str = "new") -> None:
+                          mode: str = "new",
+                          video_path: str | None = None) -> None:
     """Prompt for a video file, then open the labeler.
 
     Patch 122aj: opens via :func:`open_frame_labeller_dock` so the
@@ -990,10 +1071,13 @@ def launch_frame_labeller(parent: QWidget,
         # project layout helper can't resolve a video dir for
         # any reason. Better to open SOMEWHERE than nowhere.
         start_dir = ""
-    path, _ = QFileDialog.getOpenFileName(
-        parent, "Select video to annotate", start_dir,
-        "Videos (*.mp4 *.avi *.mov *.mkv *.webm)",
-    )
+    # Patch 122jc: the Frame Labeling table passes the chosen video.
+    path = video_path
+    if not path:
+        path, _ = QFileDialog.getOpenFileName(
+            parent, "Select video to annotate", start_dir,
+            "Videos (*.mp4 *.avi *.mov *.mkv *.webm)",
+        )
     if not path:
         return
     try:
@@ -1010,6 +1094,7 @@ def launch_frame_labeller(parent: QWidget,
 
 
 __all__ = [
+    "annotation_events",
     "FrameLabellerDialog",
     "FrameLabellerWidget",
     "launch_frame_labeller",

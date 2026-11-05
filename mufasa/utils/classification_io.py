@@ -77,7 +77,11 @@ __all__ = [
 def _strip_video_ext(video_name: str) -> str:
     """Accept either 'video_001' or 'video_001.mp4'. Returns the
     bare stem either way."""
-    return Path(video_name).stem
+    # Patch 122jc: strip only a real video / table extension. Path.stem
+    # also cut dotted video names ("rec.v2" -> "rec"), so their labels,
+    # features and classifications landed under the wrong name.
+    from mufasa.utils.annotation_status import strip_media_ext
+    return strip_media_ext(video_name)
 
 
 def _classifications_dir(config_path: str) -> Path:

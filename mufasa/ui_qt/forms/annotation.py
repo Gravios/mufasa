@@ -82,6 +82,29 @@ class _LauncherForm(OperationForm):
 # --------------------------------------------------------------------------- #
 # FrameLabellingLauncher — launches the Qt FrameLabellerDialog
 # --------------------------------------------------------------------------- #
+_SORT_ROLE = Qt.UserRole + 1
+
+
+def _make_sort_item():
+    from PySide6.QtWidgets import QTableWidgetItem
+
+    class SortItem(QTableWidgetItem):
+        """Sorts by a numeric key (``_SORT_ROLE``) when both cells have one,
+        so status / counts / dates sort by value rather than text."""
+
+        def __lt__(self, other):  # noqa: D105
+            a, b = self.data(_SORT_ROLE), other.data(_SORT_ROLE)
+            if a is not None and b is not None:
+                return a < b
+            # (QTableWidgetItem.__lt__ re-enters this override in PySide6
+            # and recurses until the stack overflows — compare text here.)
+            return self.text().lower() < other.text().lower()
+
+    return SortItem
+
+
+_SortItem = _make_sort_item()
+
 class FrameLabellingLauncher(OperationForm):
     """Launch the Qt frame-labeller for behavioural annotation.
 
@@ -153,15 +176,153 @@ class FrameLabellingLauncher(OperationForm):
         launch = QPushButton("  Label", self)
         launch.setStyleSheet("padding: 8px 16px; font-size: 11pt;")
         launch.setMinimumWidth(140)
+        launch.setToolTip("Label the video selected in the table "
+                          "(or pick a file when none is selected)")
         launch.clicked.connect(self._launch)
+        self.launch_btn = launch
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         btn_row.addWidget(launch)
         self.body_layout.addLayout(btn_row)
 
+        # Patch 122jc — which videos already have annotations.
+        self._build_status_table()
+
         # Labellers are long-running interactive sessions; the base
         # class's Run button doesn't fit this flow.
         self.run_btn.setVisible(False)
+
+    # ------------------------------------------------------------------ #
+    # Patch 122jc — annotation status table
+    # ------------------------------------------------------------------ #
+    STATUS_COLUMNS = ("Video", "Status", "Labelled frames", "Last saved")
+    _STATE_STYLE = {
+        "complete":    ("✓ complete",    "#2e7d32"),
+        "in progress": ("● in progress", "#b26a00"),
+        "started":     ("○ saved, empty", "#8d6e63"),
+        "not started": ("— not started", None),
+    }
+
+    def _build_status_table(self) -> None:
+        from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QTableWidget
+        head = QHBoxLayout()
+        self.status_summary = QLabel("", self)
+        head.addWidget(self.status_summary)
+        head.addStretch()
+        refresh = QPushButton("Refresh", self)
+        refresh.clicked.connect(self.refresh_status)
+        head.addWidget(refresh)
+        self.body_layout.addLayout(head)
+        t = QTableWidget(0, len(self.STATUS_COLUMNS), self)
+        t.setHorizontalHeaderLabels(self.STATUS_COLUMNS)
+        t.setSelectionBehavior(QAbstractItemView.SelectRows)
+        t.setSelectionMode(QAbstractItemView.SingleSelection)
+        t.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        t.verticalHeader().setVisible(False)
+        t.setSortingEnabled(True)
+        hh = t.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+        for c in range(1, len(self.STATUS_COLUMNS)):
+            hh.setSectionResizeMode(c, QHeaderView.ResizeToContents)
+        t.setMinimumHeight(220)
+        t.setToolTip("Double-click a video to label it")
+        t.cellDoubleClicked.connect(self._on_row_double_clicked)
+        self.status_table = t
+        self.body_layout.addWidget(t)
+        try:
+            from mufasa.ui_qt.frame_labeller import annotation_events
+            annotation_events().changed.connect(self._on_annotation_changed)
+        except Exception:
+            pass
+        self.refresh_status()
+
+    def _on_row_double_clicked(self, row: int, _col: int) -> None:
+        self.status_table.selectRow(row)
+        self._launch()
+
+    def _on_annotation_changed(self, config_path: str, _video: str) -> None:
+        if self.config_path and str(config_path) == str(self.config_path):
+            self.refresh_status()
+
+    def showEvent(self, ev) -> None:  # noqa: ANN001
+        super().showEvent(ev)
+        if hasattr(self, "status_table"):
+            self.refresh_status()
+
+    def refresh_status(self) -> None:
+        """Re-read labels and complete marks; keep the selected video."""
+        from datetime import datetime
+
+        from PySide6.QtGui import QBrush, QColor
+        QTableWidgetItem = _SortItem
+        t = self.status_table
+        keep = self.selected_video()
+        t.setSortingEnabled(False)
+        t.setRowCount(0)
+        if not self.config_path:
+            self.status_summary.setText("<i>No project loaded.</i>")
+            return
+        try:
+            from mufasa.ui_qt.forms.analysis import _load_classifier_names
+            from mufasa.utils.annotation_status import summarize
+            rows = summarize(self.config_path, _load_classifier_names(self.config_path))
+        except Exception as exc:
+            self.status_summary.setText(f"<i>Could not read annotation status: {exc}</i>")
+            return
+        self._rows = {r.video: r for r in rows}
+        for r in rows:
+            i = t.rowCount()
+            t.insertRow(i)
+            name = QTableWidgetItem(r.video)
+            name.setData(Qt.UserRole, r.video)
+            if r.video_path is None:
+                name.setToolTip("Labels exist but the video is not in sources/videos")
+                name.setForeground(QBrush(QColor("#9e9e9e")))
+            text, colour = self._STATE_STYLE[r.state]
+            st = QTableWidgetItem(text)
+            st.setData(_SORT_ROLE, ("not started", "started", "in progress",
+                                    "complete").index(r.state))
+            if colour:
+                st.setForeground(QBrush(QColor(colour)))
+            if r.has_labels and r.labelled:
+                parts = [f"{k} {v:,}" + (f" ({100 * v / r.n_frames:.1f}%)" if r.n_frames else "")
+                         for k, v in r.labelled.items()]
+                lab = QTableWidgetItem(" · ".join(parts))
+                lab.setData(_SORT_ROLE, sum(r.labelled.values()))
+            else:
+                lab = QTableWidgetItem("")
+                lab.setData(_SORT_ROLE, -1)
+            saved = QTableWidgetItem(
+                datetime.fromtimestamp(r.saved).strftime("%Y-%m-%d %H:%M") if r.saved else "")
+            saved.setData(_SORT_ROLE, r.saved or 0.0)
+            for c, it in enumerate((name, st, lab, saved)):
+                t.setItem(i, c, it)
+        t.setSortingEnabled(True)
+        n_done = sum(r.state == "complete" for r in rows)
+        n_prog = sum(r.state in ("in progress", "started") for r in rows)
+        self.status_summary.setText(
+            f"<b>{len(rows)}</b> videos · <b>{n_done}</b> complete · "
+            f"<b>{n_prog}</b> in progress · <b>{len(rows) - n_done - n_prog}</b> not started")
+        if keep:
+            self.select_video(keep)
+
+    def selected_video(self) -> str | None:
+        t = getattr(self, "status_table", None)
+        if t is None:
+            return None
+        rows = t.selectionModel().selectedRows() if t.selectionModel() else []
+        if not rows:
+            return None
+        it = t.item(rows[0].row(), 0)
+        return it.data(Qt.UserRole) if it else None
+
+    def select_video(self, video: str) -> None:
+        t = self.status_table
+        for i in range(t.rowCount()):
+            it = t.item(i, 0)
+            if it and it.data(Qt.UserRole) == video:
+                t.selectRow(i)
+                return
 
     def _launch(self) -> None:
         if not self.config_path:
@@ -172,10 +333,34 @@ class FrameLabellingLauncher(OperationForm):
             )
             return
         mode = self.MODES[self.mode_cb.currentIndex()][1]
+        video = self.selected_video()
+        row = getattr(self, "_rows", {}).get(video) if video else None
+        video_path = row.video_path if row else None
+        if row is not None and video_path is None:
+            QMessageBox.warning(
+                self.window(), "Video not found",
+                f"'{video}' has labels but no video in sources/videos.")
+            return
+        # Patch 122jc: "New" on a video that already has labels would start
+        # from zeros and overwrite them on save — ask first.
+        if row is not None and row.has_labels and mode == "new":
+            reply = QMessageBox.question(
+                self.window(), "Video already has labels",
+                f"'{video}' already has labels"
+                + (f" ({sum(row.labelled.values()):,} labelled frames)" if row.labelled else "")
+                + ". <b>New labeling</b> starts from empty labels and overwrites "
+                "them when you save.<br><br>Continue the existing labels instead?",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Yes)
+            if reply == QMessageBox.Cancel:
+                return
+            if reply == QMessageBox.Yes:
+                mode = "continue"
         # Import here to keep module-load light — cv2 comes with a cost
         from mufasa.ui_qt.frame_labeller import launch_frame_labeller
         launch_frame_labeller(self.window(),
-                              config_path=self.config_path, mode=mode)
+                              config_path=self.config_path, mode=mode,
+                              video_path=video_path)
 
     # OperationForm interface — unused, launcher handles everything
     def collect_args(self) -> dict:

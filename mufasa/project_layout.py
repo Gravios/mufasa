@@ -531,7 +531,7 @@ def _format_toml(data: dict[str, Any]) -> list[str]:
     bare = {k: v for k, v in data.items() if not isinstance(v, dict)}
     sectioned = {k: v for k, v in data.items() if isinstance(v, dict)}
     for k, v in bare.items():
-        out.append(f"{k} = {_format_toml_value(v)}")
+        out.append(f"{_toml_key(k)} = {_format_toml_value(v)}")
     if bare and sectioned:
         out.append("")
     for sec_name, sec_body in sectioned.items():
@@ -557,30 +557,30 @@ def _format_toml(data: dict[str, Any]) -> list[str]:
         table_arrays = {
             k: v for k, v in sec_body.items() if _is_table_array(v)
         }
-        out.append(f"[{sec_name}]")
+        out.append(f"[{_toml_key(sec_name)}]")
         for k, v in flat.items():
-            out.append(f"{k} = {_format_toml_value(v)}")
+            out.append(f"{_toml_key(k)} = {_format_toml_value(v)}")
         out.append("")
         for arr_name, rows in table_arrays.items():
             for row in rows:
-                out.append(f"[[{sec_name}.{arr_name}]]")
+                out.append(f"[[{_toml_key(sec_name)}.{_toml_key(arr_name)}]]")
                 for k, v in row.items():
                     if isinstance(v, dict) or _is_table_array(v):
                         raise TypeError(
                             f"nested tables inside an array of tables are "
                             f"not supported (at {sec_name}.{arr_name}.{k})"
                         )
-                    out.append(f"{k} = {_format_toml_value(v)}")
+                    out.append(f"{_toml_key(k)} = {_format_toml_value(v)}")
                 out.append("")
         for sub_name, sub_body in subs.items():
-            out.append(f"[{sec_name}.{sub_name}]")
+            out.append(f"[{_toml_key(sec_name)}.{_toml_key(sub_name)}]")
             for k, v in sub_body.items():
                 if isinstance(v, dict):
                     raise TypeError(
                         f"nested-twice tables not supported "
                         f"(at {sec_name}.{sub_name}.{k})"
                     )
-                out.append(f"{k} = {_format_toml_value(v)}")
+                out.append(f"{_toml_key(k)} = {_format_toml_value(v)}")
             out.append("")
     # Trim trailing blank
     while out and out[-1] == "":
@@ -618,6 +618,18 @@ def _format_toml_value(v: Any) -> str:
     raise TypeError(
         f"unsupported TOML value type {type(v).__name__}: {v!r}"
     )
+
+
+_BARE_KEY = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _toml_key(k: Any) -> str:
+    """A TOML key: bare when it may be (letters, digits, ``_``, ``-``),
+    otherwise quoted. Patch 122jc — keys were always written bare, so a
+    key with a dot or a space (a video name, a classifier called "head
+    dip") produced a file that could not be read back."""
+    k = str(k)
+    return k if _BARE_KEY.match(k) else _toml_string(k)
 
 
 def _toml_string(s: str) -> str:
