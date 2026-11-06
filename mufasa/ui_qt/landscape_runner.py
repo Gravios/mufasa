@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-from PySide6.QtCore import QProcess, Qt, QUrl
+from PySide6.QtCore import QProcess, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QMovie, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -169,6 +169,120 @@ def animate_argv(run: Path, pairs: list[tuple[str, str]], out: Path,
 
 
 # --------------------------------------------------------------------------- #
+# Pair matrix (patch 122jr)
+# --------------------------------------------------------------------------- #
+class PairMatrix(QWidget):
+    """Feature × feature grid of tick boxes: the cell in row *a*, column *b*
+    animates the joint space with *a* on x and *b* on y (the mirror cell
+    swaps the axes). The diagonal is unused. Ticked cells show their place
+    in the animation, which follows the order they were ticked in."""
+
+    changed = Signal()
+
+    def __init__(self, cols: list[str], labels: list[str], parent: QWidget | None = None):
+        super().__init__(parent)
+        self.cols = list(cols)
+        self._order: list[tuple[str, str]] = []
+        self._busy = False
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        hint = QLabel("Tick the joint spaces to animate — row feature on x, column "
+                      "feature on y. Numbers give the order (the order you tick them); "
+                      "the animation goes t-SNE → 1 → t-SNE → 2 → …", self)
+        hint.setWordWrap(True)
+        lay.addWidget(hint)
+        n = len(self.cols)
+        self.grid = QTableWidget(n, n, self)
+        self.grid.setSelectionMode(QAbstractItemView.NoSelection)
+        self.grid.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        for r in range(n):
+            for c in range(n):
+                it = QTableWidgetItem("")
+                it.setTextAlignment(Qt.AlignCenter)
+                if r == c:
+                    it.setFlags(Qt.NoItemFlags)
+                    it.setBackground(self.palette().mid())
+                else:
+                    it.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+                    it.setCheckState(Qt.Unchecked)
+                self.grid.setItem(r, c, it)
+        self.grid.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.grid.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.set_labels(labels)
+        self.grid.itemChanged.connect(self._on_item)
+        lay.addWidget(self.grid, 1)
+        brow = QHBoxLayout()
+        self.best_btn = QPushButton("Best-ranked", self)
+        brow.addWidget(self.best_btn)
+        upper = QPushButton("All pairs (upper triangle)", self)
+        upper.clicked.connect(lambda: self.set_pairs(
+            [(self.cols[i], self.cols[j]) for i in range(n) for j in range(i + 1, n)]))
+        brow.addWidget(upper)
+        clear = QPushButton("Clear", self)
+        clear.clicked.connect(lambda: self.set_pairs([]))
+        brow.addWidget(clear)
+        brow.addStretch()
+        self.count = QLabel("", self)
+        brow.addWidget(self.count)
+        lay.addLayout(brow)
+        self._refresh()
+
+    def set_labels(self, labels: list[str]) -> None:
+        short = [(lb if len(lb) <= 28 else lb[:26] + "…") for lb in labels]
+        self.grid.setHorizontalHeaderLabels([f"y: {s}" for s in short])
+        self.grid.setVerticalHeaderLabels([f"x: {s}" for s in short])
+        for i, lb in enumerate(labels):
+            self.grid.horizontalHeaderItem(i).setToolTip(lb)
+            self.grid.verticalHeaderItem(i).setToolTip(lb)
+
+    def _cell(self, a: str, b: str) -> QTableWidgetItem:
+        return self.grid.item(self.cols.index(a), self.cols.index(b))
+
+    def _on_item(self, it: QTableWidgetItem) -> None:
+        if self._busy or it.row() == it.column():
+            return
+        p = (self.cols[it.row()], self.cols[it.column()])
+        if it.checkState() == Qt.Checked and p not in self._order:
+            self._order.append(p)
+        elif it.checkState() != Qt.Checked and p in self._order:
+            self._order.remove(p)
+        self._refresh()
+
+    def set_pairs(self, pairs) -> None:
+        """Tick exactly these pairs, in this order."""
+        self._busy = True
+        self._order = []
+        for p in pairs:
+            p = tuple(p)
+            if p[0] in self.cols and p[1] in self.cols and p[0] != p[1] and p not in self._order:
+                self._order.append(p)
+        for r in range(len(self.cols)):
+            for c in range(len(self.cols)):
+                if r != c:
+                    self.grid.item(r, c).setCheckState(
+                        Qt.Checked if (self.cols[r], self.cols[c]) in self._order
+                        else Qt.Unchecked)
+        self._busy = False
+        self._refresh()
+
+    def pairs(self) -> list[tuple[str, str]]:
+        return list(self._order)
+
+    def _refresh(self) -> None:
+        self._busy, was = True, self._busy
+        for r in range(len(self.cols)):
+            for c in range(len(self.cols)):
+                if r != c:
+                    self.grid.item(r, c).setText("")
+        for k, (a, b) in enumerate(self._order, 1):
+            self._cell(a, b).setText(str(k))
+        self._busy = was
+        n = len(self._order)
+        self.count.setText(f"{n} joint space(s) · {1 + 2 * n if n else 0} spaces with t-SNE")
+        self.changed.emit()
+
+
+# --------------------------------------------------------------------------- #
 # Names (and options) before a run
 # --------------------------------------------------------------------------- #
 class FeatureNamesDialog(QDialog):
@@ -242,7 +356,10 @@ class FeatureNamesDialog(QDialog):
                           "step between them — figures only; the analysis uses the "
                           "real values")
             self.table.setItem(r, 3, jt)
-        lay.addWidget(self.table, 1)
+        names_tab = QWidget(self)
+        nl = QVBoxLayout(names_tab)
+        nl.setContentsMargins(0, 0, 0, 0)
+        nl.addWidget(self.table, 1)
 
         brow = QHBoxLayout()
         reset = QPushButton("Reset selected to column names", self)
@@ -255,7 +372,21 @@ class FeatureNamesDialog(QDialog):
             b.clicked.connect(lambda _c=False, s=s: [cb.setCurrentText(s)
                                                      for cb in self.scale_cbs])
             brow.addWidget(b)
-        lay.addLayout(brow)
+        nl.addLayout(brow)
+        self.matrix: PairMatrix | None = None
+        if mode == "animate":
+            # Patch 122jr: pick the animated pairs in a feature × feature matrix
+            from PySide6.QtWidgets import QTabWidget
+            self.tabs = QTabWidget(self)
+            self.tabs.addTab(names_tab, "Names, scales, jitter")
+            self.matrix = PairMatrix(self.cols, [self.table.item(r, 1).text()
+                                                 for r in range(len(self.cols))], self)
+            self.tabs.addTab(self.matrix, "Pairs to animate")
+            self.table.itemChanged.connect(self._names_edited)
+            self.matrix.changed.connect(self._pairs_changed)
+            lay.addWidget(self.tabs, 1)
+        else:
+            lay.addWidget(names_tab, 1)
 
         form = QFormLayout()
         self.tsne_sample = QSpinBox(self)
@@ -282,7 +413,26 @@ class FeatureNamesDialog(QDialog):
             self.n_pairs.setEnabled(len(self.cols) > 2)
             self.n_pairs.setToolTip("Joint spaces in the animation (best-ranked pairs); "
                                     "with two features selected, that one pair")
-            form.addRow("Joint spaces:", self.n_pairs)
+            form.addRow("Best-ranked joint spaces:", self.n_pairs)
+            self._ranked = None
+            run = find_reusable_run(config_path, self.cols) if config_path else None
+            if run is not None:
+                self._ranked = run / "pairs.csv"
+            self.matrix.best_btn.clicked.connect(
+                lambda: self.matrix.set_pairs(animation_pairs(
+                    self.cols, self._ranked, self.n_pairs.value())))
+            self.matrix.best_btn.setToolTip(
+                "Tick the best-ranked pairs (up to 'Joint spaces')"
+                + ("" if self._ranked else " — no landscape of this selection yet, so "
+                   "the features are paired in order"))
+            saved = []
+            if config_path:
+                from mufasa.utils.feature_view_state import load_state
+                saved = [tuple(p) for p in load_state(config_path).get("animation_pairs", [])
+                         if isinstance(p, list) and len(p) == 2
+                         and p[0] in self.cols and p[1] in self.cols and p[0] != p[1]]
+            self.matrix.set_pairs(saved or animation_pairs(self.cols, self._ranked,
+                                                           self.n_pairs.value()))
             self.color = QComboBox(self)
             self.color.addItems(["tsne", "session"])
             self.color.setToolTip("Colour points by their t-SNE position or by session")
@@ -376,6 +526,9 @@ class FeatureNamesDialog(QDialog):
             "Generate landscape" if mode == "landscape" else "Generate animation")
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
+        self._ok = bb.button(QDialogButtonBox.Ok)
+        if self.matrix is not None:
+            self._pairs_changed()
         lay.addWidget(bb)
 
     def _reset_selected(self) -> None:
@@ -398,10 +551,32 @@ class FeatureNamesDialog(QDialog):
         """{column: "linear" | "log10"} as chosen."""
         return {c: cb.currentText() for c, cb in zip(self.cols, self.scale_cbs)}
 
+    def _names_edited(self, item: QTableWidgetItem) -> None:
+        if self.matrix is not None and item.column() == 1:
+            self.matrix.set_labels([self.table.item(r, 1).text()
+                                    for r in range(len(self.cols))])
+
+    def _pairs_changed(self) -> None:
+        n = len(self.matrix.pairs())
+        self.tabs.setTabText(1, f"Pairs to animate ({n})" if n else "Pairs to animate")
+        bb = getattr(self, "_ok", None)
+        if bb is not None:
+            bb.setEnabled(n > 0)
+
+    def pairs(self) -> list[tuple[str, str]]:
+        """The ticked pairs in animation order (animate mode)."""
+        return self.matrix.pairs() if self.matrix is not None else []
+
     def accept(self) -> None:
         if self.config_path:
             from mufasa.utils.feature_names import save_names
             save_names(self.config_path, self.names(), self.scales(), self.jitter())
+            if self.matrix is not None:
+                from mufasa.utils.feature_view_state import load_state, save_state
+                keep = [list(p) for p in load_state(self.config_path).get(
+                    "animation_pairs", []) if not (set(p) <= set(self.cols))]
+                save_state(self.config_path, {
+                    "animation_pairs": keep + [list(p) for p in self.pairs()]})
         super().accept()
 
     def options(self) -> dict:
@@ -409,7 +584,7 @@ class FeatureNamesDialog(QDialog):
                  frames_per_session=self.frames_per_session.value(),
                  n_plot=self.n_plot.value())
         if self.mode == "animate":
-            o.update(n_pairs=self.n_pairs.value(), theme=self.theme.currentText(),
+            o.update(pairs=self.pairs(), n_pairs=self.n_pairs.value(), theme=self.theme.currentText(),
                      color=self.color.currentText(), mp4=self.mp4.isChecked(),
                      reuse=self.reuse.isChecked(), n_points=self.n_points.value(),
                      sampling=self.sampling.currentText(),
@@ -673,7 +848,8 @@ def run_animation(parent: QWidget | None, config_path, cols: list[str], *,
                                             n_plot=opts["n_plot"]))
 
     def _animate() -> list[str]:
-        pairs = animation_pairs(cols, run / "pairs.csv", opts["n_pairs"])
+        pairs = (list(opts["pairs"]) if opts.get("pairs") else
+                 animation_pairs(cols, run / "pairs.csv", opts["n_pairs"]))
         k, out = 1, run / "animation.gif"
         while out.exists():
             out = run / f"animation_{k}.gif"
@@ -698,6 +874,6 @@ def run_animation(parent: QWidget | None, config_path, cols: list[str], *,
     return dlg
 
 
-__all__ = ["FeatureNamesDialog", "LandscapeRunDialog", "animate_argv", "animation_pairs",
-           "find_reusable_run", "landscape_argv", "landscape_root", "run_animation",
+__all__ = ["FeatureNamesDialog", "LandscapeRunDialog", "PairMatrix", "animate_argv",
+           "animation_pairs", "find_reusable_run", "landscape_argv", "landscape_root", "run_animation",
            "run_landscape"]

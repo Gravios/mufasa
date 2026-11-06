@@ -8,6 +8,20 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jr — Animation pairs chosen in a feature × feature matrix.**
+The Animate… popup gets a "Pairs to animate" tab: a grid of tick boxes with
+the selected features as rows (x axis) and columns (y axis); the mirror
+cell swaps the axes, the diagonal is unused. Ticked cells are numbered in
+the order ticked — the animation order (t-SNE → 1 → t-SNE → 2 → …).
+Pre-filled with the pairs used last time for these features, else the
+best-ranked; buttons Best-ranked (from an earlier landscape of the
+selection, up to "Best-ranked joint spaces"), All pairs (upper triangle),
+Clear. Generate is disabled with nothing ticked. The pairs go to
+mufasa-landscape-animate as `--pair`s and are kept per selection in
+`logs/measures/feature_view.toml` (`animation_pairs`); renaming a feature
+relabels the matrix.
+Test: `tests/smoke_122jr_animation_pair_matrix.py` (21 checks).
+
 **122jq — Feature selection kept between sessions.**
 Feature Visualization saves its selection (in order), video, colour-by,
 joint style, jitter and "Group by name parts" to
