@@ -94,9 +94,10 @@ check("landscape popup has no matrix",
       lr.FeatureNamesDialog(None, cfg, cols, "landscape").matrix is None)
 check("diagonal not tickable",
       all(not (m.grid.item(i, i).flags() & Qt.ItemIsUserCheckable) for i in range(3)))
-check("headers: rows x, columns y, with figure names",
-      m.grid.verticalHeaderItem(0).text() == "x: speed a"
-      and m.grid.horizontalHeaderItem(1).text().startswith("y: "))
+check("headers are the custom figure names (122js)",
+      m.grid.verticalHeaderItem(0).text() == "speed a"
+      and m.grid.horizontalHeaderItem(0).text() == "speed a"
+      and m.grid.horizontalHeaderItem(1).text().replace("\n", " ") == fn.default_name(B))
 check("pre-filled without a landscape run: features paired in order",
       d.pairs() == [(A, B)])
 m.set_pairs([])
@@ -115,7 +116,15 @@ check("tab shows the count", d.tabs.tabText(1) == "Pairs to animate (2)"
       and "2 joint space(s) · 5 spaces" in m.count.text())
 d.table.item(1, 1).setText("speed b")
 check("renaming a feature relabels the matrix",
-      m.grid.horizontalHeaderItem(1).text() == "y: speed b")
+      m.grid.horizontalHeaderItem(1).text() == "speed b"
+      and m.grid.verticalHeaderItem(1).text() == "speed b")
+long = "forward head speed relative to body axis"
+d.table.item(2, 1).setText(long)
+check("long custom names shown in full (columns wrapped, rows on one line)",
+      m.grid.verticalHeaderItem(2).text() == long
+      and m.grid.horizontalHeaderItem(2).text().replace("\n", " ") == long
+      and "\n" in m.grid.horizontalHeaderItem(2).text()
+      and C in m.grid.verticalHeaderItem(2).toolTip())
 check("options carry the pairs", d.options()["pairs"] == [(A, B), (B, A)])
 d.accept()
 check("pairs saved for next time", st.load_state(cfg)["animation_pairs"] == [[A, B], [B, A]])

@@ -186,8 +186,8 @@ class PairMatrix(QWidget):
         self._busy = False
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        hint = QLabel("Tick the joint spaces to animate — row feature on x, column "
-                      "feature on y. Numbers give the order (the order you tick them); "
+        hint = QLabel("Tick the joint spaces to animate — rows: feature on the x axis, "
+                      "columns: feature on the y axis. Numbers give the order (the order you tick them); "
                       "the animation goes t-SNE → 1 → t-SNE → 2 → …", self)
         hint.setWordWrap(True)
         lay.addWidget(hint)
@@ -228,12 +228,17 @@ class PairMatrix(QWidget):
         self._refresh()
 
     def set_labels(self, labels: list[str]) -> None:
-        short = [(lb if len(lb) <= 28 else lb[:26] + "…") for lb in labels]
-        self.grid.setHorizontalHeaderLabels([f"y: {s}" for s in short])
-        self.grid.setVerticalHeaderLabels([f"x: {s}" for s in short])
-        for i, lb in enumerate(labels):
-            self.grid.horizontalHeaderItem(i).setToolTip(lb)
-            self.grid.verticalHeaderItem(i).setToolTip(lb)
+        """Header the rows and columns with the names used in the figures
+        (as typed in the names table). Column headers wrap onto several
+        lines so long names do not widen the grid; the column name is in
+        the tooltip."""
+        self.labels = list(labels)
+        self.grid.setHorizontalHeaderLabels([_wrap(lb, 14) for lb in labels])
+        self.grid.setVerticalHeaderLabels(list(labels))
+        for i, (c, lb) in enumerate(zip(self.cols, labels)):
+            tip = f"{lb}\n({c})"
+            self.grid.horizontalHeaderItem(i).setToolTip(tip + " — y axis")
+            self.grid.verticalHeaderItem(i).setToolTip(tip + " — x axis")
 
     def _cell(self, a: str, b: str) -> QTableWidgetItem:
         return self.grid.item(self.cols.index(a), self.cols.index(b))
@@ -774,6 +779,12 @@ class LandscapeRunDialog(QDialog):
                                 if not pm.isNull() else pm)
         else:
             self.view.setText(f"{p.name}\n\nDouble-click to open with the system viewer.")
+
+
+def _wrap(text: str, width: int) -> str:
+    """Break ``text`` at spaces into lines of about ``width`` characters."""
+    import textwrap
+    return "\n".join(textwrap.wrap(text, width, break_long_words=False)) or text
 
 
 def _quote(s: str) -> str:

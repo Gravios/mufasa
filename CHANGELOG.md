@@ -8,6 +8,13 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122js — Pair matrix headed by the custom feature names.**
+The matrix rows and columns now show exactly the names typed in the names
+table (no "x:"/"y:" prefix, no truncation; column headers wrap onto
+several lines, rows stay on one), updated as you rename; the tooltip gives
+the column name and its axis. The hint above says rows are x, columns y.
+smoke_122jr updated (22 checks).
+
 **122jr — Animation pairs chosen in a feature × feature matrix.**
 The Animate… popup gets a "Pairs to animate" tab: a grid of tick boxes with
 the selected features as rows (x axis) and columns (y axis); the mirror
