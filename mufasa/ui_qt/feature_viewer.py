@@ -64,6 +64,8 @@ class FeatureTracePlot(QWidget):
 
     LANE_H = 46
     LABEL_LANE_H = 14
+    GRID_LINES = 5          # light horizontal grid per lane (0/25/50/75/100 %)
+    GRID_ALPHA = 38
     NAME_W = 230
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -159,6 +161,21 @@ class FeatureTracePlot(QWidget):
             ev.accept()
 
     # ---- painting --------------------------------------------------------
+    def grid_ys(self, top: int, h: int) -> list[float]:
+        """y of the lane's grid lines: GRID_LINES evenly spaced from the
+        top (lane maximum) to the bottom (lane minimum)."""
+        n = self.GRID_LINES
+        return [top + h * i / (n - 1) for i in range(n)] if n > 1 else []
+
+    def _draw_grid(self, p, x0: int, pw: int, top: int, h: int, text) -> None:  # noqa: ANN001
+        g = QColor(text)
+        g.setAlpha(self.GRID_ALPHA)
+        pen = QPen(g)
+        pen.setWidth(0)
+        p.setPen(pen)
+        for gy in self.grid_ys(top, h):
+            p.drawLine(QPointF(x0, gy), QPointF(x0 + pw, gy))
+
     def paintEvent(self, _ev) -> None:  # noqa: ANN001
         p = QPainter(self)
         p.fillRect(self.rect(), self.palette().base())
@@ -201,6 +218,7 @@ class FeatureTracePlot(QWidget):
             h = self.LANE_H - 6
             if k % 2 == 0:
                 p.fillRect(x0, y, pw, self.LANE_H, self.palette().alternateBase())
+            self._draw_grid(p, x0, pw, top, h, text)
             col = QColor(*TRACE_COLORS[k % len(TRACE_COLORS)])
             cur = v[self._frame] if 0 <= self._frame < len(v) else np.nan
             p.setPen(text)
@@ -290,27 +308,55 @@ class FeatureViewerWidget(QWidget):
         self.window_spin.setSuffix(" s")
         self.window_spin.setValue(5.0)
         bar.addWidget(self.window_spin)
+        # Patch 122jk: follow the Feature Visualization selection
+        from PySide6.QtWidgets import QCheckBox
+        self.follow_cb = QCheckBox("Follow selection", self)
+        self.follow_cb.setChecked(True)
+        self.follow_cb.setToolTip("Update the traces when features are ticked or "
+                                  "unticked in Feature Visualization")
+        bar.addWidget(self.follow_cb)
         self.info = QLabel("", self)
         self.info.setStyleSheet("color: palette(placeholder-text);")
         bar.addWidget(self.info, 1)
         lay.addLayout(bar)
         self.plot = FeatureTracePlot(self)
         self.plot.set_fps(self.scrubber.fps)
-        df = load_feature_columns(self.video_name, config_path, features)
-        self.plot.set_features(df)
+        self._loaded: dict[str, np.ndarray] = {}
+        self.features: list[str] = []
+        self.set_feature_columns(features)
         self.plot.set_labels(self._labels())
         lay.addWidget(self.plot, 2)
-        n_feat = len(df)
-        n_vid = self.scrubber.total_frames
-        self.info.setText(
-            f"{df.shape[1]} feature(s) · {n_feat:,} rows"
-            + (f" — video has {n_vid:,} frames" if n_feat != n_vid else ""))
         self.window_spin.valueChanged.connect(self.plot.set_window_seconds)
         self.plot.window_changed.connect(self._sync_spin)
         self.plot.frame_clicked.connect(self._seek)
         self.scrubber.frame_changed.connect(self.plot.set_current_frame)
         self._seek(start_frame)
         self.plot.set_current_frame(self.scrubber.current_frame)
+
+    def set_feature_columns(self, features: list[str]) -> None:
+        """Show these features (in this order); only columns not shown
+        before are read from disk."""
+        from mufasa.utils.feature_io import load_feature_columns
+        features = list(dict.fromkeys(features))
+        new = [c for c in features if c not in self._loaded]
+        if new:
+            df = load_feature_columns(self.video_name, self.config_path, new)
+            for c in df.columns:
+                self._loaded[c] = df[c].to_numpy()
+        self.features = [c for c in features if c in self._loaded]
+        self.plot.set_features(pd.DataFrame({c: self._loaded[c] for c in self.features}))
+        n_feat = len(next(iter(self._loaded.values()))) if self._loaded else 0
+        n_vid = self.scrubber.total_frames
+        self.info.setText(
+            f"{len(self.features)} feature(s) · {n_feat:,} rows"
+            + (f" — video has {n_vid:,} frames" if n_feat and n_feat != n_vid else ""))
+
+    def follow(self, features: list[str]) -> bool:
+        """Selection changed elsewhere: update when following; True if it did."""
+        if not self.follow_cb.isChecked() or list(features) == self.features:
+            return False
+        self.set_feature_columns(features)
+        return True
 
     def _labels(self) -> dict[str, np.ndarray]:
         try:
@@ -360,6 +406,7 @@ def open_feature_viewer(parent: QWidget, config_path: str, video_path: str,
             orig(ev)
 
         dock.closeEvent = _close
+        dock.viewer = w
         if not hasattr(main, "_feature_viewer_docks"):
             main._feature_viewer_docks = []
         main._feature_viewer_docks.append(dock)
@@ -370,6 +417,7 @@ def open_feature_viewer(parent: QWidget, config_path: str, video_path: str,
     QVBoxLayout(dlg).addWidget(w)
     dlg.resize(1150, 780)
     dlg.finished.connect(lambda *_: w.cleanup())
+    dlg.viewer = w
     dlg.show()
     return dlg
 

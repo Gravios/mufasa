@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 BEHAVIOUR_COLOR = "#d9662b"
+JOINT_STYLES = ("heatmap", "scatter", "scatter-heatmap")
 REST_COLOR = "#4a7fb5"
 
 
@@ -146,8 +147,13 @@ def plot_distributions(fig, data: dict[str, np.ndarray], *,
 def plot_joint(fig, a: np.ndarray, b: np.ndarray, name_a: str, name_b: str, *,
                mask: np.ndarray | None = None, behaviour: str = "",
                bins: int = 90, max_points: int = 4000, seed: int = 0,
-               swap: bool = False, xlog: bool = False, ylog: bool = False) -> None:
-    """2-D log density of two features (``a`` on x, ``b`` on y; ``swap``
+               swap: bool = False, xlog: bool = False, ylog: bool = False,
+               style: str = "heatmap", scatter_points: int = 20000) -> None:
+    """Two features jointly. ``style``: ``heatmap`` (2-D log density,
+    behaviour frames overlaid), ``scatter`` (a random sample of frames as
+    points — behaviour frames in colour), or ``scatter-heatmap`` (both).
+
+    ``a`` is on x and ``b`` on y, ``b`` on y; ``swap``
     exchanges them); behaviour frames overlaid. ``xlog`` / ``ylog``: log10
     axes with log-spaced bins; frames with a value ≤ 0 on a log axis are
     left out (and counted)."""
@@ -167,9 +173,26 @@ def plot_joint(fig, a: np.ndarray, b: np.ndarray, name_a: str, name_b: str, *,
     xe, ye = _edges(x[ok], bins, xlog), _edges(y[ok], bins, ylog)
     H, xe, ye = np.histogram2d(x[ok], y[ok], bins=(xe, ye))
     Hm = np.ma.masked_less_equal(H.T, 0)
-    if Hm.count():
-        ax.pcolormesh(xe, ye, Hm, cmap="Greys", shading="auto",
-                      norm=mcolors.LogNorm(vmin=1, vmax=max(2, H.max())))
+    if style not in JOINT_STYLES:
+        raise ValueError(f"style must be one of {JOINT_STYLES}")
+    if style != "scatter" and Hm.count():
+        mesh = ax.pcolormesh(xe, ye, Hm, cmap="Greys" if style == "heatmap" else "Blues",
+                             shading="auto",
+                             norm=mcolors.LogNorm(vmin=1, vmax=max(2, H.max())),
+                             alpha=1.0 if style == "heatmap" else 0.85)
+        if style == "heatmap":
+            fig.colorbar(mesh, ax=ax, pad=0.01, fraction=0.04).set_label(
+                "frames per bin", fontsize=7)
+    if style != "heatmap":
+        rng_ = np.random.default_rng(seed + 1)
+        idx_all = np.flatnonzero(ok & ~(mask.astype(bool) if mask is not None
+                                        else np.zeros_like(ok)))
+        if idx_all.size > scatter_points:
+            idx_all = rng_.choice(idx_all, scatter_points, replace=False)
+        ax.scatter(x[idx_all], y[idx_all], s=2 if style == "scatter" else 1.2, lw=0,
+                   color=REST_COLOR if style == "scatter" else "#203040",
+                   alpha=0.35 if style == "scatter" else 0.25, rasterized=True,
+                   label="other frames" if mask is not None and style == "scatter" else None)
     if mask is not None:
         m = mask.astype(bool) & ok
         idx = np.flatnonzero(m)
@@ -371,5 +394,5 @@ def compact_family(cols: list[str], *, min_group: int = 2, min_family: int = 6,
     return template, _group(items, min_group=min_group, max_leaves=max_leaves, depth=1)
 
 
-__all__ = ["Node", "auc", "compact_family", "plot_distributions", "plot_joint", "plot_over_time",
+__all__ = ["JOINT_STYLES", "Node", "auc", "compact_family", "plot_distributions", "plot_joint", "plot_over_time",
            "short_name"]

@@ -203,7 +203,7 @@ form.colour_cb.setCurrentText("rear")
 form.plot_joint()
 ax = form.figure.axes[0]
 check("joint plot: 2-D density with the behaviour frames overlaid",
-      len(form.figure.axes) == 1 and ax.collections and "rear (" in
+      len(form.figure.axes) in (1, 2) and ax.collections and "rear (" in
       ax.get_legend().get_texts()[0].get_text())
 form.scope_cb.setCurrentIndex(0)
 form.plot_over_time()

@@ -12,11 +12,17 @@ filters across families) — then:
   over all videos. With *Colour by* set to a behaviour, labelled frames
   are drawn against the rest and each panel shows the feature's AUC for
   that behaviour.
-* **Joint** — two features as a 2-D density, behaviour frames overlaid.
+* **Joint** — two features as a heatmap (2-D density), a scatter, or a
+  scatter over the heatmap; behaviour frames overlaid.
 * **Over time** — the whole session per feature with behaviour bouts
   shaded; double-click a time to open the video there.
+* **Landscape… / Animate…** — the selection through mufasa-landscape
+  (joint PDFs + t-SNE over all sessions) and mufasa-landscape-animate
+  (t-SNE → pair → t-SNE → next pair GIF); a table to name the features in
+  the figures comes first, and the names are remembered (122jk).
 * **Open with video** — the video with the selected features as live
-  traces under it (click / drag the traces to move, wheel to zoom).
+  traces under it (click / drag the traces to move, wheel to zoom); open
+  viewers follow the selection as features are ticked / unticked (122jk).
 
 Only the selected columns are read (parquet column projection), so this
 stays quick with hundreds of features and dozens of sessions.
@@ -45,6 +51,7 @@ from mufasa.ui_qt.workbench import OperationForm
 
 MAX_DIST_FEATURES = 12
 MAX_TIME_FEATURES = 8
+MAX_VIEWER_FEATURES = 16
 
 
 class FeatureVisualizationForm(OperationForm):
@@ -145,9 +152,22 @@ class FeatureVisualizationForm(OperationForm):
         self.time_btn.clicked.connect(self.plot_over_time)
         self.video_btn = QPushButton("Open with video ▸", self)
         self.video_btn.clicked.connect(lambda: self.open_viewer())
+        # Patch 122jk: the selection through mufasa-landscape / -animate
+        self.landscape_btn = QPushButton("Landscape…", self)
+        self.landscape_btn.setToolTip(
+            "mufasa-landscape on the selected features, pooled over all sessions: "
+            "joint PDFs of their pairs and a t-SNE (asks for figure names first)")
+        self.landscape_btn.clicked.connect(self.generate_landscape)
+        self.animate_btn = QPushButton("Animate…", self)
+        self.animate_btn.setToolTip(
+            "GIF: t-SNE → joint space 1 → t-SNE → joint space 2 → … of the "
+            "selected features (runs the landscape first if needed)")
+        self.animate_btn.clicked.connect(self.generate_animation)
         for b in (self.dist_btn, self.joint_btn, self.time_btn):
             brow.addWidget(b)
         brow.addStretch()
+        brow.addWidget(self.landscape_btn)
+        brow.addWidget(self.animate_btn)
         brow.addWidget(self.video_btn)
         self.body_layout.addLayout(brow)
 
@@ -167,9 +187,26 @@ class FeatureVisualizationForm(OperationForm):
                           "are left out (each plot says how many).")
             cb.currentIndexChanged.connect(self._replot)
             arow.addWidget(cb)
+        from mufasa.tools.feature_plots import JOINT_STYLES
+        arow.addWidget(QLabel("Joint:", self))
+        self.joint_style_cb = QComboBox(self)
+        self.joint_style_cb.addItems(list(JOINT_STYLES))
+        self.joint_style_cb.setToolTip(
+            "heatmap: 2-D log density · scatter: a sample of frames as points · "
+            "scatter-heatmap: points over the density")
+        self.joint_style_cb.currentIndexChanged.connect(
+            lambda _i: self._mode == "joint" and self._replot())
+        arow.addWidget(self.joint_style_cb)
         arow.addStretch()
         self.body_layout.addLayout(arow)
         self._cache: dict = {}
+        # Patch 122jk: open video × feature viewers follow the selection
+        from PySide6.QtCore import QTimer as _QT
+        self._viewers: list = []
+        self._sel_timer = _QT(self)
+        self._sel_timer.setSingleShot(True)
+        self._sel_timer.setInterval(300)
+        self._sel_timer.timeout.connect(self._sync_viewers)
 
         from matplotlib.backends.backend_qtagg import (
             FigureCanvasQTAgg,
@@ -432,6 +469,8 @@ class FeatureVisualizationForm(OperationForm):
             names = ", ".join(short_name(c) for c in self._checked[:4])
             more = f" … +{len(self._checked) - 4}" if len(self._checked) > 4 else ""
             self.sel_label.setText(head + f"<b>{len(self._checked)} selected</b>: {names}{more}")
+        if getattr(self, "_viewers", None):
+            self._sel_timer.start()
 
     # ------------------------------------------------------------------ #
     # Selection API (also used by tests)
@@ -576,8 +615,12 @@ class FeatureVisualizationForm(OperationForm):
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             data, mask, nv = self._load(cols, self.scope_cb.currentIndex() == 1)
-            plot_joint(self.figure, data[cols[0]], data[cols[1]], cols[0], cols[1],
-                       mask=mask, behaviour=self._behaviour() or "", **self._axes())
+            from mufasa.utils.feature_names import display, load_names
+            names = load_names(self.config_path)
+            plot_joint(self.figure, data[cols[0]], data[cols[1]],
+                       display(cols[0], names), display(cols[1], names),
+                       mask=mask, behaviour=self._behaviour() or "",
+                       style=self.joint_style_cb.currentText(), **self._axes())
             self.canvas.draw_idle()
         finally:
             QApplication.restoreOverrideCursor()
@@ -639,6 +682,27 @@ class FeatureVisualizationForm(OperationForm):
                 self.open_viewer(start_frame=max(0, int(round(t * 60 * self._time_fps))))
 
     # ------------------------------------------------------------------ #
+    # Patch 122jk — landscape / animation of the selection
+    # ------------------------------------------------------------------ #
+    def generate_landscape(self, ask: bool = True, options: dict | None = None):
+        cols = self._need(2, None, "Landscape")
+        if cols is None:
+            return None
+        from mufasa.ui_qt.landscape_runner import run_landscape
+        self._run = run_landscape(self.window(), self.config_path, cols, ask=ask,
+                                  options=options)
+        return self._run
+
+    def generate_animation(self, ask: bool = True, options: dict | None = None):
+        cols = self._need(2, None, "Animate")
+        if cols is None:
+            return None
+        from mufasa.ui_qt.landscape_runner import run_animation
+        self._run = run_animation(self.window(), self.config_path, cols, ask=ask,
+                                  options=options)
+        return self._run
+
+    # ------------------------------------------------------------------ #
     def open_viewer(self, start_frame: int = 0):
         cols = self._need(1, None, "Open with video")
         if cols is None:
@@ -651,8 +715,25 @@ class FeatureVisualizationForm(OperationForm):
             return None
         from mufasa.ui_qt.feature_viewer import open_feature_viewer
         self._viewer = open_feature_viewer(self.window(), self.config_path, path,
-                                           cols[:16], start_frame)
+                                           cols[:MAX_VIEWER_FEATURES], start_frame)
+        self._viewers.append(self._viewer)
         return self._viewer
+
+    def _sync_viewers(self) -> int:
+        """Push the current selection to every open viewer that follows it
+        (each keeps its own video); returns how many were updated."""
+        from shiboken6 import isValid
+        cols = self.selected_features()[:MAX_VIEWER_FEATURES]
+        self._viewers = [v for v in self._viewers if isValid(v) and v.isVisible()]
+        n = 0
+        for v in self._viewers:
+            w = getattr(v, "viewer", None)
+            if w is not None and isValid(w) and cols:
+                try:
+                    n += bool(w.follow(cols))
+                except Exception as exc:   # a column missing for that video
+                    self.plot_info.setText(f"Viewer not updated: {exc}")
+        return n
 
 
 __all__ = ["FeatureVisualizationForm"]

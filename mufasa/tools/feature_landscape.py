@@ -301,7 +301,8 @@ def is_angle_column(name: str, v: np.ndarray) -> bool:
     return "angle" in name.lower() and bool(w.size) and w.min() >= -360 and w.max() <= 360
 
 
-def clean_columns(X: pd.DataFrame, angles: str = "unwrap", log=print) -> pd.DataFrame:
+def clean_columns(X: pd.DataFrame, angles: str = "unwrap", log=print,
+                  drop_full_circle: bool = True) -> pd.DataFrame:
     """Undo artefacts that would otherwise show up as 'modes'.
 
     * The feature writer stores missing values as -1; in a column whose
@@ -344,7 +345,7 @@ def clean_columns(X: pd.DataFrame, angles: str = "unwrap", log=print) -> pd.Data
                 ang["folded"] += 1
             else:
                 v, gap = unwrap_angle(v, return_gap=True)
-                if gap > 0.25:
+                if gap > 0.25 and drop_full_circle:
                     drop.append(c)
                     ang["full-circle"] += 1
                     continue
@@ -671,10 +672,20 @@ def draw_jpdf(fig, spec, X: pd.DataFrame, row: pd.Series, *, bins: int,
         "joint adds modes" if row.get("adds_modes") else "multimodal")
     axx.set_title(f"{tag}: {int(row.modes_joint)} modes along {row.best_direction}  "
                   f"(dip {row.dip_max:.3f})", fontsize=7, loc="left")
-    ax.set_xlabel(_short(row.feature_a), fontsize=7)
-    ax.set_ylabel(_short(row.feature_b), fontsize=7)
+    ax.set_xlabel(_short(display(row.feature_a, DISPLAY)), fontsize=7)
+    ax.set_ylabel(_short(display(row.feature_b, DISPLAY)), fontsize=7)
     ax.tick_params(labelsize=6)
     return ax
+
+
+# Patch 122jk: display names for figures ({column: name}); see
+# mufasa.utils.feature_names. Set by main() from the project's names file.
+DISPLAY: dict[str, str] = {}
+
+
+def display(col: str, names: dict[str, str] | None) -> str:
+    from mufasa.utils.feature_names import display as _d
+    return _d(col, names)
 
 
 def _short(name: str, n: int = 48) -> str:
@@ -753,7 +764,7 @@ def plot_tsne(E: np.ndarray, sess: np.ndarray, names: list[str], X: pd.DataFrame
             sc = ax.scatter(E[:, 0], E[:, 1], c=np.clip(v, lo, hi), cmap="viridis",
                             s=s, lw=0, rasterized=True)
             fig.colorbar(sc, ax=ax, shrink=0.8)
-            ax.set_title(_short(title, 60), fontsize=8)
+            ax.set_title(_short(display(title, DISPLAY), 60), fontsize=8)
         ax.set_xticks([]), ax.set_yticks([])
     for ax in list(axes.flat)[len(panels):]:
         ax.axis("off")
@@ -825,6 +836,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-tsne", action="store_true")
     p.add_argument("--n-jobs", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--columns-file", default=None,
+                   help="text file, one column name per line: screen exactly these "
+                        "columns (as chosen in Feature Visualization)")
+    p.add_argument("--names-file", default=None,
+                   help="feature display names for the figures (TOML [names]); "
+                        "default: the project's logs/measures/feature_names.toml")
     p.add_argument("--out", default=None,
                    help="output directory (default derived/plots/feature_landscape/<run_id>)")
     return p
@@ -840,6 +857,9 @@ def main(argv: list[str] | None = None) -> int:
     sources = {s.strip() for s in a.sources.split(",") if s.strip()}
     if not sources <= {"pose", "features"} or not sources:
         raise SystemExit("--sources takes pose, features or pose,features")
+    global DISPLAY
+    from mufasa.utils.feature_names import load_names, read_names
+    DISPLAY = read_names(a.names_file) if a.names_file else load_names(config)
     run_id = generate_run_id()
     out = Path(a.out) if a.out else (config.parent / "derived" / "plots"
                                      / "feature_landscape" / run_id)
@@ -850,10 +870,25 @@ def main(argv: list[str] | None = None) -> int:
                              pose_cols=a.pose_cols,
                              frames_per_session=a.frames_per_session, seed=a.seed)
     X, sess, frame = stack(sessions)
-    X = clean_columns(X, angles=a.angles)
-    X = keep_families(X, a.include_families, a.exclude_families)
-    cols = select_columns(X, max_nan=a.max_nan, min_unique=a.min_unique,
-                          max_corr=a.max_corr, max_features=a.max_features)
+    wanted = None
+    if a.columns_file:
+        # Patch 122jk: an explicit feature selection (Feature Visualization):
+        # keep exactly these columns — no family filter, no near-duplicate
+        # pruning, angles kept even when they cover the full circle.
+        wanted = [ln.strip() for ln in Path(a.columns_file).read_text().splitlines()
+                  if ln.strip()]
+        missing = [c for c in wanted if c not in X.columns]
+        if missing:
+            print(f"[landscape] {len(missing)} selected column(s) not in every session, "
+                  f"left out: {', '.join(missing[:5])}" + (" …" if len(missing) > 5 else ""))
+        X = X[[c for c in wanted if c in X.columns]]
+    X = clean_columns(X, angles=a.angles, drop_full_circle=wanted is None)
+    if wanted is None:
+        X = keep_families(X, a.include_families, a.exclude_families)
+    cols = select_columns(X, max_nan=a.max_nan,
+                          min_unique=2 if wanted else a.min_unique,
+                          max_corr=1.0 if wanted else a.max_corr,
+                          max_features=None if wanted else a.max_features)
     log_families("columns screened per family (kept / loaded)", cols, list(X.columns))
     if len(cols) < 2:
         raise SystemExit("fewer than two usable columns")
@@ -878,7 +913,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[landscape] {n_multi}/{len(pairs)} pairs multimodal; {n_adds} with more "
           f"modes jointly than in either column, {n_emerg} of them emergent "
           f"(unimodal columns)")
-    top = pick_pairs(pairs, a.n_plot, a.max_per_feature, a.max_per_family)
+    if wanted:
+        # explicit selection: plot the selected pairs, best-ranked first,
+        # whether or not the screen calls them multimodal
+        top = pairs.head(a.n_plot)
+    else:
+        top = pick_pairs(pairs, a.n_plot, a.max_per_feature, a.max_per_family)
     if 0 < len(top) < min(a.n_plot, n_multi):
         print(f"[landscape] plotting {len(top)} pairs: the per-family "
               f"(--max-per-family {a.max_per_family}) and per-column "

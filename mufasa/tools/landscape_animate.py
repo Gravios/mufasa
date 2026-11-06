@@ -315,6 +315,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--theme", choices=tuple(THEMES), default="dark")
     p.add_argument("--mp4", action="store_true", help="also write an MP4")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--names-file", default=None,
+                   help="feature display names (TOML [names]); default: the "
+                        "project's logs/measures/feature_names.toml")
     p.add_argument("--out", default=None,
                    help="output file (default <run>/animation[_N].gif)")
     return p
@@ -356,8 +359,12 @@ def main(argv: list[str] | None = None) -> int:
     emb, samples = emb.iloc[keep].reset_index(drop=True), samples.iloc[keep].reset_index(drop=True)
 
     tsne = tsne_space(emb[["tsne_1", "tsne_2"]].to_numpy(np.float64))
+    from mufasa.utils.feature_names import display, load_names, read_names
+    cfg = find_project_config(run)
+    names = read_names(a.names_file) if a.names_file else (load_names(cfg) if cfg else {})
     fspaces = [feature_space(samples[x].to_numpy(np.float64),
-                             samples[y].to_numpy(np.float64), x, y) for x, y in pairs]
+                             samples[y].to_numpy(np.float64),
+                             display(x, names), display(y, names)) for x, y in pairs]
     spaces = [tsne]
     for f in fspaces:
         spaces += [f, tsne] if a.through_tsne else [f]

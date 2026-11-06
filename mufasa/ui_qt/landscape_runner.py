@@ -1,0 +1,536 @@
+"""
+mufasa.ui_qt.landscape_runner
+=============================
+
+Feature Visualization → **Landscape…** / **Animate…** (patch 122jk).
+
+Both run the command-line tools on the features selected in the tree:
+
+* **Landscape** — ``mufasa-landscape --sources features --columns-file …``:
+  joint PDFs of the selected pairs (``jpdf_top.png``) and a t-SNE of the
+  selected features (``tsne.png``), pooled over every session.
+* **Animate** — the landscape above (or an earlier run on the same
+  selection, reused), then ``mufasa-landscape-animate --through-tsne`` with
+  explicit pairs, so the GIF goes t-SNE → pair 1 → t-SNE → pair 2 → … →
+  t-SNE.
+
+Before either runs, :class:`FeatureNamesDialog` shows the selected
+features in an editable table — column name | name in figures — pre-filled
+from, and saved back to, the project's ``logs/measures/feature_names.toml``
+(:mod:`mufasa.utils.feature_names`), so the names are remembered.
+
+The tools run as child processes (:class:`QProcess`), so the GUI stays
+responsive and their log streams into :class:`LandscapeRunDialog`, which
+then shows the figures and the animation.
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pandas as pd
+from PySide6.QtCore import QProcess, Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QMovie, QPixmap
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPlainTextEdit,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+LANDSCAPE_MODULE = "mufasa.tools.feature_landscape"
+ANIMATE_MODULE = "mufasa.tools.landscape_animate"
+SELECTION_FILE = "columns.txt"
+
+
+# --------------------------------------------------------------------------- #
+# Runs and pairs
+# --------------------------------------------------------------------------- #
+def landscape_root(config_path) -> Path:
+    return Path(config_path).parent / "derived" / "plots" / "feature_landscape"
+
+
+def find_reusable_run(config_path, cols: list[str]) -> Path | None:
+    """Newest landscape run made from exactly this selection (any order)
+    that has what the animation needs; None if there is none."""
+    root = landscape_root(config_path)
+    if not root.is_dir():
+        return None
+    want = sorted(cols)
+    for run in sorted((p for p in root.iterdir() if p.is_dir()), reverse=True):
+        sel = run / SELECTION_FILE
+        if not sel.is_file():
+            continue
+        got = sorted(ln.strip() for ln in sel.read_text().splitlines() if ln.strip())
+        if got == want and all((run / f).is_file() for f in
+                               ("tsne.parquet", "tsne_samples.parquet", "pairs.csv")):
+            return run
+    return None
+
+
+def animation_pairs(cols: list[str], pairs_csv: Path | None, n: int,
+                    max_per_feature: int = 2) -> list[tuple[str, str]]:
+    """Pairs to animate. Two features → that pair. More → the best-ranked
+    pairs of the run's ``pairs.csv`` (mufasa-landscape's ordering), each
+    feature in at most ``max_per_feature`` of them; without a table, the
+    selection taken two at a time."""
+    if len(cols) == 2:
+        return [(cols[0], cols[1])]
+    out: list[tuple[str, str]] = []
+    if pairs_csv is not None and Path(pairs_csv).is_file():
+        table = pd.read_csv(pairs_csv)
+        use = {c: 0 for c in cols}
+        for a, b in zip(table.feature_a, table.feature_b):
+            if a not in use or b not in use:
+                continue
+            if use[a] >= max_per_feature or use[b] >= max_per_feature:
+                continue
+            out.append((a, b))
+            use[a] += 1
+            use[b] += 1
+            if len(out) >= n:
+                break
+    if not out:
+        out = [(cols[i], cols[i + 1]) for i in range(0, len(cols) - 1, 2)][:n]
+    return out
+
+
+def landscape_argv(config_path, columns_file: Path, out: Path, names_file: Path | None,
+                   *, tsne_sample: int, frames_per_session: int, n_plot: int) -> list[str]:
+    argv = ["-m", LANDSCAPE_MODULE, "--project", str(config_path),
+            "--sources", "features", "--columns-file", str(columns_file),
+            "--out", str(out), "--tsne-sample", str(tsne_sample),
+            "--frames-per-session", str(frames_per_session), "--n-plot", str(n_plot)]
+    if names_file is not None:
+        argv += ["--names-file", str(names_file)]
+    return argv
+
+
+def animate_argv(run: Path, pairs: list[tuple[str, str]], out: Path,
+                 names_file: Path | None, *, theme: str, mp4: bool, color: str) -> list[str]:
+    argv = ["-m", ANIMATE_MODULE, str(run), "--through-tsne", "--theme", theme,
+            "--color", color, "--out", str(out)]
+    for a, b in pairs:
+        argv += ["--pair", a, b]
+    if names_file is not None:
+        argv += ["--names-file", str(names_file)]
+    if mp4:
+        argv.append("--mp4")
+    return argv
+
+
+# --------------------------------------------------------------------------- #
+# Names (and options) before a run
+# --------------------------------------------------------------------------- #
+class FeatureNamesDialog(QDialog):
+    """Editable table of the selected features: column | name in figures.
+
+    Pre-filled from the project's saved names; on OK the edits are saved
+    (a name equal to the default, or empty, is forgotten). ``mode`` adds the
+    options of that run ("landscape" or "animate")."""
+
+    def __init__(self, parent: QWidget | None, config_path, cols: list[str],
+                 mode: str = "landscape") -> None:
+        super().__init__(parent)
+        from mufasa.utils.feature_names import default_name, display, load_names
+        self.config_path, self.cols, self.mode = config_path, list(cols), mode
+        self.setWindowTitle("Feature names for the figures")
+        self.resize(820, 520)
+        lay = QVBoxLayout(self)
+        intro = QLabel(
+            "Names used for these features in the figures. Edit the right column; "
+            "names are remembered for this project "
+            "(logs/measures/feature_names.toml).", self)
+        intro.setWordWrap(True)
+        lay.addWidget(intro)
+
+        saved = load_names(config_path) if config_path else {}
+        self.table = QTableWidget(len(self.cols), 2, self)
+        self.table.setHorizontalHeaderLabels(["Feature (column)", "Name in figures"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.DoubleClicked
+                                   | QAbstractItemView.EditKeyPressed
+                                   | QAbstractItemView.AnyKeyPressed)
+        hdr = self.table.horizontalHeader()
+        hdr.setSectionResizeMode(0, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(1, QHeaderView.Stretch)
+        for r, c in enumerate(self.cols):
+            src = QTableWidgetItem(default_name(c))
+            src.setFlags(src.flags() & ~Qt.ItemIsEditable)
+            src.setToolTip(c)
+            src.setData(Qt.UserRole, c)
+            self.table.setItem(r, 0, src)
+            name = QTableWidgetItem(display(c, saved))
+            name.setToolTip("Double-click or start typing to rename")
+            self.table.setItem(r, 1, name)
+        lay.addWidget(self.table, 1)
+
+        brow = QHBoxLayout()
+        reset = QPushButton("Reset selected to column names", self)
+        reset.clicked.connect(self._reset_selected)
+        brow.addWidget(reset)
+        brow.addStretch()
+        lay.addLayout(brow)
+
+        form = QFormLayout()
+        self.tsne_sample = QSpinBox(self)
+        self.tsne_sample.setRange(500, 100000)
+        self.tsne_sample.setSingleStep(1000)
+        self.tsne_sample.setValue(10000)
+        self.tsne_sample.setToolTip("Frames embedded by t-SNE (sampled over all sessions)")
+        form.addRow("t-SNE frames:", self.tsne_sample)
+        self.frames_per_session = QSpinBox(self)
+        self.frames_per_session.setRange(100, 1000000)
+        self.frames_per_session.setSingleStep(500)
+        self.frames_per_session.setValue(3000)
+        self.frames_per_session.setToolTip("Frames read from each session (uniform sample)")
+        form.addRow("Frames per session:", self.frames_per_session)
+        self.n_plot = QSpinBox(self)
+        self.n_plot.setRange(1, 200)
+        self.n_plot.setValue(24)
+        self.n_plot.setToolTip("Joint PDFs drawn (best-ranked pairs of the selection)")
+        form.addRow("Pairs plotted:", self.n_plot)
+        if mode == "animate":
+            self.n_pairs = QSpinBox(self)
+            self.n_pairs.setRange(1, 20)
+            self.n_pairs.setValue(4 if len(self.cols) > 2 else 1)
+            self.n_pairs.setEnabled(len(self.cols) > 2)
+            self.n_pairs.setToolTip("Joint spaces in the animation (best-ranked pairs); "
+                                    "with two features selected, that one pair")
+            form.addRow("Joint spaces:", self.n_pairs)
+            self.color = QComboBox(self)
+            self.color.addItems(["tsne", "session"])
+            self.color.setToolTip("Colour points by their t-SNE position or by session")
+            form.addRow("Colour by:", self.color)
+            self.theme = QComboBox(self)
+            self.theme.addItems(["dark", "light"])
+            form.addRow("Theme:", self.theme)
+            self.mp4 = QCheckBox("Also write an MP4", self)
+            form.addRow("", self.mp4)
+            self.reuse = QCheckBox("Reuse an earlier landscape of this selection", self)
+            self.reuse.setChecked(True)
+            self.reuse.setToolTip("Skip re-running mufasa-landscape (and its t-SNE) when "
+                                  "a run on exactly these features exists")
+            form.addRow("", self.reuse)
+        lay.addLayout(form)
+
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        bb.button(QDialogButtonBox.Ok).setText(
+            "Generate landscape" if mode == "landscape" else "Generate animation")
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def _reset_selected(self) -> None:
+        from mufasa.utils.feature_names import default_name
+        rows = {i.row() for i in self.table.selectedIndexes()} or set(range(len(self.cols)))
+        for r in rows:
+            self.table.item(r, 1).setText(default_name(self.cols[r]))
+
+    def names(self) -> dict[str, str]:
+        """{column: name in figures} as edited."""
+        return {self.cols[r]: self.table.item(r, 1).text().strip()
+                for r in range(len(self.cols))}
+
+    def accept(self) -> None:
+        if self.config_path:
+            from mufasa.utils.feature_names import save_names
+            save_names(self.config_path, self.names())
+        super().accept()
+
+    def options(self) -> dict:
+        o = dict(tsne_sample=self.tsne_sample.value(),
+                 frames_per_session=self.frames_per_session.value(),
+                 n_plot=self.n_plot.value())
+        if self.mode == "animate":
+            o.update(n_pairs=self.n_pairs.value(), theme=self.theme.currentText(),
+                     color=self.color.currentText(), mp4=self.mp4.isChecked(),
+                     reuse=self.reuse.isChecked())
+        return o
+
+
+# --------------------------------------------------------------------------- #
+# Running, with the log and the results
+# --------------------------------------------------------------------------- #
+class LandscapeRunDialog(QDialog):
+    """Runs steps one after another as child Python processes; a step is a
+    callable returning argv (after ``python``) or None to skip, so later
+    steps can depend on earlier outputs. Shows the log, then the files."""
+
+    def __init__(self, parent: QWidget | None, title: str, steps, out_dir: Path,
+                 *, python: str | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(1000, 760)
+        self.setAttribute(Qt.WA_DeleteOnClose, False)
+        self._steps = list(steps)
+        self._python = python or sys.executable
+        self.out_dir = Path(out_dir)
+        self.failed = False
+        self.finished_ok = False
+        lay = QVBoxLayout(self)
+        self.status = QLabel("Starting…", self)
+        lay.addWidget(self.status)
+        split = QSplitter(Qt.Vertical, self)
+        self.log = QPlainTextEdit(self)
+        self.log.setReadOnly(True)
+        self.log.setMaximumBlockCount(5000)
+        split.addWidget(self.log)
+        res = QWidget(self)
+        rl = QHBoxLayout(res)
+        rl.setContentsMargins(0, 0, 0, 0)
+        self.files = QListWidget(res)
+        self.files.setMaximumWidth(260)
+        self.files.currentItemChanged.connect(self._preview)
+        self.files.itemDoubleClicked.connect(
+            lambda it: QDesktopServices.openUrl(QUrl.fromLocalFile(it.data(Qt.UserRole))))
+        rl.addWidget(self.files)
+        self.view = QLabel("Results appear here when the run finishes.", res)
+        self.view.setAlignment(Qt.AlignCenter)
+        scroll = QScrollArea(res)
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.view)
+        rl.addWidget(scroll, 1)
+        split.addWidget(res)
+        split.setSizes([260, 500])
+        lay.addWidget(split, 1)
+        brow = QHBoxLayout()
+        self.open_btn = QPushButton("Open folder", self)
+        self.open_btn.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.out_dir))))
+        brow.addWidget(self.open_btn)
+        brow.addStretch()
+        self.stop_btn = QPushButton("Stop", self)
+        self.stop_btn.clicked.connect(self.stop)
+        brow.addWidget(self.stop_btn)
+        close = QPushButton("Close", self)
+        close.clicked.connect(self.close)
+        brow.addWidget(close)
+        lay.addLayout(brow)
+        self._movie: QMovie | None = None
+        self.proc: QProcess | None = None
+        self._i = -1
+
+    # -- process control ---------------------------------------------- #
+    def start(self) -> None:
+        self._next()
+
+    def _next(self) -> None:
+        self._i += 1
+        while self._i < len(self._steps):
+            try:
+                argv = self._steps[self._i]()
+            except Exception as exc:   # a step's own setup failed
+                self._append(f"[error] {exc}")
+                self._done(False)
+                return
+            if argv is not None:
+                break
+            self._i += 1
+        else:
+            self._done(True)
+            return
+        self.status.setText(f"Step {self._i + 1} of {len(self._steps)} running…")
+        self._append("$ python " + " ".join(_quote(x) for x in argv))
+        p = QProcess(self)
+        p.setProcessChannelMode(QProcess.MergedChannels)
+        env = p.processEnvironment()
+        if env.isEmpty():
+            from PySide6.QtCore import QProcessEnvironment
+            env = QProcessEnvironment.systemEnvironment()
+        env.insert("PYTHONUNBUFFERED", "1")
+        env.insert("MPLBACKEND", "Agg")
+        p.setProcessEnvironment(env)
+        p.readyReadStandardOutput.connect(self._read)
+        p.finished.connect(self._on_finished)
+        p.errorOccurred.connect(self._on_error)
+        self.proc = p
+        p.start(self._python, argv)
+
+    def _read(self) -> None:
+        if self.proc is not None:
+            txt = bytes(self.proc.readAllStandardOutput()).decode("utf-8", "replace")
+            for ln in txt.rstrip("\n").splitlines():
+                self._append(ln)
+
+    def _on_error(self, err) -> None:  # noqa: ANN001
+        if err == QProcess.FailedToStart:
+            self._append(f"[error] could not start {self._python}")
+            self._done(False)
+
+    def _on_finished(self, code: int, _status) -> None:  # noqa: ANN001
+        self._read()
+        if code != 0:
+            self._append(f"[error] step {self._i + 1} exited with code {code}")
+            self._done(False)
+            return
+        self._next()
+
+    def stop(self) -> None:
+        if self.proc is not None and self.proc.state() != QProcess.NotRunning:
+            self._steps = self._steps[: self._i + 1]
+            self.proc.kill()
+            self._append("[stopped]")
+
+    def closeEvent(self, ev) -> None:  # noqa: ANN001
+        self.stop()
+        super().closeEvent(ev)
+
+    def _append(self, line: str) -> None:
+        self.log.appendPlainText(line)
+
+    def _done(self, ok: bool) -> None:
+        self.finished_ok, self.failed = ok, not ok
+        self.stop_btn.setEnabled(False)
+        self.status.setText(f"Done — {self.out_dir}" if ok else
+                            "Failed — see the log above.")
+        self.show_results()
+
+    # -- results -------------------------------------------------------- #
+    def result_files(self) -> list[Path]:
+        if not self.out_dir.is_dir():
+            return []
+        order = {".gif": 0, ".png": 1, ".mp4": 2, ".pdf": 3, ".csv": 4}
+        fs = [p for p in self.out_dir.iterdir() if p.suffix.lower() in order]
+        return sorted(fs, key=lambda p: (order[p.suffix.lower()],
+                                         -p.stat().st_mtime, p.name))
+
+    def show_results(self) -> None:
+        self.files.clear()
+        for p in self.result_files():
+            it = QListWidgetItem(p.name)
+            it.setData(Qt.UserRole, str(p))
+            self.files.addItem(it)
+        if self.files.count():
+            self.files.setCurrentRow(0)
+
+    def _preview(self, cur: QListWidgetItem | None, _prev=None) -> None:  # noqa: ANN001
+        if self._movie is not None:
+            self._movie.stop()
+            self._movie = None
+        if cur is None:
+            return
+        p = Path(cur.data(Qt.UserRole))
+        suf = p.suffix.lower()
+        if suf == ".gif":
+            self._movie = QMovie(str(p))
+            self.view.setMovie(self._movie)
+            self._movie.start()
+        elif suf == ".png":
+            pm = QPixmap(str(p))
+            w = max(400, self.view.parentWidget().width() - 20)
+            self.view.setPixmap(pm.scaledToWidth(min(w, pm.width()),
+                                                 Qt.SmoothTransformation)
+                                if not pm.isNull() else pm)
+        else:
+            self.view.setText(f"{p.name}\n\nDouble-click to open with the system viewer.")
+
+
+def _quote(s: str) -> str:
+    return f'"{s}"' if any(ch in s for ch in " ()'\"") else s
+
+
+# --------------------------------------------------------------------------- #
+# Entry points used by the Feature Visualization form
+# --------------------------------------------------------------------------- #
+def run_landscape(parent: QWidget | None, config_path, cols: list[str], *,
+                  ask: bool = True, options: dict | None = None,
+                  start: bool = True) -> LandscapeRunDialog | None:
+    """Names dialog, then mufasa-landscape on ``cols``; returns the run
+    dialog (None if cancelled)."""
+    from mufasa.project_layout import generate_run_id
+    from mufasa.utils.feature_names import names_path
+    opts = options or {}
+    if ask:
+        d = FeatureNamesDialog(parent, config_path, cols, "landscape")
+        if d.exec() != QDialog.Accepted:
+            return None
+        opts = {**d.options(), **opts}
+    opts = {"tsne_sample": 10000, "frames_per_session": 3000, "n_plot": 24, **opts}
+    out = landscape_root(config_path) / generate_run_id()
+    out.mkdir(parents=True, exist_ok=True)
+    sel = out / SELECTION_FILE
+    sel.write_text("\n".join(cols) + "\n")
+    nf = names_path(config_path)
+    names_file = nf if nf.is_file() else None
+    steps = [lambda: landscape_argv(config_path, sel, out, names_file,
+                                    tsne_sample=opts["tsne_sample"],
+                                    frames_per_session=opts["frames_per_session"],
+                                    n_plot=opts["n_plot"])]
+    dlg = LandscapeRunDialog(parent, f"Landscape — {len(cols)} features", steps, out)
+    dlg.show()
+    if start:
+        dlg.start()
+    return dlg
+
+
+def run_animation(parent: QWidget | None, config_path, cols: list[str], *,
+                  ask: bool = True, options: dict | None = None,
+                  start: bool = True) -> LandscapeRunDialog | None:
+    """Names dialog, then (unless an earlier run on this selection is
+    reused) mufasa-landscape, then mufasa-landscape-animate --through-tsne
+    on the best-ranked pairs of the selection."""
+    from mufasa.project_layout import generate_run_id
+    from mufasa.utils.feature_names import names_path
+    opts = options or {}
+    if ask:
+        d = FeatureNamesDialog(parent, config_path, cols, "animate")
+        if d.exec() != QDialog.Accepted:
+            return None
+        opts = {**d.options(), **opts}
+    opts = {"tsne_sample": 10000, "frames_per_session": 3000, "n_plot": 24,
+            "n_pairs": 4, "theme": "dark", "color": "tsne", "mp4": False,
+            "reuse": True, **opts}
+    nf = names_path(config_path)
+    names_file = nf if nf.is_file() else None
+    run = find_reusable_run(config_path, cols) if opts["reuse"] else None
+    steps = []
+    if run is None:
+        run = landscape_root(config_path) / generate_run_id()
+        run.mkdir(parents=True, exist_ok=True)
+        sel = run / SELECTION_FILE
+        sel.write_text("\n".join(cols) + "\n")
+        steps.append(lambda: landscape_argv(config_path, sel, run, names_file,
+                                            tsne_sample=opts["tsne_sample"],
+                                            frames_per_session=opts["frames_per_session"],
+                                            n_plot=opts["n_plot"]))
+
+    def _animate() -> list[str]:
+        pairs = animation_pairs(cols, run / "pairs.csv", opts["n_pairs"])
+        k, out = 1, run / "animation.gif"
+        while out.exists():
+            out = run / f"animation_{k}.gif"
+            k += 1
+        return animate_argv(run, pairs, out, names_file, theme=opts["theme"],
+                            mp4=opts["mp4"], color=opts["color"])
+
+    steps.append(_animate)
+    dlg = LandscapeRunDialog(parent, f"Animation — {len(cols)} features", steps, run)
+    if len(steps) == 1:
+        dlg._append(f"[reusing landscape run {run.name}]")
+    dlg.show()
+    if start:
+        dlg.start()
+    return dlg
+
+
+__all__ = ["FeatureNamesDialog", "LandscapeRunDialog", "animate_argv", "animation_pairs",
+           "find_reusable_run", "landscape_argv", "landscape_root", "run_animation",
+           "run_landscape"]

@@ -8,6 +8,27 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jk — Landscape / animation from the selection; figure names; joint
+styles; viewer grid and follow.**
+Feature Visualization gets *Landscape…* and *Animate…*: the ticked features
+go through mufasa-landscape (`--sources features --columns-file`, pooled over
+all sessions; exactly the selection — no family filter, no near-duplicate
+pruning, full-circle angles kept — and the best-ranked pairs plotted whether
+or not they are multimodal) and mufasa-landscape-animate (`--through-tsne`
+with explicit `--pair`s: t-SNE → pair 1 → t-SNE → pair 2 → … → t-SNE; an
+earlier landscape of the same selection is reused). Both run as child
+processes with the log streaming into a dialog that then previews the PNGs
+and plays the GIF. Before either runs, a table of the selected features
+(column | name in figures) is shown; edits are saved to
+`logs/measures/feature_names.toml` (`mufasa.utils.feature_names`) and used by
+both tools (`--names-file`, default the project's file) and the form's joint
+plot. Joint plots take a style: heatmap (now with a colour bar), scatter or
+scatter-heatmap. The video × feature viewer draws a light 5-line grid per
+lane (0/25/50/75/100 %) and follows the selection: ticking / unticking
+features updates open viewers (debounced; "Follow selection" to opt out).
+Test: `tests/smoke_122jk_landscape_from_selection.py` (52 checks);
+smoke_122je allows the heatmap colour bar axes.
+
 **122jj — Feature Visualization: swap axes, linear / log10.**
 New "Axes:" row under the plot buttons: *Swap X ↔ Y* and an X and a Y scale
 (linear / log10) for the displayed axes, applied to the plot on screen at
