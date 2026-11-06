@@ -11,7 +11,10 @@ Each point keeps its colour throughout. By default the colour encodes the
 point's position in the t-SNE map (hue = direction from the centre,
 saturation = distance), so in every feature space you can see where each
 region of the map ended up; ``--color session`` or ``--color <column>``
-colour by session or by a column's value instead. Every space is shown in
+colour by session or by a column's value instead. The animation opens
+(``--intro-frames``, default 40) on the t-SNE map coloured by session, then
+the colours ease into the main colouring. ``--n-points`` and ``--sampling``
+(random / balanced per session / even over the map) choose the points. Every space is shown in
 its own units (percentile-clipped to fill the square); axis labels, ticks,
 title and a faint density backdrop cross-fade with the motion.
 
@@ -117,15 +120,85 @@ def tsne_colors(xy: np.ndarray) -> np.ndarray:
                      for h, s in zip(ang, r)])
 
 
+def session_colors(sessions) -> np.ndarray:
+    """One colour per session: tab20 up to 20 sessions, beyond that hues
+    spread by the golden ratio (no repeats)."""
+    import matplotlib
+    codes = pd.Categorical(sessions).codes
+    n = int(codes.max()) + 1 if len(codes) else 0
+    if n <= 20:
+        cmap = matplotlib.colormaps["tab20"]
+        pal = np.array([cmap(i)[:3] for i in range(20)])
+    else:
+        pal = np.array([colorsys.hsv_to_rgb((i * 0.618034) % 1.0,
+                                            0.55 + 0.35 * (i % 3) / 2, 0.92 - 0.12 * (i % 2))
+                        for i in range(n)])
+    return pal[codes]
+
+
+# --------------------------------------------------------------------------- #
+# Sampling (patch 122jm)
+# --------------------------------------------------------------------------- #
+SAMPLING = ("random", "balanced", "even")
+
+
+def sample_points(n: int, candidates: np.ndarray, sessions: np.ndarray,
+                  tsne_xy: np.ndarray, method: str, rng: np.random.Generator,
+                  grid: int = 40) -> np.ndarray:
+    """Pick ``n`` of ``candidates`` (row indices) for the animation.
+
+    * ``random``   — uniformly at random (dense regions of the map dominate,
+      as in the data);
+    * ``balanced`` — the same number from every session (sessions with too
+      few frames give all they have, the rest is shared out);
+    * ``even``     — spread over the t-SNE map: the map is cut into a
+      ``grid`` × ``grid`` lattice and cells are drawn from in turn, so sparse
+      regions are as visible as dense ones.
+
+    Returns sorted row indices."""
+    cand = np.asarray(candidates)
+    if n >= len(cand):
+        return np.sort(cand)
+    if method == "random":
+        return np.sort(rng.choice(cand, size=n, replace=False))
+    if method == "balanced":
+        groups = [rng.permutation(cand[sessions[cand] == s])
+                  for s in pd.unique(sessions[cand])]
+        return np.sort(_round_robin(groups, n))
+    if method == "even":
+        xy = tsne_xy[cand]
+        lo, hi = xy.min(0), xy.max(0)
+        ij = np.floor((xy - lo) / np.maximum(hi - lo, 1e-12) * grid).clip(0, grid - 1)
+        cell = (ij[:, 0] * grid + ij[:, 1]).astype(int)
+        groups = [rng.permutation(cand[cell == c]) for c in rng.permutation(np.unique(cell))]
+        return np.sort(_round_robin(groups, n))
+    raise SystemExit(f"--sampling must be one of {', '.join(SAMPLING)}")
+
+
+def _round_robin(groups: list[np.ndarray], n: int) -> np.ndarray:
+    """Take one from each group in turn until ``n`` are taken."""
+    out, k = [], 0
+    while len(out) < n:
+        took = False
+        for g in groups:
+            if k < len(g):
+                out.append(g[k])
+                took = True
+                if len(out) == n:
+                    break
+        if not took:
+            break
+        k += 1
+    return np.asarray(out, dtype=int)
+
+
 def point_colors(mode: str, emb: pd.DataFrame, samples: pd.DataFrame,
                  tsne_xy: np.ndarray) -> np.ndarray:
     import matplotlib
     if mode == "tsne":
         return tsne_colors(tsne_xy)
     if mode == "session":
-        cmap = matplotlib.colormaps["tab20"]
-        codes = pd.Categorical(emb["session"]).codes
-        return np.array([cmap(i % 20)[:3] for i in codes])
+        return session_colors(emb["session"])
     if mode in samples.columns:
         v = samples[mode].to_numpy(np.float64)
         lo, hi = np.nanpercentile(v, [1, 99])
@@ -154,6 +227,19 @@ def timeline(n_spaces: int, fps: int, hold: float, transition: float
         out += [(k, k, 0.0)] * nh
         if k < n_spaces - 1:
             out += [(k, k + 1, ease(i / (nt - 1))) for i in range(nt)]
+    return out
+
+
+def intro(frames: int, fade: int, start: np.ndarray, end: np.ndarray, label: str
+          ) -> list[tuple[np.ndarray, str, float]]:
+    """Session intro (patch 122jm): ``frames`` frames on the t-SNE map in
+    ``start`` colours, then ``fade`` frames easing to ``end`` colours. Each
+    entry is (colours, subtitle, subtitle alpha); the subtitle fades out
+    with the colours."""
+    out = [(start, label, 1.0)] * max(0, frames)
+    for k in range(max(0, fade)):
+        t = ease((k + 1) / fade)
+        out.append((start + (end - start) * t, label, 1.0 - t))
     return out
 
 
@@ -195,9 +281,13 @@ class Renderer:
         self.dens = [ax.imshow(np.zeros((2, 2)), extent=ext, origin="lower", cmap=cm,
                                vmin=0, vmax=1, interpolation="bilinear", zorder=0,
                                aspect="auto") for _ in range(2)]
+        self.colors = np.asarray(colors, np.float64)
         self.sc = ax.scatter(spaces[0].xy[:, 0], spaces[0].xy[:, 1], s=point_size,
-                             c=colors, lw=0, alpha=0.85, zorder=2)
+                             c=self.colors, lw=0, alpha=0.85, zorder=2)
+        self._cur_colors = self.colors
         fs = size / 800
+        self.subtitle = self.fig.text(0.5, 0.895, "", ha="center", va="center",
+                                      color=T["dim"], fontsize=12 * fs, alpha=0.0)
         self.texts: dict[int, list] = {}
         for k, sp in enumerate(spaces):
             t = [self.fig.text(0.5, 0.94, sp.title, ha="center", va="center",
@@ -218,7 +308,17 @@ class Renderer:
         self.fig.text(0.985, 0.012, caption, ha="right", va="bottom",
                       color=T["dim"], fontsize=9 * fs)
 
-    def frame(self, i: int, j: int, t: float) -> np.ndarray:
+    def frame(self, i: int, j: int, t: float, colors: np.ndarray | None = None,
+              subtitle: str = "", subtitle_alpha: float = 0.0) -> np.ndarray:
+        """Draw spaces i → j at progress t. ``colors`` overrides the point
+        colours for this frame (the session intro); the subtitle line under
+        the title shows ``subtitle`` at ``subtitle_alpha``."""
+        cols = self.colors if colors is None else colors
+        if cols is not self._cur_colors:
+            self.sc.set_facecolors(np.c_[cols, np.full(len(cols), 0.85)])
+            self._cur_colors = cols
+        self.subtitle.set_text(subtitle)
+        self.subtitle.set_alpha(subtitle_alpha)
         a, b = self.spaces[i], self.spaces[j]
         self.sc.set_offsets(a.xy + (b.xy - a.xy) * t)
         self.dens[0].set_data(a.density)
@@ -306,7 +406,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--color", default="tsne",
                    help="tsne (position in the map, default), session, or a column name")
     p.add_argument("--n-points", type=int, default=4000,
-                   help="points animated, a random subset of the t-SNE sample (default 4000)")
+                   help="points animated, a subset of the t-SNE sample (default 4000)")
+    p.add_argument("--sampling", choices=SAMPLING, default="random",
+                   help="how the points are picked from the t-SNE sample: random "
+                        "(default), balanced (same number per session) or even "
+                        "(spread over the t-SNE map, sparse regions kept)")
+    p.add_argument("--intro-frames", type=int, default=40,
+                   help="first frames: the t-SNE map coloured by session, before "
+                        "--color takes over (0 = no intro; default 40)")
+    p.add_argument("--intro-fade", type=int, default=20,
+                   help="frames for the colour change after the intro (default 20)")
     p.add_argument("--fps", type=int, default=20)
     p.add_argument("--hold", type=float, default=1.5, help="seconds on each space")
     p.add_argument("--transition", type=float, default=2.0, help="seconds per move")
@@ -355,7 +464,11 @@ def main(argv: list[str] | None = None) -> int:
     if len(keep) < len(samples):
         print(f"[animate] {len(samples) - len(keep)} sample(s) with NaN in the chosen "
               "columns left out")
-    keep = np.sort(rng.choice(keep, size=min(a.n_points, len(keep)), replace=False))
+    sess_arr = emb["session"].astype(str).to_numpy()
+    raw_xy = emb[["tsne_1", "tsne_2"]].to_numpy(np.float64)
+    keep = sample_points(a.n_points, keep, sess_arr, raw_xy, a.sampling, rng)
+    print(f"[animate] {len(keep)} point(s), sampling: {a.sampling} "
+          f"({len(pd.unique(sess_arr[keep]))} sessions)")
     emb, samples = emb.iloc[keep].reset_index(drop=True), samples.iloc[keep].reset_index(drop=True)
 
     tsne = tsne_space(emb[["tsne_1", "tsne_2"]].to_numpy(np.float64))
@@ -377,15 +490,24 @@ def main(argv: list[str] | None = None) -> int:
         spaces.append(tsne)
     colors = point_colors(a.color, emb, samples, tsne.xy)
     psize = a.point_size or float(np.clip(6e4 / len(keep), 2, 30)) * (a.size / 800) ** 2
-    caption = (f"{len(keep)} frames · {emb['session'].nunique()} sessions · "
-               f"colour: {a.color}")
+    caption = (f"{len(keep)} frames ({a.sampling}) · {emb['session'].nunique()} "
+               f"sessions · colour: {a.color}")
     R = Renderer(spaces, colors, size=a.size, theme=a.theme, point_size=psize,
                  caption=caption)
     tl = timeline(len(spaces), a.fps, a.hold, a.transition)
     print(f"[animate] {len(pairs)} pair(s), {len(spaces)} spaces, {len(tl)} frames "
           f"({len(tl) / a.fps:.1f} s at {a.fps} fps)")
     t0 = time.time()
-    frames = [R.frame(i, j, t) for i, j, t in tl]
+    frames = []
+    if a.intro_frames > 0 and a.color != "session":
+        sc = session_colors(emb["session"])
+        lead = intro(a.intro_frames, a.intro_fade, sc, np.asarray(colors, np.float64),
+                     f"coloured by session ({emb['session'].nunique()})")
+        frames += [R.frame(0, 0, 0.0, colors=c, subtitle=lab, subtitle_alpha=al)
+                   for c, lab, al in lead]
+        print(f"[animate] intro: {a.intro_frames} frame(s) by session, "
+              f"{a.intro_fade} to change colour")
+    frames += [R.frame(i, j, t) for i, j, t in tl]
     R.close()
     out = Path(a.out) if a.out else None
     if out is None:

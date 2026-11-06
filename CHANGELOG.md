@@ -8,6 +8,20 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jm — Animation: number of points, sampling method, session intro.**
+mufasa-landscape-animate gets `--sampling random | balanced | even` next to
+`--n-points`: random as before (dense regions dominate, as in the data),
+balanced takes the same number from every session, even spreads the points
+over the t-SNE map (a 40 × 40 lattice drawn from in turn) so sparse regions
+stay visible. The GIF now opens with `--intro-frames` (default 40) frames of
+the t-SNE map coloured by session ("coloured by session (N)" under the
+title), then eases over `--intro-fade` (20) frames into the `--color`
+colouring; skipped when colouring by session anyway. Session colours stay
+distinct beyond 20 sessions. The Animate… popup has Points in animation,
+Sampling and Intro frames. smoke_122iy runs its timing check with
+`--intro-frames 0`.
+Test: `tests/smoke_122jm_animate_sampling_and_session_intro.py` (19 checks).
+
 **122jl — Names popup now opens; per-feature linear / log10 scale.**
 The Landscape… / Animate… buttons connected clicked(bool) straight to
 `generate_*(ask=True)`, so clicked's `False` skipped the names popup; they

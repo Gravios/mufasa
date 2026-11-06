@@ -82,7 +82,7 @@ check("easing starts at 0, ends at 1, is monotone and symmetric",
 # ---- render from the run directory --------------------------------------
 buf = io.StringIO()
 with contextlib.redirect_stdout(buf):
-    rc = LA.main([str(rd), "--pair", "ea", "eb", "--pair", "sp", "bc", "--n-points", "600",
+    rc = LA.main([str(rd), "--intro-frames", "0", "--pair", "ea", "eb", "--pair", "sp", "bc", "--n-points", "600",
                   "--fps", "10", "--hold", "0.5", "--transition", "1", "--size", "320",
                   "--mp4"])
 gif = rd / "animation.gif"

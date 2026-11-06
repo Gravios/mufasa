@@ -138,9 +138,12 @@ def landscape_argv(config_path, columns_file: Path, out: Path, names_file: Path 
 
 
 def animate_argv(run: Path, pairs: list[tuple[str, str]], out: Path,
-                 names_file: Path | None, *, theme: str, mp4: bool, color: str) -> list[str]:
+                 names_file: Path | None, *, theme: str, mp4: bool, color: str,
+                 n_points: int = 4000, sampling: str = "random",
+                 intro_frames: int = 40) -> list[str]:
     argv = ["-m", ANIMATE_MODULE, str(run), "--through-tsne", "--theme", theme,
-            "--color", color, "--out", str(out)]
+            "--color", color, "--out", str(out), "--n-points", str(n_points),
+            "--sampling", sampling, "--intro-frames", str(intro_frames)]
     for a, b in pairs:
         argv += ["--pair", a, b]
     if names_file is not None:
@@ -258,6 +261,27 @@ class FeatureNamesDialog(QDialog):
             self.color.addItems(["tsne", "session"])
             self.color.setToolTip("Colour points by their t-SNE position or by session")
             form.addRow("Colour by:", self.color)
+            # Patch 122jm: points, how they are picked, and the session intro
+            self.n_points = QSpinBox(self)
+            self.n_points.setRange(100, 100000)
+            self.n_points.setSingleStep(500)
+            self.n_points.setValue(4000)
+            self.n_points.setToolTip("Points animated, taken from the t-SNE frames "
+                                     "(at most that many)")
+            form.addRow("Points in animation:", self.n_points)
+            self.sampling = QComboBox(self)
+            self.sampling.addItems(["random", "balanced", "even"])
+            self.sampling.setToolTip(
+                "random: uniformly (dense regions dominate, as in the data) · "
+                "balanced: the same number from every session · "
+                "even: spread over the t-SNE map, so sparse regions stay visible")
+            form.addRow("Sampling:", self.sampling)
+            self.intro_frames = QSpinBox(self)
+            self.intro_frames.setRange(0, 1000)
+            self.intro_frames.setValue(40)
+            self.intro_frames.setToolTip("First frames: the t-SNE map coloured by session, "
+                                         "then the colours change to 'Colour by' (0 = none)")
+            form.addRow("Intro frames (by session):", self.intro_frames)
             self.theme = QComboBox(self)
             self.theme.addItems(["dark", "light"])
             form.addRow("Theme:", self.theme)
@@ -305,7 +329,9 @@ class FeatureNamesDialog(QDialog):
         if self.mode == "animate":
             o.update(n_pairs=self.n_pairs.value(), theme=self.theme.currentText(),
                      color=self.color.currentText(), mp4=self.mp4.isChecked(),
-                     reuse=self.reuse.isChecked())
+                     reuse=self.reuse.isChecked(), n_points=self.n_points.value(),
+                     sampling=self.sampling.currentText(),
+                     intro_frames=self.intro_frames.value())
         return o
 
 
@@ -540,7 +566,8 @@ def run_animation(parent: QWidget | None, config_path, cols: list[str], *,
         opts = {**d.options(), **opts}
     opts = {"tsne_sample": 10000, "frames_per_session": 3000, "n_plot": 24,
             "n_pairs": 4, "theme": "dark", "color": "tsne", "mp4": False,
-            "reuse": True, **opts}
+            "reuse": True, "n_points": 4000, "sampling": "random", "intro_frames": 40,
+            **opts}
     nf = names_path(config_path)
     names_file = nf if nf.is_file() else None
     run = find_reusable_run(config_path, cols) if opts["reuse"] else None
@@ -562,7 +589,9 @@ def run_animation(parent: QWidget | None, config_path, cols: list[str], *,
             out = run / f"animation_{k}.gif"
             k += 1
         return animate_argv(run, pairs, out, names_file, theme=opts["theme"],
-                            mp4=opts["mp4"], color=opts["color"])
+                            mp4=opts["mp4"], color=opts["color"],
+                            n_points=opts["n_points"], sampling=opts["sampling"],
+                            intro_frames=opts["intro_frames"])
 
     steps.append(_animate)
     dlg = LandscapeRunDialog(parent, f"Animation — {len(cols)} features", steps, run)
