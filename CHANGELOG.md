@@ -8,6 +8,21 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jj — Feature Visualization: swap axes, linear / log10.**
+New "Axes:" row under the plot buttons: *Swap X ↔ Y* and an X and a Y scale
+(linear / log10) for the displayed axes, applied to the plot on screen at
+once from cached data (no re-read; cache cleared on Refresh). Swapping also
+exchanges the two scale settings, so each quantity keeps its scale.
+Distributions: values on x, density on y (swap → sideways histograms); a
+log value axis uses log-spaced bins and leaves out values ≤ 0, counted in
+the panel; AUC unaffected. Joint: the features exchange axes; log axes use
+log-spaced bins, frames ≤ 0 on a log axis are counted in the title. Over
+time: time on x (swap → time running down y, panels side by side);
+double-click reads time from whichever axis holds it.
+`plot_distributions` / `plot_joint` / `plot_over_time` take `swap`, `xlog`,
+`ylog`.
+smoke_122jj_feature_view_axes: 19/19. 122je 38/38, 122jg 20/20.
+
 **122ji — Compute Features: ROI families show "modified" when the ROIs change.**
 ROI-family outputs (distances to ROI centres, body parts inside ROIs) now
 carry in their parquet metadata a fingerprint of the ROIs each video was

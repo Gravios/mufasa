@@ -151,6 +151,26 @@ class FeatureVisualizationForm(OperationForm):
         brow.addWidget(self.video_btn)
         self.body_layout.addLayout(brow)
 
+        # Patch 122jj — axis controls; applied to the plot on screen at once.
+        arow = QHBoxLayout()
+        arow.addWidget(QLabel("Axes:", self))
+        self.swap_btn = QPushButton("Swap X ↔ Y", self)
+        self.swap_btn.setCheckable(True)
+        self.swap_btn.setToolTip("Exchange the horizontal and vertical axes")
+        self.swap_btn.toggled.connect(self._on_swap)
+        arow.addWidget(self.swap_btn)
+        self.xscale_cb, self.yscale_cb = QComboBox(self), QComboBox(self)
+        for lab, cb in (("X:", self.xscale_cb), ("Y:", self.yscale_cb)):
+            arow.addWidget(QLabel(lab, self))
+            cb.addItems(["linear", "log10"])
+            cb.setToolTip("Scale of the displayed axis. On a log axis, values ≤ 0 "
+                          "are left out (each plot says how many).")
+            cb.currentIndexChanged.connect(self._replot)
+            arow.addWidget(cb)
+        arow.addStretch()
+        self.body_layout.addLayout(arow)
+        self._cache: dict = {}
+
         from matplotlib.backends.backend_qtagg import (
             FigureCanvasQTAgg,
             NavigationToolbar2QT,
@@ -178,6 +198,7 @@ class FeatureVisualizationForm(OperationForm):
     # Discovery
     # ------------------------------------------------------------------ #
     def refresh(self) -> None:
+        self._cache = {}
         self.video_cb.blockSignals(True)
         cur = self.video_cb.currentText()
         self.video_cb.clear()
@@ -429,7 +450,37 @@ class FeatureVisualizationForm(OperationForm):
         b = self.colour_cb.currentText()
         return None if not b or b == "(none)" else b
 
+    def _axes(self) -> dict:
+        """Patch 122jj: axis options for the plotting functions."""
+        return dict(swap=self.swap_btn.isChecked(),
+                    xlog=self.xscale_cb.currentText() == "log10",
+                    ylog=self.yscale_cb.currentText() == "log10")
+
+    def _on_swap(self, _on: bool) -> None:
+        """Swap also exchanges the X / Y scale settings, so each quantity
+        keeps its scale when it moves to the other axis."""
+        x, y = self.xscale_cb.currentIndex(), self.yscale_cb.currentIndex()
+        for cb, i in ((self.xscale_cb, y), (self.yscale_cb, x)):
+            cb.blockSignals(True)
+            cb.setCurrentIndex(i)
+            cb.blockSignals(False)
+        self._replot()
+
+    def _replot(self, *_a) -> None:
+        """Redraw the plot on screen with the current axis options (data
+        come from the cache, so nothing is re-read)."""
+        {"dist": self.plot_distributions, "joint": self.plot_joint,
+         "time": self.plot_over_time}.get(self._mode, lambda: None)()
+
     def _load(self, cols: list[str], all_videos: bool):
+        key = ("load", tuple(cols), all_videos, self._behaviour(),
+               self.video_cb.currentText())
+        if key not in self._cache:
+            self._cache = {k: v for k, v in self._cache.items() if k[0] != "load"}
+            self._cache[key] = self._load_uncached(cols, all_videos)
+        return self._cache[key]
+
+    def _load_uncached(self, cols: list[str], all_videos: bool):
         """(data {col: array}, behaviour mask or None, n videos)."""
         from mufasa.utils.feature_io import load_feature_columns
         from mufasa.utils.label_io import load_labels_for_video
@@ -492,7 +543,8 @@ class FeatureVisualizationForm(OperationForm):
             all_v = self.scope_cb.currentIndex() == 1
             data, mask, nv = self._load(cols, all_v)
             beh = self._behaviour() or ""
-            aucs = plot_distributions(self.figure, data, mask=mask, behaviour=beh)
+            aucs = plot_distributions(self.figure, data, mask=mask, behaviour=beh,
+                                      **self._axes())
             self.canvas.draw_idle()
         finally:
             QApplication.restoreOverrideCursor()
@@ -525,7 +577,7 @@ class FeatureVisualizationForm(OperationForm):
         try:
             data, mask, nv = self._load(cols, self.scope_cb.currentIndex() == 1)
             plot_joint(self.figure, data[cols[0]], data[cols[1]], cols[0], cols[1],
-                       mask=mask, behaviour=self._behaviour() or "")
+                       mask=mask, behaviour=self._behaviour() or "", **self._axes())
             self.canvas.draw_idle()
         finally:
             QApplication.restoreOverrideCursor()
@@ -541,11 +593,14 @@ class FeatureVisualizationForm(OperationForm):
         video = self.video_cb.currentText()
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            df = load_feature_columns(video, self.config_path, cols)
-            fps = self._video_fps(video)
-            labels = self._labels(video)
+            key = ("time", video, tuple(cols))
+            if key not in self._cache:
+                self._cache = {k: v for k, v in self._cache.items() if k[0] != "time"}
+                self._cache[key] = (load_feature_columns(video, self.config_path, cols),
+                                    self._video_fps(video), self._labels(video))
+            df, fps, labels = self._cache[key]
             plot_over_time(self.figure, {c: df[c].to_numpy(np.float64) for c in df.columns},
-                           fps, labels=labels)
+                           fps, labels=labels, **self._axes())
             self.canvas.draw_idle()
         finally:
             QApplication.restoreOverrideCursor()
@@ -578,9 +633,10 @@ class FeatureVisualizationForm(OperationForm):
         return 30.0
 
     def _on_canvas_click(self, ev) -> None:  # noqa: ANN001
-        if self._mode == "time" and ev.dblclick and ev.inaxes is not None \
-                and ev.xdata is not None:
-            self.open_viewer(start_frame=int(round(ev.xdata * 60 * self._time_fps)))
+        if self._mode == "time" and ev.dblclick and ev.inaxes is not None:
+            t = ev.ydata if self.swap_btn.isChecked() else ev.xdata   # minutes
+            if t is not None:
+                self.open_viewer(start_frame=max(0, int(round(t * 60 * self._time_fps))))
 
     # ------------------------------------------------------------------ #
     def open_viewer(self, start_frame: int = 0):

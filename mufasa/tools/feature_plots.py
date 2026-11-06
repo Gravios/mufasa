@@ -66,58 +66,106 @@ def _range(v: np.ndarray) -> tuple[float, float]:
     return float(lo), float(hi)
 
 
+def _edges(v: np.ndarray, bins: int, log: bool) -> np.ndarray:
+    """Histogram edges over the 0.5–99.5 % range; log-spaced over the
+    positive values when ``log``."""
+    if log:
+        pos = v[np.isfinite(v) & (v > 0)]
+        if pos.size == 0:
+            return np.logspace(0, 1, bins + 1)
+        lo, hi = np.percentile(pos, [0.5, 99.5])
+        if not hi > lo:
+            lo, hi = pos.min(), pos.max() * 1.0001 + 1e-12
+        return np.logspace(np.log10(lo), np.log10(hi), bins + 1)
+    lo, hi = _range(v)
+    return np.linspace(lo, hi, bins + 1)
+
+
+def _note(ax, text: str) -> None:
+    ax.text(0.99, 0.97, text, transform=ax.transAxes, ha="right", va="top",
+            fontsize=6, color="#888")
+
+
 def plot_distributions(fig, data: dict[str, np.ndarray], *,
                        mask: np.ndarray | None = None, behaviour: str = "",
-                       bins: int = 60) -> dict[str, float]:
-    """Histogram per feature; returns {feature: AUC} when ``mask`` given."""
+                       bins: int = 60, swap: bool = False, xlog: bool = False,
+                       ylog: bool = False) -> dict[str, float]:
+    """Histogram per feature; returns {feature: AUC} when ``mask`` given.
+
+    Feature values run along x and density along y; ``swap`` turns the
+    histograms sideways (values on y). ``xlog`` / ``ylog`` put the
+    displayed x / y axis on a log10 scale — the value axis gets log-spaced
+    bins and values ≤ 0 are left out (and counted in the panel)."""
     fig.clear()
     cols = list(data)
     if not cols:
         return {}
+    vlog, dlog = (ylog, xlog) if swap else (xlog, ylog)
+    orient = "horizontal" if swap else "vertical"
     ncol = min(3, len(cols))
     nrow = math.ceil(len(cols) / ncol)
     aucs: dict[str, float] = {}
     for k, c in enumerate(cols):
         ax = fig.add_subplot(nrow, ncol, k + 1)
         v = np.asarray(data[c], np.float64)
-        lo, hi = _range(v)
-        edges = np.linspace(lo, hi, bins + 1)
+        edges = _edges(v, bins, vlog)
         fin = np.isfinite(v)
+        use = fin & (v > 0) if vlog else fin
+        kw = dict(bins=edges, density=True, orientation=orient)
         if mask is not None and mask.any():
             m = mask.astype(bool)
-            ax.hist(v[fin & ~m], bins=edges, density=True, color=REST_COLOR,
-                    alpha=0.55, label=f"not {behaviour}")
-            ax.hist(v[fin & m], bins=edges, density=True, color=BEHAVIOUR_COLOR,
-                    alpha=0.6, label=behaviour)
+            ax.hist(v[use & ~m], color=REST_COLOR, alpha=0.55,
+                    label=f"not {behaviour}", **kw)
+            ax.hist(v[use & m], color=BEHAVIOUR_COLOR, alpha=0.6, label=behaviour, **kw)
             a = auc(v, m)
             aucs[c] = a
             ax.set_title(f"{_wrap(c)}\nAUC {a:.2f}", fontsize=8)
             if k == 0:
                 ax.legend(fontsize=7, frameon=False)
         else:
-            ax.hist(v[fin], bins=edges, density=True, color=REST_COLOR, alpha=0.8)
+            ax.hist(v[use], color=REST_COLOR, alpha=0.8, **kw)
             ax.set_title(_wrap(c), fontsize=8)
+        if vlog:
+            (ax.set_yscale if swap else ax.set_xscale)("log")
+        if dlog:
+            (ax.set_xscale if swap else ax.set_yscale)("log")
+        else:
+            (ax.set_xticks if swap else ax.set_yticks)([])
         ax.tick_params(labelsize=7)
-        ax.set_yticks([])
-        n_nan = int((~fin).sum())
-        if n_nan:
-            ax.text(0.99, 0.97, f"{n_nan:,} NaN", transform=ax.transAxes,
-                    ha="right", va="top", fontsize=6, color="#888")
+        notes = []
+        if int((~fin).sum()):
+            notes.append(f"{int((~fin).sum()):,} NaN")
+        if vlog and int((fin & (v <= 0)).sum()):
+            notes.append(f"{int((fin & (v <= 0)).sum()):,} ≤ 0 not shown")
+        if notes:
+            _note(ax, " · ".join(notes))
     fig.tight_layout()
     return aucs
 
 
 def plot_joint(fig, a: np.ndarray, b: np.ndarray, name_a: str, name_b: str, *,
                mask: np.ndarray | None = None, behaviour: str = "",
-               bins: int = 90, max_points: int = 4000, seed: int = 0) -> None:
-    """2-D log density of two features; behaviour frames overlaid."""
+               bins: int = 90, max_points: int = 4000, seed: int = 0,
+               swap: bool = False, xlog: bool = False, ylog: bool = False) -> None:
+    """2-D log density of two features (``a`` on x, ``b`` on y; ``swap``
+    exchanges them); behaviour frames overlaid. ``xlog`` / ``ylog``: log10
+    axes with log-spaced bins; frames with a value ≤ 0 on a log axis are
+    left out (and counted)."""
     import matplotlib.colors as mcolors
     fig.clear()
     ax = fig.add_subplot(1, 1, 1)
-    a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
-    ok = np.isfinite(a) & np.isfinite(b)
-    xr, yr = _range(a[ok]), _range(b[ok])
-    H, xe, ye = np.histogram2d(a[ok], b[ok], bins=bins, range=(xr, yr))
+    x, y = np.asarray(a, np.float64), np.asarray(b, np.float64)
+    nx, ny = name_a, name_b
+    if swap:
+        x, y, nx, ny = y, x, ny, nx
+    ok = np.isfinite(x) & np.isfinite(y)
+    n_fin = int(ok.sum())
+    if xlog:
+        ok &= x > 0
+    if ylog:
+        ok &= y > 0
+    xe, ye = _edges(x[ok], bins, xlog), _edges(y[ok], bins, ylog)
+    H, xe, ye = np.histogram2d(x[ok], y[ok], bins=(xe, ye))
     Hm = np.ma.masked_less_equal(H.T, 0)
     if Hm.count():
         ax.pcolormesh(xe, ye, Hm, cmap="Greys", shading="auto",
@@ -128,28 +176,44 @@ def plot_joint(fig, a: np.ndarray, b: np.ndarray, name_a: str, name_b: str, *,
         if idx.size:
             if idx.size > max_points:
                 idx = np.random.default_rng(seed).choice(idx, max_points, replace=False)
-            ax.scatter(a[idx], b[idx], s=4, lw=0, color=BEHAVIOUR_COLOR, alpha=0.6,
+            ax.scatter(x[idx], y[idx], s=4, lw=0, color=BEHAVIOUR_COLOR, alpha=0.6,
                        label=f"{behaviour} ({int(m.sum()):,} frames)")
             ax.legend(fontsize=8, frameon=False, loc="upper right")
-    ax.set_xlim(*xr)
-    ax.set_ylim(*yr)
-    ax.set_xlabel(_wrap(name_a, 60), fontsize=8)
-    ax.set_ylabel(_wrap(name_b, 60), fontsize=8)
+    if xlog:
+        ax.set_xscale("log")
+    if ylog:
+        ax.set_yscale("log")
+    ax.set_xlim(xe[0], xe[-1])
+    ax.set_ylim(ye[0], ye[-1])
+    ax.set_xlabel(_wrap(nx, 60), fontsize=8)
+    ax.set_ylabel(_wrap(ny, 60), fontsize=8)
     ax.tick_params(labelsize=7)
-    ax.set_title(f"{int(ok.sum()):,} frames", fontsize=8)
+    hidden = n_fin - int(ok.sum())
+    ax.set_title(f"{int(ok.sum()):,} frames"
+                 + (f" ({hidden:,} with a value ≤ 0 on a log axis not shown)" if hidden else ""),
+                 fontsize=8)
     fig.tight_layout()
 
 
 def plot_over_time(fig, data: dict[str, np.ndarray], fps: float, *,
                    labels: dict[str, np.ndarray] | None = None,
-                   max_points: int = 6000) -> list:
+                   max_points: int = 6000, swap: bool = False, xlog: bool = False,
+                   ylog: bool = False) -> list:
     """Whole-session traces (min/max decimated) with behaviour bouts
-    shaded; returns the axes (time in minutes on x)."""
+    shaded; returns the axes. Time (minutes) runs along x and values along
+    y, one panel per feature stacked vertically; ``swap`` puts time on y
+    (downwards) with the panels side by side. ``xlog`` / ``ylog``: log10 on
+    the displayed axis (values ≤ 0, or time 0, are not drawn)."""
+    import warnings
     fig.clear()
     cols = list(data)
     if not cols:
         return []
-    axes = fig.subplots(len(cols), 1, sharex=True, squeeze=False)[:, 0]
+    tlog, vlog = (ylog, xlog) if swap else (xlog, ylog)
+    if swap:
+        axes = fig.subplots(1, len(cols), sharey=True, squeeze=False)[0, :]
+    else:
+        axes = fig.subplots(len(cols), 1, sharex=True, squeeze=False)[:, 0]
     fps = fps if fps and fps > 0 else 30.0
     spans = []
     for k, (name, lab) in enumerate((labels or {}).items()):
@@ -158,30 +222,48 @@ def plot_over_time(fig, data: dict[str, np.ndarray], fps: float, *,
         spans.append((name, np.flatnonzero(d == 1), np.flatnonzero(d == -1), k))
     palette = [BEHAVIOUR_COLOR, "#7b5ea7", "#2e9e6b", "#c49a1a", "#c43b6b"]
     for ax, c in zip(axes, cols):
-        v = np.asarray(data[c], np.float64)
+        v = np.asarray(data[c], np.float64).copy()
+        if vlog:
+            v[v <= 0] = np.nan
         n = len(v)
         t = np.arange(n) / fps / 60.0
         if n > max_points:
             step = math.ceil(n / (max_points / 2))
             m = n // step * step
             blk = v[:m].reshape(-1, step)
-            with np.errstate(all="ignore"):
-                import warnings
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", RuntimeWarning)
-                    lo, hi = np.nanmin(blk, 1), np.nanmax(blk, 1)
+            with np.errstate(all="ignore"), warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                lo, hi = np.nanmin(blk, 1), np.nanmax(blk, 1)
             tt = t[:m].reshape(-1, step)[:, 0]
-            ax.fill_between(tt, lo, hi, color=REST_COLOR, lw=0.6, alpha=0.9)
+            if swap:
+                ax.fill_betweenx(tt, lo, hi, color=REST_COLOR, lw=0.6, alpha=0.9)
+            else:
+                ax.fill_between(tt, lo, hi, color=REST_COLOR, lw=0.6, alpha=0.9)
+        elif swap:
+            ax.plot(v, t, color=REST_COLOR, lw=0.7)
         else:
             ax.plot(t, v, color=REST_COLOR, lw=0.7)
         for name, on, off, k in spans:
             for s, e in zip(on, off):
-                ax.axvspan(s / fps / 60, e / fps / 60, color=palette[k % len(palette)],
-                           alpha=0.25, lw=0)
-        ax.set_ylim(*_range(v))
-        ax.set_ylabel(_wrap(c, 26), fontsize=7, rotation=0, ha="right", va="center")
+                (ax.axhspan if swap else ax.axvspan)(
+                    s / fps / 60, e / fps / 60, color=palette[k % len(palette)],
+                    alpha=0.25, lw=0)
+        e = _edges(v, 1, vlog)
+        (ax.set_xlim if swap else ax.set_ylim)(e[0], e[-1])
+        if vlog:
+            (ax.set_xscale if swap else ax.set_yscale)("log")
+        if swap:
+            ax.set_xlabel(_wrap(c, 26), fontsize=7)
+        else:
+            ax.set_ylabel(_wrap(c, 26), fontsize=7, rotation=0, ha="right", va="center")
         ax.tick_params(labelsize=7)
-    axes[-1].set_xlabel("time (min)", fontsize=8)
+    if tlog:
+        (axes[0].set_yscale if swap else axes[-1].set_xscale)("log")
+    if swap:
+        axes[0].set_ylabel("time (min)", fontsize=8)
+        axes[0].invert_yaxis()
+    else:
+        axes[-1].set_xlabel("time (min)", fontsize=8)
     if spans:
         from matplotlib.patches import Patch
         axes[0].legend(handles=[Patch(color=palette[k % len(palette)], alpha=0.4, label=nm)
