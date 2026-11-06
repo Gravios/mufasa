@@ -175,6 +175,39 @@ def sample_points(n: int, candidates: np.ndarray, sessions: np.ndarray,
     raise SystemExit(f"--sampling must be one of {', '.join(SAMPLING)}")
 
 
+OUTLIER_METHODS = ("none", "percentile", "mad")
+
+
+def outlier_mask(values: dict[str, np.ndarray], method: str, *, percentile: float = 1.0,
+                 mad: float = 5.0) -> tuple[np.ndarray, dict[str, int]]:
+    """Frames that are outliers in any of ``values`` ({name: array}, same
+    length): ``percentile`` — below the ``percentile``-th or above the
+    (100 − ``percentile``)-th percentile; ``mad`` — more than ``mad`` scaled
+    MADs (≈ SDs for normal data) from the median. Returns (mask, {name:
+    frames flagged by it})."""
+    n = len(next(iter(values.values()))) if values else 0
+    bad = np.zeros(n, bool)
+    per: dict[str, int] = {}
+    for name, v in values.items():
+        v = np.asarray(v, np.float64)
+        if method == "percentile":
+            lo, hi = np.nanpercentile(v, [percentile, 100 - percentile])
+            b = (v < lo) | (v > hi)
+        elif method == "mad":
+            med = np.nanmedian(v)
+            s = 1.4826 * np.nanmedian(np.abs(v - med))
+            if not s > 0:          # more than half the values identical
+                s = np.nanstd(v)
+            b = np.abs(v - med) > mad * s if s > 0 else np.zeros(n, bool)
+        elif method == "none":
+            b = np.zeros(n, bool)
+        else:
+            raise SystemExit(f"--outliers must be one of {', '.join(OUTLIER_METHODS)}")
+        per[name] = int(b.sum())
+        bad |= b
+    return bad, per
+
+
 def _round_robin(groups: list[np.ndarray], n: int) -> np.ndarray:
     """Take one from each group in turn until ``n`` are taken."""
     out, k = [], 0
@@ -418,6 +451,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="how the points are picked from the t-SNE sample: random "
                         "(default), balanced (same number per session) or even "
                         "(spread over the t-SNE map, sparse regions kept)")
+    p.add_argument("--outliers", choices=OUTLIER_METHODS, default="none",
+                   help="leave out frames that are outliers in any animated feature: "
+                        "percentile (outside --outlier-percentile .. 100 − it) or mad "
+                        "(more than --outlier-mad scaled MADs from the median)")
+    p.add_argument("--outlier-percentile", type=float, default=1.0,
+                   help="with --outliers percentile: tail cut on each side, in %% (default 1)")
+    p.add_argument("--outlier-mad", type=float, default=5.0,
+                   help="with --outliers mad: threshold in scaled MADs (default 5)")
+    p.add_argument("--outliers-tsne", action="store_true",
+                   help="also test the t-SNE coordinates for outliers")
     p.add_argument("--intro-frames", type=int, default=40,
                    help="first frames: the t-SNE map coloured by session, before "
                         "--color takes over (0 = no intro; default 40)")
@@ -476,6 +519,9 @@ def main(argv: list[str] | None = None) -> int:
     if missing:
         raise SystemExit(f"not in the run's samples: {', '.join(missing)}")
 
+    from mufasa.utils.feature_names import display, load_names, read_names
+    cfg = find_project_config(run)
+    names = read_names(a.names_file) if a.names_file else (load_names(cfg) if cfg else {})
     rng = np.random.default_rng(a.seed)
     need = sorted({c for p in pairs for c in p})
     ok = np.isfinite(samples[need].to_numpy(np.float64)).all(1)
@@ -485,15 +531,25 @@ def main(argv: list[str] | None = None) -> int:
               "columns left out")
     sess_arr = emb["session"].astype(str).to_numpy()
     raw_xy = emb[["tsne_1", "tsne_2"]].to_numpy(np.float64)
+    # Patch 122jp: leave out outlying frames before sampling
+    if a.outliers != "none":
+        vals = {c: samples[c].to_numpy(np.float64)[keep] for c in need}
+        if a.outliers_tsne:
+            vals["t-SNE 1"], vals["t-SNE 2"] = raw_xy[keep, 0], raw_xy[keep, 1]
+        bad, per = outlier_mask(vals, a.outliers, percentile=a.outlier_percentile,
+                                mad=a.outlier_mad)
+        if bad.any():
+            print(f"[animate] {int(bad.sum())} of {len(keep)} frame(s) left out as outliers "
+                  f"({a.outliers}): " + ", ".join(
+                      f"{display(c, names) if c in samples.columns else c} {n}"
+                      for c, n in per.items() if n))
+        keep = keep[~bad]
     keep = sample_points(a.n_points, keep, sess_arr, raw_xy, a.sampling, rng)
     print(f"[animate] {len(keep)} point(s), sampling: {a.sampling} "
           f"({len(pd.unique(sess_arr[keep]))} sessions)")
     emb, samples = emb.iloc[keep].reset_index(drop=True), samples.iloc[keep].reset_index(drop=True)
 
     tsne = tsne_space(emb[["tsne_1", "tsne_2"]].to_numpy(np.float64))
-    from mufasa.utils.feature_names import display, load_names, read_names
-    cfg = find_project_config(run)
-    names = read_names(a.names_file) if a.names_file else (load_names(cfg) if cfg else {})
     # columns the landscape analysed as log10 (samples hold log10 values)
     lf = run / "log10_columns.txt"
     scaled = ({ln.strip(): "log10" for ln in lf.read_text().splitlines() if ln.strip()}

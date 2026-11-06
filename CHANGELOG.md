@@ -8,6 +8,17 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jp — Animation: remove outliers.**
+mufasa-landscape-animate `--outliers none | percentile | mad` leaves out,
+before the points are sampled, frames that are outliers in any animated
+feature: outside `--outlier-percentile` (default 1 %) on either tail, or
+more than `--outlier-mad` (default 5) scaled MADs from the median (SD when
+over half the values are identical); `--outliers-tsne` tests the t-SNE
+coordinates too. The log says how many frames each feature flagged. The
+landscape run is untouched. The Animate… popup has "Remove outliers"
+(method, threshold, "also t-SNE coordinates").
+Test: `tests/smoke_122jp_animate_outliers.py` (15 checks).
+
 **122jo — Animation: pause and transition in frames.**
 mufasa-landscape-animate takes `--transition-frames` (frames per move),
 `--hold-frames` (pause on each feature space, 0 = none) and

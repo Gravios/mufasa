@@ -142,7 +142,9 @@ def animate_argv(run: Path, pairs: list[tuple[str, str]], out: Path,
                  n_points: int = 4000, sampling: str = "random",
                  intro_frames: int = 40, hold_frames: int | None = None,
                  tsne_hold_frames: int | None = None,
-                 transition_frames: int | None = None) -> list[str]:
+                 transition_frames: int | None = None, outliers: str = "none",
+                 outlier_value: float | None = None,
+                 outliers_tsne: bool = False) -> list[str]:
     argv = ["-m", ANIMATE_MODULE, str(run), "--through-tsne", "--theme", theme,
             "--color", color, "--out", str(out), "--n-points", str(n_points),
             "--sampling", sampling, "--intro-frames", str(intro_frames)]
@@ -150,6 +152,13 @@ def animate_argv(run: Path, pairs: list[tuple[str, str]], out: Path,
                     ("--transition-frames", transition_frames)):
         if v is not None:
             argv += [flag, str(v)]
+    if outliers != "none":   # patch 122jp
+        argv += ["--outliers", outliers]
+        if outlier_value is not None:
+            argv += ["--outlier-percentile" if outliers == "percentile" else "--outlier-mad",
+                     f"{outlier_value:g}"]
+        if outliers_tsne:
+            argv.append("--outliers-tsne")
     for a, b in pairs:
         argv += ["--pair", a, b]
     if names_file is not None:
@@ -293,6 +302,40 @@ class FeatureNamesDialog(QDialog):
                 "balanced: the same number from every session · "
                 "even: spread over the t-SNE map, so sparse regions stay visible")
             form.addRow("Sampling:", self.sampling)
+            # Patch 122jp: outliers left out of the animated points
+            orow = QHBoxLayout()
+            self.outliers = QComboBox(self)
+            self.outliers.addItems(["none", "percentile", "mad"])
+            self.outliers.setToolTip(
+                "Leave out frames that are outliers in any animated feature, before "
+                "the points are sampled. percentile: outside the given % tails; "
+                "mad: farther than the given number of scaled MADs from the median")
+            orow.addWidget(self.outliers)
+            from PySide6.QtWidgets import QDoubleSpinBox
+            self.outlier_value = QDoubleSpinBox(self)
+            self.outlier_value.setDecimals(2)
+            orow.addWidget(self.outlier_value)
+            self.outliers_tsne = QCheckBox("also t-SNE coordinates", self)
+            orow.addWidget(self.outliers_tsne)
+            orow.addStretch()
+            self._outlier_defaults = {"percentile": 1.0, "mad": 5.0}
+
+            def _sync(m: str) -> None:
+                on = m != "none"
+                self.outlier_value.setEnabled(on)
+                self.outliers_tsne.setEnabled(on)
+                if m == "percentile":
+                    self.outlier_value.setRange(0.01, 25.0)
+                    self.outlier_value.setSuffix(" % each tail")
+                elif m == "mad":
+                    self.outlier_value.setRange(1.0, 50.0)
+                    self.outlier_value.setSuffix(" × MAD")
+                if on:
+                    self.outlier_value.setValue(self._outlier_defaults[m])
+
+            self.outliers.currentTextChanged.connect(_sync)
+            _sync("none")
+            form.addRow("Remove outliers:", orow)
             self.intro_frames = QSpinBox(self)
             self.intro_frames.setRange(0, 1000)
             self.intro_frames.setValue(40)
@@ -373,7 +416,11 @@ class FeatureNamesDialog(QDialog):
                      intro_frames=self.intro_frames.value(),
                      hold_frames=self.hold_frames.value(),
                      tsne_hold_frames=self.tsne_hold_frames.value(),
-                     transition_frames=self.transition_frames.value())
+                     transition_frames=self.transition_frames.value(),
+                     outliers=self.outliers.currentText(),
+                     outlier_value=(self.outlier_value.value()
+                                    if self.outliers.currentText() != "none" else None),
+                     outliers_tsne=self.outliers_tsne.isChecked())
         return o
 
 
@@ -609,7 +656,8 @@ def run_animation(parent: QWidget | None, config_path, cols: list[str], *,
     opts = {"tsne_sample": 10000, "frames_per_session": 3000, "n_plot": 24,
             "n_pairs": 4, "theme": "dark", "color": "tsne", "mp4": False,
             "reuse": True, "n_points": 4000, "sampling": "random", "intro_frames": 40,
-            "hold_frames": 30, "tsne_hold_frames": 30, "transition_frames": 40, **opts}
+            "hold_frames": 30, "tsne_hold_frames": 30, "transition_frames": 40,
+            "outliers": "none", "outlier_value": None, "outliers_tsne": False, **opts}
     nf = names_path(config_path)
     names_file = nf if nf.is_file() else None
     run = find_reusable_run(config_path, cols) if opts["reuse"] else None
@@ -636,7 +684,9 @@ def run_animation(parent: QWidget | None, config_path, cols: list[str], *,
                             intro_frames=opts["intro_frames"],
                             hold_frames=opts["hold_frames"],
                             tsne_hold_frames=opts["tsne_hold_frames"],
-                            transition_frames=opts["transition_frames"])
+                            transition_frames=opts["transition_frames"],
+                            outliers=opts["outliers"], outlier_value=opts["outlier_value"],
+                            outliers_tsne=opts["outliers_tsne"])
 
     steps.append(_animate)
     dlg = LandscapeRunDialog(parent, f"Animation — {len(cols)} features", steps, run)
