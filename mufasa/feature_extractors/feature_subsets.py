@@ -431,6 +431,16 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         if HEAD_VELOCITY_BODY_FRAME in self.feature_families:
             self._resolve_head_body()
 
+    def _roi_fingerprints(self) -> dict:
+        """Patch 122ji: {video: fingerprint of its ROIs in rois.json} for
+        stamping the ROI-family outputs."""
+        try:
+            from mufasa.roi_tools.roi_store import load_rois
+            store = load_rois(self.roi_coordinates_path)
+        except Exception:
+            return {}
+        return {v: store.fingerprint(v) for v in store.videos}
+
     def _resolve_head_body(self):
         """Patch 122iz: head / body markers per animal for the head-velocity
         family, from project.toml ([features], [[pose.segments]]) or the
@@ -566,6 +576,10 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             within_animal_four_point_combs=self.within_animal_four_point_combs,
             animal_bps=self.animal_bps,
             roi_dict=getattr(self, "roi_dict", None) if (
+                FRAME_BP_TO_ROI_CENTER in self.feature_families
+                or FRAME_BP_INSIDE_ROI in self.feature_families
+            ) else None,
+            roi_fingerprints=self._roi_fingerprints() if (
                 FRAME_BP_TO_ROI_CENTER in self.feature_families
                 or FRAME_BP_INSIDE_ROI in self.feature_families
             ) else None,

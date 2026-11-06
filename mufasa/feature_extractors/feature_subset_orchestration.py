@@ -98,6 +98,30 @@ HEAD_VELOCITY_BODY_FRAME = (
 # Families whose values can be negative: their per-family parquet keeps NaN
 # for missing values instead of the legacy -1.
 SIGNED_FAMILIES = frozenset({HEAD_VELOCITY_BODY_FRAME})
+ROI_FAMILIES = frozenset({FRAME_BP_TO_ROI_CENTER, FRAME_BP_INSIDE_ROI})
+ROI_FINGERPRINT_KEY = b"mufasa.roi_fingerprint"
+
+
+def write_with_roi_fingerprint(df: pd.DataFrame, path: str,
+                               fingerprint: str | None) -> None:
+    """Write a ROI-family parquet carrying the fingerprint of the ROIs it
+    was computed from in its schema metadata (patch 122ji). Readers that
+    use pandas see an ordinary file."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    table = pa.Table.from_pandas(df, preserve_index=False)
+    meta = dict(table.schema.metadata or {})
+    meta[ROI_FINGERPRINT_KEY] = (fingerprint or "").encode()
+    pq.write_table(table.replace_schema_metadata(meta), path)
+
+
+def read_roi_fingerprint(path: str) -> str | None:
+    """The fingerprint stamped by :func:`write_with_roi_fingerprint`, ""
+    for "computed with no ROIs", or None for files written before 122ji."""
+    import pyarrow.parquet as pq
+    meta = pq.read_schema(path).metadata or {}
+    v = meta.get(ROI_FINGERPRINT_KEY)
+    return None if v is None else v.decode()
 
 
 @dataclass(frozen=True)
@@ -147,6 +171,11 @@ class VideoProcessingConfig:
     # project.toml (see resolve_head_body_markers). None when the
     # family isn't requested.
     head_body_markers: Mapping[str, tuple] | None = None
+
+    # Patch 122ji: {video: fingerprint of its ROIs} at compute time,
+    # stamped into the ROI families' parquet metadata so a later change
+    # of the ROIs shows as "modified" in Compute Features.
+    roi_fingerprints: Mapping[str, str | None] | None = None
 
 
 def _read_video_info_for(
@@ -392,10 +421,12 @@ def process_one_video(
             # keeps NaN.
             if family not in SIGNED_FAMILIES:
                 fam_df = fam_df.fillna(-1)
-            fam_df.to_parquet(
-                os.path.join(out_dir, f"{video_name}.parquet"),
-                index=False,
-            )
+            out_path = os.path.join(out_dir, f"{video_name}.parquet")
+            if family in ROI_FAMILIES and config.roi_fingerprints is not None:
+                write_with_roi_fingerprint(
+                    fam_df, out_path, config.roi_fingerprints.get(video_name))
+            else:
+                fam_df.to_parquet(out_path, index=False)
     timer.stop_timer()
     if print_progress:
         print(
@@ -419,4 +450,7 @@ __all__ = [
     "FRAME_BP_INSIDE_ROI",
     "ARENA_EDGE",
     "HEAD_VELOCITY_BODY_FRAME",
+    "ROI_FAMILIES",
+    "read_roi_fingerprint",
+    "write_with_roi_fingerprint",
 ]

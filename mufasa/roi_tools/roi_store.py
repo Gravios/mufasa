@@ -292,6 +292,19 @@ class RoiStore:
     def remove_video(self, video: str) -> None:
         self.videos.pop(video, None)
 
+    def fingerprint(self, video: str) -> str | None:
+        """Short content hash of one video's ROIs (names, shapes,
+        geometry, order) — None when it has none. Stamped into ROI-feature
+        outputs so the Compute Features form can tell when the ROIs they
+        were computed from have changed (patch 122ji)."""
+        import hashlib
+        rois = self.rois(video)
+        if not rois:
+            return None
+        blob = json.dumps([r.to_json() for r in rois], sort_keys=True,
+                          separators=(",", ":"))
+        return hashlib.sha1(blob.encode()).hexdigest()[:16]
+
     def videos_with_rois(self) -> list[str]:
         return sorted(v for v, vr in self.videos.items() if vr.rois)
 

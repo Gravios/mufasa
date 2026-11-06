@@ -143,6 +143,7 @@ class FeatureSubsetExtractorForm(OperationForm):
         # preserved in Qt.UserRole, so collect_args (which reads
         # UserRole, not the display text) is unaffected.
         computed_slugs = self._computed_family_slugs()
+        roi_status = self._roi_family_statuses(roi_families)
 
         # Subject frame
         subj_box = QGroupBox("Subject features", self)
@@ -180,8 +181,9 @@ class FeatureSubsetExtractorForm(OperationForm):
         self.roi_families.setMinimumHeight(90)
         for fam in roi_families:
             self.roi_families.addItem(
-                self._make_family_item(fam, computed_slugs),
+                self._make_family_item(fam, computed_slugs, roi_status),
             )
+        self._watch_rois()
         roi_layout.addWidget(self.roi_families)
         roi_hint = QLabel(
             "<i>Require ROI definitions in the current project. "
@@ -395,9 +397,65 @@ class FeatureSubsetExtractorForm(OperationForm):
             return set()
         return computed
 
+    def _roi_family_statuses(self, roi_families) -> dict:
+        """Patch 122ji: {slug: RoiFamilyStatus} for the ROI families —
+        whether their outputs still match the project's ROIs."""
+        if not self.config_path:
+            return {}
+        from mufasa.utils.feature_io import family_slug, roi_family_status
+        out = {}
+        for fam in roi_families:
+            try:
+                out[family_slug(fam)] = roi_family_status(self.config_path,
+                                                          family_slug(fam))
+            except Exception:
+                pass
+        return out
+
+    def _watch_rois(self) -> None:
+        """Patch 122ji: refresh the ROI badges when rois.json changes (the
+        ROI editor saves by atomic replace, so the folder is watched too)."""
+        from PySide6.QtCore import QFileSystemWatcher, QTimer
+        if not self.config_path:
+            return
+        try:
+            from mufasa.project_layout import project_paths_from_config
+            roi_path = project_paths_from_config(self.config_path).get(
+                "roi_definitions_path")
+        except Exception:
+            return
+        if not roi_path:
+            return
+        self._roi_path = roi_path
+        self._roi_watcher = QFileSystemWatcher(self)
+        self._roi_timer = QTimer(self)
+        self._roi_timer.setSingleShot(True)
+        self._roi_timer.setInterval(300)
+        self._roi_timer.timeout.connect(self._on_rois_changed)
+        self._roi_watcher.fileChanged.connect(lambda *_: self._roi_timer.start())
+        self._roi_watcher.directoryChanged.connect(lambda *_: self._roi_timer.start())
+        self._rewatch()
+
+    def _rewatch(self) -> None:
+        import os
+        d = os.path.dirname(self._roi_path)
+        for p in (d, self._roi_path):
+            if p and os.path.exists(p) and p not in (self._roi_watcher.files()
+                                                     + self._roi_watcher.directories()):
+                self._roi_watcher.addPath(p)
+
+    def _on_rois_changed(self) -> None:
+        self._rewatch()
+        self._refresh_computed_badges()
+
+    def showEvent(self, ev) -> None:  # noqa: ANN001
+        super().showEvent(ev)
+        if hasattr(self, "roi_families"):
+            self._refresh_computed_badges()
+
     @staticmethod
     def _make_family_item(
-        fam: str, computed_slugs: set[str],
+        fam: str, computed_slugs: set[str], roi_status: dict | None = None,
     ) -> QListWidgetItem:
         """Build a QListWidgetItem for a feature family, badged if
         already computed. Patch 122fo.
@@ -412,12 +470,31 @@ class FeatureSubsetExtractorForm(OperationForm):
 
         slug = family_slug(fam)
         is_computed = slug in computed_slugs
-        label = f"\u2713  {fam}" if is_computed else fam
+        st = (roi_status or {}).get(slug)
+        modified = bool(is_computed and st is not None and st.modified)
+        label = (f"\u25cf  {fam}  — modified" if modified
+                 else f"\u2713  {fam}" if is_computed else fam)
         item = QListWidgetItem(label)
         # Clean name in UserRole — selection logic reads this, not
         # the badged display text.
         item.setData(Qt.UserRole, fam)
-        if is_computed:
+        item.setData(Qt.UserRole + 1, "modified" if modified
+                     else "computed" if is_computed else "")
+        if modified:
+            # Patch 122ji: computed, but from ROIs that have since changed.
+            def few(vs):
+                return ", ".join(vs[:5]) + (f" … +{len(vs) - 5}" if len(vs) > 5 else "")
+            lines = [f"Computed, but the ROIs have changed since: {st.summary()}."]
+            for title, vs in (("ROIs changed", st.changed),
+                              ("ROIs added, not computed", st.missing),
+                              ("ROIs removed", st.removed),
+                              ("computed before rois.json was last saved", st.unknown)):
+                if vs:
+                    lines.append(f"• {title}: {few(vs)}")
+            lines.append("Select it and run Compute Features to update.")
+            item.setToolTip("\n".join(lines))
+            item.setForeground(QColor(178, 106, 0))      # amber
+        elif is_computed:
             item.setToolTip(
                 f"Already computed — output exists in "
                 f"derived/features/{slug}/. Re-selecting and "
@@ -451,13 +528,17 @@ class FeatureSubsetExtractorForm(OperationForm):
         badge if a family is no longer computed, not only sets one.
         """
         computed_slugs = self._computed_family_slugs()
+        roi_fams = [self.roi_families.item(r).data(Qt.UserRole)
+                    for r in range(self.roi_families.count())]
+        roi_status = self._roi_family_statuses([f for f in roi_fams if f])
         for widget in (self.subject_families, self.roi_families):
             for row in range(widget.count()):
                 item = widget.item(row)
                 fam = item.data(Qt.UserRole)
                 if fam is None:
                     continue
-                fresh = self._make_family_item(fam, computed_slugs)
+                fresh = self._make_family_item(fam, computed_slugs, roi_status)
+                item.setData(Qt.UserRole + 1, fresh.data(Qt.UserRole + 1))
                 item.setText(fresh.text())
                 item.setToolTip(fresh.toolTip())
                 item.setForeground(fresh.foreground())

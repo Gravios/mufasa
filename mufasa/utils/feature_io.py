@@ -50,6 +50,8 @@ recent values; the wide parquet is the baseline.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 import os
 import re
 import warnings
@@ -60,12 +62,14 @@ import pandas as pd
 from mufasa.project_layout import project_paths_from_config
 
 __all__ = [
+    "RoiFamilyStatus",
     "WIDE_FAMILY",
     "family_slug",
     "feature_catalog",
     "list_video_stems_with_features",
     "load_feature_columns",
     "load_features_for_video",
+    "roi_family_status",
     "write_wide_features_v1",
 ]
 
@@ -418,6 +422,86 @@ def load_feature_columns(video_name: str, config_path: str,
             for c in cols:
                 got[c] = df[c].reset_index(drop=True)
     return pd.DataFrame({c: got[c] for c in want if c in got})
+
+
+# ---------------------------------------------------------------------- #
+# Patch 122ji — is a ROI family's output still current?
+# ---------------------------------------------------------------------- #
+@dataclass
+class RoiFamilyStatus:
+    """How a ROI feature family's outputs compare with the current ROIs.
+
+    * ``changed`` — computed from different ROIs (a ROI added, removed,
+      renamed, moved or reshaped since);
+    * ``missing`` — videos that now have ROIs but no output;
+    * ``removed`` — outputs for videos that no longer have ROIs;
+    * ``unknown`` — outputs written before ROI tracking (122ji) whose file
+      is older than rois.json, so the ROIs may have changed.
+    """
+    computed: list[str] = field(default_factory=list)
+    current: list[str] = field(default_factory=list)
+    changed: list[str] = field(default_factory=list)
+    missing: list[str] = field(default_factory=list)
+    removed: list[str] = field(default_factory=list)
+    unknown: list[str] = field(default_factory=list)
+
+    @property
+    def modified(self) -> bool:
+        return bool(self.computed) and bool(
+            self.changed or self.missing or self.removed or self.unknown)
+
+    def summary(self) -> str:
+        parts = []
+        if self.changed:
+            parts.append(f"ROIs changed in {len(self.changed)} video(s)")
+        if self.missing:
+            parts.append(f"{len(self.missing)} video(s) with ROIs not computed")
+        if self.removed:
+            parts.append(f"ROIs removed from {len(self.removed)} video(s)")
+        if self.unknown:
+            parts.append(f"{len(self.unknown)} video(s) computed before rois.json "
+                         "was last saved")
+        return "; ".join(parts)
+
+
+def roi_family_status(config_path: str, slug: str) -> RoiFamilyStatus:
+    """Compare ``derived/features/<slug>/`` with the project's rois.json."""
+    from mufasa.feature_extractors.feature_subset_orchestration import (
+        read_roi_fingerprint,
+    )
+    from mufasa.roi_tools.roi_store import RoiFileError, load_rois
+    st = RoiFamilyStatus()
+    paths = project_paths_from_config(config_path)
+    fam_dir = os.path.join(paths["derived_features_dir"], slug)
+    roi_path = paths.get("roi_definitions_path", "")
+    try:
+        store = load_rois(roi_path)
+    except (RoiFileError, OSError):
+        store = None
+    with_rois = set(store.videos_with_rois()) if store else set()
+    roi_mtime = os.path.getmtime(roi_path) if roi_path and os.path.isfile(roi_path) else 0.0
+    outs = {}
+    if os.path.isdir(fam_dir):
+        outs = {os.path.splitext(f)[0]: os.path.join(fam_dir, f)
+                for f in os.listdir(fam_dir)
+                if f.endswith(".parquet") and not f.startswith(".")}
+    st.computed = sorted(outs)
+    for v, f in sorted(outs.items()):
+        if v not in with_rois:
+            st.removed.append(v)
+            continue
+        try:
+            fp = read_roi_fingerprint(f)
+        except Exception:
+            fp = None
+        if fp is None:
+            (st.unknown if os.path.getmtime(f) < roi_mtime else st.current).append(v)
+        elif fp == store.fingerprint(v):
+            st.current.append(v)
+        else:
+            st.changed.append(v)
+    st.missing = sorted(with_rois - set(outs)) if outs else []
+    return st
 
 
 def list_video_stems_with_features(

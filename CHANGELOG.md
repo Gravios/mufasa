@@ -8,6 +8,23 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ji — Compute Features: ROI families show "modified" when the ROIs change.**
+ROI-family outputs (distances to ROI centres, body parts inside ROIs) now
+carry in their parquet metadata a fingerprint of the ROIs each video was
+computed from (`RoiStore.fingerprint`: hash of names, shapes, geometry,
+order; `write_with_roi_fingerprint` / `read_roi_fingerprint`). New
+`feature_io.roi_family_status` compares outputs with rois.json: *changed*
+(a ROI added, removed, renamed, moved or reshaped), *missing* (a video
+gained ROIs after the run), *removed* (a video lost its ROIs), *unknown*
+(output from before 122ji and older than rois.json). The Compute Features
+form badges such a family "● … — modified" in amber with a tooltip listing
+the videos per reason; it re-checks when rois.json changes on disk (file
+watcher on the file and its folder, 300 ms debounce), when shown, and after
+a run. Recomputing clears it. Subject families unaffected.
+smoke_122ji_roi_features_modified_status: 16/16 (real ROI-family run;
+add / move / remove ROIs; untracked old outputs; watcher; show; recompute).
+Badge, Compute Features, ROI and feature-pool suites as before.
+
 **122jh — ROI "Apply to all" copies only the selected ROI; Manage classifiers above Features.**
 ROI editor: the button is now "Apply '<roi>' to all…", enabled only with a
 ROI selected. It copies that one ROI to every other video, rescaled to each
