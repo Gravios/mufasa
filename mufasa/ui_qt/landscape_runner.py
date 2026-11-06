@@ -17,7 +17,9 @@ Both run the command-line tools on the features selected in the tree:
 Before either runs, :class:`FeatureNamesDialog` shows the selected
 features in an editable table — column name | name in figures — pre-filled
 from, and saved back to, the project's ``logs/measures/feature_names.toml``
-(:mod:`mufasa.utils.feature_names`), so the names are remembered.
+(:mod:`mufasa.utils.feature_names`), so the names are remembered. Patch
+122jl adds a Scale column (linear / log10) per feature: log10 features are
+analysed and plotted as log10 by both tools, also remembered.
 
 The tools run as child processes (:class:`QProcess`), so the GUI stays
 responsive and their log streams into :class:`LandscapeRunDialog`, which
@@ -66,20 +68,33 @@ def landscape_root(config_path) -> Path:
     return Path(config_path).parent / "derived" / "plots" / "feature_landscape"
 
 
+def _lines(p: Path) -> list[str]:
+    return sorted(ln.strip() for ln in p.read_text().splitlines() if ln.strip()) \
+        if p.is_file() else []
+
+
 def find_reusable_run(config_path, cols: list[str]) -> Path | None:
-    """Newest landscape run made from exactly this selection (any order)
-    that has what the animation needs; None if there is none."""
+    """Newest landscape run made from exactly this selection (any order),
+    with the same log10 scales, that has what the animation needs; None if
+    there is none."""
+    from mufasa.utils.feature_names import load_scales
     root = landscape_root(config_path)
     if not root.is_dir():
         return None
     want = sorted(cols)
+    sc = load_scales(config_path)
+    want_log = sorted(c for c in cols if sc.get(c) == "log10")
     for run in sorted((p for p in root.iterdir() if p.is_dir()), reverse=True):
         sel = run / SELECTION_FILE
         if not sel.is_file():
             continue
         got = sorted(ln.strip() for ln in sel.read_text().splitlines() if ln.strip())
-        if got == want and all((run / f).is_file() for f in
-                               ("tsne.parquet", "tsne_samples.parquet", "pairs.csv")):
+        logged = run / "log10_columns.txt"
+        if want_log and not logged.is_file():
+            continue
+        if got == want and _lines(logged) == want_log and all(
+                (run / f).is_file() for f in
+                ("tsne.parquet", "tsne_samples.parquet", "pairs.csv")):
             return run
     return None
 
@@ -148,21 +163,31 @@ class FeatureNamesDialog(QDialog):
     def __init__(self, parent: QWidget | None, config_path, cols: list[str],
                  mode: str = "landscape") -> None:
         super().__init__(parent)
-        from mufasa.utils.feature_names import default_name, display, load_names
+        from mufasa.utils.feature_names import (
+            SCALES,
+            default_name,
+            display,
+            load_names,
+            load_scales,
+            scale_of,
+        )
         self.config_path, self.cols, self.mode = config_path, list(cols), mode
         self.setWindowTitle("Feature names for the figures")
         self.resize(820, 520)
         lay = QVBoxLayout(self)
         intro = QLabel(
-            "Names used for these features in the figures. Edit the right column; "
-            "names are remembered for this project "
+            "Names used for these features in the figures, and the scale each is "
+            "analysed and plotted on (log10: values ≤ 0 become missing). Names and "
+            "scales are remembered for this project "
             "(logs/measures/feature_names.toml).", self)
         intro.setWordWrap(True)
         lay.addWidget(intro)
 
         saved = load_names(config_path) if config_path else {}
-        self.table = QTableWidget(len(self.cols), 2, self)
-        self.table.setHorizontalHeaderLabels(["Feature (column)", "Name in figures"])
+        scales = load_scales(config_path) if config_path else {}
+        self.table = QTableWidget(len(self.cols), 3, self)
+        self.table.setHorizontalHeaderLabels(["Feature (column)", "Name in figures",
+                                              "Scale"])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.DoubleClicked
@@ -171,6 +196,8 @@ class FeatureNamesDialog(QDialog):
         hdr = self.table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.Stretch)
         hdr.setSectionResizeMode(1, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.scale_cbs: list[QComboBox] = []
         for r, c in enumerate(self.cols):
             src = QTableWidgetItem(default_name(c))
             src.setFlags(src.flags() & ~Qt.ItemIsEditable)
@@ -180,6 +207,12 @@ class FeatureNamesDialog(QDialog):
             name = QTableWidgetItem(display(c, saved))
             name.setToolTip("Double-click or start typing to rename")
             self.table.setItem(r, 1, name)
+            sc = QComboBox(self.table)
+            sc.addItems(list(SCALES))
+            sc.setCurrentText(scale_of(c, scales))
+            sc.setToolTip("linear, or log10 (values ≤ 0 become missing)")
+            self.table.setCellWidget(r, 2, sc)
+            self.scale_cbs.append(sc)
         lay.addWidget(self.table, 1)
 
         brow = QHBoxLayout()
@@ -187,6 +220,12 @@ class FeatureNamesDialog(QDialog):
         reset.clicked.connect(self._reset_selected)
         brow.addWidget(reset)
         brow.addStretch()
+        brow.addWidget(QLabel("Set all scales:", self))
+        for s in ("linear", "log10"):
+            b = QPushButton(s, self)
+            b.clicked.connect(lambda _c=False, s=s: [cb.setCurrentText(s)
+                                                     for cb in self.scale_cbs])
+            brow.addWidget(b)
         lay.addLayout(brow)
 
         form = QFormLayout()
@@ -249,10 +288,14 @@ class FeatureNamesDialog(QDialog):
         return {self.cols[r]: self.table.item(r, 1).text().strip()
                 for r in range(len(self.cols))}
 
+    def scales(self) -> dict[str, str]:
+        """{column: "linear" | "log10"} as chosen."""
+        return {c: cb.currentText() for c, cb in zip(self.cols, self.scale_cbs)}
+
     def accept(self) -> None:
         if self.config_path:
             from mufasa.utils.feature_names import save_names
-            save_names(self.config_path, self.names())
+            save_names(self.config_path, self.names(), self.scales())
         super().accept()
 
     def options(self) -> dict:

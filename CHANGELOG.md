@@ -8,6 +8,18 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jl — Names popup now opens; per-feature linear / log10 scale.**
+The Landscape… / Animate… buttons connected clicked(bool) straight to
+`generate_*(ask=True)`, so clicked's `False` skipped the names popup; they
+now call with no arguments. The popup's table gains a Scale column
+(linear / log10 per feature, "Set all scales" buttons), saved as `[scales]`
+next to the names in `logs/measures/feature_names.toml`. mufasa-landscape
+analyses log10 features as log10 (values ≤ 0 → missing), labels them
+"log10 <name>", and lists them in the run's `log10_columns.txt`
+(`--no-scales` to ignore the marks); mufasa-landscape-animate labels them the
+same way, and a landscape made with other scales is not reused.
+Test: `tests/smoke_122jl_feature_scales_and_names_popup.py` (19 checks).
+
 **122jk — Landscape / animation from the selection; figure names; joint
 styles; viewer grid and follow.**
 Feature Visualization gets *Landscape…* and *Animate…*: the ticked features

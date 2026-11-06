@@ -362,9 +362,14 @@ def main(argv: list[str] | None = None) -> int:
     from mufasa.utils.feature_names import display, load_names, read_names
     cfg = find_project_config(run)
     names = read_names(a.names_file) if a.names_file else (load_names(cfg) if cfg else {})
+    # columns the landscape analysed as log10 (samples hold log10 values)
+    lf = run / "log10_columns.txt"
+    scaled = ({ln.strip(): "log10" for ln in lf.read_text().splitlines() if ln.strip()}
+              if lf.is_file() else {})
     fspaces = [feature_space(samples[x].to_numpy(np.float64),
                              samples[y].to_numpy(np.float64),
-                             display(x, names), display(y, names)) for x, y in pairs]
+                             display(x, names, scaled), display(y, names, scaled))
+               for x, y in pairs]
     spaces = [tsne]
     for f in fspaces:
         spaces += [f, tsne] if a.through_tsne else [f]

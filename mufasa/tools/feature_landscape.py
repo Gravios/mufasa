@@ -681,11 +681,12 @@ def draw_jpdf(fig, spec, X: pd.DataFrame, row: pd.Series, *, bins: int,
 # Patch 122jk: display names for figures ({column: name}); see
 # mufasa.utils.feature_names. Set by main() from the project's names file.
 DISPLAY: dict[str, str] = {}
+SCALED: dict[str, str] = {}      # columns analysed as log10 (patch 122jl)
 
 
 def display(col: str, names: dict[str, str] | None) -> str:
     from mufasa.utils.feature_names import display as _d
-    return _d(col, names)
+    return _d(col, names, SCALED)
 
 
 def _short(name: str, n: int = 48) -> str:
@@ -842,6 +843,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--names-file", default=None,
                    help="feature display names for the figures (TOML [names]); "
                         "default: the project's logs/measures/feature_names.toml")
+    p.add_argument("--no-scales", action="store_true",
+                   help="ignore the log10 marks in the names file (analyse all linear)")
     p.add_argument("--out", default=None,
                    help="output directory (default derived/plots/feature_landscape/<run_id>)")
     return p
@@ -857,9 +860,17 @@ def main(argv: list[str] | None = None) -> int:
     sources = {s.strip() for s in a.sources.split(",") if s.strip()}
     if not sources <= {"pose", "features"} or not sources:
         raise SystemExit("--sources takes pose, features or pose,features")
-    global DISPLAY
-    from mufasa.utils.feature_names import load_names, read_names
+    global DISPLAY, SCALED
+    from mufasa.utils.feature_names import (
+        apply_scales,
+        load_names,
+        load_scales,
+        read_names,
+        read_scales,
+    )
     DISPLAY = read_names(a.names_file) if a.names_file else load_names(config)
+    scales = {} if a.no_scales else (read_scales(a.names_file) if a.names_file
+                                     else load_scales(config))
     run_id = generate_run_id()
     out = Path(a.out) if a.out else (config.parent / "derived" / "plots"
                                      / "feature_landscape" / run_id)
@@ -882,6 +893,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[landscape] {len(missing)} selected column(s) not in every session, "
                   f"left out: {', '.join(missing[:5])}" + (" …" if len(missing) > 5 else ""))
         X = X[[c for c in wanted if c in X.columns]]
+    # Patch 122jl: features the user marked log10 are analysed as log10
+    X, logged = apply_scales(X, scales)
+    SCALED = {c: "log10" for c in logged}
     X = clean_columns(X, angles=a.angles, drop_full_circle=wanted is None)
     if wanted is None:
         X = keep_families(X, a.include_families, a.exclude_families)
@@ -902,6 +916,8 @@ def main(argv: list[str] | None = None) -> int:
     pairs.insert(2, "family_a", [COLUMN_FAMILY.get(c, "(other)") for c in pairs.feature_a])
     pairs.insert(3, "family_b", [COLUMN_FAMILY.get(c, "(other)") for c in pairs.feature_b])
     pairs.to_csv(out / "pairs.csv", index=False)
+    # which columns were log10 (tsne_samples holds them transformed)
+    (out / "log10_columns.txt").write_text("".join(f"{c}\n" for c in logged if c in cols))
     mm = pairs[pairs["multimodal"]]
     if len(mm):
         fc = pd.concat([mm.family_a, mm.family_b]).value_counts()

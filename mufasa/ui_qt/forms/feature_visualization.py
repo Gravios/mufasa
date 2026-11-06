@@ -157,12 +157,13 @@ class FeatureVisualizationForm(OperationForm):
         self.landscape_btn.setToolTip(
             "mufasa-landscape on the selected features, pooled over all sessions: "
             "joint PDFs of their pairs and a t-SNE (asks for figure names first)")
-        self.landscape_btn.clicked.connect(self.generate_landscape)
+        # clicked(bool) would land in ``ask`` — call with no arguments
+        self.landscape_btn.clicked.connect(lambda: self.generate_landscape())
         self.animate_btn = QPushButton("Animate…", self)
         self.animate_btn.setToolTip(
             "GIF: t-SNE → joint space 1 → t-SNE → joint space 2 → … of the "
             "selected features (runs the landscape first if needed)")
-        self.animate_btn.clicked.connect(self.generate_animation)
+        self.animate_btn.clicked.connect(lambda: self.generate_animation())
         for b in (self.dist_btn, self.joint_btn, self.time_btn):
             brow.addWidget(b)
         brow.addStretch()

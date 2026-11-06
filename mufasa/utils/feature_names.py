@@ -14,6 +14,15 @@ shorter names ("forward head velocity"). They are kept per project in
 
 and used by mufasa-landscape, mufasa-landscape-animate and the Feature
 Visualization dialogs. Only names that differ from the default are stored.
+
+Patch 122jl: a feature can also be marked for a log10 scale; the
+landscape tools then analyse and plot log10 of it (values ≤ 0 become
+missing) and label it "log10 <name>"::
+
+    [scales]
+    "Animal_1 movement a (mm)_FEATURE_SUBSET" = "log10"
+
+Only log10 entries are stored (linear is the default).
 """
 from __future__ import annotations
 
@@ -21,6 +30,7 @@ import tomllib
 from pathlib import Path
 
 FILENAME = "feature_names.toml"
+SCALES = ("linear", "log10")
 SUFFIX = "_FEATURE_SUBSET"
 
 
@@ -36,44 +46,96 @@ def names_path(config_path) -> Path:
     return base / FILENAME
 
 
-def read_names(path) -> dict[str, str]:
+def _read(path) -> dict:
     p = Path(path)
     if not p.is_file():
         return {}
     try:
         with open(p, "rb") as fh:
-            data = tomllib.load(fh)
+            return tomllib.load(fh)
     except (OSError, tomllib.TOMLDecodeError):
         return {}
-    names = data.get("names", {})
+
+
+def read_names(path) -> dict[str, str]:
+    names = _read(path).get("names", {})
     return {str(k): str(v) for k, v in names.items() if str(v).strip()}
+
+
+def read_scales(path) -> dict[str, str]:
+    """{column: "log10"} for the features marked log10."""
+    sc = _read(path).get("scales", {})
+    return {str(k): "log10" for k, v in sc.items() if str(v).strip().lower() == "log10"}
+
+
+def load_scales(config_path) -> dict[str, str]:
+    return read_scales(names_path(config_path))
+
+
+def scale_of(col: str, scales: dict[str, str] | None) -> str:
+    return "log10" if (scales or {}).get(col) == "log10" else "linear"
 
 
 def load_names(config_path) -> dict[str, str]:
     return read_names(names_path(config_path))
 
 
-def save_names(config_path, updates: dict[str, str]) -> Path:
+def save_names(config_path, updates: dict[str, str],
+               scales: dict[str, str] | None = None) -> Path:
     """Merge ``updates`` ({column: name}) into the project's names. A name
-    that is empty or equal to the default removes the entry."""
+    that is empty or equal to the default removes the entry. ``scales``
+    ({column: "linear" | "log10"}) is merged the same way (linear removes)."""
     from mufasa.project_layout import write_project_toml
     p = names_path(config_path)
-    names = read_names(p)
+    names, sc = read_names(p), read_scales(p)
     for col, name in updates.items():
         name = (name or "").strip()
         if not name or name == default_name(col):
             names.pop(col, None)
         else:
             names[col] = name
+    for col, s in (scales or {}).items():
+        if s not in SCALES:
+            raise ValueError(f"scale must be one of {SCALES}, not {s!r}")
+        if s == "log10":
+            sc[col] = "log10"
+        else:
+            sc.pop(col, None)
     p.parent.mkdir(parents=True, exist_ok=True)
-    write_project_toml(p, {"names": dict(sorted(names.items()))})
+    data = {"names": dict(sorted(names.items()))}
+    if sc:
+        data["scales"] = dict(sorted(sc.items()))
+    write_project_toml(p, data)
     return p
 
 
-def display(col: str, names: dict[str, str] | None) -> str:
-    """Name to show for ``col``: the user's, else the default."""
-    return (names or {}).get(col) or default_name(col)
+def display(col: str, names: dict[str, str] | None,
+            scales: dict[str, str] | None = None) -> str:
+    """Name to show for ``col``: the user's, else the default; prefixed
+    "log10 " when ``scales`` marks it log10."""
+    name = (names or {}).get(col) or default_name(col)
+    return f"log10 {name}" if scale_of(col, scales) == "log10" else name
 
 
-__all__ = ["FILENAME", "default_name", "display", "load_names", "names_path",
-           "read_names", "save_names"]
+def apply_scales(df, scales: dict[str, str] | None, log=print):
+    """log10 of the columns marked log10 (values ≤ 0 → NaN), in a copy;
+    returns (frame, [columns transformed])."""
+    import numpy as np
+    cols = [c for c in df.columns if scale_of(c, scales) == "log10"]
+    if not cols:
+        return df, []
+    out = df.copy()
+    for c in cols:
+        v = out[c].to_numpy(np.float64)
+        bad = ~(v > 0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out[c] = np.where(bad, np.nan, np.log10(np.where(bad, 1.0, v)))
+        nb = int((bad & np.isfinite(v)).sum())
+        log(f"[scales] log10 {default_name(c)}" + (f" ({nb:,} values ≤ 0 → missing)"
+                                                   if nb else ""))
+    return out, cols
+
+
+__all__ = ["FILENAME", "SCALES", "apply_scales", "default_name", "display", "load_names",
+           "load_scales", "names_path", "read_names", "read_scales", "save_names",
+           "scale_of"]
