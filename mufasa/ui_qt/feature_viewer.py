@@ -300,6 +300,8 @@ class FeatureViewerWidget(QWidget):
         self.scrubber = FrameScrubberWidget(self)
         self.scrubber.load(video_path)
         lay.addWidget(self.scrubber, 3)
+        self.video_path = video_path
+        self._build_overlay_bar(lay)
         bar = QHBoxLayout()
         bar.addWidget(QLabel("Window ±", self))
         self.window_spin = QDoubleSpinBox(self)
@@ -379,7 +381,140 @@ class FeatureViewerWidget(QWidget):
             if f != self.scrubber.current_frame:
                 self.scrubber.seek(f)
 
+    # ------------------------------------------------------------------ #
+    # Patch 122ju — pose overlays and recording
+    # ------------------------------------------------------------------ #
+    def _build_overlay_bar(self, lay) -> None:  # noqa: ANN001
+        from PySide6.QtWidgets import QCheckBox, QPushButton
+
+        from mufasa.ui_qt.pose_overlay import find_fdlc_pose, find_kalman_pose
+        self.overlay = None
+        self.recorder = None
+        self._encode_thread = None
+        self.fdlc_path = find_fdlc_pose(self.config_path, self.video_name)
+        self.kalman_path = find_kalman_pose(self.config_path, self.video_name)
+        bar = QHBoxLayout()
+        self.fdlc_cb = QCheckBox("FDLC markers", self)
+        self.kalman_cb = QCheckBox("Kalman markers", self)
+        for cb, path, what in ((self.fdlc_cb, self.fdlc_path, "tracker (FDLC) pose under "
+                                "sources/pose"),
+                               (self.kalman_cb, self.kalman_path, "Kalman v2 smoothed pose "
+                                "(latest run)")):
+            cb.setEnabled(path is not None)
+            cb.setToolTip(str(path) if path else f"No {what} for this video")
+            cb.toggled.connect(self._overlay_changed)
+            bar.addWidget(cb)
+        self.skeleton_cb = QCheckBox("Skeleton", self)
+        self.skeleton_cb.setChecked(True)
+        self.skeleton_cb.setToolTip("Join the Kalman markers by the skeleton")
+        self.skeleton_cb.toggled.connect(self._overlay_changed)
+        bar.addWidget(self.skeleton_cb)
+        bar.addWidget(QLabel("p ≥", self))
+        self.p_spin = QDoubleSpinBox(self)
+        self.p_spin.setRange(0.0, 1.0)
+        self.p_spin.setSingleStep(0.05)
+        self.p_spin.setValue(0.5)
+        self.p_spin.setToolTip("FDLC markers below this likelihood are not drawn")
+        self.p_spin.valueChanged.connect(self._overlay_changed)
+        bar.addWidget(self.p_spin)
+        bar.addWidget(QLabel("Pose scale", self))
+        self.scale_spin = QDoubleSpinBox(self)
+        self.scale_spin.setRange(0.1, 16.0)
+        self.scale_spin.setSingleStep(0.5)
+        self.scale_spin.setValue(1.0)
+        self.scale_spin.setToolTip("Multiply pose coordinates (2 = pose estimated on a "
+                                   "half-resolution video)")
+        self.scale_spin.valueChanged.connect(self._overlay_changed)
+        bar.addWidget(self.scale_spin)
+        bar.addStretch()
+        self.keep_frames_cb = QCheckBox("Keep frames", self)
+        self.keep_frames_cb.setChecked(True)
+        self.keep_frames_cb.setToolTip("Keep the extracted PNG frames after the video "
+                                       "is made")
+        bar.addWidget(self.keep_frames_cb)
+        self.record_btn = QPushButton("● Record", self)
+        self.record_btn.setCheckable(True)
+        self.record_btn.setToolTip(
+            "Start: every frame shown from now on (playing or stepping) is saved as a "
+            "PNG, overlays included. Stop: the frames are made into a video under "
+            "derived/frames/annotated/")
+        self.record_btn.toggled.connect(self._toggle_record)
+        bar.addWidget(self.record_btn)
+        lay.addLayout(bar)
+        self.rec_status = QLabel("", self)
+        self.rec_status.setStyleSheet("color: palette(placeholder-text);")
+        self.rec_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        lay.addWidget(self.rec_status)
+        self.scrubber.frame_changed.connect(self._record_frame)
+
+    def _overlay_changed(self, *_a) -> None:
+        want = self.fdlc_cb.isChecked() or self.kalman_cb.isChecked()
+        if want and self.overlay is None:
+            from mufasa.ui_qt.pose_overlay import PoseOverlay
+            self.overlay = PoseOverlay.for_video(self.config_path, self.video_name,
+                                                 self.video_path)
+            for name, cb in (("fdlc", self.fdlc_cb), ("kalman", self.kalman_cb)):
+                if name in self.overlay.errors:
+                    cb.setChecked(False)
+                    cb.setEnabled(False)
+                    cb.setToolTip("Could not load: " + self.overlay.errors[name])
+        ov = self.overlay
+        if ov is not None:
+            ov.show_fdlc = self.fdlc_cb.isChecked()
+            ov.show_kalman = self.kalman_cb.isChecked()
+            ov.show_skeleton = self.skeleton_cb.isChecked()
+            ov.p_threshold = self.p_spin.value()
+            ov.scale = self.scale_spin.value()
+        self.scrubber.set_overlay(ov if want and ov is not None else None)
+
+    def _toggle_record(self, on: bool) -> None:
+        from mufasa.ui_qt.pose_overlay import FrameRecorder
+        if on:
+            self.recorder = FrameRecorder(self.config_path, self.video_name,
+                                          self.scrubber.fps,
+                                          keep_frames=self.keep_frames_cb.isChecked())
+            self.record_btn.setText("■ Stop")
+            self.record_btn.setStyleSheet("color: #d03030; font-weight: bold;")
+            self.recorder.add(self.scrubber.last_display_frame, self.scrubber.current_frame)
+            self.rec_status.setText(f"Recording → {self.recorder.frames_dir}")
+            return
+        rec, self.recorder = self.recorder, None
+        self.record_btn.setText("● Record")
+        self.record_btn.setStyleSheet("")
+        if rec is None:
+            return
+        self.rec_status.setText(f"Making the video from {rec.n} frame(s)…")
+        self.record_btn.setEnabled(False)
+        import threading
+        result: dict = {}
+        t = threading.Thread(target=lambda: result.update(r=rec.stop()), daemon=True)
+        t.start()
+        from PySide6.QtCore import QTimer
+        timer = QTimer(self)
+
+        def poll() -> None:
+            if t.is_alive():
+                return
+            timer.stop()
+            ok, msg = result.get("r", (False, "encoding failed"))
+            self.rec_status.setText(("Saved: " if ok else "Recording failed: ") + msg)
+            self.record_btn.setEnabled(True)
+            self.last_recording = rec.video_path if ok else None
+
+        timer.timeout.connect(poll)
+        timer.start(100)
+        self._encode_thread = t
+
+    def _record_frame(self, f: int) -> None:
+        if self.recorder is not None:
+            self.recorder.add(self.scrubber.last_display_frame, f)
+            if self.recorder.n % 25 == 0:
+                self.rec_status.setText(f"Recording → {self.recorder.frames_dir} · "
+                                        f"{self.recorder.n} frame(s)")
+
     def cleanup(self) -> None:
+        if self.recorder is not None:
+            self.record_btn.setChecked(False)
         try:
             self.scrubber.close_video()
         except Exception:

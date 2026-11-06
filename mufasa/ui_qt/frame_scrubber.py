@@ -80,6 +80,11 @@ class FrameScrubberWidget(QWidget):
         self._flip_h: bool = False
         self._flip_v: bool = False
         self._last_raw_frame: np.ndarray | None = None
+        # Patch 122ju: optional overlay(frame_bgr, frame_idx) -> frame_bgr,
+        # drawn in video coordinates (before orientation); the frame as
+        # finally displayed (overlay + orientation, BGR) is kept for recording.
+        self._overlay = None
+        self.last_display_frame: np.ndarray | None = None
         # Playback state. _play_direction is +1 (forward), -1
         # (backward), or 0 (paused). The single timer drives both
         # directions; the direction flips by clicking the opposite
@@ -372,7 +377,13 @@ class FrameScrubberWidget(QWidget):
         # Cache the untransformed frame so orientation changes can
         # re-render without re-reading from the file.
         self._last_raw_frame = frame_bgr
+        if self._overlay is not None:
+            try:
+                frame_bgr = self._overlay(frame_bgr, self._current_frame)
+            except Exception:       # a broken overlay must not break the viewer
+                pass
         frame_bgr = self._apply_orientation(frame_bgr)
+        self.last_display_frame = frame_bgr
         h, w = frame_bgr.shape[:2]
         if not frame_bgr.flags["C_CONTIGUOUS"]:
             frame_bgr = np.ascontiguousarray(frame_bgr)
@@ -396,6 +407,12 @@ class FrameScrubberWidget(QWidget):
         elif self._rotation == 270:
             f = cv2.rotate(f, cv2.ROTATE_90_COUNTERCLOCKWISE)
         return f
+
+    def set_overlay(self, fn) -> None:
+        """Draw ``fn(frame_bgr, frame_idx) -> frame_bgr`` on every frame
+        (None removes it); the current frame is redrawn."""
+        self._overlay = fn
+        self._rerender()
 
     def _rerender(self) -> None:
         if self._last_raw_frame is not None:

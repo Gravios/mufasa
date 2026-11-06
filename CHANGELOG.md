@@ -8,6 +8,24 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ju — Feature viewer: FDLC / Kalman marker overlays and recording.**
+The video × feature viewer finds the video's tracker pose under
+`sources/pose` (`<video>.fdlc.parquet`, `<video>.parquet`, a FreeDLC run's
+`pose.parquet` named by its run sidecar, or CSV) and its file in the latest
+Kalman v2 run. "FDLC markers" draws hollow rings (hidden below the "p ≥"
+likelihood threshold), "Kalman markers" filled dots joined by the skeleton
+("Skeleton"; project / pose-file skeleton); "Pose scale" multiplies the
+coordinates. Overlays are drawn in video coordinates before the display
+rotation (`FrameScrubberWidget.set_overlay`); boxes are disabled with the
+reason when a source is missing. "● Record" keeps every frame shown from
+then on — playing or stepping, overlays included — as numbered PNGs in
+`derived/frames/extracted/<video>_rec_<time>/` with `frames.csv` (image →
+video frame); pressing it again encodes them at the video's frame rate into
+`derived/frames/annotated/<video>_rec_<time>.mp4` (ffmpeg H.264 when
+installed, else OpenCV mp4v; in the background). "Keep frames" off deletes
+the PNGs afterwards. New module `mufasa.ui_qt.pose_overlay`.
+Test: `tests/smoke_122ju_viewer_pose_overlay_and_record.py` (25 checks).
+
 **122jt — JPDF of the last ticked pair beside the pair matrix.**
 The "Pairs to animate" tab is split: the matrix on the left, on the right a
 joint PDF (2-D log density, `plot_joint` heatmap) of the last ticked pair,
