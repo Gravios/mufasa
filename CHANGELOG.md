@@ -8,6 +8,15 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jo — Animation: pause and transition in frames.**
+mufasa-landscape-animate takes `--transition-frames` (frames per move),
+`--hold-frames` (pause on each feature space, 0 = none) and
+`--tsne-hold-frames` (pause on the t-SNE map, default as `--hold-frames`),
+overriding the seconds options; `timeline()` takes per-space holds. The
+Animate… popup has the three spins (defaults 30 / 30 / 40 frames — the
+previous 1.5 s / 2 s at 20 fps).
+Test: `tests/smoke_122jo_animate_pause_and_transition_frames.py` (12 checks).
+
 **122jn — Jitter near-discrete features in figures.**
 The Landscape… / Animate… names table gets a Jitter tick per feature, saved
 as `[jitter]` in `logs/measures/feature_names.toml`. Marked features are

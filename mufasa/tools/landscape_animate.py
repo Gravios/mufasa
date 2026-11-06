@@ -217,14 +217,21 @@ def ease(t: float) -> float:
     return 4 * t ** 3 if t < 0.5 else 1 - (-2 * t + 2) ** 3 / 2
 
 
-def timeline(n_spaces: int, fps: int, hold: float, transition: float
+def timeline(n_spaces: int, fps: int, hold: float, transition: float,
+             holds: list[int] | None = None, n_transition: int | None = None
              ) -> list[tuple[int, int, float]]:
     """Frames as (from-space, to-space, eased progress): hold on each space,
-    then move to the next; the last space is held too."""
-    nh, nt = max(1, round(hold * fps)), max(2, round(transition * fps))
+    then move to the next; the last space is held too.
+
+    Patch 122jo: ``holds`` gives the pause in frames per space (overrides
+    ``hold`` seconds; 0 = no pause) and ``n_transition`` the frames per move
+    (overrides ``transition`` seconds)."""
+    nt = max(2, n_transition if n_transition is not None else round(transition * fps))
+    if holds is None:
+        holds = [max(1, round(hold * fps))] * n_spaces
     out = []
     for k in range(n_spaces):
-        out += [(k, k, 0.0)] * nh
+        out += [(k, k, 0.0)] * max(0, holds[k])
         if k < n_spaces - 1:
             out += [(k, k + 1, ease(i / (nt - 1))) for i in range(nt)]
     return out
@@ -419,6 +426,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--fps", type=int, default=20)
     p.add_argument("--hold", type=float, default=1.5, help="seconds on each space")
     p.add_argument("--transition", type=float, default=2.0, help="seconds per move")
+    p.add_argument("--transition-frames", type=int, default=None,
+                   help="frames per move (overrides --transition)")
+    p.add_argument("--hold-frames", type=int, default=None,
+                   help="frames paused on each feature space (overrides --hold; "
+                        "0 = no pause)")
+    p.add_argument("--tsne-hold-frames", type=int, default=None,
+                   help="frames paused on the t-SNE map (default: as --hold-frames)")
     p.add_argument("--size", type=int, default=800, help="square size in pixels")
     p.add_argument("--point-size", type=float, default=None)
     p.add_argument("--theme", choices=tuple(THEMES), default="dark")
@@ -511,7 +525,20 @@ def main(argv: list[str] | None = None) -> int:
                f"sessions · colour: {a.color}")
     R = Renderer(spaces, colors, size=a.size, theme=a.theme, point_size=psize,
                  caption=caption)
-    tl = timeline(len(spaces), a.fps, a.hold, a.transition)
+    # Patch 122jo: pauses and transitions in frames
+    holds = None
+    if a.hold_frames is not None or a.tsne_hold_frames is not None:
+        fh = a.hold_frames if a.hold_frames is not None else max(1, round(a.hold * a.fps))
+        th = a.tsne_hold_frames if a.tsne_hold_frames is not None else fh
+        holds = [th if sp is tsne else fh for sp in spaces]
+    tl = timeline(len(spaces), a.fps, a.hold, a.transition, holds=holds,
+                  n_transition=a.transition_frames)
+    if holds is not None or a.transition_frames is not None:
+        nt = max(2, a.transition_frames if a.transition_frames is not None
+                 else round(a.transition * a.fps))
+        hs = holds or [max(1, round(a.hold * a.fps))] * len(spaces)
+        print(f"[animate] pause {hs[1] if len(hs) > 1 else hs[0]} frame(s) on each "
+              f"feature space, {hs[0]} on t-SNE; {nt} frame(s) per transition")
     print(f"[animate] {len(pairs)} pair(s), {len(spaces)} spaces, {len(tl)} frames "
           f"({len(tl) / a.fps:.1f} s at {a.fps} fps)")
     t0 = time.time()
