@@ -30,6 +30,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from PySide6.QtCore import QProcess, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QMovie, QPixmap
@@ -287,6 +288,44 @@ class PairMatrix(QWidget):
         self.changed.emit()
 
 
+class PairPreview(QWidget):
+    """Joint PDF (2-D log density) of one feature pair, for the pair
+    matrix (patch 122jt)."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+        from matplotlib.figure import Figure
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.title = QLabel("", self)
+        self.title.setWordWrap(True)
+        lay.addWidget(self.title)
+        self.figure = Figure(figsize=(4, 4))
+        self.canvas = FigureCanvasQTAgg(self.figure)
+        self.canvas.setMinimumSize(260, 260)
+        lay.addWidget(self.canvas, 1)
+        self.pair: tuple[str, str] | None = None
+
+    def show_message(self, text: str) -> None:
+        self.pair = None
+        self.figure.clear()
+        self.figure.text(0.5, 0.5, text, ha="center", va="center", wrap=True,
+                         color="#777777")
+        self.title.setText("")
+        self.canvas.draw_idle()
+
+    def draw(self, x: np.ndarray, y: np.ndarray, name_x: str, name_y: str, k: int) -> None:
+        from mufasa.tools.feature_plots import plot_joint
+        self.pair = (name_x, name_y)
+        self.figure.clear()
+        plot_joint(self.figure, x, y, name_x, name_y, style="heatmap", bins=70)
+        n = int((np.isfinite(x) & np.isfinite(y)).sum())
+        self.title.setText(f"<b>Pair {k}</b> (last ticked): {name_x} × {name_y} · "
+                           f"{n:,} frames, all videos")
+        self.canvas.draw_idle()
+
+
 # --------------------------------------------------------------------------- #
 # Names (and options) before a run
 # --------------------------------------------------------------------------- #
@@ -386,9 +425,25 @@ class FeatureNamesDialog(QDialog):
             self.tabs.addTab(names_tab, "Names, scales, jitter")
             self.matrix = PairMatrix(self.cols, [self.table.item(r, 1).text()
                                                  for r in range(len(self.cols))], self)
-            self.tabs.addTab(self.matrix, "Pairs to animate")
+            # Patch 122jt: JPDF of the last ticked pair beside the matrix
+            self.preview = PairPreview(self)
+            split = QSplitter(Qt.Horizontal, self)
+            split.addWidget(self.matrix)
+            split.addWidget(self.preview)
+            split.setStretchFactor(0, 1)
+            split.setStretchFactor(1, 1)
+            self.tabs.addTab(split, "Pairs to animate")
             self.table.itemChanged.connect(self._names_edited)
             self.matrix.changed.connect(self._pairs_changed)
+            from PySide6.QtCore import QTimer
+            self._pv_timer = QTimer(self)
+            self._pv_timer.setSingleShot(True)
+            self._pv_timer.setInterval(150)
+            self._pv_timer.timeout.connect(self.update_preview)
+            self._frame: pd.DataFrame | None = None
+            self.tabs.currentChanged.connect(lambda _i: self._pv_timer.start())
+            for cb in self.scale_cbs:
+                cb.currentTextChanged.connect(lambda *_a: self._pv_timer.start())
             lay.addWidget(self.tabs, 1)
         else:
             lay.addWidget(names_tab, 1)
@@ -560,8 +615,66 @@ class FeatureNamesDialog(QDialog):
         if self.matrix is not None and item.column() == 1:
             self.matrix.set_labels([self.table.item(r, 1).text()
                                     for r in range(len(self.cols))])
+        if self.matrix is not None:
+            self._pv_timer.start()
+
+    # -- JPDF preview (patch 122jt) ------------------------------------ #
+    PREVIEW_PER_VIDEO = 3000
+
+    def preview_frame(self) -> pd.DataFrame:
+        """The selected features pooled over every video (at most
+        PREVIEW_PER_VIDEO frames each, -1 read as missing), read once."""
+        if self._frame is None:
+            parts = []
+            if self.config_path:
+                from mufasa.tools.feature_landscape import clean_columns
+                from mufasa.utils.feature_io import (
+                    list_video_stems_with_features,
+                    load_feature_columns,
+                )
+                for v in list_video_stems_with_features(self.config_path):
+                    try:
+                        df = load_feature_columns(v, self.config_path, self.cols)
+                    except Exception:
+                        continue
+                    if len(df) > self.PREVIEW_PER_VIDEO:
+                        df = df.sample(self.PREVIEW_PER_VIDEO, random_state=0)
+                    parts.append(df)
+            frame = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+            if len(frame.columns):
+                frame = clean_columns(frame.apply(pd.to_numeric, errors="coerce"),
+                                      log=lambda *_a, **_k: None, drop_full_circle=False)
+            self._frame = frame
+        return self._frame
+
+    def update_preview(self) -> None:
+        """Draw the JPDF of the last ticked pair with the names, scales and
+        jitter currently set in the names table."""
+        if self.matrix is None or self.tabs.currentIndex() != 1:
+            return
+        prs = self.matrix.pairs()
+        if not prs:
+            self.preview.show_message("Tick a pair to see its joint distribution.")
+            return
+        a, b = prs[-1]
+        frame = self.preview_frame()
+        missing = [c for c in (a, b) if c not in frame.columns]
+        if missing:
+            self.preview.show_message("No values for: " + ", ".join(missing))
+            return
+        from mufasa.utils.feature_names import apply_scales, jitter_values
+        names = self.names()
+        sc = {c: v for c, v in self.scales().items() if v == "log10"}
+        jit = self.jitter()
+        sub, _ = apply_scales(frame[[a, b]], sc, log=lambda *_a, **_k: None)
+        va, vb = (jitter_values(sub[c].to_numpy(np.float64), seed=k + 1) if jit.get(c)
+                  else sub[c].to_numpy(np.float64) for k, c in enumerate((a, b)))
+        label = lambda c: ("log10 " if c in sc else "") + (names.get(c) or c)  # noqa: E731
+        self.preview.draw(va, vb, label(a), label(b), len(prs))
 
     def _pairs_changed(self) -> None:
+        if getattr(self, "_pv_timer", None) is not None:
+            self._pv_timer.start()
         n = len(self.matrix.pairs())
         self.tabs.setTabText(1, f"Pairs to animate ({n})" if n else "Pairs to animate")
         bb = getattr(self, "_ok", None)
@@ -885,6 +998,6 @@ def run_animation(parent: QWidget | None, config_path, cols: list[str], *,
     return dlg
 
 
-__all__ = ["FeatureNamesDialog", "LandscapeRunDialog", "PairMatrix", "animate_argv",
-           "animation_pairs", "find_reusable_run", "landscape_argv", "landscape_root", "run_animation",
-           "run_landscape"]
+__all__ = ["FeatureNamesDialog", "LandscapeRunDialog", "PairMatrix", "PairPreview",
+           "animate_argv", "animation_pairs", "find_reusable_run", "landscape_argv",
+           "landscape_root", "run_animation", "run_landscape"]

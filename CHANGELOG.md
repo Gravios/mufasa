@@ -8,6 +8,15 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jt — JPDF of the last ticked pair beside the pair matrix.**
+The "Pairs to animate" tab is split: the matrix on the left, on the right a
+joint PDF (2-D log density, `plot_joint` heatmap) of the last ticked pair,
+pooled over all videos (≤ 3000 frames each, read once; -1 as missing). It
+uses the names, log10 scales and jitter currently set in the names table
+and redraws when ticks, names, scales or jitter change; unticking shows the
+previous pair, nothing ticked shows a hint.
+Test: `tests/smoke_122jt_pair_matrix_jpdf_preview.py` (11 checks).
+
 **122js — Pair matrix headed by the custom feature names.**
 The matrix rows and columns now show exactly the names typed in the names
 table (no "x:"/"y:" prefix, no truncation; column headers wrap onto
