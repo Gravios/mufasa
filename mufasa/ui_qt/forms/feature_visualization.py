@@ -20,6 +20,9 @@ filters across families) — then:
   (joint PDFs + t-SNE over all sessions) and mufasa-landscape-animate
   (t-SNE → pair → t-SNE → next pair GIF); a table to name the features in
   the figures comes first, and the names are remembered (122jk).
+* The selection (in order), video, colour-by, joint style, jitter and
+  grouping are kept between sessions in ``logs/measures/feature_view.toml``
+  (122jq); selected features a video lacks are kept for the next video.
 * **Open with video** — the video with the selected features as live
   traces under it (click / drag the traces to move, wheel to zoom); open
   viewers follow the selection as features are ticked / unticked (122jk).
@@ -66,6 +69,7 @@ class FeatureVisualizationForm(OperationForm):
     def build(self) -> None:
         self.run_btn.setVisible(False)
         self._checked: list[str] = []          # selection order kept
+        self._parked: list[str] = []           # selected, absent from this video
         self._catalog: dict[str, list[str]] = {}
         self._videos: dict[str, str | None] = {}
 
@@ -240,7 +244,78 @@ class FeatureVisualizationForm(OperationForm):
         self.body_layout.addWidget(self.plot_info)
         self._mode: str | None = None
         self._time_fps = 30.0
+        # Patch 122jq: selection and view kept between sessions
+        from PySide6.QtCore import QTimer as _QT2
+        self._state_timer = _QT2(self)
+        self._state_timer.setSingleShot(True)
+        self._state_timer.setInterval(500)
+        self._state_timer.timeout.connect(self.save_state)
+        self._restoring = True
+        state = self._load_state()
+        self._checked = list(state.get("selected", []))
+        self._want_video = state.get("video")
+        if isinstance(state.get("group_by_name_parts"), bool):
+            self.compact_cb.setChecked(state["group_by_name_parts"])
+        if state.get("joint_style") in [self.joint_style_cb.itemText(i)
+                                        for i in range(self.joint_style_cb.count())]:
+            self.joint_style_cb.setCurrentText(state["joint_style"])
+        if isinstance(state.get("jitter"), bool):
+            self.jitter_cb.setChecked(state["jitter"])
+        self._want_colour = state.get("colour_by")
         self.refresh()
+        self._restoring = False
+        for sig in (self.video_cb.currentIndexChanged, self.colour_cb.currentIndexChanged,
+                    self.joint_style_cb.currentIndexChanged, self.jitter_cb.toggled,
+                    self.compact_cb.toggled):
+            sig.connect(lambda *_: self._state_changed())
+        from PySide6.QtWidgets import QApplication as _QA
+        if _QA.instance() is not None:
+            _QA.instance().aboutToQuit.connect(self._flush_state)
+
+    def _flush_state(self) -> None:
+        """Save now if a save is pending (quitting within the debounce)."""
+        try:
+            if self._state_timer.isActive():
+                self._state_timer.stop()
+                self.save_state()
+        except RuntimeError:     # widget already gone
+            pass
+
+    # ------------------------------------------------------------------ #
+    # Persistence (patch 122jq)
+    # ------------------------------------------------------------------ #
+    def _load_state(self) -> dict:
+        if not self.config_path:
+            return {}
+        try:
+            from mufasa.utils.feature_view_state import load_state
+            return load_state(self.config_path)
+        except Exception:
+            return {}
+
+    def _state_changed(self) -> None:
+        if not getattr(self, "_restoring", True) and self.config_path:
+            self._state_timer.start()
+
+    def save_state(self) -> None:
+        """Write the selection and view settings to logs/measures/feature_view.toml.
+        The selection keeps features the current video lacks (they come back
+        on a video that has them)."""
+        if not self.config_path:
+            return
+        from mufasa.utils.feature_view_state import save_state
+        colour = self.colour_cb.currentText()
+        try:
+            save_state(self.config_path, {
+                "selected": self._checked + [c for c in self._parked if c not in self._checked],
+                "video": self.video_cb.currentText() or None,
+                "colour_by": colour if colour and colour != "(none)" else None,
+                "joint_style": self.joint_style_cb.currentText(),
+                "jitter": self.jitter_cb.isChecked(),
+                "group_by_name_parts": self.compact_cb.isChecked(),
+            })
+        except OSError as exc:
+            self.plot_info.setText(f"Could not save the feature selection: {exc}")
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -261,14 +336,22 @@ class FeatureVisualizationForm(OperationForm):
             except Exception as exc:
                 self.sel_label.setText(f"Could not list features: {exc}")
         self.video_cb.addItems(sorted(self._videos))
+        want = getattr(self, "_want_video", None)
         if cur in self._videos:
             self.video_cb.setCurrentText(cur)
+        elif want in self._videos:
+            self.video_cb.setCurrentText(want)
+        self._want_video = None
         self.video_cb.blockSignals(False)
         self.colour_cb.clear()
         self.colour_cb.addItem("(none)")
         if self.config_path:
             from mufasa.ui_qt.forms.analysis import _load_classifier_names
             self.colour_cb.addItems(_load_classifier_names(self.config_path))
+        want = getattr(self, "_want_colour", None)
+        if want and self.colour_cb.findText(want) >= 0:
+            self.colour_cb.setCurrentText(want)
+        self._want_colour = None
         if not self._videos:
             self.sel_label.setText(
                 "No computed features found — run Compute Features first."
@@ -282,7 +365,10 @@ class FeatureVisualizationForm(OperationForm):
             from mufasa.utils.feature_io import feature_catalog
             self._catalog = feature_catalog(video, self.config_path)
         have = {c for cols in self._catalog.values() for c in cols}
-        self._checked = [c for c in self._checked if c in have]
+        # features this video lacks are parked, not forgotten (122jq)
+        allsel = self._checked + [c for c in getattr(self, "_parked", []) if c not in self._checked]
+        self._checked = [c for c in allsel if c in have]
+        self._parked = [c for c in allsel if c not in have]
         self._build_tree()
         self.video_btn.setEnabled(bool(self._videos.get(video)))
         self.video_btn.setToolTip("" if self._videos.get(video) else
@@ -469,6 +555,7 @@ class FeatureVisualizationForm(OperationForm):
 
     def _clear_selection(self) -> None:
         self._checked = []
+        self._parked = []
         self._build_tree()
 
     def _update_sel_label(self, shown: int | None = None, total: int | None = None) -> None:
@@ -482,6 +569,7 @@ class FeatureVisualizationForm(OperationForm):
             self.sel_label.setText(head + f"<b>{len(self._checked)} selected</b>: {names}{more}")
         if getattr(self, "_viewers", None):
             self._sel_timer.start()
+        self._state_changed()
 
     # ------------------------------------------------------------------ #
     # Selection API (also used by tests)
@@ -491,6 +579,7 @@ class FeatureVisualizationForm(OperationForm):
 
     def set_selected(self, cols: list[str]) -> None:
         self._checked = list(cols)
+        self._parked = []
         self._build_tree()
 
     # ------------------------------------------------------------------ #

@@ -8,6 +8,16 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jq — Feature selection kept between sessions.**
+Feature Visualization saves its selection (in order), video, colour-by,
+joint style, jitter and "Group by name parts" to
+`logs/measures/feature_view.toml` (`mufasa.utils.feature_view_state`;
+debounced 0.5 s, and flushed on quit) and restores them when the form is
+built. Selected features the current video lacks are parked rather than
+dropped, and come back on a video that has them; unknown videos / features
+in the file are ignored, an unreadable file starts empty.
+Test: `tests/smoke_122jq_feature_selection_persistent.py` (15 checks).
+
 **122jp — Animation: remove outliers.**
 mufasa-landscape-animate `--outliers none | percentile | mad` leaves out,
 before the points are sampled, frames that are outliers in any animated
