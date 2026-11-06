@@ -198,6 +198,16 @@ class FeatureVisualizationForm(OperationForm):
         self.joint_style_cb.currentIndexChanged.connect(
             lambda _i: self._mode == "joint" and self._replot())
         arow.addWidget(self.joint_style_cb)
+        # Patch 122jn: spread near-discrete values in the joint plot
+        from PySide6.QtWidgets import QCheckBox as _QCB
+        self.jitter_cb = _QCB("Jitter", self)
+        self.jitter_cb.setToolTip(
+            "Joint plot: add uniform noise of ±0.4 of the step between distinct "
+            "values, so stacked near-discrete values spread out (display only). "
+            "Features ticked 'Jitter' in the Landscape… names table are always "
+            "jittered.")
+        self.jitter_cb.toggled.connect(lambda _on: self._mode == "joint" and self._replot())
+        arow.addWidget(self.jitter_cb)
         arow.addStretch()
         self.body_layout.addLayout(arow)
         self._cache: dict = {}
@@ -616,9 +626,18 @@ class FeatureVisualizationForm(OperationForm):
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             data, mask, nv = self._load(cols, self.scope_cb.currentIndex() == 1)
-            from mufasa.utils.feature_names import display, load_names
+            from mufasa.utils.feature_names import (
+                display,
+                jitter_values,
+                load_jitter,
+                load_names,
+            )
             names = load_names(self.config_path)
-            plot_joint(self.figure, data[cols[0]], data[cols[1]],
+            marked = load_jitter(self.config_path)
+            self._jittered = [c for c in cols if self.jitter_cb.isChecked() or c in marked]
+            va, vb = (jitter_values(data[c], seed=k + 1) if c in self._jittered else data[c]
+                      for k, c in enumerate(cols))
+            plot_joint(self.figure, va, vb,
                        display(cols[0], names), display(cols[1], names),
                        mask=mask, behaviour=self._behaviour() or "",
                        style=self.joint_style_cb.currentText(), **self._axes())
@@ -626,7 +645,9 @@ class FeatureVisualizationForm(OperationForm):
         finally:
             QApplication.restoreOverrideCursor()
         self._mode = "joint"
-        self.plot_info.setText(f"{nv} video(s).")
+        self.plot_info.setText(f"{nv} video(s)." + (
+            " Jittered: " + ", ".join(display(c, names) for c in self._jittered) + "."
+            if self._jittered else ""))
 
     def plot_over_time(self) -> None:
         cols = self._need(1, MAX_TIME_FEATURES, "Over time")

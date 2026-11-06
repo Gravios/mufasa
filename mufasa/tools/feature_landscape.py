@@ -645,19 +645,24 @@ def draw_jpdf(fig, spec, X: pd.DataFrame, row: pd.Series, *, bins: int,
     b = X[row.feature_b].to_numpy(np.float64)
     ok = np.isfinite(a) & np.isfinite(b)
     a, b = a[ok], b[ok]
+    # Patch 122jn: drawn values jittered for near-discrete features; the
+    # dipsplit boundaries are found on the real values
+    from mufasa.utils.feature_names import jitter_values
+    ja = jitter_values(a, seed=1) if row.feature_a in JITTERED else a
+    jb = jitter_values(b, seed=2) if row.feature_b in JITTERED else b
     gs = spec.subgridspec(2, 2, width_ratios=(4, 1), height_ratios=(1, 4),
                           wspace=0.04, hspace=0.04)
     ax = fig.add_subplot(gs[1, 0])
     axx = fig.add_subplot(gs[0, 0], sharex=ax)
     axy = fig.add_subplot(gs[1, 1], sharey=ax)
-    xr, yr = _range(a), _range(b)
-    H, xe, ye = np.histogram2d(a, b, bins=bins, range=(xr, yr), density=True)
+    xr, yr = _range(ja), _range(jb)
+    H, xe, ye = np.histogram2d(ja, jb, bins=bins, range=(xr, yr), density=True)
     H = np.ma.masked_less_equal(H.T, 0)
     ax.pcolormesh(xe, ye, H, cmap="magma", shading="auto",
                   norm=mcolors.LogNorm(vmin=max(H.min(), H.max() * 1e-4), vmax=H.max()))
-    for v, axm, orient in ((a, axx, "vertical"), (b, axy, "horizontal")):
+    for v, jv, axm, orient in ((a, ja, axx, "vertical"), (b, jb, axy, "horizontal")):
         rng_ = xr if axm is axx else yr
-        h, e = np.histogram(v, bins=bins, range=rng_, density=True)
+        h, e = np.histogram(jv, bins=bins, range=rng_, density=True)
         c = (e[:-1] + e[1:]) / 2
         if orient == "vertical":
             axm.fill_between(c, h, color="#D9952B", alpha=0.8, lw=0)
@@ -670,8 +675,10 @@ def draw_jpdf(fig, spec, X: pd.DataFrame, row: pd.Series, *, bins: int,
     _draw_joint_splits(ax, a, b, row, dp, xr, yr)
     tag = "emergent" if row.get("emergent") else (
         "joint adds modes" if row.get("adds_modes") else "multimodal")
+    jit = [n for n, c in (("x", row.feature_a), ("y", row.feature_b)) if c in JITTERED]
     axx.set_title(f"{tag}: {int(row.modes_joint)} modes along {row.best_direction}  "
-                  f"(dip {row.dip_max:.3f})", fontsize=7, loc="left")
+                  f"(dip {row.dip_max:.3f})"
+                  + (f"  · {'/'.join(jit)} jittered" if jit else ""), fontsize=7, loc="left")
     ax.set_xlabel(_short(display(row.feature_a, DISPLAY)), fontsize=7)
     ax.set_ylabel(_short(display(row.feature_b, DISPLAY)), fontsize=7)
     ax.tick_params(labelsize=6)
@@ -682,6 +689,7 @@ def draw_jpdf(fig, spec, X: pd.DataFrame, row: pd.Series, *, bins: int,
 # mufasa.utils.feature_names. Set by main() from the project's names file.
 DISPLAY: dict[str, str] = {}
 SCALED: dict[str, str] = {}      # columns analysed as log10 (patch 122jl)
+JITTERED: set[str] = set()       # columns jittered in figures (patch 122jn)
 
 
 def display(col: str, names: dict[str, str] | None) -> str:
@@ -843,6 +851,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--names-file", default=None,
                    help="feature display names for the figures (TOML [names]); "
                         "default: the project's logs/measures/feature_names.toml")
+    p.add_argument("--jitter", action="append", metavar="COLUMN",
+                   help="jitter this near-discrete column in the figures (repeatable; "
+                        "added to the names file's [jitter] marks)")
+    p.add_argument("--no-jitter", action="store_true",
+                   help="ignore the names file's [jitter] marks")
     p.add_argument("--no-scales", action="store_true",
                    help="ignore the log10 marks in the names file (analyse all linear)")
     p.add_argument("--out", default=None,
@@ -860,15 +873,20 @@ def main(argv: list[str] | None = None) -> int:
     sources = {s.strip() for s in a.sources.split(",") if s.strip()}
     if not sources <= {"pose", "features"} or not sources:
         raise SystemExit("--sources takes pose, features or pose,features")
-    global DISPLAY, SCALED
+    global DISPLAY, SCALED, JITTERED
     from mufasa.utils.feature_names import (
         apply_scales,
         load_names,
         load_scales,
         read_names,
+        read_jitter,
         read_scales,
     )
+    from mufasa.utils.feature_names import load_jitter
     DISPLAY = read_names(a.names_file) if a.names_file else load_names(config)
+    JITTERED = set() if a.no_jitter else (read_jitter(a.names_file) if a.names_file
+                                           else load_jitter(config))
+    JITTERED |= set(a.jitter or [])
     scales = {} if a.no_scales else (read_scales(a.names_file) if a.names_file
                                      else load_scales(config))
     run_id = generate_run_id()

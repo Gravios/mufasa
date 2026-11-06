@@ -23,6 +23,14 @@ missing) and label it "log10 <name>"::
     "Animal_1 movement a (mm)_FEATURE_SUBSET" = "log10"
 
 Only log10 entries are stored (linear is the default).
+
+Patch 122jn: features that are close to discrete (counts, quantised
+values) can be marked for jitter. Figures then add a small uniform noise to
+them — at most ±0.4 of the typical step between the values they take — so
+stacked points spread out; analyses (dip test, t-SNE) use the real values::
+
+    [jitter]
+    "Animal_1 number of rears_FEATURE_SUBSET" = true
 """
 from __future__ import annotations
 
@@ -68,6 +76,39 @@ def read_scales(path) -> dict[str, str]:
     return {str(k): "log10" for k, v in sc.items() if str(v).strip().lower() == "log10"}
 
 
+def read_jitter(path) -> set[str]:
+    """Columns marked for jitter in figures."""
+    return {str(k) for k, v in _read(path).get("jitter", {}).items() if v is True}
+
+
+def load_jitter(config_path) -> set[str]:
+    return read_jitter(names_path(config_path))
+
+
+def value_step(v) -> float:
+    """Typical spacing between the distinct values of ``v``: the median gap
+    between neighbouring distinct values (0 when fewer than two)."""
+    import numpy as np
+    u = np.unique(np.asarray(v, np.float64)[np.isfinite(v)])
+    if u.size < 2:
+        return 0.0
+    if u.size > 20000:   # continuous anyway; keep it cheap
+        u = u[:: u.size // 20000]
+    return float(np.median(np.diff(u)))
+
+
+def jitter_values(v, seed: int = 0, frac: float = 0.4, step: float | None = None):
+    """``v`` plus uniform noise in ±``frac`` × the value step (NaN stays
+    NaN). For figures only."""
+    import numpy as np
+    v = np.asarray(v, np.float64)
+    st = value_step(v) if step is None else step
+    if not st > 0:
+        return v.copy()
+    rng = np.random.default_rng(seed)
+    return v + rng.uniform(-frac * st, frac * st, v.shape)
+
+
 def load_scales(config_path) -> dict[str, str]:
     return read_scales(names_path(config_path))
 
@@ -81,13 +122,16 @@ def load_names(config_path) -> dict[str, str]:
 
 
 def save_names(config_path, updates: dict[str, str],
-               scales: dict[str, str] | None = None) -> Path:
+               scales: dict[str, str] | None = None,
+               jitter: dict[str, bool] | None = None) -> Path:
     """Merge ``updates`` ({column: name}) into the project's names. A name
     that is empty or equal to the default removes the entry. ``scales``
     ({column: "linear" | "log10"}) is merged the same way (linear removes)."""
     from mufasa.project_layout import write_project_toml
     p = names_path(config_path)
-    names, sc = read_names(p), read_scales(p)
+    names, sc, jit = read_names(p), read_scales(p), read_jitter(p)
+    for col, on in (jitter or {}).items():
+        (jit.add if on else jit.discard)(col)
     for col, name in updates.items():
         name = (name or "").strip()
         if not name or name == default_name(col):
@@ -105,6 +149,8 @@ def save_names(config_path, updates: dict[str, str],
     data = {"names": dict(sorted(names.items()))}
     if sc:
         data["scales"] = dict(sorted(sc.items()))
+    if jit:
+        data["jitter"] = {c: True for c in sorted(jit)}
     write_project_toml(p, data)
     return p
 
@@ -136,6 +182,7 @@ def apply_scales(df, scales: dict[str, str] | None, log=print):
     return out, cols
 
 
-__all__ = ["FILENAME", "SCALES", "apply_scales", "default_name", "display", "load_names",
+__all__ = ["FILENAME", "SCALES", "apply_scales", "jitter_values", "load_jitter",
+           "read_jitter", "value_step", "default_name", "display", "load_names",
            "load_scales", "names_path", "read_names", "read_scales", "save_names",
            "scale_of"]

@@ -8,6 +8,19 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jn — Jitter near-discrete features in figures.**
+The Landscape… / Animate… names table gets a Jitter tick per feature, saved
+as `[jitter]` in `logs/measures/feature_names.toml`. Marked features are
+drawn with uniform noise of ±0.4 × the median step between their distinct
+values (`feature_names.jitter_values`; levels stay separable, NaN stays
+NaN, reproducible): mufasa-landscape's joint PDFs (titled "x/y jittered")
+and mufasa-landscape-animate's feature spaces. The dip test, its boundaries,
+`tsne_samples.parquet` and the t-SNE keep the real values. Both tools take
+`--jitter COL` (repeatable) and `--no-jitter`. Feature Visualization's joint
+plot gets a Jitter checkbox and always jitters marked features.
+Test: `tests/smoke_122jn_jitter_discrete_features.py` (19 checks);
+smoke_122jl allows the extra table column.
+
 **122jm — Animation: number of points, sampling method, session intro.**
 mufasa-landscape-animate gets `--sampling random | balanced | even` next to
 `--n-points`: random as before (dense regions dominate, as in the data),

@@ -115,7 +115,7 @@ lr.FeatureNamesDialog.exec = orig_exec
 # ---------------------------------------------------------------- scale column
 d = lr.FeatureNamesDialog(None, cfg, [A, B, C], "landscape")
 check("table has a Scale column",
-      d.table.columnCount() == 3 and d.table.horizontalHeaderItem(2).text() == "Scale")
+      d.table.columnCount() >= 3 and d.table.horizontalHeaderItem(2).text() == "Scale")
 check("scales default to linear",
       [cb.currentText() for cb in d.scale_cbs] == ["linear"] * 3
       and [d.scale_cbs[0].itemText(i) for i in range(2)] == ["linear", "log10"])

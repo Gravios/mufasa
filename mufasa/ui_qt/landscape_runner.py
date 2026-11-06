@@ -180,17 +180,20 @@ class FeatureNamesDialog(QDialog):
         lay = QVBoxLayout(self)
         intro = QLabel(
             "Names used for these features in the figures, and the scale each is "
-            "analysed and plotted on (log10: values ≤ 0 become missing). Names and "
-            "scales are remembered for this project "
+            "analysed and plotted on (log10: values ≤ 0 become missing). Tick Jitter "
+            "for near-discrete features: their points are spread by a little noise "
+            "in the figures only. All of it is remembered for this project "
             "(logs/measures/feature_names.toml).", self)
         intro.setWordWrap(True)
         lay.addWidget(intro)
 
         saved = load_names(config_path) if config_path else {}
         scales = load_scales(config_path) if config_path else {}
-        self.table = QTableWidget(len(self.cols), 3, self)
+        from mufasa.utils.feature_names import load_jitter
+        jittered = load_jitter(config_path) if config_path else set()
+        self.table = QTableWidget(len(self.cols), 4, self)
         self.table.setHorizontalHeaderLabels(["Feature (column)", "Name in figures",
-                                              "Scale"])
+                                              "Scale", "Jitter"])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.DoubleClicked
@@ -200,6 +203,7 @@ class FeatureNamesDialog(QDialog):
         hdr.setSectionResizeMode(0, QHeaderView.Stretch)
         hdr.setSectionResizeMode(1, QHeaderView.Stretch)
         hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.scale_cbs: list[QComboBox] = []
         for r, c in enumerate(self.cols):
             src = QTableWidgetItem(default_name(c))
@@ -216,6 +220,13 @@ class FeatureNamesDialog(QDialog):
             sc.setToolTip("linear, or log10 (values ≤ 0 become missing)")
             self.table.setCellWidget(r, 2, sc)
             self.scale_cbs.append(sc)
+            jt = QTableWidgetItem("")
+            jt.setFlags((jt.flags() | Qt.ItemIsUserCheckable) & ~Qt.ItemIsEditable)
+            jt.setCheckState(Qt.Checked if c in jittered else Qt.Unchecked)
+            jt.setToolTip("Spread near-discrete values by uniform noise of ±0.4 of the "
+                          "step between them — figures only; the analysis uses the "
+                          "real values")
+            self.table.setItem(r, 3, jt)
         lay.addWidget(self.table, 1)
 
         brow = QHBoxLayout()
@@ -312,6 +323,11 @@ class FeatureNamesDialog(QDialog):
         return {self.cols[r]: self.table.item(r, 1).text().strip()
                 for r in range(len(self.cols))}
 
+    def jitter(self) -> dict[str, bool]:
+        """{column: jitter in figures?} as ticked."""
+        return {c: self.table.item(r, 3).checkState() == Qt.Checked
+                for r, c in enumerate(self.cols)}
+
     def scales(self) -> dict[str, str]:
         """{column: "linear" | "log10"} as chosen."""
         return {c: cb.currentText() for c, cb in zip(self.cols, self.scale_cbs)}
@@ -319,7 +335,7 @@ class FeatureNamesDialog(QDialog):
     def accept(self) -> None:
         if self.config_path:
             from mufasa.utils.feature_names import save_names
-            save_names(self.config_path, self.names(), self.scales())
+            save_names(self.config_path, self.names(), self.scales(), self.jitter())
         super().accept()
 
     def options(self) -> dict:

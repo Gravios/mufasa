@@ -427,6 +427,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--names-file", default=None,
                    help="feature display names (TOML [names]); default: the "
                         "project's logs/measures/feature_names.toml")
+    p.add_argument("--jitter", action="append", metavar="COLUMN",
+                   help="jitter this near-discrete column (repeatable; added to the "
+                        "names file's [jitter] marks)")
+    p.add_argument("--no-jitter", action="store_true",
+                   help="ignore the names file's [jitter] marks")
     p.add_argument("--out", default=None,
                    help="output file (default <run>/animation[_N].gif)")
     return p
@@ -479,8 +484,20 @@ def main(argv: list[str] | None = None) -> int:
     lf = run / "log10_columns.txt"
     scaled = ({ln.strip(): "log10" for ln in lf.read_text().splitlines() if ln.strip()}
               if lf.is_file() else {})
-    fspaces = [feature_space(samples[x].to_numpy(np.float64),
-                             samples[y].to_numpy(np.float64),
+    # Patch 122jn: near-discrete features jittered (display only)
+    from mufasa.utils.feature_names import jitter_values, load_jitter, read_jitter
+    jit = set() if a.no_jitter else (read_jitter(a.names_file) if a.names_file
+                                     else (load_jitter(cfg) if cfg else set()))
+    jit |= set(a.jitter or [])
+    if jit & {c for p_ in pairs for c in p_}:
+        print("[animate] jittered: " + ", ".join(
+            sorted(display(c, names) for c in jit & {c for p_ in pairs for c in p_})))
+
+    def _vals(c: str) -> np.ndarray:
+        v = samples[c].to_numpy(np.float64)
+        return jitter_values(v, seed=a.seed + 7) if c in jit else v
+
+    fspaces = [feature_space(_vals(x), _vals(y),
                              display(x, names, scaled), display(y, names, scaled))
                for x, y in pairs]
     spaces = [tsne]
