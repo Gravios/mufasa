@@ -8,6 +8,20 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jv — Feature viewer: JPDF beside the video, recorded with it.**
+"JPDF beside the video" with x / y feature combos (the viewer's features,
+by their figure names) and a Trail length composes, to the right of the
+displayed frame, the 2-D log density of the pair pooled over all videos
+(≤ 5000 frames each; −1 as missing; log10 scales and labels from
+`feature_names.toml`; background jittered for jitter-marked features) with
+the current frame's position as a solid red marker (white rim) and a red
+trail fading over the last N frames. The panel is square at the frame
+height; the density is drawn once per pair / height and cached, each frame
+only draws marker and trail. It is composed after overlay and orientation
+(`FrameScrubberWidget.set_composer`), so "● Record" saves video + JPDF side
+by side. New module `mufasa.ui_qt.jpdf_panel`.
+Test: `tests/smoke_122jv_viewer_jpdf_beside_video.py` (19 checks).
+
 **122ju — Feature viewer: FDLC / Kalman marker overlays and recording.**
 The video × feature viewer finds the video's tracker pose under
 `sources/pose` (`<video>.fdlc.parquet`, `<video>.parquet`, a FreeDLC run's

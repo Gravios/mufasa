@@ -346,6 +346,11 @@ class FeatureViewerWidget(QWidget):
             for c in df.columns:
                 self._loaded[c] = df[c].to_numpy()
         self.features = [c for c in features if c in self._loaded]
+        if hasattr(self, "jpdf_x"):
+            self._fill_jpdf_combos()
+            if self.jpdf is not None and (self.jpdf.x not in self.features
+                                          or self.jpdf.y not in self.features):
+                self.jpdf_cb.setChecked(False)
         self.plot.set_features(pd.DataFrame({c: self._loaded[c] for c in self.features}))
         n_feat = len(next(iter(self._loaded.values()))) if self._loaded else 0
         n_vid = self.scrubber.total_frames
@@ -441,11 +446,87 @@ class FeatureViewerWidget(QWidget):
         self.record_btn.toggled.connect(self._toggle_record)
         bar.addWidget(self.record_btn)
         lay.addLayout(bar)
+        self._build_jpdf_bar(lay)
         self.rec_status = QLabel("", self)
         self.rec_status.setStyleSheet("color: palette(placeholder-text);")
         self.rec_status.setTextInteractionFlags(Qt.TextSelectableByMouse)
         lay.addWidget(self.rec_status)
         self.scrubber.frame_changed.connect(self._record_frame)
+
+    # ------------------------------------------------------------------ #
+    # Patch 122jv — JPDF beside the video
+    # ------------------------------------------------------------------ #
+    def _build_jpdf_bar(self, lay) -> None:  # noqa: ANN001
+        from PySide6.QtWidgets import QCheckBox, QComboBox, QSpinBox
+        self.jpdf = None
+        self._pooled: dict = {}
+        bar = QHBoxLayout()
+        self.jpdf_cb = QCheckBox("JPDF beside the video", self)
+        self._jpdf_tip = (
+            "Show the joint distribution of two features (all videos) to the right of "
+            "the video, with this frame's position as a red marker and its recent "
+            "path as a trail. Recording then saves video and JPDF together.")
+        self.jpdf_cb.setToolTip(self._jpdf_tip)
+        self.jpdf_cb.toggled.connect(self._jpdf_changed)
+        bar.addWidget(self.jpdf_cb)
+        bar.addWidget(QLabel("x:", self))
+        self.jpdf_x = QComboBox(self)
+        bar.addWidget(self.jpdf_x, 1)
+        bar.addWidget(QLabel("y:", self))
+        self.jpdf_y = QComboBox(self)
+        bar.addWidget(self.jpdf_y, 1)
+        bar.addWidget(QLabel("Trail", self))
+        self.trail_spin = QSpinBox(self)
+        self.trail_spin.setRange(0, 3000)
+        self.trail_spin.setValue(30)
+        self.trail_spin.setSuffix(" frames")
+        self.trail_spin.setToolTip("Frames of the path drawn behind the marker")
+        bar.addWidget(self.trail_spin)
+        for w in (self.jpdf_x, self.jpdf_y):
+            w.currentIndexChanged.connect(self._jpdf_changed)
+        self.trail_spin.valueChanged.connect(self._trail_changed)
+        lay.addLayout(bar)
+        self._fill_jpdf_combos()
+
+    def _fill_jpdf_combos(self) -> None:
+        from mufasa.utils.feature_names import display, load_names
+        names = load_names(self.config_path) if self.config_path else {}
+        for k, cb in enumerate((self.jpdf_x, self.jpdf_y)):
+            cur = cb.currentData()
+            cb.blockSignals(True)
+            cb.clear()
+            for c in getattr(self, "features", []):
+                cb.addItem(display(c, names), c)
+            i = cb.findData(cur) if cur is not None else -1
+            cb.setCurrentIndex(i if i >= 0 else min(k, cb.count() - 1))
+            cb.blockSignals(False)
+        ok = len(getattr(self, "features", [])) >= 2
+        self.jpdf_cb.setEnabled(ok)
+        self.jpdf_cb.setToolTip(self._jpdf_tip if ok else
+                                "Needs two or more features in the viewer")
+
+    def set_jpdf_pair(self, x: str, y: str) -> None:
+        self.jpdf_x.setCurrentIndex(self.jpdf_x.findData(x))
+        self.jpdf_y.setCurrentIndex(self.jpdf_y.findData(y))
+
+    def _trail_changed(self, v: int) -> None:
+        if self.jpdf is not None:
+            self.jpdf.trail = int(v)
+            self.scrubber._rerender()
+
+    def _jpdf_changed(self, *_a) -> None:
+        x, y = self.jpdf_x.currentData(), self.jpdf_y.currentData()
+        if not self.jpdf_cb.isChecked() or x is None or y is None:
+            self.jpdf = None
+            self.scrubber.set_composer(None)
+            return
+        from mufasa.ui_qt.jpdf_panel import JpdfPanel, pooled_values
+        key = (x, y)
+        if key not in self._pooled:
+            self._pooled[key] = pooled_values(self.config_path, [x, y])
+        self.jpdf = JpdfPanel(self.config_path, x, y, self._loaded[x], self._loaded[y],
+                              trail=self.trail_spin.value(), pooled=self._pooled[key])
+        self.scrubber.set_composer(self.jpdf)
 
     def _overlay_changed(self, *_a) -> None:
         want = self.fdlc_cb.isChecked() or self.kalman_cb.isChecked()

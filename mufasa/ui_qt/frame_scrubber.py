@@ -84,6 +84,9 @@ class FrameScrubberWidget(QWidget):
         # drawn in video coordinates (before orientation); the frame as
         # finally displayed (overlay + orientation, BGR) is kept for recording.
         self._overlay = None
+        # Patch 122jv: composer(frame_bgr, frame_idx) -> frame_bgr applied
+        # after orientation (e.g. a JPDF panel beside the video)
+        self._composer = None
         self.last_display_frame: np.ndarray | None = None
         # Playback state. _play_direction is +1 (forward), -1
         # (backward), or 0 (paused). The single timer drives both
@@ -383,6 +386,11 @@ class FrameScrubberWidget(QWidget):
             except Exception:       # a broken overlay must not break the viewer
                 pass
         frame_bgr = self._apply_orientation(frame_bgr)
+        if self._composer is not None:
+            try:
+                frame_bgr = self._composer(frame_bgr, self._current_frame)
+            except Exception:
+                pass
         self.last_display_frame = frame_bgr
         h, w = frame_bgr.shape[:2]
         if not frame_bgr.flags["C_CONTIGUOUS"]:
@@ -412,6 +420,12 @@ class FrameScrubberWidget(QWidget):
         """Draw ``fn(frame_bgr, frame_idx) -> frame_bgr`` on every frame
         (None removes it); the current frame is redrawn."""
         self._overlay = fn
+        self._rerender()
+
+    def set_composer(self, fn) -> None:
+        """Compose ``fn(displayed_frame_bgr, frame_idx) -> frame_bgr`` after
+        overlay and orientation (None removes it); redraws."""
+        self._composer = fn
         self._rerender()
 
     def _rerender(self) -> None:
