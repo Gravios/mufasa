@@ -431,6 +431,13 @@ class FeatureViewerWidget(QWidget):
                                    "half-resolution video)")
         self.scale_spin.valueChanged.connect(self._overlay_changed)
         bar.addWidget(self.scale_spin)
+        self.style_btn = QPushButton("Style…", self)
+        self.style_btn.setToolTip("Marker / skeleton style and visibility for FDLC and "
+                                  "Kalman (remembered per project)")
+        self.style_btn.setEnabled(self.fdlc_path is not None or self.kalman_path is not None)
+        self.style_btn.clicked.connect(self.open_style_dialog)
+        self._style_dlg = None
+        bar.addWidget(self.style_btn)
         bar.addStretch()
         self.keep_frames_cb = QCheckBox("Keep frames", self)
         self.keep_frames_cb.setChecked(True)
@@ -528,9 +535,8 @@ class FeatureViewerWidget(QWidget):
                               trail=self.trail_spin.value(), pooled=self._pooled[key])
         self.scrubber.set_composer(self.jpdf)
 
-    def _overlay_changed(self, *_a) -> None:
-        want = self.fdlc_cb.isChecked() or self.kalman_cb.isChecked()
-        if want and self.overlay is None:
+    def _ensure_overlay(self) -> None:
+        if self.overlay is None:
             from mufasa.ui_qt.pose_overlay import PoseOverlay
             self.overlay = PoseOverlay.for_video(self.config_path, self.video_name,
                                                  self.video_path)
@@ -539,6 +545,27 @@ class FeatureViewerWidget(QWidget):
                     cb.setChecked(False)
                     cb.setEnabled(False)
                     cb.setToolTip("Could not load: " + self.overlay.errors[name])
+
+    def open_style_dialog(self):
+        """Patch 122jw: the style popup; edits show on the video at once and
+        are saved to the project when it is closed."""
+        from mufasa.ui_qt.overlay_style import OverlayStyleDialog
+        self._ensure_overlay()
+        ov = self.overlay
+        if self._style_dlg is None:
+            markers = {k: list(pf.markers) for k, pf in (("fdlc", ov.fdlc),
+                                                          ("kalman", ov.kalman)) if pf}
+            self._style_dlg = OverlayStyleDialog(self.config_path, ov.style, markers,
+                                                 ov.edges, self)
+            self._style_dlg.changed.connect(self.scrubber._rerender)
+        self._style_dlg.show()
+        self._style_dlg.raise_()
+        return self._style_dlg
+
+    def _overlay_changed(self, *_a) -> None:
+        want = self.fdlc_cb.isChecked() or self.kalman_cb.isChecked()
+        if want:
+            self._ensure_overlay()
         ov = self.overlay
         if ov is not None:
             ov.show_fdlc = self.fdlc_cb.isChecked()

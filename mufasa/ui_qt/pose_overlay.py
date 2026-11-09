@@ -100,13 +100,20 @@ class PoseOverlay:
     p_threshold: float = 0.5
     scale: float = 1.0
     offset: int = 0                     # pose frame = video frame + offset
+    style: object = None                # overlay_style.OverlayStyle (122jw)
+
+    def __post_init__(self) -> None:
+        if self.style is None:
+            from mufasa.ui_qt.overlay_style import OverlayStyle
+            self.style = OverlayStyle()
 
     @classmethod
     def for_video(cls, config_path, video: str, video_path: str | None = None
                   ) -> "PoseOverlay":
         from mufasa.tools.pose_viewer import _load_pose_file
         fp, kp = find_fdlc_pose(config_path, video), find_kalman_pose(config_path, video)
-        ov = cls()
+        from mufasa.ui_qt.overlay_style import load_style
+        ov = cls(style=load_style(config_path))
         ov.fdlc_path, ov.kalman_path = fp, kp
         ov.errors = {}
         for name, p in (("fdlc", fp), ("kalman", kp)):
@@ -146,44 +153,33 @@ class PoseOverlay:
                 for k, m in enumerate(pf.markers) if ok[k]}
 
     def __call__(self, frame: np.ndarray, i: int) -> np.ndarray:
-        from mufasa.tools.pose_viewer import MARKER_PALETTE
+        from mufasa.ui_qt.overlay_style import draw_source
         if not ((self.show_fdlc and self.fdlc is not None)
                 or (self.show_kalman and self.kalman is not None)):
             return frame
         out = frame.copy()
         h, w = out.shape[:2]
         r = max(3, int(round(min(h, w) / 120)))
-        th = max(1, r // 2)
-
-        def col(k: int) -> tuple[int, int, int]:
-            rr, gg, bb = MARKER_PALETTE[k % len(MARKER_PALETTE)]
-            return (bb, gg, rr)
-
+        st = self.style
         legend = []
-        if self.show_kalman and self.kalman is not None:
-            pts = self._points(self.kalman, i, use_p=False)
-            if self.show_skeleton:
-                for a, b in self.edges:
-                    if a in pts and b in pts:
-                        cv2.line(out, _ip(pts[a]), _ip(pts[b]), (235, 235, 235), th,
-                                 cv2.LINE_AA)
-            for k, m in enumerate(self.kalman.markers):
-                if m in pts:
-                    cv2.circle(out, _ip(pts[m]), r, col(k), -1, cv2.LINE_AA)
-                    cv2.circle(out, _ip(pts[m]), r, (0, 0, 0), 1, cv2.LINE_AA)
-            legend.append(("● Kalman", (235, 235, 235)))
-        if self.show_fdlc and self.fdlc is not None:
-            pts = self._points(self.fdlc, i, use_p=True)
-            for k, m in enumerate(self.fdlc.markers):
-                if m in pts:
-                    cv2.circle(out, _ip(pts[m]), r + 2, col(k), th, cv2.LINE_AA)
-            legend.append((f"o FDLC (p >= {self.p_threshold:.2f})", (235, 235, 235)))
-        fs = max(0.4, min(h, w) / 900)
-        for n, (txt, c) in enumerate(legend):
-            y = int(18 * fs * 1.6 * (n + 1))
-            cv2.putText(out, txt, (8, y), cv2.FONT_HERSHEY_SIMPLEX, fs, (0, 0, 0), 3,
-                        cv2.LINE_AA)
-            cv2.putText(out, txt, (8, y), cv2.FONT_HERSHEY_SIMPLEX, fs, c, 1, cv2.LINE_AA)
+        # Kalman underneath, FDLC on top (patch 122jw: styles per source)
+        for name, pf, use_p, sst in (("kalman", self.kalman, False, st.kalman),
+                                     ("fdlc", self.fdlc, True, st.fdlc)):
+            if pf is None or not getattr(self, f"show_{name}"):
+                continue
+            pts = {m: _ip(p) for m, p in self._points(pf, i, use_p=use_p).items()}
+            draw_source(out, pts, list(pf.markers), self.edges, sst, r,
+                        skeleton=self.show_skeleton)
+            legend.append("Kalman" if name == "kalman"
+                          else f"FDLC (p >= {self.p_threshold:.2f})")
+        if st.legend:
+            fs = max(0.4, min(h, w) / 900)
+            for n, txt in enumerate(reversed(legend)):
+                y = int(18 * fs * 1.6 * (n + 1))
+                cv2.putText(out, txt, (8, y), cv2.FONT_HERSHEY_SIMPLEX, fs, (0, 0, 0), 3,
+                            cv2.LINE_AA)
+                cv2.putText(out, txt, (8, y), cv2.FONT_HERSHEY_SIMPLEX, fs, (235, 235, 235),
+                            1, cv2.LINE_AA)
         return out
 
 

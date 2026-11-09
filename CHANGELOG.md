@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jw — Style / visibility popup for the FDLC and Kalman overlays.**
+"Style…" in the viewer's overlay row opens a non-modal popup with a tab per
+source. Markers: show, shape (filled circle / ring / cross / square /
+diamond), size (px or auto), line width, opacity, black outline, palette or
+single colour, marker names; a table to hide single markers or give them
+their own colour (double-click; Shift+double-click resets). Skeleton: show,
+colour, width, opacity; a table to hide single segments or colour them.
+Plus a legend switch and Reset to defaults. Edits redraw the video at once
+(and so go into recordings); Close saves to
+`logs/measures/pose_overlay_style.toml`, used by every viewer of the
+project. Defaults keep the 122ju look (FDLC rings without skeleton, Kalman
+dots with skeleton); FDLC can now have its own skeleton. The row's
+"Skeleton" box stays a master switch. New module
+`mufasa.ui_qt.overlay_style`.
+Test: `tests/smoke_122jw_overlay_style_popup.py` (27 checks).
+
 **122jv — Feature viewer: JPDF beside the video, recorded with it.**
 "JPDF beside the video" with x / y feature combos (the viewer's features,
 by their figure names) and a Trail length composes, to the right of the
