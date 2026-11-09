@@ -492,6 +492,45 @@ class FeatureViewerWidget(QWidget):
         for w in (self.jpdf_x, self.jpdf_y):
             w.currentIndexChanged.connect(self._jpdf_changed)
         self.trail_spin.valueChanged.connect(self._trail_changed)
+        # Patch 122jx: density bins and outliers
+        from PySide6.QtWidgets import QDoubleSpinBox as _QDS
+        bar.addWidget(QLabel("Bins", self))
+        self.bins_spin = QSpinBox(self)
+        self.bins_spin.setRange(10, 400)
+        self.bins_spin.setValue(90)
+        self.bins_spin.setToolTip("Density bins per axis")
+        bar.addWidget(self.bins_spin)
+        bar.addWidget(QLabel("Outliers", self))
+        self.jout_cb = QComboBox(self)
+        self.jout_cb.addItems(["none", "percentile", "mad"])
+        self.jout_cb.setCurrentText("percentile")
+        self.jout_cb.setToolTip("Background frames left out (and the axes fitted to the "
+                                "rest): percentile tails of either feature, or beyond N "
+                                "scaled MADs from the median")
+        bar.addWidget(self.jout_cb)
+        self.jout_val = _QDS(self)
+        self.jout_val.setDecimals(2)
+        bar.addWidget(self.jout_val)
+        self._jout_defaults = {"percentile": 0.5, "mad": 5.0}
+
+        def _sync_out(m: str) -> None:
+            self.jout_val.blockSignals(True)
+            self.jout_val.setEnabled(m != "none")
+            if m == "percentile":
+                self.jout_val.setRange(0.01, 25.0)
+                self.jout_val.setSuffix(" % tails")
+            elif m == "mad":
+                self.jout_val.setRange(1.0, 50.0)
+                self.jout_val.setSuffix(" × MAD")
+            if m != "none":
+                self.jout_val.setValue(self._jout_defaults[m])
+            self.jout_val.blockSignals(False)
+
+        self.jout_cb.currentTextChanged.connect(_sync_out)
+        _sync_out("percentile")
+        self.jout_cb.currentTextChanged.connect(self._jpdf_options)
+        self.jout_val.valueChanged.connect(self._jpdf_options)
+        self.bins_spin.valueChanged.connect(self._jpdf_options)
         lay.addLayout(bar)
         self._fill_jpdf_combos()
 
@@ -516,6 +555,16 @@ class FeatureViewerWidget(QWidget):
         self.jpdf_x.setCurrentIndex(self.jpdf_x.findData(x))
         self.jpdf_y.setCurrentIndex(self.jpdf_y.findData(y))
 
+    def _jpdf_kw(self) -> dict:
+        m = self.jout_cb.currentText()
+        return dict(bins=self.bins_spin.value(), outliers=m,
+                    outlier_value=self.jout_val.value() if m != "none" else 0.0)
+
+    def _jpdf_options(self, *_a) -> None:
+        if self.jpdf is not None:
+            self.jpdf.set_options(**self._jpdf_kw())
+            self.scrubber._rerender()
+
     def _trail_changed(self, v: int) -> None:
         if self.jpdf is not None:
             self.jpdf.trail = int(v)
@@ -532,7 +581,8 @@ class FeatureViewerWidget(QWidget):
         if key not in self._pooled:
             self._pooled[key] = pooled_values(self.config_path, [x, y])
         self.jpdf = JpdfPanel(self.config_path, x, y, self._loaded[x], self._loaded[y],
-                              trail=self.trail_spin.value(), pooled=self._pooled[key])
+                              trail=self.trail_spin.value(), pooled=self._pooled[key],
+                              **self._jpdf_kw())
         self.scrubber.set_composer(self.jpdf)
 
     def _ensure_overlay(self) -> None:

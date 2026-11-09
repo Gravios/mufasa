@@ -17,6 +17,10 @@ trail on a copy, mapping feature values to pixels with the axes transform.
 Feature values: −1 is read as missing; features marked log10 in
 ``feature_names.toml`` are shown as log10 (labelled "log10 <name>"); the
 background (not the marker) is jittered for features marked for jitter.
+
+Patch 122jx: ``bins`` (per axis) and outlier handling of the background
+(``none`` / ``percentile`` tails / ``mad``) are adjustable; the axes span
+the frames kept, and the marker is pinned to the edge when outside.
 """
 from __future__ import annotations
 
@@ -76,7 +80,9 @@ class JpdfPanel:
     JPDF to the right of the frame."""
 
     def __init__(self, config_path, x: str, y: str, x_values, y_values,
-                 *, trail: int = 30, pooled: pd.DataFrame | None = None) -> None:
+                 *, trail: int = 30, pooled: pd.DataFrame | None = None,
+                 bins: int = 90, outliers: str = "percentile",
+                 outlier_value: float = 0.5) -> None:
         from mufasa.utils.feature_names import (
             display,
             load_jitter,
@@ -85,6 +91,10 @@ class JpdfPanel:
         )
         self.config_path, self.x, self.y = config_path, x, y
         self.trail = int(trail)
+        # Patch 122jx: density bins per axis and outlier handling
+        self.bins = int(bins)
+        self.outliers = outliers
+        self.outlier_value = float(outlier_value)
         names = load_names(config_path) if config_path else {}
         scales = load_scales(config_path) if config_path else {}
         self.jitter = load_jitter(config_path) if config_path else set()
@@ -112,12 +122,16 @@ class JpdfPanel:
         from mufasa.utils.feature_names import jitter_values
         ok = np.isfinite(self.px) & np.isfinite(self.py)
         bx, by = self.px[ok], self.py[ok]
+        n_all = int(ok.sum())
+        bad = self.outlier_mask(bx, by)
+        bx, by = bx[~bad], by[~bad]
+        self.n_outliers = int(bad.sum())
         if self.x in self.jitter:
             bx = jitter_values(bx, seed=1)
         if self.y in self.jitter:
             by = jitter_values(by, seed=2)
-        xlim = _limits(np.r_[bx, self.vx[np.isfinite(self.vx)]])
-        ylim = _limits(np.r_[by, self.vy[np.isfinite(self.vy)]])
+        xlim = _limits(bx)
+        ylim = _limits(by)
         dpi = 100
         w = h
         fig = Figure(figsize=(w / dpi, h / dpi), dpi=dpi, facecolor="white")
@@ -125,7 +139,7 @@ class JpdfPanel:
         fs = max(6.0, h / 70)
         ax = fig.add_axes([0.17, 0.13, 0.78, 0.80])
         if bx.size:
-            H, xe, ye = np.histogram2d(bx, by, bins=90, range=(xlim, ylim))
+            H, xe, ye = np.histogram2d(bx, by, bins=self.bins, range=(xlim, ylim))
             Hm = np.ma.masked_less_equal(H.T, 0)
             if Hm.count():
                 ax.pcolormesh(xe, ye, Hm, cmap="Greys", shading="auto",
@@ -135,8 +149,9 @@ class JpdfPanel:
         ax.set_xlabel(self.name_x, fontsize=fs)
         ax.set_ylabel(self.name_y, fontsize=fs)
         ax.tick_params(labelsize=fs * 0.85)
-        ax.set_title(f"all videos · {int(ok.sum()):,} frames", fontsize=fs * 0.85,
-                     loc="left", color="#555555")
+        drop = (f" ({self.n_outliers:,} outliers left out)" if self.n_outliers else "")
+        ax.set_title(f"all videos · {n_all - self.n_outliers:,} frames{drop} · "
+                     f"{self.bins} bins", fontsize=fs * 0.85, loc="left", color="#555555")
         fig.canvas.draw()
         rgba = np.asarray(fig.canvas.buffer_rgba())
         img = cv2.cvtColor(rgba[:, :, :3].copy(), cv2.COLOR_RGB2BGR)
@@ -149,6 +164,30 @@ class JpdfPanel:
             return d[:, 0], img.shape[0] - d[:, 1]      # display y is bottom-up
 
         return _Background(img, to_px, xlim, ylim)
+
+    def outlier_mask(self, bx: np.ndarray, by: np.ndarray) -> np.ndarray:
+        """Background frames left out: ``none``; ``percentile`` — outside the
+        ``outlier_value`` % tails of either feature; ``mad`` — beyond
+        ``outlier_value`` scaled MADs from the median. The axes span what is
+        kept; markers outside are pinned to the edge."""
+        if self.outliers == "none" or not bx.size:
+            return np.zeros(bx.size, bool)
+        from mufasa.tools.landscape_animate import outlier_mask
+        kw = ({"percentile": self.outlier_value} if self.outliers == "percentile"
+              else {"mad": self.outlier_value})
+        bad, _ = outlier_mask({"x": bx, "y": by}, self.outliers, **kw)
+        return bad
+
+    def set_options(self, *, bins: int | None = None, outliers: str | None = None,
+                    outlier_value: float | None = None) -> None:
+        """Change bins / outlier handling; the density is redrawn."""
+        if bins is not None:
+            self.bins = int(bins)
+        if outliers is not None:
+            self.outliers = outliers
+        if outlier_value is not None:
+            self.outlier_value = float(outlier_value)
+        self._bg = None
 
     def background(self, h: int) -> _Background:
         if self._bg is None or self._bg_h != h:
@@ -200,10 +239,11 @@ class JpdfPanel:
 
 
 def _limits(v: np.ndarray) -> tuple[float, float]:
+    """Axis range of the kept values (outliers are removed beforehand)."""
     v = v[np.isfinite(v)]
     if not v.size:
         return 0.0, 1.0
-    lo, hi = np.percentile(v, [0.5, 99.5])
+    lo, hi = float(v.min()), float(v.max())
     if hi <= lo:
         lo, hi = float(v.min()), float(v.max())
     if hi <= lo:

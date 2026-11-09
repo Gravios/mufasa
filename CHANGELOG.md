@@ -8,6 +8,17 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jx — Viewer JPDF: bins and outliers.**
+The "JPDF beside the video" row gets "Bins" (per axis, default 90) and
+"Outliers": none, percentile tails (default 0.5 %, as before) or MAD
+(default 5 ×), with the threshold. Outlying background frames (in either
+feature) are left out and the axes fitted to the frames kept (previously
+fixed 0.5–99.5 % of background + video); a current-frame marker outside is
+pinned to the edge. The panel title gives frames kept, outliers left out
+and bins. Changes redraw at once and carry over to a new pair
+(`JpdfPanel.set_options`, `JpdfPanel.outlier_mask`).
+Test: `tests/smoke_122jx_viewer_jpdf_bins_outliers.py` (13 checks).
+
 **122jw — Style / visibility popup for the FDLC and Kalman overlays.**
 "Style…" in the viewer's overlay row opens a non-modal popup with a tab per
 source. Markers: show, shape (filled circle / ring / cross / square /
