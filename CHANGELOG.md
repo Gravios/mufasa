@@ -8,6 +8,20 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kd — Kalman v2: confirmed prior settings are the defaults; serial and parallel runs now agree.**
+The settings confirmed on the K7 data ("It works very well") are now the
+defaults: robust outlier gate 25, segment-length prior 1, speed prior 1, and
+the joint angle prior on (panel box ticked; CLI `--joint-prior` on by
+default, `--no-joint-prior` turns it off; `--tune outlier_gate=0`,
+`length_prior=0`, `speed_prior=0` turn the others off). Fixes two plumbing
+bugs: the pooled EM E-step (`n_workers > 1`, what the GUI uses) did not pass
+the joint/kinematic priors to the filter, and the serial final pass
+(`n_workers = 1`) did not either, so serial and parallel runs fitted or
+smoothed differently whenever a prior was on. Re-run on K7, results are
+unchanged (hidden-head error median / p90 / p99 14.6 / 35.9 / 71.5 px).
+Tests: `smoke_122kd_prior_defaults_and_pool_parity`; older tests pin the
+previous values where they check other behaviour.
+
 **122kc — Kalman v2: stretchier segment lengths by default.**
 `length_q_scale` default 1 → 50 and `length_q_ceiling` 10 → 500 — the
 setting recommended on 2026-11-11 and confirmed by the user ("That looks

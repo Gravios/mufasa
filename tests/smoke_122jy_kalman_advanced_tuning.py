@@ -73,7 +73,7 @@ check("defaults reproduce the previous constants",
           "length_q_ceiling": 500.0, "seg_q_ceiling": 10.0,
           "q_floor_factor": 0.1, "sigma_ceiling": 3.0,
           "constraint_sigma": 0.05}
-      and K.TUNING_DEFAULTS.get("outlier_gate", 0.0) == 0.0
+      and K.TUNING_DEFAULTS.get("outlier_gate") == 25.0   # 122kd
       and K.TUNING_DEFAULTS["seg_q_ceiling"] == K._M_STEP_Q_CEILING_FACTOR
       and K.TUNING_DEFAULTS["sigma_ceiling"] == K._M_STEP_SIGMA_CEILING_FACTOR
       and K.TUNING_DEFAULTS["q_floor_factor"] == K._M_STEP_Q_FLOOR_FACTOR

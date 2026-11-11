@@ -68,8 +68,8 @@ out = K._gate_marker_observations(z, h, H, R, 3, P * 1e4, 25.0)
 check("…and not at all when the state is very uncertain (long gap)", out[5] == 0
       and np.array_equal(out[3], R))
 check("input arrays not modified", np.array_equal(R, np.ones(6)))
-check("default off (0): behaviour unchanged unless asked",
-      K.TUNING_DEFAULTS["outlier_gate"] == 0.0 and "outlier_gate" in K.TUNING_HELP)
+check("default 25 since 122kd (0 = off)",
+      K.TUNING_DEFAULTS["outlier_gate"] == 25.0 and "outlier_gate" in K.TUNING_HELP)
 check("0 is accepted for outlier_gate (off), not for other knobs",
       K.parse_tuning(["outlier_gate=0"]) == {"outlier_gate": 0.0})
 try:
@@ -185,7 +185,8 @@ pd.DataFrame({**{f"{m}_x": pos[:, i, 0] for i, m in enumerate(names)},
 
 def run(gate):
     """Full pipeline (EM-fitted noise) on the corrupted session."""
-    lay = dataclasses.replace(layout, tuning={"outlier_gate": gate} if gate else {})
+    lay = dataclasses.replace(layout, tuning={"outlier_gate": gate, "length_prior": 0.0,
+                                              "speed_prior": 0.0})
     out = tmp / f"out_{gate:g}"
     K.smooth_pose_v2(pose_input=str(tmp / "in"), output_dir=str(out), layout=lay,
                      em_max_iter=4, n_workers=1, fps=30.0, likelihood_threshold=0.5)
@@ -204,7 +205,9 @@ with contextlib.redirect_stdout(buf):
 log1 = buf.getvalue()
 with contextlib.redirect_stdout(io.StringIO()):
     out_n = tmp / "out_plain"
-    K.smooth_pose_v2(pose_input=str(tmp / "in"), output_dir=str(out_n), layout=layout,
+    K.smooth_pose_v2(pose_input=str(tmp / "in"), output_dir=str(out_n),
+                     layout=dataclasses.replace(layout, tuning={
+                         "outlier_gate": 0.0, "length_prior": 0.0, "speed_prior": 0.0}),
                      em_max_iter=4, n_workers=1, fps=30.0, likelihood_threshold=0.5)
 d_n = pd.read_parquet(next(out_n.glob("*.parquet")))
 xy_n = np.stack([d_n[[m + "_x", m + "_y"]].to_numpy() for m in names], 1)
@@ -222,10 +225,10 @@ from mufasa.ui_qt.forms.pose_cleanup import KalmanV2SmoothingForm  # noqa: E402
 
 F = KalmanV2SmoothingForm(config_path=None)
 sp = F.tuning_spins.get("outlier_gate")
-check("advanced view: Outlier gate spin, 0 = off by default",
-      sp is not None and sp.value() == 0.0 and sp.minimum() == 0.0)
-sp.setValue(25)
-check("set → passed as tuning", F.tuning() == {"outlier_gate": 25.0})
+check("advanced view: Outlier gate spin, 25 by default (0 = off)",
+      sp is not None and sp.value() == 25.0 and sp.minimum() == 0.0)
+sp.setValue(0)
+check("set → passed as tuning", F.tuning() == {"outlier_gate": 0.0})
 
 failed = [n for n, ok in checks if not ok]
 for n, ok in checks:

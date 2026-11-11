@@ -1547,7 +1547,7 @@ class KalmanV2SmoothingForm(OperationForm):
             "segments to the body during dropouts)",
             self,
         )
-        self.joint_prior.setChecked(False)
+        self.joint_prior.setChecked(True)      # patch 122kd: on by default
         ext_form.addRow("", self.joint_prior)
         train_form.addRow(ext_group)
         self._build_advanced(train_form)

@@ -102,17 +102,17 @@ TUNING_DEFAULTS: dict[str, float] = {
     "constraint_sigma": 0.05,
     # Innovation gate (χ², 2 dof) per marker and frame: a detection that
     # far from where the model expects it is down-weighted (patch 122jz).
-    # 0 = off (default: with too-stiff noise parameters a gate can also drop
-    # genuine fast motion); 25 ≈ 5 σ is a good start for real data.
-    "outlier_gate": 0.0,
+    # 0 = off. Patch 122kd: default 25 (≈ 5 σ), confirmed on real sessions.
+    "outlier_gate": 25.0,
     # Patch 122ka: segment-length prior. 0 = off; otherwise its SD as a
     # multiple of each segment's observed length spread (1 = as wide as the
-    # data: only matters while a segment is unobserved).
-    "length_prior": 0.0,
+    # data: only matters while a segment is unobserved). 122kd: default 1.
+    "length_prior": 1.0,
     # Patch 122ka: speed prior pulling the body's velocity toward rest, SD as
     # a multiple of the typical (RMS) speed at the animal's current place in
     # the arena (a spatial map). 0 = off; 1 = as wide as the data.
-    "speed_prior": 0.0,
+    # 122kd: default 1.
+    "speed_prior": 1.0,
 }
 TUNING_HELP: dict[str, str] = {
     "drift_radius_cap": "max per-marker drift radius, px (needs --with-drift)",
@@ -7218,13 +7218,16 @@ def _pool_em_e_step(
         pos, likes, layout, marker_names,
         fitted_lengths, likelihood_threshold,
     )
-    # Forward filter + smoother
+    # Forward filter + smoother. Patch 122kd: pass the joint prior (and the
+    # kinematic priors it carries) — the serial E-step did, the pooled one
+    # dropped it, so n_workers > 1 fitted a different model.
     filt = forward_filter_v2(
         pos, likes, layout, params, dt,
         initial_state=x0,
         likelihood_threshold=likelihood_threshold,
         apply_constraints=apply_constraints,
         perspective=perspective,
+        joint_prior=joint_prior,
     )
     smooth = rts_smooth_v2(filt, layout, dt, params)
 
@@ -9879,6 +9882,9 @@ def smooth_pose_v2(
                         likelihood_threshold=likelihood_threshold,
                         apply_constraints=apply_constraints,
                         perspective=perspective,
+                        # Patch 122kd: the parallel final pass passed the
+                        # joint (and kinematic) priors, this one did not.
+                        joint_prior=joint_prior,
                         device=device,
                     )
                 except Exception as exc:
@@ -10078,8 +10084,9 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
-        "--joint-prior", action="store_true",
+        "--joint-prior", action=argparse.BooleanOptionalAction, default=True,
         help=(
+            "Patch 122kd: on by default; --no-joint-prior turns it off. "
             "Patch 122hf. Fit a von Mises prior on each segment's local "
             "angle from the frames where its marker IS visible, and apply "
             "it as a soft constraint everywhere. Matters for segments "

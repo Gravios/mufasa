@@ -132,7 +132,10 @@ layout = layout_from_segments(SPEC)
 # tail is still chance-level but lands on another chance value (143 deg).
 # Keep the original setting here so the checks test what they were built for.
 import dataclasses as _dc  # noqa: E402
-layout = _dc.replace(layout, tuning={"length_q_scale": 1.0, "length_q_ceiling": 10.0})
+layout = _dc.replace(layout, tuning={"length_q_scale": 1.0, "length_q_ceiling": 10.0,
+                                     # 122kd defaults, also off here
+                                     "outlier_gate": 0.0, "length_prior": 0.0,
+                                     "speed_prior": 0.0})
 n_seg = len(layout.non_root_topo_order)
 state = np.zeros(layout.state_dim)
 for s in layout.non_root_topo_order:
@@ -408,7 +411,8 @@ check("the final smoothing worker receives it",
       "sess_idx, params, perspective, joint_prior, device = args" in src)
 check("smooth_pose_v2 exposes it", "enable_joint_prior: bool = False" in
       src[src.index("def smooth_pose_v2("):src.index("def smooth_pose_v2(") + 1500])
-check("the CLI exposes --joint-prior", '"--joint-prior", action="store_true"' in src)
+check("the CLI exposes --joint-prior (on by default since 122kd)",
+      '"--joint-prior", action=argparse.BooleanOptionalAction, default=True' in src)
 check("the CLI flag is actually passed through",
       "enable_joint_prior=args.joint_prior," in src)
 check("EMResultV2 carries it back out",

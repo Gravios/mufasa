@@ -84,8 +84,9 @@ check("outside the map -> overall typical speed",
 # ---------------------------------------------------------------- rows
 state = K.initial_state_from_data(pos, lik, layout, names, fl, 0.5)
 ri = K._pack_state_layout_indices(layout)["__root__"]
-z0, _, _, _ = K._build_constraint_observations(state, layout, 0.05, joint_prior=jp)
-check("tuning off (default): no prior rows", z0.shape[0] == 1 + len(layout.non_root_topo_order))
+lay_off = dataclasses.replace(layout, tuning={"length_prior": 0.0, "speed_prior": 0.0})
+z0, _, _, _ = K._build_constraint_observations(state, lay_off, 0.05, joint_prior=jp)
+check("tuning off (0): no prior rows", z0.shape[0] == 1 + len(layout.non_root_topo_order))
 lay = dataclasses.replace(layout, tuning={"length_prior": 2.0, "speed_prior": 1.0})
 st = state.copy()
 st[ri["x"]], st[ri["y"]] = 170.0, 200.0
@@ -112,7 +113,7 @@ check("no fitted priors (old model): tuning on adds nothing",
 check("0 allowed (= off) for the priors",
       K.parse_tuning(["length_prior=0", "speed_prior=0"]) == {"length_prior": 0.0,
                                                                "speed_prior": 0.0}
-      and K.TUNING_DEFAULTS["length_prior"] == 0 and K.TUNING_DEFAULTS["speed_prior"] == 0)
+      and K.TUNING_DEFAULTS["length_prior"] == 1 and K.TUNING_DEFAULTS["speed_prior"] == 1)
 with tempfile.TemporaryDirectory() as d:
     p = os.path.join(d, "m.npz")
     params = K.fit_initial_params_v2(pos, lik, layout, names, fl, 30.0, 0.5)
@@ -159,12 +160,12 @@ app = QApplication.instance() or QApplication([])
 from mufasa.ui_qt.forms.pose_cleanup import KalmanV2SmoothingForm  # noqa: E402
 
 F = KalmanV2SmoothingForm(config_path=None)
-check("advanced view: length and speed prior spins, 0 = off",
-      F.tuning_spins["length_prior"].value() == 0 and F.tuning_spins["speed_prior"].value() == 0
+check("advanced view: length and speed prior spins, 1 by default (122kd), 0 = off",
+      F.tuning_spins["length_prior"].value() == 1 and F.tuning_spins["speed_prior"].value() == 1
       and F.tuning_spins["speed_prior"].minimum() == 0)
-F.tuning_spins["length_prior"].setValue(1)
-F.tuning_spins["speed_prior"].setValue(1)
-check("set → passed as tuning", F.tuning() == {"length_prior": 1.0, "speed_prior": 1.0})
+F.tuning_spins["length_prior"].setValue(0)
+F.tuning_spins["speed_prior"].setValue(2)
+check("set → passed as tuning", F.tuning() == {"length_prior": 0.0, "speed_prior": 2.0})
 
 failed = [n for n, ok in checks if not ok]
 for n, ok in checks:
