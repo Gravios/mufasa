@@ -8,6 +8,19 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kc — Kalman v2: stretchier segment lengths by default.**
+`length_q_scale` default 1 → 50 and `length_q_ceiling` 10 → 500 — the
+setting recommended on 2026-11-11 and confirmed by the user ("That looks
+much better"). On Cacna_87 (frames 20000–29000) it cut the 90th-percentile
+error on confident frames for tail_V32 14.2 → 8.1 px, tail_V18 12.2 → 5.7,
+back_V2 6.3 → 2.6, head_mid 7.0 → 4.1, and fixed the floating skeleton
+seen in that session. Only training is affected (initial length noise and
+its EM ceiling); loading a saved model is unchanged. The other new options
+(outlier gate, length / speed priors) stay off by default. To get the old
+behaviour: `--tune length_q_scale=1 --tune length_q_ceiling=10` or the
+advanced view. smoke_122jy / smoke_122kb follow the new defaults;
+smoke_122hf pins the old values for its synthetic joint-prior checks.
+
 **122kb — Kalman v2 panel remembers its settings and the last model.**
 Starting a run writes every option of the panel — mode, fps, likelihood
 threshold, workers, overwrite, EM settings, model extensions, advanced fine

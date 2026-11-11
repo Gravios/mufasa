@@ -126,6 +126,13 @@ check("handles wrap-around at +/-pi (circular mean, not arithmetic)",
 # 2. the pseudo-observation rows
 # ---------------------------------------------------------------- #
 layout = layout_from_segments(SPEC)
+# Patch 122kc raised the segment-length flexibility defaults (1 -> 50, ceiling
+# 10 -> 500). These synthetic checks are about the joint prior and were
+# calibrated with stiff lengths; with free lengths a blind 20 s near-uniform
+# tail is still chance-level but lands on another chance value (143 deg).
+# Keep the original setting here so the checks test what they were built for.
+import dataclasses as _dc  # noqa: E402
+layout = _dc.replace(layout, tuning={"length_q_scale": 1.0, "length_q_ceiling": 10.0})
 n_seg = len(layout.non_root_topo_order)
 state = np.zeros(layout.state_dim)
 for s in layout.non_root_topo_order:

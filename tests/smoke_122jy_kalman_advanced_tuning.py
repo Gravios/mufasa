@@ -69,8 +69,8 @@ def synth(T=900, seed=0, wobble=6.0):
 check("defaults reproduce the previous constants",
       {k: v for k, v in K.TUNING_DEFAULTS.items()
        if k not in ("outlier_gate", "length_prior", "speed_prior")}
-      == {"drift_radius_cap": 20.0, "length_q_scale": 1.0,
-          "length_q_ceiling": 10.0, "seg_q_ceiling": 10.0,
+      == {"drift_radius_cap": 20.0, "length_q_scale": 50.0,     # 122kc
+          "length_q_ceiling": 500.0, "seg_q_ceiling": 10.0,
           "q_floor_factor": 0.1, "sigma_ceiling": 3.0,
           "constraint_sigma": 0.05}
       and K.TUNING_DEFAULTS.get("outlier_gate", 0.0) == 0.0
@@ -113,7 +113,8 @@ loose = K.fit_initial_params_v2(
                                                  "constraint_sigma": 0.2}),
     NAMES, fl, 30.0, 0.5)
 check("length_q_scale multiplies every segment's length noise",
-      all(np.isclose(loose.q_length[s], 10 * base.q_length[s]) for s in base.q_length))
+      all(np.isclose(loose.q_length[s], 10 / K.TUNING_DEFAULTS["length_q_scale"]
+                     * base.q_length[s]) for s in base.q_length))
 check("constraint_sigma reaches the parameters",
       base.constraint_sigma == 0.05 and loose.constraint_sigma == 0.2)
 fl_w = dataclasses.replace(fl, marker_r_drift={m: 60.0 for m in NAMES})
@@ -144,8 +145,8 @@ o_def = aggregate(layout, 1000.0)
 o_tun = aggregate(dataclasses.replace(layout, tuning={
     "length_q_ceiling": 100.0, "seg_q_ceiling": 50.0, "sigma_ceiling": 8.0}), 1000.0)
 s = "head"
-check("default: length / angle / σ clipped at 10x / 10x / 3x",
-      np.isclose(o_def.q_length[s], 10 * init.q_length[s])
+check("default: length / angle / σ clipped at 500x (122kc) / 10x / 3x",
+      np.isclose(o_def.q_length[s], 500 * init.q_length[s])
       and np.isclose(o_def.q_seg_ori[s], 10 * init.q_seg_ori[s])
       and np.isclose(o_def.sigma_marker["head_mid"], 3 * init.sigma_marker["head_mid"]))
 check("tuned ceilings let EM go to 100x / 50x / 8x",

@@ -74,8 +74,8 @@ F.high_angular.setText("tail_3")
 F.root_q_ceiling.setValue(20.0)
 F.joint_prior.setChecked(True)
 F.adv_toggle.setChecked(True)
-F.tuning_spins["length_q_scale"].setValue(50)
-F.tuning_spins["length_q_ceiling"].setValue(500)
+F.tuning_spins["length_q_scale"].setValue(20)
+F.tuning_spins["length_q_ceiling"].setValue(200)
 F.tuning_spins["outlier_gate"].setValue(25)
 F.device.setCurrentText("auto")
 args = F.collect_args()
@@ -84,14 +84,14 @@ with open(F.settings_path(), "rb") as fh:
     saved = tomllib.load(fh)
 check("starting a run saves the settings",
       saved["fps"] == 25.0 and saved["em_iter"] == 7 and saved["with_drift"] is True
-      and saved["tuning"]["length_q_scale"] == 50 and saved["mode"] == "train")
+      and saved["tuning"]["length_q_scale"] == 20 and saved["mode"] == "train")
 check("…and the model it will train as the last model", saved["last_model"] == model_path)
 
 # the run writes the model (simulate with a real model file)
 SPEC = [{"name": "back", "markers": ["a", "b"]}]
 lay = K.layout_from_segments(SPEC, with_drift=True)
 lay = dataclasses.replace(lay, const_accel_segments=["back"],
-                          tuning={"length_q_scale": 50.0, "outlier_gate": 25.0})
+                          tuning={"length_q_scale": 20.0, "outlier_gate": 25.0})
 rng = np.random.default_rng(0)
 pos = np.stack([np.c_[100 + np.arange(300) * .1, np.full(300, 100.)],
                 np.c_[120 + np.arange(300) * .1, np.full(300, 100.)]], 1) + rng.normal(0, .3, (300, 2, 2))
@@ -110,7 +110,7 @@ check("next session: model extensions restored",
       and G.high_angular.text() == "tail_3" and G.root_q_ceiling.value() == 20.0
       and G.joint_prior.isChecked())
 check("next session: fine tuning restored (advanced view open)",
-      G.tuning() == {"length_q_scale": 50.0, "length_q_ceiling": 500.0, "outlier_gate": 25.0}
+      G.tuning() == {"length_q_scale": 20.0, "length_q_ceiling": 200.0, "outlier_gate": 25.0}
       and G.adv_toggle.isChecked())
 check("input folder restored; output keeps a fresh run folder",
       G.input_dir.text() == str(pose_in) and G.output_dir.text() != ""
@@ -121,7 +121,7 @@ check("mode stays 'Train' when training was used last", G.mode_train.isChecked()
 check("model summary shows what it was trained with",
       "25 fps" in G.model_info.text() and "per-marker drift" in G.model_info.text()
       and "const-accel: back" in G.model_info.text()
-      and "length_q_scale=50" in G.model_info.text()
+      and "length_q_scale=20" in G.model_info.text()
       and G.use_model_settings_btn.isEnabled())
 
 # use the model: load mode is remembered
@@ -142,7 +142,7 @@ check("'Train a new model with these settings' copies the model's options",
       ok and H.mode_train.isChecked() and H.with_drift.isChecked()
       and H.const_accel.text() == "back" and H.fps.value() == 25.0
       and H.lik_thr.value() == 0.6
-      and H.tuning() == {"length_q_scale": 50.0, "outlier_gate": 25.0})
+      and H.tuning() == {"length_q_scale": 20.0, "outlier_gate": 25.0})
 H.load_model_path.setText(str(tmp / "missing.npz"))
 check("missing model file: said so, button off",
       "not found" in H.model_info.text() and not H.use_model_settings_btn.isEnabled())

@@ -82,10 +82,14 @@ TUNING_DEFAULTS: dict[str, float] = {
     # its rigid attachment point, px. Fitted per marker, capped here.
     "drift_radius_cap": 20.0,
     # Segment-length flexibility: multiplies the initial process noise of
-    # every segment length (how fast a length may change).
-    "length_q_scale": 1.0,
+    # every segment length (how fast a length may change). Patch 122kc:
+    # default 50 (was 1) — on real rat sessions (Cacna_87, K7) the old
+    # value kept tail and rear-back distances stiff; 50 / 500 followed the
+    # confident FDLC positions closely (tail_V32 p90 error 14 -> 8 px).
+    "length_q_scale": 50.0,
     # EM ceiling for the segment-length process noise, × its initial value.
-    "length_q_ceiling": 10.0,
+    # Patch 122kc: default 500 (was 10), see length_q_scale.
+    "length_q_ceiling": 500.0,
     # EM ceiling for segment orientation noise (segments not listed as
     # high-angular-noise), × initial.
     "seg_q_ceiling": 10.0,
