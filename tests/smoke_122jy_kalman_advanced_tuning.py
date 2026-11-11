@@ -67,10 +67,12 @@ def synth(T=900, seed=0, wobble=6.0):
 
 # ---------------------------------------------------------------- defaults
 check("defaults reproduce the previous constants",
-      K.TUNING_DEFAULTS == {"drift_radius_cap": 20.0, "length_q_scale": 1.0,
-                            "length_q_ceiling": 10.0, "seg_q_ceiling": 10.0,
-                            "q_floor_factor": 0.1, "sigma_ceiling": 3.0,
-                            "constraint_sigma": 0.05}
+      {k: v for k, v in K.TUNING_DEFAULTS.items() if k != "outlier_gate"}
+      == {"drift_radius_cap": 20.0, "length_q_scale": 1.0,
+          "length_q_ceiling": 10.0, "seg_q_ceiling": 10.0,
+          "q_floor_factor": 0.1, "sigma_ceiling": 3.0,
+          "constraint_sigma": 0.05}
+      and K.TUNING_DEFAULTS.get("outlier_gate", 0.0) == 0.0
       and K.TUNING_DEFAULTS["seg_q_ceiling"] == K._M_STEP_Q_CEILING_FACTOR
       and K.TUNING_DEFAULTS["sigma_ceiling"] == K._M_STEP_SIGMA_CEILING_FACTOR
       and K.TUNING_DEFAULTS["q_floor_factor"] == K._M_STEP_Q_FLOOR_FACTOR

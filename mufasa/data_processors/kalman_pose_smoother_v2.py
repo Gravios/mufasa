@@ -96,6 +96,11 @@ TUNING_DEFAULTS: dict[str, float] = {
     "sigma_ceiling": 3.0,
     # Softness of the unit-norm orientation constraint (smaller = harder).
     "constraint_sigma": 0.05,
+    # Innovation gate (χ², 2 dof) per marker and frame: a detection that
+    # far from where the model expects it is down-weighted (patch 122jz).
+    # 0 = off (default: with too-stiff noise parameters a gate can also drop
+    # genuine fast motion); 25 ≈ 5 σ is a good start for real data.
+    "outlier_gate": 0.0,
 }
 TUNING_HELP: dict[str, str] = {
     "drift_radius_cap": "max per-marker drift radius, px (needs --with-drift)",
@@ -105,6 +110,8 @@ TUNING_HELP: dict[str, str] = {
     "q_floor_factor": "EM floor of all process noises, × initial",
     "sigma_ceiling": "EM ceiling of marker observation noise σ, × initial",
     "constraint_sigma": "softness of the orientation unit-norm constraint",
+    "outlier_gate": "robust χ² gate per marker innovation (2 dof): beyond it a "
+                    "detection is down-weighted; 0 = off, e.g. 25",
 }
 
 
@@ -126,7 +133,7 @@ def parse_tuning(items) -> dict[str, float]:
                 val = float(v)
             except ValueError:
                 raise ValueError(f"{k}: not a number: {v!r}") from None
-            if not val > 0:
+            if not (val > 0 or (k == "outlier_gate" and val == 0)):
                 raise ValueError(f"{k} must be > 0, got {val:g}")
             out[k] = val
     return out
@@ -399,7 +406,7 @@ class BodyLayout:
                     f"unknown tuning key {k!r}; available: "
                     f"{sorted(TUNING_DEFAULTS)}"
                 )
-            if not (float(v) > 0):
+            if not (float(v) > 0 or (k == "outlier_gate" and float(v) == 0)):
                 raise ValueError(f"tuning {k!r} must be > 0, got {v!r}")
         if not (float(self.root_q_ceiling_factor) >= 1.0):
             raise ValueError(
@@ -3869,6 +3876,8 @@ class FilterResultV2:
     x_filt: np.ndarray
     P_filt: np.ndarray
     n_observed: np.ndarray
+    # Patch 122jz: marker detections down-weighted per frame by the gate
+    n_gated: np.ndarray | None = None
 
 
 def _build_constraint_observations(
@@ -4052,6 +4061,36 @@ def _build_marker_observations(
     return z, h, H, R_diag, n_obs
 
 
+def _gate_marker_observations(z, h, H, R_diag, n_m, P_p, gate):
+    """Robust (soft) innovation gate, patch 122jz.
+
+    A marker whose 2-D innovation χ² d² (against its own predicted
+    covariance) exceeds ``gate`` keeps its row but its noise is inflated by
+    d² / gate, so it pulls the state only as much as an observation right on
+    the gate would. A wildly wrong detection (d² in the thousands) thus has
+    almost no effect, while a genuine fast movement that merely surprised
+    the model still drags it along over a few frames instead of being
+    discarded and losing lock (a hard gate did that to the tail).
+
+    Returns (z, h, H, R_diag, n_m, n_downweighted).
+    """
+    nu = z - h
+    R = R_diag.copy()
+    n_w = 0
+    for b in range(n_m):
+        r = slice(2 * b, 2 * b + 2)
+        Hb = H[r]
+        Sb = Hb @ P_p @ Hb.T + np.diag(R_diag[r])
+        try:
+            d2 = float(nu[r] @ np.linalg.solve(Sb, nu[r]))
+        except np.linalg.LinAlgError:
+            continue
+        if np.isfinite(d2) and d2 > gate:
+            R[r] = R_diag[r] * (d2 / gate)
+            n_w += 1
+    return z, h, H, R, n_m, n_w
+
+
 def forward_filter_v2(
     positions: np.ndarray,        # (T, K, 2)
     likelihoods: np.ndarray,      # (T, K)
@@ -4064,6 +4103,7 @@ def forward_filter_v2(
     apply_constraints: bool = True,
     perspective: PerspectiveModelV2 | None = None,
     joint_prior: JointPriorV2 | None = None,
+    gate: float | None = None,
 ) -> FilterResultV2:
     """EKF forward pass on the v2 body-state representation.
 
@@ -4190,6 +4230,11 @@ def forward_filter_v2(
     x_filt = np.empty((T, D))
     P_filt = np.empty((T, D, D))
     n_observed = np.zeros(T, dtype=np.int64)
+    n_gated = np.zeros(T, dtype=np.int64)
+    # None -> the layout's tuning (so EM's E-steps and the final pass see
+    # the same gate; gating only the final pass, against noise fitted on
+    # ungated data, rejected most frames on real data).
+    gate = _tune(layout, "outlier_gate") if gate is None else float(gate)
 
     # Initialize: no predict step at t=0; treat initial as the
     # filter's starting belief.
@@ -4214,6 +4259,17 @@ def forward_filter_v2(
             x_p, positions[t], likelihoods[t], layout, params,
             likelihood_threshold, perspective=perspective,
         )
+        # Patch 122jz: robust gate against confident-but-wrong detections
+        # (a hidden head found on another spot / camera tile). Each marker's
+        # 2-D innovation is tested against its own predicted covariance;
+        # beyond the χ² gate its noise is inflated (see
+        # _gate_marker_observations). The test widens by itself when the
+        # state is uncertain (long gaps).
+        if n_m > 1 and gate > 0:
+            z_m, h_m, H_m, R_diag_m, n_m, n_rej = _gate_marker_observations(
+                z_m, h_m, H_m, R_diag_m, n_m, P_p, gate,
+            )
+            n_gated[t] = n_rej
         n_observed[t] = n_m
 
         if apply_constraints:
@@ -4330,6 +4386,7 @@ def forward_filter_v2(
         x_pred=x_pred, P_pred=P_pred,
         x_filt=x_filt, P_filt=P_filt,
         n_observed=n_observed,
+        n_gated=n_gated,
     )
 
 
@@ -8320,6 +8377,10 @@ def smooth_session_v2(
         joint_prior=joint_prior,
     )
     smooth = rts_smooth_v2(filt, layout, dt, params)
+    if filt.n_gated is not None and filt.n_gated.any():
+        ng = int(filt.n_gated.sum())
+        print(f"[smoother-v2] outlier gate: {ng:,} detection(s) down-weighted in "
+              f"{int((filt.n_gated > 0).sum()):,} of {len(filt.n_gated):,} frames")
 
     # Compute marker positions and Jacobian once each from
     # smoothed body state. variances reuses the precomputed

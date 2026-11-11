@@ -8,6 +8,25 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jz — Kalman v2: robust outlier gate (confident-but-wrong detections).**
+On K7_cam_20251124_1510_A10-0-051_640x360-triplet the body "twisted" during
+long low-confidence stretches (e.g. around frame 3767). The RTS smoother
+already uses the whole future, so look-ahead was not the problem: while the
+head is hidden FDLC still returns head markers at p ≈ 0.5–0.7 hundreds of px
+away, which pass the likelihood threshold and pull the head (and body)
+around. New tuning knob `outlier_gate` (χ², 2 dof; 0 = off, the default;
+25 recommended; `--tune outlier_gate=25`, "Outlier gate" in the advanced
+view): each marker's innovation is tested against its own predicted
+covariance and, beyond the gate, its noise is inflated by d²/gate — a wild
+detection barely pulls, a genuine fast move is still followed (a hard gate
+that dropped detections lost lock on the tail). The test widens by itself
+while the state is uncertain. Applied in EM and the final pass alike;
+`FilterResultV2.n_gated` counts down-weighted detections and the run log
+reports them. On frames 1500–7500 of that session (length ×50): head flips
+> 60° within 3 frames 7 → 3, the 3720 / 3767 head twists gone, tail frames
+> 30 px off a confident detection 82 → 31 (tail_V32), 52 → 15 (tail_V18).
+Test: `tests/smoke_122jz_kalman_outlier_gate.py` (12 checks).
+
 **122jy — Kalman v2: fine-tuning knobs and an advanced view.**
 `BodyLayout.tuning` (saved with the model as `layout_tuning`, so it reaches
 the worker processes and survives `--load-model`; recorded in the run

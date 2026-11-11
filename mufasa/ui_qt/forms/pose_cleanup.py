@@ -1136,6 +1136,7 @@ class KalmanV2SmoothingForm(OperationForm):
         ("q_floor_factor", "Process noise floor", (0.001, 1.0, 0.05, 3), " ×"),
         ("sigma_ceiling", "Marker σ ceiling", (1.0, 100.0, 0.5, 2), " ×"),
         ("constraint_sigma", "Orientation constraint softness", (0.001, 1.0, 0.01, 3), ""),
+        ("outlier_gate", "Outlier gate (0 = off)", (0.0, 1000.0, 5.0, 1), " χ²"),
     )
 
     def _build_advanced(self, form) -> None:  # noqa: ANN001
@@ -1157,7 +1158,9 @@ class KalmanV2SmoothingForm(OperationForm):
             "Loosen marker distances: raise <b>Max marker drift radius</b> "
             "(needs per-marker drift) and <b>Segment-length flexibility</b> / "
             "<b>Length noise ceiling</b>. Markers in one segment of "
-            "[[pose.segments]] stay rigid apart from drift.", self)
+            "[[pose.segments]] stay rigid apart from drift. <b>Outlier gate</b> "
+            "drops confident-but-wrong detections (e.g. a hidden head found on "
+            "the wrong spot) that otherwise twist the body.", self)
         hint.setWordWrap(True)
         af.addRow(hint)
         self.tuning_spins: dict = {}
