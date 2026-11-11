@@ -438,6 +438,13 @@ class FeatureViewerWidget(QWidget):
         self.style_btn.clicked.connect(self.open_style_dialog)
         self._style_dlg = None
         bar.addWidget(self.style_btn)
+        # Patch 122ke: 3-D marker viewer (volume above, this video below)
+        self.view3d_btn = QPushButton("3-D…", self)
+        self.view3d_btn.setToolTip(
+            "Open the 3-D marker viewer for this video (a <video>*3d*.parquet beside "
+            "the video or under derived/pose3d/; otherwise choose a file)")
+        self.view3d_btn.clicked.connect(lambda: self.open_3d())
+        bar.addWidget(self.view3d_btn)
         bar.addStretch()
         self.keep_frames_cb = QCheckBox("Keep frames", self)
         self.keep_frames_cb.setChecked(True)
@@ -669,6 +676,17 @@ class FeatureViewerWidget(QWidget):
             if self.recorder.n % 25 == 0:
                 self.rec_status.setText(f"Recording → {self.recorder.frames_dir} · "
                                         f"{self.recorder.n} frame(s)")
+
+    def open_3d(self, pose_path: str | None = None):
+        """Patch 122ke: the 3-D viewer for this video (found, given, or chosen)."""
+        from mufasa.ui_qt.pose3d_viewer import choose_pose3d, find_pose3d, open_pose3d_viewer
+        path = pose_path or find_pose3d(self.video_path, self.config_path)
+        if path is None:
+            path = choose_pose3d(self, str(Path(self.video_path).parent))
+        if not path:
+            return None
+        self._view3d = open_pose3d_viewer(self, self.video_path, path)
+        return self._view3d
 
     def cleanup(self) -> None:
         if self.recorder is not None:

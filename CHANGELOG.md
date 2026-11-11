@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ke — 3-D marker viewer with the video below.**
+New `mufasa/ui_qt/pose3d_viewer.py`: the reconstruction volume on top and the
+video as a viewport below (one splitter), kept in step — scrub or play the
+video and the 3-D pose follows. The volume is drawn with QPainter (no OpenGL
+or new dependencies): box, floor grid, depth-sorted markers, skeleton,
+shadows on the floor, height lines and an optional trail; drag to orbit,
+right/middle-drag to pan, wheel to zoom, double-click to reset; presets
+Perspective / Top / Front / Side / Camera (the recording camera's own view).
+"Reprojection" draws the 3-D markers on the video as the camera sees them.
+Input: `<marker>_x/_y/_z` parquet/CSV with optional `frame`,
+`<marker>_likelihood` and `mufasa_pose3d` metadata (box, edges, units,
+camera as height/focal/principal point or a 3×4 `P`). Open it from the
+feature viewer ("3-D…": a `<video stem>*3d*.parquet` beside the video or
+under `derived/pose3d/`, else choose a file) or `mufasa-view3d VIDEO [POSE3D]`.
+Test: `smoke_122ke_pose3d_viewer`.
+
 **122kd — Kalman v2: confirmed prior settings are the defaults; serial and parallel runs now agree.**
 The settings confirmed on the K7 data ("It works very well") are now the
 defaults: robust outlier gate 25, segment-length prior 1, speed prior 1, and
