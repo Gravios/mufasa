@@ -101,6 +101,14 @@ TUNING_DEFAULTS: dict[str, float] = {
     # 0 = off (default: with too-stiff noise parameters a gate can also drop
     # genuine fast motion); 25 ≈ 5 σ is a good start for real data.
     "outlier_gate": 0.0,
+    # Patch 122ka: segment-length prior. 0 = off; otherwise its SD as a
+    # multiple of each segment's observed length spread (1 = as wide as the
+    # data: only matters while a segment is unobserved).
+    "length_prior": 0.0,
+    # Patch 122ka: speed prior pulling the body's velocity toward rest, SD as
+    # a multiple of the typical (RMS) speed at the animal's current place in
+    # the arena (a spatial map). 0 = off; 1 = as wide as the data.
+    "speed_prior": 0.0,
 }
 TUNING_HELP: dict[str, str] = {
     "drift_radius_cap": "max per-marker drift radius, px (needs --with-drift)",
@@ -112,7 +120,14 @@ TUNING_HELP: dict[str, str] = {
     "constraint_sigma": "softness of the orientation unit-norm constraint",
     "outlier_gate": "robust χ² gate per marker innovation (2 dof): beyond it a "
                     "detection is down-weighted; 0 = off, e.g. 25",
+    "length_prior": "segment-length prior, SD × observed length spread; 0 = off, e.g. 1",
+    "speed_prior": "speed prior toward rest, SD × local typical speed (spatial map); "
+                   "0 = off, e.g. 1",
 }
+
+
+# knobs for which 0 means "off"
+_TUNING_ZERO_OFF = frozenset({"outlier_gate", "length_prior", "speed_prior"})
 
 
 def parse_tuning(items) -> dict[str, float]:
@@ -133,7 +148,7 @@ def parse_tuning(items) -> dict[str, float]:
                 val = float(v)
             except ValueError:
                 raise ValueError(f"{k}: not a number: {v!r}") from None
-            if not (val > 0 or (k == "outlier_gate" and val == 0)):
+            if not (val > 0 or (k in _TUNING_ZERO_OFF and val == 0)):
                 raise ValueError(f"{k} must be > 0, got {val:g}")
             out[k] = val
     return out
@@ -406,7 +421,7 @@ class BodyLayout:
                     f"unknown tuning key {k!r}; available: "
                     f"{sorted(TUNING_DEFAULTS)}"
                 )
-            if not (float(v) > 0 or (k == "outlier_gate" and float(v) == 0)):
+            if not (float(v) > 0 or (k in _TUNING_ZERO_OFF and float(v) == 0)):
                 raise ValueError(f"tuning {k!r} must be > 0, got {v!r}")
         if not (float(self.root_q_ceiling_factor) >= 1.0):
             raise ValueError(
@@ -3966,6 +3981,33 @@ def _build_constraint_observations(
                 z_vals.append(target)
                 r_diag.append(var)
 
+    # Patch 122ka: kinematic priors (off unless the layout's tuning asks).
+    if joint_prior is not None:
+        k_len = _tune(layout, "length_prior")
+        if k_len > 0 and joint_prior.length_mu:
+            for seg_name, mu_l in joint_prior.length_mu.items():
+                if seg_name not in indices or "length" not in indices[seg_name]:
+                    continue
+                sd = k_len * joint_prior.length_sd.get(seg_name, _LENGTH_PRIOR_SD_FLOOR)
+                row = np.zeros(layout.state_dim)
+                row[indices[seg_name]["length"]] = 1.0
+                rows.append(row)
+                h_vals.append(float(state[indices[seg_name]["length"]]))
+                z_vals.append(float(mu_l))
+                r_diag.append(sd ** 2)
+        k_sp = _tune(layout, "speed_prior")
+        if k_sp > 0 and joint_prior.speed_rms > 0:
+            ri = indices["__root__"]
+            s_loc = joint_prior.local_speed(float(state[ri["x"]]), float(state[ri["y"]]))
+            var = (k_sp * s_loc) ** 2 / 2.0          # per axis
+            for axis in ("vx", "vy"):
+                row = np.zeros(layout.state_dim)
+                row[ri[axis]] = 1.0
+                rows.append(row)
+                h_vals.append(float(state[ri[axis]]))
+                z_vals.append(0.0)
+                r_diag.append(var)
+
     z = np.array(z_vals)
     h = np.array(h_vals)
     H = np.array(rows)
@@ -4517,6 +4559,26 @@ class JointPriorV2:
     mu: dict[str, float]
     kappa: dict[str, float]
     n_obs: dict[str, int] = field(default_factory=dict)
+    # Patch 122ka: kinematic priors fitted alongside (see
+    # fit_kinematic_priors_v2). Used only when the layout's tuning turns
+    # them on ("length_prior", "speed_prior").
+    length_mu: dict[str, float] = field(default_factory=dict)
+    length_sd: dict[str, float] = field(default_factory=dict)
+    speed_rms: float = 0.0
+    speed_grid: np.ndarray | None = None
+    speed_grid_origin: tuple[float, float] = (0.0, 0.0)
+    speed_grid_cell: float = 0.0
+
+    def local_speed(self, x: float, y: float) -> float:
+        """Typical (RMS) root speed at (x, y), px/s: the grid cell's value,
+        else the session-wide value."""
+        g = self.speed_grid
+        if g is not None and self.speed_grid_cell > 0 and np.isfinite(x) and np.isfinite(y):
+            j = int((x - self.speed_grid_origin[0]) // self.speed_grid_cell)
+            i = int((y - self.speed_grid_origin[1]) // self.speed_grid_cell)
+            if 0 <= i < g.shape[0] and 0 <= j < g.shape[1] and np.isfinite(g[i, j]):
+                return float(g[i, j])
+        return float(self.speed_rms)
 
 
 # A prior tighter than this would fight real motion rather than merely
@@ -4656,6 +4718,81 @@ def _joint_prior_session_samples(
         sin_v[flipped] *= -1.0
 
         out[seg_name] = (cos_v, sin_v)
+    return out
+
+
+_SPEED_PRIOR_MIN_COUNT = 30        # frames per grid cell for a local value
+_SPEED_PRIOR_FLOOR = 5.0           # px/s, so "immobile" never means "frozen"
+_LENGTH_PRIOR_SD_FLOOR = 0.5       # px
+
+
+def fit_kinematic_priors_v2(
+    sessions: list[tuple[np.ndarray, np.ndarray]],
+    layout: BodyLayout,
+    marker_names: list[str],
+    fitted_lengths: FittedLengths,
+    fps: float,
+    likelihood_threshold: float = 0.5,
+    grid_cells: int = 16,
+) -> dict:
+    """Segment-length and (spatial) speed statistics for the kinematic priors.
+
+    Patch 122ka. Both describe the animal, fitted once from confident frames
+    like the joint prior:
+
+    * **length**: per segment, the fitted median length and its spread
+      (IQR / 1.349 ≈ SD) — the length state is otherwise a free random walk
+      that can wander during a long dropout;
+    * **speed**: the RMS speed of the root's distal marker over consecutive
+      confident frames, overall and per cell of a ``grid_cells`` grid over
+      the arena (cells with fewer than 30 samples fall back to the overall
+      value). Animals rest in some places and run in others; the spatial map
+      lets the prior be tight at a resting spot and loose on a running path.
+    """
+    length_mu = {s: float(v) for s, v in fitted_lengths.segment_lengths.items()
+                 if s in layout.non_root_topo_order and np.isfinite(v)}
+    length_sd = {s: max(float(fitted_lengths.segment_length_iqr.get(s, 0.0)) / 1.349,
+                        _LENGTH_PRIOR_SD_FLOOR) for s in length_mu}
+    name_to_idx = {n: i for i, n in enumerate(marker_names)}
+    root_m = _segment_distal_marker(layout, layout.root_segment.name)
+    xs, ys, sp = [], [], []
+    if root_m in name_to_idx:
+        k = name_to_idx[root_m]
+        for pos, lik in sessions:
+            p = pos[:, k, :]
+            ok = (lik[:, k] >= likelihood_threshold) & np.all(np.isfinite(p), axis=1)
+            both = ok[1:] & ok[:-1]
+            if not both.any():
+                continue
+            d = np.hypot(*(p[1:] - p[:-1]).T) * fps
+            mid = 0.5 * (p[1:] + p[:-1])
+            xs.append(mid[both, 0])
+            ys.append(mid[both, 1])
+            sp.append(d[both])
+    out = {"length_mu": length_mu, "length_sd": length_sd, "speed_rms": 0.0,
+           "speed_grid": None, "speed_grid_origin": (0.0, 0.0), "speed_grid_cell": 0.0}
+    if not sp:
+        return out
+    x, y, v = np.concatenate(xs), np.concatenate(ys), np.concatenate(sp)
+    # robust to tracking jumps: drop the top 0.5 %
+    keep = v <= np.percentile(v, 99.5)
+    x, y, v = x[keep], y[keep], v[keep]
+    out["speed_rms"] = max(float(np.sqrt(np.mean(v ** 2))), _SPEED_PRIOR_FLOOR)
+    x0, x1 = np.percentile(x, [0.5, 99.5])
+    y0, y1 = np.percentile(y, [0.5, 99.5])
+    cell = max(x1 - x0, y1 - y0, 1.0) / grid_cells
+    nx = int(np.ceil((x1 - x0) / cell)) + 1
+    ny = int(np.ceil((y1 - y0) / cell)) + 1
+    jj = np.clip(((x - x0) // cell).astype(int), 0, nx - 1)
+    ii = np.clip(((y - y0) // cell).astype(int), 0, ny - 1)
+    flat = ii * nx + jj
+    cnt = np.bincount(flat, minlength=nx * ny)
+    ss = np.bincount(flat, weights=v ** 2, minlength=nx * ny)
+    g = np.full(nx * ny, np.nan)
+    ok = cnt >= _SPEED_PRIOR_MIN_COUNT
+    g[ok] = np.maximum(np.sqrt(ss[ok] / cnt[ok]), _SPEED_PRIOR_FLOOR)
+    out.update(speed_grid=g.reshape(ny, nx), speed_grid_origin=(float(x0), float(y0)),
+               speed_grid_cell=float(cell))
     return out
 
 
@@ -7644,6 +7781,28 @@ def fit_noise_params_em_v2(
                     f"information): {inert}. These behave exactly as before."
                 )
 
+    # Patch 122ka: kinematic priors (lengths, spatial speed), fitted once
+    # from confident frames, carried on the joint-prior object.
+    if _tune(layout, "length_prior") > 0 or _tune(layout, "speed_prior") > 0:
+        kin = fit_kinematic_priors_v2(
+            sessions, layout, marker_names, fitted_lengths, fps,
+            likelihood_threshold=likelihood_threshold,
+        )
+        if joint_prior is None:
+            joint_prior = JointPriorV2(mu={}, kappa={})
+        for _k, _v in kin.items():
+            setattr(joint_prior, _k, _v)
+        if verbose:
+            g = kin["speed_grid"]
+            print(
+                f"[v2-em] kinematic priors: lengths for {len(kin['length_mu'])} "
+                f"segment(s); typical speed {kin['speed_rms']:.0f} px/s"
+                + (f", spatial map {g.shape[1]}x{g.shape[0]} cells "
+                   f"({int(np.isfinite(g).sum())} with data, local "
+                   f"{np.nanmin(g):.0f}-{np.nanmax(g):.0f} px/s)"
+                   if g is not None and np.isfinite(g).any() else "")
+            )
+
     params = initial_params
     history: list[dict[str, float]] = []
     converged = False
@@ -8605,6 +8764,17 @@ def save_model_v2(
         save_kwargs["jp_n_obs"] = np.array(
             list(joint_prior.n_obs.items()), dtype=object,
         )
+        # Patch 122ka: kinematic priors
+        save_kwargs["jp_len_mu"] = np.array(
+            list(joint_prior.length_mu.items()), dtype=object).reshape(-1, 2)
+        save_kwargs["jp_len_sd"] = np.array(
+            list(joint_prior.length_sd.items()), dtype=object).reshape(-1, 2)
+        save_kwargs["jp_speed_rms"] = float(joint_prior.speed_rms)
+        if joint_prior.speed_grid is not None:
+            save_kwargs["jp_speed_grid"] = np.asarray(joint_prior.speed_grid, float)
+            save_kwargs["jp_speed_grid_origin"] = np.asarray(
+                joint_prior.speed_grid_origin, float)
+            save_kwargs["jp_speed_grid_cell"] = float(joint_prior.speed_grid_cell)
 
     np.savez(path, **save_kwargs)
 
@@ -8822,6 +8992,15 @@ def load_model_v2(
             kappa={k: float(v) for k, v in data["jp_kappa"]},
             n_obs={k: int(v) for k, v in data["jp_n_obs"]},
         )
+        if "jp_len_mu" in data.files:          # patch 122ka
+            joint_prior.length_mu = {str(k): float(v) for k, v in data["jp_len_mu"]}
+            joint_prior.length_sd = {str(k): float(v) for k, v in data["jp_len_sd"]}
+            joint_prior.speed_rms = float(data["jp_speed_rms"])
+        if "jp_speed_grid" in data.files:
+            joint_prior.speed_grid = np.asarray(data["jp_speed_grid"], float)
+            joint_prior.speed_grid_origin = tuple(
+                float(v) for v in data["jp_speed_grid_origin"])
+            joint_prior.speed_grid_cell = float(data["jp_speed_grid_cell"])
 
     # Patch 119a: apply fitted marker offsets to the layout
     # so external callers (pose_viewer, downstream tools) get

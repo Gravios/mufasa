@@ -8,6 +8,26 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ka — Kalman v2: segment-length and spatial speed priors.**
+`fit_kinematic_priors_v2` fits, once from confident frames (like the joint
+prior), each segment's typical length and spread (IQR / 1.349) and the
+root's typical (RMS) speed — overall and on a grid over the arena, so the
+prior is tight where the animal rests and loose where it runs (cells with
+< 30 samples fall back to the overall value; speeds floored at 5 px/s).
+New tuning knobs `length_prior` and `speed_prior` (0 = off, the default;
+otherwise the prior SD as a multiple of the observed spread / local typical
+speed; 1 = as wide as the data) add pseudo-observations: each segment length
+→ its typical length, the root velocity → rest, with the variance looked up
+at the current position. Carried on `JointPriorV2` (new fields, saved with
+the model; older models load without them) and in the advanced view.
+Measured on K7 frames 1500–7500 with 30 head windows of 45 frames hidden on
+purpose: hidden-head error median 15.0 → 15.3 px, p90 38.8 → 37.1, p99
+93.5 → 71.0 (with the joint prior too: 14.6 / 35.9 / 71.5); all markers
+hidden for 30 frames: unchanged. The RTS smoother already interpolates
+across gaps, so the priors mainly trim the worst cases.
+Test: `tests/smoke_122ka_kinematic_priors.py` (16 checks); smoke_122jy
+skips the new zero-means-off knobs in its defaults check.
+
 **122jz — Kalman v2: robust outlier gate (confident-but-wrong detections).**
 On K7_cam_20251124_1510_A10-0-051_640x360-triplet the body "twisted" during
 long low-confidence stretches (e.g. around frame 3767). The RTS smoother

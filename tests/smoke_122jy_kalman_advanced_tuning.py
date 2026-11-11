@@ -67,7 +67,8 @@ def synth(T=900, seed=0, wobble=6.0):
 
 # ---------------------------------------------------------------- defaults
 check("defaults reproduce the previous constants",
-      {k: v for k, v in K.TUNING_DEFAULTS.items() if k != "outlier_gate"}
+      {k: v for k, v in K.TUNING_DEFAULTS.items()
+       if k not in ("outlier_gate", "length_prior", "speed_prior")}
       == {"drift_radius_cap": 20.0, "length_q_scale": 1.0,
           "length_q_ceiling": 10.0, "seg_q_ceiling": 10.0,
           "q_floor_factor": 0.1, "sigma_ceiling": 3.0,
