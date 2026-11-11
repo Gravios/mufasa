@@ -1569,6 +1569,20 @@ class KalmanV2SmoothingForm(OperationForm):
         load_browse.clicked.connect(self._browse_load_model)
         load_row.addWidget(load_browse)
         load_form.addRow("Model file:", load_row)
+        # Patch 122kb: what the chosen model was trained with
+        self.model_info = QLabel("", self)
+        self.model_info.setWordWrap(True)
+        self.model_info.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        load_form.addRow("Model:", self.model_info)
+        self.use_model_settings_btn = QPushButton(
+            "Train a new model with these settings", self)
+        self.use_model_settings_btn.setToolTip(
+            "Switch to 'Train new model' with every option set as this model "
+            "was trained (extensions, fine tuning, fps, likelihood threshold)")
+        self.use_model_settings_btn.clicked.connect(
+            lambda: self.apply_model_settings(self.load_model_path.text().strip()))
+        load_form.addRow("", self.use_model_settings_btn)
+        self.load_model_path.textChanged.connect(self._describe_model)
 
         load_form.addRow("", QLabel(
             "Layout extensions (per-marker drift, orientation\n"
@@ -1656,6 +1670,187 @@ class KalmanV2SmoothingForm(OperationForm):
                         self.output_dir.setText(default_out)
                 except (ValueError, OSError):
                     pass
+
+        # Patch 122kb: last session's settings and model
+        self.restore_settings()
+        self._describe_model()
+
+    # ------------------------------------------------------------------ #
+    # Patch 122kb — remembered settings, last model
+    # ------------------------------------------------------------------ #
+    # widget attribute -> settings key (all plain values)
+    _REMEMBER = (
+        "fps", "lik_thr", "workers", "overwrite", "em_iter", "em_tol",
+        "em_damping", "em_aggregation", "warm_start_sigma", "use_perspective",
+        "use_validation", "save_model_chk", "with_drift", "orient_drift",
+        "const_accel", "accel_tau", "high_angular", "root_q_ceiling",
+        "joint_prior", "apply_constraints", "strict_validation", "device",
+        "adv_toggle",
+    )
+
+    def settings_path(self):
+        """Per project: logs/measures/kalman_v2_settings.toml; without a
+        project: the user's mufasa config folder."""
+        from pathlib import Path
+        if self.config_path:
+            try:
+                from mufasa.utils.feature_names import names_path
+                return names_path(self.config_path).with_name("kalman_v2_settings.toml")
+            except Exception:
+                pass
+        return Path(_default_model_dir()).parent / "kalman_v2_settings.toml"
+
+    @staticmethod
+    def _get(w):  # noqa: ANN001
+        if isinstance(w, QCheckBox):
+            return bool(w.isChecked())
+        if isinstance(w, QComboBox):
+            return w.currentText()
+        if isinstance(w, QLineEdit):
+            return w.text()
+        if isinstance(w, (QSpinBox, QDoubleSpinBox)):
+            return w.value()
+        return None
+
+    @staticmethod
+    def _set(w, v) -> None:  # noqa: ANN001
+        try:
+            if isinstance(w, QCheckBox):
+                w.setChecked(bool(v))
+            elif isinstance(w, QComboBox):
+                if w.findText(str(v)) >= 0:
+                    w.setCurrentText(str(v))
+            elif isinstance(w, QLineEdit):
+                w.setText(str(v))
+            elif isinstance(w, QSpinBox):
+                w.setValue(int(v))
+            elif isinstance(w, QDoubleSpinBox):
+                w.setValue(float(v))
+        except (TypeError, ValueError):
+            pass
+
+    def current_settings(self) -> dict:
+        out = {k: self._get(getattr(self, k)) for k in self._REMEMBER
+               if hasattr(self, k)}
+        out["mode"] = "train" if self.mode_train.isChecked() else "load"
+        out["tuning"] = {k: float(sp.value()) for k, sp in self.tuning_spins.items()}
+        out["input_dir"] = self.input_dir.text().strip()
+        out["load_model_path"] = self.load_model_path.text().strip()
+        return out
+
+    def save_settings(self, args: dict | None = None) -> None:
+        """Write the panel's settings; the model this run trains (or loads)
+        becomes the 'last model' offered next time."""
+        from mufasa.project_layout import write_project_toml
+        data = self.current_settings()
+        if args:
+            last = (args.get("save_model_path") if args.get("mode") == "train"
+                    else args.get("load_model_path"))
+            if last:
+                data["last_model"] = str(last)
+        else:
+            old = self.load_settings()
+            if old.get("last_model"):
+                data["last_model"] = old["last_model"]
+        p = self.settings_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        write_project_toml(p, {k: v for k, v in data.items() if v is not None})
+
+    def load_settings(self) -> dict:
+        import tomllib
+        try:
+            with open(self.settings_path(), "rb") as fh:
+                return tomllib.load(fh)
+        except (OSError, tomllib.TOMLDecodeError):
+            return {}
+
+    def restore_settings(self) -> dict:
+        """Put last session's settings back. The output folder (a fresh run
+        id) and the save path (inside it) are left as built. The last model
+        — trained or loaded — goes into 'Load saved model'."""
+        st = self.load_settings()
+        if not st:
+            return {}
+        for k in self._REMEMBER:
+            if k in st and hasattr(self, k):
+                self._set(getattr(self, k), st[k])
+        for k, v in (st.get("tuning") or {}).items():
+            if k in self.tuning_spins:
+                self._set(self.tuning_spins[k], v)
+        if st.get("input_dir") and os.path.isdir(st["input_dir"]):
+            self.input_dir.setText(st["input_dir"])
+        model = st.get("last_model") or st.get("load_model_path")
+        if model and os.path.isfile(model):
+            self.load_model_path.setText(model)
+        if st.get("mode") == "load" and self.load_model_path.text().strip():
+            self.mode_load.setChecked(True)
+        else:
+            self.mode_train.setChecked(True)
+        self._update_save_model_visibility(self.save_model_chk.isChecked())
+        return st
+
+    def _describe_model(self, *_a) -> None:
+        if not hasattr(self, "model_info"):
+            return
+        path = self.load_model_path.text().strip()
+        self.use_model_settings_btn.setEnabled(False)
+        if not path:
+            self.model_info.setText("")
+            return
+        if not os.path.isfile(path):
+            self.model_info.setText("(file not found)")
+            return
+        try:
+            from mufasa.data_processors.kalman_pose_smoother_v2 import load_model_v2
+            layout, _fl, params, fps, lik, persp, jp = load_model_v2(path)
+        except Exception as exc:
+            self.model_info.setText(f"(cannot read: {type(exc).__name__}: {exc})")
+            return
+        bits = [f"{fps:g} fps", f"p ≥ {lik:g}"]
+        if getattr(layout, "with_drift", False):
+            bits.append("per-marker drift")
+        if layout.orientation_drift_segments:
+            bits.append("orient. drift: " + ", ".join(layout.orientation_drift_segments))
+        if layout.const_accel_segments:
+            bits.append("const-accel: " + ", ".join(layout.const_accel_segments))
+        if layout.high_angular_noise_segments:
+            bits.append("high-angular: " + ", ".join(layout.high_angular_noise_segments))
+        if jp is not None and any(v > 0 for v in jp.kappa.values()):
+            bits.append("joint prior")
+        if persp is not None:
+            bits.append("perspective")
+        t = getattr(layout, "tuning", None) or {}
+        bits.append("tuning: " + (", ".join(f"{k}={v:g}" for k, v in t.items())
+                                  if t else "defaults"))
+        import time as _t
+        when = _t.strftime("%Y-%m-%d %H:%M", _t.localtime(os.path.getmtime(path)))
+        self.model_info.setText(f"saved {when} · " + " · ".join(bits))
+        self.use_model_settings_btn.setEnabled(True)
+
+    def apply_model_settings(self, path: str) -> bool:
+        """Set the training options to what ``path``'s model was trained
+        with, and switch to training."""
+        try:
+            from mufasa.data_processors.kalman_pose_smoother_v2 import load_model_v2
+            layout, _fl, params, fps, lik, persp, jp = load_model_v2(path)
+        except Exception:
+            return False
+        self.fps.setValue(float(fps))
+        self.lik_thr.setValue(float(lik))
+        self.with_drift.setChecked(bool(getattr(layout, "with_drift", False)))
+        self.orient_drift.setText(", ".join(layout.orientation_drift_segments))
+        self.const_accel.setText(", ".join(layout.const_accel_segments))
+        self.high_angular.setText(", ".join(layout.high_angular_noise_segments))
+        self.root_q_ceiling.setValue(float(layout.root_q_ceiling_factor))
+        self.accel_tau.setValue(float(params.tau_accel) if params.tau_accel else 0.0)
+        self.joint_prior.setChecked(jp is not None and any(v > 0 for v in jp.kappa.values()))
+        self.use_perspective.setChecked(persp is not None)
+        self.reset_tuning()
+        for k, v in (getattr(layout, "tuning", None) or {}).items():
+            if k in self.tuning_spins:
+                self.tuning_spins[k].setValue(float(v))
+        self.mode_train.setChecked(True)
+        return True
 
     # ------------------------------------------------------------------ #
     # Visibility / refresh helpers
@@ -1755,6 +1950,16 @@ class KalmanV2SmoothingForm(OperationForm):
     # collect_args / target
     # ------------------------------------------------------------------ #
     def collect_args(self) -> dict:
+        args = self._collect_args()
+        # Patch 122kb: remember this panel's settings (and the model it
+        # trains / loads) for next time.
+        try:
+            self.save_settings(args)
+        except OSError:
+            pass
+        return args
+
+    def _collect_args(self) -> dict:
         in_dir = self.input_dir.text().strip()
         out_dir = self.output_dir.text().strip()
         if not in_dir:

@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kb — Kalman v2 panel remembers its settings and the last model.**
+Starting a run writes every option of the panel — mode, fps, likelihood
+threshold, workers, overwrite, EM settings, model extensions, advanced fine
+tuning (and whether that view is open), input folder — to
+`logs/measures/kalman_v2_settings.toml` (the user's mufasa config folder
+outside a project), together with the model the run trains or loads as
+`last_model`. Building the panel restores them; the output folder keeps its
+fresh run id and the save path stays inside it. The last model (if it still
+exists) is put into "Load saved model", and that mode is kept when it was
+used last. "Load saved model" now shows what the chosen model was trained
+with (fps, threshold, extensions, joint prior, perspective, tuning, date),
+and "Train a new model with these settings" copies them into the training
+options. smoke_pose_cleanup_v2_wiring reads `collect_args` and its new
+`_collect_args`.
+Test: `tests/smoke_122kb_kalman_panel_remembers.py` (16 checks).
+
 **122ka — Kalman v2: segment-length and spatial speed priors.**
 `fit_kinematic_priors_v2` fits, once from confident frames (like the joint
 prior), each segment's typical length and spread (IQR / 1.349) and the

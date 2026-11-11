@@ -121,12 +121,12 @@ def _check_form_module() -> None:
 
     # collect_args must validate both modes (mode_train + mode_load
     # widgets, training subset, model file path)
-    collect_method = next(
-        n for n in target_class.body
+    # Patch 122kb: collect_args wraps _collect_args (and saves settings)
+    collect_src = "\n".join(
+        ast.unparse(n) for n in target_class.body
         if isinstance(n, ast.FunctionDef)
-        and n.name == "collect_args"
+        and n.name in ("collect_args", "_collect_args")
     )
-    collect_src = ast.unparse(collect_method)
     for required in (
         "mode_train", "load_model_path",
         "training_files", "em_max_iter",
