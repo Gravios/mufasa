@@ -1124,6 +1124,109 @@ class KalmanV2SmoothingForm(OperationForm):
     # discover_pose_files / smooth_pose_v2 will pick up.
     _POSE_EXTS = (".parquet", ".csv", ".tsv")
 
+    # ------------------------------------------------------------------ #
+    # Patch 122jy — advanced fine tuning
+    # ------------------------------------------------------------------ #
+    _TUNING_UI = (
+        # key, label, (min, max, step, decimals), suffix
+        ("drift_radius_cap", "Max marker drift radius", (1.0, 500.0, 5.0, 1), " px"),
+        ("length_q_scale", "Segment-length flexibility", (0.01, 1000.0, 1.0, 2), " ×"),
+        ("length_q_ceiling", "Length noise ceiling", (1.0, 1000.0, 10.0, 1), " ×"),
+        ("seg_q_ceiling", "Segment angle noise ceiling", (1.0, 1000.0, 10.0, 1), " ×"),
+        ("q_floor_factor", "Process noise floor", (0.001, 1.0, 0.05, 3), " ×"),
+        ("sigma_ceiling", "Marker σ ceiling", (1.0, 100.0, 0.5, 2), " ×"),
+        ("constraint_sigma", "Orientation constraint softness", (0.001, 1.0, 0.01, 3), ""),
+    )
+
+    def _build_advanced(self, form) -> None:  # noqa: ANN001
+        from PySide6.QtWidgets import QHBoxLayout as _QH
+        from PySide6.QtWidgets import QWidget as _QW
+
+        from mufasa.data_processors.kalman_pose_smoother_v2 import (
+            TUNING_DEFAULTS,
+            TUNING_HELP,
+        )
+        self.adv_toggle = QCheckBox("Show advanced fine tuning", self)
+        self.adv_toggle.setToolTip("Constraint looseness, EM floors/ceilings and "
+                                   "run options. Defaults reproduce the standard fit.")
+        form.addRow("", self.adv_toggle)
+        self.adv_group = QGroupBox("Advanced fine tuning (defines a new model)", self)
+        af = QFormLayout(self.adv_group)
+        af.setLabelAlignment(Qt.AlignRight)
+        hint = QLabel(
+            "Loosen marker distances: raise <b>Max marker drift radius</b> "
+            "(needs per-marker drift) and <b>Segment-length flexibility</b> / "
+            "<b>Length noise ceiling</b>. Markers in one segment of "
+            "[[pose.segments]] stay rigid apart from drift.", self)
+        hint.setWordWrap(True)
+        af.addRow(hint)
+        self.tuning_spins: dict = {}
+        for key, label, (lo, hi, step, dec), suffix in self._TUNING_UI:
+            sp = QDoubleSpinBox(self)
+            sp.setRange(lo, hi)
+            sp.setDecimals(dec)
+            sp.setSingleStep(step)
+            sp.setValue(TUNING_DEFAULTS[key])
+            sp.setSuffix(suffix)
+            sp.setToolTip(f"{TUNING_HELP[key]} (default {TUNING_DEFAULTS[key]:g}; "
+                          f"CLI: --tune {key}=…)")
+            sp.valueChanged.connect(self._mark_tuning)
+            self.tuning_spins[key] = sp
+            af.addRow(label + ":", sp)
+        self.apply_constraints = QCheckBox(
+            "Unit-norm orientation constraints (recommended)", self)
+        self.apply_constraints.setChecked(True)
+        self.apply_constraints.setToolTip("Off = --no-constraints: orientations may drift")
+        af.addRow("", self.apply_constraints)
+        self.strict_validation = QCheckBox(
+            "Strict validation (stop EM on any validation warning)", self)
+        af.addRow("", self.strict_validation)
+        self.device = QComboBox(self)
+        self.device.addItems(["cpu", "cuda", "auto"])
+        self.device.setToolTip("Backend for the vectorised kinematics; the filter "
+                               "itself runs on the CPU")
+        af.addRow("Device:", self.device)
+        row = _QW(self)
+        rl = _QH(row)
+        rl.setContentsMargins(0, 0, 0, 0)
+        reset = QPushButton("Reset to defaults", self)
+        reset.clicked.connect(self.reset_tuning)
+        rl.addWidget(reset)
+        self.tuning_summary = QLabel("", self)
+        rl.addWidget(self.tuning_summary, 1)
+        af.addRow(row)
+        self.adv_group.setVisible(False)
+        self.adv_toggle.toggled.connect(self.adv_group.setVisible)
+        self.adv_toggle.toggled.connect(self._mark_tuning)
+        form.addRow(self.adv_group)
+        self._mark_tuning()
+
+    def tuning(self) -> dict:
+        """Non-default fine-tuning values {key: value} (patch 122jy)."""
+        from mufasa.data_processors.kalman_pose_smoother_v2 import TUNING_DEFAULTS
+        out = {}
+        for k, sp in self.tuning_spins.items():
+            v = round(float(sp.value()), sp.decimals())
+            if abs(v - TUNING_DEFAULTS[k]) > 10 ** -(sp.decimals() + 1):
+                out[k] = v
+        return out
+
+    def reset_tuning(self) -> None:
+        from mufasa.data_processors.kalman_pose_smoother_v2 import TUNING_DEFAULTS
+        for k, sp in self.tuning_spins.items():
+            sp.setValue(TUNING_DEFAULTS[k])
+        self.apply_constraints.setChecked(True)
+        self.strict_validation.setChecked(False)
+        self.device.setCurrentText("cpu")
+
+    def _mark_tuning(self, *_a) -> None:
+        t = self.tuning()
+        self.tuning_summary.setText(
+            "all defaults" if not t else
+            "changed: " + ", ".join(f"{k}={v:g}" for k, v in t.items()))
+        self.adv_toggle.setText("Show advanced fine tuning"
+                                + (" (changed)" if t else ""))
+
     def build(self) -> None:
         from PySide6.QtWidgets import (
             QAbstractItemView,
@@ -1287,7 +1390,14 @@ class KalmanV2SmoothingForm(OperationForm):
         )
 
         self.em_aggregation = QComboBox(self)
-        self.em_aggregation.addItems(["pooled", "per-session"])
+        # Patch 122jy: the smoother's real choices ("per-session" was not one
+        # of them and silently fell through to a weighted mean).
+        self.em_aggregation.addItems(["pooled", "median", "trimmed_mean"])
+        self.em_aggregation.setToolTip(
+            "pooled: one estimate from all sessions' statistics · median: "
+            "per-session estimates, median across sessions (robust to "
+            "outlier sessions) · trimmed_mean: drop the top/bottom 10 %, "
+            "average the rest")
         train_form.addRow(
             "M-step aggregation:", self.em_aggregation,
         )
@@ -1432,6 +1542,7 @@ class KalmanV2SmoothingForm(OperationForm):
         self.joint_prior.setChecked(False)
         ext_form.addRow("", self.joint_prior)
         train_form.addRow(ext_group)
+        self._build_advanced(train_form)
 
         outer_form.addRow(self.train_group)
 
@@ -1722,6 +1833,11 @@ class KalmanV2SmoothingForm(OperationForm):
                 "enable_joint_prior":
                     bool(self.joint_prior.isChecked()),
                 "overwrite": bool(self.overwrite.isChecked()),
+                # Patch 122jy: advanced fine tuning
+                "tuning": self.tuning(),
+                "apply_constraints": bool(self.apply_constraints.isChecked()),
+                "strict_validation": bool(self.strict_validation.isChecked()),
+                "device": self.device.currentText(),
             }
 
         # Load mode
@@ -1835,6 +1951,9 @@ class KalmanV2SmoothingForm(OperationForm):
                 replacements["high_angular_noise_segments"] = (
                     kwargs["high_angular_noise_segments"]
                 )
+            # Patch 122jy: fine-tuning knobs (layout.tuning)
+            if kwargs.get("tuning"):
+                replacements["tuning"] = dict(kwargs["tuning"])
             # Patch 122ig: root process-noise ceiling (default 10x).
             if float(kwargs.get("root_q_ceiling", 10.0)) != 10.0:
                 replacements["root_q_ceiling_factor"] = float(
@@ -1903,6 +2022,9 @@ class KalmanV2SmoothingForm(OperationForm):
                     enable_validation=kwargs["use_validation"],
                     enable_joint_prior=kwargs["enable_joint_prior"],
                     accel_tau=kwargs["accel_tau"],
+                    apply_constraints=kwargs.get("apply_constraints", True),
+                    enable_strict_validation=kwargs.get("strict_validation", False),
+                    device=kwargs.get("device", "cpu"),
                     n_workers=kwargs["n_workers"],
                     save_model=save_path,
                     verbose=True,
@@ -1944,6 +2066,9 @@ class KalmanV2SmoothingForm(OperationForm):
                     enable_validation=kwargs["use_validation"],
                     enable_joint_prior=kwargs["enable_joint_prior"],
                     accel_tau=kwargs["accel_tau"],
+                    apply_constraints=kwargs.get("apply_constraints", True),
+                    enable_strict_validation=kwargs.get("strict_validation", False),
+                    device=kwargs.get("device", "cpu"),
                     n_workers=kwargs["n_workers"],
                     save_model=save_path,
                     overwrite=kwargs["overwrite"],

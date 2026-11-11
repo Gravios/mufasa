@@ -8,6 +8,25 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122jy — Kalman v2: fine-tuning knobs and an advanced view.**
+`BodyLayout.tuning` (saved with the model as `layout_tuning`, so it reaches
+the worker processes and survives `--load-model`; recorded in the run
+provenance) carries knobs that were hard-coded constants:
+`drift_radius_cap` (max per-marker drift radius, 20 px), `length_q_scale`
+(× initial segment-length noise, 1), `length_q_ceiling` (EM ceiling of the
+length noise, 10×), `seg_q_ceiling` (EM ceiling of segment-angle noise,
+10×; high-angular-noise segments keep max(40×, it)), `q_floor_factor`
+(EM floor of all process noises, 0.1×), `sigma_ceiling` (EM ceiling of
+marker σ, 3×) and `constraint_sigma` (unit-norm constraint softness,
+0.05). Defaults reproduce the previous behaviour. CLI: `--tune KEY=VALUE`
+(repeatable / comma-separated; ignored with `--load-model`). The Kalman v2
+page gets "Show advanced fine tuning": a spin box per knob, unit-norm
+constraints on/off, strict validation, device, Reset, and a summary of
+changed knobs. The M-step aggregation combo now offers the smoother's
+choices (pooled / median / trimmed_mean; "per-session" silently fell
+through to a weighted mean). smoke_122hj accepts the tunable length ceiling.
+Test: `tests/smoke_122jy_kalman_advanced_tuning.py` (30 checks).
+
 **122jx — Viewer JPDF: bins and outliers.**
 The "JPDF beside the video" row gets "Bins" (per axis, default 90) and
 "Outliers": none, percentile tails (default 0.5 %, as before) or MAD

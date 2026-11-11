@@ -133,9 +133,11 @@ for mstep in ("finalize_m_step_v2", "finalize_m_step_v2_from_per_session"):
         len_idx < 0 or ceil_idx < len_idx)
     check(f"{mstep} applies the per-segment ceiling in the q_seg_ori loop",
           in_segori)
-    # length ceiling must remain the plain global factor (not per-segment)
+    # length ceiling must remain a global factor (not per-segment); since
+    # patch 122jy it is the tunable "length_q_ceiling" (default 10x)
     check(f"{mstep} leaves the q_length ceiling on the default factor",
-          "q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR" in b)
+          'q_ceiling = q_initial * _tune(layout, "length_q_ceiling")' in b
+          and "_seg_ori_ceiling_factor" not in b[b.find("initial_params.q_length.get("):])
 
 # The CLI flag exists and is wired to the field.
 main_src = fn_src("main")

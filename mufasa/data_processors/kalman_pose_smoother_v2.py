@@ -75,6 +75,68 @@ import numpy as np
 # want enough samples for robust median estimation.
 _LENGTH_FIT_THRESHOLD = 0.5
 
+# Patch 122jy: fine-tuning knobs carried on BodyLayout.tuning. The defaults
+# reproduce the behaviour before the knobs existed.
+TUNING_DEFAULTS: dict[str, float] = {
+    # Per-marker drift (--with-drift): largest radius a marker may move off
+    # its rigid attachment point, px. Fitted per marker, capped here.
+    "drift_radius_cap": 20.0,
+    # Segment-length flexibility: multiplies the initial process noise of
+    # every segment length (how fast a length may change).
+    "length_q_scale": 1.0,
+    # EM ceiling for the segment-length process noise, × its initial value.
+    "length_q_ceiling": 10.0,
+    # EM ceiling for segment orientation noise (segments not listed as
+    # high-angular-noise), × initial.
+    "seg_q_ceiling": 10.0,
+    # EM floor for every process noise, × initial.
+    "q_floor_factor": 0.1,
+    # EM ceiling for marker observation noise σ, × initial: how far the
+    # filter may stop trusting a marker's tracked position.
+    "sigma_ceiling": 3.0,
+    # Softness of the unit-norm orientation constraint (smaller = harder).
+    "constraint_sigma": 0.05,
+}
+TUNING_HELP: dict[str, str] = {
+    "drift_radius_cap": "max per-marker drift radius, px (needs --with-drift)",
+    "length_q_scale": "segment-length flexibility, × initial length noise",
+    "length_q_ceiling": "EM ceiling of segment-length noise, × initial",
+    "seg_q_ceiling": "EM ceiling of segment-angle noise, × initial",
+    "q_floor_factor": "EM floor of all process noises, × initial",
+    "sigma_ceiling": "EM ceiling of marker observation noise σ, × initial",
+    "constraint_sigma": "softness of the orientation unit-norm constraint",
+}
+
+
+def parse_tuning(items) -> dict[str, float]:
+    """['key=value', ...] -> {key: value}, validated (patch 122jy)."""
+    out: dict[str, float] = {}
+    for it in items or []:
+        for part in str(it).split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if "=" not in part:
+                raise ValueError(f"expected KEY=VALUE, got {part!r}")
+            k, v = (x.strip() for x in part.split("=", 1))
+            if k not in TUNING_DEFAULTS:
+                raise ValueError(f"unknown key {k!r}; available: "
+                                 f"{', '.join(TUNING_DEFAULTS)}")
+            try:
+                val = float(v)
+            except ValueError:
+                raise ValueError(f"{k}: not a number: {v!r}") from None
+            if not val > 0:
+                raise ValueError(f"{k} must be > 0, got {val:g}")
+            out[k] = val
+    return out
+
+
+def _tune(layout, key: str) -> float:
+    """A tuning value of the layout (patch 122jy), else its default."""
+    t = getattr(layout, "tuning", None) or {}
+    return float(t.get(key, TUNING_DEFAULTS[key]))
+
 
 @dataclass
 class BodySegment:
@@ -268,6 +330,11 @@ class BodyLayout:
     # caps (_M_STEP_Q_ROOT_POS_HARD_CAP / _ORI_HARD_CAP) still apply.
     # Default 10.0 = prior behaviour.
     root_q_ceiling_factor: float = 10.0
+    # Patch 122jy: fine-tuning knobs (see TUNING_DEFAULTS / TUNING_HELP).
+    # Missing keys take their defaults, so an empty dict is prior behaviour.
+    # Part of the layout so they reach worker processes and are saved with
+    # the model.
+    tuning: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # Validate exactly one root
@@ -326,6 +393,14 @@ class BodyLayout:
                 )
             seen_ca.add(sname)
 
+        for k, v in dict(self.tuning).items():
+            if k not in TUNING_DEFAULTS:
+                raise ValueError(
+                    f"unknown tuning key {k!r}; available: "
+                    f"{sorted(TUNING_DEFAULTS)}"
+                )
+            if not (float(v) > 0):
+                raise ValueError(f"tuning {k!r} must be > 0, got {v!r}")
         if not (float(self.root_q_ceiling_factor) >= 1.0):
             raise ValueError(
                 f"root_q_ceiling_factor must be >= 1, got "
@@ -5251,9 +5326,10 @@ def _seg_ori_ceiling_factor(layout: BodyLayout, seg_name: str) -> float:
     whose fitted q_seg_ori otherwise pins at the default ceiling), else the
     default factor. Applies only to orientation noise, not length or root.
     """
+    base = _tune(layout, "seg_q_ceiling")
     if seg_name in layout.high_angular_noise_segments:
-        return _M_STEP_Q_CEILING_FACTOR_HIGH
-    return _M_STEP_Q_CEILING_FACTOR
+        return max(_M_STEP_Q_CEILING_FACTOR_HIGH, base)
+    return base
 
 
 def finalize_m_step_v2(
@@ -5345,7 +5421,7 @@ def finalize_m_step_v2(
     q_root_pos_raw = _q_from_4block(Q_hat[0:4, 0:4])
     q_root_pos_floor = max(
         _FLOOR_Q_ROOT_POS,
-        initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
+        initial_params.q_root_pos * _tune(layout, "q_floor_factor"),
     )
     q_root_pos_ceiling = min(
         initial_params.q_root_pos * _root_q_ceiling_factor(layout),
@@ -5361,7 +5437,7 @@ def finalize_m_step_v2(
     q_root_ori_raw = _q_from_4block(Q_hat[4:8, 4:8])
     q_root_ori_floor = max(
         _FLOOR_Q_ROOT_ORI,
-        initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
+        initial_params.q_root_ori * _tune(layout, "q_floor_factor"),
     )
     q_root_ori_ceiling = min(
         initial_params.q_root_ori * _root_q_ceiling_factor(layout),
@@ -5383,7 +5459,7 @@ def finalize_m_step_v2(
             seg_name, _FLOOR_Q_SEG_ORI,
         )
         q_floor = max(
-            _FLOOR_Q_SEG_ORI, q_initial * _M_STEP_Q_FLOOR_FACTOR,
+            _FLOOR_Q_SEG_ORI, q_initial * _tune(layout, "q_floor_factor"),
         )
         # Patch 122hj: per-segment orientation ceiling — raised for
         # high_angular_noise_segments (e.g. a fast head).
@@ -5404,9 +5480,9 @@ def finalize_m_step_v2(
             seg_name, _FLOOR_Q_LENGTH,
         )
         q_floor = max(
-            _FLOOR_Q_LENGTH, q_initial * _M_STEP_Q_FLOOR_FACTOR,
+            _FLOOR_Q_LENGTH, q_initial * _tune(layout, "q_floor_factor"),
         )
-        q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR
+        q_ceiling = q_initial * _tune(layout, "length_q_ceiling")
         q_clipped = max(q_floor, min(q_ceiling, q_raw))
         q_prev = prev_params.q_length.get(seg_name, q_initial)
         q_length[seg_name] = _damp(q_prev, q_clipped)
@@ -5427,7 +5503,7 @@ def finalize_m_step_v2(
         # Floor and ceiling
         sigma_floor = _M_STEP_FLOOR_SIGMA
         sigma_initial = initial_params.sigma_marker.get(m, 3.0)
-        sigma_ceiling = _M_STEP_SIGMA_CEILING_FACTOR * sigma_initial
+        sigma_ceiling = _tune(layout, "sigma_ceiling") * sigma_initial
         sigma_marker[m] = float(
             max(sigma_floor, min(sigma_ceiling, sigma_raw))
         )
@@ -5468,7 +5544,7 @@ def finalize_m_step_v2(
                     if initial_params.q_jerk_root_ori is not None
                     else 0.1
                 )
-                q_floor_p = q_initial_p * _M_STEP_Q_FLOOR_FACTOR
+                q_floor_p = q_initial_p * _tune(layout, "q_floor_factor")
                 q_ceiling_p = min(
                     q_initial_p * _M_STEP_Q_CEILING_FACTOR,
                     _M_STEP_Q_JERK_ROOT_POS_HARD_CAP,
@@ -5476,7 +5552,7 @@ def finalize_m_step_v2(
                 q_clipped_p = max(
                     q_floor_p, min(q_ceiling_p, qjp_raw)
                 )
-                q_floor_o = q_initial_o * _M_STEP_Q_FLOOR_FACTOR
+                q_floor_o = q_initial_o * _tune(layout, "q_floor_factor")
                 q_ceiling_o = min(
                     q_initial_o * _M_STEP_Q_CEILING_FACTOR,
                     _M_STEP_Q_JERK_ROOT_ORI_HARD_CAP,
@@ -5507,7 +5583,7 @@ def finalize_m_step_v2(
                     if initial_params.q_jerk_seg_ori is not None
                     else 0.1
                 )
-                q_floor_s = q_initial_s * _M_STEP_Q_FLOOR_FACTOR
+                q_floor_s = q_initial_s * _tune(layout, "q_floor_factor")
                 q_ceiling_s = min(
                     q_initial_s * _M_STEP_Q_CEILING_FACTOR,
                     _M_STEP_Q_JERK_SEG_ORI_HARD_CAP,
@@ -5735,7 +5811,7 @@ def finalize_m_step_v2_from_per_session(
     )
     q_root_pos_floor = max(
         _FLOOR_Q_ROOT_POS,
-        initial_params.q_root_pos * _M_STEP_Q_FLOOR_FACTOR,
+        initial_params.q_root_pos * _tune(layout, "q_floor_factor"),
     )
     q_root_pos_ceiling = min(
         initial_params.q_root_pos * _root_q_ceiling_factor(layout),
@@ -5755,7 +5831,7 @@ def finalize_m_step_v2_from_per_session(
     )
     q_root_ori_floor = max(
         _FLOOR_Q_ROOT_ORI,
-        initial_params.q_root_ori * _M_STEP_Q_FLOOR_FACTOR,
+        initial_params.q_root_ori * _tune(layout, "q_floor_factor"),
     )
     q_root_ori_ceiling = min(
         initial_params.q_root_ori * _root_q_ceiling_factor(layout),
@@ -5780,7 +5856,7 @@ def finalize_m_step_v2_from_per_session(
             seg_name, _FLOOR_Q_SEG_ORI,
         )
         q_floor = max(
-            _FLOOR_Q_SEG_ORI, q_initial * _M_STEP_Q_FLOOR_FACTOR,
+            _FLOOR_Q_SEG_ORI, q_initial * _tune(layout, "q_floor_factor"),
         )
         # Patch 122hj: per-segment orientation ceiling — raised for
         # high_angular_noise_segments (e.g. a fast head).
@@ -5804,9 +5880,9 @@ def finalize_m_step_v2_from_per_session(
             seg_name, _FLOOR_Q_LENGTH,
         )
         q_floor = max(
-            _FLOOR_Q_LENGTH, q_initial * _M_STEP_Q_FLOOR_FACTOR,
+            _FLOOR_Q_LENGTH, q_initial * _tune(layout, "q_floor_factor"),
         )
-        q_ceiling = q_initial * _M_STEP_Q_CEILING_FACTOR
+        q_ceiling = q_initial * _tune(layout, "length_q_ceiling")
         q_clipped = max(q_floor, min(q_ceiling, q_raw))
         q_prev = prev_params.q_length.get(seg_name, q_initial)
         q_length[seg_name] = _damp(q_prev, q_clipped)
@@ -5835,7 +5911,7 @@ def finalize_m_step_v2_from_per_session(
         sigma_floor = _M_STEP_FLOOR_SIGMA
         sigma_initial = initial_params.sigma_marker.get(m, 3.0)
         sigma_ceiling = (
-            _M_STEP_SIGMA_CEILING_FACTOR * sigma_initial
+            _tune(layout, "sigma_ceiling") * sigma_initial
         )
         sigma_clipped = float(
             max(sigma_floor, min(sigma_ceiling, sigma_raw))
@@ -6094,6 +6170,8 @@ def fit_initial_params_v2(
             )
         else:
             q_length[seg_name] = _INIT_DEFAULT_Q_LENGTH
+        # Patch 122jy: segment-length flexibility
+        q_length[seg_name] *= _tune(layout, "length_q_scale")
 
     # Patch 120b: drift parameters when layout has drift
     # enabled. Read from the empirical calibration on
@@ -6114,7 +6192,7 @@ def fit_initial_params_v2(
         }
         r_drift_d: dict[str, float] | None = {}
         q_drift_d: dict[str, float] | None = {}
-        r_cap = 20.0
+        r_cap = _tune(layout, "drift_radius_cap")
         for m in layout.marker_names:
             used_empirical = (
                 fitted_lengths.marker_r_drift is not None
@@ -6201,6 +6279,7 @@ def fit_initial_params_v2(
         q_jerk_root_pos=q_jerk_root_pos_d,
         q_jerk_root_ori=q_jerk_root_ori_d,
         q_jerk_seg_ori=q_jerk_seg_ori_d,
+        constraint_sigma=_tune(layout, "constraint_sigma"),  # patch 122jy
     )
 
 
@@ -7993,6 +8072,9 @@ def _smoother_param_hash(
         "const_accel_segments": sorted(layout.const_accel_segments),
         "high_angular_noise_segments":
             sorted(layout.high_angular_noise_segments),
+        # patch 122jy: fine-tuning (only non-default keys)
+        "tuning": {k: r(float(v)) for k, v in
+                   sorted((getattr(layout, "tuning", None) or {}).items())},
         # fitted noise params
         "q_root_pos": r(params.q_root_pos),
         "q_root_ori": r(params.q_root_ori),
@@ -8412,6 +8494,13 @@ def save_model_v2(
     save_kwargs["layout_high_angular_noise_segments"] = np.array(
         list(layout.high_angular_noise_segments), dtype=object,
     )
+    # Patch 122jy: fine-tuning knobs, as (key, value) pairs; absent on older
+    # models -> defaults.
+    save_kwargs["layout_tuning"] = np.array(
+        [(str(k), float(v)) for k, v in sorted(
+            (getattr(layout, "tuning", None) or {}).items())],
+        dtype=object,
+    ).reshape(-1, 2)
     has_const_accel = (
         params.q_jerk_root_pos is not None
         or params.q_jerk_root_ori is not None
@@ -8525,11 +8614,16 @@ def load_model_v2(
         han_segments = [
             str(s) for s in data["layout_high_angular_noise_segments"]
         ]
+    tuning: dict = {}
+    if "layout_tuning" in data.files:
+        tuning = {str(k): float(v) for k, v in data["layout_tuning"]
+                  if str(k) in TUNING_DEFAULTS}
     layout = BodyLayout(
         segments=segments,
         orientation_drift_segments=odd_segments,
         const_accel_segments=ca_segments,
         high_angular_noise_segments=han_segments,
+        tuning=tuning,
     )
     # Patch 120b: layout.with_drift flag. Defaults False for
     # pre-120b model files where the field is absent.
@@ -9997,6 +10091,17 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--tune", action="append", default=[], metavar="KEY=VALUE",
+        help=(
+            "Patch 122jy. Fine-tuning knob, repeatable. Keys: "
+            + "; ".join(f"{k} (default {v:g}): {TUNING_HELP[k]}"
+                        for k, v in TUNING_DEFAULTS.items())
+            + ". E.g. --tune drift_radius_cap=40 --tune length_q_scale=10 "
+            "loosens the marker distances. Training only (ignored with "
+            "--load-model, whose model carries its own)."
+        ),
+    )
+    parser.add_argument(
         "--root-q-ceiling", type=float, default=10.0,
         help=(
             "M-step ceiling for the root (whole-body) position and "
@@ -10030,6 +10135,7 @@ def main(argv=None) -> int:
                 ("--high-angular-noise-segments",
                  bool(args.high_angular_noise_segments)),
                 ("--root-q-ceiling", args.root_q_ceiling != 10.0),
+                ("--tune", bool(args.tune)),
                 ("--no-back4", args.no_back4), ("--no-tail", args.no_tail),
                 ("--no-lateral", args.no_lateral),
                 ("--no-center", args.no_center),
@@ -10260,6 +10366,14 @@ def main(argv=None) -> int:
                 "high_angular_noise_segments",
                 "--high-angular-noise-segments",
             )
+        # Patch 122jy: --tune KEY=VALUE fine-tuning knobs.
+        if args.tune:
+            try:
+                tuning = parse_tuning(args.tune)
+                layout = _dc_ms.replace(layout, tuning={**layout.tuning, **tuning})
+            except ValueError as exc:
+                print(f"[smoother-v2] ERROR: --tune: {exc}", file=sys.stderr)
+                return 1
         # Patch 122ig: root process-noise ceiling.
         if args.root_q_ceiling != 10.0:
             try:
