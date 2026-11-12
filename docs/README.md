@@ -111,6 +111,9 @@ Read this when adding a new form to remember to wire it; the smoke test will fai
 
 These four documents are a separate concern (the Kalman v2 smoother design + audit). Not workflow-related; kept in `docs/` for proximity to the rest of the technical writing.
 
+### `pose3d.md`
+**3-D pose (patch 122kf).** The 3-D tab and `mufasa-pose3d`: camera calibration from marked box edges or a checkerboard, single-camera inference with a Rat7M body prior, two-camera triangulation, 3-D Kalman smoothing, output format, model data.
+
 ### `kalman_smoother_design.md`
 Triplet-egocentric covariance Kalman smoother design document (1408 lines, May 2026). Mathematical formulation, state space, EM noise fitting, integration plan. No implementation yet at time of writing — design only.
 

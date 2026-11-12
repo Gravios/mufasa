@@ -584,6 +584,27 @@ SECTIONS: dict[str, SectionSpec] = {
             root / "derived" / "classifications"
         ),
     ),
+    # Patch 122kf — 3-D tab.
+    "pose3d_calibration": SectionSpec(
+        section_id="pose3d_calibration",
+        page="3-D",
+        section_title="Camera calibration",
+        depends_on=(),
+        detect_path=lambda root: root / "sources" / "calibration",
+    ),
+    "pose3d": SectionSpec(
+        section_id="pose3d",
+        page="3-D",
+        section_title="3-D inference",
+        depends_on=("import_pose", "pose3d_calibration"),
+        detect_path=lambda root: root / "derived" / "pose3d",
+    ),
+    "pose3d_kalman": SectionSpec(
+        section_id="pose3d_kalman",
+        page="3-D",
+        section_title="3-D Kalman smoothing",
+        depends_on=("pose3d",),
+    ),
 }
 
 

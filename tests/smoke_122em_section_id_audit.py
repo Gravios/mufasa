@@ -287,13 +287,14 @@ def main() -> int:
         detail=(f"missing: {sorted(missing_producers)}"),
     )
 
-    # 9. Expected count: 7 wired, 17 total.
+    # 9. Expected count: 10 wired (patch 122kf added the three 3-D tab
+    #    sections: pose3d_calibration, pose3d, pose3d_kalman).
     check(
-        f"Currently 7 of {len(known_ids)} SECTIONS keys have "
+        f"Currently 10 of {len(known_ids)} SECTIONS keys have "
         f"wired forms — pinned to catch accidental unwiring "
         f"OR accidental over-wiring (an 8th form would surface "
         f"in this check)",
-        len(wired_ids) == 7,
+        len(wired_ids) == 10,
         detail=(f"got {len(wired_ids)} wired: "
                 f"{sorted(wired_ids)}"),
     )

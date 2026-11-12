@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kf — 3-D pose: calibration, single-camera and stereo inference, 3-D Kalman smoothing, and a "3-D" tab.**
+New package `mufasa/pose3d/`: `camera` (pinhole + lens distortion; calibration
+from marked box edges — principal point from the wall-corner edges, scale from
+the floor, warnings when the entered size does not fit the marked floor — from a
+checkerboard (lens, adapted from rpimocap; with the box corners it also solves
+the camera height) and DLT from 3-D points (rpimocap)); `mono` (single camera:
+rigid head learned from the session with the ear distance as scale; spine and hip
+heights and the lumbar angle from Rat7M motion capture by k-nearest neighbours;
+pelvis pitched to the lumbar angle; back refitted as one chain within Rat7M bend
+limits; tail draped without stretching; every label stays on its camera ray; the
+head's heights below the ear line are fixed (unobservable from above) and walls
+tolerate 20 mm so an imprecise box does not push heads up);
+`stereo` (triangulation with likelihood/reprojection gates); `kalman3d`
+(constant-velocity Kalman + RTS with gating, noise along the camera ray for
+single-camera runs); `io`; `pipeline` (project: `sources/pose/` + newest Kalman v2
+run to fill gaps + `sources/calibration/camera_<name>.toml` →
+`derived/pose3d/<run>/<video>_3d.parquet` with `run.toml`). Model data:
+`mufasa/assets/models/pose3d/rat7m_trunk_prior.npz` (80 000 Rat7M frames, Dunn et
+al. 2021, CC BY 4.0; README with attribution; rebuilt by
+`scripts/build_rat7m_prior.py`). Workbench: "3-D" tab after Preprocessing with
+Camera calibration (box-marking dialog on a median frame), 3-D inference, 3-D
+Kalman smoothing and a viewer launcher; sections registered for status badges.
+CLI `mufasa-pose3d` (calibrate-box, calibrate-checkerboard, infer, smooth). Docs:
+`docs/pose3d.md`. Tests: `smoke_122kf_pose3d`; `smoke_122em_section_id_audit` now
+pins 10 wired sections.
+
 **122ke — 3-D marker viewer with the video below.**
 New `mufasa/ui_qt/pose3d_viewer.py`: the reconstruction volume on top and the
 video as a viewport below (one splitter), kept in step — scrub or play the

@@ -74,6 +74,10 @@ def build_workbench(project_config_path: str | None = None
     from mufasa.ui_qt.pages.pose_cleanup_page import build_pose_cleanup_page
     build_pose_cleanup_page(wb, config_path=project_config_path)
 
+    # Patch 122kf — 3-D tab after Preprocessing (Kalman v2 runs feed it).
+    from mufasa.ui_qt.pages.pose3d_page import build_pose3d_page
+    build_pose3d_page(wb, config_path=project_config_path)
+
     from mufasa.ui_qt.pages.roi_page import build_roi_page
     build_roi_page(wb, config_path=project_config_path)
 
