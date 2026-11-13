@@ -8,6 +8,33 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ki — 3-D inference faster: parallel workers and a cheaper Jacobian.**
+* **Workers.** *Workers* on the 3-D tab, `--workers` on `mufasa-pose3d infer`,
+  `RunSettings.workers` (default: all cores but one). Several videos run at
+  once, one process each, with progress per finished video and the time
+  left; a single video splits its 6000-frame head and spine-chain chunks
+  over the workers instead (`MonoConfig.workers`). Same results as one
+  process. K7, 13 000 frames (3 chunks): 1.9× faster on 2 workers than on 1.
+* **Jacobian** (`mufasa/pose3d/solver.py`). The head and spine fits used
+  SciPy's sparse finite differences (17 column groups, the matrix rebuilt
+  each time: 726 ms per evaluation on a K7 head chunk, ~130 per chunk). The
+  columns are now grouped by frame parity (12 groups, exact because no
+  residual spans two frames that far apart) and the matrix filled from a
+  fixed index: 198 ms. Same solver, same steps: about 1.3× faster per
+  worker (K7, 13 000 frames: 292 s against 383 s).
+  Results: on the K7 head chunk 5700–12 300 the cost is identical and
+  positions agree within 0.0055 mm (99th percentile) — closer than the old
+  solver agrees with itself after a 10⁻⁶ px change of its input (0.045 mm).
+  Over a whole reconstruction rounding still steers a few poorly
+  constrained frames elsewhere (13 000 K7 frames: median difference
+  10⁻⁵ mm; 3% of frames over 1 mm, 99th percentile 5–10 mm).
+  Rejected because they changed results: capping LSMR at 20 iterations per
+  step (2.3× faster; lower cost on one chunk, 10% higher on another, heads
+  up to 50 mm lower) and Levenberg–Marquardt with direct banded solves (6×
+  per chunk, stuck in higher local minima at the box-wall hinges).
+* Expected: about 2–3 hours for 67 sessions on an 8-core / 16-thread
+  workstation, instead of about 1.5 days. Test: `smoke_122ki_pose3d_speed`.
+
 **122kh — smoke suite green: three real fixes, 19 obsolete tests retired, the rest updated.**
 Fixes found by the suite (regression test `smoke_122kh_settings_and_tk_free_imports`):
 * **mufasa imports without tkinter.** `utils.errors`, `utils.lookups`,

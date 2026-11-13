@@ -20,6 +20,7 @@ Patch 122kf: forms of the "3-D" workbench tab.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -499,6 +500,13 @@ class Pose3DInferenceForm(OperationForm):
         f.addRow("Smoothing", krow)
         self.fps = dspin(30, 1, 1000, " fps", 1)
         f.addRow("Frame rate", self.fps)
+        from mufasa.pose3d.pipeline import default_workers
+        self.workers = QSpinBox(self)
+        self.workers.setRange(1, max(1, os.cpu_count() or 1))
+        self.workers.setValue(default_workers())
+        self.workers.setToolTip("Processes. Several videos run at once; a single video splits its "
+                                "6000-frame chunks over them. Each needs a few hundred MB.")
+        f.addRow("Workers", self.workers)
         self.body_layout.addLayout(f)
         self.cal_dir.textChanged.connect(self.refresh)
         self.pose_dir.textChanged.connect(self.refresh)
@@ -538,7 +546,8 @@ class Pose3DInferenceForm(OperationForm):
                           wall_tolerance_mm=self.wall_tol.value(),
                           spine_chain=self.chain.isChecked())
         kal = Kalman3DConfig(fps=self.fps.value(), sigma_a=self.sig_a.value()) if self.kal.isChecked() else None
-        st = RunSettings(mode="stereo" if self.mode.currentIndex() == 1 else "mono", mono=mono, kalman=kal)
+        st = RunSettings(mode="stereo" if self.mode.currentIndex() == 1 else "mono", mono=mono, kalman=kal,
+                         workers=self.workers.value())
         return dict(settings=st, stems=stems, pose_dir=self.pose_dir.text(),
                     fallback=self.kv2.currentData() if self.use_kv2.isChecked() else None,
                     cal_dir=self.cal_dir.text(),

@@ -45,6 +45,7 @@ from scipy.sparse import lil_matrix
 from scipy.spatial.transform import Rotation as Rot
 
 from mufasa.pose3d.camera import Camera
+from mufasa.pose3d.solver import solve_sequence
 
 PRIOR_PATH = Path(__file__).resolve().parents[1] / "assets" / "models" / "pose3d" / "rat7m_trunk_prior.npz"
 
@@ -94,6 +95,8 @@ class MonoConfig:
     max_pelvis_rise_mm: float = 90.0
     chunk: int = 6000
     head_iters: int = 150
+    # processes for the per-chunk head and spine fits (1: in this process)
+    workers: int = 1
 
 
 # --------------------------------------------------------------------------- #
@@ -346,8 +349,8 @@ class RigidHead:
         for k in range(n):
             sp[i, 6 * k:6 * k + 6] = 1
             i += 1
-        out = least_squares(res, x0.ravel(), jac_sparsity=sp.tocsr(), max_nfev=iters,
-                            x_scale="jac", tr_solver="lsmr")
+        out = solve_sequence(res, x0.ravel(), sp.tocsr(), 6, max_nfev=iters)
+        self.last_cost = float(out.cost)
         P = out.x.reshape(n, 6)
         Xw = P[:, None, :3] + np.einsum("nij,mj->nmi", _rotm(P[:, 3:]), T)
         return P, Xw
@@ -356,10 +359,29 @@ class RigidHead:
 # --------------------------------------------------------------------------- #
 # Full single-camera reconstruction
 # --------------------------------------------------------------------------- #
+def _pool(workers: int):
+    """A process pool for the per-chunk fits, or None for ``workers`` ≤ 1."""
+    if workers is None or workers <= 1:
+        return None
+    from concurrent.futures import ProcessPoolExecutor
+    return ProcessPoolExecutor(max_workers=int(workers))
+
+
 def reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig | None = None,
                      progress=None) -> tuple[pd.DataFrame, dict]:
-    """3-D pose from one camera. Returns (DataFrame, report)."""
+    """3-D pose from one camera. Returns (DataFrame, report).
+    ``cfg.workers`` > 1 runs the head and spine chunks in parallel."""
     cfg = cfg or MonoConfig()
+    pool = _pool(cfg.workers)
+    try:
+        return _reconstruct_mono(pose, camera, cfg, progress, pool)
+    finally:
+        if pool is not None:
+            pool.shutdown()
+
+
+def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
+                      pool) -> tuple[pd.DataFrame, dict]:
     say = progress or (lambda s: None)
     t_start = time.time()
     cam0 = replace(camera, dist=np.zeros(5))           # work in undistorted pixels
@@ -389,13 +411,15 @@ def reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig | None = None
     report["head_template_reproj_px"] = err
     Xh = np.full((N, 5, 3), np.nan)
     CH, OV = cfg.chunk, 300
-    for s in range(0, N, CH):
-        a, b = max(0, s - OV), min(N, s + CH + OV)
-        say(f"head frames {s}–{min(N, s + CH)} of {N}")
-        _, Xc = rh.fit_sequence(huv[a:b], hlk[a:b], box, roll_sd_deg=cfg.head_roll_sd_deg, iters=cfg.head_iters,
-                                wall_tolerance_mm=cfg.wall_tolerance_mm)
+    spans = [(s, max(0, s - OV), min(N, s + CH + OV)) for s in range(0, N, CH)]
+    kw = {"roll_sd_deg": cfg.head_roll_sd_deg, "iters": cfg.head_iters,
+          "wall_tolerance_mm": cfg.wall_tolerance_mm}
+    say(f"head: {len(spans)} chunk(s) of {CH} frames" + (f" on {cfg.workers} workers" if pool else ""))
+    results = (pool.map if pool else map)(_head_chunk, [(rh, huv[a:b], hlk[a:b], box, kw) for _, a, b in spans])
+    for i, ((s, a, _), Xc) in enumerate(zip(spans, results)):
         k = min(CH, N - s)
         Xh[s:s + k] = Xc[s - a:s - a + k]
+        say(f"head frames {s}–{s + k} of {N} ({i + 1}/{len(spans)})")
     for j, m in enumerate(head):
         X[m] = Xh[:, j]
     report["steps"].append("rigid head")
@@ -460,7 +484,7 @@ def reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig | None = None
         free = [m for m in reversed(spine) if m not in cfg.pelvis]
         for p in range(cfg.chain_passes):
             say(f"spine chain pass {p + 1}/{cfg.chain_passes}")
-            _chain_refit(cam0, X, chain, free, prior, cfg, box)
+            _chain_refit(cam0, X, chain, free, prior, cfg, box, pool)
         report["steps"].append(f"spine chain ({cfg.chain_passes} passes)")
 
     # 5. tail ---------------------------------------------------------------- #
@@ -502,90 +526,98 @@ def reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig | None = None
 # Spine chain refit
 # --------------------------------------------------------------------------- #
 def _chain_refit(cam: Camera, X: dict, chain: list[str], free: list[str], prior: Rat7MPrior,
-                 cfg: MonoConfig, box) -> None:
+                 cfg: MonoConfig, box, pool=None) -> None:
     """Refit the heights of ``free`` chain labels (tail→head order in
-    ``chain``) on their rays; see the module docstring."""
+    ``chain``) on their rays; see the module docstring. Chunks run on
+    ``pool`` (a process pool) when given."""
     N = len(X[chain[0]])
     C = cam.center
     tail_end, head_end = X[chain[0]], X[chain[-1]]
     hd = head_end[:, :2] - tail_end[:, :2]
     hd /= np.maximum(np.linalg.norm(hd, axis=1, keepdims=True), 1e-6)
     lim = prior.bend_limits((head_end[:, 2] + cfg.head_height_offset_mm) / cfg.body_scale)
-    rad = np.deg2rad
-    idx = [chain.index(m) for m in free]
     n_mid = max(1, len(chain) - 4)                      # joints between pelvis and neck
-    P0 = {m: X[m].copy() for m in free}
-    D = {m: (P0[m] - C) for m in free}
-
-    def pts(z, sl):
-        out = {}
-        for i, m in enumerate(free):
-            d = D[m][sl]
-            s = (z[:, i] - C[2]) / d[:, 2]
-            out[m] = C + s[:, None] * d
-        return out
-
-    def solve(sl):
-        n = sl.stop - sl.start
-        z0 = np.stack([P0[m][sl, 2] for m in free], 1)
-        hdl = hd[sl]
-        M50, M95, F5, F95 = (lim[k][sl] for k in ("M50", "M95", "F5", "F95"))
-
-        def elev(a, b):
-            return np.arctan2(b[:, 2] - a[:, 2], np.einsum("ij,ij->i", b[:, :2] - a[:, :2], hdl))
-
-        def res(x):
-            z = x.reshape(n, len(free))
-            Q = pts(z, sl)
-            nodes = [Q[m] if m in Q else X[m][sl] for m in chain]
-            a = [elev(nodes[i], nodes[i + 1]) for i in range(len(nodes) - 1)]
-            bends = [a[i + 1] - a[i] for i in range(len(a) - 1)]   # at chain[1..-2]
-            r = [((z - z0) / 20.0).ravel()]
-            for j, bd in enumerate(bends):
-                node_i = j + 1
-                if node_i == 1:                                   # pelvis → lumbar
-                    r.append(np.maximum(0, bd - rad(10)) / rad(2))
-                elif node_i == len(chain) - 2:                    # neck
-                    r.append(np.maximum(0, bd - rad(F95)) / rad(3))
-                    r.append(np.maximum(0, rad(F5) - bd) / rad(3))
-                else:                                             # mid-back
-                    r.append((bd - rad(M50) / n_mid) / rad(15))
-                    r.append(np.maximum(0, bd - rad(M95) / n_mid - rad(3)) / rad(2))
-            r.append((np.diff(z, axis=0) / 8.0).ravel())
-            r.append(np.maximum(0, 3 - z).ravel())
-            return np.concatenate([np.ravel(v) for v in r])
-        nf = len(free)
-        r0 = res(z0.ravel())
-        sp = lil_matrix((len(r0), nf * n), dtype=np.int8)
-        i = 0
-        for k in range(n):
-            sp[i:i + nf, nf * k:nf * k + nf] = 1
-            i += nf
-        nb = len(r0) - nf * n - (n - 1) * nf - n * nf
-        for _ in range(nb // n):
-            for k in range(n):
-                sp[i, nf * k:nf * k + nf] = 1
-                i += 1
-        for k in range(n - 1):
-            for c in range(nf):
-                sp[i, nf * k:nf * k + 2 * nf] = 1
-                i += 1
-        for k in range(n):
-            sp[i:i + nf, nf * k:nf * k + nf] = 1
-            i += nf
-        o = least_squares(res, z0.ravel(), jac_sparsity=sp.tocsr(), max_nfev=60, x_scale="jac", tr_solver="lsmr")
-        return o.x.reshape(n, nf)
-    Z = np.zeros((N, len(free)))
+    D = {m: (X[m] - C) for m in free}
     CH, OV = cfg.chunk, 100
-    for s in range(0, N, CH):
-        a, b = max(0, s - OV), min(N, s + CH + OV)
-        z = solve(slice(a, b))
+    spans = [(s, max(0, s - OV), min(N, s + CH + OV)) for s in range(0, N, CH)]
+    payloads = [{
+        "C": C, "chain": chain, "free": free, "n_mid": n_mid,
+        "fixed": {m: X[m][a:b] for m in chain if m not in free},
+        "D": {m: D[m][a:b] for m in free},
+        "z0": np.stack([X[m][a:b, 2] for m in free], 1),
+        "hd": hd[a:b], "lim": {k: v[a:b] for k, v in lim.items()},
+    } for _, a, b in spans]
+    results = (pool.map if pool is not None else map)(_chain_chunk, payloads)
+    Z = np.zeros((N, len(free)))
+    for (s, a, _), z in zip(spans, results):
         k = min(CH, N - s)
         Z[s:s + k] = z[s - a:s - a + k]
     zmax = (box or {}).get("z", [0, 1e9])[1]
     for i, m in enumerate(free):
         X[m] = _on_ray(cam, X[m], np.clip(Z[:, i], 3, zmax))
-    _ = idx
+
+
+def _chain_chunk(p: dict) -> np.ndarray:
+    """One chunk of the spine-chain refit (a top-level function so a
+    process pool can run it). Returns the free labels' heights (n, nf)."""
+    C, chain, free, n_mid = p["C"], p["chain"], p["free"], p["n_mid"]
+    D, z0, hdl, fixed = p["D"], p["z0"], p["hd"], p["fixed"]
+    n, nf = z0.shape
+    M50, M95, F5, F95 = (p["lim"][k] for k in ("M50", "M95", "F5", "F95"))
+    rad = np.deg2rad
+
+    def elev(a, b):
+        return np.arctan2(b[:, 2] - a[:, 2], np.einsum("ij,ij->i", b[:, :2] - a[:, :2], hdl))
+
+    def res(x):
+        z = x.reshape(n, nf)
+        Q = {}
+        for i, m in enumerate(free):
+            d = D[m]
+            Q[m] = C + ((z[:, i] - C[2]) / d[:, 2])[:, None] * d
+        nodes = [Q[m] if m in Q else fixed[m] for m in chain]
+        a = [elev(nodes[i], nodes[i + 1]) for i in range(len(nodes) - 1)]
+        bends = [a[i + 1] - a[i] for i in range(len(a) - 1)]   # at chain[1..-2]
+        r = [((z - z0) / 20.0).ravel()]
+        for j, bd in enumerate(bends):
+            node_i = j + 1
+            if node_i == 1:                                   # pelvis → lumbar
+                r.append(np.maximum(0, bd - rad(10)) / rad(2))
+            elif node_i == len(chain) - 2:                    # neck
+                r.append(np.maximum(0, bd - rad(F95)) / rad(3))
+                r.append(np.maximum(0, rad(F5) - bd) / rad(3))
+            else:                                             # mid-back
+                r.append((bd - rad(M50) / n_mid) / rad(15))
+                r.append(np.maximum(0, bd - rad(M95) / n_mid - rad(3)) / rad(2))
+        r.append((np.diff(z, axis=0) / 8.0).ravel())
+        r.append(np.maximum(0, 3 - z).ravel())
+        return np.concatenate([np.ravel(v) for v in r])
+    r0 = res(z0.ravel())
+    sp = lil_matrix((len(r0), nf * n), dtype=np.int8)
+    i = 0
+    for k in range(n):
+        sp[i:i + nf, nf * k:nf * k + nf] = 1
+        i += nf
+    nb = len(r0) - nf * n - (n - 1) * nf - n * nf
+    for _ in range(nb // n):
+        for k in range(n):
+            sp[i, nf * k:nf * k + nf] = 1
+            i += 1
+    for k in range(n - 1):
+        for c in range(nf):
+            sp[i, nf * k:nf * k + 2 * nf] = 1
+            i += 1
+    for k in range(n):
+        sp[i:i + nf, nf * k:nf * k + nf] = 1
+        i += nf
+    o = solve_sequence(res, z0.ravel(), sp.tocsr(), nf, max_nfev=60)
+    return o.x.reshape(n, nf)
+
+
+def _head_chunk(p: tuple) -> np.ndarray:
+    """One chunk of the head fit, for a process pool."""
+    rh, uv, lk, box, kw = p
+    return rh.fit_sequence(uv, lk, box, **kw)[1]
 
 
 # --------------------------------------------------------------------------- #

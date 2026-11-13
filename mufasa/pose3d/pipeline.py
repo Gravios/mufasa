@@ -52,6 +52,15 @@ class RunSettings:
     kalman: Kalman3DConfig | None = field(default_factory=Kalman3DConfig)
     stereo_likelihood: float = 0.6
     stereo_max_reproj_px: float = 15.0
+    # processes: several videos run at once; a single video splits its
+    # head and spine chunks over them instead (122ki)
+    workers: int = 1
+
+
+def default_workers() -> int:
+    """Leave one core for the GUI / system."""
+    import os
+    return max(1, (os.cpu_count() or 2) - 1)
 
 
 def _stem(p: Path) -> str:
@@ -209,15 +218,45 @@ def _jsonable(o):
     return o
 
 
+def _run_job_quiet(args) -> tuple[str, dict]:
+    job, settings, out_dir = args
+    return job.stem, run_job(job, settings, out_dir, None)
+
+
 def run_pose3d(jobs: list[Job], settings: RunSettings, out_dir, *, progress=None,
                run_id: str | None = None) -> dict:
+    """Run every job. With ``settings.workers`` > 1, several videos run at
+    once (one process each); a single video uses the workers for its
+    chunks instead."""
+    from dataclasses import replace
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     reports = {}
-    for i, job in enumerate(jobs):
+    w = max(1, int(settings.workers or 1))
+    if w > 1 and len(jobs) > 1:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        per = replace(settings, mono=replace(settings.mono, workers=1))
+        n = min(w, len(jobs))
         if progress:
-            progress(f"[{i + 1}/{len(jobs)}] {job.stem}")
-        reports[job.stem] = run_job(job, settings, out_dir, progress)
+            progress(f"{len(jobs)} videos on {n} workers")
+        t0 = time.time()
+        with ProcessPoolExecutor(max_workers=n) as ex:
+            futs = [ex.submit(_run_job_quiet, (job, per, out_dir)) for job in jobs]
+            for i, f in enumerate(as_completed(futs)):
+                stem, rep = f.result()
+                reports[stem] = rep
+                if progress:
+                    left = (time.time() - t0) / (i + 1) * (len(jobs) - i - 1)
+                    progress(f"[{i + 1}/{len(jobs)}] {stem} done ({rep.get('seconds_total', 0):.0f} s); "
+                             f"about {left / 60:.0f} min left")
+        reports = {j.stem: reports[j.stem] for j in jobs}
+    else:
+        if w > 1 and settings.mode == "mono":
+            settings = replace(settings, mono=replace(settings.mono, workers=w))
+        for i, job in enumerate(jobs):
+            if progress:
+                progress(f"[{i + 1}/{len(jobs)}] {job.stem}")
+            reports[job.stem] = run_job(job, settings, out_dir, progress)
     mono = asdict(settings.mono)
     mono["spine_map"] = [f"{k}: {a}..{b} {f:g}" for k, (a, b, f) in settings.mono.spine_map.items()]
     hz = settings.mono.head_template_z
@@ -255,5 +294,5 @@ def run_project(config_path, settings: RunSettings | None = None, *, stems=None,
     return out, reports, problems
 
 
-__all__ = ["Job", "RunSettings", "find_jobs", "pose_files", "project_defaults", "run_job",
+__all__ = ["Job", "RunSettings", "default_workers", "find_jobs", "pose_files", "project_defaults", "run_job",
            "run_pose3d", "run_project"]

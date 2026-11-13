@@ -112,10 +112,17 @@ per-video report. `run.toml` and `report.json` sit beside them.
 mufasa-pose3d calibrate-box marks.json --width 300 --camera-height 500 --out sources/calibration/camera_K7.toml
 mufasa-pose3d calibrate-checkerboard board.mp4 --pattern 9 6 --square-mm 20 --out lens.toml
 mufasa-pose3d calibrate-box marks.json --length 554 --width 300 --intrinsics lens.toml --out camera_K7.toml
-mufasa-pose3d infer --project project.toml [--video STEM ...] [--no-kalman] [--stereo camA camB]
+mufasa-pose3d infer --project project.toml [--video STEM ...] [--no-kalman] [--stereo camA camB] [--workers N]
 mufasa-pose3d infer --pose labels.parquet --fallback kv2.parquet --camera camera_K7.toml --out K7_3d.parquet
 mufasa-pose3d smooth K7_3d.parquet --camera camera_K7.toml --out K7_3d_smooth.parquet
 ```
+
+## Workers
+
+*Workers* (tab) / `--workers` (CLI; default: all cores but one) /
+`RunSettings.workers`: several videos run at once, one process each; a
+single video splits its 6000-frame head and spine chunks over the
+workers instead. Each worker needs a few hundred MB.
 
 ## Model data
 

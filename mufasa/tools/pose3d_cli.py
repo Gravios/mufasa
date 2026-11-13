@@ -4,7 +4,7 @@
     mufasa-pose3d calibrate-box MARKS.json --width 300 [--length 554] --camera-height 430 \
         [--wall-height 300] [--intrinsics lens.toml] --out sources/calibration/camera_K7.toml
     mufasa-pose3d calibrate-checkerboard VIDEO_OR_DIR --pattern 9 6 --square-mm 20 --out lens.toml
-    mufasa-pose3d infer --project project.toml [--video STEM ...] [--no-kalman] [--stereo camA camB]
+    mufasa-pose3d infer --project project.toml [--video STEM ...] [--no-kalman] [--stereo camA camB] [--workers N]
     mufasa-pose3d infer --pose labels.parquet --camera camera.toml [--fallback smoothed.parquet] --out out_3d.parquet
     mufasa-pose3d smooth IN_3d.parquet --out OUT_3d.parquet [--camera camera.toml] [--sigma-a 3000]
 
@@ -82,6 +82,9 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--no-trunk-prior", action="store_true")
     i.add_argument("--no-spine-chain", action="store_true")
     i.add_argument("--fps", type=float, default=30.0)
+    i.add_argument("--workers", type=int, default=None,
+                   help="processes (default: all cores but one); several videos run at once, "
+                        "a single video splits its chunks")
     s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file")
     s.add_argument("input")
     s.add_argument("--out", required=True)
@@ -96,12 +99,13 @@ def build_parser() -> argparse.ArgumentParser:
 def settings_from(a):
     from mufasa.pose3d.kalman3d import Kalman3DConfig
     from mufasa.pose3d.mono import MonoConfig
-    from mufasa.pose3d.pipeline import RunSettings
+    from mufasa.pose3d.pipeline import RunSettings, default_workers
     mono = MonoConfig(head_width_mm=a.head_width, body_scale=a.body_scale, fps=a.fps,
                       wall_tolerance_mm=a.wall_tolerance,
                       use_trunk_prior=not a.no_trunk_prior, spine_chain=not a.no_spine_chain)
     kal = None if a.no_kalman else Kalman3DConfig(fps=a.fps, sigma_a=a.sigma_a)
-    return RunSettings(mode="stereo" if a.stereo else "mono", mono=mono, kalman=kal)
+    return RunSettings(mode="stereo" if a.stereo else "mono", mono=mono, kalman=kal,
+                       workers=a.workers if a.workers else default_workers())
 
 
 def main(argv: list[str] | None = None) -> int:
