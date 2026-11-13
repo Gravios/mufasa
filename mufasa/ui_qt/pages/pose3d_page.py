@@ -10,6 +10,7 @@ runs fill low-confidence 2-D labels.
 from __future__ import annotations
 
 from mufasa.ui_qt.forms.pose3d import (
+    C3DImportForm,
     CameraCalibrationForm,
     Pose3DInferenceForm,
     Pose3DSmoothingForm,
@@ -23,5 +24,6 @@ def build_pose3d_page(workbench, config_path: str | None = None) -> WorkflowPage
     page.add_section("Camera calibration", [(CameraCalibrationForm, {})])
     page.add_section("3-D inference", [(Pose3DInferenceForm, {})])
     page.add_section("3-D Kalman smoothing", [(Pose3DSmoothingForm, {})])
+    page.add_section("Import motion capture (C3D)", [(C3DImportForm, {})])
     page.add_section_widget("3-D viewer", Pose3DViewerLauncher)
     return page

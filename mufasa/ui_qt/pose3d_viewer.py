@@ -149,9 +149,10 @@ def find_pose3d(video_path: str | None, config_path: str | None = None) -> Path 
     stem = v.stem
     hits = list(v.parent.glob(f"{stem}*3d*.parquet")) if v.parent.is_dir() else []
     if config_path:
-        d = Path(config_path).parent / "derived" / "pose3d"
-        if d.is_dir():
-            hits += list(d.rglob(f"{stem}*.parquet"))
+        for d in (Path(config_path).parent / "derived" / "pose3d",
+                  Path(config_path).parent / "sources" / "pose3d"):    # + motion capture (122kl)
+            if d.is_dir():
+                hits += list(d.rglob(f"{stem}*.parquet"))
     hits = [h for h in hits if h.is_file()]
     return max(hits, key=lambda h: h.stat().st_mtime) if hits else None
 

@@ -98,6 +98,29 @@ the ray* vs *across the ray*), so smoothing evens out depth while points
 stay on their labels. Runs inside 3-D inference (checkbox) or on an
 existing run (*3-D Kalman smoothing* section, new run).
 
+## Motion capture (C3D)
+
+*Import motion capture (C3D)* (tab) / `mufasa-pose3d import-c3d` reads
+`.c3d` files from motion-capture systems (Vicon, Qualisys, OptiTrack,
+Cortex, …) into `sources/pose3d/<trial>_3d.parquet`: millimetres, z up,
+one row per mocap frame, `_likelihood` 1 where the marker was measured and
+0 where it was missing, the residual in `_residual_mm`. They open in the 3-D
+viewer (choose *(no video)*, or a video with the same name) like 3-D
+inference runs — e.g. as ground truth for the single-camera estimate.
+
+* *Up axis in the file*: most systems use z up; OptiTrack and some Vicon
+  setups y up — that axis becomes z.
+* *Rename markers* `HeadF=head_nose, SpineM=back_T8`: project names give the
+  rat skeleton in the viewer; otherwise give *Skeleton* lines `a-b, b-c`.
+* The reader needs nothing beyond NumPy: integer and floating-point files,
+  Intel, DEC and big-endian (MIPS/SGI) processors, labels beyond 255
+  (`LABELS2`…), units in m / cm / mm, more than 65 535 frames. Analog
+  channels (force plates, EMG) are not imported.
+
+```
+mufasa-pose3d import-c3d trial01.c3d trial02.c3d --project project.toml [--up y] [--rename HeadF=head_nose] [--edges a-b,b-c]
+```
+
 ## Output
 
 `derived/pose3d/<run_id>/<video>_3d.parquet`: `frame`, per marker

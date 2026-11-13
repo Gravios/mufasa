@@ -580,6 +580,70 @@ class Pose3DInferenceForm(OperationForm):
 # --------------------------------------------------------------------------- #
 # 3-D Kalman smoothing of a run
 # --------------------------------------------------------------------------- #
+# Motion capture (C3D)
+# --------------------------------------------------------------------------- #
+class C3DImportForm(OperationForm):
+    title = "Import motion capture (C3D)"
+    section_id = "pose3d_c3d"
+    description = (
+        "Import motion-capture marker trajectories (.c3d — Vicon, Qualisys, OptiTrack, Cortex, …) as "
+        "3-D pose files in sources/pose3d/: millimetres, z up, one row per mocap frame, missing markers "
+        "empty. They open in the 3-D viewer like 3-D inference runs, e.g. as ground truth.")
+
+    def build(self) -> None:
+        self._root = _root(self.config_path)
+        f = QFormLayout()
+        self.files = QLineEdit(self)
+        self.files.setPlaceholderText("one or more .c3d files (separated by ;)")
+        row = QHBoxLayout()
+        row.addWidget(self.files, 1)
+        b = QPushButton("…", self)
+        b.setFixedWidth(32)
+
+        def pick():
+            paths, _ = QFileDialog.getOpenFileNames(self, "Motion capture files", "", "C3D (*.c3d *.C3D)")
+            if paths:
+                self.files.setText("; ".join(paths))
+        b.clicked.connect(pick)
+        row.addWidget(b)
+        f.addRow("C3D files", row)
+        self.up = QComboBox(self)
+        for label, ax in (("z (most systems)", "z"), ("y (e.g. OptiTrack, some Vicon setups)", "y"), ("x", "x")):
+            self.up.addItem(label, ax)
+        self.up.setToolTip("The file's axis that points up; it becomes z.")
+        f.addRow("Up axis in the file", self.up)
+        self.rename = QLineEdit(self)
+        self.rename.setPlaceholderText("optional: mocap=project names, e.g. HeadF=head_nose, SpineM=back_T8")
+        f.addRow("Rename markers", self.rename)
+        self.edges = QLineEdit(self)
+        self.edges.setPlaceholderText("optional skeleton lines: a-b, b-c (default: rat skeleton for known names)")
+        f.addRow("Skeleton", self.edges)
+        out = (self._root / "sources" / "pose3d") if self._root else None
+        f.addRow("Saved to", QLabel(str(out) if out else "sources/pose3d/ of the open project", self))
+        self.body_layout.addLayout(f)
+
+    def collect_args(self) -> dict:
+        if not self._root:
+            raise ValueError("open a project first")
+        paths = [p.strip() for p in self.files.text().split(";") if p.strip()]
+        if not paths:
+            raise ValueError("choose one or more .c3d files")
+        missing = [p for p in paths if not Path(p).is_file()]
+        if missing:
+            raise ValueError("not found: " + ", ".join(missing))
+        from mufasa.pose3d.c3d import parse_edges, parse_rename
+        return dict(paths=paths, up=self.up.currentData(), rename=parse_rename(self.rename.text()),
+                    edges=parse_edges(self.edges.text()))
+
+    def target(self, *, paths, up, rename, edges) -> None:
+        from mufasa.pose3d.c3d import import_c3d
+        out_dir = self._root / "sources" / "pose3d"
+        for p in paths:
+            out = import_c3d(p, out_dir, up=up, rename=rename, edges=edges)
+            print(f"C3D → {out}")
+
+
+# --------------------------------------------------------------------------- #
 class Pose3DSmoothingForm(OperationForm):
     title = "3-D Kalman smoothing"
     section_id = "pose3d_kalman"
@@ -673,6 +737,7 @@ class Pose3DViewerLauncher(QWidget):
         self.video = QComboBox(self)
         for v in _videos(self._root):
             self.video.addItem(v.name, str(v))
+        self.video.addItem("(no video)", None)          # e.g. motion capture (122kl)
         self.file = QComboBox(self)
         lay.addRow("Video", self.video)
         lay.addRow("3-D file", self.file)
@@ -690,10 +755,13 @@ class Pose3DViewerLauncher(QWidget):
 
     def refresh(self) -> None:
         self.file.clear()
-        stem = Path(self.video.currentText()).stem
+        stem = Path(self.video.currentText()).stem if self.video.currentData() else ""
         files = []
         for r in reversed(_pose3d_runs(self._root)):
             files += [p for p in sorted(r.glob("*.parquet")) if not stem or p.name.startswith(stem)]
+        mocap = self._root / "sources" / "pose3d" if self._root else None
+        if mocap and mocap.is_dir():                    # imported motion capture
+            files += [p for p in sorted(mocap.glob("*.parquet")) if not stem or p.name.startswith(stem)]
         for p in files:
             self.file.addItem(f"{p.parent.name}/{p.name}", str(p))
         self.open_btn.setEnabled(self.file.count() > 0)
@@ -705,5 +773,5 @@ class Pose3DViewerLauncher(QWidget):
         return open_pose3d_viewer(self, self.video.currentData(), self.file.currentData())
 
 
-__all__ = ["BoxMarkDialog", "CameraCalibrationForm", "Pose3DInferenceForm", "Pose3DSmoothingForm",
-           "Pose3DViewerLauncher", "background_frame", "smooth_run"]
+__all__ = ["BoxMarkDialog", "C3DImportForm", "CameraCalibrationForm", "Pose3DInferenceForm",
+           "Pose3DSmoothingForm", "Pose3DViewerLauncher", "background_frame", "smooth_run"]

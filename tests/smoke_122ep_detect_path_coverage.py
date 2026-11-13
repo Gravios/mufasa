@@ -300,14 +300,14 @@ def main() -> int:
     ui_bound = [s for s in SECTIONS.values() if s.ui_bound]
     with_detect = [s for s in ui_bound if s.detect_path is not None]
     check(
-        "13 of 16 ui_bound sections have detect_path "
+        "14 of 17 ui_bound sections have detect_path "
         "(122ep added 4 producer-style sections; 122es flipped "
         "pixels_per_mm from None → sources/video_info.csv; "
         "122ez added egocentric → <root>/rotated)",
         # 122kf added three 3-D sections (calibration and inference
         # have detect paths; 3-D Kalman smoothing writes a new
-        # pose3d run).
-        len(with_detect) == 13 and len(ui_bound) == 16,
+        # pose3d run); 122kl the C3D import (sources/pose3d).
+        len(with_detect) == 14 and len(ui_bound) == 17,
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 

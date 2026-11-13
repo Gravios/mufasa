@@ -218,9 +218,10 @@ def main() -> int:
         "is 11 of 13 (was 11 of 12 pre-122fj; 122fj added "
         "features_compute_subset as a 13th ui_bound section "
         "without detect_path — relies on record_run instead; "
-        "122kf's three 3-D sections made it 13 of 16)",
-        ("len(with_detect) == 13" in ep_src
-         and "13 of 16" in ep_src),
+        "122kf's three 3-D sections made it 13 of 16, 122kl's C3D "
+        "import 14 of 17)",
+        ("len(with_detect) == 14" in ep_src
+         and "14 of 17" in ep_src),
     )
 
     # -----------------------------------------------------------------

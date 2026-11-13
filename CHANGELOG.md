@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kl — import motion capture (C3D) as 3-D pose.**
+New `mufasa/pose3d/c3d.py`: a C3D reader needing only NumPy — header and
+parameter section; integer and floating-point point data; Intel, DEC (VAX
+floats) and MIPS/SGI (big-endian) processors; labels from `POINT:LABELS` and
+its continuations; units (m, cm, mm, in) to millimetres; frame counts beyond
+the 16-bit header (`POINT:FRAMES`, `TRIAL:ACTUAL_*_FIELD`); invalid points
+(negative residual word) → NaN; analog channels skipped. Tolerates
+`POINT:DATA_START = 0`, empty character parameters, a processor byte of 0.
+Checked against ezc3d on 13 vendor files (Vicon, Qualisys, Cortex, BTS,
+Kistler, Optotrak, Motion Analysis, one DEC): identical points, invalid
+markers, labels, rates; residuals as the C3D specification and the `c3d`
+package (low byte of the fourth word × |scale|; ezc3d reads float-file
+residuals differently).
+`c3d_to_pose3d` / `import_c3d` write `sources/pose3d/<trial>_3d.parquet`
+(mm, z up; `_likelihood` 1 measured / 0 missing; `_residual_mm`;
+`c3d_frame`) with the `mufasa_pose3d` metadata (box from the data, rat
+skeleton for known names). Options: the file's up axis (y-up files turned),
+renaming markers, skeleton lines, a frame range.
+* 3-D tab: *Import motion capture (C3D)* section (`pose3d_c3d`, detect path
+  `sources/pose3d`); the 3-D viewer section has *(no video)* and lists
+  `sources/pose3d/`; `find_pose3d` also looks there.
+* CLI: `mufasa-pose3d import-c3d FILES --project P | --out DIR [--up]
+  [--rename] [--edges] [--frames]`.
+* Section-count pins updated (14 of 17 with a detect path, 11 wired forms).
+  Test: `smoke_122kl_c3d_import` (writes C3D files in every storage form).
+
 **122kk — project links survive an sshfs mount; classifier table warning.**
 Imported videos were symbolic links holding the absolute path of the
 original; opening the project on an sshfs mount (another path) broke every

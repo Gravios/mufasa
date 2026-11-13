@@ -255,8 +255,8 @@ def main() -> int:
                         and isinstance(m.value, ast.Constant)
                         and isinstance(m.value.value, str)):
                     wired_ids.add(m.value.value)
-    # 122kf: + pose3d_calibration, pose3d, pose3d_kalman.
-    expected_wired = 10
+    # 122kf: + pose3d_calibration, pose3d, pose3d_kalman; 122kl: + pose3d_c3d.
+    expected_wired = 11
     check(
         f"Total wired forms is now {expected_wired} (was 5 "
         f"pre-122fj; features_roi + features_compute_subset "

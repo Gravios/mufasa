@@ -9,6 +9,7 @@
     mufasa-pose3d infer --pose labels.parquet --camera camera.toml [--fallback smoothed.parquet] --out out_3d.parquet
     mufasa-pose3d smooth IN_3d.parquet --out OUT_3d.parquet [--camera camera.toml] [--sigma-a 3000]
     mufasa-pose3d gpu-check [--frames 20000]      # GPU solver: synthetic run, CPU vs CUDA
+    mufasa-pose3d import-c3d TRIAL.c3d ... --project project.toml [--up y] [--rename a=b,c=d] [--edges a-b,b-c]
 
 MARKS.json (pixels of one frame of the empty box)::
 
@@ -90,6 +91,16 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--workers", type=int, default=None,
                    help="processes (default: all cores but one); several videos run at once, "
                         "a single video splits its chunks")
+    ic = sub.add_parser("import-c3d", help="motion capture (.c3d) → 3-D pose files")
+    ic.add_argument("files", nargs="+")
+    ic.add_argument("--project", help="write to the project's sources/pose3d/")
+    ic.add_argument("--out", help="output folder (instead of --project)")
+    ic.add_argument("--up", choices=["z", "y", "x"], default="z", help="the file's up axis (becomes z)")
+    ic.add_argument("--rename", default="", help="mocap=project marker names, comma separated")
+    ic.add_argument("--edges", default="", help="skeleton lines a-b,b-c (default: the rat skeleton "
+                                                "for the markers present)")
+    ic.add_argument("--frames", type=int, nargs=2, metavar=("FIRST", "LAST"),
+                    help="frame range (0-based, end exclusive)")
     gc = sub.add_parser("gpu-check", help="is the GPU solver usable here? (synthetic run, CPU vs CUDA)")
     gc.add_argument("--frames", type=int, default=20000)
     s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file")
@@ -162,6 +173,29 @@ def main(argv: list[str] | None = None) -> int:
         if produced != out:
             produced.replace(out)
         print(f"wrote {out}")
+        return 0
+    if a.cmd == "import-c3d":
+        from mufasa.pose3d.c3d import import_c3d, read_c3d
+        if a.project:
+            from mufasa.project_layout import resolve_v1_project_root
+            root = resolve_v1_project_root(str(a.project))
+            if root is None:
+                print("not a v1 Mufasa project: " + a.project, file=sys.stderr)
+                return 2
+            out_dir = Path(root) / "sources" / "pose3d"
+        elif a.out:
+            out_dir = Path(a.out)
+        else:
+            print("give --project or --out", file=sys.stderr)
+            return 2
+        from mufasa.pose3d.c3d import parse_edges, parse_rename
+        rename, edges = parse_rename(a.rename), parse_edges(a.edges)
+        for f in a.files:
+            c = read_c3d(f)
+            out = import_c3d(f, out_dir, up=a.up, rename=rename, edges=edges,
+                             frames=tuple(a.frames) if a.frames else None)
+            print(f"{Path(f).name}: {len(c.labels)} markers, {len(c.points)} frames at {c.rate:g} Hz "
+                  f"({c.units}) → {out}")
         return 0
     if a.cmd == "gpu-check":
         from mufasa.pose3d import gpu

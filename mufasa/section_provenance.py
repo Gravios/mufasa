@@ -605,6 +605,14 @@ SECTIONS: dict[str, SectionSpec] = {
         section_title="3-D Kalman smoothing",
         depends_on=("pose3d",),
     ),
+    # Patch 122kl — motion capture in.
+    "pose3d_c3d": SectionSpec(
+        section_id="pose3d_c3d",
+        page="3-D",
+        section_title="Import motion capture (C3D)",
+        depends_on=(),
+        detect_path=lambda root: root / "sources" / "pose3d",
+    ),
 }
 
 
