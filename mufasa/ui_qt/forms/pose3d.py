@@ -507,6 +507,19 @@ class Pose3DInferenceForm(OperationForm):
         self.workers.setToolTip("Processes. Several videos run at once; a single video splits its "
                                 "6000-frame chunks over them. Each needs a few hundred MB.")
         f.addRow("Workers", self.workers)
+        from mufasa.pose3d import gpu
+        self.solver = QComboBox(self)
+        for label, dev in (("Auto (GPU when available)", "auto"), ("GPU (CUDA, PyTorch)", "cuda"),
+                           ("CPU (PyTorch)", "torch-cpu"), ("CPU (SciPy)", "cpu")):
+            self.solver.addItem(label, dev)
+        model = self.solver.model()
+        if not gpu.cuda_available():
+            model.item(1).setEnabled(False)
+        if not gpu.available():
+            model.item(2).setEnabled(False)
+        self.solver.setToolTip("Head and spine solver. The PyTorch versions are a port of the SciPy "
+                               "solver: same results within rounding, faster; on the GPU much faster.")
+        f.addRow("Solver", self.solver)
         self.body_layout.addLayout(f)
         self.cal_dir.textChanged.connect(self.refresh)
         self.pose_dir.textChanged.connect(self.refresh)
@@ -544,7 +557,7 @@ class Pose3DInferenceForm(OperationForm):
         mono = MonoConfig(head_width_mm=self.head_w.value(), body_scale=self.body_scale.value(),
                           fps=self.fps.value(), use_trunk_prior=self.prior.isChecked(),
                           wall_tolerance_mm=self.wall_tol.value(),
-                          spine_chain=self.chain.isChecked())
+                          spine_chain=self.chain.isChecked(), device=self.solver.currentData())
         kal = Kalman3DConfig(fps=self.fps.value(), sigma_a=self.sig_a.value()) if self.kal.isChecked() else None
         st = RunSettings(mode="stereo" if self.mode.currentIndex() == 1 else "mono", mono=mono, kalman=kal,
                          workers=self.workers.value())

@@ -97,6 +97,11 @@ class MonoConfig:
     head_iters: int = 150
     # processes for the per-chunk head and spine fits (1: in this process)
     workers: int = 1
+    # head and spine solver: "cuda" (PyTorch on the GPU), "torch-cpu"
+    # (PyTorch on the CPU) or "cpu" (SciPy); "auto": the first available of
+    # those. The PyTorch path is a port of the same trust-region solver
+    # (122kj): same results within rounding, faster even on the CPU.
+    device: str = "auto"
 
 
 # --------------------------------------------------------------------------- #
@@ -305,7 +310,7 @@ class RigidHead:
 
     def fit_sequence(self, uv: np.ndarray, lk: np.ndarray, box=None, *, sigma: float = 2.5,
                      roll_sd_deg: float = 20.0, iters: int = 150,
-                     wall_tolerance_mm: float = 20.0) -> tuple[np.ndarray, np.ndarray]:
+                     wall_tolerance_mm: float = 20.0, device: str = "cpu") -> tuple[np.ndarray, np.ndarray]:
         """All frames jointly: reprojection, box limits, roll prior, smooth
         motion. ``uv`` (n, m, 2) may hold NaN (weight 0)."""
         n, m = uv.shape[:2]
@@ -318,6 +323,9 @@ class RigidHead:
         wt = np.sqrt(np.clip((np.nan_to_num(lk) - .3) / .6, 0, 1))
         wt[~np.isfinite(uv).all(2)] = 0
         uvf = np.nan_to_num(uv)
+        if device != "cpu":
+            return self._fit_sequence_torch(x0, uvf, wt, box, sigma=sigma, roll_sd_deg=roll_sd_deg,
+                                            iters=iters, wall_tolerance_mm=wall_tolerance_mm, device=device)
         cont = (8.0, np.deg2rad(8))
 
         def res(x):
@@ -355,13 +363,44 @@ class RigidHead:
         Xw = P[:, None, :3] + np.einsum("nij,mj->nmi", _rotm(P[:, 3:]), T)
         return P, Xw
 
+    def _fit_sequence_torch(self, x0, uvf, wt, box, *, sigma, roll_sd_deg, iters, wall_tolerance_mm, device):
+        from mufasa.pose3d import gpu
+        f = gpu.head_residual_fn(self.cam, self.T, box, sigma=sigma, roll_sd_deg=roll_sd_deg,
+                                 wall_tolerance_mm=wall_tolerance_mm, device=device)
+        out = gpu.solve_frames(f, x0, (uvf, wt), gpu.HEAD_SMOOTH_W, device=device, max_nfev=iters)
+        self.last_cost = out.cost
+        P = out.x
+        T = self.T
+        Xw = P[:, None, :3] + np.einsum("nij,mj->nmi", _rotm(P[:, 3:]), T)
+        return P, Xw
+
 
 # --------------------------------------------------------------------------- #
 # Full single-camera reconstruction
 # --------------------------------------------------------------------------- #
-def _pool(workers: int):
-    """A process pool for the per-chunk fits, or None for ``workers`` ≤ 1."""
-    if workers is None or workers <= 1:
+def resolve_device(spec: str) -> str:
+    """``MonoConfig.device`` → "cuda", "torch-cpu" or "cpu" (SciPy).
+    "auto": cuda when PyTorch sees a GPU, else torch-cpu when PyTorch is
+    installed, else cpu."""
+    if spec in (None, "", "cpu", "scipy"):
+        return "cpu"
+    from mufasa.pose3d import gpu
+    if spec == "auto":
+        return "cuda" if gpu.cuda_available() else ("torch-cpu" if gpu.available() else "cpu")
+    if spec in ("cuda", "gpu"):
+        gpu.resolve_device("cuda")                       # raises when unavailable
+        return "cuda"
+    if spec == "torch-cpu":
+        gpu.resolve_device("cpu")
+        return "torch-cpu"
+    raise ValueError(f"unknown device {spec!r} (cpu, cuda, torch-cpu or auto)")
+
+
+def _pool(workers: int, device: str = "cpu"):
+    """A process pool for the per-chunk fits, or None for ``workers`` ≤ 1.
+    No pool for the GPU: one process drives it (CUDA does not survive a
+    fork)."""
+    if workers is None or workers <= 1 or resolve_device(device) == "cuda":
         return None
     from concurrent.futures import ProcessPoolExecutor
     return ProcessPoolExecutor(max_workers=int(workers))
@@ -372,7 +411,7 @@ def reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig | None = None
     """3-D pose from one camera. Returns (DataFrame, report).
     ``cfg.workers`` > 1 runs the head and spine chunks in parallel."""
     cfg = cfg or MonoConfig()
-    pool = _pool(cfg.workers)
+    pool = _pool(cfg.workers, cfg.device)
     try:
         return _reconstruct_mono(pose, camera, cfg, progress, pool)
     finally:
@@ -383,6 +422,7 @@ def reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig | None = None
 def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
                       pool) -> tuple[pd.DataFrame, dict]:
     say = progress or (lambda s: None)
+    device = resolve_device(cfg.device)
     t_start = time.time()
     cam0 = replace(camera, dist=np.zeros(5))           # work in undistorted pixels
     N = pose.n
@@ -391,6 +431,7 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
     L = pose.lk
     has = set(pose.names)
     report: dict = {"frames": N, "steps": []}
+    report["solver"] = {"cuda": "PyTorch on the GPU", "torch-cpu": "PyTorch on the CPU"}.get(device, "SciPy")
     X: dict[str, np.ndarray] = {}
     box = camera.box
 
@@ -413,7 +454,7 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
     CH, OV = cfg.chunk, 300
     spans = [(s, max(0, s - OV), min(N, s + CH + OV)) for s in range(0, N, CH)]
     kw = {"roll_sd_deg": cfg.head_roll_sd_deg, "iters": cfg.head_iters,
-          "wall_tolerance_mm": cfg.wall_tolerance_mm}
+          "wall_tolerance_mm": cfg.wall_tolerance_mm, "device": device}
     say(f"head: {len(spans)} chunk(s) of {CH} frames" + (f" on {cfg.workers} workers" if pool else ""))
     results = (pool.map if pool else map)(_head_chunk, [(rh, huv[a:b], hlk[a:b], box, kw) for _, a, b in spans])
     for i, ((s, a, _), Xc) in enumerate(zip(spans, results)):
@@ -484,7 +525,7 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
         free = [m for m in reversed(spine) if m not in cfg.pelvis]
         for p in range(cfg.chain_passes):
             say(f"spine chain pass {p + 1}/{cfg.chain_passes}")
-            _chain_refit(cam0, X, chain, free, prior, cfg, box, pool)
+            _chain_refit(cam0, X, chain, free, prior, cfg, box, pool, device)
         report["steps"].append(f"spine chain ({cfg.chain_passes} passes)")
 
     # 5. tail ---------------------------------------------------------------- #
@@ -526,7 +567,7 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
 # Spine chain refit
 # --------------------------------------------------------------------------- #
 def _chain_refit(cam: Camera, X: dict, chain: list[str], free: list[str], prior: Rat7MPrior,
-                 cfg: MonoConfig, box, pool=None) -> None:
+                 cfg: MonoConfig, box, pool=None, device: str = "cpu") -> None:
     """Refit the heights of ``free`` chain labels (tail→head order in
     ``chain``) on their rays; see the module docstring. Chunks run on
     ``pool`` (a process pool) when given."""
@@ -541,7 +582,7 @@ def _chain_refit(cam: Camera, X: dict, chain: list[str], free: list[str], prior:
     CH, OV = cfg.chunk, 100
     spans = [(s, max(0, s - OV), min(N, s + CH + OV)) for s in range(0, N, CH)]
     payloads = [{
-        "C": C, "chain": chain, "free": free, "n_mid": n_mid,
+        "C": C, "chain": chain, "free": free, "n_mid": n_mid, "device": device,
         "fixed": {m: X[m][a:b] for m in chain if m not in free},
         "D": {m: D[m][a:b] for m in free},
         "z0": np.stack([X[m][a:b, 2] for m in free], 1),
@@ -563,6 +604,15 @@ def _chain_chunk(p: dict) -> np.ndarray:
     C, chain, free, n_mid = p["C"], p["chain"], p["free"], p["n_mid"]
     D, z0, hdl, fixed = p["D"], p["z0"], p["hd"], p["fixed"]
     n, nf = z0.shape
+    if p.get("device", "cpu") != "cpu":
+        from mufasa.pose3d import gpu
+        f = gpu.chain_residual_fn(C, chain, free, n_mid, p["device"])
+        Dk = np.stack([D[m] for m in free], 1)                               # (n, nf, 3)
+        Fx = np.stack([fixed[m] for m in chain if m not in free], 1)        # (n, nfix, 3)
+        L4 = np.stack([p["lim"][k] for k in ("M50", "M95", "F5", "F95")], 1)
+        o = gpu.solve_frames(f, z0, (Dk, Fx, z0, hdl, L4), np.full(nf, 1 / 64.0),
+                             device=p["device"], max_nfev=60)
+        return o.x
     M50, M95, F5, F95 = (p["lim"][k] for k in ("M50", "M95", "F5", "F95"))
     rad = np.deg2rad
 

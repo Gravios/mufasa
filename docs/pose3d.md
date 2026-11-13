@@ -112,10 +112,35 @@ per-video report. `run.toml` and `report.json` sit beside them.
 mufasa-pose3d calibrate-box marks.json --width 300 --camera-height 500 --out sources/calibration/camera_K7.toml
 mufasa-pose3d calibrate-checkerboard board.mp4 --pattern 9 6 --square-mm 20 --out lens.toml
 mufasa-pose3d calibrate-box marks.json --length 554 --width 300 --intrinsics lens.toml --out camera_K7.toml
-mufasa-pose3d infer --project project.toml [--video STEM ...] [--no-kalman] [--stereo camA camB] [--workers N]
+mufasa-pose3d infer --project project.toml [--video STEM ...] [--no-kalman] [--stereo camA camB] [--workers N] [--device cuda]
+mufasa-pose3d gpu-check
 mufasa-pose3d infer --pose labels.parquet --fallback kv2.parquet --camera camera_K7.toml --out K7_3d.parquet
 mufasa-pose3d smooth K7_3d.parquet --camera camera_K7.toml --out K7_3d_smooth.parquet
 ```
+
+## Solver: GPU, PyTorch or SciPy
+
+The head and spine-chain fits (most of the time) run on
+
+* **GPU** — PyTorch with CUDA; several videos share the GPU (up to 4 at
+  once, in fresh processes);
+* **CPU (PyTorch)** — the same code on the CPU, about 2× faster than SciPy
+  per core;
+* **CPU (SciPy)** — the original.
+
+*Solver* (tab) / `--device auto|cuda|torch-cpu|cpu` (CLI) /
+`MonoConfig.device`; *auto* (default) takes the first available. The
+PyTorch solver is a port of SciPy's trust-region solver (same steps, exact
+derivatives), so results match within rounding (K7, 13 000 frames: median
+difference 2·10⁻⁵ mm, 99th percentile 4–5 mm in poorly constrained
+frames). PyTorch comes with the `gpu` extra (`pip install -e '.[gpu]'`);
+an RTX 50xx (Blackwell) needs a CUDA ≥ 12.8 build. Check a machine with
+
+```
+mufasa-pose3d gpu-check
+```
+
+(a synthetic run on CPU and GPU: time and agreement).
 
 ## Workers
 

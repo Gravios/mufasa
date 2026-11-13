@@ -57,6 +57,9 @@ class RunSettings:
     workers: int = 1
 
 
+GPU_VIDEO_WORKERS = 4          # videos at once when the solver runs on the GPU
+
+
 def default_workers() -> int:
     """Leave one core for the GUI / system."""
     import os
@@ -158,7 +161,8 @@ def run_job(job: Job, settings: RunSettings, out_dir, progress=None) -> dict:
         center = cam.center
         method = (f"single camera: rigid head (ear width {settings.mono.head_width_mm:.1f} mm), "
                   "Rat7M trunk heights, pelvis pitched to the lumbar angle, spine chain within "
-                  "Rat7M bend limits, tail draped; labels on their camera rays")
+                  "Rat7M bend limits, tail draped; labels on their camera rays"
+                  f"; solver: {rep.get('solver', 'SciPy')}")
     names = [c[:-2] for c in df.columns if c.endswith("_z")]
     if settings.kalman is not None:
         say(f"{job.stem}: 3-D Kalman smoothing")
@@ -233,14 +237,24 @@ def run_pose3d(jobs: list[Job], settings: RunSettings, out_dir, *, progress=None
     out_dir.mkdir(parents=True, exist_ok=True)
     reports = {}
     w = max(1, int(settings.workers or 1))
+    from mufasa.pose3d.mono import resolve_device
+    on_gpu = settings.mode == "mono" and resolve_device(settings.mono.device) == "cuda"
     if w > 1 and len(jobs) > 1:
+        import multiprocessing
         from concurrent.futures import ProcessPoolExecutor, as_completed
         per = replace(settings, mono=replace(settings.mono, workers=1))
         n = min(w, len(jobs))
+        ctx = None
+        if on_gpu:
+            # fresh processes (CUDA does not survive a fork), each with its own
+            # GPU context; a few keep the GPU busy while the others do the CPU
+            # steps
+            n = min(n, GPU_VIDEO_WORKERS)
+            ctx = multiprocessing.get_context("spawn")
         if progress:
-            progress(f"{len(jobs)} videos on {n} workers")
+            progress(f"{len(jobs)} videos on {n} workers" + (" sharing the GPU" if on_gpu else ""))
         t0 = time.time()
-        with ProcessPoolExecutor(max_workers=n) as ex:
+        with ProcessPoolExecutor(max_workers=n, mp_context=ctx) as ex:
             futs = [ex.submit(_run_job_quiet, (job, per, out_dir)) for job in jobs]
             for i, f in enumerate(as_completed(futs)):
                 stem, rep = f.result()

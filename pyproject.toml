@@ -132,6 +132,9 @@ qt = [
 # ensure driver >=570 and nvidia-open kernel modules.
 gpu = [
     "cupy-cuda12x>=13.0",
+    # 3-D pose on the GPU (patch 122kj). A CUDA build of PyTorch — the PyPI
+    # wheel is one on Linux; Blackwell (RTX 50xx) needs CUDA ≥12.8 builds.
+    "torch>=2.4",
     # numba >=0.60 is already in base deps; its CUDA backend is what this
     # extra mainly "activates". Kept here as a marker so ``pip install
     # .[gpu]`` documents the intent.
@@ -184,6 +187,7 @@ all = [
     "PySide6>=6.8,<7.0",
     # gpu
     "cupy-cuda12x>=13.0",
+    "torch>=2.4",
     # onnx
     "onnx>=1.16",
     "onnxruntime>=1.18",

@@ -5,8 +5,10 @@
         [--wall-height 300] [--intrinsics lens.toml] --out sources/calibration/camera_K7.toml
     mufasa-pose3d calibrate-checkerboard VIDEO_OR_DIR --pattern 9 6 --square-mm 20 --out lens.toml
     mufasa-pose3d infer --project project.toml [--video STEM ...] [--no-kalman] [--stereo camA camB] [--workers N]
+        [--device auto|cuda|torch-cpu|cpu]
     mufasa-pose3d infer --pose labels.parquet --camera camera.toml [--fallback smoothed.parquet] --out out_3d.parquet
     mufasa-pose3d smooth IN_3d.parquet --out OUT_3d.parquet [--camera camera.toml] [--sigma-a 3000]
+    mufasa-pose3d gpu-check [--frames 20000]      # GPU solver: synthetic run, CPU vs CUDA
 
 MARKS.json (pixels of one frame of the empty box)::
 
@@ -82,9 +84,14 @@ def build_parser() -> argparse.ArgumentParser:
     i.add_argument("--no-trunk-prior", action="store_true")
     i.add_argument("--no-spine-chain", action="store_true")
     i.add_argument("--fps", type=float, default=30.0)
+    i.add_argument("--device", choices=["auto", "cuda", "torch-cpu", "cpu"], default="auto",
+                   help="head/spine solver: cuda (PyTorch GPU), torch-cpu, cpu (SciPy); "
+                        "auto = the first available")
     i.add_argument("--workers", type=int, default=None,
                    help="processes (default: all cores but one); several videos run at once, "
                         "a single video splits its chunks")
+    gc = sub.add_parser("gpu-check", help="is the GPU solver usable here? (synthetic run, CPU vs CUDA)")
+    gc.add_argument("--frames", type=int, default=20000)
     s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file")
     s.add_argument("input")
     s.add_argument("--out", required=True)
@@ -101,7 +108,7 @@ def settings_from(a):
     from mufasa.pose3d.mono import MonoConfig
     from mufasa.pose3d.pipeline import RunSettings, default_workers
     mono = MonoConfig(head_width_mm=a.head_width, body_scale=a.body_scale, fps=a.fps,
-                      wall_tolerance_mm=a.wall_tolerance,
+                      wall_tolerance_mm=a.wall_tolerance, device=a.device,
                       use_trunk_prior=not a.no_trunk_prior, spine_chain=not a.no_spine_chain)
     kal = None if a.no_kalman else Kalman3DConfig(fps=a.fps, sigma_a=a.sigma_a)
     return RunSettings(mode="stereo" if a.stereo else "mono", mono=mono, kalman=kal,
@@ -156,6 +163,16 @@ def main(argv: list[str] | None = None) -> int:
             produced.replace(out)
         print(f"wrote {out}")
         return 0
+    if a.cmd == "gpu-check":
+        from mufasa.pose3d import gpu
+        if not gpu.available():
+            print("PyTorch is not installed: pip install torch (a CUDA build for the GPU)")
+            return 1
+        import torch
+        print(f"PyTorch {torch.__version__}; CUDA available: {torch.cuda.is_available()}"
+              + (f" ({torch.cuda.get_device_name(0)})" if torch.cuda.is_available() else ""))
+        out = gpu.gpu_check(a.frames)
+        return 0 if ("cuda" not in out or out.get("max_difference", 1) < 1e-3) else 1
     if a.cmd == "smooth":
         from mufasa.pose3d.camera import Camera
         from mufasa.pose3d.io import marker_names, read_pose3d, write_pose3d

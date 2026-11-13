@@ -8,6 +8,37 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kj — 3-D pose on the GPU (PyTorch).**
+New `mufasa/pose3d/gpu.py`: the single-camera head and spine-chain fits in
+PyTorch, on CUDA or the CPU. *Solver* on the 3-D tab, `--device
+auto|cuda|torch-cpu|cpu` on `mufasa-pose3d infer`, `MonoConfig.device`
+(default *auto*: GPU, else PyTorch on the CPU, else SciPy).
+* **Solver.** A port of SciPy's `least_squares(method="trf",
+  x_scale="jac", tr_solver="lsmr")` — the CPU path's solver — with the
+  same trust-region loop, regularised LSMR, 2-D subspace step, radius update
+  and stopping tests. Residuals and per-frame Jacobians come from
+  `torch.func` (exact); the Jacobian is applied as batched per-frame blocks
+  plus the smoothness rows. Float64 (the work is launch-bound, so slow
+  consumer-GPU FP64 does not matter). Same 6000-frame chunks as the CPU.
+* **Same results.** The PyTorch residuals equal the NumPy ones to the last
+  digit. K7 head chunk 5700–12 300: cost 19 015.3 against SciPy's 19 014.8,
+  identical 2-D error, no yaw flips. K7, 13 000 frames, whole
+  reconstruction: median difference 2·10⁻⁵ mm, 95th percentile 0.3 mm, 99th
+  4–5 mm (head); trunk heights, pelvis pitch, spine length unchanged.
+  Exact Levenberg–Marquardt steps (one damping, per-frame damping, frame
+  rollback) were tried first and settled in clearly worse minima on K7
+  (33–37k against 19k): the step rule matters, so SciPy's was ported.
+* **Speed.** On this 2-core cloud machine (no GPU): PyTorch on the CPU
+  128 s for 13 000 K7 frames against 383 s for SciPy; about 2× per core
+  single-threaded. PyTorch on the CPU solves with one thread so a video
+  gives the same result whatever the number of workers. The GPU path could
+  not be timed here (no GPU); `mufasa-pose3d gpu-check` times CPU vs CUDA on
+  a synthetic sequence and checks they agree.
+* **Several videos on the GPU** run in spawned processes (CUDA does not
+  survive a fork), at most 4 at once; no chunk pool on the GPU.
+* `torch>=2.4` added to the `gpu` extra. Test: `smoke_122kj_pose3d_gpu`
+  (CUDA agreement is checked when the machine has a GPU).
+
 **122ki — 3-D inference faster: parallel workers and a cheaper Jacobian.**
 * **Workers.** *Workers* on the 3-D tab, `--workers` on `mufasa-pose3d infer`,
   `RunSettings.workers` (default: all cores but one). Several videos run at
