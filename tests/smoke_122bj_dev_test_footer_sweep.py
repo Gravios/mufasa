@@ -144,7 +144,8 @@ def main() -> int:
         "mufasa/feature_extractors/feature_extractor_4bp.py",
         "mufasa/data_processors/agg_clf_calculator.py",
         "mufasa/plotting/heat_mapper_clf.py",
-        "mufasa/labelling/labelling_interface.py",
+        # mufasa/labelling/labelling_interface.py was spot-checked here
+        # until patch 122d5 deleted it with the rest of the Tk surface.
     ]
     for sp in spot_check:
         f = REPO_ROOT / sp

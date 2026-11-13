@@ -8,6 +8,25 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kg — tests brought up to date; the feature viewer's 3-D… button no longer crashes.**
+Fix: `feature_viewer.open_3d` (122ke) used `Path` without importing it, so the
+3-D… button raised NameError when no 3-D file was found next to the session.
+Tests updated for intended changes: `smoke_kalman_diagnostic` writes lowercase
+marker names (names are case-sensitive since 122hb) and runs from any
+directory; `smoke_122ed` accepts the FreeDLC parquet importer (122ie), whose
+Interpolate step is guarded and off for both callers (13 importers);
+`smoke_122bj` no longer spot-checks `labelling_interface.py` (deleted in
+122d5); the section-count pins in `smoke_122ep/eq/er/es/ex/fj` include the
+three 3-D sections (13 of 16 ui_bound sections with a detect path, 10 wired
+forms); the README lists `mufasa-pose3d`, `mufasa-view3d` and the 3-D page
+(`smoke_122iw`). Lint regressions from 122ke/122kf fixed: a lambda shadowing
+its loop variable in `pose3d_viewer` (`smoke_122fs`), a `.format` call in
+`pose3d.pipeline` (`smoke_122fw`), and four unused imports
+(`landscape_animate`, `forms/pose3d`, `csv_export`, `feature_viewer`;
+`smoke_122fy`). Full smoke suite: every test that passed before 122kd passes;
+the 71 that already failed (mostly tests that pin files deleted with the Tk
+surface, lint counts and legacy-INI paths) are unchanged.
+
 **122kf — 3-D pose: calibration, single-camera and stereo inference, 3-D Kalman smoothing, and a "3-D" tab.**
 New package `mufasa/pose3d/`: `camera` (pinhole + lens distortion; calibration
 from marked box edges — principal point from the wall-corner edges, scale from

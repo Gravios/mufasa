@@ -202,10 +202,11 @@ def main() -> int:
                                 and isinstance(m.value.value, str)):
                             wired.add(m.value.value)
     check(
-        f"Currently 5 of {len(SECTIONS)} SECTIONS keys have "
+        f"Currently 10 of {len(SECTIONS)} SECTIONS keys have "
         f"wired forms (was 4 pre-122ex; egocentric is the "
         f"new addition)",
-        len(wired) == 7,
+        # 122fj added two features forms, 122kf three 3-D forms.
+        len(wired) == 10,
         detail=(f"got {len(wired)} wired: {sorted(wired)}"),
     )
 

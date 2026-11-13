@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import argparse
 import colorsys
-import math
 import sys
 import time
 from dataclasses import dataclass

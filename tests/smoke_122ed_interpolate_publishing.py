@@ -370,7 +370,7 @@ def main() -> int:
     #
     # * mufasa/ui_qt/forms/pose_cleanup.py — the form. ONLY caller
     #   reachable from the workbench.
-    # * mufasa/pose_importers/* — 11 importers. Each has a guarded
+    # * mufasa/pose_importers/* — 13 importers. Each has a guarded
     #   call inside `if self.interpolation_settings is not None:`.
     #   The workbench's PoseImportForm passes
     #   ``interpolation_settings=None`` (per the comment in the
@@ -401,6 +401,10 @@ def main() -> int:
         "mufasa/pose_importers/sleap_h5_importer.py",
         "mufasa/pose_importers/sleap_slp_importer.py",
         "mufasa/pose_importers/superanimal_import.py",
+        # Patch 122ie's FreeDLC parquet importer follows the same pattern:
+        # Interpolate only under `if self.interpolation_settings is not None`,
+        # and both callers (the import form, model.session_ingest) leave it None.
+        "mufasa/pose_importers/fdlc_parquet_importer.py",
     }
     real_caller_files = set()
     for hit in caller_hits:
@@ -417,7 +421,7 @@ def main() -> int:
     )
     missing_expected = expected_callers - real_caller_files
     check(
-        "Interpolate caller surface is the form (live) + 12 "
+        "Interpolate caller surface is the form (live) + 13 "
         "pose_importers (unreachable-from-workbench dead branches). "
         "No unexpected callers; the form is still present.",
         not unexpected and not missing_expected,

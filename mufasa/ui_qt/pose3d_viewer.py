@@ -329,7 +329,7 @@ class Volume3DWidget(QWidget):
                 if ok[ja] and ok[jb]:
                     self._line(p, X[ja], X[jb], pen)
             pts, z = self.project(np.where(ok[:, None], X, 0.0))
-            for j in sorted(np.flatnonzero(ok & (z > 0)), key=lambda j: -z[j]):
+            for j in sorted(np.flatnonzero(ok & (z > 0)), key=lambda k: -z[k]):
                 r = max(3.0, min(9.0, 900.0 / max(z[j], 1e-6) * 4))
                 p.setPen(QPen(bg, 1))
                 p.setBrush(self.colors[names[j]])

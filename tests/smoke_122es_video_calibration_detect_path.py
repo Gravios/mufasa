@@ -217,9 +217,10 @@ def main() -> int:
         "smoke_122ep was flipped post-122fj: coverage count "
         "is 11 of 13 (was 11 of 12 pre-122fj; 122fj added "
         "features_compute_subset as a 13th ui_bound section "
-        "without detect_path — relies on record_run instead)",
-        ("len(with_detect) == 11" in ep_src
-         and "11 of 13" in ep_src),
+        "without detect_path — relies on record_run instead; "
+        "122kf's three 3-D sections made it 13 of 16)",
+        ("len(with_detect) == 13" in ep_src
+         and "13 of 16" in ep_src),
     )
 
     # -----------------------------------------------------------------

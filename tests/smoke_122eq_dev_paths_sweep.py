@@ -202,9 +202,12 @@ def main() -> int:
     ui_bound = [s for s in SECTIONS.values() if s.ui_bound]
     with_detect = [s for s in ui_bound if s.detect_path is not None]
     check(
-        "122ep + 122es state preserved: 11 of 13 ui_bound sections have "
+        "122ep + 122es + 122kf state: 13 of 16 ui_bound sections have "
         "detect_path",
-        len(with_detect) == 11 and len(ui_bound) == 13,
+        # 122kf added three 3-D sections (calibration and inference
+        # have detect paths; 3-D Kalman smoothing writes a new
+        # pose3d run).
+        len(with_detect) == 13 and len(ui_bound) == 16,
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 

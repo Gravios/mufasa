@@ -142,9 +142,9 @@ def run_job(job: Job, settings: RunSettings, out_dir, progress=None) -> dict:
         pose = load_pose2d(job.pose, job.fallback, settings.mono.likelihood_threshold)
         df, rep = reconstruct_mono(pose, cam, settings.mono, progress=lambda s: say(f"{job.stem}: {s}"))
         center = cam.center
-        method = ("single camera: rigid head (ear width {:.1f} mm), Rat7M trunk heights, pelvis pitched to the "
-                  "lumbar angle, spine chain within Rat7M bend limits, tail draped; labels on their camera rays"
-                  ).format(settings.mono.head_width_mm)
+        method = (f"single camera: rigid head (ear width {settings.mono.head_width_mm:.1f} mm), "
+                  "Rat7M trunk heights, pelvis pitched to the lumbar angle, spine chain within "
+                  "Rat7M bend limits, tail draped; labels on their camera rays")
     names = [c[:-2] for c in df.columns if c.endswith("_z")]
     if settings.kalman is not None:
         say(f"{job.stem}: 3-D Kalman smoothing")

@@ -35,7 +35,6 @@ directly (useful for scripts that read with ``pd.read_csv()``).
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import pandas as pd
 

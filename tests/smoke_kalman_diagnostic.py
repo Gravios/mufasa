@@ -31,6 +31,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+# Run from anywhere: the repository root on the import path (the other
+# smoke tests do the same).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 # Headless matplotlib for tests
 os.environ.setdefault("MPLBACKEND", "Agg")
 
@@ -186,17 +190,17 @@ def _build_synthetic_csv(
         raise ValueError(f"Unknown pattern {likelihood_pattern}")
 
     df = pd.DataFrame({
-        "Nose_x": nose_x, "Nose_y": nose_y, "Nose_p": nose_p,
-        "Ear_left_x": ear_l_x, "Ear_left_y": ear_l_y, "Ear_left_p": ear_l_p,
-        "Ear_right_x": ear_r_x, "Ear_right_y": ear_r_y,
-        "Ear_right_p": ear_r_p,
-        "Center_x": center_x, "Center_y": center_y, "Center_p": body_p,
-        "Left_flank_x": left_flank_x, "Left_flank_y": left_flank_y,
-        "Left_flank_p": body_p,
-        "Right_flank_x": right_flank_x, "Right_flank_y": right_flank_y,
-        "Right_flank_p": body_p,
-        "Tail_base_x": tail_base_x, "Tail_base_y": tail_base_y,
-        "Tail_base_p": body_p,
+        "nose_x": nose_x, "nose_y": nose_y, "nose_p": nose_p,
+        "ear_left_x": ear_l_x, "ear_left_y": ear_l_y, "ear_left_p": ear_l_p,
+        "ear_right_x": ear_r_x, "ear_right_y": ear_r_y,
+        "ear_right_p": ear_r_p,
+        "center_x": center_x, "center_y": center_y, "center_p": body_p,
+        "left_flank_x": left_flank_x, "left_flank_y": left_flank_y,
+        "left_flank_p": body_p,
+        "right_flank_x": right_flank_x, "right_flank_y": right_flank_y,
+        "right_flank_p": body_p,
+        "tail_base_x": tail_base_x, "tail_base_y": tail_base_y,
+        "tail_base_p": body_p,
     })
     df.to_csv(path, index=True)
 
@@ -206,8 +210,8 @@ def main() -> int:
     # Case 1: marker column detection
     # ---------------------------------------------------------- #
     df = pd.DataFrame({
-        "Nose_x": [1, 2], "Nose_y": [3, 4], "Nose_p": [0.9, 0.95],
-        "Tail_x": [5, 6], "Tail_y": [7, 8], "Tail_p": [0.8, 0.85],
+        "nose_x": [1, 2], "nose_y": [3, 4], "nose_p": [0.9, 0.95],
+        "tail_x": [5, 6], "tail_y": [7, 8], "tail_p": [0.8, 0.85],
         "Bad_x": [0, 0], "Bad_y": [0, 0],   # missing _p — should skip
     })
     df.columns = [c.lower() for c in df.columns]
@@ -501,11 +505,11 @@ def main() -> int:
         cx = 200 + 50 * np.sin(t / 200)
         cy = 200 + 50 * np.cos(t / 200)
         df = pd.DataFrame({
-            "Nose_x": cx + 10, "Nose_y": cy, "Nose_p": np.full(n, 0.99),
-            "Ear_left_x": cx, "Ear_left_y": cy + 5,
-            "Ear_left_p": np.full(n, 0.99),
-            "Ear_right_x": cx, "Ear_right_y": cy - 5,
-            "Ear_right_p": np.full(n, 0.99),
+            "nose_x": cx + 10, "nose_y": cy, "nose_p": np.full(n, 0.99),
+            "ear_left_x": cx, "ear_left_y": cy + 5,
+            "ear_left_p": np.full(n, 0.99),
+            "ear_right_x": cx, "ear_right_y": cy - 5,
+            "ear_right_p": np.full(n, 0.99),
         })
         df.to_csv(csv, index=True)
 
@@ -602,30 +606,30 @@ def main() -> int:
         # runs.
         n = 100
         df_a = pd.DataFrame({
-            "Nose_x": [10.0] * n,
-            "Nose_y": [20.0] * n,
-            "Nose_p": [0.99] * (n - 20) + [0.0] * 20,
-            "Ear_left_x": [11.0] * n,
-            "Ear_left_y": [21.0] * n,
-            "Ear_left_p": [0.99] * n,
-            "Ear_right_x": [12.0] * n,
-            "Ear_right_y": [22.0] * n,
-            "Ear_right_p": [0.99] * n,
-            "Center_x": [10.0] * n,
-            "Center_y": [20.0] * n,
-            "Center_p": [0.99] * n,
-            "Left_flank_x": [9.0] * n,
-            "Left_flank_y": [21.0] * n,
-            "Left_flank_p": [0.99] * n,
-            "Right_flank_x": [11.0] * n,
-            "Right_flank_y": [21.0] * n,
-            "Right_flank_p": [0.99] * n,
-            "Tail_base_x": [10.0] * n,
-            "Tail_base_y": [25.0] * n,
-            "Tail_base_p": [0.99] * n,
+            "nose_x": [10.0] * n,
+            "nose_y": [20.0] * n,
+            "nose_p": [0.99] * (n - 20) + [0.0] * 20,
+            "ear_left_x": [11.0] * n,
+            "ear_left_y": [21.0] * n,
+            "ear_left_p": [0.99] * n,
+            "ear_right_x": [12.0] * n,
+            "ear_right_y": [22.0] * n,
+            "ear_right_p": [0.99] * n,
+            "center_x": [10.0] * n,
+            "center_y": [20.0] * n,
+            "center_p": [0.99] * n,
+            "left_flank_x": [9.0] * n,
+            "left_flank_y": [21.0] * n,
+            "left_flank_p": [0.99] * n,
+            "right_flank_x": [11.0] * n,
+            "right_flank_y": [21.0] * n,
+            "right_flank_p": [0.99] * n,
+            "tail_base_x": [10.0] * n,
+            "tail_base_y": [25.0] * n,
+            "tail_base_p": [0.99] * n,
         })
         df_b = df_a.copy()
-        df_b["Nose_p"] = [0.0] * 20 + [0.99] * (n - 20)
+        df_b["nose_p"] = [0.0] * 20 + [0.99] * (n - 20)
 
         csv_a = td / "fileA.csv"
         csv_b = td / "fileB.csv"

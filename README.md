@@ -68,6 +68,8 @@ Docs: [workflows.md (Stages 5–8)](docs/workflows.md) · [workflow_recipes.md](
 | `mufasa-preview` | Pose-overlay viewer: plays a video with its raw and smoothed markers, pairing files by session name (`--video`, or `--folder` to search a directory). |
 | `mufasa-landscape` | Exploratory map of a project: loads the Kalman v2 pose and features of every session, finds column pairs with multimodal joint distributions (dip-test splitting) and plots their joint PDFs, and runs t-SNE on a frame sample. Needs the `analysis` extra. |
 | `mufasa-landscape-animate` | Animated GIF (and MP4) of a `mufasa-landscape` run for presentations: the sampled frames glide from the t-SNE map into the joint scatter of each chosen feature pair and back, coloured by their position in the t-SNE map. |
+| `mufasa-pose3d` | 3-D pose from the command line: camera calibration from marked box edges or a checkerboard, single-camera or stereo 3-D inference, 3-D Kalman smoothing (see [`docs/pose3d.md`](docs/pose3d.md)). |
+| `mufasa-view3d` | 3-D marker viewer with the video below the reconstruction volume. |
 
 The workbench sidebar follows the pipeline:
 
@@ -76,6 +78,7 @@ The workbench sidebar follows the pipeline:
 | Projects | Create, open and inspect projects. |
 | Data Import · Data inspector · Model modifications | Import pose data and videos, check column names, rename markers. |
 | Preprocessing | Video preprocessing and calibration, interpolation, Kalman v2 smoothing, outlier correction, egocentric alignment. |
+| 3-D | Camera calibration, 3-D pose from one or two cameras, 3-D Kalman smoothing, the 3-D viewer. |
 | ROI | Draw ROIs, analyse and visualise them, compute ROI features. |
 | Features | Compute feature families from the smoothed pose. |
 | Manage classifiers · Annotation · Train · Validate · Inference | Behavior labelling and the classifier workflow. |

@@ -17,6 +17,8 @@ workbench (or a dialog without one).
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from PySide6.QtCore import QPointF, QRect, Qt, Signal
@@ -292,7 +294,6 @@ class FeatureViewerWidget(QWidget):
         from pathlib import Path
 
         from mufasa.ui_qt.frame_scrubber import FrameScrubberWidget
-        from mufasa.utils.feature_io import load_feature_columns
         self.config_path = config_path
         self.video_name = Path(video_path).stem
         lay = QVBoxLayout(self)
