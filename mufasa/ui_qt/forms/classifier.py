@@ -553,12 +553,12 @@ class ClassifierManageForm(OperationForm):
         self.empty_label.setVisible(not has_any)
         self.table.setVisible(has_any)
 
-        # Double-click on Key cell → edit-key dialog.
-        try:
-            self.table.cellDoubleClicked.disconnect()
-        except (RuntimeError, TypeError):
-            pass
-        self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
+        # Double-click on Key cell → edit-key dialog. Connected once:
+        # disconnecting an unconnected signal makes PySide6 print a
+        # RuntimeWarning on every refresh (122kk).
+        if not getattr(self, "_dbl_click_connected", False):
+            self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
+            self._dbl_click_connected = True
 
     # ------------------------------------------------------------------ #
     # Action handlers

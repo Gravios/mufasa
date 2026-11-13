@@ -41,6 +41,19 @@ from mufasa.ui_qt.recent_project import (
 from mufasa.ui_qt.workbench import MufasaWorkbench
 
 
+def _repair_links(project_config_path: str) -> None:
+    """Patch 122kk: make the project's absolute file links (imported videos)
+    relative, finding their targets through the mount offset when the
+    project is opened on a mount (sshfs) where they are broken."""
+    try:
+        from mufasa.utils.project_links import repair_project_links
+        rep = repair_project_links(Path(project_config_path).parent)
+        if rep.changed or rep.broken or rep.failed:
+            print(f"[project links] {rep.text()}", file=sys.stderr)
+    except Exception as e:                       # never block opening a project
+        print(f"[project links] check skipped: {e}", file=sys.stderr)
+
+
 def build_workbench(project_config_path: str | None = None
                     ) -> MufasaWorkbench:
     """Assemble a workbench with all currently-ported pages.
@@ -54,6 +67,8 @@ def build_workbench(project_config_path: str | None = None
     Tools rather than in the pipeline's step-2 slot. As more pages are
     ported, add them in the position the pipeline demands.
     """
+    if project_config_path:
+        _repair_links(project_config_path)
     wb = MufasaWorkbench(project_config_path=project_config_path)
 
     # --- Pages, in sidebar order (pipeline progression) --------------- #

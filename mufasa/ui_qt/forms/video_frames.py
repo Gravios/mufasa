@@ -46,7 +46,6 @@ Backend functions used:
 """
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 
@@ -518,8 +517,8 @@ class ImportFrameDirectoryForm(OperationForm):
         if symlink:
             # symlink the whole directory, not contents — copytree
             # semantic equivalent.
-            os.symlink(source, destination,
-                       target_is_directory=True)
+            from mufasa.utils.project_links import link_file
+            link_file(source, destination)              # relative (122kk)
         else:
             shutil.copytree(source, destination)
 

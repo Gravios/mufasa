@@ -22,7 +22,7 @@ Coverage:
    ``frames_to_movie``.
 3. **ImportFrameDirectoryForm shape** — src + dst pickers,
    symlink toggle, target() calls shutil.copytree or
-   os.symlink, collect_args() validates source-has-images
+   a (relative) link, collect_args() validates source-has-images
    and destination-doesn't-exist.
 4. **Legacy class removal** — the four classes are gone from
    ``video_processing_pop_up.py``; deletion-record markers
@@ -160,9 +160,9 @@ def main() -> int:
             "shutil.copytree" in class_src,
         )
         check(
-            "ImportFrameDirectoryForm.target uses os.symlink "
-            "for symlink mode",
-            "os.symlink" in class_src,
+            "ImportFrameDirectoryForm.target links in symlink mode "
+            "(relative link_file since 122kk)",
+            "os.symlink" in class_src or "link_file(" in class_src,
         )
         # validation: must have images
         if "collect_args" in {

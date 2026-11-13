@@ -225,6 +225,7 @@ mufasa-preview   = "mufasa.tools.pose_preview:main"  # patch 122hy: pose-overlay
 mufasa-landscape = "mufasa.tools.feature_landscape:main"  # patch 122ix: dipsplit joint PDFs + t-SNE of pose/features
 mufasa-landscape-animate = "mufasa.tools.landscape_animate:main"  # patch 122iy: GIF/MP4 of frames moving t-SNE <-> feature pairs
 mufasa-view3d    = "mufasa.tools.view3d:main"  # patch 122ke: 3-D marker viewer with the video below
+mufasa-relink    = "mufasa.utils.project_links:main"  # patch 122kk: relative file links (sshfs-safe)
 mufasa-pose3d    = "mufasa.tools.pose3d_cli:main"  # patch 122kf: 3-D calibration, inference, Kalman smoothing
 # patch 122dx: mufasa-chooser entry point removed along with the
 # legacy Qt chooser (mufasa/ui_qt/app.py). Standalone popups can

@@ -70,6 +70,7 @@ Docs: [workflows.md (Stages 5–8)](docs/workflows.md) · [workflow_recipes.md](
 | `mufasa-landscape-animate` | Animated GIF (and MP4) of a `mufasa-landscape` run for presentations: the sampled frames glide from the t-SNE map into the joint scatter of each chosen feature pair and back, coloured by their position in the t-SNE map. |
 | `mufasa-pose3d` | 3-D pose from the command line: camera calibration from marked box edges or a checkerboard, single-camera or stereo 3-D inference, 3-D Kalman smoothing (see [`docs/pose3d.md`](docs/pose3d.md)). |
 | `mufasa-view3d` | 3-D marker viewer with the video below the reconstruction volume. |
+| `mufasa-relink` | Makes a project's file links (imported videos) relative, so they survive mounting the project elsewhere (sshfs, NFS); finds the targets through the mount offset when run on the mount. The workbench does this when it opens a project. |
 
 The workbench sidebar follows the pipeline:
 

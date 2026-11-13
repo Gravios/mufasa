@@ -1589,9 +1589,10 @@ def copy_single_video_to_project(
             shutil.copy(source_path, destination)
         else:
             try:
-                if os.path.isfile(destination):
-                    os.remove(destination)
-                os.symlink(source_path, destination)
+                # Patch 122kk: relative link — survives mounting the
+                # project elsewhere (sshfs); see utils/project_links.
+                from mufasa.utils.project_links import link_file
+                link_file(source_path, destination)
             except OSError as e:
                 raise PermissionError(
                     msg="Symbolic link privilege not held. Try running SimBA in terminal opened in admin mode",
@@ -1659,7 +1660,8 @@ def copy_multiple_videos_to_project(config_path: str | os.PathLike,
                 shutil.copy(file_path, dest1)
             else:
                 try:
-                    os.symlink(file_path, dest1)
+                    from mufasa.utils.project_links import link_file
+                    link_file(file_path, dest1)         # relative (122kk)
                 except OSError:
                     raise PermissionError(msg="Symbolic link privilege not held. Try running SimBA in terminal opened in admin mode")
             timer.stop_timer()

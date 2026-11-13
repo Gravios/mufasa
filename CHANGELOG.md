@@ -8,6 +8,27 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kk — project links survive an sshfs mount; classifier table warning.**
+Imported videos were symbolic links holding the absolute path of the
+original; opening the project on an sshfs mount (another path) broke every
+one ("NO FILES FOUND ERROR: …/sources/videos/K7_….mp4 is not a valid file
+path"). New `mufasa/utils/project_links.py`:
+* imports (single and many videos, frame folders) create **relative**
+  links (`link_file`);
+* `repair_project_links` rewrites absolute links under `sources/` as
+  relative: a working link to the same target; a broken one after finding
+  its target through the mount offset — the target path minus leading parts
+  under each ancestor of the project (`/proc/videos/K7.mp4` on the server,
+  the project at `/cloud/server/proc/mufasa/P` here → `/cloud/server/proc/
+  videos/K7.mp4`); only the project's ancestors are tried, so the relative
+  link names the same file on the server. Targets not reachable here are
+  reported and left alone;
+* the workbench runs it when a project opens (one line on the console when
+  anything changed); `mufasa-relink [PROJECT] [--dry-run]` runs it by hand.
+Also: the classifier table connected its double-click handler after a
+blind `disconnect()`, which made PySide6 print a RuntimeWarning on every
+refresh; it now connects once. Test: `smoke_122kk_project_links`.
+
 **122kj — 3-D pose on the GPU (PyTorch).**
 New `mufasa/pose3d/gpu.py`: the single-camera head and spine-chain fits in
 PyTorch, on CUDA or the CPU. *Solver* on the 3-D tab, `--device
