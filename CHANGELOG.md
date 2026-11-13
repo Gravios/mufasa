@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122km — re-import the skeleton model (markers and skeleton) on the Data Import page.**
+For a retrained pose model with new markers (e.g. eyes, shoulders). New
+`mufasa/model/skeleton_reimport.py` and the Data Import section *Re-import
+skeleton model*: pick the new model's pose file (FreeDLC / DeepLabCut
+parquet, .h5, .csv), read what would change, *Apply*.
+* `[pose] body_parts` ← the file's markers (its order); `[skeleton]` ← the
+  file's embedded skeleton, or the project's edges between markers that
+  remain when the file has none.
+* `[[pose.segments]]` (Kalman v2, takes priority over `[skeleton]`): removed
+  markers leave their segments; each new marker joins the segment of its
+  nearest marker on the new skeleton (eyes → head, shoulders → back); a
+  segment left without markers is dropped and its children re-attached to
+  its parent. New markers with no skeleton path to a segment are reported
+  (the smoother ignores them); optional (*Add new markers to the Kalman v2
+  segments*).
+* Removed markers still named elsewhere in project.toml (`[pose.layout]`,
+  stage settings) are reported, not changed. project.toml is backed up to
+  `logs/project.toml.<timestamp>.bak` first (comments in project.toml are
+  not kept by the rewrite; the backup has them). Pose files already
+  imported are untouched. After applying, the form offers to reopen the
+  project.
+* On the strohA-kj project.toml with eyes and shoulders added and tail_V32
+  dropped: eyes in `head`, shoulders in `back`, `tail_3` removed; the Kalman
+  v2 layout builds with 18 markers. The single-camera 3-D solver does not
+  use eyes or shoulders yet. Test: `smoke_122km_skeleton_reimport`.
+
 **122kl — import motion capture (C3D) as 3-D pose.**
 New `mufasa/pose3d/c3d.py`: a C3D reader needing only NumPy — header and
 parameter section; integer and floating-point point data; Intel, DEC (VAX

@@ -7,6 +7,9 @@ Data Import workbench page. Two sections after patch 122x:
 * **Import pose data** — :class:`PoseImportForm`.
   Loads pose data into the currently-open project's
   ``sources/pose/`` tree.
+* **Re-import skeleton model** (122km) —
+  :class:`SkeletonReimportForm`: markers and skeleton from a retrained
+  model's pose file.
 * **Import video** — :class:`VideoImportForm`. Single video or
   directory of videos into ``sources/videos/``. Patch 122o:
   replaces the legacy Tk ``ImportVideosFrame`` popup.
@@ -51,6 +54,7 @@ from __future__ import annotations
 
 from mufasa.ui_qt.forms.add_sessions import AddSessionsForm
 from mufasa.ui_qt.forms.pose_import import PoseImportForm
+from mufasa.ui_qt.forms.skeleton_reimport import SkeletonReimportForm
 from mufasa.ui_qt.forms.video_import import VideoImportForm
 from mufasa.ui_qt.workbench import WorkflowPage
 
@@ -68,6 +72,9 @@ def build_data_import_page(workbench,
                      [(PoseImportForm, {}), (AddSessionsForm, {})])
     page.add_section("Import video",
                      [(VideoImportForm, {})])
+    # Patch 122km: markers and skeleton from a (retrained) model's pose file.
+    page.add_section("Re-import skeleton model",
+                     [(SkeletonReimportForm, {})])
     return page
 
 

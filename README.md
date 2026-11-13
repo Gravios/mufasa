@@ -77,7 +77,7 @@ The workbench sidebar follows the pipeline:
 | Page | What it covers |
 |---|---|
 | Projects | Create, open and inspect projects. |
-| Data Import · Data inspector · Model modifications | Import pose data and videos, check column names, rename markers. |
+| Data Import · Data inspector · Model modifications | Import pose data and videos, re-import the skeleton model (markers and skeleton) from a retrained model's pose file, check column names, rename markers. |
 | Preprocessing | Video preprocessing and calibration, interpolation, Kalman v2 smoothing, outlier correction, egocentric alignment. |
 | 3-D | Camera calibration, 3-D pose from one or two cameras, 3-D Kalman smoothing, the 3-D viewer. |
 | ROI | Draw ROIs, analyse and visualise them, compute ROI features. |
