@@ -1,7 +1,6 @@
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 from datetime import datetime
-from tkinter import messagebox as mb
 
 from mufasa.utils.enums import Defaults, TagNames
 from mufasa.utils.printing import log_event
@@ -21,7 +20,12 @@ class MufasaError(Exception):
         log_event(logger_name=f"{self.source}.{self.__class__.__name__}", log_type=TagNames.ERROR.value,msg=self.msg)
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.msg}{Defaults.STR_SPLIT_DELIMITER.value}{TagNames.ERROR.value}")
         if self.show_window:
-            mb.showerror(title=WINDOW_TITLE, message=self.msg)
+            # Tk only on demand: a Qt-only Python may have no tkinter.
+            try:
+                from tkinter import messagebox as mb
+                mb.showerror(title=WINDOW_TITLE, message=self.msg)
+            except Exception:
+                pass
 
 
 class NoSpecifiedOutputError(MufasaError):

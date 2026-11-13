@@ -9,6 +9,12 @@ testable in isolation).
 """
 from __future__ import annotations
 
+# Run without installing mufasa: the repository root on the import path.
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import importlib.util
 import shutil
 import sys
@@ -76,19 +82,19 @@ def main() -> int:
     tmp = Path(tempfile.mkdtemp())
     try:
         # ------------------------------------------------------------ #
-        # Case 1: paths dict for a legacy project_config.ini
+        # Case 1: paths dict for a v1 project.toml (legacy
+        # project_config.ini projects were dropped in 122dw)
         # ------------------------------------------------------------ #
-        proj = tmp / "p1" / "project_folder"
-        proj.mkdir(parents=True)
-        cfg = proj / "project_config.ini"
-        cfg.write_text(
-            f"[General settings]\nproject_path = {proj}\n"
-        )
+        from mufasa.project_layout import write_project_toml
+        proj = tmp / "p1"
+        cfg = proj / "project.toml"
+        write_project_toml(cfg, {"project_layout_version": 1,
+                                 "project": {"name": "p1"}})
         out = _project_paths_lite(str(cfg))
         assert out.get("project_root") == str(proj), (
             f"case 1: project_root mismatch — got {out!r}"
         )
-        assert out.get("video_dir") == str(proj / "videos"), (
+        assert out.get("video_dir") == str(proj / "sources" / "videos"), (
             f"case 1: video_dir mismatch — got {out!r}"
         )
         assert out.get("roi_definitions_path") == str(
@@ -96,7 +102,8 @@ def main() -> int:
         ), f"case 1: roi_definitions_path mismatch — got {out!r}"
 
         # ------------------------------------------------------------ #
-        # Case 2: malformed INI (missing project_path) returns {}
+        # Case 2: a config that is not a project (an INI without
+        # project_path) returns {}
         # rather than crashing — see the docstring on
         # _project_paths_lite for the rationale (the dialog wants
         # a polite "no project" state, not an exception).

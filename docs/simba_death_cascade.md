@@ -1,7 +1,7 @@
 # SimBA.py death cascade — scope
 
 **Status:** scoped post-patch 122cw; pending execution (122cy onwards).
-**Authority:** evidence-based reachability audit. All findings reproducible via the AST + grep checks in `tests/smoke_122cx_simba_death_cascade_scope.py`.
+**Authority:** evidence-based reachability audit. Findings were reproducible via the AST + grep checks in `tests/smoke_122cx_simba_death_cascade_scope.py` (retired in 122kh, after the cascade was executed).
 
 ---
 

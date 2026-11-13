@@ -103,11 +103,7 @@ def main() -> int:
             "'project.toml'",
             "project.toml" in class_src,
         )
-        check(
-            "FrameLabellingLauncher _launch warning still mentions "
-            "legacy 'project_config.ini'",
-            "project_config.ini" in class_src,
-        )
+        # Legacy project_config.ini mention dropped with legacy projects (122dw).
 
         # 122aa patch note in class docstring
         check(

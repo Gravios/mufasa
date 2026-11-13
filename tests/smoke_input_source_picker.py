@@ -14,8 +14,6 @@ Coverage:
   exist and contain pose files.
 * v1 projects surface ``sources/pose/`` plus one entry per
   smoothed / outlier-corrected run, sorted newest-first.
-* Post-migration projects (both v1 and legacy paths reachable)
-  list v1 candidates first, legacy after.
 * Exactly one default per call, picked by ``_DEFAULT_PREFER_ORDER``.
 * Empty run dirs are skipped.
 * AST sanity check on the Qt widget class.
@@ -246,42 +244,8 @@ def main() -> int:
             and "bbbbbb" in defaults[0].label,
         )
 
-    # -----------------------------------------------------------
-    # 4. Post-migration: both layouts present
-    # -----------------------------------------------------------
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
-        proj = tmp / "post_mig"
-        proj.mkdir()
-        # v1 layout files
-        paths = _make_v1_project(proj)
-        _make_pose_file(paths.sources_pose)
-        # Plus a legacy INI at the same root pointing to a
-        # legacy-style csv/ tree inside it.
-        legacy_root = proj / "legacy_root"
-        legacy_root.mkdir()
-        _make_pose_file(legacy_root / "csv" / "input_csv")
-        ini = proj / "project_config.ini"
-        ini.write_text(
-            "[General settings]\n"
-            f"project_path = {legacy_root}\n"
-        )
-
-        sources = discover_input_sources(config_path=str(ini))
-        check(
-            "post-migration: both v1 and legacy sources surfaced",
-            len(sources) == 2,
-            detail=f"got {len(sources)}: "
-                   f"{[s.kind for s in sources]}",
-        )
-        check(
-            "post-migration: v1 source comes first",
-            sources[0].path == paths.sources_pose,
-        )
-        check(
-            "post-migration: legacy source comes second",
-            "csv/input_csv" in str(sources[1].path).replace("\\", "/"),
-        )
+    # (4. Post-migration — a legacy INI beside a v1 project — removed:
+    # an INI no longer resolves to a v1 root since 122dw.)
 
     # -----------------------------------------------------------
     # 5. AST sanity on the Qt widget

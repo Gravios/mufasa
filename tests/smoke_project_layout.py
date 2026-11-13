@@ -15,6 +15,12 @@ Covers:
 """
 from __future__ import annotations
 
+# Run without installing mufasa: the repository root on the import path.
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import sys
 import tempfile
 from pathlib import Path
@@ -243,18 +249,8 @@ def _check_detect_layout() -> None:
         # Empty dir
         assert detect_layout(root) == "unknown"
 
-        # Legacy: project_folder/project_config.ini
-        legacy_dir = root / "legacy_proj"
-        (legacy_dir / "project_folder").mkdir(parents=True)
-        (legacy_dir / "project_folder"
-         / "project_config.ini").write_text(
-            "[General settings]\nproject_name=Test\n",
-        )
-        assert detect_layout(legacy_dir) == "legacy"
-        # Pointed at project_folder/ directly
-        assert detect_layout(
-            legacy_dir / "project_folder",
-        ) == "legacy"
+        # Legacy (project_folder/project_config.ini) layouts are no
+        # longer supported (122dw); only v1 and unknown remain.
 
         # v1: project.toml
         v1_dir = root / "v1_proj"

@@ -32,6 +32,9 @@ Read this when planning the next typing/lint sweep or asking "is this file lint-
 
 Read this when you have a real dataset and want to validate the patch series before relying on it.
 
+### `pose3d.md`
+**3-D pose (patch 122kf).** The 3-D tab and `mufasa-pose3d`: camera calibration from marked box edges or a checkerboard, single-camera inference with a Rat7M body prior, two-camera triangulation, 3-D Kalman smoothing, output format, model data.
+
 ### `roi_enhancements_proposal.md` (122dk)
 **ROI tool audit + proposed enhancements.** Honest status of the ROI tool's current capabilities (what's wired, what's fixed, what's missing). Two design proposals: "Apply to selected videos" subset-apply (122dk-future) and drag-to-adjust placed ROIs (122dl-future).
 
@@ -40,6 +43,11 @@ Read this when planning the next ROI feature patches or deciding whether the cur
 ---
 
 ## Workflow & usage
+
+### `qt_workbench_known_issues.md`
+**Known workbench issues** found in real-world use, with severity and status, tracked until a patch fixes them.
+
+Read this before reporting a workbench bug, or when picking the next fix.
 
 ### `workflow_audit.md`
 **Topological view of the system.** AST inventory of all workbench pages, forms, backend classes, the canonical data-flow pipeline, project-layout schemas, and the plotting backend table. Generated post-patch 122bj.
@@ -100,6 +108,15 @@ Read this for the historical record of how each gap was closed, or to understand
 
 Read this when planning Tier-4 work or when considering whether a backend file's Tk use is a candidate for decoupling vs delete-with-parent. The decision rule in §3d is the actionable summary.
 
+### `hardwired_paths_audit.md` (122da)
+**Hardwired-paths audit.** Where code assumed the legacy SimBA folder layout instead of resolving v1 paths; the record behind the v1 path work (legacy projects were dropped in 122dw).
+
+### `simba_death_cascade.md` (122cx)
+**Scope of the `SimBA.py` retirement.** Reachability audit of what had to go with the legacy Tk entry point. Historical: executed in 122cy–122d5.
+
+### `stage_b_checklist.md` (122cy)
+**Pre-Stage-B checklist.** Coverage of every Tk popup by a Qt form before the Tk surface was deleted. Historical: completed.
+
 ### `qt_form_registration_audit.md`
 **Registration check for OperationForm subclasses.** Confirms every form defined under `mufasa/ui_qt/forms/` is reachable from at least one page's `add_section()` call. All 60 subclasses registered (zero orphans) as of patch 122cf. Includes the reproducible AST script and a regression-guard smoke test that flags any future orphan addition.
 
@@ -109,13 +126,13 @@ Read this when adding a new form to remember to wire it; the smoke test will fai
 
 ## <img src="images/icon_smoothing.svg" width="24" align="center" alt=""> Kalman smoother — design track
 
-These four documents are a separate concern (the Kalman v2 smoother design + audit). Not workflow-related; kept in `docs/` for proximity to the rest of the technical writing.
-
-### `pose3d.md`
-**3-D pose (patch 122kf).** The 3-D tab and `mufasa-pose3d`: camera calibration from marked box edges or a checkerboard, single-camera inference with a Rat7M body prior, two-camera triangulation, 3-D Kalman smoothing, output format, model data.
+These documents are a separate concern (the Kalman v2 smoother design + audit). Not workflow-related; kept in `docs/` for proximity to the rest of the technical writing.
 
 ### `kalman_smoother_design.md`
 Triplet-egocentric covariance Kalman smoother design document (1408 lines, May 2026). Mathematical formulation, state space, EM noise fitting, integration plan. No implementation yet at time of writing — design only.
+
+### `joint_model_design.md`
+Design proposal for a joint model in the v2 smoother, extending the project-derived marker names (122gv) and kinematic tree from `[skeleton]` (122gx).
 
 ### `v2_next_steps_design.md`
 Follow-up design notes addressing `q_root_pos` ceiling-hit observed in the v2 real-data run. Patches 113–118 context.

@@ -223,8 +223,9 @@ def main() -> int:
     )
 
     # 6. smoke_122bl no longer .read_text()s app.py.
-    bl_src = (REPO_ROOT / "tests"
-              / "smoke_122bl_code_cleanup_pass.py").read_text()
+    bl_path = REPO_ROOT / "tests" / "smoke_122bl_code_cleanup_pass.py"
+    # (smoke_122bl was retired in 122kh; nothing reads app.py then.)
+    bl_src = bl_path.read_text() if bl_path.exists() else ""
     has_read = '(pkg_root / "ui_qt" / "app.py").read_text()' in bl_src
     check(
         "tests/smoke_122bl_code_cleanup_pass.py no longer reads "

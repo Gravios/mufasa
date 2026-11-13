@@ -193,6 +193,7 @@ def main() -> int:
         "_read_data_file_helper_futures takes optional "
         "config_path kwarg",
         "config_path: Optional[str] = None" in mixin_src
+        or "config_path: str | None = None" in mixin_src
         or "config_path=None" in mixin_src,
     )
     # It calls load_features_for_video + load_labels_for_video

@@ -232,6 +232,8 @@ def main() -> int:
             / "standard_labeller.py",
     }
     for name, path in labellers.items():
+        if not path.exists():      # deleted with the Tk surface (122d5)
+            continue
         src = path.read_text()
         # Patch 122bf: 122ak migrated the labellers to labels-only
         # save via save_labels_for_video. The import is the same

@@ -8,6 +8,48 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kh — smoke suite green: three real fixes, 19 obsolete tests retired, the rest updated.**
+Fixes found by the suite (regression test `smoke_122kh_settings_and_tk_free_imports`):
+* **mufasa imports without tkinter.** `utils.errors`, `utils.lookups`,
+  `roi_tools.roi_utils` and `video_processors.video_processing` imported
+  tkinter (and `PIL.ImageTk`) at module level, so on a Python without Tk
+  most of mufasa — ConfigReader, checks, every backend — failed to import.
+  Tk is now imported only where a Tk window is opened.
+* **Classifier model paths.** project.toml stores them relative to the
+  project (`relativize_project_path`), but the TOML→INI translator passed
+  them on unresolved, so inference read `model_path_N` as
+  `../../…/model.sav`. They are resolved against the project again.
+* **Directing settings.** The add-ons "Directing settings" form read and
+  wrote project.toml with configparser — saving replaced the TOML with INI
+  text — and the translator never passed `bodypart_direction` on. It is now
+  `[directionality] bodypart_direction` in project.toml and reaches
+  ConfigReader as `[Directionality settings]`.
+* Lint: UP037 and I001 in the 3-D modules and a few others; two grey text
+  colours in the classifier form now use `palette(placeholder-text)`.
+
+Retired (their subject is gone or they only pinned a past patch's
+counts): the Tk-migration and Tk-deletion acceptance tests
+`smoke_122ae5`, `122ae5d`, `122aw`, `122bn`, `122br`, `122ck`, `122cm`,
+`122cr`, `122cx`, `122cy`, `122d5`, `dead_code_sweep`, `pyglet_removal`;
+the rename/cleanup count floors `122bl`, `122bm`, `122bq`; `v1_configreader`
+(the `_is_v1` branch went in 122dy); `pose_import_rename` (122w, superseded
+by 122eb); `hull_area_diagnostic` (a one-off diagnostic). Updated: checks
+on deleted Tk files dropped from `122ae5c`, `122ak`, `122an`, `122ax`,
+`frame_ops_cluster`, `image_format_converter`, `join_transition_cluster`,
+`pose_tools_port`, `video_utilities_cluster`; legacy-INI cases dropped or
+moved to project.toml (`edit_project_metadata`, `model_dual_save`,
+`input_source_picker`, `annotation_polish`, `122bc`, `project_layout`,
+`workbench_auto_discover`, `roi_video_table_helpers`); `Optional[X]`
+spellings accept `X | None` (`122ae3`, `122ae5e`, `122az`, `122be`, `122bi`);
+current section names and order (`122aq`, `122ar`, `projects_page_restructure`,
+`video_import`); `data_import_minimal` knows `animal_ids`;
+`docs/README.md` indexes every doc (`122cn`). Eleven tests put the
+repository root on the import path, so the suite runs without installing
+mufasa. Needs the `analysis` extra (`diptest`) and built Cython kernels
+(`python setup.py build_ext --inplace`) for the landscape and native-kernel
+tests. `smoke_feature_kernels_realdata` and `smoke_feature_parallel_verify`
+remain manual checks on a real project (`--config`).
+
 **122kg — tests brought up to date; the feature viewer's 3-D… button no longer crashes.**
 Fix: `feature_viewer.open_3d` (122ke) used `Path` without importing it, so the
 3-D… button raised NameError when no 3-D file was found next to the session.

@@ -321,9 +321,9 @@ class Node:
     """Feature-tree node: a group (``col`` None, ``children``) or a leaf."""
     label: str
     col: str | None = None
-    children: list["Node"] = field(default_factory=list)
+    children: list[Node] = field(default_factory=list)
 
-    def leaves(self) -> list["Node"]:
+    def leaves(self) -> list[Node]:
         if self.col is not None:
             return [self]
         return [x for c in self.children for x in c.leaves()]

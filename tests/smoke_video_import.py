@@ -163,7 +163,7 @@ def main() -> int:
             break
     if builder is not None:
         body_src = ast.unparse(builder)
-        idx_pose = body_src.find("Import Pose Data")
+        idx_pose = body_src.find("Import pose data")   # sentence case since 122eb
         idx_video = body_src.find("Import video")
         check(
             "section order: Import Pose Data → Import video "

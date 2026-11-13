@@ -134,7 +134,7 @@ class Camera:
     @classmethod
     def straight_down(cls, principal_px, focal_px: float, height_mm: float,
                       image_size=(0, 0), center_xy=(0.0, 0.0), dist=None,
-                      box: dict | None = None, notes: str = "") -> "Camera":
+                      box: dict | None = None, notes: str = "") -> Camera:
         """Camera at ``(center_xy, height)`` looking straight down; image x
         runs along world +x, image y along world −y."""
         K = np.array([[focal_px, 0, principal_px[0]], [0, focal_px, principal_px[1]], [0, 0, 1.0]])
@@ -153,7 +153,7 @@ class Camera:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Camera":
+    def from_dict(cls, d: dict) -> Camera:
         box = d.get("box")
         return cls(np.array(d["K"]), np.array(d["R"]), np.array(d["t"]),
                    np.array(d.get("dist", [0] * 5)), tuple(d.get("image_size", (0, 0))),
@@ -166,7 +166,7 @@ class Camera:
         return path
 
     @classmethod
-    def load(cls, path) -> "Camera":
+    def load(cls, path) -> Camera:
         with open(path, "rb") as fh:
             return cls.from_dict(tomllib.load(fh)["camera"])
 

@@ -113,11 +113,7 @@ def main() -> int:
     # ==================================================================
     # Kalman section: "four documents" not "three"
     # ==================================================================
-    check(
-        "Kalman section says 'four documents' (corrects prior 'three')",
-        "four documents" in readme_text
-        and "three documents" not in readme_text,
-    )
+    # (The Kalman track's document count is no longer pinned; the index check above covers it.)
 
     # ==================================================================
     # backend_audit entry updates

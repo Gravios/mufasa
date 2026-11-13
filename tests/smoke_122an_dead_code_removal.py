@@ -180,73 +180,13 @@ def main() -> int:
         "122an" in qt_src,
     )
 
-    # ==================================================================
-    # B1 — Tk popup checkboxes removed
-    # ==================================================================
-    tk_path = (REPO_ROOT / "mufasa" / "ui" / "pop_ups"
-               / "subset_feature_extractor_pop_up.py")
-    tk_src = tk_path.read_text()
-    check(
-        "B1 (Tk popup): append_to_features_var checkbox removed",
-        "append_to_features_var" not in tk_src,
-    )
-    check(
-        "B1 (Tk popup): append_to_targets_var checkbox removed",
-        "append_to_targets_var" not in tk_src,
-    )
-    check(
-        "B1 (Tk popup): FeatureSubsetsCalculator call no longer "
-        "passes append_to_* kwargs",
-        "append_to_features_extracted=" not in tk_src
-        and "append_to_targets_inserted=" not in tk_src,
-    )
-    check(
-        "B1 (Tk popup): records 122an patch number",
-        "122an" in tk_src,
-    )
-
-    # ==================================================================
-    # B2 — select_video_for_labelling_popup existence check
-    # ==================================================================
-    sv_path = (REPO_ROOT / "mufasa" / "ui" / "pop_ups"
-               / "select_video_for_labelling_popup.py")
-    sv_src = sv_path.read_text()
-    check(
-        "B2: continue-mode check no longer uses "
-        "os.path.isfile(self.targets_inserted_file_path)",
-        not any(
-            "os.path.isfile(self.targets_inserted_file_path)"
-            in line
-            and not line.lstrip().startswith("#")
-            for line in sv_src.splitlines()
-        ),
-    )
-    check(
-        "B2: probes v1 layout via load_labels_for_video",
-        "load_labels_for_video" in sv_src,
-    )
-    check(
-        "B2: catches FileNotFoundError from v1 probe",
-        "FileNotFoundError" in sv_src,
-    )
-    check(
-        "B2: no longer constructs targets_inserted_dir at code "
-        "level (legacy path no longer used)",
-        not any(
-            "targets_inserted_dir = " in line
-            and not line.lstrip().startswith("#")
-            for line in sv_src.splitlines()
-        ),
-    )
-    check(
-        "B2: records 122an patch number",
-        "122an" in sv_src,
-    )
+    # (B1 Tk popup and B2 select_video_for_labelling_popup checks removed:
+    # both popups were deleted with the Tk surface in 122d5.)
 
     # ==================================================================
     # Sanity — all touched files parse
     # ==================================================================
-    for p in (fs_path, qt_path, tk_path, sv_path):
+    for p in (fs_path, qt_path):
         try:
             ast.parse(p.read_text())
             ok = True

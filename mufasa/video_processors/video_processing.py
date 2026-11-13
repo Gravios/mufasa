@@ -13,13 +13,12 @@ import subprocess
 import time
 from copy import deepcopy
 from datetime import datetime
-from tkinter import *
 from typing import Any
 
 import cv2
 import numpy as np
 import pandas as pd
-from PIL import Image, ImageTk
+from PIL import Image
 from shapely.geometry import Polygon
 from skimage.color import label2rgb
 from skimage.segmentation import slic
@@ -2046,6 +2045,9 @@ class VideoRotator(ConfigReader):
             )
 
     def __insert_img(self, img: np.array):
+        from tkinter import Label
+
+        from PIL import ImageTk
         current_frm_pil = Image.fromarray(img)
         current_frm_pil.thumbnail(MAX_FRM_SIZE, Image.ANTIALIAS)
         current_frm_pil = ImageTk.PhotoImage(
@@ -2157,6 +2159,7 @@ class VideoRotator(ConfigReader):
         self.video_meta_data = get_video_meta_data(video_path=file_path)
         self.file_path = file_path
         _, self.video_name, _ = get_fn_ext(filepath=file_path)
+        from tkinter import NW, Frame, Label, Toplevel
         self.main_frm = Toplevel()
         self.main_frm.title(f"ROTATE VIDEO {self.video_name}")
         self.video_frm = Frame(self.main_frm)

@@ -163,19 +163,8 @@ def main() -> int:
             not f.exists(),
         )
 
-    # ==================================================================
-    # 4. SimBA.py wiring scrubbed
-    # ==================================================================
-    simba_src = (REPO_ROOT / "mufasa" / "SimBA.py").read_text()
-    for cls_name in ("PoseReorganizerPopUp", "SLEAPcsvInference2Yolo"):
-        leaked = any(
-            cls_name in line and not line.lstrip().startswith("#")
-            for line in simba_src.splitlines()
-        )
-        check(
-            f"SimBA.py has no code-level reference to {cls_name}",
-            not leaked,
-        )
+    # (Checks against the Tk popup module and SimBA.py were removed:
+    # both were deleted with the Tk surface in 122d5.)
 
     # ==================================================================
     # 5. Tools page registration

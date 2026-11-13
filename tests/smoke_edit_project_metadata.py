@@ -130,12 +130,7 @@ def main() -> int:
             "_on_save emits metadata_updated",
             "self.metadata_updated.emit(" in cls_src,
         )
-        # Legacy guard
-        check(
-            "Legacy INI projects refused (not silently edited)",
-            "_is_v1" in cls_src
-            and "Legacy project" in cls_src,
-        )
+        # Legacy INI projects are no longer supported (122dw); no legacy guard to check.
 
     # ------------------------------------------------------------------
     # 2. ProjectInfoForm Edit button wiring

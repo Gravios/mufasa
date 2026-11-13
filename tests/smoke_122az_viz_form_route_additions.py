@@ -77,11 +77,11 @@ def main() -> int:
     # ==================================================================
     check(
         "_VizRoute declares kwargs_transform field",
-        "kwargs_transform: Optional[Callable[[dict], dict]]" in src,
+        "kwargs_transform: Callable[[dict], dict] | None" in src,
     )
     check(
         "_VizRoute kwargs_transform defaults to None",
-        "kwargs_transform: Optional[Callable[[dict], dict]] = None"
+        "kwargs_transform: Callable[[dict], dict] | None = None"
         in src,
     )
 

@@ -34,7 +34,6 @@ Coverage:
 from __future__ import annotations
 
 import ast
-import re
 import sys
 from pathlib import Path
 
@@ -187,51 +186,8 @@ def main() -> int:
                         and "already exists" in ca_src,
                     )
 
-    # ==================================================================
-    # Legacy class removal from video_processing_pop_up.py
-    # ==================================================================
-    vp_path = (REPO_ROOT / "mufasa" / "ui" / "pop_ups"
-               / "video_processing_pop_up.py")
-    vp_src = vp_path.read_text()
-    vp_tree = ast.parse(vp_src)
-    defined = {
-        n.name for n in vp_tree.body
-        if isinstance(n, ast.ClassDef)
-    }
-
-    DOOMED = {
-        "ImportFrameDirectoryPopUp", "MergeFrames2VideoPopUp",
-        "ExtractSpecificFramesPopUp", "ExtractSEQFramesPopUp",
-    }
-    for d in sorted(DOOMED):
-        check(
-            f"legacy {d} class no longer defined",
-            d not in defined,
-        )
-        marker_re = re.compile(
-            rf"^# {re.escape(d)}: removed in patch 122s",
-            re.MULTILINE,
-        )
-        check(
-            f"deletion-record marker for {d} present",
-            bool(marker_re.search(vp_src)),
-        )
-
-    # ==================================================================
-    # SimBA.py — no remaining code references to the 4 classes
-    # ==================================================================
-    simba_src = (REPO_ROOT / "mufasa" / "SimBA.py").read_text()
-    for d in sorted(DOOMED):
-        # The string may appear in a deletion-record comment; require
-        # that no NON-comment line mentions it.
-        leaked = any(
-            d in line and not line.lstrip().startswith("#")
-            for line in simba_src.splitlines()
-        )
-        check(
-            f"SimBA.py has no code-level reference to {d}",
-            not leaked,
-        )
+    # (Checks against the Tk popup module and SimBA.py were removed:
+    # both were deleted with the Tk surface in 122d5.)
 
     # ==================================================================
     # video_processing_page.py — new sections registered

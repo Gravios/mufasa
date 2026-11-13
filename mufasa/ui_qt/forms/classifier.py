@@ -366,7 +366,7 @@ class _EditKeyDialog(QDialog):
     def _validate(self) -> None:
         key = self.key_edit.text().strip()
         if not key:
-            self.status_label.setStyleSheet("color: #666;")
+            self.status_label.setStyleSheet("color: palette(placeholder-text);")
             self.status_label.setText(
                 "(empty — clears the hotkey for this classifier)",
             )
@@ -476,7 +476,7 @@ class ClassifierManageForm(OperationForm):
         )
         self.empty_label.setAlignment(Qt.AlignCenter)
         self.empty_label.setStyleSheet(
-            "color: #666; padding: 24px;"
+            "color: palette(placeholder-text); padding: 24px;"
         )
         f = QFont(); f.setItalic(True)
         self.empty_label.setFont(f)

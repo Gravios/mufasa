@@ -56,7 +56,7 @@ class SourceStyle:
     edge_colors: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, d: dict, base: "SourceStyle") -> "SourceStyle":
+    def from_dict(cls, d: dict, base: SourceStyle) -> SourceStyle:
         out = cls(**asdict(base))
         names = {f.name for f in fields(cls)}
         for k, v in (d or {}).items():
@@ -93,7 +93,7 @@ class OverlayStyle:
                 "kalman": asdict(self.kalman)}
 
     @classmethod
-    def from_dict(cls, d: dict) -> "OverlayStyle":
+    def from_dict(cls, d: dict) -> OverlayStyle:
         return cls(fdlc=SourceStyle.from_dict(d.get("fdlc", {}), default_fdlc()),
                    kalman=SourceStyle.from_dict(d.get("kalman", {}), default_kalman()),
                    legend=bool(d.get("legend", True)))

@@ -29,7 +29,6 @@ AST-only.
 from __future__ import annotations
 
 import ast
-import re
 import sys
 from pathlib import Path
 
@@ -152,9 +151,11 @@ def main() -> int:
         if "target" in methods:
             target_src = ast.unparse(methods["target"])
             check(
-                "PixelsPerMMForm.target uses "
-                "GetPixelsPerMillimeterInterface",
-                "GetPixelsPerMillimeterInterface" in target_src,
+                "PixelsPerMMForm.target launches the calibration "
+                "(the Qt PixelsPerMMDialog replaced the Tk "
+                "GetPixelsPerMillimeterInterface)",
+                "GetPixelsPerMillimeterInterface" in target_src
+                or "_launch_calibration" in target_src,
             )
             check(
                 "PixelsPerMMForm.target surfaces result via "
@@ -163,51 +164,8 @@ def main() -> int:
                 or "QMessageBox" in class_src,
             )
 
-    # ------------------ Legacy class removal ------------------
-    vp_path = (REPO_ROOT / "mufasa" / "ui" / "pop_ups"
-               / "video_processing_pop_up.py")
-    vp_src = vp_path.read_text()
-    vp_tree = ast.parse(vp_src)
-    defined = {
-        n.name for n in vp_tree.body
-        if isinstance(n, ast.ClassDef)
-    }
-    for d in ("ReverseVideoPopUp",
-              "CalculatePixelsPerMMInVideoPopUp"):
-        check(
-            f"legacy {d} class no longer defined in "
-            "video_processing_pop_up.py",
-            d not in defined,
-        )
-        marker_re = re.compile(
-            rf"^# {re.escape(d)}: removed in patch 122u",
-            re.MULTILINE,
-        )
-        check(
-            f"deletion-record marker for {d} present",
-            bool(marker_re.search(vp_src)),
-        )
-
-    # change_speed_popup.py — whole file gone
-    cs_path = (REPO_ROOT / "mufasa" / "ui" / "pop_ups"
-               / "change_speed_popup.py")
-    check(
-        "legacy change_speed_popup.py file deleted",
-        not cs_path.exists(),
-    )
-
-    # ------------------ SimBA.py — no code-level refs ------------------
-    simba_src = (REPO_ROOT / "mufasa" / "SimBA.py").read_text()
-    for d in ("ReverseVideoPopUp", "ChangeSpeedPopup",
-              "CalculatePixelsPerMMInVideoPopUp"):
-        leaked = any(
-            d in line and not line.lstrip().startswith("#")
-            for line in simba_src.splitlines()
-        )
-        check(
-            f"SimBA.py has no code-level reference to {d}",
-            not leaked,
-        )
+    # (Checks against the Tk popup module and SimBA.py were removed:
+    # both were deleted with the Tk surface in 122d5.)
 
     # ------------------ Page wiring ------------------
     vpp_src = (REPO_ROOT / "mufasa" / "ui_qt" / "pages"

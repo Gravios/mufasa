@@ -35,7 +35,6 @@ the backend module, neither available in the sandbox.
 from __future__ import annotations
 
 import ast
-import re
 import sys
 from pathlib import Path
 
@@ -200,44 +199,8 @@ def main() -> int:
         or '"CrossfadeVideosForm"' in vj_src,
     )
 
-    # ==================================================================
-    # 3. Legacy class removal + deletion marker
-    # ==================================================================
-    vp_path = (REPO_ROOT / "mufasa" / "ui" / "pop_ups"
-               / "video_processing_pop_up.py")
-    vp_src = vp_path.read_text()
-    vp_tree = ast.parse(vp_src)
-    defined = {
-        n.name for n in vp_tree.body
-        if isinstance(n, ast.ClassDef)
-    }
-    check(
-        "CrossfadeVideosPopUp class no longer defined in "
-        "video_processing_pop_up.py",
-        "CrossfadeVideosPopUp" not in defined,
-    )
-    marker_re = re.compile(
-        r"^# CrossfadeVideosPopUp: removed in patch 122t",
-        re.MULTILINE,
-    )
-    check(
-        "deletion-record marker for CrossfadeVideosPopUp present",
-        bool(marker_re.search(vp_src)),
-    )
-
-    # ==================================================================
-    # 4. SimBA.py — no code-level reference to CrossfadeVideosPopUp
-    # ==================================================================
-    simba_src = (REPO_ROOT / "mufasa" / "SimBA.py").read_text()
-    leaked = any(
-        "CrossfadeVideosPopUp" in line
-        and not line.lstrip().startswith("#")
-        for line in simba_src.splitlines()
-    )
-    check(
-        "SimBA.py has no code-level reference to CrossfadeVideosPopUp",
-        not leaked,
-    )
+    # (Checks against the Tk popup module and SimBA.py were removed:
+    # both were deleted with the Tk surface in 122d5.)
 
     # ==================================================================
     # 5. Video Processing page registers CrossfadeVideosForm

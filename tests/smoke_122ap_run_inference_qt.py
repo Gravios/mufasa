@@ -260,17 +260,14 @@ def main() -> int:
         "RunMachineModelsPopUp" not in clf_src
         or "deferred" not in clf_src,
     )
-    check(
-        "classifier.py docstring references the new form",
-        "RunInferenceForm" in clf_src,
-    )
+    # classifier.py's docstring was trimmed later; the form itself is checked above.
 
     # ==================================================================
     # 8. 122ap recorded in all touched files
     # ==================================================================
     for path in (
         REPO_ROOT / "mufasa" / "ui_qt" / "forms" / "run_inference.py",
-        REPO_ROOT / "mufasa" / "ui_qt" / "forms" / "classifier.py",
+        # (forms/classifier.py dropped its 122ap note when it was trimmed.)
         REPO_ROOT / "mufasa" / "ui_qt" / "pages"
         / "classifier_page.py",
     ):

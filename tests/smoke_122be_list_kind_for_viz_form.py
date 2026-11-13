@@ -228,7 +228,7 @@ def main() -> int:
     # ==================================================================
     check(
         "_VizRoute.kwargs_transform field still declared",
-        "kwargs_transform: Optional[Callable[[dict], dict]] = None"
+        "kwargs_transform: Callable[[dict], dict] | None = None"
         in src,
     )
     check(

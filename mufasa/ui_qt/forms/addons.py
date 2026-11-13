@@ -22,6 +22,7 @@ Specialty / add-on workflows. Replaces 10 legacy popups:
 from __future__ import annotations
 
 import configparser
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -667,10 +668,10 @@ class DirectingBodyPartSettingsForm(OperationForm):
         "Pick the body-part used as the 'direction-from' reference "
         "for the 'Directing toward body-part — statistics' analysis "
         "route. Writes a single value to project.toml's "
-        "[Directionality settings] / bodypart_direction key."
+        "[directionality] / bodypart_direction key."
     )
 
-    _SECTION = "Directionality settings"
+    _TOML_TABLE = "directionality"
     _KEY = "bodypart_direction"
 
     def build(self) -> None:
@@ -734,14 +735,12 @@ class DirectingBodyPartSettingsForm(OperationForm):
         if not self.config_path:
             return None
         try:
-            cfg = configparser.ConfigParser()
-            cfg.read(self.config_path)
-            if cfg.has_section(self._SECTION):
-                v = cfg.get(self._SECTION, self._KEY, fallback="")
-                return v.strip() if v else None
+            from mufasa.project_layout import read_project_toml
+            v = read_project_toml(Path(self.config_path)).get(
+                self._TOML_TABLE, {}).get(self._KEY, "")
+            return str(v).strip() or None
         except Exception:
             return None
-        return None
 
     # ------------------------------------------------------------------ #
     # OperationForm contract
@@ -758,20 +757,17 @@ class DirectingBodyPartSettingsForm(OperationForm):
         return {"config_path": self.config_path, "bp": bp}
 
     def target(self, *, config_path: str, bp: str) -> None:
-        """Write the single bodypart_direction key to project config.
+        """Write ``[directionality] bodypart_direction`` to project.toml.
 
-        Mirrors the Tk popup's write logic in
-        ``DirectionAnimalToBodyPartSettingsPopUp.run()``: read
-        current config, add the section if missing, set the key,
-        write back.
+        ConfigReader sees it as ``[Directionality settings]
+        bodypart_direction`` through the TOML→INI translator. (Until
+        122kh this wrote INI text over project.toml.)
         """
-        cfg = configparser.ConfigParser()
-        cfg.read(config_path)
-        if not cfg.has_section(self._SECTION):
-            cfg.add_section(self._SECTION)
-        cfg.set(self._SECTION, self._KEY, bp)
-        with open(config_path, "w") as f:
-            cfg.write(f)
+        from mufasa.project_layout import read_project_toml, write_project_toml
+        path = Path(config_path)
+        data = read_project_toml(path)
+        data.setdefault(self._TOML_TABLE, {})[self._KEY] = bp
+        write_project_toml(path, data)
 
 
 __all__ = [

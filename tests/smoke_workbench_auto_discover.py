@@ -1,10 +1,10 @@
-"""Tests for project_config.ini auto-discovery in workbench_app.
+"""Tests for project.toml auto-discovery in workbench_app.
 
 Mufasa projects are laid out as:
     <project_path>/
     └── <project_name>/
         └── project_folder/        ← DirNames.PROJECT.value
-            ├── project_config.ini ← THE FILE
+            ├── project.toml ← THE FILE
             ├── csv/
             ├── videos/
             └── ...
@@ -62,7 +62,7 @@ def main() -> int:
     max_depth: int = ns["_AUTO_DISCOVER_MAX_DEPTH"]
     config_name: str = ns["_PROJECT_CONFIG_FILENAME"]
     folder_name: str = ns["_PROJECT_FOLDER_NAME"]
-    assert config_name == "project_config.ini"
+    assert config_name == "project.toml"   # was project_config.ini before 122dw
     assert folder_name == "project_folder"
 
     # ------------------------------------------------------------------ #

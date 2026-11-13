@@ -79,7 +79,12 @@ def _match(stem: str, files: dict[str, Path]) -> Path | None:
 
 
 def project_defaults(config_path) -> dict:
-    from mufasa.project_layout import ProjectPaths, SmoothingFlavors, Stages, resolve_v1_project_root
+    from mufasa.project_layout import (
+        ProjectPaths,
+        SmoothingFlavors,
+        Stages,
+        resolve_v1_project_root,
+    )
     root = resolve_v1_project_root(str(config_path))
     if root is None:
         raise ValueError("3-D pose needs a v1 Mufasa project (project.toml with sources/ and derived/)")

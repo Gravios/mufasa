@@ -41,6 +41,7 @@ identically.
 """
 from __future__ import annotations
 
+import os
 import platform
 import tomllib
 from configparser import ConfigParser
@@ -167,6 +168,12 @@ def project_toml_to_configparser(
             "model_path",
             str(Path(models_dir) / f"{target}.sav"),
         )
+        # project.toml stores model paths relative to the project
+        # (relativize_project_path); INI consumers open them as given,
+        # so hand them back absolute.
+        if not Path(str(model_path)).is_absolute():
+            model_path = Path(project_root) / str(model_path)
+            model_path = str(Path(os.path.normpath(model_path)))
         cp.set("SML settings", f"model_path_{i}", str(model_path))
 
     # ------------------------------------------------------------------
@@ -293,6 +300,16 @@ def project_toml_to_configparser(
         "Outlier settings", "location_criterion",
         _stringify(outlier.get("location_criterion", "NaN")),
     )
+
+    # ------------------------------------------------------------------
+    # [Directionality settings] ← [directionality] (DirectingBodyPart
+    # SettingsForm writes it; the directing-to-body-part analysis reads
+    # bodypart_direction through ConfigReader).
+    # ------------------------------------------------------------------
+    direction = toml_data.get("directionality", {})
+    if isinstance(direction, dict) and direction.get("bodypart_direction"):
+        cp.set("Directionality settings", "bodypart_direction",
+               str(direction["bodypart_direction"]))
 
     return cp
 

@@ -173,8 +173,9 @@ def main() -> int:
     )
     di_src = di_path.read_text()
     check(
-        "data_import_page has 'Import Pose Data' (post-122w rename)",
-        '"Import Pose Data"' in di_src,
+        "data_import_page has 'Import pose data' (122w rename, "
+        "sentence case since 122eb)",
+        '"Import pose data"' in di_src,
     )
     check(
         "data_import_page no longer registers 'Video parameters & "

@@ -48,7 +48,6 @@ Coverage:
 from __future__ import annotations
 
 import ast
-import re
 import sys
 from pathlib import Path
 
@@ -171,59 +170,8 @@ def main() -> int:
                 and ("is_dir" in ca_src or "scope.is_dir" in ca_src),
             )
 
-    # ==================================================================
-    # 4. Legacy class removal from video_processing_pop_up.py
-    # ==================================================================
-    vp_path = (REPO_ROOT / "mufasa" / "ui" / "pop_ups"
-               / "video_processing_pop_up.py")
-    vp_src = vp_path.read_text()
-    vp_tree = ast.parse(vp_src)
-    defined_classes = {
-        n.name for n in vp_tree.body
-        if isinstance(n, ast.ClassDef)
-    }
-
-    DOOMED = {
-        "Convert2PNGPopUp", "Convert2TIFFPopUp",
-        "Convert2WEBPPopUp", "Convert2bmpPopUp",
-        "Convert2jpegPopUp", "ChangeImageFormatPopUp",
-    }
-    for d in sorted(DOOMED):
-        check(
-            f"legacy {d} class no longer defined in "
-            "video_processing_pop_up.py",
-            d not in defined_classes,
-        )
-        # The deletion marker comment should remain so future
-        # readers can find the rationale + Qt replacement
-        # pointer via grep.
-        marker_re = re.compile(
-            rf"^# {re.escape(d)}: removed in patch 122r",
-            re.MULTILINE,
-        )
-        check(
-            f"deletion-record marker for {d} present",
-            bool(marker_re.search(vp_src)),
-        )
-
-    # ==================================================================
-    # 5. SimBA.py wiring scrubbed
-    # ==================================================================
-    simba_src = (REPO_ROOT / "mufasa" / "SimBA.py").read_text()
-    for d in sorted(DOOMED):
-        check(
-            f"SimBA.py no longer references {d}",
-            d not in simba_src,
-        )
-    # img_format_menu cascade should be gone (it had no surviving
-    # entries after the scrub).
-    check(
-        "SimBA.py no longer creates 'img_format_menu' "
-        "(no surviving entries)",
-        "img_format_menu = Menu(" not in simba_src
-        and "img_format_menu.add_command" not in simba_src
-        and "menu=img_format_menu" not in simba_src,
-    )
+    # (Checks against the Tk popup module and SimBA.py were removed:
+    # both were deleted with the Tk surface in 122d5.)
 
     print(
         f"smoke_image_format_converter: "

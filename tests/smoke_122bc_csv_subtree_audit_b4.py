@@ -185,11 +185,7 @@ def main() -> int:
         "derived/classifications/",
         ri_src.count("<code>derived/classifications/</code>") >= 2,
     )
-    check(
-        "run_inference: description mentions both v1 and legacy "
-        "settings persistence",
-        "project.toml" in ri_src and "project_config.ini" in ri_src,
-    )
+    # run_inference: legacy project_config.ini persistence dropped (122dw); only project.toml remains.
 
     # ==================================================================
     # 4. ui_qt/forms/annotation.py — visible text drift

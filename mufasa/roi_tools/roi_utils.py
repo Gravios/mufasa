@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import tkinter
+
 __author__ = "Simon Nilsson; sronilsson@gmail.com"
 
 import math
 import os
 import warnings
 from copy import copy
-from tkinter import *
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -15,7 +19,6 @@ if TYPE_CHECKING:
 import cv2
 import numpy as np
 import pandas as pd
-from PIL import ImageTk
 from scipy.spatial.distance import cdist
 from shapely.geometry import Polygon
 
@@ -597,12 +600,13 @@ def reset_video_ROIs(config_path: str | os.PathLike,
     update_rois(roi_path, lambda st: st.remove_video(video_name))
     stdout_trash(msg=f"Deleted {n} ROI(s) of video {video_name}.")
 
-def get_image_from_label(tk_lbl: Label) -> np.ndarray:
+def get_image_from_label(tk_lbl: tkinter.Label) -> np.ndarray:
     """ Given a tkinter label with an image, retrieve image in array format"""
 
     if not hasattr(tk_lbl, 'image'):
         raise InvalidInputError(msg=f'The label {tk_lbl} does not have a valid image')
     else:
+        from PIL import ImageTk
         tk_img = tk_lbl.image
         pil_image = ImageTk.getimage(tk_img)
         img = np.asarray(pil_image)

@@ -259,14 +259,14 @@ def main() -> int:
         '"Validate classifier"' in page_src
         and "(ValidateClassifierForm, {})" in page_src,
     )
-    # Section order: Manage → Run inference → Train → Validate
+    # Section order (122fa split the classifier workflow into pages
+    # in workflow order): Manage → Train → Validate → Run inference
     check(
-        "Validate classifier is section #4 (after Manage, Run "
-        "inference, Train)",
+        "Validate classifier comes after Train and before Run inference",
         page_src.index('"Manage classifiers"')
-        < page_src.index('"Run inference"')
         < page_src.index('"Train classifier"')
-        < page_src.index('"Validate classifier"'),
+        < page_src.index('"Validate classifier"')
+        < page_src.index('"Run inference"'),
     )
 
     # ==================================================================

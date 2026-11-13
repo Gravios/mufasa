@@ -229,11 +229,7 @@ def main() -> int:
         legacy_ini = proj_root / "project_config.ini"
         legacy_ini.write_text("[General settings]\n")
         resolved = resolve_v1_project_root(str(legacy_ini))
-        check(
-            "resolve finds v1 root from legacy INI at v1 root",
-            resolved == proj_root.resolve(),
-            detail=f"got {resolved}",
-        )
+        # Legacy INI resolution dropped with legacy projects (122dw).
 
         # ProjectPaths-style: project.toml passed directly.
         resolved_direct = resolve_v1_project_root(

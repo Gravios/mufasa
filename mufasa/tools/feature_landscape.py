@@ -876,13 +876,13 @@ def main(argv: list[str] | None = None) -> int:
     global DISPLAY, SCALED, JITTERED
     from mufasa.utils.feature_names import (
         apply_scales,
+        load_jitter,
         load_names,
         load_scales,
-        read_names,
         read_jitter,
+        read_names,
         read_scales,
     )
-    from mufasa.utils.feature_names import load_jitter
     DISPLAY = read_names(a.names_file) if a.names_file else load_names(config)
     JITTERED = set() if a.no_jitter else (read_jitter(a.names_file) if a.names_file
                                            else load_jitter(config))

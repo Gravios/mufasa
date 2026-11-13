@@ -223,6 +223,8 @@ def main() -> int:
         / "select_video_for_pseudo_labelling_popup.py",
     ]
     for path in rail_files:
+        if not path.exists():      # deleted with the Tk surface (122d5)
+            continue
         src = path.read_text()
         check(
             f"{path.name}: imports list_video_stems_with_classifications",

@@ -245,6 +245,8 @@ def main() -> int:
             / "frame_labeller.py",
     }
     for name, path in labellers.items():
+        if not path.exists():      # deleted with the Tk surface (122d5)
+            continue
         src = path.read_text()
         check(
             f"{name}: save method records 122ak (labels-only "

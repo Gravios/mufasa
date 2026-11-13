@@ -7,6 +7,12 @@ Covers the pure-Python logic that the Qt dialogs drive. Runs headless
 """
 from __future__ import annotations
 
+# Run without installing mufasa: the repository root on the import path.
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import configparser
 import csv
 import shutil

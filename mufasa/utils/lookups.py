@@ -10,7 +10,6 @@ import re
 import struct
 import subprocess
 import sys
-import tkinter as tk
 from copy import copy
 from datetime import datetime
 from multiprocessing import Lock, Value
@@ -818,6 +817,7 @@ def get_display_resolution() -> tuple[int, int]:
        May return the virtual geometry in multi-display setups. To return the resolution of each available monitor in mosaic, see :func:`mufasa.utils.lookups.get_monitor_info`.
 
     """
+    import tkinter as tk
     root = tk.Tk()
     root.withdraw()
     width = root.winfo_screenwidth()

@@ -126,9 +126,12 @@ def main() -> int:
             kwonly = [a.arg for a in args.kwonlyargs]
             check(
                 "PoseImportForm.target kwonly args = "
-                "{route, config_path, source_path, p_threshold}",
+                "{route, config_path, source_path, p_threshold, "
+                "animal_ids}",
+                # animal_ids: multi-animal import (added after this test).
                 set(kwonly) == {
                     "route", "config_path", "source_path", "p_threshold",
+                    "animal_ids",
                 },
                 detail=f"got: {kwonly}",
             )

@@ -238,7 +238,9 @@ def main() -> int:
         "FeatureSubsetsCalculator.__init__ signature includes "
         "derived_features_dir",
         "derived_features_dir: Optional[" in calc_src
-        or "derived_features_dir=None" in calc_src,
+        or "derived_features_dir=None" in calc_src
+        # 122ga's pyupgrade sweep: Optional[X] → X | None.
+        or "derived_features_dir: str | os.PathLike | None = None" in calc_src,
     )
     check(
         "FeatureSubsetsCalculator stores self.derived_features_dir",
@@ -276,7 +278,8 @@ def main() -> int:
     )
     check(
         "Form's target() takes derived_features_dir kwarg",
-        "derived_features_dir: Optional[str]" in form_src,
+        "derived_features_dir: Optional[str]" in form_src
+        or "derived_features_dir: str | None" in form_src,
     )
     check(
         "Form's target() passes derived_features_dir to "

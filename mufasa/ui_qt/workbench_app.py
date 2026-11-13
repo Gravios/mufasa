@@ -97,14 +97,13 @@ def build_workbench(project_config_path: str | None = None
     # classifiers BEFORE Annotation (identity is a prerequisite for
     # labelling); training / validation / inference AFTER Annotation
     # (need labels first); YOLO at the tail (independent workflow).
+    from mufasa.ui_qt.pages.annotation_page import build_annotation_page
     from mufasa.ui_qt.pages.classifier_page import (
         build_run_inference_page,
         build_train_classifier_page,
         build_validate_classifier_page,
         build_yolo_pose_page,
     )
-
-    from mufasa.ui_qt.pages.annotation_page import build_annotation_page
     build_annotation_page(wb, config_path=project_config_path)
 
     build_train_classifier_page(wb, config_path=project_config_path)

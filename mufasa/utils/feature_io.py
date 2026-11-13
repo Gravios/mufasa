@@ -50,11 +50,10 @@ recent values; the wide parquet is the baseline.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 import os
 import re
 import warnings
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd

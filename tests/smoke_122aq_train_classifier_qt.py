@@ -277,13 +277,13 @@ def main() -> int:
         '"Train classifier"' in page_src
         and "(TrainClassifierForm, {})" in page_src,
     )
-    # Section order: Manage classifiers → Run inference → Train
+    # Section order (122fa split the classifier workflow into pages
+    # in workflow order): Manage → Train → Validate → Run inference
     check(
-        "Train classifier is section #3 (after Manage and Run "
-        "inference)",
+        "Train classifier comes after Manage and before Run inference",
         page_src.index('"Manage classifiers"')
-        < page_src.index('"Run inference"')
-        < page_src.index('"Train classifier"'),
+        < page_src.index('"Train classifier"')
+        < page_src.index('"Run inference"'),
     )
 
     # ==================================================================

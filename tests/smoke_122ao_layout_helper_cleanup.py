@@ -225,17 +225,7 @@ def main() -> int:
         "self.feature_file_paths = []" in cr_src
         and "self.target_file_paths = []" in cr_src,
     )
-    check(
-        "ConfigReader: still sets self.features_dir from Paths."
-        "FEATURES_EXTRACTED_DIR (preserved for legacy writes + "
-        "16 ERROR_MSG sites)",
-        "Paths.FEATURES_EXTRACTED_DIR" in cr_src,
-    )
-    check(
-        "ConfigReader: still sets self.targets_folder from Paths."
-        "TARGETS_INSERTED_DIR (preserved)",
-        "Paths.TARGETS_INSERTED_DIR" in cr_src,
-    )
+    # features_dir / targets_folder: legacy Paths.* defaults removed in 122dy (v1 paths only).
     check(
         "ConfigReader: records 122ao patch number",
         "122ao" in cr_src,

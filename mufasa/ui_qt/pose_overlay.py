@@ -109,7 +109,7 @@ class PoseOverlay:
 
     @classmethod
     def for_video(cls, config_path, video: str, video_path: str | None = None
-                  ) -> "PoseOverlay":
+                  ) -> PoseOverlay:
         from mufasa.tools.pose_viewer import _load_pose_file
         fp, kp = find_fdlc_pose(config_path, video), find_kalman_pose(config_path, video)
         from mufasa.ui_qt.overlay_style import load_style
