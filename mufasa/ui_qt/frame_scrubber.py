@@ -182,6 +182,15 @@ class FrameScrubberWidget(QWidget):
     def current_frame(self) -> int:
         return self._current_frame
 
+    def raw_frame(self) -> np.ndarray | None:
+        """The current frame as read (BGR), before overlay, orientation and
+        composer — e.g. for drawing it into a 3-D view (patch 122kn)."""
+        return self._last_raw_frame
+
+    def set_picture_visible(self, on: bool) -> None:
+        """Show or hide the picture; the slider and buttons stay."""
+        self._display.setVisible(bool(on))
+
     @property
     def total_frames(self) -> int:
         return self._total_frames

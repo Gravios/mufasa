@@ -21,6 +21,16 @@ frame) and ``<marker>_likelihood``. Optional parquet metadata
 straight-down pinhole, or a 3×4 ``P``); with a camera, the reconstruction
 can be reprojected onto the video ("Reprojection") to check it.
 
+Patch 122kn: **video in the 3-D view.** With a camera in the file, the
+current video frame is drawn on the floor (``z = 0``) of the volume —
+mapped through the calibration (image → floor homography, undistorted
+first when the camera has lens distortion), then through the view (floor →
+screen, a second homography; one projective ``QTransform``). Markers on
+the floor sit on their image; raised markers show their height as
+parallax. The **Camera** view renders through the calibration itself: the
+frame fills the view as recorded and every marker sits on the animal at any
+height (zoom and pan keep the alignment; dragging to orbit leaves it).
+
 Open from the feature viewer ("3-D…") or ``mufasa-view3d VIDEO [POSE3D]``.
 """
 from __future__ import annotations
@@ -33,7 +43,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QTransform
 from PySide6.QtWidgets import (
     QCheckBox,
     QDockWidget,
@@ -104,6 +114,42 @@ class Pose3D:
         _, _, vt = np.linalg.svd(P)
         c = vt[-1]
         return c[:3] / c[3] if abs(c[3]) > 1e-12 else None
+
+    def image_size(self) -> tuple[int, int] | None:
+        """(width, height) of the video the camera describes, if known."""
+        c = self.camera or {}
+        w, h = int(c.get("image_width_px") or 0), int(c.get("image_height_px") or 0)
+        if w > 0 and h > 0:
+            return w, h
+        if "principal_px" in c and h > 0:
+            return int(round(2 * float(c["principal_px"][0]))), h
+        return None
+
+    def floor_homography(self, z: float = 0.0) -> np.ndarray | None:
+        """3×3: floor point (x, y, 1) at height ``z`` → video pixel (homogeneous)."""
+        P = self.projection_matrix()
+        if P is None:
+            return None
+        return np.c_[P[:, 0], P[:, 1], P[:, 2] * z + P[:, 3]]
+
+    def undistorter(self):
+        """``fn(frame_bgr) -> frame_bgr`` removing lens distortion (the
+        calibration's ``K`` and ``dist``), or None when there is none."""
+        c = self.camera or {}
+        dist = np.asarray(c.get("dist") or [], float)
+        if "K" not in c or not dist.size or not np.any(np.abs(dist) > 0):
+            return None
+        import cv2
+        K = np.asarray(c["K"], float)
+        cache: dict = {}
+
+        def undistort(img: np.ndarray) -> np.ndarray:
+            h, w = img.shape[:2]
+            if (w, h) not in cache:
+                cache[(w, h)] = cv2.initUndistortRectifyMap(K, dist, None, K, (w, h), cv2.CV_16SC2)
+            m1, m2 = cache[(w, h)]
+            return cv2.remap(img, m1, m2, cv2.INTER_LINEAR)
+        return undistort
 
 
 def load_pose3d(path) -> Pose3D:
@@ -187,6 +233,16 @@ class Volume3DWidget(QWidget):
         self._home_target = np.array([(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 3])
         self._home_dist = 2.2 * max(x1 - x0, y1 - y0, z1 - z0, 1e-6)
         self.fov = math.radians(40)
+        # 122kn: video in the volume; exact recording-camera view
+        self.video_img: QImage | None = None
+        self.show_video = False
+        self.video_opacity = 0.9
+        self._P = pose.projection_matrix()
+        self._P_sign = float(np.sign(np.linalg.det(self._P[:, :3]))) if self._P is not None else 1.0
+        self._undistort = pose.undistorter()
+        self.cam_mode = False
+        self.cam_zoom = 1.0
+        self.cam_pan = np.zeros(2)
         self.reset_view()
         self._drag = None
 
@@ -195,8 +251,12 @@ class Volume3DWidget(QWidget):
         self.target = self._home_target.copy()
         self.dist = self._home_dist
         self.fov = math.radians(40)
+        self.cam_mode = False
         if name == "Camera" and self.pose.camera_position() is not None:
-            self.view_from_recording_camera()
+            self.view_from_recording_camera()           # orbit pose to leave from
+            self.cam_mode = self._image_wh() is not None
+            self.cam_zoom, self.cam_pan = 1.0, np.zeros(2)
+            self.update()
             return
         self.az, self.el = (math.radians(a) for a in VIEWS.get(name, VIEWS["Perspective"]))
         self.update()
@@ -216,10 +276,89 @@ class Volume3DWidget(QWidget):
         # image x runs along world x for a straight-down camera; keep that
         self.az = math.atan2(-axis[1], -axis[0]) if abs(axis[2]) < 0.99 else math.radians(-90)
         f = (self.pose.camera or {}).get("focal_px")
+        if not f and "K" in (self.pose.camera or {}):
+            f = float(np.asarray(self.pose.camera["K"], float)[1, 1])
+        if not f and P is not None:
+            from scipy.linalg import rq
+            Kp, _ = rq(P[:, :3])
+            f = abs(Kp[1, 1] / Kp[2, 2]) if abs(Kp[2, 2]) > 1e-12 else None
         if f:
-            h = float((self.pose.camera or {}).get("image_height_px", 360))
+            h = float((self.pose.camera or {}).get("image_height_px") or 360)
             self.fov = 2 * math.atan(h / 2 / float(f))
         self.update()
+
+    # -- video ------------------------------------------------------------ #
+    def _image_wh(self) -> tuple[int, int] | None:
+        if self.video_img is not None and not self.video_img.isNull():
+            return self.video_img.width(), self.video_img.height()
+        return self.pose.image_size()
+
+    def set_video_frame(self, frame_bgr: np.ndarray | None) -> None:
+        """The video frame to draw into the volume (BGR, as read)."""
+        if frame_bgr is None:
+            self.video_img = None
+        else:
+            if self._undistort is not None:
+                frame_bgr = self._undistort(frame_bgr)
+            f = np.ascontiguousarray(frame_bgr)
+            h, w = f.shape[:2]
+            self.video_img = QImage(f.data, w, h, 3 * w, QImage.Format_BGR888).copy()
+        self.update()
+
+    def _cam_fit(self) -> tuple[float, float, float]:
+        """Camera view: video pixel → widget pixel (scale k, offset ox, oy)."""
+        iw, ih = self._image_wh()
+        k = self.cam_zoom * min(self.width() / iw, self.height() / ih)
+        ox = self.width() / 2 - k * iw / 2 + self.cam_pan[0]
+        oy = self.height() / 2 - k * ih / 2 + self.cam_pan[1]
+        return k, ox, oy
+
+    def video_transform(self) -> QTransform | None:
+        """Video pixel → widget pixel for the frame drawn on the floor, or
+        None when it cannot be drawn in this view (no camera, or the floor
+        it covers reaches behind the eye)."""
+        if self._P is None or self._image_wh() is None:
+            return None
+        if self.cam_mode:
+            k, ox, oy = self._cam_fit()
+            return QTransform(k, 0, 0, 0, k, 0, ox, oy, 1)
+        H = self.pose.floor_homography(0.0)
+        try:
+            Hinv = np.linalg.inv(H)
+        except np.linalg.LinAlgError:
+            return None
+        eye, right, up, fwd = self._basis()
+        sc = 0.5 * min(self.width(), self.height()) / math.tan(self.fov / 2)
+        R_ = np.r_[right[:2], -right @ eye]
+        U_ = np.r_[up[:2], -up @ eye]
+        F_ = np.r_[fwd[:2], -fwd @ eye]
+        V = np.vstack([self.width() / 2 * F_ + sc * R_, self.height() / 2 * F_ - sc * U_, F_])
+        G = V @ Hinv
+        iw, ih = self._image_wh()
+        corners = np.array([[0, 0, 1], [iw, 0, 1], [0, ih, 1], [iw, ih, 1]], float)
+        fl = corners @ Hinv.T                          # floor points (homogeneous)
+        if np.any(np.abs(fl[:, 2]) < 1e-12):
+            return None
+        X = np.c_[fl[:, :2] / fl[:, 2:], np.zeros(4)]
+        depth_cam = (np.c_[X, np.ones(4)] @ self._P.T)[:, 2] * self._P_sign
+        depth_view = (X - eye) @ fwd
+        if np.any(depth_cam <= 0) or np.any(depth_view <= 1e-6):
+            return None
+        return QTransform(G[0, 0], G[1, 0], G[2, 0], G[0, 1], G[1, 1], G[2, 1], G[0, 2], G[1, 2], G[2, 2])
+
+    def _draw_video(self, p: QPainter) -> bool:
+        if not self.show_video or self.video_img is None:
+            return False
+        T = self.video_transform()
+        if T is None:
+            return False
+        p.save()
+        p.setRenderHint(QPainter.SmoothPixmapTransform)
+        p.setOpacity(self.video_opacity)
+        p.setTransform(T)
+        p.drawImage(0, 0, self.video_img)
+        p.restore()
+        return True
 
     def _basis(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         ce, se, ca, sa = math.cos(self.el), math.sin(self.el), math.cos(self.az), math.sin(self.az)
@@ -235,6 +374,13 @@ class Volume3DWidget(QWidget):
     def project(self, pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """World (N,3) -> widget pixels (N,2) and depth (N,); depth <= 0 is
         behind the eye."""
+        if self.cam_mode and self._P is not None:          # through the calibration
+            X3 = np.asarray(pts, float).reshape(-1, 3)
+            h = np.c_[X3, np.ones(len(X3))] @ self._P.T
+            k, ox, oy = self._cam_fit()
+            with np.errstate(divide="ignore", invalid="ignore"):
+                uv = h[:, :2] / h[:, 2:]
+            return np.c_[ox + k * uv[:, 0], oy + k * uv[:, 1]], h[:, 2] * self._P_sign
         eye, right, up, fwd = self._basis()
         d = np.asarray(pts, float).reshape(-1, 3) - eye
         x, y, z = d @ right, d @ up, d @ fwd
@@ -273,6 +419,7 @@ class Volume3DWidget(QWidget):
         ink = QColor("#c9ccd1") if dark else QColor("#3a3d42")
         faint = QColor("#3a3e45") if dark else QColor("#dcdfe3")
         p.fillRect(self.rect(), bg)
+        video_drawn = self._draw_video(p)
         (x0, x1), (y0, y1), (z0, z1) = self.pose.extent()
         # floor grid
         step = _nice_step(max(x1 - x0, y1 - y0) / 8)
@@ -341,6 +488,10 @@ class Volume3DWidget(QWidget):
         f.setPointSizeF(max(8.0, f.pointSizeF() - 1))
         p.setFont(f)
         txt = f"frame {self.frame}"
+        if self.cam_mode:
+            txt += "  · camera view"
+        if self.show_video and self.video_img is not None and not video_drawn:
+            txt += "  · video: turn the view to look down at the floor"
         if X is None:
             txt += "  · no 3-D data for this frame"
         else:
@@ -352,13 +503,20 @@ class Volume3DWidget(QWidget):
 
     # -- interaction ------------------------------------------------------ #
     def mousePressEvent(self, ev) -> None:  # noqa: ANN001, N802
-        self._drag = (ev.position(), ev.button(), self.az, self.el, self.target.copy())
+        if self.cam_mode and ev.button() == Qt.LeftButton:
+            self.cam_mode = False                      # orbiting leaves the camera view
+        self._drag = (ev.position(), ev.button(), self.az, self.el, self.target.copy(),
+                      self.cam_pan.copy())
 
     def mouseMoveEvent(self, ev) -> None:  # noqa: ANN001, N802
         if self._drag is None:
             return
-        pos0, btn, az0, el0, t0 = self._drag
+        pos0, btn, az0, el0, t0, pan0 = self._drag
         d = ev.position() - pos0
+        if self.cam_mode:                              # pan the image, keep alignment
+            self.cam_pan = pan0 + np.array([d.x(), d.y()])
+            self.update()
+            return
         if btn == Qt.LeftButton:
             self.az = az0 - d.x() * 0.01
             self.el = max(math.radians(-89), min(math.radians(89), el0 + d.y() * 0.01))
@@ -375,6 +533,10 @@ class Volume3DWidget(QWidget):
         self.reset_view()
 
     def wheelEvent(self, ev) -> None:  # noqa: ANN001, N802
+        if self.cam_mode:
+            self.cam_zoom = max(0.2, min(20.0, self.cam_zoom * 1.1 ** (ev.angleDelta().y() / 120)))
+            self.update()
+            return
         self.dist *= 0.9 ** (ev.angleDelta().y() / 120)
         self.dist = max(self._home_dist * 0.05, min(self._home_dist * 10, self.dist))
         self.update()
@@ -395,11 +557,23 @@ def _nice_step(x: float) -> float:
 # --------------------------------------------------------------------------- #
 def reprojection_overlay(pose: Pose3D, colors: dict):
     """``fn(frame_bgr, frame_idx) -> frame`` drawing the 3-D markers as the
-    camera sees them (needs a camera in the file), or None."""
+    camera sees them (needs a camera in the file), or None. With lens
+    distortion in the file the points are distorted to match the video
+    (122kn; before, they were drawn undistorted)."""
     P = pose.projection_matrix()
     if P is None:
         return None
     import cv2
+    distort = None
+    c = pose.camera or {}
+    dist = np.asarray(c.get("dist") or [], float)
+    if "K" in c and dist.size and np.any(np.abs(dist) > 0):
+        from mufasa.pose3d.camera import _distort_normalized
+        K = np.asarray(c["K"], float)
+
+        def distort(uv: np.ndarray) -> np.ndarray:
+            xn = (uv - K[:2, 2]) / np.array([K[0, 0], K[1, 1]])
+            return _distort_normalized(xn, dist) * np.array([K[0, 0], K[1, 1]]) + K[:2, 2]
 
     def draw(img: np.ndarray, frame: int) -> np.ndarray:
         i = pose.row(frame)
@@ -411,6 +585,8 @@ def reprojection_overlay(pose: Pose3D, colors: dict):
             return img
         h = np.c_[X, np.ones(len(X))] @ P.T
         uv = h[:, :2] / h[:, 2:]
+        if distort is not None:                    # the video is not undistorted (122kn)
+            uv = distort(uv)
         out = img.copy()
         for a, b in pose.edges:
             ja, jb = pose.names.index(a), pose.names.index(b)
@@ -426,7 +602,7 @@ def reprojection_overlay(pose: Pose3D, colors: dict):
 
 
 # --------------------------------------------------------------------------- #
-# Viewer: volume above, video below
+# Viewer: volume above (optionally with the video on its floor), video below
 # --------------------------------------------------------------------------- #
 class Pose3DViewerWidget(QWidget):
     def __init__(self, video_path: str | None, pose_path, parent: QWidget | None = None) -> None:
@@ -460,6 +636,22 @@ class Pose3DViewerWidget(QWidget):
         self.trail_spin.setSuffix(" fr")
         bar.addWidget(self.trail_spin)
         bar.addWidget(self.reproj_cb)
+        bar.addSpacing(12)
+        self.video3d_cb = QCheckBox("Video in 3-D", self)
+        self.video3d_cb.setToolTip(
+            "Draw the video frame on the floor of the volume, mapped through the camera calibration. "
+            "Camera view: every marker sits on the animal; other views: floor-level markers do, "
+            "raised ones show their height as parallax.")
+        self.opacity_spin = QSpinBox(self)
+        self.opacity_spin.setRange(10, 100)
+        self.opacity_spin.setSuffix(" %")
+        self.opacity_spin.setValue(90)
+        self.opacity_spin.setToolTip("Opacity of the video in the 3-D view")
+        self.panel_cb = QCheckBox("Video panel", self)
+        self.panel_cb.setToolTip("The video picture below the volume (the playback controls stay)")
+        self.panel_cb.setChecked(True)
+        for w in (self.video3d_cb, self.opacity_spin, self.panel_cb):
+            bar.addWidget(w)
         bar.addStretch()
         lay.addLayout(bar)
         split = QSplitter(Qt.Vertical, self)
@@ -482,10 +674,28 @@ class Pose3DViewerWidget(QWidget):
         self.reproj_cb.setEnabled(self._reproj is not None)
         self.reproj_cb.toggled.connect(self._reproj_changed)
         self.box_cb.setEnabled(self.pose.box is not None)
-        self.scrubber.frame_changed.connect(self.volume.set_frame)
+        self.scrubber.frame_changed.connect(self._on_frame)
+        can_video = bool(video_path) and self.pose.projection_matrix() is not None
+        self.video3d_cb.setEnabled(can_video)
+        self.opacity_spin.setEnabled(can_video)
+        self.panel_cb.setEnabled(bool(video_path))
+        self.video3d_cb.toggled.connect(self._video3d_changed)
+        self.opacity_spin.valueChanged.connect(lambda v: self._set("video_opacity", v / 100.0))
+        self.panel_cb.toggled.connect(self.scrubber.set_picture_visible)
         if video_path:
             self.scrubber.load(str(video_path))
             self.scrubber.seek(int(self.pose.frames[0]))
+        if can_video:
+            self.video3d_cb.setChecked(True)
+
+    def _on_frame(self, frame: int) -> None:
+        self.volume.set_frame(frame)
+        if self.volume.show_video:
+            self.volume.set_video_frame(self.scrubber.raw_frame())
+
+    def _video3d_changed(self, on: bool) -> None:
+        self.volume.show_video = bool(on)
+        self.volume.set_video_frame(self.scrubber.raw_frame() if on else None)
 
     def _set(self, attr: str, v) -> None:  # noqa: ANN001
         setattr(self.volume, attr, v)

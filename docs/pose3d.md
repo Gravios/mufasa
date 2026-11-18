@@ -98,6 +98,25 @@ the ray* vs *across the ray*), so smoothing evens out depth while points
 stay on their labels. Runs inside 3-D inference (checkbox) or on an
 existing run (*3-D Kalman smoothing* section, new run).
 
+## The 3-D viewer: video in the 3-D view
+
+With a camera in the file (every 3-D inference run has one) and a video,
+*Video in 3-D* draws the current frame on the floor of the volume, mapped
+through the calibration — undistorted first when the lens has distortion.
+Markers on the floor sit on their image in every view; raised markers
+(head, back) show their height as parallax away from the camera.
+
+**Camera** renders through the calibration itself: the frame fills the
+view as recorded and every marker sits on the animal whatever its height.
+Wheel zooms and right-drag pans without losing the alignment; left-drag
+orbits away from it (press *Camera* to return). *Top* looks straight down
+on the floor; the video under it is then a map of the box.
+
+The opacity box sets how strongly the video shows; *Video panel* hides the
+separate picture below (its playback controls stay). *Reprojection* still
+draws the 3-D markers on that picture — now with the lens distortion
+applied, so they also line up on distorted videos.
+
 ## Motion capture (C3D)
 
 *Import motion capture (C3D)* (tab) / `mufasa-pose3d import-c3d` reads

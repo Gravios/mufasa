@@ -8,6 +8,34 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kn — the video in the 3-D view, aligned with the markers.**
+3-D viewer: *Video in 3-D* (on when the file has a camera and a video is
+open) draws the current frame on the floor (`z = 0`) of the volume. The
+frame is mapped through the calibration — image → floor homography from
+`P`, undistorted first (`cv2.remap` with the file's `K` and `dist`) when the
+lens has distortion — and through the view (floor → screen, a second
+homography), as one projective `QTransform`; no OpenGL. It is not drawn
+when the floor it covers would reach behind the eye.
+* **Camera** view now renders through the calibration (`P`) instead of an
+  approximate orbit camera with a guessed field of view: the frame fills the
+  view as recorded and every marker sits on the animal at any height; wheel
+  zoom and right-drag pan keep the alignment, left-drag orbits away. In
+  other views floor-level markers sit on their image, raised ones show
+  parallax.
+* Opacity of the video; *Video panel* hides the picture below (playback
+  controls stay). `FrameScrubberWidget.raw_frame()` and
+  `set_picture_visible()`.
+* `Camera.viewer_meta` also stores `K`, `dist` and the image width (new 3-D
+  runs); without them the frame is taken as undistorted.
+* Fix: *Reprojection* drew undistorted points on the raw (distorted) video;
+  it now applies the lens distortion (off by up to 41 px near the corners of
+  the test lens; K7 has no distortion).
+* Checked on K7 (frames 3700 and 3775, rat on the wall and on the bars): box
+  floor on the bedding edges, markers on the rat in the Camera view. Test:
+  `smoke_122kn_video_in_3d` (a synthetic tilted, distorting camera filming
+  dots at a floor and a raised point; their rendered positions within 3 px
+  of the markers in Top, Perspective and Camera views, zoomed and panned).
+
 **122km — re-import the skeleton model (markers and skeleton) on the Data Import page.**
 For a retrained pose model with new markers (e.g. eyes, shoulders). New
 `mufasa/model/skeleton_reimport.py` and the Data Import section *Re-import

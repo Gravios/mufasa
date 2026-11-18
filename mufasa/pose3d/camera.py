@@ -173,7 +173,11 @@ class Camera:
     def viewer_meta(self) -> dict:
         """Camera block for the 3-D viewer's metadata (``P`` for undistorted
         pixels, plus the straight-down keys when they apply)."""
-        m = {"P": self.P.tolist(), "image_height_px": int(self.image_size[1] or 0)}
+        m = {"P": self.P.tolist(), "image_height_px": int(self.image_size[1] or 0),
+             # 122kn: the viewer undistorts frames drawn into the 3-D view
+             "image_width_px": int(self.image_size[0] or 0),
+             "K": np.asarray(self.K, float).tolist(),
+             "dist": np.asarray(self.dist, float).ravel().tolist()}
         if np.allclose(self.R, np.diag([1.0, -1.0, -1.0]), atol=1e-9):
             C = self.center
             if abs(C[0]) < 1e-9 and abs(C[1]) < 1e-9:
