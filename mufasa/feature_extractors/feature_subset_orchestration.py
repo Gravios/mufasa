@@ -56,6 +56,12 @@ from mufasa.feature_extractors.feature_subset_kernels import (
     compute_three_point_hulls,
     compute_two_point_distances,
 )
+from mufasa.feature_extractors.features_3d import (
+    FAMILIES_3D,
+    SIGNED_3D,
+    compute_family,
+    load_pose3d_aligned,
+)
 from mufasa.utils.printing import SimbaTimer
 from mufasa.utils.read_write import get_fn_ext, read_df, write_df
 
@@ -97,7 +103,7 @@ HEAD_VELOCITY_BODY_FRAME = (
 )
 # Families whose values can be negative: their per-family parquet keeps NaN
 # for missing values instead of the legacy -1.
-SIGNED_FAMILIES = frozenset({HEAD_VELOCITY_BODY_FRAME})
+SIGNED_FAMILIES = frozenset({HEAD_VELOCITY_BODY_FRAME}) | SIGNED_3D
 ROI_FAMILIES = frozenset({FRAME_BP_TO_ROI_CENTER, FRAME_BP_INSIDE_ROI})
 ROI_FINGERPRINT_KEY = b"mufasa.roi_fingerprint"
 
@@ -176,6 +182,9 @@ class VideoProcessingConfig:
     # stamped into the ROI families' parquet metadata so a later change
     # of the ROIs shows as "modified" in Compute Features.
     roi_fingerprints: Mapping[str, str | None] | None = None
+
+    # Patch 122ko: {video: its 3-D pose file} for the 3-D families.
+    pose3d_files: Mapping[str, str] | None = None
 
 
 def _read_video_info_for(
@@ -284,6 +293,7 @@ def process_one_video(
     # branch chain. The legacy wide write's bytes are unchanged.
     results: dict[str, np.ndarray] = {}
     results_by_family: dict[str, dict[str, np.ndarray]] = {}
+    pose3d = None                                   # (names, xyz, extra), read once
     for family_idx, family in enumerate(config.feature_families):
         if print_progress:
             print(
@@ -368,6 +378,15 @@ def process_one_video(
                 df=df, head_body=config.head_body_markers,
                 px_per_mm=px_per_mm, fps=fps, source=str(file_path),
             )
+        elif family in FAMILIES_3D:
+            path3d = (config.pose3d_files or {}).get(video_name)
+            if path3d is None:
+                if print_progress:
+                    print(f"  {video_name}: no 3-D pose file — {family} skipped")
+            else:
+                if pose3d is None:
+                    pose3d = load_pose3d_aligned(path3d, len(df))
+                fam_result = compute_family(family, *pose3d)
         elif family == ARENA_EDGE:
             fam_result = compute_distances_to_frame_edge(
                 df=df, animal_bps=config.animal_bps,

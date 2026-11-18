@@ -94,6 +94,14 @@ FRAME_BP_INSIDE_ROI = "FRAME-BY-FRAME BODY-PARTS INSIDE ROIS (BOOLEAN)"
 ARENA_EDGE = "BODY-PART DISTANCES TO VIDEO FRAME EDGE (MM)"
 # Patch 122iz: head velocity decomposed on the body→head axis.
 HEAD_VELOCITY_BODY_FRAME = "HEAD VELOCITY IN BODY FRAME (MM/S)"
+# Patch 122ko: from the video's 3-D pose file (derived/pose3d, sources/pose3d).
+from mufasa.feature_extractors.features_3d import (  # noqa: E402
+    DISTANCES_3D,
+    FAMILIES_3D,
+    HEIGHTS_3D,
+    MOVEMENT_3D,
+    POSTURE_3D,
+)
 
 
 class FeatureFamily(Enum):
@@ -130,6 +138,10 @@ class FeatureFamily(Enum):
     FRAME_BP_INSIDE_ROI = FRAME_BP_INSIDE_ROI
     ARENA_EDGE = ARENA_EDGE
     HEAD_VELOCITY_BODY_FRAME = HEAD_VELOCITY_BODY_FRAME
+    HEIGHTS_3D = HEIGHTS_3D
+    DISTANCES_3D = DISTANCES_3D
+    MOVEMENT_3D = MOVEMENT_3D
+    POSTURE_3D = POSTURE_3D
 
 
 
@@ -144,7 +156,8 @@ FEATURE_FAMILIES = [TWO_POINT_BP_DISTANCES,
                     FRAME_BP_TO_ROI_CENTER,
                     FRAME_BP_INSIDE_ROI,
                     ARENA_EDGE,
-                    HEAD_VELOCITY_BODY_FRAME]
+                    HEAD_VELOCITY_BODY_FRAME,
+                    *FAMILIES_3D]
 
 
 def _explain_no_roi_coverage(video_names: list[str], roi_dict: dict,
@@ -218,7 +231,8 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
                  derived_features_dir: str | os.PathLike | None = None,
                  n_workers: int = 1,
                  raise_on_error: bool = False,
-                 overwrite_existing: bool = False):
+                 overwrite_existing: bool = False,
+                 pose3d_dir: str | os.PathLike | None = None):
 
         check_file_exist_and_readable(file_path=config_path)
         ConfigReader.__init__(self, config_path=config_path)
@@ -252,6 +266,10 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         self.n_workers = n_workers
         self.raise_on_error = raise_on_error
         self.overwrite_existing = overwrite_existing
+        # Patch 122ko: where the 3-D families read the 3-D pose files
+        # (None: the newest derived/pose3d run that has the video, then
+        # sources/pose3d motion capture).
+        self.pose3d_dir = str(pose3d_dir) if pose3d_dir else None
         # Refuse to start without an explicit save destination. Pre-fix
         # behavior: if save_dir was None, run() would compute features
         # into temp_dir and then delete temp_dir at the end —
@@ -430,6 +448,39 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
         self.__get_bp_combinations()
         if HEAD_VELOCITY_BODY_FRAME in self.feature_families:
             self._resolve_head_body()
+        if any(f in FAMILIES_3D for f in self.feature_families):
+            self._resolve_pose3d_files()
+
+    def _resolve_pose3d_files(self):
+        """Patch 122ko: the 3-D pose file of each video for the 3-D
+        families. Videos without one get no 3-D features (reported); if
+        none has one, say where they were looked for."""
+        from pathlib import Path
+
+        from mufasa.feature_extractors.features_3d import find_pose3d_file, pose3d_sources
+        if self.pose3d_dir:
+            folders = [Path(self.pose3d_dir)]
+        else:
+            folders = pose3d_sources(Path(self.config_path).parent)
+        self.pose3d_files = {}
+        for v in self.video_names:
+            f = find_pose3d_file(v, folders)
+            if f is not None:
+                self.pose3d_files[v] = str(f)
+        missing = [v for v in self.video_names if v not in self.pose3d_files]
+        where = ", ".join(str(f) for f in folders) or "derived/pose3d/ or sources/pose3d/ (none exist)"
+        if not self.pose3d_files:
+            msg = ("3-D features need a 3-D pose file per video (3-D tab: 3-D inference, or "
+                   f"Import motion capture); none found for these videos in: {where}")
+            if all(f in FAMILIES_3D for f in self.feature_families):
+                raise InvalidInputError(msg=msg, source=self.__class__.__name__)
+            # 2-D families asked for too: compute those, skip the 3-D ones
+            self.feature_families = [f for f in self.feature_families if f not in FAMILIES_3D]
+            print(msg + " — 3-D families skipped")
+            return
+        print(f"3-D features: {len(self.pose3d_files)} of {len(self.video_names)} video(s) have a 3-D pose file"
+              + (f"; no 3-D features for: {', '.join(missing[:8])}{' …' if len(missing) > 8 else ''}"
+                 if missing else ""))
 
     def _roi_fingerprints(self) -> dict:
         """Patch 122ji: {video: fingerprint of its ROIs in rois.json} for
@@ -589,6 +640,7 @@ class FeatureSubsetsCalculator(ConfigReader, TrainModelMixin):
             # change.
             derived_features_dir=self.derived_features_dir,
             head_body_markers=getattr(self, "head_body_markers", None),
+            pose3d_files=getattr(self, "pose3d_files", None),
         )
 
     def preflight_check(self) -> dict[str, list[str]]:

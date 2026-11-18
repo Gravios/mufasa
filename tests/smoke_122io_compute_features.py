@@ -124,8 +124,10 @@ cr = ConfigReader(config_path=cfg, read_video_info=False)
 os.makedirs(cr.outlier_corrected_dir, exist_ok=True)
 pd.DataFrame(cols).to_parquet(os.path.join(cr.outlier_corrected_dir, "v1.parquet"))
 
+# 3-D families need a 3-D pose file (smoke_122ko_features_3d)
+FAMS_2D = [f for f in FS.FEATURE_FAMILIES if f not in FS.FAMILIES_3D]
 calc = FS.FeatureSubsetsCalculator(
-    config_path=cfg, feature_families=list(FS.FEATURE_FAMILIES),
+    config_path=cfg, feature_families=FAMS_2D,
     file_checks=True, save_dir=None, data_dir=None,
     derived_features_dir=P["derived_features_dir"], n_workers=1,
     overwrite_existing=False)
@@ -133,8 +135,8 @@ check("preflight runs (the step that failed in the report)",
       isinstance(calc.preflight_check(), dict))
 calc.run()
 out = {p.parent.name: p for p in Path(P["derived_features_dir"]).rglob("*.parquet")}
-check(f"every feature family is written ({len(out)}/{len(FS.FEATURE_FAMILIES)})",
-      len(out) == len(FS.FEATURE_FAMILIES))
+check(f"every (2-D) feature family is written ({len(out)}/{len(FAMS_2D)})",
+      len(out) == len(FAMS_2D))
 inside = pd.read_parquet(next(p for n, p in out.items() if "inside_rois" in n))
 col = next(c for c in inside.columns if "nose inside rectangle left" in c)
 truth = (cx >= 0) & (cx <= 320)

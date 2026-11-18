@@ -148,6 +148,34 @@ mufasa-pose3d import-c3d trial01.c3d trial02.c3d --project project.toml [--up y]
 (`mufasa_pose3d`): camera (3×4 `P`), box, skeleton edges, method, a
 per-video report. `run.toml` and `report.json` sit beside them.
 
+## 3-D features
+
+*Compute Features* has a **3-D features** group (patch 122ko). Each family
+reads the video's 3-D pose file: by default from the newest
+`derived/pose3d/<run>` that has the video, then `sources/pose3d/` (motion
+capture). You can also pick one run, or motion capture, under *3-D pose
+from*. The output goes to `derived/features/<family>/<video>.parquet`, like
+the 2-D families, with one row per video frame:
+
+| Family | Columns |
+|---|---|
+| 3-D BODY-PART HEIGHTS (MM) | `Height (mm) <marker>`: height above the floor |
+| 3-D TWO-POINT BODY-PART DISTANCES (MM) | `3-D distance (mm) a-b` for every marker pair |
+| 3-D FRAME-BY-FRAME BODY-PART MOVEMENTS (MM) | `3-D movement <marker> (mm)`: distance moved since the previous frame |
+| 3-D BODY POSTURE ANGLES (DEGREES) | head pitch, head roll (right side up is positive), body pitch (`tail_V6` → `head_back`), head pitch relative to the body, `Spine bend at <joint>`, pelvis pitch, lumbar angle |
+
+`Spine bend at <joint>` is the change in elevation, in the body's heading
+plane, from the segment behind the joint to the segment in front of it. It
+is positive when the back is concave (bending up toward the head) and
+negative when it is hunched. An angle is left out when its markers are
+missing.
+
+Frames that are missing from the 3-D file are written as NaN for heights
+and angles, and as -1 for distances and movements (the 2-D convention).
+Videos without a 3-D file get no 3-D features, and this is reported. If
+you ask only for 3-D families and no video has a 3-D file, the run stops
+with an error.
+
 ## Command line
 
 ```

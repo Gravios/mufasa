@@ -40,11 +40,15 @@ Patch 122ae-3 supersedes the 122z destination notes
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -131,8 +135,10 @@ class FeatureSubsetExtractorForm(OperationForm):
         # categories distinctly. Two QListWidgets feeding one
         # combined selection in collect_args().
         families = self._discover_families()
+        from mufasa.feature_extractors.features_3d import FAMILIES_3D
         subject_families = [f for f in families
-                            if not _is_roi_family(f)]
+                            if not _is_roi_family(f) and f not in FAMILIES_3D]
+        families_3d = [f for f in families if f in FAMILIES_3D]
         roi_families = [f for f in families if _is_roi_family(f)]
 
         # Patch 122fo — per-family "already computed" badge. Scan
@@ -196,6 +202,35 @@ class FeatureSubsetExtractorForm(OperationForm):
         roi_hint.setWordWrap(True)
         roi_layout.addWidget(roi_hint)
         outer.addWidget(roi_box)
+
+        # Patch 122ko: 3-D frame — families computed from the video's
+        # 3-D pose file, and which 3-D files to use.
+        box3d = QGroupBox("3-D features", self)
+        lay3d = QVBoxLayout(box3d)
+        lay3d.setContentsMargins(8, 8, 8, 8)
+        self.families_3d = QListWidget(self)
+        self.families_3d.setSelectionMode(QListWidget.MultiSelection)
+        self.families_3d.setMinimumHeight(80)
+        for fam in families_3d:
+            self.families_3d.addItem(self._make_family_item(fam, computed_slugs))
+        lay3d.addWidget(self.families_3d)
+        src_row = QHBoxLayout()
+        src_row.addWidget(QLabel("3-D pose from:", self))
+        self.pose3d_source = QComboBox(self)
+        self._fill_pose3d_sources()
+        src_row.addWidget(self.pose3d_source, 1)
+        lay3d.addLayout(src_row)
+        hint3d = QLabel(
+            "<i>Heights above the floor, 3-D distances and movements, head and "
+            "body pitch, spine bend — in mm and degrees. Need a 3-D pose file "
+            "per video: a 3-D inference run (3-D tab) or imported motion "
+            "capture. Videos without one get no 3-D features.</i>",
+            self,
+        )
+        hint3d.setStyleSheet("color: palette(placeholder-text);")
+        hint3d.setWordWrap(True)
+        lay3d.addWidget(hint3d)
+        outer.addWidget(box3d)
 
         # Back-compat alias: some external code (and the prior
         # smoke test) reads self.families. Expose a combined
@@ -506,6 +541,20 @@ class FeatureSubsetExtractorForm(OperationForm):
             item.setForeground(QColor(46, 139, 87))  # sea green
         return item
 
+    def _fill_pose3d_sources(self) -> None:
+        """Patch 122ko: 'newest run' (data None), each derived/pose3d run,
+        and sources/pose3d motion capture."""
+        from mufasa.feature_extractors.features_3d import pose3d_sources
+        self.pose3d_source.clear()
+        self.pose3d_source.addItem("Newest 3-D run that has the video (then motion capture)", None)
+        if not self.config_path:
+            return
+        for d in pose3d_sources(Path(self.config_path).parent):
+            n = len(list(d.glob("*.parquet")))
+            label = ("Motion capture (sources/pose3d)" if d.parent.name == "sources"
+                     else f"3-D run {d.name}")
+            self.pose3d_source.addItem(f"{label} — {n} file(s)", str(d))
+
     def _refresh_computed_badges(self) -> None:
         """Re-scan derived/features/ and re-apply the per-family
         "already computed" badge to every item in both selector
@@ -531,7 +580,7 @@ class FeatureSubsetExtractorForm(OperationForm):
         roi_fams = [self.roi_families.item(r).data(Qt.UserRole)
                     for r in range(self.roi_families.count())]
         roi_status = self._roi_family_statuses([f for f in roi_fams if f])
-        for widget in (self.subject_families, self.roi_families):
+        for widget in (self.subject_families, self.roi_families, self.families_3d):
             for row in range(widget.count()):
                 item = widget.item(row)
                 fam = item.data(Qt.UserRole)
@@ -555,6 +604,8 @@ class FeatureSubsetExtractorForm(OperationForm):
              for it in self.subject_families.selectedItems()]
             + [it.data(Qt.UserRole)
                for it in self.roi_families.selectedItems()]
+            + [it.data(Qt.UserRole)
+               for it in self.families_3d.selectedItems()]
         )
         if not selected:
             raise ValueError("Select at least one feature family.")
@@ -606,6 +657,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             "derived_features_dir": derived_features_dir,
             "n_workers":        int(self.n_workers.value()),
             "overwrite_existing": False,  # default; on_run may flip
+            "pose3d_dir":       self.pose3d_source.currentData(),
         }
 
     def on_run(self) -> None:
@@ -800,6 +852,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             derived_features_dir=kwargs["derived_features_dir"],
             n_workers=kwargs["n_workers"],
             overwrite_existing=False,  # preflight runs in non-overwrite mode
+            pose3d_dir=kwargs.get("pose3d_dir"),
         )
         # Patch 122d7 (QWI-3): if the project has no eligible
         # videos, signal that to on_run so it can show a clear
@@ -812,7 +865,8 @@ class FeatureSubsetExtractorForm(OperationForm):
     def target(self, *, config_path: str, feature_families: list[str],
                file_checks: bool, save_dir: str | None,
                derived_features_dir: str | None,
-               n_workers: int, overwrite_existing: bool = False) -> None:
+               n_workers: int, overwrite_existing: bool = False,
+               pose3d_dir: str | None = None) -> None:
         from mufasa.feature_extractors.feature_subsets import (
             FeatureSubsetsCalculator,
         )
@@ -825,6 +879,7 @@ class FeatureSubsetExtractorForm(OperationForm):
             derived_features_dir=derived_features_dir,
             n_workers=n_workers,
             overwrite_existing=overwrite_existing,
+            pose3d_dir=pose3d_dir,
         ).run()
 
 

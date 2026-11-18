@@ -8,6 +8,35 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ko — 3-D features in Compute Features.**
+`mufasa/feature_extractors/features_3d.py` adds four families. They are in
+`FEATURE_FAMILIES` and in the form's new **3-D features** group:
+* heights above the floor;
+* 3-D distances for every marker pair;
+* 3-D frame-to-frame movements;
+* posture angles: head pitch and roll, body pitch, head pitch relative to
+  the body, and the signed spine bend at each joint (concave back is
+  positive, hunched is negative). The run's own pelvis pitch and lumbar
+  angle are passed through.
+How it works:
+* Source: the video's 3-D pose file from the newest `derived/pose3d` run
+  that has it, then `sources/pose3d` (motion capture). The form's *3-D
+  pose from* combo can pick one run or motion capture instead
+  (`FeatureSubsetsCalculator(pose3d_dir=...)`).
+* Rows follow the video's frames through the file's `frame` column.
+  Missing frames are NaN for heights and angles (added to the signed
+  families) and -1 for distances and movements.
+* Videos without a 3-D file are reported and get no 3-D features. If only
+  3-D families are asked for and no video has a 3-D file, the run stops
+  with an error. If 2-D families are asked for too, the 3-D ones are
+  skipped and the 2-D ones are still computed.
+* Checked on K7: 15 markers, 108,030 frames. Body pitch has a median of
+  31° (5–95 %: 7–72°), head pitch relative to the body a median of −47°.
+* Test: `smoke_122ko_features_3d` uses a synthetic walking-then-rearing
+  rat with a gap in the 3-D file, and checks values, signs, the gap,
+  source choice, errors and the form. `smoke_122io_compute_features` now
+  runs the 2-D families only.
+
 **122kn — the video in the 3-D view, aligned with the markers.**
 3-D viewer: *Video in 3-D* (on when the file has a camera and a video is
 open) draws the current frame on the floor (`z = 0`) of the volume. The
