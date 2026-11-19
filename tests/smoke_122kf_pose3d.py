@@ -181,7 +181,8 @@ check(f"single camera: head {np.median(he):.1f} mm median, {np.percentile(he, 90
 check("head shape: outline learned, heights fixed from the config",
       abs(rep["head_template_mm"]["head_nose"][2] + 6.0) < 1e-6 and rep["head_template_reproj_px"] < 1.5)
 check("steps: rigid head, Rat7M trunk, pelvis, spine chain, tail",
-      rep["steps"][:2] == ["rigid head", "Rat7M trunk heights"] and "tail draped" in rep["steps"]
+      [s for s in rep["steps"] if "virtual rodent" not in s][:2] == ["rigid head", "Rat7M trunk heights"]
+      and "tail draped" in rep["steps"]
       and any(s.startswith("spine chain") for s in rep["steps"]))
 trunk = ["back_T4", "back_T8", "back_L2", "back_L6", "back_V2", "hip_left", "tail_V32"]
 check("trunk and tail labels stay on their camera rays (< 0.5 px)",

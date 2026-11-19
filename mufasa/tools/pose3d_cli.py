@@ -89,6 +89,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="mm a label may sit beyond a wall before it pushes back")
     i.add_argument("--no-trunk-prior", action="store_true")
     i.add_argument("--no-spine-chain", action="store_true")
+    i.add_argument("--no-anatomy", action="store_true",
+                   help="no anatomical limits (heights and spine bends from the virtual rodent)")
+    i.add_argument("--anatomy-scale", type=float, help="rat size vs the virtual rodent (default: estimated)")
     i.add_argument("--fps", type=float, default=30.0)
     i.add_argument("--device", choices=["auto", "cuda", "torch-cpu", "cpu"], default="auto",
                    help="head/spine solver: cuda (PyTorch GPU), torch-cpu, cpu (SciPy); "
@@ -152,7 +155,8 @@ def settings_from(a):
     from mufasa.pose3d.pipeline import RunSettings, default_workers
     mono = MonoConfig(head_width_mm=a.head_width, body_scale=a.body_scale, fps=a.fps,
                       wall_tolerance_mm=a.wall_tolerance, device=a.device,
-                      use_trunk_prior=not a.no_trunk_prior, spine_chain=not a.no_spine_chain)
+                      use_trunk_prior=not a.no_trunk_prior, spine_chain=not a.no_spine_chain,
+                      anatomy=None if a.no_anatomy else "virtual_rodent", anatomy_scale=a.anatomy_scale)
     kal = None if a.no_kalman else Kalman3DConfig(fps=a.fps, sigma_a=a.sigma_a)
     return RunSettings(mode="stereo" if a.stereo else "mono", mono=mono, kalman=kal,
                        workers=a.workers if a.workers else default_workers())

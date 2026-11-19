@@ -75,6 +75,39 @@ lands on the 2-D labels.
 5. **Tail.** Each tail label hangs as low as possible on its line of
    sight without the tail stretching (lengths measured from the session).
 
+**Anatomical limits** (*anatomical limits (virtual rodent)*, on by
+default; patch 122kr). DeepMind's virtual rodent — a rat skeleton with
+every joint's range and a skin, from dm_control (Merel et al. 2020;
+Apache 2.0) — sets what the body can do:
+
+* **Heights.** For each head and trunk label, the highest it can be (the
+  rat rearing on its hind paws, every joint within range) and the lowest
+  (no part of the body below the floor), scaled to this rat with 10%
+  slack. The head is moved along its lines of sight into its range — it
+  is scaled about the camera, so it still lies on its labels — and the
+  trunk labels are kept within theirs, before and during the spine chain.
+  A head placed far too high usually means the ear labels came too close
+  together (the head turned or seen end-on).
+* **Spine bends.** The up/down bend of the lumbar region (`back_V2`→`back_L6`
+  against `back_T8`→`back_T4`) and of the neck (`back_T8`→`back_T4`
+  against `back_T4`→`head_back`) stay within the model's range (5° slack),
+  as hard limits in the spine chain, in frames where every spine segment
+  points forward from overhead. Where one points backwards (labels stacked
+  above each other, as when rearing or with the head over the shoulders —
+  about a third of K7's frames) an up/down bend cannot be measured from one
+  camera and is left to Rat7M, which still sets the typical shape.
+* **Size.** *Body size vs virtual rodent* (auto): the length of the back
+  (`head_back` → `back_V2`, overhead) in confident frames with the head
+  low, against the model's.
+
+The report (`anatomy`) gives the size, the frames whose head was lowered or
+raised, the trunk labels moved per label, and frames still outside the
+bend ranges. The limits are worked out once by
+`scripts/build_virtual_rodent_limits.py` into
+`mufasa/assets/models/pose3d/virtual_rodent/virtual_rodent_limits.json`;
+`mufasa.pose3d.rodent_model` reads the model (forward kinematics and
+skinning, NumPy only).
+
 Low-confidence 2-D labels (below 0.9) are replaced by a Kalman v2 run
 (*fill from Kalman v2 run*) or interpolated.
 
@@ -259,7 +292,10 @@ workers instead. Each worker needs a few hundred MB.
 
 `mufasa/assets/models/pose3d/rat7m_trunk_prior.npz` — 80 000 frames of
 Rat7M motion capture (Dunn et al. 2021, *Nature Methods*; CC BY 4.0),
-rebuilt by `scripts/build_rat7m_prior.py`. See
+rebuilt by `scripts/build_rat7m_prior.py`.
+`mufasa/assets/models/pose3d/virtual_rodent/` — DeepMind's virtual rodent
+(dm_control `rodent.xml` and skin, Apache 2.0) and the limits worked out
+from it (`scripts/build_virtual_rodent_limits.py`). See
 `mufasa/assets/models/pose3d/README.md`.
 
 ## Limits

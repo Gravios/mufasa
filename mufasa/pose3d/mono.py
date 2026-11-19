@@ -28,6 +28,15 @@ One camera sees each label only as a ray; depth comes from body models:
 5. **Tail** — each tail label hangs as low as it can on its ray without
    the tail stretching (lengths measured from the session).
 
+**Anatomical limits** (patch 122kr, ``MonoConfig.anatomy``): DeepMind's
+virtual rodent (:mod:`mufasa.pose3d.rodent_model`) gives, scaled to the
+session's rat, how high and how low each head and trunk label can be with
+every joint within range, and how far the lumbar spine and the neck can
+bend up or down. The head is moved along the camera rays into its height
+range (scaled about the camera centre, so it still reprojects onto its
+labels); the trunk labels are kept within theirs; the spine chain keeps
+both bends within range.
+
 Every label stays on its own camera ray, so the 3-D pose reprojects onto
 the 2-D labels (rigid head: about a pixel).
 """
@@ -86,6 +95,13 @@ class MonoConfig:
     # size; labels may sit this far beyond a wall before it pushes back
     # (a hard wall pushes heads up along their rays)
     wall_tolerance_mm: float = 20.0
+    # anatomical limits from a body model (122kr): "virtual_rodent" or None
+    anatomy: str | None = "virtual_rodent"
+    # this rat's size relative to the model (None: estimated from the session)
+    anatomy_scale: float | None = None
+    # slack on the height limits (fraction) and on the bend limits (deg)
+    anatomy_margin: float = 0.1
+    anatomy_bend_margin_deg: float = 5.0
     use_trunk_prior: bool = True
     pelvis_from_lumbar: bool = True
     spine_chain: bool = True
@@ -464,6 +480,14 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
     for j, m in enumerate(head):
         X[m] = Xh[:, j]
     report["steps"].append("rigid head")
+    anat = Anatomy.for_session(cfg, cam0, Uf, L, X) if cfg.anatomy else None
+    if anat is not None:
+        report["anatomy"] = {"model": cfg.anatomy, "scale": round(anat.scale, 3),
+                             "scale_from": anat.scale_from}
+        n_lo, n_hi = anat.limit_head(cam0, X, head)
+        report["anatomy"]["head_frames_lowered"] = n_hi
+        report["anatomy"]["head_frames_raised"] = n_lo
+        report["steps"].append("head within its height range (virtual rodent)")
 
     # 2. trunk heights from Rat7M -------------------------------------------- #
     spine = [m for m in cfg.spine if m in has]
@@ -519,14 +543,19 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
             place(m, np.full(N, 50.0 * s_))
         report["steps"].append("trunk at a fixed height (no Rat7M prior)")
 
+    if anat is not None:
+        report["anatomy"]["trunk_clamped_before_chain"] = anat.clamp(cam0, X, spine + hips)
     # 4. spine chain -------------------------------------------------------- #
     if cfg.spine_chain and prior is not None and len(spine) >= 3:
         chain = list(reversed(spine)) + [cfg.head_back]
         free = [m for m in reversed(spine) if m not in cfg.pelvis]
         for p in range(cfg.chain_passes):
             say(f"spine chain pass {p + 1}/{cfg.chain_passes}")
-            _chain_refit(cam0, X, chain, free, prior, cfg, box, pool, device)
+            _chain_refit(cam0, X, chain, free, prior, cfg, box, pool, device, anat)
         report["steps"].append(f"spine chain ({cfg.chain_passes} passes)")
+    if anat is not None:
+        report["anatomy"]["trunk_clamped_after_chain"] = anat.clamp(cam0, X, spine + hips)
+        report["anatomy"]["bend_outside_range"] = anat.bend_violations(X, list(reversed(spine)) + [cfg.head_back])
 
     # 5. tail ---------------------------------------------------------------- #
     tail = [m for m in cfg.tail if m in has]
@@ -564,10 +593,156 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
 
 
 # --------------------------------------------------------------------------- #
+# Anatomical limits (122kr)
+# --------------------------------------------------------------------------- #
+class Anatomy:
+    """Height ranges of the labels and bend ranges of the spine from a body
+    model (:mod:`mufasa.pose3d.rodent_model`), scaled to the session's rat.
+
+    ``names`` maps this project's labels to the model's; ``scale`` is the
+    rat's size relative to the model."""
+
+    MODEL_SPINE = ("back_T4", "back_T8", "back_L2", "back_L6", "back_V2")
+
+    def __init__(self, limits: dict, scale: float, names: dict, *, margin: float = 0.1,
+                 bend_margin_deg: float = 5.0, scale_from: str = "set") -> None:
+        self.limits, self.scale, self.names = limits, float(scale), names
+        self.margin, self.bend_margin = margin, np.deg2rad(bend_margin_deg)
+        self.scale_from = scale_from
+
+    @classmethod
+    def for_session(cls, cfg: MonoConfig, cam: Camera, Uf: dict, L: dict, X: dict) -> Anatomy:
+        from mufasa.pose3d import rodent_model
+        if cfg.anatomy != "virtual_rodent":
+            raise ValueError(f"unknown anatomy model {cfg.anatomy!r} (virtual_rodent or None)")
+        lim = rodent_model.load_limits()
+        names = {cfg.head_back: "head_back", cfg.head_mid: "head_mid", cfg.head_nose: "head_nose",
+                 cfg.head_left: "head_left", cfg.head_right: "head_right"}
+        names.update(zip(cfg.spine, cls.MODEL_SPINE))
+        names.update(zip(cfg.hips, ("hip_left", "hip_right")))
+        if cfg.anatomy_scale:
+            scale, how = float(cfg.anatomy_scale), "set"
+        else:
+            scale, how = cls.estimate_scale(cfg, cam, Uf, L, X, lim["sizes_mm"]["back_path_horizontal"])
+        return cls(lim, scale, names, margin=cfg.anatomy_margin, bend_margin_deg=cfg.anatomy_bend_margin_deg,
+                   scale_from=how)
+
+    @staticmethod
+    def estimate_scale(cfg: MonoConfig, cam: Camera, Uf: dict, L: dict, X: dict,
+                       model_path_mm: float) -> tuple[float, str]:
+        """The rat's size from the session: the horizontal length of the back
+        (head_back → back_T4 → … → back_V2, the labels on their rays at the
+        head's height), median over confident frames with the head low,
+        against the model's."""
+        path = [cfg.head_back] + [m for m in cfg.spine if m in Uf]
+        if len(path) < 3 or any(m not in L for m in path):
+            return 1.0, "default (labels missing)"
+        hb = X[cfg.head_back]
+        hz = hb[:, 2]
+        ok = np.isfinite(hz) & (hz <= np.nanmedian(hz))
+        for m in path:
+            ok &= (L[m] > .95) & np.isfinite(Uf[m]).all(1)
+        if ok.sum() < 50:
+            return 1.0, "default (too few confident frames)"
+        P = [hb[ok]] + [cam.point_at_height(Uf[m][ok], hz[ok], undistort=False) for m in path[1:]]
+        length = sum(np.linalg.norm((b - a)[:, :2], axis=1) for a, b in zip(P[:-1], P[1:]))
+        return float(np.median(length) / model_path_mm), f"back length over {int(ok.sum())} frames"
+
+    def zrange(self, name: str) -> tuple[float, float]:
+        """(lowest, highest) height in mm for a project label (±inf when the
+        model has no limit for it)."""
+        h = self.limits["label_heights"].get(self.names.get(name, ""))
+        if h is None:
+            return -np.inf, np.inf
+        return h["min_mm"] * self.scale * (1 - self.margin), h["max_mm"] * self.scale * (1 + self.margin)
+
+    def limit_head(self, cam: Camera, X: dict, head: list[str]) -> tuple[int, int]:
+        """Move the rigid head along the camera rays (scaling it about the
+        camera centre: it still reprojects onto its labels) so the ears are
+        within their height range. Returns (frames raised, frames lowered)."""
+        ears = [m for m in head if self.names.get(m) in ("head_left", "head_right")]
+        if len(ears) != 2:
+            return 0, 0
+        r = [self.zrange(m) for m in ears]
+        lo, hi = (r[0][0] + r[1][0]) / 2, (r[0][1] + r[1][1]) / 2
+        C = cam.center
+        ez = (X[ears[0]][:, 2] + X[ears[1]][:, 2]) / 2
+        with np.errstate(invalid="ignore", divide="ignore"):
+            k = (C[2] - np.clip(ez, lo, hi)) / (C[2] - ez)
+        k = np.where(np.isfinite(k), k, 1.0)
+        for m in head:
+            X[m] = C + k[:, None] * (X[m] - C)
+        return int((ez < lo).sum()), int((ez > hi).sum())
+
+    def clamp(self, cam: Camera, X: dict, names: list[str]) -> dict:
+        """Keep labels within their height range, along their rays. Returns
+        the number of frames moved per label."""
+        out = {}
+        for m in names:
+            lo, hi = self.zrange(m)
+            if not np.isfinite([lo, hi]).any():
+                continue
+            z = X[m][:, 2]
+            zc = np.clip(z, lo, hi)
+            moved = np.isfinite(z) & (zc != z)
+            if moved.any():
+                X[m] = np.where(moved[:, None], _on_ray(cam, X[m], zc), X[m])
+            out[m] = int(moved.sum())
+        return out
+
+    def regions(self, chain: list[str]) -> list[tuple[int, int, float, float]]:
+        """Spine regions whose total bend is limited, as (first segment, last
+        segment, lowest, highest) in chain-segment indices and radians; empty
+        when the chain is not the model's."""
+        from mufasa.pose3d import rodent_model
+        if [self.names.get(m) for m in chain] != rodent_model.CHAIN:
+            return []
+        out = []
+        for r, (a, b) in rodent_model.REGIONS.items():
+            sb = self.limits["spine_bend"][r]
+            out.append((a, b, np.deg2rad(sb["min_deg"]) - self.bend_margin,
+                        np.deg2rad(sb["max_deg"]) + self.bend_margin))
+        return out
+
+    def chain_terms(self, chain: list[str], free: list[str]) -> dict:
+        zr = [self.zrange(m) for m in free]
+        return {"zlo": np.array([max(a, -1e6) for a, _ in zr]), "zhi": np.array([min(b, 1e6) for _, b in zr]),
+                "regions": self.regions(chain)}
+
+    @staticmethod
+    def measurable(X: dict, chain: list[str]) -> np.ndarray:
+        """Frames where every chain segment points forward (along the
+        horizontal tail-end → head direction): there the up/down bends can
+        be measured from overhead."""
+        hd = X[chain[-1]][:, :2] - X[chain[0]][:, :2]
+        hd = hd / np.maximum(np.linalg.norm(hd, axis=1, keepdims=True), 1e-6)
+        ok = np.ones(len(hd), bool)
+        for a, b in zip(chain[:-1], chain[1:]):
+            with np.errstate(invalid="ignore"):
+                ok &= np.einsum("ij,ij->i", X[b][:, :2] - X[a][:, :2], hd) > 0
+        return ok
+
+    def bend_violations(self, X: dict, chain: list[str]) -> dict:
+        """Frames whose region bends are outside range (after the fit), among
+        the frames where they can be measured; and how many cannot."""
+        from mufasa.pose3d import rodent_model
+        regs = self.regions(chain)
+        if not regs:
+            return {}
+        ok = self.measurable(X, chain)
+        _, el = rodent_model.chain_bends({m: X[m] for m in chain}, chain)
+        out = {"not_measurable": int((~ok).sum())}
+        for (a, b, lo, hi), name in zip(regs, rodent_model.REGIONS):
+            tot = el[:, b] - el[:, a]
+            out[name] = int((ok & ((tot < lo - 1e-3) | (tot > hi + 1e-3))).sum())
+        return out
+
+
+# --------------------------------------------------------------------------- #
 # Spine chain refit
 # --------------------------------------------------------------------------- #
 def _chain_refit(cam: Camera, X: dict, chain: list[str], free: list[str], prior: Rat7MPrior,
-                 cfg: MonoConfig, box, pool=None, device: str = "cpu") -> None:
+                 cfg: MonoConfig, box, pool=None, device: str = "cpu", anat: Anatomy | None = None) -> None:
     """Refit the heights of ``free`` chain labels (tail→head order in
     ``chain``) on their rays; see the module docstring. Chunks run on
     ``pool`` (a process pool) when given."""
@@ -579,6 +754,10 @@ def _chain_refit(cam: Camera, X: dict, chain: list[str], free: list[str], prior:
     lim = prior.bend_limits((head_end[:, 2] + cfg.head_height_offset_mm) / cfg.body_scale)
     n_mid = max(1, len(chain) - 4)                      # joints between pelvis and neck
     D = {m: (X[m] - C) for m in free}
+    # the bend limits apply where every chain segment points forward from
+    # overhead; where one points backwards (labels stacked above each other,
+    # e.g. rearing) the up/down bend cannot be measured from one camera
+    rw = Anatomy.measurable(X, chain).astype(float)
     CH, OV = cfg.chunk, 100
     spans = [(s, max(0, s - OV), min(N, s + CH + OV)) for s in range(0, N, CH)]
     payloads = [{
@@ -587,6 +766,8 @@ def _chain_refit(cam: Camera, X: dict, chain: list[str], free: list[str], prior:
         "D": {m: D[m][a:b] for m in free},
         "z0": np.stack([X[m][a:b, 2] for m in free], 1),
         "hd": hd[a:b], "lim": {k: v[a:b] for k, v in lim.items()},
+        "anat": anat.chain_terms(chain, free) if anat is not None else None,
+        "rw": rw[a:b],
     } for _, a, b in spans]
     results = (pool.map if pool is not None else map)(_chain_chunk, payloads)
     Z = np.zeros((N, len(free)))
@@ -606,15 +787,17 @@ def _chain_chunk(p: dict) -> np.ndarray:
     n, nf = z0.shape
     if p.get("device", "cpu") != "cpu":
         from mufasa.pose3d import gpu
-        f = gpu.chain_residual_fn(C, chain, free, n_mid, p["device"])
+        f = gpu.chain_residual_fn(C, chain, free, n_mid, p["device"], anatomy=p.get("anat"))
         Dk = np.stack([D[m] for m in free], 1)                               # (n, nf, 3)
         Fx = np.stack([fixed[m] for m in chain if m not in free], 1)        # (n, nfix, 3)
         L4 = np.stack([p["lim"][k] for k in ("M50", "M95", "F5", "F95")], 1)
-        o = gpu.solve_frames(f, z0, (Dk, Fx, z0, hdl, L4), np.full(nf, 1 / 64.0),
+        data = (Dk, Fx, z0, hdl, L4) + ((p["rw"],) if p.get("anat") is not None else ())
+        o = gpu.solve_frames(f, z0, data, np.full(nf, 1 / 64.0),
                              device=p["device"], max_nfev=60)
         return o.x
     M50, M95, F5, F95 = (p["lim"][k] for k in ("M50", "M95", "F5", "F95"))
     rad = np.deg2rad
+    an = p.get("anat")
 
     def elev(a, b):
         return np.arctan2(b[:, 2] - a[:, 2], np.einsum("ij,ij->i", b[:, :2] - a[:, :2], hdl))
@@ -639,6 +822,15 @@ def _chain_chunk(p: dict) -> np.ndarray:
             else:                                             # mid-back
                 r.append((bd - rad(M50) / n_mid) / rad(15))
                 r.append(np.maximum(0, bd - rad(M95) / n_mid - rad(3)) / rad(2))
+        if an is not None:                                    # anatomical limits (hard)
+            for i in range(nf):
+                r.append(np.maximum(0, z[:, i] - an["zhi"][i]) / 1.0)
+                r.append(np.maximum(0, an["zlo"][i] - z[:, i]) / 1.0)
+            rw = p["rw"]
+            for s0, s1, lo, hi in an["regions"]:
+                tot = a[s1] - a[s0]
+                r.append(rw * np.maximum(0, tot - hi) / rad(1))
+                r.append(rw * np.maximum(0, lo - tot) / rad(1))
         r.append((np.diff(z, axis=0) / 8.0).ravel())
         r.append(np.maximum(0, 3 - z).ravel())
         return np.concatenate([np.ravel(v) for v in r])
@@ -717,4 +909,4 @@ def _tail_lengths(cam: Camera, Uf: dict, L: dict, X: dict, chain: list, cfg: Mon
     return out
 
 
-__all__ = ["MonoConfig", "Pose2D", "Rat7MPrior", "RigidHead", "load_pose2d", "reconstruct_mono"]
+__all__ = ["Anatomy", "MonoConfig", "Pose2D", "Rat7MPrior", "RigidHead", "load_pose2d", "reconstruct_mono"]

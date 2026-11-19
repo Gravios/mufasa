@@ -8,6 +8,39 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kr — Anatomical limits for single-camera 3-D pose (virtual rodent).**
+The user has one camera and DeepLabCut labels, and asked for the height
+estimates to be held to what a body can do; for a rat, the reference is
+DeepMind's virtual rodent (dm_control, Apache 2.0), now packaged in
+`mufasa/assets/models/pose3d/virtual_rodent/` with its licence and notice.
+* `mufasa/pose3d/rodent_model.py`: reads the MJCF (bodies, hinge joints,
+  default-class inheritance) and the skin (scaled ×0.82 to the skeleton it
+  was bound to); forward kinematics and skinning in NumPy; the project's
+  labels placed on the model; `build_limits` (a seeded random search per
+  label for its highest height on the hind paws and its lowest; sampled
+  lumbar and neck bend ranges, measured as the spine chain measures them).
+  `scripts/build_virtual_rodent_limits.py` writes
+  `virtual_rodent_limits.json`.
+* `mono.MonoConfig.anatomy` ("virtual_rodent", default; None to switch off),
+  `anatomy_scale` (None: from the back's overhead length in the session),
+  `anatomy_margin` (10%), `anatomy_bend_margin_deg` (5°). `mono.Anatomy`:
+  * the rigid head is scaled about the camera centre so the ears are within
+    their height range (it still reprojects);
+  * trunk labels and hips are kept in their ranges along their rays, before
+    and after the spine chain, and inside it as hinge terms;
+  * the chain keeps the lumbar and neck bends within range (hard hinges; the
+    pelvis segment was only limited upwards before) in frames where every
+    spine segment points forward from overhead (`Anatomy.measurable`);
+    elsewhere the bend is not measurable from one camera. SciPy and PyTorch
+    (`gpu.chain_residual_fn(anatomy=…)`) alike.
+  * report `anatomy`: size and how it was found, head frames lowered/raised,
+    trunk labels moved, frames still outside the bend ranges.
+* 3-D inference form: *anatomical limits (virtual rodent)* and *Body size vs
+  virtual rodent* (auto); CLI `--no-anatomy`, `--anatomy-scale`.
+* Docs: `docs/pose3d.md`, the models README.
+* Test: `tests/smoke_122kr_anatomical_limits.py`; `smoke_122kf` lets the new
+  step sit after the rigid head.
+
 **122kq — Body model tab: fit a rigged 3-D model to video, over time.**
 The new package `mufasa/bodymodel/` and the tab `pages/bodymodel_page.py`
 (after 3-D) are documented in `docs/bodymodel.md`.

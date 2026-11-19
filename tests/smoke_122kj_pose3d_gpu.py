@@ -131,11 +131,13 @@ def main() -> int:
     finally:
         mono.solve_sequence = real
     free, chain = p["free"], p["chain"]
-    fc = gpu.chain_residual_fn(p["C"], chain, free, p["n_mid"], "cpu")
+    fc = gpu.chain_residual_fn(p["C"], chain, free, p["n_mid"], "cpu", anatomy=p.get("anat"))
     z = p["z0"] + rng.normal(0, 5, p["z0"].shape)
     args = (z, np.stack([p["D"][m] for m in free], 1),
             np.stack([p["fixed"][m] for m in chain if m not in free], 1), p["z0"], p["hd"],
             np.stack([p["lim"][k] for k in ("M50", "M95", "F5", "F95")], 1))
+    if p.get("anat") is not None:                     # 122kr: anatomical limits (on by default)
+        args += (p["rw"],)
     rc = torch.func.vmap(fc)(*(torch.tensor(a) for a in args)).numpy()
     cc = 0.5 * (rc ** 2).sum() + 0.5 * ((np.diff(z, axis=0) / 8) ** 2).sum()
     rn = capc["fun"](z.ravel())

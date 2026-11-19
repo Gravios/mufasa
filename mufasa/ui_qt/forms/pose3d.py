@@ -484,12 +484,22 @@ class Pose3DInferenceForm(OperationForm):
         orow = QHBoxLayout()
         self.prior = QCheckBox("Rat7M trunk heights", self)
         self.chain = QCheckBox("spine within bend limits", self)
+        self.anat = QCheckBox("anatomical limits (virtual rodent)", self)
+        self.anat.setToolTip("Heights of the head and back labels, and the bend of the lumbar spine and "
+                             "the neck, kept within what DeepMind's virtual rodent can do with every "
+                             "joint within range (scaled to this rat)")
         self.prior.setChecked(True)
         self.chain.setChecked(True)
+        self.anat.setChecked(True)
         orow.addWidget(self.prior)
         orow.addWidget(self.chain)
+        orow.addWidget(self.anat)
         orow.addStretch()
         f.addRow("Body model", orow)
+        self.anat_scale = dspin(0.0, 0, 3, "", 2, "this rat's size relative to the virtual rodent "
+                                "(auto: from the length of its back in the session)")
+        self.anat_scale.setSpecialValueText("auto")
+        f.addRow("Body size vs virtual rodent", self.anat_scale)
         krow = QHBoxLayout()
         self.kal = QCheckBox("3-D Kalman smoothing", self)
         self.kal.setChecked(True)
@@ -557,7 +567,9 @@ class Pose3DInferenceForm(OperationForm):
         mono = MonoConfig(head_width_mm=self.head_w.value(), body_scale=self.body_scale.value(),
                           fps=self.fps.value(), use_trunk_prior=self.prior.isChecked(),
                           wall_tolerance_mm=self.wall_tol.value(),
-                          spine_chain=self.chain.isChecked(), device=self.solver.currentData())
+                          spine_chain=self.chain.isChecked(), device=self.solver.currentData(),
+                          anatomy="virtual_rodent" if self.anat.isChecked() else None,
+                          anatomy_scale=self.anat_scale.value() or None)
         kal = Kalman3DConfig(fps=self.fps.value(), sigma_a=self.sig_a.value()) if self.kal.isChecked() else None
         st = RunSettings(mode="stereo" if self.mode.currentIndex() == 1 else "mono", mono=mono, kalman=kal,
                          workers=self.workers.value())

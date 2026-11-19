@@ -423,20 +423,27 @@ def head_residual_fn(cam, T, box, *, sigma: float, roll_sd_deg: float, wall_tole
 HEAD_SMOOTH_W = np.r_[[1 / 8.0 ** 2] * 3, [1 / math.radians(8) ** 2] * 3]
 
 
-def chain_residual_fn(C, chain: list, free: list, n_mid: int, device):
+def chain_residual_fn(C, chain: list, free: list, n_mid: int, device, anatomy: dict | None = None):
     """One frame's spine-chain residuals, as ``mono._chain_chunk``. Frame
     data: D (nf, 3) ray directions of the free labels, fixed (n_fixed, 3)
     positions of the other chain nodes in chain order, z0 (nf,), hd (2,),
-    lim (4,) = M50, M95, F5, F95 (deg)."""
+    lim (4,) = M50, M95, F5, F95 (deg). ``anatomy`` (122kr): the free
+    labels' height limits and the spine regions' bend limits, as
+    ``mono.Anatomy.chain_terms``; then the frame data end with rw (), the
+    weight of the bend limits (0 where they cannot be measured)."""
     device = _torch_device(device)
     dt = torch.float64
     Ct = torch.as_tensor(np.asarray(C, float), dtype=dt, device=device)
+    if anatomy is not None:
+        zlo = torch.as_tensor(np.asarray(anatomy["zlo"], float), dtype=dt, device=device)
+        zhi = torch.as_tensor(np.asarray(anatomy["zhi"], float), dtype=dt, device=device)
+        regions = list(anatomy["regions"])
     rad = math.pi / 180
     free_idx = {m: i for i, m in enumerate(free)}
     fixed_idx = {m: i for i, m in enumerate([c for c in chain if c not in free])}
     nb = len(chain) - 2
 
-    def f(z, D, fixed, z0, hd, lim):
+    def f(z, D, fixed, z0, hd, lim, rw=None):
         nodes = []
         for m in chain:
             if m in free_idx:
@@ -460,6 +467,13 @@ def chain_residual_fn(C, chain: list, free: list, n_mid: int, device):
             else:
                 r.append(((bd - M50 * rad / n_mid) / (15 * rad))[None])
                 r.append((torch.relu(bd - M95 * rad / n_mid - 3 * rad) / (2 * rad))[None])
+        if anatomy is not None:
+            r.append(torch.relu(z - zhi))
+            r.append(torch.relu(zlo - z))
+            for s0, s1, lo, hi in regions:
+                tot = el[s1] - el[s0]
+                r.append((rw * torch.relu(tot - hi) / rad)[None])
+                r.append((rw * torch.relu(lo - tot) / rad)[None])
         r.append(torch.relu(3 - z))
         return torch.cat(r)
     return f
