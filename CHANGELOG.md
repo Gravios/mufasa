@@ -8,6 +8,41 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ks — The rat in the Body model tab: the virtual rodent as a rig, rig profiles.**
+The plan's next step after 122kr ("looks good, continue").
+* `mufasa/bodymodel/rodent_rig.py`: `export_rodent_rig` builds a `.rig.npz`
+  from the packaged virtual rodent, no Blender. HBP conventions (facing −y,
+  left +x, z up, floor 0, mm), re-rooted at the pelvis: `Pelvis`,
+  `Spine1`–`Spine6` (lumbar vertebrae, the rigid thorax last), `Neck1`–`Neck7`,
+  `Head`, `Tail1`–`Tail30`, hind and fore legs. Fitting mesh by vertex
+  clustering (`decimate`, 3 mm). Skin drawn light grey.
+* Rig profiles (`profile` JSON in the `.rig.npz`; `fit.HBP_PROFILE` for rigs
+  without one): spine regions, head, trunk and tail chains, hidden tail,
+  paws, hips, posture limits, limit texts, prior centres, and optionally
+  fixed label positions. `Rig`, `Markers`, the search, the free-scale fit,
+  the temporal term and the prior all read the rig's profile. The rat's limits
+  come from the model's joint ranges spread over each region (lumbar ±10°
+  sideways, −15…+10° up/down per joint; cervical ±10°, −10…+15°; atlas
+  −45…+5°; tail ±8°; rigid thorax), its prior pulls to the rest pose, and its
+  labels sit where `rodent_model` puts them (the scale does not hinge on the
+  head's size, which is small for a large rat).
+* Masks for light animals: `MaskConfig.polarity` (auto/dark/light; auto from
+  the pixels under the confident back labels against the background),
+  `min_grey_light`, `near_labels` (light animals by default: only the region
+  around the confident labels, and of its parts the one holding most of
+  them, since moved bedding also differs from the background). The scale's
+  first guess is corrected by the animal's mask area when they disagree by
+  more than 15%, and the free-scale fit starts from that guess.
+* Forms: *Import rig* → *Model: Virtual rodent (rat, built in)*; *Fit body
+  model* → *Animal* (auto / darker / lighter than the background). CLI:
+  `body-rig --virtual-rodent OUT`, `body-fit --animal`.
+* K7 (white rat on bedding): scale 0.85 px per model mm, consistent with the
+  camera and the 122kr size estimate (0.66 px/mm × 1.34); see the session
+  notes for IoU and label error by behaviour.
+* Docs: `docs/bodymodel.md` (the rat, profiles, light animals).
+* Test: `tests/smoke_122ks_rat_rig.py` (20 checks; a synthetic white rat on
+  darker bedding with a bright patch that is not the rat).
+
 **122kr — Anatomical limits for single-camera 3-D pose (virtual rodent).**
 The user has one camera and DeepLabCut labels, and asked for the height
 estimates to be held to what a body can do; for a rat, the reference is

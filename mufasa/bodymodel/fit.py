@@ -15,6 +15,12 @@ joint table (Dewan et al. 2010, Shahrokni et al. 2012) where it has them;
 head and body ranges are assumptions. Limbs keep their rest pose (hidden
 under the body from above). Nothing may go below the floor.
 
+A rig may carry a *profile* (patch 122ks; ``profile`` in the ``.rig.npz``,
+see :data:`HBP_PROFILE`): which bones form each spine region, the head and
+the tail, the hind paws and hips, and its own posture limits. Rigs without
+one are taken to be the HBP mouse. The virtual rodent (a rat,
+:mod:`mufasa.bodymodel.rodent_rig`) carries its own.
+
 Per frame the loss is
 
 * silhouette: 1 - IoU of the body (tail excluded: it is pale in IR) with the
@@ -67,6 +73,21 @@ GROUPS = {
     "tail_p": [f"Tail{i}" for i in range(4, 13)],
     "tail_d": [f"Tail{i}" for i in range(13, 24)],
 }
+# the HBP mouse (rigs without a profile)
+HBP_PROFILE = {
+    "name": "HBP mouse",
+    "groups": GROUPS,
+    "head": "Head",
+    "trunk": ["Head"] + [f"Neck{i}" for i in range(8, 0, -1)] + [f"Spine{i}" for i in range(17, 0, -1)] + ["Pelvis"],
+    "tail": [f"Tail{k}" for k in range(1, 24)],
+    "tail_hidden": [f"Tail{i}" for i in range(4, 24)],
+    "paws": [*(f"BPhalange{i}.L" for i in range(1, 6)), *(f"BPhalange{i}.R" for i in range(1, 6))],
+    "hips": {"hip_left": "Femur.L", "hip_right": "Femur.R"},
+    "posture": None,                     # PARAMS
+    "limits": LIMITS,
+}
+
+
 # 2-D label -> point on the model. The chain labels are placed along the model's
 # nose -> spine -> tail line at the spacing the labels show (see Markers).
 CHAIN = ["head_nose", "head_mid", "head_back", "back_T4", "back_T8", "back_L2", "back_L6", "back_V2",
@@ -102,14 +123,24 @@ class Rig:
         self.V, self.F, self.W = z["V"].astype(float), z["F"].astype(int), z["W"].astype(np.float32)
         self.Vd, self.Fd, self.Wd = z["Vd"].astype(float), z["Fd"].astype(int), z["Wd"].astype(np.float32)
         self.face_rgb = z["face_rgb"] if "face_rgb" in z.files and z["face_rgb"].ndim == 2 else None
-        tail_bones = [self.ix[f"Tail{i}"] for i in range(4, 24) if f"Tail{i}" in self.ix]
+        import json
+        prof = dict(HBP_PROFILE)
+        if "profile" in z.files:
+            prof.update(json.loads(str(z["profile"])))
+        self.profile = prof
+        self.groups = {g: list(b) for g, b in prof["groups"].items()}
+        self.posture = ([tuple(x) for x in prof["posture"]] if prof.get("posture") else list(POSTURE))
+        self.limits = dict(prof.get("limits") or LIMITS)
+        # the weak posture prior pulls towards these (default: the middle of each range)
+        self.prior_centre = dict(prof.get("prior_centre") or {})
+        tail_bones = [self.ix[b] for b in prof["tail_hidden"] if b in self.ix]
         self.body_faces_d = self.Fd[~np.isin(self.Wd.argmax(1)[self.Fd[:, 0]], tail_bones)]
-        paws = [self.ix[n] for n in (*(f"BPhalange{i}.L" for i in range(1, 6)),
-                                     *(f"BPhalange{i}.R" for i in range(1, 6))) if n in self.ix]
+        paws = [self.ix[n] for n in prof["paws"] if n in self.ix]
+        hip_l = prof["hips"].get("hip_left")
         if paws:
             py = self.heads[paws][:, 1].mean()
-        elif "Femur.L" in self.ix:
-            py = self.tails[self.ix["Femur.L"]][1]
+        elif hip_l in self.ix:
+            py = self.tails[self.ix[hip_l]][1]
         else:
             py = self.heads[0][1]
         self.pivot = np.array([0.0, py, 0.0])
@@ -122,12 +153,12 @@ class Rig:
         R = {}
         for g in ("lum", "tho", "cer"):
             r = rot("z", p[f"{g}_yaw"] * DEG) @ rot("x", p[f"{g}_pitch"] * DEG)
-            for b in GROUPS[g]:
+            for b in self.groups.get(g, ()):
                 R[b] = r
-        R["Head"] = rot("z", p["head_yaw"] * DEG) @ rot("x", p["head_pitch"] * DEG)
+        R[self.profile["head"]] = rot("z", p["head_yaw"] * DEG) @ rot("x", p["head_pitch"] * DEG)
         for g, yaw in (("tail_p", "tail_yaw_p"), ("tail_d", "tail_yaw_d")):
             r = rot("z", p[yaw] * DEG) @ rot("x", p["tail_pitch"] * DEG)
-            for b in GROUPS[g]:
+            for b in self.groups.get(g, ()):
                 R[b] = r
         return R
 
@@ -201,8 +232,18 @@ class Markers:
     def build(cls, rig: Rig, labels: dict | None = None) -> Markers:
         """``labels``: name -> (n, 2) px positions and (n,) likelihoods over the video, used to
         measure the chain spacing; without them a typical rodent spacing is assumed."""
+        fixed = rig.profile.get("markers")
+        if fixed:                                       # the rig says where each label sits
+            spec = {}
+            for n, m in fixed.items():
+                if m[0] == "vert":
+                    spec[n] = ("vert", [int(i) for i in m[1]])
+                elif m[1] in rig.ix:
+                    spec[n] = ("bone", rig.ix[m[1]], np.asarray(m[2], float))
+            return cls(spec, 1.0)
         V, W = rig.V, rig.W
-        head = W[:, rig.ix["Head"]] > 0.5 if "Head" in rig.ix else np.zeros(len(V), bool)
+        hb = rig.profile["head"]
+        head = W[:, rig.ix[hb]] > 0.5 if hb in rig.ix else np.zeros(len(V), bool)
         hv = np.nonzero(head)[0]
         spec = {}
         if len(hv):
@@ -217,19 +258,17 @@ class Markers:
         else:
             nose = int(np.argmin(V[:, 1]))
             spec["head_nose"] = ("vert", [nose])
-        for name, bone in (("hip_left", "Femur.L"), ("hip_right", "Femur.R")):
+        for name, bone in rig.profile["hips"].items():
             if bone in rig.ix:
                 spec[name] = ("bone", rig.ix[bone], rig.tails[rig.ix[bone]].copy())
         # chain samples nose -> head -> neck -> spine -> pelvis -> tail
-        samples = [(rig.ix.get("Head", 0), V[spec["head_nose"][1][0]].copy())]
-        fwd = ["Head"] + [f"Neck{i}" for i in range(8, 0, -1)] + [f"Spine{i}" for i in range(17, 0, -1)] + ["Pelvis"]
-        for b in fwd:                                   # these point head-wards: walk them tail -> head
+        samples = [(rig.ix.get(hb, 0), V[spec["head_nose"][1][0]].copy())]
+        for b in rig.profile["trunk"]:                  # these point head-wards: walk them tail -> head
             if b in rig.ix:
                 i = rig.ix[b]
                 for t in np.linspace(0, 1, 8)[1:]:
                     samples.append((i, rig.tails[i] + t * (rig.heads[i] - rig.tails[i])))
-        for k in range(1, 24):
-            b = f"Tail{k}"
+        for b in rig.profile["tail"]:
             if b in rig.ix:
                 i = rig.ix[b]
                 for t in np.linspace(0, 1, 8)[1:]:
@@ -237,7 +276,7 @@ class Markers:
         pts = np.array([s[1] for s in samples])
         arc = np.r_[0, np.cumsum(np.linalg.norm(np.diff(pts[:, :2], axis=0), axis=1))]
         # scale anchor: nose -> head_back on the labels = nose -> the head joint on the model
-        head_joint_arc = arc[min(len(arc) - 1, 7)] if "Head" in rig.ix else arc[-1] * 0.3
+        head_joint_arc = arc[min(len(arc) - 1, 7)] if hb in rig.ix else arc[-1] * 0.3
         spacing = _label_arc(labels) if labels else None
         if spacing and "head_back" in spacing and spacing["head_back"] > 0:
             k = spacing["head_back"] / head_joint_arc
@@ -303,11 +342,11 @@ class FitConfig:
     weights: dict = field(default_factory=lambda: dict(KP_WEIGHT))
 
 
-def _step_scale(gap):
+def _step_scale(gap, posture=POSTURE):
     """How far each posture value may move per frame (for the temporal term)."""
     g = max(1.0, float(gap))
     sc = {"tx": 12.0 * g, "ty": 12.0 * g, "phi": 12 * DEG * g}
-    for n, lo, hi in POSTURE:
+    for n, lo, hi in posture:
         sc[n] = 0.25 * (hi - lo) * min(1.0, 0.3 * g)
     return sc
 
@@ -356,15 +395,15 @@ class FrameProblem:
             parts["kp"] = e / max(w_sum, 1e-9)
         else:
             parts["kp"] = 0.0
-        z = np.array([(p[n] - (lo + hi) / 2) / ((hi - lo) / 2) for n, lo, hi in POSTURE])
+        z = np.array([(p[n] - rig.prior_centre.get(n, (lo + hi) / 2)) / ((hi - lo) / 2) for n, lo, hi in rig.posture])
         parts["prior"] = 0.02 * float(np.mean(z ** 2))
         if self.refs and cfg.temporal > 0:
             t = 0.0
             for q, gap in self.refs:
-                sc = _step_scale(gap)
+                sc = _step_scale(gap, rig.posture)
                 d = [(p[n] - q[n]) / sc[n] for n in ("tx", "ty")]
                 d.append(_wrap(p["phi"] - q["phi"]) / sc["phi"])
-                d += [(p[n] - q[n]) / sc[n] for n, _, _ in POSTURE]
+                d += [(p[n] - q[n]) / sc[n] for n, _, _ in rig.posture]
                 t += float(np.mean(np.square(d)))
             parts["temporal"] = cfg.temporal * t / len(self.refs)
         total = (cfg.w_sil * parts.get("sil", 0.0) + cfg.w_kp * parts["kp"] + parts["prior"] + parts["floor"]
@@ -380,6 +419,7 @@ def search(problem: FrameProblem, base: dict, *, wide: bool, evals: int, seed: i
     """CMA-ES in a box around ``base`` (position/heading) and within the joint limits."""
     import cma
     best = None
+    posture = problem.rig.posture
     span_xy = 150.0 if wide else 40.0
     span_phi = math.radians(60 if wide else 25)
     for flip in flips:
@@ -392,10 +432,10 @@ def search(problem: FrameProblem, base: dict, *, wide: bool, evals: int, seed: i
             p["tx"] = b["tx"] + (x[0] - 0.5) * 2 * span_xy
             p["ty"] = b["ty"] + (x[1] - 0.5) * 2 * span_xy
             p["phi"] = b["phi"] + (x[2] - 0.5) * 2 * span_phi
-            for v, (n, lo, hi) in zip(x[3:], POSTURE):
+            for v, (n, lo, hi) in zip(x[3:], posture):
                 p[n] = lo + v * (hi - lo)
             return p
-        x0 = [0.5, 0.5, 0.5] + [min(0.98, max(0.02, (b[n] - lo) / (hi - lo))) for n, lo, hi in POSTURE]
+        x0 = [0.5, 0.5, 0.5] + [min(0.98, max(0.02, (b[n] - lo) / (hi - lo))) for n, lo, hi in posture]
         es = cma.CMAEvolutionStrategy(x0, 0.15 if wide else 0.06,
                                       {"bounds": [0, 1], "maxfevals": evals, "seed": seed + flip, "verbose": -9,
                                        "popsize": 14 if wide else 10})
@@ -450,8 +490,15 @@ def fill_triangles(img, tri_px) -> None:
 # --------------------------------------------------------------------------- #
 @dataclass
 class MaskConfig:
-    darker_by: float = 35.0        # grey levels below the background
+    darker_by: float = 35.0        # grey levels below the background (above it for a light animal)
     max_grey: float = 110.0        # and at most this bright (dark fur)
+    # "dark" (dark fur, e.g. under IR), "light" (a white rat on darker ground) or "auto": from
+    # the pixels under the confident back labels against the background (patch 122ks)
+    polarity: str = "auto"
+    min_grey_light: float = 120.0  # a light animal: at least this bright
+    # keep only the region around the confident labels, and of its parts the one holding most of
+    # them (None: for light animals, whose ground — bedding — often differs from the background)
+    near_labels: bool | None = None
     blur: float = 3.0
     area_range: tuple = (0.45, 3.0)   # mask area / expected body area, for the mask to be used
 
@@ -471,18 +518,41 @@ def background(video, frames, n=60):
     return np.median(np.array(imgs), 0).astype(np.float32)
 
 
-def animal_mask(gray, bg, mc: MaskConfig, expected_area: float):
-    """(mask or None if implausible, area)."""
+def animal_mask(gray, bg, mc: MaskConfig, expected_area: float, near=None):
+    """(mask or None if implausible, area). ``near``: confident label positions (k, 2); the
+    region that holds most of them is the animal (otherwise the largest)."""
     import cv2
     a = cv2.GaussianBlur(gray.astype(np.float32), (0, 0), mc.blur)
     b = cv2.GaussianBlur(bg, (0, 0), mc.blur)
-    m = (((b - a) > mc.darker_by) & (a < mc.max_grey)).astype(np.uint8)
+    if mc.polarity == "light":
+        m = (((a - b) > mc.darker_by) & (a > mc.min_grey_light)).astype(np.uint8)
+    else:
+        m = (((b - a) > mc.darker_by) & (a < mc.max_grey)).astype(np.uint8)
+    use_near = mc.near_labels if mc.near_labels is not None else mc.polarity == "light"
+    if not use_near:
+        near = None
+    if near is not None and len(near) >= 3:
+        # only near the labels: their hull, widened by a third of their span
+        q = np.asarray(near, np.float32)
+        span = float(np.linalg.norm(q.max(0) - q.min(0)))
+        hull = np.zeros_like(m)
+        cv2.fillConvexPoly(hull, cv2.convexHull(np.round(q).astype(np.int32)), 1)
+        r = max(5, int(round(span / 3)))
+        hull = cv2.dilate(hull, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1)))
+        m &= hull
     m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((7, 7), np.uint8))
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
     k, lab, st, _ = cv2.connectedComponentsWithStats(m)
     if k < 2:
         return None, 0
     j = 1 + int(np.argmax(st[1:, 4]))
+    if near is not None and len(near):
+        H_, W_ = lab.shape
+        q = np.round(np.asarray(near, float)).astype(int)
+        q = q[(q[:, 0] >= 0) & (q[:, 0] < W_) & (q[:, 1] >= 0) & (q[:, 1] < H_)]
+        hits = np.bincount(lab[q[:, 1], q[:, 0]], minlength=k)[1:] if len(q) else np.zeros(k - 1)
+        if hits.max() > 0:
+            j = 1 + int(np.argmax(hits * 1e6 + st[1:, 4]))
     area = int(st[j, 4])
     mk = (lab == j).astype(np.uint8)
     ff = mk.copy()
@@ -494,6 +564,29 @@ def animal_mask(gray, bg, mc: MaskConfig, expected_area: float):
     lo, hi = mc.area_range
     ok = (lo * expected_area <= area <= hi * expected_area) and not edge
     return (mk.astype(bool) if ok else None), area
+
+
+def _spread(frames, n):
+    frames = sorted(frames)
+    return [frames[i] for i in np.unique(np.linspace(0, len(frames) - 1, min(n, len(frames))).astype(int))]
+
+
+def animal_polarity(imgs: dict, bg, labels: dict, names=("back_T4", "back_T8", "back_L2", "back_L6", "head_back"),
+                    min_lk=0.9) -> str:
+    """"light" when the animal (the pixels under its confident back labels) is brighter than the
+    background there, else "dark"."""
+    d = []
+    H, Wd = bg.shape
+    for f, img in imgs.items():
+        for n in names:
+            if n not in labels or f >= len(labels[n][1]) or labels[n][1][f] < min_lk:
+                continue
+            x, y = labels[n][0][f]
+            if not (np.isfinite(x) and np.isfinite(y)):
+                continue
+            xi, yi = int(np.clip(round(x), 2, Wd - 3)), int(np.clip(round(y), 2, H - 3))
+            d.append(float(img[yi - 2:yi + 3, xi - 2:xi + 3].mean() - bg[yi - 2:yi + 3, xi - 2:xi + 3].mean()))
+    return "light" if d and np.median(d) > 0 else "dark"
 
 
 def load_labels(pose_file):
@@ -511,6 +604,14 @@ def load_labels(pose_file):
 
 def observed(labels, f):
     return {n: (xy[f], float(lk[f])) for n, (xy, lk) in labels.items() if f < len(lk)}
+
+
+def body_points(obs: dict, names, min_lk=0.8):
+    """Confident positions of the labels ``names`` (those the model knows) on the body (not the
+    tail beyond its base), for picking the animal's region in the mask."""
+    return np.array([pos for n, (pos, lk) in obs.items()
+                     if n in names and lk >= min_lk and np.isfinite(pos).all()
+                     and n not in ("tail_V18", "tail_V32")]).reshape(-1, 2)
 
 
 # --------------------------------------------------------------------------- #
@@ -580,6 +681,8 @@ class SequenceFitter:
     def ensure_background(self, frames):
         if self.bg is None:
             self.bg = background(self.video, frames)
+        if self.mcfg.polarity == "auto":
+            self.mcfg.polarity = animal_polarity(self.read(_spread(frames, 12)), self.bg, self.labels)
 
     def estimate_scale(self, frames, n=8, say=print) -> float:
         """Similarity starts give a first scale; a free-scale fit on up to ``n`` frames with a usable
@@ -592,17 +695,30 @@ class SequenceFitter:
         exp_area = silhouette_area(self.rig, s_guess)
         pick = [frames[i] for i in np.linspace(0, len(frames) - 1, min(len(frames), 4 * n)).astype(int)]
         imgs = self.read(pick)
+        # the labels alone can be far off (a hunched animal shortens them, a fat one is wider than the
+        # model): correct the guess by the animal's area in the masks (median, any size accepted)
+        from dataclasses import replace as _replace
+        anyc = _replace(self.mcfg, area_range=(0.0, float("inf")))
+        areas = [a for f in pick if f in imgs
+                 for m, a in [animal_mask(imgs[f], self.bg, anyc, exp_area, body_points(observed(self.labels, f), self.markers.spec))]
+                 if m is not None]
+        if len(areas) >= 3:
+            s_area = s_guess * math.sqrt(float(np.median(areas)) / exp_area)
+            if abs(math.log(s_area / s_guess)) > math.log(1.15):
+                say(f"  scale from the labels {s_guess:.3f}, from the mask area {s_area:.3f} px/unit: using the latter")
+                s_guess = s_area
+                exp_area = silhouette_area(self.rig, s_guess)
         scales = []
         for f in pick:
             if len(scales) >= n or f not in imgs:
                 continue
-            m, _ = animal_mask(imgs[f], self.bg, self.mcfg, exp_area)
             o = observed(self.labels, f)
+            m, _ = animal_mask(imgs[f], self.bg, self.mcfg, exp_area, body_points(o, self.markers.spec))
             st = similarity_start(self.rig, self.markers, o, None)
             if m is None or st is None:
                 continue
             prob = FrameProblem(self.rig, self.markers, self.cfg, m, o)
-            prob_s = _FreeScale(prob, st["s"])
+            prob_s = _FreeScale(prob, s_guess)
             tot, parts, p, _ = prob_s.search(st)
             scales.append(p["s"])
             say(f"  scale from frame {f}: {p['s']:.3f} px/unit (IoU {1 - parts.get('sil', 1):.2f})")
@@ -612,8 +728,9 @@ class SequenceFitter:
     def frame_problem(self, f, img, refs):
         exp_area = silhouette_area(self.rig, self.scale) if not hasattr(self, "_exp_area") else self._exp_area
         self._exp_area = exp_area
-        m, area = animal_mask(img, self.bg, self.mcfg, exp_area) if img is not None else (None, 0)
         o = observed(self.labels, f)
+        m, area = (animal_mask(img, self.bg, self.mcfg, exp_area, body_points(o, self.markers.spec))
+                   if img is not None else (None, 0))
         return FrameProblem(self.rig, self.markers, self.cfg, m, o, refs), m is not None, area, o
 
     # -- the sequence -------------------------------------------------------------
@@ -693,6 +810,7 @@ class _FreeScale:
     def search(self, st):
         import cma
         prob, s0 = self.prob, self.s0
+        posture = prob.rig.posture
 
         def unpack(x):
             p = dict(st)
@@ -700,14 +818,14 @@ class _FreeScale:
             p["ty"] = st["ty"] + (x[1] - 0.5) * 300
             p["phi"] = st["phi"] + (x[2] - 0.5) * math.radians(120)
             p["s"] = s0 * (0.75 + 0.5 * x[3])
-            for v, (n, lo, hi) in zip(x[4:], POSTURE):
+            for v, (n, lo, hi) in zip(x[4:], posture):
                 p[n] = lo + v * (hi - lo)
             return p
         best = None
         for flip in (0, math.pi):
             st0 = dict(st)
             st0["phi"] += flip
-            x0 = [0.5, 0.5, 0.5, 0.5] + [(0 - lo) / (hi - lo) for n, lo, hi in POSTURE]
+            x0 = [0.5, 0.5, 0.5, 0.5] + [(0 - lo) / (hi - lo) for n, lo, hi in posture]
 
             def f(x, st0=st0):
                 p = unpack(x)
@@ -816,7 +934,7 @@ def fit_video(rig_path, video, pose_file, run: RunConfig, out_path, *, progress=
     import pyarrow.parquet as pq
     tab = pa.Table.from_pandas(df, preserve_index=False)
     meta = {"rig": str(rig_path), "video": str(video), "pose": str(pose_file), "fps": fps, "scale_px_per_unit": scale,
-            "limits": LIMITS, "config": {"start": run.start, "stop": stop, "step": run.step,
+            "limits": rig.limits, "profile": rig.profile.get("name"), "config": {"start": run.start, "stop": stop, "step": run.step,
                                          "fit": fit_d, "mask": {k: list(v) if isinstance(v, tuple) else v
                                                                 for k, v in mask_d.items()}}}
     tab = tab.replace_schema_metadata({**(tab.schema.metadata or {}), b"mufasa_bodymodel": json.dumps(meta).encode()})
@@ -850,7 +968,7 @@ def params_at(df, frame: int) -> dict | None:
     return p
 
 
-__all__ = ["CHAIN", "LIMITS", "PARAMS", "PN", "FitConfig", "FrameProblem", "FrameResult", "MaskConfig",
-           "Markers", "Rig", "RunConfig", "SequenceFitter", "animal_mask", "background", "fit_video",
+__all__ = ["CHAIN", "HBP_PROFILE", "LIMITS", "PARAMS", "PN", "FitConfig", "FrameProblem", "FrameResult", "MaskConfig",
+           "Markers", "Rig", "RunConfig", "SequenceFitter", "animal_mask", "animal_polarity", "background", "fit_video",
            "load_labels", "neutral", "observed", "params_at", "read_fit", "search", "similarity_start",
            "to_image"]

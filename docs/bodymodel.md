@@ -30,6 +30,42 @@ Blender 5: `Pelvis`, `Spine1`–`Spine17`, `Neck1`–`Neck8`, `Head`,
 `Tail1`–`Tail23`, `Femur.L/.R`, `BPhalange1–5.L/.R`. Bones it does not know
 keep their rest pose.
 
+### The rat: DeepMind's virtual rodent
+
+*Model: Virtual rodent (rat, built in)* (patch 122ks) makes a rig from the
+virtual rodent that ships with Mufasa (dm_control's `rodent.xml` and skin,
+Apache 2.0; see `docs/pose3d.md`). It needs no Blender:
+
+```
+mufasa-pose3d body-rig --virtual-rodent sources/bodymodel/rat.rig.npz
+```
+
+The rig carries its own *profile*: the regions of its spine, its joint
+limits, and where each label sits on it. The fitter uses those in place
+of the mouse's:
+
+| Joint | Limit | Source |
+|---|---|---|
+| Lumbar (6 joints) | sideways ±10°, up/down −15° (extension) … +10° (flexion) per joint | the model's two bend joints (±30°) and two extension joints (−30…45°) |
+| Thorax | rigid | the model |
+| Cervical (7 bones) | sideways ±10°, up/down −10…+15° | the model's three extension joints (−23…35°) and two bend joints (±35°) |
+| Head (atlas) | up/down −45…+5°; sideways ±30° | the model; sideways assumed |
+| Tail (29 joints) | ±8° per joint (the model allows ±15°); the first fixed | the model |
+| Body | rearing −10…60°, roll ±15° about the hind paws | assumed |
+
+The labels sit where `mufasa.pose3d.rodent_model` puts them (the skin over
+the vertebrae, the crown for the ears, the hip joints, caudal vertebrae).
+So the scale does not depend on the head's size; this matters because a
+large rat's head is small for its body. The model is a slim rat standing
+on all fours. A rat curled up or lying flat covers more floor than the
+model, and the silhouette then overlaps less.
+
+Any rig can carry a profile: a `profile` entry in the `.rig.npz` (JSON)
+with `groups`, `head`, `trunk`, `tail`, `tail_hidden`, `paws`, `hips`,
+`posture` (name, low, high), `limits` and, optionally, `markers`. See
+`mufasa.bodymodel.fit.HBP_PROFILE`. Rigs without one are taken to be the
+HBP mouse.
+
 ## 2. Fit body model
 
 Pick the rig, the video, and the 2-D labels: the imported ones, or a
@@ -60,10 +96,14 @@ The limbs keep their rest pose.
 **What a frame is fitted to.**
 
 * **Silhouette.** The animal's mask is the pixels much darker than the
-  median background (for dark animals under IR). The model's body is drawn
-  without the tail, which is pale, and compared to the mask by IoU. A
-  mask is used only when it is plausible: not touching the frame edge, and
-  0.45–3 times the model's area.
+  median background (dark animals, e.g. under IR) or much lighter (a white
+  rat on darker ground). *Animal* chooses; *auto* compares the pixels under
+  the confident back labels with the background. For a light animal, only
+  the region around the confident labels counts, and of that the part that
+  holds most of them: moved bedding also differs from the background. The
+  model's body is drawn without the tail and compared to the mask by IoU.
+  A mask is used only when it is plausible: not touching the frame edge,
+  and 0.45–3 times the model's area.
 * **Labels.** Likelihood-weighted, robust distance between each 2-D label
   and the same point on the model. The chain labels (`head_nose`,
   `head_mid`, `head_back`, `back_T4` … `tail_V32`) are placed along the
@@ -73,8 +113,9 @@ The limbs keep their rest pose.
 * A weak pull towards a neutral posture, for joints that can't be seen.
 
 **Scale.** By default it is estimated per video: a first value from the
-labels, then a fit with the scale free on a few frames that have a usable
-mask, taking the median. You can also set it in px per model unit (the
+labels (corrected by the animal's area in the masks when the two disagree
+by more than 15%), then a fit with the scale free on a few frames that
+have a usable mask, taking the median. You can also set it in px per model unit (the
 mouse model is in mm).
 
 **Over time** (*Forwards and backwards*, *Smoothness*):
@@ -112,7 +153,7 @@ On the command line:
 ```
 mufasa-pose3d body-fit mouse.rig.npz VIDEO.mp4 LABELS.parquet --out fit.parquet \
     [--start 0 --stop 9000 --step 3 --workers 8] [--no-refine] [--smoothness 0.5] [--scale 4.9] \
-    [--overlay overlay.mp4 [--side-by-side]]
+    [--overlay overlay.mp4 [--side-by-side]] [--animal auto|dark|light]
 ```
 
 In Python, `mufasa.bodymodel.fit.Rig.local_quaternions(params)` gives each

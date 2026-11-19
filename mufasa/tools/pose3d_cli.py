@@ -11,6 +11,7 @@
     mufasa-pose3d gpu-check [--frames 20000]      # GPU solver: synthetic run, CPU vs CUDA
     mufasa-pose3d import-c3d TRIAL.c3d ... --project project.toml [--up y] [--rename a=b,c=d] [--edges a-b,b-c]
     mufasa-pose3d body-rig MODEL.blend OUT.rig.npz [--blender /path/to/blender]   # rig for body fitting
+    mufasa-pose3d body-rig --virtual-rodent OUT.rig.npz                           # the built-in rat
     mufasa-pose3d body-fit RIG.rig.npz VIDEO POSE --out FIT.parquet [--start 0 --stop N --step 1 --workers 4]
         [--no-refine] [--smoothness 0.5] [--scale PX] [--overlay OUT.mp4 [--side-by-side]]
     mufasa-pose3d render-animation PATH.camera.json --pose X_3d.parquet [--video X.mp4] --out X_anim.mp4 \
@@ -109,9 +110,11 @@ def build_parser() -> argparse.ArgumentParser:
                                                 "for the markers present)")
     ic.add_argument("--frames", type=int, nargs=2, metavar=("FIRST", "LAST"),
                     help="frame range (0-based, end exclusive)")
-    br = sub.add_parser("body-rig", help="rigged model (.blend) -> arrays for body fitting")
-    br.add_argument("blend")
-    br.add_argument("out")
+    br = sub.add_parser("body-rig", help="rigged model (.blend, or the built-in virtual rodent) -> arrays "
+                                         "for body fitting")
+    br.add_argument("blend", help=".blend file (or, with --virtual-rodent, the output)")
+    br.add_argument("out", nargs="?")
+    br.add_argument("--virtual-rodent", action="store_true", help="the built-in rat (DeepMind's virtual rodent)")
     br.add_argument("--armature", default="Armature")
     br.add_argument("--skin", default="Skin")
     br.add_argument("--blender", help="Blender executable (if bpy is not installed)")
@@ -129,6 +132,8 @@ def build_parser() -> argparse.ArgumentParser:
     bf.add_argument("--scale", type=float, help="px per model unit (default: estimated)")
     bf.add_argument("--overlay", help="also render the model over the video to this file")
     bf.add_argument("--side-by-side", action="store_true")
+    bf.add_argument("--animal", choices=["auto", "dark", "light"], default="auto",
+                    help="the animal darker or lighter than the background (silhouette)")
     ra = sub.add_parser("render-animation", help="render a camera path saved from the 3-D viewer")
     ra.add_argument("camera_path")
     ra.add_argument("--pose", required=True, help="3-D pose file")
@@ -233,18 +238,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{Path(f).name}: {len(c.labels)} markers, {len(c.points)} frames at {c.rate:g} Hz "
                   f"({c.units}) → {out}")
         return 0
+    if a.cmd == "body-rig" and a.virtual_rodent:
+        from mufasa.bodymodel.rodent_rig import export_rodent_rig
+        export_rodent_rig(a.out or a.blend)
+        return 0
     if a.cmd == "body-rig":
         import subprocess
+        if not a.out:
+            print("body-rig: give the .blend file and the output")
+            return 2
         script = Path(__file__).resolve().parents[1] / "bodymodel" / "_blend_export.py"
         args = [a.blend, a.out, a.armature, a.skin]
         cmd = ([a.blender, "-b", "--python", str(script), "--", *args] if a.blender
                else [sys.executable, str(script), *args])
         return subprocess.run(cmd).returncode
     if a.cmd == "body-fit":
-        from mufasa.bodymodel.fit import FitConfig, RunConfig, fit_video
+        from mufasa.bodymodel.fit import FitConfig, MaskConfig, RunConfig, fit_video
         cfg = FitConfig(scale=a.scale, refine=not a.no_refine, temporal=0.0 if a.no_refine else a.smoothness)
         out = fit_video(a.rig, a.video, a.pose, RunConfig(start=a.start, stop=a.stop, step=a.step,
-                                                         workers=a.workers, fit=cfg), a.out)
+                                                         workers=a.workers, fit=cfg,
+                                                         mask=MaskConfig(polarity=a.animal)), a.out)
         if a.overlay:
             from mufasa.bodymodel.render import OverlayStyle, render_overlay_video
             render_overlay_video(out, a.overlay, style=OverlayStyle(side_by_side=a.side_by_side))
