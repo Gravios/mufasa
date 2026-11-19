@@ -8,6 +8,58 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kq — Body model tab: fit a rigged 3-D model to video, over time.**
+The new package `mufasa/bodymodel/` and the tab `pages/bodymodel_page.py`
+(after 3-D) are documented in `docs/bodymodel.md`.
+* *Import rig (.blend)*: an armature and the skin it deforms are saved as
+  `sources/bodymodel/<name>.rig.npz`:
+  * the bones (parents first, rest matrices);
+  * the skin, full and decimated;
+  * the weights;
+  * the fur colour per face, from the texture.
+  It runs in a separate process with Blender's Python module (`bpy`) or a
+  Blender executable.
+* *Fit body model*: rig, video, 2-D labels (imported or Kalman v2), frames
+  from/to/every, *Forwards and backwards*, *Smoothness*, *Scale* (auto),
+  *Workers*, *Render the model over the video* (optionally side by side).
+* Posture: 17 values per frame. Per-joint limits are from the HBP mouse
+  model's table (Dewan 2010, Shahrokni 2012); head and body limits are
+  assumed. The body rears about the hind paws, and nothing may go below the
+  floor.
+* Per-frame loss:
+  * silhouette IoU of the body without the tail, against the animal's mask
+    (much darker than a median background taken over the whole video),
+    used when the mask is plausible;
+  * robust, likelihood-weighted label distance. The chain labels are placed
+    along the model at the labels' own spacing, with the scale anchored on
+    nose to back of the head;
+  * a floor penalty and a weak neutral prior.
+  CMA-ES within the limits.
+* Over time (the user's frame-history request):
+  * forwards, each frame starts from the previous one and is pulled towards
+    it, and is searched again (both headings) if it loses track;
+  * backwards, each frame is refined towards both neighbours, keeping the
+    better result.
+  On the synthetic test this reduces the head error on frames with wrong
+  head labels from 4.8° to about 2°, and the frame-to-frame jitter by a
+  third.
+* Runs in overlapping chunks on a process pool. Output:
+  `derived/bodymodel/<run>/<video>_fit.parquet` (posture, IoU, label error,
+  loss terms; rig, scale, limits and settings in the metadata), an optional
+  `<video>_overlay.mp4` (shaded with the fur colours, outline, labels
+  against model points; every frame, interpolated between fits), and
+  `run.toml`.
+* `Rig.local_quaternions` gives each bone's rotation in Blender's
+  convention. The CLI has `mufasa-pose3d body-rig` and `mufasa-pose3d
+  body-fit`.
+* The model silhouette is filled one triangle at a time: `cv2.fillPoly`
+  with many overlapping triangles cancels where they overlap (the top and
+  underside of the body), which had left holes in it.
+* Test: `smoke_122kq_body_model_fit` uses a synthetic rig with the mouse's
+  bone names, walking, turning and bending through a synthetic video with
+  noisy labels, dropouts and wrong head labels. The section-count pins are
+  now 16 of 19 ui_bound sections with detect_path, and 13 wired forms.
+
 **122kp — camera animation in the 3-D viewer, rendered to video.**
 `mufasa/pose3d/animation.py` (paths, rendering) and
 `mufasa/ui_qt/pose3d_animation.py` (the editor). Tick *Animation* in the viewer to open

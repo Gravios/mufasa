@@ -35,6 +35,9 @@ Read this when you have a real dataset and want to validate the patch series bef
 ### `pose3d.md`
 **3-D pose (patch 122kf).** The 3-D tab and `mufasa-pose3d`: camera calibration from marked box edges or a checkerboard, single-camera inference with a Rat7M body prior, two-camera triangulation, 3-D Kalman smoothing, output format, model data.
 
+### `bodymodel.md`
+**Body model (patch 122kq).** The Body model tab and `mufasa-pose3d body-rig` / `body-fit`: a rigged model from Blender, fitted to top-down video from the silhouette and the 2-D labels within joint limits, forwards and backwards over time; output format and overlay video.
+
 ### `roi_enhancements_proposal.md` (122dk)
 **ROI tool audit + proposed enhancements.** Honest status of the ROI tool's current capabilities (what's wired, what's fixed, what's missing). Two design proposals: "Apply to selected videos" subset-apply (122dk-future) and drag-to-adjust placed ROIs (122dl-future).
 

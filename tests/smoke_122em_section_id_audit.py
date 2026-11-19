@@ -291,11 +291,11 @@ def main() -> int:
     #    sections: pose3d_calibration, pose3d, pose3d_kalman; 122kl
     #    the C3D import, pose3d_c3d).
     check(
-        f"Currently 11 of {len(known_ids)} SECTIONS keys have "
+        f"Currently 13 of {len(known_ids)} SECTIONS keys have "
         f"wired forms — pinned to catch accidental unwiring "
         f"OR accidental over-wiring (an 8th form would surface "
         f"in this check)",
-        len(wired_ids) == 11,
+        len(wired_ids) == 13,      # 122kq: + bodymodel_rig, bodymodel_fit
         detail=(f"got {len(wired_ids)} wired: "
                 f"{sorted(wired_ids)}"),
     )

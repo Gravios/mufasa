@@ -613,6 +613,21 @@ SECTIONS: dict[str, SectionSpec] = {
         depends_on=(),
         detect_path=lambda root: root / "sources" / "pose3d",
     ),
+    # Patch 122kq — Body model tab.
+    "bodymodel_rig": SectionSpec(
+        section_id="bodymodel_rig",
+        page="Body model",
+        section_title="Import rig (.blend)",
+        depends_on=(),
+        detect_path=lambda root: root / "sources" / "bodymodel",
+    ),
+    "bodymodel_fit": SectionSpec(
+        section_id="bodymodel_fit",
+        page="Body model",
+        section_title="Fit body model",
+        depends_on=("import_pose", "bodymodel_rig"),
+        detect_path=lambda root: root / "derived" / "bodymodel",
+    ),
 }
 
 

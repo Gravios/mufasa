@@ -202,12 +202,12 @@ def main() -> int:
                                 and isinstance(m.value.value, str)):
                             wired.add(m.value.value)
     check(
-        f"Currently 11 of {len(SECTIONS)} SECTIONS keys have "
+        f"Currently 13 of {len(SECTIONS)} SECTIONS keys have "
         f"wired forms (was 4 pre-122ex; egocentric is the "
         f"new addition)",
         # 122fj added two features forms, 122kf three 3-D forms,
-        # 122kl the C3D import.
-        len(wired) == 11,
+        # 122kl the C3D import, 122kq the two Body model forms.
+        len(wired) == 13,
         detail=(f"got {len(wired)} wired: {sorted(wired)}"),
     )
 

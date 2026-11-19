@@ -10,6 +10,9 @@
     mufasa-pose3d smooth IN_3d.parquet --out OUT_3d.parquet [--camera camera.toml] [--sigma-a 3000]
     mufasa-pose3d gpu-check [--frames 20000]      # GPU solver: synthetic run, CPU vs CUDA
     mufasa-pose3d import-c3d TRIAL.c3d ... --project project.toml [--up y] [--rename a=b,c=d] [--edges a-b,b-c]
+    mufasa-pose3d body-rig MODEL.blend OUT.rig.npz [--blender /path/to/blender]   # rig for body fitting
+    mufasa-pose3d body-fit RIG.rig.npz VIDEO POSE --out FIT.parquet [--start 0 --stop N --step 1 --workers 4]
+        [--no-refine] [--smoothness 0.5] [--scale PX] [--overlay OUT.mp4 [--side-by-side]]
     mufasa-pose3d render-animation PATH.camera.json --pose X_3d.parquet [--video X.mp4] --out X_anim.mp4 \
         [--size 1920 1080] [--fps 30]          # camera animation saved from the 3-D viewer
 
@@ -103,6 +106,26 @@ def build_parser() -> argparse.ArgumentParser:
                                                 "for the markers present)")
     ic.add_argument("--frames", type=int, nargs=2, metavar=("FIRST", "LAST"),
                     help="frame range (0-based, end exclusive)")
+    br = sub.add_parser("body-rig", help="rigged model (.blend) -> arrays for body fitting")
+    br.add_argument("blend")
+    br.add_argument("out")
+    br.add_argument("--armature", default="Armature")
+    br.add_argument("--skin", default="Skin")
+    br.add_argument("--blender", help="Blender executable (if bpy is not installed)")
+    bf = sub.add_parser("body-fit", help="fit a rigged body model to a top-down video")
+    bf.add_argument("rig")
+    bf.add_argument("video")
+    bf.add_argument("pose", help="2-D labels for the video")
+    bf.add_argument("--out", required=True)
+    bf.add_argument("--start", type=int, default=0)
+    bf.add_argument("--stop", type=int)
+    bf.add_argument("--step", type=int, default=1)
+    bf.add_argument("--workers", type=int, default=1)
+    bf.add_argument("--no-refine", action="store_true", help="forwards only (no backward pass)")
+    bf.add_argument("--smoothness", type=float, default=0.5, help="pull towards neighbouring frames")
+    bf.add_argument("--scale", type=float, help="px per model unit (default: estimated)")
+    bf.add_argument("--overlay", help="also render the model over the video to this file")
+    bf.add_argument("--side-by-side", action="store_true")
     ra = sub.add_parser("render-animation", help="render a camera path saved from the 3-D viewer")
     ra.add_argument("camera_path")
     ra.add_argument("--pose", required=True, help="3-D pose file")
@@ -205,6 +228,22 @@ def main(argv: list[str] | None = None) -> int:
                              frames=tuple(a.frames) if a.frames else None)
             print(f"{Path(f).name}: {len(c.labels)} markers, {len(c.points)} frames at {c.rate:g} Hz "
                   f"({c.units}) → {out}")
+        return 0
+    if a.cmd == "body-rig":
+        import subprocess
+        script = Path(__file__).resolve().parents[1] / "bodymodel" / "_blend_export.py"
+        args = [a.blend, a.out, a.armature, a.skin]
+        cmd = ([a.blender, "-b", "--python", str(script), "--", *args] if a.blender
+               else [sys.executable, str(script), *args])
+        return subprocess.run(cmd).returncode
+    if a.cmd == "body-fit":
+        from mufasa.bodymodel.fit import FitConfig, RunConfig, fit_video
+        cfg = FitConfig(scale=a.scale, refine=not a.no_refine, temporal=0.0 if a.no_refine else a.smoothness)
+        out = fit_video(a.rig, a.video, a.pose, RunConfig(start=a.start, stop=a.stop, step=a.step,
+                                                         workers=a.workers, fit=cfg), a.out)
+        if a.overlay:
+            from mufasa.bodymodel.render import OverlayStyle, render_overlay_video
+            render_overlay_video(out, a.overlay, style=OverlayStyle(side_by_side=a.side_by_side))
         return 0
     if a.cmd == "render-animation":
         import os
