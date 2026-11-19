@@ -8,6 +8,34 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kp — camera animation in the 3-D viewer, rendered to video.**
+`mufasa/pose3d/animation.py` (paths, rendering) and
+`mufasa/ui_qt/pose3d_animation.py` (the editor). Tick *Animation* in the viewer to open
+the editor:
+* keys of the view at video frames, in a table: frame, length to the next
+  key (output frames), easing (*Ease in-out*, *Linear*, *Spline*);
+* *Add key*, *Update key*, *Delete* and *Go to*;
+* a timeline slider and *Preview*;
+* *Save…* and *Load…* (`.camera.json`);
+* *Render video…* with size, fps, *Video below* and *Frame label*.
+How it works:
+* `CameraPath`: the azimuth takes the shorter way round, the distance is
+  interpolated on a log scale, and the data frame moves linearly between
+  keys (real time, slow motion, or frozen on equal frames). Camera →
+  camera moves zoom and pan in the recording camera's view.
+* Moves into or out of the camera view blend the calibrated and the orbit
+  projection, both for the markers and for the video homography.
+  `Volume3DWidget.cam_blend`. On K7 the first step changed 40 grey levels
+  on average before blending and 2.6 after.
+* `Volume3DWidget.view_state()` / `set_view_state()`, plus `show_label`.
+* `render_animation` draws offscreen at any size. On K7, 960×1080 with the
+  video below rendered at about 35 frames/s.
+* CLI: `mufasa-pose3d render-animation`.
+* Test: `smoke_122kp_camera_animation` (30 checks). It covers
+  interpolation, freeze, the spline through keys, no jump out of the
+  camera view (6 px without blending), every editor action, the rendered
+  frames against the view drawn directly, the video below, and the CLI.
+
 **122ko — 3-D features in Compute Features.**
 `mufasa/feature_extractors/features_3d.py` adds four families. They are in
 `FEATURE_FAMILIES` and in the form's new **3-D features** group:

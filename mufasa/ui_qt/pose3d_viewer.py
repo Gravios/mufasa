@@ -243,11 +243,32 @@ class Volume3DWidget(QWidget):
         self.cam_mode = False
         self.cam_zoom = 1.0
         self.cam_pan = np.zeros(2)
+        self.show_label = True               # "frame N · …" text (off for rendered animations)
+        self.cam_blend = 0.0                 # 122kp: 0 orbit … 1 recording camera (animation moves)
         self.reset_view()
         self._drag = None
 
+    # 122kp: the whole view as plain values (camera animation keys)
+    def view_state(self) -> dict:
+        return {"az": float(self.az), "el": float(self.el), "dist": float(self.dist),
+                "target": [float(v) for v in self.target], "fov": float(self.fov),
+                "cam_mode": bool(self.cam_mode), "cam_zoom": float(self.cam_zoom),
+                "cam_pan": [float(v) for v in self.cam_pan]}
+
+    def set_view_state(self, s: dict) -> None:
+        self.az, self.el, self.dist = float(s["az"]), float(s["el"]), float(s["dist"])
+        self.target = np.asarray(s["target"], float).copy()
+        self.fov = float(s.get("fov", self.fov))
+        self.cam_mode = bool(s.get("cam_mode")) and self._P is not None and self._image_wh() is not None
+        self.cam_zoom = float(s.get("cam_zoom", 1.0))
+        self.cam_pan = np.asarray(s.get("cam_pan", (0.0, 0.0)), float).copy()
+        ok = self._P is not None and self._image_wh() is not None
+        self.cam_blend = float(s.get("cam_blend", 0.0)) if ok and not self.cam_mode else 0.0
+        self.update()
+
     # -- camera ----------------------------------------------------------- #
     def reset_view(self, name: str = "Perspective") -> None:
+        self.cam_blend = 0.0
         self.target = self._home_target.copy()
         self.dist = self._home_dist
         self.fov = math.radians(40)
@@ -319,9 +340,25 @@ class Volume3DWidget(QWidget):
         it covers reaches behind the eye)."""
         if self._P is None or self._image_wh() is None:
             return None
+        k, ox, oy = self._cam_fit()
         if self.cam_mode:
-            k, ox, oy = self._cam_fit()
             return QTransform(k, 0, 0, 0, k, 0, ox, oy, 1)
+        T = self._orbit_video_transform()
+        if T is None or self.cam_blend <= 0:
+            return T
+        # 122kp: moving between the camera view and an orbit view — blend the
+        # two image→widget homographies (each scaled to map the image centre
+        # with weight 1), continuous at both ends
+        A = np.array([[k, 0, ox], [0, k, oy], [0, 0, 1.0]])
+        B = np.array([[T.m11(), T.m21(), T.m31()], [T.m12(), T.m22(), T.m32()], [T.m13(), T.m23(), T.m33()]])
+        iw, ih = self._image_wh()
+        c = np.array([iw / 2, ih / 2, 1.0])
+        B = B / (B[2] @ c)
+        b = self.cam_blend
+        G = b * A + (1 - b) * B
+        return QTransform(G[0, 0], G[1, 0], G[2, 0], G[0, 1], G[1, 1], G[2, 1], G[0, 2], G[1, 2], G[2, 2])
+
+    def _orbit_video_transform(self) -> QTransform | None:
         H = self.pose.floor_homography(0.0)
         try:
             Hinv = np.linalg.inv(H)
@@ -388,6 +425,16 @@ class Volume3DWidget(QWidget):
         with np.errstate(divide="ignore", invalid="ignore"):
             px = self.width() / 2 + s * x / z
             py = self.height() / 2 - s * y / z
+        if self.cam_blend > 0 and self._P is not None and self._image_wh() is not None:
+            # 122kp: on the way to / from the camera view: mix the two
+            self.cam_mode = True
+            try:
+                pc, zc = self.project(pts)
+            finally:
+                self.cam_mode = False
+            b = self.cam_blend
+            px, py = b * pc[:, 0] + (1 - b) * px, b * pc[:, 1] + (1 - b) * py
+            z = np.where(zc > 0, z, -1.0)
         return np.c_[px, py], z
 
     # -- data ------------------------------------------------------------- #
@@ -498,11 +545,13 @@ class Volume3DWidget(QWidget):
             z = X[:, 2]
             if np.isfinite(z).any():
                 txt += f"  · height {np.nanmin(z):.0f}–{np.nanmax(z):.0f} {self.pose.units}"
-        p.drawText(10, 18, txt)
+        if self.show_label:
+            p.drawText(10, 18, txt)
         p.end()
 
     # -- interaction ------------------------------------------------------ #
     def mousePressEvent(self, ev) -> None:  # noqa: ANN001, N802
+        self.cam_blend = 0.0
         if self.cam_mode and ev.button() == Qt.LeftButton:
             self.cam_mode = False                      # orbiting leaves the camera view
         self._drag = (ev.position(), ev.button(), self.az, self.el, self.target.copy(),
@@ -533,6 +582,7 @@ class Volume3DWidget(QWidget):
         self.reset_view()
 
     def wheelEvent(self, ev) -> None:  # noqa: ANN001, N802
+        self.cam_blend = 0.0
         if self.cam_mode:
             self.cam_zoom = max(0.2, min(20.0, self.cam_zoom * 1.1 ** (ev.angleDelta().y() / 120)))
             self.update()
@@ -652,6 +702,11 @@ class Pose3DViewerWidget(QWidget):
         self.panel_cb.setChecked(True)
         for w in (self.video3d_cb, self.opacity_spin, self.panel_cb):
             bar.addWidget(w)
+        bar.addSpacing(12)
+        self.anim_cb = QCheckBox("Animation", self)
+        self.anim_cb.setToolTip("Camera animation: key views at frames, smooth moves between them, "
+                                "rendered to a video")
+        bar.addWidget(self.anim_cb)
         bar.addStretch()
         lay.addLayout(bar)
         split = QSplitter(Qt.Vertical, self)
@@ -662,6 +717,11 @@ class Pose3DViewerWidget(QWidget):
         split.setStretchFactor(0, 3)
         split.setStretchFactor(1, 2)
         lay.addWidget(split, 1)
+        from mufasa.ui_qt.pose3d_animation import CameraAnimationPanel
+        self.animation = CameraAnimationPanel(self, self)          # 122kp
+        self.animation.setVisible(False)
+        self.anim_cb.toggled.connect(self.animation.setVisible)
+        lay.addWidget(self.animation)
         self.info = QLabel(self._info_text(), self)
         self.info.setStyleSheet("color: palette(placeholder-text);")
         self.info.setWordWrap(True)
@@ -713,6 +773,7 @@ class Pose3DViewerWidget(QWidget):
         return s
 
     def cleanup(self) -> None:
+        self.animation.timer.stop()
         try:
             self.scrubber.close_video()
         except Exception:

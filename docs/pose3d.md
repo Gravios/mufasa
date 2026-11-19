@@ -117,6 +117,42 @@ separate picture below (its playback controls stay). *Reprojection* still
 draws the 3-D markers on that picture — now with the lens distortion
 applied, so they also line up on distorted videos.
 
+## Camera animation
+
+Tick **Animation** in the 3-D viewer to open the editor (patch 122kp).
+
+1. Go to a frame and set up a view (orbit, zoom, pan, or *Camera*), then
+   press **Add key**. Repeat for each key. The key is inserted after the
+   selected one. The move from the previous key gets a real-time length:
+   the difference in frames. If two keys are on the same frame, the move
+   gets 2 s, and the data freezes while the camera moves.
+2. In the table, set each key's *Video frame*, its *To next* length (in
+   output frames, with seconds shown) and its *Easing*:
+   * *Ease in-out* starts and stops gently at each key;
+   * *Linear* moves at a constant rate;
+   * *Spline* is a smooth curve through the keys that does not stop at
+     them.
+   **Update key** sets the selected key to the current view.
+   Double-clicking a row or pressing **Go to** shows that key.
+3. Drag the timeline or press **Preview** to play the move in the viewer.
+4. Press **Render video…**. You can set the size, the fps, *Video below*
+   (the video under the 3-D view) and *Frame label*. The 3-D view's own
+   settings are used: box, shadows, height lines, trail, video in 3-D and
+   its opacity. The output is .mp4 (mp4v) or .avi (MJPG). The camera path
+   is saved beside it as `.camera.json`. **Save…**/**Load…** keep paths
+   for later.
+
+The data frame moves linearly between keys, so a length longer than the
+frame difference plays in slow motion. The azimuth turns the short way
+round, and the zoom changes at an even rate. A move between two *Camera*
+keys stays in the recording camera's view and only zooms and pans. A move
+into or out of it blends the two projections, so there is no jump. Render
+a saved path without the GUI (e.g. on the server):
+
+```
+mufasa-pose3d render-animation K7.camera.json --pose K7_3d.parquet --video K7.mp4 --out K7_anim.mp4 [--size 1920 1080] [--fps 30]
+```
+
 ## Motion capture (C3D)
 
 *Import motion capture (C3D)* (tab) / `mufasa-pose3d import-c3d` reads

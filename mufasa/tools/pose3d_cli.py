@@ -10,6 +10,8 @@
     mufasa-pose3d smooth IN_3d.parquet --out OUT_3d.parquet [--camera camera.toml] [--sigma-a 3000]
     mufasa-pose3d gpu-check [--frames 20000]      # GPU solver: synthetic run, CPU vs CUDA
     mufasa-pose3d import-c3d TRIAL.c3d ... --project project.toml [--up y] [--rename a=b,c=d] [--edges a-b,b-c]
+    mufasa-pose3d render-animation PATH.camera.json --pose X_3d.parquet [--video X.mp4] --out X_anim.mp4 \
+        [--size 1920 1080] [--fps 30]          # camera animation saved from the 3-D viewer
 
 MARKS.json (pixels of one frame of the empty box)::
 
@@ -101,6 +103,13 @@ def build_parser() -> argparse.ArgumentParser:
                                                 "for the markers present)")
     ic.add_argument("--frames", type=int, nargs=2, metavar=("FIRST", "LAST"),
                     help="frame range (0-based, end exclusive)")
+    ra = sub.add_parser("render-animation", help="render a camera path saved from the 3-D viewer")
+    ra.add_argument("camera_path")
+    ra.add_argument("--pose", required=True, help="3-D pose file")
+    ra.add_argument("--video", help="the video (for the video in 3-D / below)")
+    ra.add_argument("--out", required=True, help=".mp4 or .avi")
+    ra.add_argument("--size", type=int, nargs=2, metavar=("W", "H"), help="default: as saved")
+    ra.add_argument("--fps", type=float, help="default: as saved")
     gc = sub.add_parser("gpu-check", help="is the GPU solver usable here? (synthetic run, CPU vs CUDA)")
     gc.add_argument("--frames", type=int, default=20000)
     s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file")
@@ -196,6 +205,26 @@ def main(argv: list[str] | None = None) -> int:
                              frames=tuple(a.frames) if a.frames else None)
             print(f"{Path(f).name}: {len(c.labels)} markers, {len(c.points)} frames at {c.rate:g} Hz "
                   f"({c.units}) → {out}")
+        return 0
+    if a.cmd == "render-animation":
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        _app = QApplication.instance() or QApplication([])
+        from mufasa.pose3d.animation import CameraPath, render_animation
+        cp, st = CameraPath.from_json(Path(a.camera_path).read_text())
+        total = cp.n_output()
+        step = max(total // 20, 1)
+
+        def prog(done, n):
+            if done % step == 0 or done == n:
+                print(f"  {done}/{n} frames", flush=True)
+        out = render_animation(a.pose, cp, a.out, video_path=a.video,
+                               size=tuple(a.size or st.get("size", (1280, 720))),
+                               fps=a.fps or st.get("fps", 30.0), style=st.get("style"),
+                               video_below=bool(st.get("video_below")) and bool(a.video),
+                               frame_label=bool(st.get("frame_label")), progress=prog)
+        print(f"wrote {out}")
         return 0
     if a.cmd == "gpu-check":
         from mufasa.pose3d import gpu
