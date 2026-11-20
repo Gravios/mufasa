@@ -604,8 +604,9 @@ def animal_polarity(imgs: dict, bg, labels: dict, names=("back_T4", "back_T8", "
 def load_labels(pose_file):
     """name -> ((n, 2) px, (n,) likelihood) from any Mufasa/FreeDLC/DLC pose file."""
     from mufasa.data_processors.kalman_diagnostic import load_pose_file
+    from mufasa.pose3d.io import pose_markers
     df = load_pose_file(str(pose_file))[0]
-    names = [c[:-2] for c in df.columns if c.endswith("_x") and c[:-2] + "_y" in df.columns]
+    names = pose_markers(df.columns, 2)                       # 122kz: not the <m>_var variances
     out = {}
     for m in names:
         xy = df[[m + "_x", m + "_y"]].to_numpy(float)

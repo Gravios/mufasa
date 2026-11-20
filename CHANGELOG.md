@@ -8,6 +8,26 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kz — The pose file contract, in one place (audit findings 1, 6, 10).**
+First patch of the 3-D pipeline audit.
+* `pose3d/io.py`: `pose_markers(columns, dims)` is the one rule for finding markers. A name
+  `<m>_var` is skipped when `<m>` is a marker: the per-axis variances the Kalman v2 smoother
+  writes into 2-D pose files. From a smoothed 2-D file, the single-camera reconstruction made
+  each one a marker of its own (K7: 15, up to 2,000 km away, setting the 3-D viewer's volume
+  and adding 3-D features for markers that do not exist). A real marker whose name ends in
+  `_var` is kept.
+* The rule replaces six copies: the single-camera 2-D loader, `pipeline.py`, the viewer's
+  `load_pose3d`, `features_3d.load_pose3d_aligned`, gait (via `marker_names`) and the body
+  model's `load_labels`. Existing files read as their real markers without being rebuilt; K7's
+  volume goes from ±2,000 km to ±0.3 m.
+* The contract is written in `io.py` and docs/pose3d.md: millimetres, z up, the floor at
+  z = 0, `frame`, `fps` in the metadata. `check_pose3d` lists breaks: no frame rate, gaps or
+  disorder, markers below the floor, units, derived columns. Gait reports them in its summary
+  (`contract`), and says when it assumed 30 fps. The gait form and CLI print them.
+* C3D import: `floor_z` (form *Floor height in the file*, CLI `--floor-z`) moves the lab's
+  floor to z = 0. The import reports markers below the floor.
+* `tests/smoke_122kz_pose_file_contract.py` (12 checks).
+
 **122ky — Real-time models in the 3-D viewer: GPU drawing, batched posing; the mouth closed.**
 The user asked for real-time rendering of the model with GPU acceleration, and for the
 virtual rodent's mouth to be closed.

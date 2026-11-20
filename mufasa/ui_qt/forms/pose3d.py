@@ -624,6 +624,13 @@ class C3DImportForm(OperationForm):
             self.up.addItem(label, ax)
         self.up.setToolTip("The file's axis that points up; it becomes z.")
         f.addRow("Up axis in the file", self.up)
+        self.floor_z = QDoubleSpinBox(self)                     # 122kz
+        self.floor_z.setRange(-5000, 5000)
+        self.floor_z.setDecimals(1)
+        self.floor_z.setSuffix(" mm")
+        self.floor_z.setToolTip("The floor's height in the file, moved to z = 0 (gait needs the floor at 0). "
+                                "The import warns when markers lie below the floor.")
+        f.addRow("Floor height in the file", self.floor_z)
         self.rename = QLineEdit(self)
         self.rename.setPlaceholderText("optional: mocap=project names, e.g. HeadF=head_nose, SpineM=back_T8")
         f.addRow("Rename markers", self.rename)
@@ -645,13 +652,13 @@ class C3DImportForm(OperationForm):
             raise ValueError("not found: " + ", ".join(missing))
         from mufasa.pose3d.c3d import parse_edges, parse_rename
         return dict(paths=paths, up=self.up.currentData(), rename=parse_rename(self.rename.text()),
-                    edges=parse_edges(self.edges.text()))
+                    edges=parse_edges(self.edges.text()), floor_z=self.floor_z.value() or None)
 
-    def target(self, *, paths, up, rename, edges) -> None:
+    def target(self, *, paths, up, rename, edges, floor_z=None) -> None:
         from mufasa.pose3d.c3d import import_c3d
         out_dir = self._root / "sources" / "pose3d"
         for p in paths:
-            out = import_c3d(p, out_dir, up=up, rename=rename, edges=edges)
+            out = import_c3d(p, out_dir, up=up, rename=rename, edges=edges, floor_z=floor_z)
             print(f"C3D → {out}")
 
 

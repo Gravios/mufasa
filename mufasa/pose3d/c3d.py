@@ -276,14 +276,18 @@ UP_AXES = {
 
 
 def c3d_to_pose3d(c: C3D, *, up: str = "z", rename: dict | None = None, edges=None,
-                  frames: tuple[int, int] | None = None, source: str = "") -> tuple[pd.DataFrame, dict]:
-    """A 3-D pose table (mm, z up) and its metadata from a read C3D."""
-    from mufasa.pose3d.io import skeleton_edges
+                  frames: tuple[int, int] | None = None, source: str = "",
+                  floor_z: float | None = None) -> tuple[pd.DataFrame, dict]:
+    """A 3-D pose table (mm, z up) and its metadata from a read C3D. ``floor_z``: the floor's
+    height in the file (mm, after turning to z up), moved to z = 0 (122kz: the pose file's floor)."""
+    from mufasa.pose3d.io import check_pose3d, skeleton_edges
     rename = rename or {}
     names = [rename.get(n, n) for n in c.labels]
     X = c.points * c.to_mm
     R = UP_AXES[up]
     X = X @ R.T
+    if floor_z:
+        X = X - np.array([0.0, 0.0, float(floor_z)])
     res = c.residuals * c.to_mm
     T = len(X)
     sl = slice(None)
@@ -314,6 +318,9 @@ def c3d_to_pose3d(c: C3D, *, up: str = "z", rename: dict | None = None, edges=No
                     box_z=[float(min(0.0, lo[2] - pad[2])), float(hi[2] + pad[2])])
     meta["report"] = {"frames": int(len(X)), "markers": len(names), "rate_hz": c.rate,
                       "visible_fraction": {m: round(float(ok[:, j].mean()), 4) for j, m in enumerate(names)}}
+    if floor_z:
+        meta["floor_z_moved_mm"] = float(floor_z)
+    meta["report"]["contract"] = check_pose3d(df, meta)        # 122kz: e.g. markers below the floor
     return df, meta
 
 
@@ -346,14 +353,17 @@ def parse_edges(text: str) -> list[list[str]] | None:
 
 
 def import_c3d(path, out_dir, *, up: str = "z", rename: dict | None = None, edges=None,
-               frames=None) -> Path:
+               frames=None, floor_z: float | None = None, say=None) -> Path:
     """Read ``path`` and write ``<out_dir>/<stem>_3d.parquet``."""
     from mufasa.pose3d.io import write_pose3d
     path = Path(path)
     c = read_c3d(path)
     if not c.labels:
         raise C3DError(f"{path.name}: no 3-D points")
-    df, meta = c3d_to_pose3d(c, up=up, rename=rename, edges=edges, frames=frames, source=str(path))
+    df, meta = c3d_to_pose3d(c, up=up, rename=rename, edges=edges, frames=frames, source=str(path),
+                             floor_z=floor_z)
+    for w in meta["report"]["contract"]:
+        (say or print)(f"{path.name}: {w}")
     return write_pose3d(df, Path(out_dir) / f"{path.stem}_3d.parquet", meta)
 
 

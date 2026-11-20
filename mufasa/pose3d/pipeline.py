@@ -163,7 +163,8 @@ def run_job(job: Job, settings: RunSettings, out_dir, progress=None) -> dict:
                   "Rat7M trunk heights, pelvis pitched to the lumbar angle, spine chain within "
                   "Rat7M bend limits, tail draped; labels on their camera rays"
                   f"; solver: {rep.get('solver', 'SciPy')}")
-    names = [c[:-2] for c in df.columns if c.endswith("_z")]
+    from mufasa.pose3d.io import marker_names
+    names = marker_names(df)
     if settings.kalman is not None:
         say(f"{job.stem}: 3-D Kalman smoothing")
         df, kinfo = smooth_pose3d_frame(df, names, settings.kalman, center)

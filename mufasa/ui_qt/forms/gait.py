@@ -91,6 +91,8 @@ def run_gait(root, run, *, mass_g=None, fps=None, bounds="catwalk", say=print) -
         res = gait_from_pose3d(p, fps=fps, mass_g=mass_g, bounds=bounds_preset(bounds))
         g, s = write_gait(res, out / f"{stem}_gait.parquet", {"pose3d": str(p)})
         sm = res.summary
+        for w in sm.get("contract", []):
+            say(f"{stem}: warning: {w}")
         say(f"{stem}: {sm['steps']} stances, size {sm['size_vs_model']}x the model, mass {sm['mass_g']} g, "
             f"load share {sm['load_share']}")
         results[stem] = {"gait": str(g), "steps": str(s),

@@ -106,6 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
     ic.add_argument("--project", help="write to the project's sources/pose3d/")
     ic.add_argument("--out", help="output folder (instead of --project)")
     ic.add_argument("--up", choices=["z", "y", "x"], default="z", help="the file's up axis (becomes z)")
+    ic.add_argument("--floor-z", type=float, help="the floor's height in the file (mm, z up), moved to 0")
     ic.add_argument("--rename", default="", help="mocap=project marker names, comma separated")
     ic.add_argument("--edges", default="", help="skeleton lines a-b,b-c (default: the rat skeleton "
                                                 "for the markers present)")
@@ -249,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
         for f in a.files:
             c = read_c3d(f)
             out = import_c3d(f, out_dir, up=a.up, rename=rename, edges=edges,
-                             frames=tuple(a.frames) if a.frames else None)
+                             frames=tuple(a.frames) if a.frames else None, floor_z=a.floor_z)
             print(f"{Path(f).name}: {len(c.labels)} markers, {len(c.points)} frames at {c.rate:g} Hz "
                   f"({c.units}) → {out}")
         return 0
@@ -284,6 +285,8 @@ def main(argv: list[str] | None = None) -> int:
                                bounds=bounds_preset(a.bounds, a.gait_scale))
         g, s = write_gait(res, a.out, {"pose3d": str(a.pose3d)})
         sm = res.summary
+        for w in sm.get("contract", []):
+            print(f"warning: {w}", file=sys.stderr)
         print(f"{sm['steps']} stances · size {sm['size_vs_model']}x · mass {sm['mass_g']} g · "
               f"load share {sm['load_share']} -> {g}, {s}")
         return 0

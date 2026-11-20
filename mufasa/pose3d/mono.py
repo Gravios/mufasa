@@ -145,7 +145,8 @@ def load_pose2d(primary, fallback=None, likelihood_threshold: float = 0.9) -> Po
     b = None
     if fallback is not None:
         b = fallback if isinstance(fallback, pd.DataFrame) else load_pose_file(str(fallback))[0]
-    names = [c[:-2] for c in a.columns if c.endswith("_x") and c[:-2] + "_y" in a.columns]
+    from mufasa.pose3d.io import pose_markers
+    names = pose_markers(a.columns, 2)          # not the Kalman v2 variances (<m>_var_x/_y)
     n = len(a) if b is None else min(len(a), len(b))
     uv, lk, filled = {}, {}, {}
     for m in names:

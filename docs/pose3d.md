@@ -390,6 +390,9 @@ inference runs — e.g. as ground truth for the single-camera estimate.
   setups y up — that axis becomes z.
 * *Rename markers* `HeadF=head_nose, SpineM=back_T8`: project names give the
   rat skeleton in the viewer; otherwise give *Skeleton* lines `a-b, b-c`.
+* *Floor height in the file* (`--floor-z`): where the lab's floor is, after
+  turning to z up. It is moved to z = 0, which gait needs. The import says
+  so when markers lie below the floor (patch 122kz).
 * The reader needs nothing beyond NumPy: integer and floating-point files,
   Intel, DEC and big-endian (MIPS/SGI) processors, labels beyond 255
   (`LABELS2`…), units in m / cm / mm, more than 65 535 frames. Analog
@@ -406,6 +409,31 @@ mufasa-pose3d import-c3d trial01.c3d trial02.c3d --project project.toml [--up y]
 `pelvis_pitch_deg`, `lumbar_angle_deg` and `spine_length_mm`. Metadata
 (`mufasa_pose3d`): camera (3×4 `P`), box, skeleton edges, method, a
 per-video report. `run.toml` and `report.json` sit beside them.
+
+## The 3-D pose file
+
+Patch 122kz writes down the contract every 3-D stage relies on
+(`mufasa/pose3d/io.py`):
+
+| Column or key | Meaning |
+|---|---|
+| `<marker>_x`, `_y`, `_z` | millimetres; z up; **the floor at z = 0** |
+| `frame` | the video frame of each row, in order, each once |
+| `<marker>_likelihood`, `<marker>_reproj_px` | optional, per marker |
+| other columns (`lumbar_angle_deg`…) | optional, per frame |
+| metadata `mufasa_pose3d` | `units`, `fps`, `method`, `camera`, `edges`, `box_x/_y/_z`, `report` |
+
+Every reader finds markers with one rule (`pose_markers`): a name with `_x`,
+`_y` and `_z` columns. A name `<m>_var` is skipped when `<m>` is a marker. These
+are the per-axis variances the Kalman v2 smoother writes into 2-D pose files.
+Single-camera runs made from a smoothed 2-D file once reconstructed them as
+markers of their own (K7: 15 such, up to 2,000 km away, which set the 3-D
+viewer's volume). Such files now read as their real markers without being
+rebuilt.
+
+`check_pose3d` lists what a file breaks: no frame rate, frames out of order
+or missing, markers below the floor, units other than mm, derived columns.
+Gait reports it with its results, and says when it assumed 30 fps.
 
 ## 3-D features
 

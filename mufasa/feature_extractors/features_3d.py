@@ -77,8 +77,8 @@ def load_pose3d_aligned(path, n_frames: int) -> tuple[list[str], np.ndarray, dic
     """(markers, xyz (n_frames, M, 3), extra per-frame columns) with row k
     = video frame k; frames the file lacks are NaN."""
     df = pd.read_parquet(path)
-    names = [c[:-2] for c in df.columns
-             if c.endswith("_x") and c[:-2] + "_y" in df.columns and c[:-2] + "_z" in df.columns]
+    from mufasa.pose3d.io import marker_names
+    names = marker_names(df)                                  # 122kz: the shared rule
     frames = df["frame"].to_numpy(int) if "frame" in df.columns else np.arange(len(df))
     keep = (frames >= 0) & (frames < n_frames)
     xyz = np.full((n_frames, len(names), 3), np.nan)

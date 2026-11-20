@@ -706,13 +706,20 @@ def _summary(fdf, sdf, fps, size, mass, phys, bounds=None) -> dict:
 
 def gait_from_pose3d(path, *, fps: float | None = None, **kw) -> GaitResult:
     """:func:`estimate_gait` on a 3-D pose file (``<video>_3d.parquet``)."""
-    from mufasa.pose3d.io import marker_names, read_pose3d
+    from mufasa.pose3d.io import check_pose3d, marker_names, read_pose3d
     df, meta = read_pose3d(path)
     names = marker_names(df)
     xyz = np.stack([df[[f"{n}_x", f"{n}_y", f"{n}_z"]].to_numpy(float) for n in names], 1)
     frames = df["frame"].to_numpy(int) if "frame" in df else np.arange(len(df))
+    # 122kz: what the file breaks of its contract travels with the result
+    warn = [w for w in check_pose3d(df, meta) if not (fps and w.startswith("no frame rate"))]
+    if not (fps or meta.get("fps")):
+        warn = [w.replace("times assume a default", "assumed 30 fps; give the video's frame rate")
+                if w.startswith("no frame rate") else w for w in warn]
     fps = fps or meta.get("fps") or 30.0
-    return estimate_gait(names, xyz, frames, float(fps), **kw)
+    res = estimate_gait(names, xyz, frames, float(fps), **kw)
+    res.summary["contract"] = warn
+    return res
 
 
 def write_gait(res: GaitResult, out, meta: dict | None = None):

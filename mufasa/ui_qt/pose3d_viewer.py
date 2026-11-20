@@ -188,8 +188,8 @@ def load_pose3d(path) -> Pose3D:
         df = t.to_pandas()
     else:
         df = pd.read_csv(path)
-    names = [c[:-2] for c in df.columns
-             if c.endswith("_x") and c[:-2] + "_y" in df.columns and c[:-2] + "_z" in df.columns]
+    from mufasa.pose3d.io import marker_names
+    names = marker_names(df)                                  # 122kz: the shared rule
     if not names:
         raise ValueError(f"{path.name}: no <marker>_x/_y/_z columns")
     xyz = np.stack([df[[n + "_x", n + "_y", n + "_z"]].to_numpy(float) for n in names], 1)
