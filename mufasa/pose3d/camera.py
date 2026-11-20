@@ -490,18 +490,26 @@ def reprojection_rmse(cam: Camera, pts3d, pts2d) -> float:
     return float(np.sqrt(np.mean(np.sum(e ** 2, axis=1))))
 
 
+def camera_names(video_stem: str) -> list[str]:
+    """The camera file names a video looks for, in order: ``<stem>.camera.toml``,
+    ``camera_<first token of the stem>.toml`` (``camera_K7.toml`` for ``K7_cam_…``), ``camera.toml``."""
+    return [f"{video_stem}.camera.toml", f"camera_{video_stem.split('_')[0]}.toml", "camera.toml"]
+
+
 def camera_for_video(calibration_dir, video_stem: str) -> Path | None:
-    """The camera file for a video: ``<stem>.camera.toml``, else
-    ``camera_<first token of the stem>.toml`` (e.g. ``camera_K7.toml`` for
-    ``K7_cam_…``), else ``camera.toml``."""
+    """The camera file for a video (:func:`camera_names`, first found; names match in any
+    letter case, so ``camera_k7.toml`` serves ``K7_…``), or None."""
     d = Path(calibration_dir)
-    for name in (f"{video_stem}.camera.toml", f"camera_{video_stem.split('_')[0]}.toml", "camera.toml"):
-        if (d / name).is_file():
-            return d / name
+    if not d.is_dir():
+        return None
+    files = {p.name.lower(): p for p in d.iterdir() if p.is_file()}
+    for name in camera_names(video_stem):
+        if name.lower() in files:
+            return files[name.lower()]
     return None
 
 
 __all__ = ["BoxCalibrationReport", "Camera", "calibrate_checkerboard", "calibrate_from_box_marks",
-           "camera_for_video", "camera_from_projection_matrix", "dlt_camera_matrix", "fit_line",
+           "camera_for_video", "camera_from_projection_matrix", "camera_names", "dlt_camera_matrix", "fit_line",
            "order_quad", "reprojection_rmse", "vanishing_point"]
 _ = math

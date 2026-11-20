@@ -40,7 +40,9 @@ including its height — is solved from the four floor corners.
 
 Cameras are saved as `sources/calibration/camera_<name>.toml`; a video
 uses `<video>.camera.toml`, else `camera_<first part of its name>.toml`
-(`camera_K7.toml` for `K7_cam_…`), else `camera.toml`.
+(`camera_K7.toml` for `K7_cam_…`), else `camera.toml`, in any letter case.
+A video with none shows *(no camera)*. The line under the list names the files
+it looked for and the camera files the folder has (patch 122la).
 
 ## 2. 3-D inference — one camera
 

@@ -349,7 +349,7 @@ class CameraCalibrationForm(OperationForm):
         self.report.setWordWrap(True)
         self.report.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.body_layout.addWidget(self.report)
-        self.mark_btn.clicked.connect(self.mark)
+        self.mark_btn.clicked.connect(lambda: self.mark())     # 122la: not clicked(checked) as the image
         self.video.currentIndexChanged.connect(self._video_changed)
         self.completed.connect(lambda: self.report.setText(getattr(self, "_report_text", "")))
         self._video_changed()
@@ -455,6 +455,11 @@ class Pose3DInferenceForm(OperationForm):
         self.videos = QListWidget(self)
         self.videos.setMaximumHeight(130)
         f.addRow("Videos", self.videos)
+        self.cam_note = QLabel("", self)                       # why a video has no camera
+        self.cam_note.setWordWrap(True)
+        self.cam_note.setStyleSheet("color: palette(placeholder-text);")
+        self.cam_note.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        f.addRow("", self.cam_note)
         self.mode = QComboBox(self)
         self.mode.addItems(["single camera", "two cameras"])
         trow = QHBoxLayout()
@@ -542,17 +547,44 @@ class Pose3DInferenceForm(OperationForm):
         stereo = self.mode.currentIndex() == 1
         jobs, problems = find_jobs(self.pose_dir.text(), self.cal_dir.text(), None,
                                    stereo_tokens=(self.tok0.text(), self.tok1.text()) if stereo else None)
+        from mufasa.pose3d.camera import camera_names
         ok = {j.stem for j in jobs}
-        for stem in sorted(pose_files(self.pose_dir.text())):
-            if stereo and self.tok0.text() not in stem:
-                continue
+        stems = [s for s in sorted(pose_files(self.pose_dir.text())) if not (stereo and self.tok0.text() not in s)]
+        missing = [s for s in stems if s not in ok]
+        self.cam_note.setText(self._camera_note(missing, problems))
+        for stem in stems:
             it = QListWidgetItem(stem if stem in ok else f"{stem}  (no camera)")
+            if stem not in ok:
+                it.setToolTip("Looked for " + ", ".join(camera_names(stem)) + f" in {self.cal_dir.text()}")
             it.setData(Qt.UserRole, stem)
             it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
             it.setCheckState(Qt.Checked if stem in ok else Qt.Unchecked)
             if stem not in ok:
                 it.setFlags(it.flags() & ~Qt.ItemIsEnabled)
             self.videos.addItem(it)
+
+    def _camera_note(self, missing: list[str], problems: list[str]) -> str:
+        """Why videos have no camera: the names looked for, and what the folder holds."""
+        if not missing:
+            return ""
+        from mufasa.pose3d.camera import camera_names
+        d = Path(self.cal_dir.text())
+        if not d.is_dir():
+            return f"No camera for {len(missing)} video(s): the folder {d} does not exist."
+        tomls = sorted(p.name for p in d.glob("*.toml"))
+        want = camera_names(missing[0])
+        msg = (f"No camera for {len(missing)} video(s). For {missing[0]} it looked for "
+               f"{', '.join(want)}. ")
+        if tomls:
+            msg += "The folder has: " + ", ".join(tomls[:6]) + ("…" if len(tomls) > 6 else "") + ". Rename one, or "
+        else:
+            msg += "The folder has no camera files. "
+        prefix = missing[0].split("_")[0]
+        msg += f"run Camera calibration with the name {prefix} (it saves {want[1]})."
+        stereo_probs = [p for p in problems if "matching" in p]
+        if stereo_probs:
+            msg += " " + stereo_probs[0] + "."
+        return msg
 
     def collect_args(self) -> dict:
         from mufasa.pose3d.kalman3d import Kalman3DConfig
@@ -697,6 +729,29 @@ class Pose3DSmoothingForm(OperationForm):
         f.addRow("Outlier gate", self.gate)
         f.addRow("Frame rate", self.fps)
         self.body_layout.addLayout(f)
+
+    def _camera_note(self, missing: list[str], problems: list[str]) -> str:
+        """Why videos have no camera: the names looked for, and what the folder holds."""
+        if not missing:
+            return ""
+        from mufasa.pose3d.camera import camera_names
+        d = Path(self.cal_dir.text())
+        if not d.is_dir():
+            return f"No camera for {len(missing)} video(s): the folder {d} does not exist."
+        tomls = sorted(p.name for p in d.glob("*.toml"))
+        want = camera_names(missing[0])
+        msg = (f"No camera for {len(missing)} video(s). For {missing[0]} it looked for "
+               f"{', '.join(want)}. ")
+        if tomls:
+            msg += "The folder has: " + ", ".join(tomls[:6]) + ("…" if len(tomls) > 6 else "") + ". Rename one, or "
+        else:
+            msg += "The folder has no camera files. "
+        prefix = missing[0].split("_")[0]
+        msg += f"run Camera calibration with the name {prefix} (it saves {want[1]})."
+        stereo_probs = [p for p in problems if "matching" in p]
+        if stereo_probs:
+            msg += " " + stereo_probs[0] + "."
+        return msg
 
     def collect_args(self) -> dict:
         from mufasa.pose3d.kalman3d import Kalman3DConfig

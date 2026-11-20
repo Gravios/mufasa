@@ -8,6 +8,21 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122la — 3-D inference says why a video has no camera.**
+The user's screenshot showed every video as "(no camera)": the project had no camera file
+under the names looked for, and the form kept the reason to itself.
+* `camera.camera_names(stem)`: the names a video looks for (`<stem>.camera.toml`,
+  `camera_<prefix>.toml`, `camera.toml`). `camera_for_video` matches them in any letter case.
+* The form gets a line under the video list: what it looked for, the camera files the folder
+  has, and what to do (*Camera calibration* with the video's prefix). A missing folder is said to
+  be missing. Each unmatched video's tooltip names its files.
+* *Mark the box…* failed with "TypeError: 'bool' object is not subscriptable": the button's
+  `clicked(checked)` went in as the image. The skeleton re-import's *Apply* had the same wiring,
+  and `clicked(False)` went in as `confirm`, so it rewrote project.toml without asking. Both are
+  wired through a lambda now. A scan of the whole UI finds no other button whose `checked` flag
+  lands in an optional parameter.
+* `tests/smoke_122la_camera_pairing.py` (7 checks, including that scan).
+
 **122kz — The pose file contract, in one place (audit findings 1, 6, 10).**
 First patch of the 3-D pipeline audit.
 * `pose3d/io.py`: `pose_markers(columns, dims)` is the one rule for finding markers. A name

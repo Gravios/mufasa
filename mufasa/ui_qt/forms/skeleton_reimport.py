@@ -64,7 +64,7 @@ class SkeletonReimportForm(QWidget):
         brow.addStretch()
         self.apply_btn = QPushButton("Apply", self)
         self.apply_btn.setEnabled(False)
-        self.apply_btn.clicked.connect(self.apply)
+        self.apply_btn.clicked.connect(lambda: self.apply())   # 122la: clicked(False) skipped the confirmation
         brow.addWidget(self.apply_btn)
         outer.addLayout(brow)
 
