@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -33,7 +33,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMessageBox,
-    QProgressDialog,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -98,6 +97,11 @@ class ViewModelsPanel(QWidget):
         g.addWidget(self.fov_spin, 2, 2)
         g.addWidget(QLabel("Background", box), 3, 0)
         g.addWidget(self.bg, 3, 1, 1, 2)
+        self.gpu_cb = QCheckBox("GPU", box)                   # 122ky
+        self.gpu_cb.setChecked(v.gpu)
+        self.gpu_cb.setToolTip("Draw the models with OpenGL (falls back to the CPU when it cannot start)")
+        self.gpu_cb.toggled.connect(lambda on: (self._set("gpu", bool(on)), self._update_info()))
+        g.addWidget(self.gpu_cb, 4, 0)
         for cb, attr in ((self.markers_cb, "show_markers"), (self.names_cb, "show_names"),
                          (self.skel_cb, "show_skeleton"), (self.grid_cb, "show_grid"), (self.axes_cb, "show_axes")):
             cb.toggled.connect(lambda on, a=attr: self._set(a, bool(on)))
@@ -127,10 +131,17 @@ class ViewModelsPanel(QWidget):
         self.rodent_btn.setToolTip("The built-in rat (DeepMind's virtual rodent), posed to the markers")
         self.remove_btn = QPushButton("Remove", box)
         self.fitall_btn = QPushButton("Fit all frames", box)
-        self.fitall_btn.setToolTip("Pose the selected rig to every frame now (smooth playback, faster scrubbing)")
+        self.fitall_btn.setToolTip("Pose the selected rig to every frame, in the background, starting at the "
+                                   "frame shown (batched; on the GPU with CUDA)")
         for b in (self.load_btn, self.rodent_btn, self.remove_btn, self.fitall_btn):
             row.addWidget(b)
         left.addLayout(row)
+        self.bg_fit_cb = QCheckBox("Fit in the background", box)       # 122ky
+        self.bg_fit_cb.setChecked(True)
+        self.bg_fit_cb.setToolTip("Start posing a rig to every frame as soon as it is added, nearest the "
+                                  "frame shown first, so playback runs in real time")
+        left.addWidget(self.bg_fit_cb)
+        self._fit_thread = None
         outer.addLayout(left, 2)
         right = QGridLayout()
         self.style = QComboBox(box)
@@ -200,6 +211,8 @@ class ViewModelsPanel(QWidget):
         it.setCheckState(Qt.Checked)
         self.list.addItem(it)
         self.list.setCurrentRow(self.list.count() - 1)
+        if m.kind == "rig" and self.bg_fit_cb.isChecked():
+            self.fit_all()
         return m
 
     def load_dialog(self) -> None:
@@ -218,23 +231,49 @@ class ViewModelsPanel(QWidget):
             self._selected_changed()
 
     def fit_all(self) -> None:
+        """122ky: pose the selected rig to every frame in a background thread (batched, the GPU
+        with CUDA), nearest the frame shown first; pressed again, it stops."""
+        if self._fit_thread is not None and self._fit_thread.isRunning():
+            self._fit_thread.requestInterruption()
+            return
         m = self.selected()
         if m is None or m.kind != "rig":
             return
-        frames = [int(f) for f in self.vol.pose.frames]
-        dlg = QProgressDialog("Posing the model to every frame…", "Stop", 0, len(frames), self)
-        dlg.setWindowModality(Qt.WindowModal)
-        from PySide6.QtWidgets import QApplication
-        for k, f in enumerate(frames):
-            if dlg.wasCanceled():
-                break
-            m.fit_frame(f)
-            if k % 10 == 0:
-                dlg.setValue(k)
-                QApplication.processEvents()
-        dlg.setValue(len(frames))
+        frames = [int(f) for f in self.vol.pose.frames if not m.cached(int(f))]
+        if not frames:
+            self._update_info()
+            return
+        th = FitThread(m, frames, lambda: self.vol.frame, self)
+        th.progress.connect(self._fit_progress)
+        th.finished.connect(self._fit_done)
+        self._fit_thread = th
+        self.fitall_btn.setText("Stop fitting")
+        self.vol.bg_fitting = True
+        th.start()
+
+    def _fit_progress(self, done: int, total: int, device: str) -> None:
+        self._fit_status = f"posing {done}/{total} frames ({device})"
         self.vol.update()
         self._update_info()
+
+    def _fit_done(self) -> None:
+        self.vol.bg_fitting = False
+        self.fitall_btn.setText("Fit all frames")
+        self._fit_status = ""
+        self._fit_thread = None
+        self.vol.update()
+        self._update_info()
+
+    def stop_fitting(self) -> None:
+        """Stop a background fit and wait for it (closing the viewer)."""
+        th = self._fit_thread
+        if th is not None:
+            th.requestInterruption()
+            th.wait(60000)
+
+    def closeEvent(self, ev) -> None:  # noqa: ANN001, N802
+        self.stop_fitting()
+        super().closeEvent(ev)
 
     def _item_changed(self, it: QListWidgetItem) -> None:
         r = self.list.row(it)
@@ -273,9 +312,11 @@ class ViewModelsPanel(QWidget):
         if m is not None:
             frame = self.vol.frame
             if m.kind == "rig" and not m.cached(frame):
-                self.info.setText(f"{m.info(None)} · frame {frame} not posed yet")
+                txt = f"{m.info(None)} · frame {frame} not posed yet"
             else:
-                self.info.setText(m.info(frame))
+                txt = m.info(frame)
+            extra = [s for s in (getattr(self, "_fit_status", ""), self.vol.gpu_note if self.vol.gpu else "") if s]
+            self.info.setText(" · ".join([txt, *extra]))
 
     def _look(self, attr, value) -> None:
         m = self.selected()
@@ -298,6 +339,38 @@ class ViewModelsPanel(QWidget):
             m.look.color = c.name()
             self.color_btn.setStyleSheet(f"background: {m.look.color};")
             self.vol.update()
+
+
+class FitThread(QThread):
+    """122ky: a rig posed to many frames in the background, chunk by chunk, the chunk nearest
+    ``current()`` (the frame shown) first; frames land in the rig's cache as they are done."""
+    progress = Signal(int, int, str)
+
+    def __init__(self, model, frames, current, parent=None, *, device: str = "auto") -> None:
+        super().__init__(parent)
+        from mufasa.pose3d import rig_batch
+        self.model, self.frames, self.current = model, sorted(frames), current
+        self.device = rig_batch.device_name(device) if rig_batch.available() else "cpu, frame by frame"
+        # big batches run fastest (CPU: about 30 ms a frame at 2048, 80 at 256); the first, around
+        # the frame shown, is small so that the model appears at once
+        self.chunk = 2048
+        self.first = 128 if self.device != "cuda" else 512
+
+    def run(self) -> None:
+        import numpy as np
+        rest = list(self.frames)
+        total, done = len(rest), 0
+        dev = "auto" if self.device != "cpu" else "cpu"
+        size = self.first
+        while rest and not self.isInterruptionRequested():
+            c = self.current()
+            i = int(np.argmin(np.abs(np.asarray(rest) - c)))
+            a = max(0, min(i - size // 4, len(rest) - size))      # mostly ahead of the frame shown
+            ch, rest = rest[a:a + size], rest[:a] + rest[a + size:]
+            self.model.fit_frames(ch, device=dev, stop=self.isInterruptionRequested)
+            done += len(ch)
+            self.progress.emit(done, total, self.device)
+            size = self.chunk
 
 
 __all__ = ["BACKGROUNDS", "ViewModelsPanel"]

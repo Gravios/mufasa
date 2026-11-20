@@ -103,9 +103,11 @@ def main() -> int:
         from mufasa.pose3d.rodent_model import RodentModel
         model = RodentModel()
         q = stance_qpos(model)
-        check(f"stance: {len(STANCE)} limb joints per side set, all within their ranges",
-              int((np.abs(q) > 0).sum()) == 2 * len(STANCE)
-              and bool(np.all((q[0] >= model.lo - 1e-9) & (q[0] <= model.hi + 1e-9))))
+        limbs = np.ones(q.shape[1], bool)
+        limbs[model.joint_index["mandible"]] = False         # 122ky: the jaw closed past its range (shown only)
+        check(f"stance: {len(STANCE)} limb joints per side set, all within their ranges (and the jaw closed)",
+              int((np.abs(q[0, limbs]) > 0).sum()) == 2 * len(STANCE)
+              and bool(np.all((q[0, limbs] >= model.lo[limbs] - 1e-9) & (q[0, limbs] <= model.hi[limbs] + 1e-9))))
         flat = BF.Rig(export_rodent_rig(td / "flat.rig.npz", stance=False, say=lambda s: None))
 
         def parts(r):

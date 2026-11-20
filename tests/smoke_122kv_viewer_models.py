@@ -249,7 +249,17 @@ def main() -> int:
     mesh = w.volume.models[0]
     check("panel: mesh scale and offset", mesh.scale == 25.0 and mesh.offset[2] == 7.0)
     pan.list.setCurrentRow(1)
+    import time
+
+    def wait_fit():                                         # 122ky: rigs are posed in the background
+        t_end = time.time() + 300
+        while pan._fit_thread is not None and time.time() < t_end:
+            QApplication.processEvents()
+            time.sleep(0.02)
+        QApplication.processEvents()
+    wait_fit()                                              # (adding the rig started it)
     pan.fit_all()
+    wait_fit()
     check("panel: fit all frames poses the rig to every frame",
           all(r2.cached(int(f)) for f in w.volume.pose.frames) and "marker error" in pan.info.text())
     pan.list.item(1).setCheckState(Qt.Unchecked)

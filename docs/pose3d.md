@@ -182,6 +182,35 @@ hidden by unticking it.
   1000 for a mesh in metres), a turn about the vertical and an offset in
   x, y and z. Meshes over 20,000 faces are simplified.
 
+**Real time (patch 122ky).**
+* *GPU* (View): the models are drawn with OpenGL 3.3, into an off-screen
+  picture with a depth buffer and smoothed edges, laid under the markers.
+  The shader projects exactly as the viewer does, in every view, so models
+  stay on the markers. Solid models hide what is behind them, faces and
+  models alike. Without OpenGL (no driver, a remote session), the models
+  are drawn on the CPU as before, and the panel says why.
+* Posing: *Fit all frames*, and *Fit in the background* when a rig is
+  added, pose the rig to every frame in a background thread. A small batch
+  around the frame shown comes first, then batches of 2048 frames, always
+  the batch nearest the frame shown, so playback catches up. The batches
+  run in PyTorch, on a CUDA GPU when there is one:
+  * the same unknowns, terms and cold starts as the per-frame fit;
+  * every 8th frame from all cold starts, the frames between from the
+    nearest solved frame;
+  * a last pass from neighbouring frames.
+
+  On K7 this gives the same marker error as the per-frame fit, at 28 ms a
+  frame on a 2-core CPU against 220 ms. While it runs, the viewer shows the
+  nearest posed frame instead of fitting frames itself. *Fit all frames*
+  again stops it.
+* The viewer works out the volume's extent once. It was recomputed over
+  every frame on each paint (0.4 s a paint on a 108,000-frame recording).
+* The virtual rodent's mouth is closed. The skin was bound with the jaw
+  open, wider than the jaw joint's range closes, so the stance pose sets
+  the jaw at −40°, where the lips meet. Rigs exported from the Body model
+  tab have it too. The cached built-in rig is rebuilt
+  (`virtual_rodent_v2.rig.npz`).
+
 A saved camera animation keeps the view options and the models, and
 renders with them. On the command line:
 

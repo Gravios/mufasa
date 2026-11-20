@@ -335,6 +335,27 @@ class PosedRig:
         self._cache[frame] = (x, rms)
         return self._cache[frame]
 
+    def fit_frames(self, frames, *, device: str = "auto", progress=None, stop=None) -> int:
+        """Patch 122ky: pose many frames at once — batched in PyTorch (on a CUDA GPU when there is
+        one) — into the same cache :meth:`fit_frame` uses; frame by frame without PyTorch.
+        Returns the number of frames posed."""
+        todo = [int(f) for f in frames if int(f) not in self._cache]
+        if not todo:
+            return 0
+        from mufasa.pose3d import rig_batch
+        if rig_batch.available():
+            res = rig_batch.fit_rig_frames(self, todo, device=device, progress=progress, stop=stop)
+            self._cache.update(res)
+            return len(res)
+        n = 0
+        for k, f in enumerate(todo):
+            if stop is not None and stop():
+                break
+            n += self.fit_frame(f) is not None
+            if progress is not None and k % 20 == 0:
+                progress(k + 1, len(todo))
+        return n
+
     def cached(self, frame: int) -> bool:
         return int(frame) in self._cache
 
@@ -380,8 +401,10 @@ def _yaw(P, phi):
 def builtin_rig_path() -> Path:
     """The virtual rodent as a rig, made once in the user's cache folder."""
     import os
+
+    from mufasa.bodymodel.rodent_rig import RIG_VERSION
     base = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "mufasa"
-    p = base / "virtual_rodent.rig.npz"
+    p = base / f"virtual_rodent_v{RIG_VERSION}.rig.npz"                # rebuilt when the rig changes
     if not p.is_file():
         from mufasa.bodymodel.rodent_rig import export_rodent_rig
         export_rodent_rig(p, say=lambda s: None)

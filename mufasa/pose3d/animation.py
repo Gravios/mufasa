@@ -239,6 +239,9 @@ def render_animation(pose, path: CameraPath, out_path, *, video_path=None, size=
     out_path.parent.mkdir(parents=True, exist_ok=True)
     writer = _writer(out_path, fps, (w, h + vh))
     total = path.n_output()
+    for m in vol.models:                         # 122ky: every rendered frame posed at once
+        if getattr(m, "kind", "") == "rig":
+            m.fit_frames(sorted({int(path.frame_at(n)) for n in range(total)}))
     img = QImage(w, h, QImage.Format_RGB32)
     try:
         for n in range(total):

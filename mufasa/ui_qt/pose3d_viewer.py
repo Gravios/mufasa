@@ -101,6 +101,15 @@ class Pose3D:
     def extent(self) -> tuple:
         if self.box is not None:
             return self.box
+        key = (id(self.xyz), self.xyz.shape)                 # 122ky: once, not on every paint
+        cached = getattr(self, "_extent_cache", None)
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        out = self._extent()
+        object.__setattr__(self, "_extent_cache", (key, out))
+        return out
+
+    def _extent(self) -> tuple:
         v = self.xyz.reshape(-1, 3)
         v = v[np.isfinite(v).all(1)]
         if not len(v):
@@ -273,6 +282,9 @@ class Volume3DWidget(QWidget):
         self._fit_timer.setSingleShot(True)
         self._fit_timer.setInterval(60)
         self._fit_timer.timeout.connect(self._fit_now)
+        self.bg_fitting = False              # 122ky: rigs are being posed in the background
+        self.gpu = True                      # 122ky: draw models with OpenGL when it works
+        self.gpu_note = ""
         self.reset_view()
         self._drag = None
 
@@ -612,8 +624,39 @@ class Volume3DWidget(QWidget):
         if self.on_fitted is not None:
             self.on_fitted()
 
+    def _gl_view(self, items) -> dict:
+        """The projection as ``project`` does it, for the GPU's vertex shader."""
+        eye, right, up, fwd = self._basis()
+        s = 0.5 * min(self.width(), self.height()) / math.tan(self.fov / 2)
+        v = {"eye": eye, "right": right, "up": up, "fwd": fwd, "s": s, "so": s / max(self.dist, 1e-9),
+             "dist": self.dist, "blend": 0.0, "psign": self._P_sign}
+        cam_ok = self._P is not None and self._image_wh() is not None
+        if self.cam_mode and self._P is not None:
+            v["mode"] = "camera"
+        elif self.ortho:
+            v["mode"] = "ortho"
+        else:
+            v["mode"] = "perspective"
+            if self.cam_blend > 0 and cam_ok:
+                v["blend"] = float(self.cam_blend)
+        if cam_ok or v["mode"] == "camera":
+            k, ox, oy = self._cam_fit()
+            v.update(P=self._P, k=k, ox=ox, oy=oy)
+        # depth range of what is drawn
+        Vall = np.vstack([V for V, _, _ in items])
+        if v["mode"] == "camera":
+            z = (np.c_[Vall, np.ones(len(Vall))] @ self._P[2]) * self._P_sign
+        else:
+            z = (Vall - eye) @ fwd + (10 * self.dist if v["mode"] == "ortho" else 0.0)
+        z = z[np.isfinite(z) & (z > 0)]
+        lo, hi = (float(z.min()), float(z.max())) if len(z) else (1.0, 2.0)
+        pad = 0.02 * (hi - lo) + 1e-3
+        v["depth_range"] = (max(lo - pad, 1e-6), hi + pad)
+        return v
+
     def _draw_models(self, p: QPainter) -> str:
         notes = []
+        meshes = []                                          # (V, F, look) of this frame
         for m in self.models:
             if not m.look.visible:
                 continue
@@ -627,7 +670,8 @@ class Volume3DWidget(QWidget):
                         m.fit_frame(frame)
                     else:
                         near = m.nearest_cached(frame)
-                        self._fit_timer.start()
+                        if not self.bg_fitting:          # 122ky: the background fit will get there
+                            self._fit_timer.start()
                         if near is None:
                             notes.append(f"{m.name}: fitting…")
                             continue
@@ -637,7 +681,24 @@ class Volume3DWidget(QWidget):
                     continue
             V = m.world(frame)
             if V is not None:
-                self._draw_mesh(p, V, m.faces(), m.look)
+                meshes.append((V, m.faces(), m.look))
+        if meshes and self.gpu:
+            from mufasa.ui_qt.gl_models import shared_renderer
+            gl = shared_renderer()
+            dpr = max(1.0, float(self.devicePixelRatioF()))
+            view = self._gl_view(meshes)
+            if dpr != 1.0:
+                view = dict(view, s=view["s"] * dpr, so=view["so"] * dpr, k=view.get("k", 0) * dpr,
+                            ox=view.get("ox", 0) * dpr, oy=view.get("oy", 0) * dpr)
+            img = gl.render(int(self.width() * dpr), int(self.height() * dpr), view, meshes)
+            if img is not None:
+                img.setDevicePixelRatio(dpr)
+                p.drawImage(0, 0, img)
+                self.gpu_note = f"GPU: {gl.info}"
+                return ", ".join(notes)
+            self.gpu_note = f"GPU unavailable ({gl.error}); drawing on the CPU"
+        for V, F, look in meshes:
+            self._draw_mesh(p, V, F, look)
         return ", ".join(notes)
 
     def _draw_mesh(self, p: QPainter, V: np.ndarray, F: np.ndarray, look) -> None:
@@ -951,6 +1012,10 @@ class Pose3DViewerWidget(QWidget):
             self.scrubber.seek(int(self.pose.frames[0]))
         if can_video:
             self.video3d_cb.setChecked(True)
+
+    def closeEvent(self, ev) -> None:  # noqa: ANN001, N802
+        self.models_panel.stop_fitting()                 # 122ky: no thread left running
+        super().closeEvent(ev)
 
     def _on_frame(self, frame: int) -> None:
         self.volume.set_frame(frame)

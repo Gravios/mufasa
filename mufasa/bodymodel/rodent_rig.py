@@ -86,9 +86,18 @@ STANCE = {"hip_supinate": -36.6, "hip_abduct": -13.6, "hip_extend": -46.1, "knee
           "shoulder": 6.2, "shoulder_sup": 8.3, "elbow": -35.8, "wrist": -13.5, "finger": 85.3}
 
 
-def stance_qpos(model, stance=STANCE):
-    """Joint angles (1, n) for ``stance`` ({joint without side: degrees}) on both sides."""
+# 122ky: the mouth closed. The skin was bound with the jaw open, wider than the joint's range
+# allows closing (−17°); at −40° the lower lip meets the upper one (−45° passes inside it).
+JAW_CLOSED_DEG = -40.0
+RIG_VERSION = 2          # 2: mouth closed (the built-in rig is rebuilt when this changes)
+
+
+def stance_qpos(model, stance=STANCE, jaw_deg: float | None = JAW_CLOSED_DEG):
+    """Joint angles (1, n) for ``stance`` ({joint without side: degrees}) on both sides, the jaw at
+    ``jaw_deg`` (None: as bound, open). The jaw may go past its joint range: it is only shown."""
     q = model.qpos()
+    if jaw_deg is not None and "mandible" in model.joint_index:
+        q[0, model.joint_index["mandible"]] = np.deg2rad(jaw_deg)
     for k, j in enumerate(model.joints):
         for side in ("_L", "_R"):
             if side in j.name:
@@ -205,7 +214,7 @@ def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, stance: boo
     rather than the model's zero pose."""
     from mufasa.pose3d.rodent_model import RodentModel
     model = model or RodentModel()
-    q0 = stance_qpos(model) if stance else model.qpos()
+    q0 = stance_qpos(model) if stance else stance_qpos(model, {})          # the mouth closed either way
     bones = _bones(model, q0)
     names = [b[0] for b in bones]
     ix = {n: i for i, n in enumerate(names)}
@@ -277,4 +286,5 @@ def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, stance: boo
     return out
 
 
-__all__ = ["LIMITS", "POSTURE", "STANCE", "decimate", "export_rodent_rig", "stance_qpos", "widen"]
+__all__ = ["JAW_CLOSED_DEG", "LIMITS", "POSTURE", "RIG_VERSION", "STANCE", "decimate", "export_rodent_rig",
+           "stance_qpos", "widen"]

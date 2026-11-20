@@ -8,6 +8,38 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ky — Real-time models in the 3-D viewer: GPU drawing, batched posing; the mouth closed.**
+The user asked for real-time rendering of the model with GPU acceleration, and for the
+virtual rodent's mouth to be closed.
+* `Pose3D.extent()` is worked out once. It was recomputed over every frame on each paint:
+  0.4 s a paint on K7's 108,000 frames, the viewer's main cost.
+* `mufasa/ui_qt/gl_models.py`: the models drawn with OpenGL 3.3 into an off-screen,
+  multisampled picture with a depth buffer, laid under the markers. The vertex shader
+  projects exactly as `Volume3DWidget.project` does (perspective, orthographic, the
+  recording camera, the animation mix); flat shading from screen-space derivatives;
+  premultiplied blending for transparent models. It falls back to QPainter without OpenGL.
+  Against the CPU drawing, model pixels overlap (IoU) ≥ 0.99 in every view.
+* `mufasa/pose3d/rig_batch.py`: the rig's posing batched in PyTorch (CUDA when present):
+  * kinematics of the bones that move markers (49 of 63), exact to 1e-13 mm;
+  * `vmap(jacfwd)` Jacobians; bounded Levenberg–Marquardt with damping per frame;
+  * the per-frame fit's cold starts on every 8th frame, the frames between from the
+    nearest solved frame, a neighbour pass.
+
+  K7: the same marker error as the per-frame fit at 28 ms a frame on a 2-core CPU (it
+  was 220).
+* `PosedRig.fit_frames`; animations pose every rendered frame up front. The *View & models*
+  panel fits in a background thread, nearest the frame shown first, while the viewer shows
+  the nearest posed frame instead of fitting on its own. New controls: *Fit in the
+  background* (on adding a rig) and *GPU*. Closing the viewer stops the thread.
+* The mouth: the skin was bound with the jaw open, wider than the joint's range closes. The
+  stance sets the jaw at −40° (`JAW_CLOSED_DEG`), where the lips meet. The built-in rig cache
+  is versioned (`virtual_rodent_v2.rig.npz`).
+* The viewer's rig keeps its size from the back's labels: on K7 that fits the markers
+  better (20.7 vs 23.9 mm) than nose to tail base, which the gait's physics uses.
+* `tests/smoke_122ky_viewer_gpu_realtime.py` (12 checks; the GPU comparison runs under
+  `xvfb-run` when present). 122kv and 122ku were updated: background fitting, and the jaw
+  set past its range.
+
 **122kx — Gait bounds from uninjured rats on a CatWalk; a stride clock.**
 The user attached Neckel et al.'s CatWalk data (Mendeley sg3d7dv345, MATLAB 7.3, in nine
 parts) to calibrate 122kw's bounds.
