@@ -212,6 +212,75 @@ class SceneMesh:
                 "offset": list(self.offset), "look": vars(self.look).copy()}
 
 
+class PoseCache:
+    """Patch 122lb: a posed rig's frames — {frame: (parameters, marker RMS mm)} — safe to share
+    between the viewer and the background fit thread (122ky), which writes into it while the
+    viewer reads. A lock around every access, and the frames kept sorted, so the nearest posed
+    frame is a binary search, not a scan of every frame on every paint. Reads like a dict."""
+
+    def __init__(self) -> None:
+        import threading
+        self._lock = threading.Lock()
+        self._d: dict[int, tuple[np.ndarray, float]] = {}
+        self._keys: list[int] = []                 # sorted
+
+    def __contains__(self, frame) -> bool:
+        with self._lock:
+            return int(frame) in self._d
+
+    def __getitem__(self, frame):
+        with self._lock:
+            return self._d[int(frame)]
+
+    def get(self, frame, default=None):
+        with self._lock:
+            return self._d.get(int(frame), default)
+
+    def __setitem__(self, frame, value) -> None:
+        self.update({int(frame): value})
+
+    def update(self, items) -> None:
+        import bisect
+        items = dict(items)
+        with self._lock:
+            for f, v in items.items():
+                f = int(f)
+                if f not in self._d:
+                    bisect.insort(self._keys, f)
+                self._d[f] = v
+
+    def clear(self) -> None:
+        with self._lock:
+            self._d.clear()
+            self._keys.clear()
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._d)
+
+    def __iter__(self):
+        with self._lock:
+            return iter(list(self._keys))          # a snapshot: safe while the other thread writes
+
+    def keys(self) -> list[int]:
+        with self._lock:
+            return list(self._keys)
+
+    def nearest(self, frame: int, within: int) -> int | None:
+        """The posed frame nearest ``frame``, at most ``within`` away (ties: the earlier one)."""
+        import bisect
+        frame = int(frame)
+        with self._lock:
+            k = bisect.bisect_left(self._keys, frame)
+            best = None
+            for j in (k - 1, k):
+                if 0 <= j < len(self._keys):
+                    d = abs(self._keys[j] - frame)
+                    if d <= within and (best is None or d < abs(best - frame)):
+                        best = self._keys[j]
+            return best
+
+
 class PosedRig:
     """A body-model rig posed to the 3-D markers, frame by frame."""
     kind = "rig"
@@ -233,7 +302,7 @@ class PosedRig:
         self._rest = np.array([rest[n] for n in self.names])
         self.posture = list(self.rig.posture)
         self.size = float(size) if size else self._estimate_size(rest)
-        self._cache: dict[int, tuple[np.ndarray, float]] = {}
+        self._cache = PoseCache()                 # 122lb: shared with the background fit thread
         self.good_mm = 12.0                    # a start within this marker error ends the search
 
     @property
@@ -287,8 +356,9 @@ class PosedRig:
     def fit_frame(self, frame: int):
         """(parameters, marker RMS mm) for a frame, or None without enough markers."""
         frame = int(frame)
-        if frame in self._cache:
-            return self._cache[frame]
+        hit = self._cache.get(frame)
+        if hit is not None:
+            return hit
         i = self.pose.row(frame)
         if i is None:
             return None
@@ -308,16 +378,18 @@ class PosedRig:
             P, _, _ = self._markers_world(x)
             r = ((P[ok] - Y[ok]) / 4.0).ravel()                      # 4 mm
             return np.r_[r, 0.3 * (x[4:] - mid) / half, x[3] / 30.0]
-        near = [f for f in self._cache if abs(f - frame) <= 30]
+        nf = self._cache.nearest(frame, 30)
         x0 = self._initial(Y, ok)
         flip = np.r_[math.pi, 0, 0, 0, [0] * len(self.posture)]
         rear = np.zeros_like(x0)
         if "rear" in [q[0] for q in self.posture]:
             rear[4 + [q[0] for q in self.posture].index("rear")] = 45.0
         cold = [x0, x0 + flip, x0 + rear, x0 + flip + rear]          # both headings, flat or rearing
-        starts = ([self._cache[min(near, key=lambda f: abs(f - frame))][0].copy()] if near else []) + cold
+        nb = self._cache.get(nf) if nf is not None else None
+        near = nb is not None
+        starts = ([nb[0].copy()] if near else []) + cold
         best = None
-        nb_rms = self._cache[min(near, key=lambda f: abs(f - frame))][1] if near else np.inf
+        nb_rms = nb[1] if near else np.inf
         for k, s0 in enumerate(starts):
             s0 = np.clip(s0, lo + 1e-9, hi - 1e-9)
             r = least_squares(res, s0, bounds=(lo, hi), max_nfev=25 if (near and k == 0) else 40, x_scale="jac")
@@ -333,7 +405,7 @@ class PosedRig:
         x = best.x.copy()
         x[0] = (x[0] + math.pi) % (2 * math.pi) - math.pi
         self._cache[frame] = (x, rms)
-        return self._cache[frame]
+        return (x, rms)
 
     def fit_frames(self, frames, *, device: str = "auto", progress=None, stop=None) -> int:
         """Patch 122ky: pose many frames at once — batched in PyTorch (on a CUDA GPU when there is
@@ -360,8 +432,7 @@ class PosedRig:
         return int(frame) in self._cache
 
     def nearest_cached(self, frame: int, within: int = 15) -> int | None:
-        near = [f for f in self._cache if abs(f - frame) <= within]
-        return min(near, key=lambda f: abs(f - frame)) if near else None
+        return self._cache.nearest(frame, within)
 
     def faces(self):
         return self.rig.Fd
@@ -482,5 +553,5 @@ def model_from_spec(spec: dict, pose):
                           offset=tuple(spec.get("offset", (0, 0, 0))), look=look)
 
 
-__all__ = ["GaitOverlay", "MESH_SUFFIXES", "STYLES", "ModelLook", "PosedRig", "SceneMesh", "builtin_rig_path", "load_mesh",
+__all__ = ["PoseCache", "GaitOverlay", "MESH_SUFFIXES", "STYLES", "ModelLook", "PosedRig", "SceneMesh", "builtin_rig_path", "load_mesh",
            "load_model", "model_from_spec", "simplify"]

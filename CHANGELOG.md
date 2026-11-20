@@ -8,6 +8,21 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lb — The posed rig's frame cache, safe with the background fit (audit finding 2).**
+Second patch of the 3-D pipeline audit.
+* Since 122ky the background fit thread wrote posed frames into `PosedRig._cache`, a plain
+  dict, while the viewer iterated it in `fit_frame` and `nearest_cached` on every paint. That
+  can raise "dictionary changed size during iteration" mid-paint.
+* `scene_models.PoseCache` takes its place: a lock around every access, and the posed frames
+  kept sorted. It reads like a dict (`[]`, `get`, `in`, `update`, `clear`, `len`, sorted
+  iteration over a snapshot). `nearest(frame, within)` is a binary search: microseconds on
+  54,000 posed frames instead of a scan of every frame on each paint.
+* `tests/smoke_122lb_pose_cache.py`:
+  * the cache's nearest frame equals a scan (12,000 queries);
+  * a writer thread against three readers;
+  * the viewer painting frame after frame while a real background fit runs;
+  * the speed of the lookup.
+
 **122la — 3-D inference says why a video has no camera.**
 The user's screenshot showed every video as "(no camera)": the project had no camera file
 under the names looked for, and the form kept the reason to itself.
