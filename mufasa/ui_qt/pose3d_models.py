@@ -121,7 +121,8 @@ class ViewModelsPanel(QWidget):
         left.addWidget(self.list)
         row = QHBoxLayout()
         self.load_btn = QPushButton("Load…", box)
-        self.load_btn.setToolTip("A body-model rig (.rig.npz), posed to the markers, or a mesh (.obj .stl .ply)")
+        self.load_btn.setToolTip("A body-model rig (.rig.npz), posed to the markers; a mesh (.obj .stl .ply); "
+                                 "or a gait file (_gait.parquet: paws, support, centre of mass)")
         self.rodent_btn = QPushButton("Virtual rodent", box)
         self.rodent_btn.setToolTip("The built-in rat (DeepMind's virtual rodent), posed to the markers")
         self.remove_btn = QPushButton("Remove", box)
@@ -193,7 +194,8 @@ class ViewModelsPanel(QWidget):
             QMessageBox.warning(self, "Load model", f"{type(e).__name__}: {e}")
             return None
         self.vol.add_model(m)
-        it = QListWidgetItem(f"{m.name} ({'posed to the markers' if m.kind == 'rig' else 'mesh'})")
+        kind = {"rig": "posed to the markers", "mesh": "mesh", "gait": "paws and balance"}[m.kind]
+        it = QListWidgetItem(f"{m.name} ({kind})")
         it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
         it.setCheckState(Qt.Checked)
         self.list.addItem(it)
@@ -203,7 +205,7 @@ class ViewModelsPanel(QWidget):
     def load_dialog(self) -> None:
         start = str(Path(self.viewer.pose_path).parent)
         fn, _ = QFileDialog.getOpenFileName(self, "Load model", start,
-                                            "Models (*.rig.npz *.obj *.stl *.ply);;All files (*)")
+                                            "Models (*.rig.npz *.obj *.stl *.ply *_gait.parquet);;All files (*)")
         if fn:
             self.add(fn)
 

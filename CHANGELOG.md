@@ -8,6 +8,42 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kw — Gait: paw placement, weight distribution and the centre of mass from a physics model.**
+The user asked for a physics model of the body and limbs to estimate paw placement and gait,
+using weight distribution and momentum to minimise paw placements within physiological bounds
+(sources: Mendes et al. 2015; Neckel et al. 2013 and their CatWalk data; TactileArena).
+* `RodentModel.body_masses()`: each body's mass and centre of mass from its collision shapes,
+  with geom default classes inherited (338 g in all).
+* `mufasa/pose3d/gait.py`:
+  * `BodyPhysics.virtual_rodent()`: each segment's centre of mass and each limb girdle is
+    tied to its nearest markers (head on head, neck between head and shoulders, tail on tail,
+    the rest on the back) as a convex combination plus an offset in a back frame that pitches
+    with the body. Over sampled spine postures it is within about 3 mm. Legs' reach comes
+    from the joint ranges.
+  * `estimate_gait`: a smoothed centre of mass, velocity and acceleration; the extrapolated
+    centre of mass (Hof 2005) and the ZMP. Paw placement keeps the fewest placements: a paw
+    stays planted within reach and half a stride; it lifts after a minimum stance, only if
+    the rest keep the body balanced and the other side's paw is down; left and right
+    alternate (duty factor); it swings for a physiological time and lands half a stride
+    ahead of its girdle, beside the midline at half the base of support. Forelimbs whose
+    girdle is out of reach stay in the air.
+  * Loads: the centre of pressure at the ZMP, the most even non-negative sharing
+    (`share_load`), and `support_margin`.
+  * Size from the back's length; mass = model × size³ or weighed.
+  * Steps table (stride, swing, duty factor) and summary (support pattern, load shares,
+    phases).
+  * `BOUNDS` from TactileArena's demo recording (58 labelled rat stances); `MOUSE_BOUNDS` from
+    Mendes et al. Lengths scale with size, times with √size.
+  * `gait_from_pose3d`, `write_gait` / `read_gait`.
+* 3-D tab: *Gait (paws from a body model)* (`GaitForm`, section `pose3d_gait`, run →
+  `derived/gait/<run>/`). CLI: `mufasa-pose3d gait`.
+* 3-D viewer: `GaitOverlay` (load a `_gait.parquet`) draws the planted paws (sized by load),
+  the support polygon, the centre of mass over the floor and the ZMP (green inside, red
+  outside).
+* Pins: 17 of 20 ui_bound sections with detect_path (122ep, 122eq, 122er, 122es); 14 wired
+  forms (122ex, 122em, 122fj).
+* Docs: `docs/pose3d.md` (*Gait*). Test: `tests/smoke_122kw_gait_physics.py` (18 checks).
+
 **122kv — 3-D viewer: a model loader and view options.**
 The user asked for a model loader and view options in the 3-D renderer.
 * `mufasa/pose3d/scene_models.py` (no Qt):

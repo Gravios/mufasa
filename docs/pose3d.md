@@ -189,6 +189,95 @@ renders with them. On the command line:
 mufasa-view3d VIDEO X_3d.parquet --model virtual_rodent --model arena.obj
 ```
 
+## Gait: paws, weight distribution and the centre of mass
+
+*Gait (paws from a body model)* on the 3-D tab (patch 122kw;
+`mufasa-pose3d gait X_3d.parquet --out X_gait.parquet`) estimates where
+the paws are, how the weight is shared between them, and the gait. It
+works from the 3-D body markers alone: the paws are not labelled, so they
+are inferred from what the body can do.
+
+**The physics model** is DeepMind's virtual rodent:
+* Each segment's mass comes from its collision shapes (density × volume):
+  338 g in all, heaviest at the pelvis and abdomen. Each segment's centre
+  of mass is tied to its nearest markers on the standing model, so the
+  whole-body centre of mass follows the markers when the animal crouches,
+  rears, turns its head or swings its tail. Over sampled spine postures it
+  is within about 3 mm of the model's own.
+* The hip and shoulder joints (the limb girdles) are tied to the markers
+  in the same way.
+* Each leg's reach, from girdle to paw over the joint ranges, is 86 mm
+  for the hindlimbs and 65 mm for the forelimbs, at the model's size.
+
+**Paw placement.** Paws are placed as rarely as the body allows:
+* A planted paw stays put until its leg cannot reach it, or it has fallen
+  half a stride behind its place.
+* It lifts only after a minimum stance.
+* It lifts only if the body stays balanced on the other planted paws. The
+  extrapolated centre of mass (position + velocity / √(g/h), which takes
+  in momentum) must stay over their support polygon.
+* It lifts only when the paw on the other side has been down for a while;
+  left and right alternate.
+* It swings for a physiological time and lands half a stride ahead of
+  where its girdle will be, beside the midline at half the base of
+  support.
+* A girdle too high for its leg to reach the floor (forelimbs when
+  rearing) keeps that paw in the air.
+
+**Weight distribution.** The vertical load m(g + a_z) is shared among the
+planted paws:
+* Their centre of pressure sits at the zero-moment point,
+  ZMP = CoM − h·a/(g + a_z), which accounts for acceleration.
+* The sharing is as even as that allows, with no negative loads.
+* If the ZMP falls outside the support (e.g. a rat rearing against a wall,
+  whose forepaws rest on the wall, which the model does not know about),
+  the stability margin is negative.
+
+**Bounds**, at the virtual rodent's size, scaled to the animal:
+
+| Bound | Value | Source |
+|---|---|---|
+| Stance | ≥ 0.12 s (shortest seen: 0.14 s) | TactileArena demo, rat |
+| Swing | 0.15 s (0.08–0.30) | TactileArena (0.09–0.29 s seen) |
+| Stride | 70 mm + 0.25 s × speed, ≤ 170 mm | TactileArena (100–135 mm at 13–25 cm/s) |
+| Duty factor | 0.6 forelimbs, 0.78 hindlimbs | TactileArena |
+| Base of support | 22 mm fore, 26 mm hind | TactileArena (17–33, 14–30 mm) |
+| Mouse, for reference | stance ≥ 50 ms, step 25–30 mm, duty 0.5 at 53 cm/s | Mendes et al. 2015 |
+
+TactileArena (Lu et al. 2026) is a rat runway with a pressure floor and
+overhead video. The bounds come from its demo recording: 58 labelled
+stances in 5 bouts. Lengths scale with the animal's size; times scale
+with its square root (dynamic similarity). Speed-dependent norms (e.g.
+Neckel et al. 2013, CatWalk) would refine them.
+
+**Size and mass.** The animal's size against the model comes from the
+back's length seen from above. Its mass is the model's × size³ unless you
+give the weighed mass, which gives forces in grams-force. Size³ is only a
+guess: weigh the animal.
+
+**Output** in `derived/gait/<run>/`:
+* `<video>_gait.parquet`, one row per frame: each paw's position,
+  contact (1 down, 0 swinging, −1 its leg cannot reach the floor), load
+  share and force; the centre of mass, its speed, the ZMP, the
+  extrapolated centre of mass, the ZMP's margin inside the support, and
+  the girdles. The summary is in the file's metadata.
+* `<video>_steps.csv`, one row per stance: paw, touch-down and lift-off,
+  position, stance and swing time, stride and duty factor.
+
+The summary gives the median speed, the share of frames on 0–4 paws, each
+paw's mean load share, strides, stance times and duty factors, and the
+phases (LF→RF, LH→RH, LH→LF, LH→RF). In the 3-D viewer, *View & models →
+Load… → `<video>_gait.parquet`* draws the planted paws (sized by load),
+the support polygon, the centre of mass over the floor and the ZMP (green
+inside, red outside).
+
+**Limits.**
+* A single camera's heights are uncertain, and the centre of mass and the
+  girdles inherit that.
+* The model knows only the floor: walls and climbing are unsupported.
+* Footfalls are inferred, not seen. Check them against a pressure floor or
+  labelled paws where you can (TactileArena's data has both).
+
 ## Camera animation
 
 Tick **Animation** in the 3-D viewer to open the editor (patch 122kp).

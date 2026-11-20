@@ -388,9 +388,57 @@ def builtin_rig_path() -> Path:
     return p
 
 
+class GaitOverlay:
+    """Patch 122kw: paws, support polygon, centre of mass and ZMP from a gait file
+    (``<video>_gait.parquet``, :mod:`mufasa.pose3d.gait`), drawn on the floor."""
+    kind = "gait"
+
+    def __init__(self, path, look: ModelLook | None = None) -> None:
+        from mufasa.pose3d.gait import read_gait
+        self.path = str(path)
+        self.df, self.meta = read_gait(path)
+        self.look = look or ModelLook(style="solid", opacity=0.9)
+        self._row = {int(f): i for i, f in enumerate(self.df["frame"])}
+
+    @property
+    def name(self) -> str:
+        return Path(self.path).name
+
+    def at(self, frame: int) -> dict | None:
+        """{paws: {paw: (x, y, load, contact)}, com: (3,), zmp: (2,), margin} for a frame."""
+        from mufasa.pose3d.gait import PAWS
+        i = self._row.get(int(frame))
+        if i is None:
+            return None
+        r = self.df.iloc[i]
+        if not bool(r["valid"]):
+            return None
+        return {"paws": {p: (float(r[f"{p}_x"]), float(r[f"{p}_y"]), float(r[f"{p}_load"]), int(r[f"{p}_contact"]))
+                         for p in PAWS},
+                "com": np.array([r["com_x"], r["com_y"], r["com_z"]], float),
+                "zmp": np.array([r["zmp_x"], r["zmp_y"]], float), "margin": float(r["zmp_margin_mm"])}
+
+    def info(self, frame: int | None = None) -> str:
+        s = self.meta.get("summary", {})
+        txt = f"{s.get('steps', '?')} steps, {s.get('mass_g', '?')} g"
+        g = self.at(frame) if frame is not None else None
+        if g is not None:
+            on = [p for p, v in g["paws"].items() if v[3] == 1]
+            txt += f" · on the floor: {' '.join(on) or 'none'}"
+            if np.isfinite(g["margin"]):
+                txt += f" · ZMP margin {g['margin']:.0f} mm"
+        return txt
+
+    def spec(self) -> dict:
+        return {"kind": "gait", "path": self.path, "look": vars(self.look).copy()}
+
+
 def load_model(path, pose, **kw):
-    """A model from a file: a ``.rig.npz`` (posed to ``pose``) or a mesh (placed as is)."""
+    """A model from a file: a ``.rig.npz`` (posed to ``pose``), a mesh (placed as is) or a gait
+    file (``_gait.parquet``: paws, support, centre of mass)."""
     path = str(path)
+    if path.endswith("_gait.parquet"):
+        return GaitOverlay(path, **{k: v for k, v in kw.items() if k == "look"})
     if path == "virtual_rodent":
         return PosedRig(builtin_rig_path(), pose, builtin="virtual rodent", **kw)
     if path.endswith(".rig.npz"):
@@ -402,6 +450,8 @@ def load_model(path, pose, **kw):
 
 def model_from_spec(spec: dict, pose):
     look = ModelLook(**spec.get("look", {}))
+    if spec.get("kind") == "gait":
+        return GaitOverlay(spec["path"], look=look)
     if spec.get("kind") == "rig":
         src = "virtual_rodent" if spec.get("builtin") else spec["path"]
         return load_model(src, pose, look=look, size=spec.get("size"))
@@ -409,5 +459,5 @@ def model_from_spec(spec: dict, pose):
                           offset=tuple(spec.get("offset", (0, 0, 0))), look=look)
 
 
-__all__ = ["MESH_SUFFIXES", "STYLES", "ModelLook", "PosedRig", "SceneMesh", "builtin_rig_path", "load_mesh",
+__all__ = ["GaitOverlay", "MESH_SUFFIXES", "STYLES", "ModelLook", "PosedRig", "SceneMesh", "builtin_rig_path", "load_mesh",
            "load_model", "model_from_spec", "simplify"]

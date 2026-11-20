@@ -301,12 +301,12 @@ def main() -> int:
     ui_bound = [s for s in SECTIONS.values() if s.ui_bound]
     with_detect = [s for s in ui_bound if s.detect_path is not None]
     check(
-        "122ep + 122es + 122kf + 122kl + 122kq state: 16 of 19 ui_bound sections "
+        "122ep + 122es + 122kf + 122kl + 122kq + 122kw state: 17 of 20 ui_bound sections "
         "have detect_path",
         # 122kf added three 3-D sections (calibration and inference
         # have detect paths; 3-D Kalman smoothing writes a new
         # pose3d run); 122kl the C3D import (sources/pose3d).
-        len(with_detect) == 16 and len(ui_bound) == 19,  # 122kq: + Body model tab
+        len(with_detect) == 17 and len(ui_bound) == 20,  # 122kq: + Body model tab; 122kw: + Gait
         detail=(f"got {len(with_detect)}/{len(ui_bound)}"),
     )
 

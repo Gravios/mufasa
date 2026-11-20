@@ -618,6 +618,9 @@ class Volume3DWidget(QWidget):
             if not m.look.visible:
                 continue
             frame = self.frame
+            if getattr(m, "kind", "") == "gait":
+                self._draw_gait(p, m)
+                continue
             if getattr(m, "kind", "") == "rig":
                 if not m.cached(frame):
                     if self.sync_fit:
@@ -678,6 +681,52 @@ class Volume3DWidget(QWidget):
             p.setBrush(c)
             a, b, cc = P[F[k]]
             p.drawConvexPolygon(QPolygonF([QPointF(*a), QPointF(*b), QPointF(*cc)]))
+
+    GAIT_COLORS = {"LF": "#e6194b", "RF": "#3cb44b", "LH": "#4363d8", "RH": "#f58231"}
+
+    def _draw_gait(self, p: QPainter, m) -> None:
+        """122kw: planted paws (size by load), the support polygon, the centre of mass over the
+        floor and the zero-moment point."""
+        from mufasa.pose3d.gait import _hull
+        g = m.at(self.frame)
+        if g is None:
+            return
+        z0 = 0.0
+        on = [(k, v) for k, v in g["paws"].items() if v[3] == 1 and np.isfinite(v[0])]
+        if len(on) >= 2:
+            H = _hull(np.array([[v[0], v[1]] for _, v in on]))
+            P, z = self.project(np.c_[H, np.full(len(H), z0)])
+            if (z > 0).all():
+                c = QColor(m.look.color)
+                c.setAlphaF(0.25 * m.look.opacity)
+                p.setBrush(c)
+                p.setPen(QPen(QColor(m.look.color).darker(150), 1.4))
+                p.drawPolygon(QPolygonF([QPointF(*q) for q in P]))
+        for k, v in on:
+            (q,), z = self.project(np.array([[v[0], v[1], z0]]))
+            if z[0] > 0:
+                r = 3 + 9 * max(0.0, min(1.0, v[2]))
+                p.setPen(QPen(QColor("#202020"), 1))
+                p.setBrush(QColor(self.GAIT_COLORS[k]))
+                p.drawEllipse(QPointF(*q), r, r * 0.6)
+        com = g["com"]
+        if np.isfinite(com).all():
+            (cp, cf), z = self.project(np.array([com, [com[0], com[1], z0]]))
+            if (z > 0).all():
+                p.setPen(QPen(QColor("#202020"), 1, Qt.DashLine))
+                p.drawLine(QPointF(*cp), QPointF(*cf))
+                p.setPen(QPen(QColor("#202020"), 1))
+                p.setBrush(QColor("#ffd400"))
+                p.drawEllipse(QPointF(*cp), 6, 6)
+                p.drawEllipse(QPointF(*cf), 3, 3)
+        zm = g["zmp"]
+        if np.isfinite(zm).all():
+            (zp,), z = self.project(np.array([[zm[0], zm[1], z0]]))
+            if z[0] > 0:
+                col = QColor("#1a9850" if g["margin"] >= 0 else "#d73027")
+                p.setPen(QPen(col, 2))
+                p.drawLine(QPointF(zp[0] - 5, zp[1] - 5), QPointF(zp[0] + 5, zp[1] + 5))
+                p.drawLine(QPointF(zp[0] - 5, zp[1] + 5), QPointF(zp[0] + 5, zp[1] - 5))
 
     def _draw_axes(self, p: QPainter) -> None:
         """A small x/y/z gizmo in the lower left, turning with the view."""

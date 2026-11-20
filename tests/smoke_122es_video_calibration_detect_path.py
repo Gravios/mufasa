@@ -219,9 +219,9 @@ def main() -> int:
         "features_compute_subset as a 13th ui_bound section "
         "without detect_path — relies on record_run instead; "
         "122kf's three 3-D sections made it 13 of 16, 122kl's C3D "
-        "import 14 of 17, 122kq's Body model tab 16 of 19)",
-        ("len(with_detect) == 16" in ep_src
-         and "16 of 19" in ep_src),
+        "import 14 of 17, 122kq's Body model tab 16 of 19, 122kw's Gait 17 of 20)",
+        ("len(with_detect) == 17" in ep_src
+         and "17 of 20" in ep_src),
     )
 
     # -----------------------------------------------------------------

@@ -108,17 +108,22 @@ class RodentModel:
             raise ValueError("expected <compiler angle='radian'>")
         # default classes: joint attributes, inherited down the tree
         classes: dict[str, dict] = {}
+        gclasses: dict[str, dict] = {}            # geom attributes (122kw: masses)
 
-        def walk_defaults(el, inherited: dict, name: str) -> None:
-            att = dict(inherited)
+        def walk_defaults(el, inherited: dict, ginherited: dict, name: str) -> None:
+            att, gatt = dict(inherited), dict(ginherited)
             j = el.find("joint")
             if j is not None:
                 att.update(j.attrib)
-            classes[name] = att
+            g = el.find("geom")
+            if g is not None:
+                gatt.update(g.attrib)
+            classes[name], gclasses[name] = att, gatt
             for ch in el.findall("default"):
-                walk_defaults(ch, att, ch.get("class"))
+                walk_defaults(ch, att, gatt, ch.get("class"))
         top = root.find("default")
-        walk_defaults(top, {}, "main")
+        walk_defaults(top, {}, {}, "main")
+        self.geoms: list[dict] = []               # body, type, size (mm), pos (mm), density (kg/m³)
 
         self.body_names: list[str] = []
         self.parent: list[int] = []
@@ -145,6 +150,13 @@ class RodentModel:
                 lo, hi = _vec(att.get("range"), (-np.pi, np.pi))
                 self.joints.append(Joint(att["name"], i, ax / np.linalg.norm(ax), _vec(att.get("pos")) * 1000.0,
                                          float(lo), float(hi)))
+            for g in el.findall("geom"):
+                ga = dict(gclasses[g.get("class", "main")])
+                ga.update(g.attrib)
+                if "size" in ga:
+                    self.geoms.append({"body": i, "type": ga.get("type", "sphere"),
+                                       "size": _vec(ga["size"]) * 1000.0, "pos": _vec(ga.get("pos")) * 1000.0,
+                                       "density": float(ga.get("density", 1000.0))})
             for ch in el.findall("body"):
                 walk_body(ch, i)
         for b in root.find("worldbody").findall("body"):
@@ -194,6 +206,33 @@ class RodentModel:
         self.weights = W / np.maximum(W.sum(1, keepdims=True), 1e-12)
         self.skin_bodies = np.flatnonzero(W.sum(0) > 0)
         self.bind_inv = np.linalg.inv(self.bind)
+
+    # -- mass (122kw) ----------------------------------------------------------- #
+    def body_masses(self) -> tuple[np.ndarray, np.ndarray]:
+        """Mass (kg) and centre of mass (mm, in the body's frame) of each body, from its
+        collision shapes (density × volume) as MuJoCo computes them; the visual shapes have none."""
+        m = np.zeros(len(self.body_names))
+        c = np.zeros((len(self.body_names), 3))
+        for g in self.geoms:
+            r = g["size"] / 1000.0                                       # m
+            t = g["type"]
+            if t == "sphere":
+                v = 4 / 3 * np.pi * r[0] ** 3
+            elif t == "capsule":
+                v = np.pi * r[0] ** 2 * 2 * r[1] + 4 / 3 * np.pi * r[0] ** 3
+            elif t == "ellipsoid":
+                v = 4 / 3 * np.pi * r[0] * r[1] * r[2]
+            elif t == "box":
+                v = 8 * r[0] * r[1] * r[2]
+            elif t == "cylinder":
+                v = np.pi * r[0] ** 2 * 2 * r[1]
+            else:
+                continue
+            mg = g["density"] * v
+            b = g["body"]
+            c[b] = (c[b] * m[b] + g["pos"] * mg) / (m[b] + mg)
+            m[b] += mg
+        return m, c
 
     # -- kinematics ----------------------------------------------------------- #
     def qpos(self, n: int = 1, **angles) -> np.ndarray:

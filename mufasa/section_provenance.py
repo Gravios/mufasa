@@ -613,6 +613,14 @@ SECTIONS: dict[str, SectionSpec] = {
         depends_on=(),
         detect_path=lambda root: root / "sources" / "pose3d",
     ),
+    # Patch 122kw — paws, weight distribution and gait from a 3-D run.
+    "pose3d_gait": SectionSpec(
+        section_id="pose3d_gait",
+        page="3-D",
+        section_title="Gait (paws from a body model)",
+        depends_on=("pose3d",),
+        detect_path=lambda root: root / "derived" / "gait",
+    ),
     # Patch 122kq — Body model tab.
     "bodymodel_rig": SectionSpec(
         section_id="bodymodel_rig",

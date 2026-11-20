@@ -295,7 +295,7 @@ def main() -> int:
         f"wired forms — pinned to catch accidental unwiring "
         f"OR accidental over-wiring (an 8th form would surface "
         f"in this check)",
-        len(wired_ids) == 13,      # 122kq: + bodymodel_rig, bodymodel_fit
+        len(wired_ids) == 14,      # 122kq: + bodymodel_rig, bodymodel_fit; 122kw: + pose3d_gait
         detail=(f"got {len(wired_ids)} wired: "
                 f"{sorted(wired_ids)}"),
     )

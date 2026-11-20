@@ -12,6 +12,7 @@
     mufasa-pose3d import-c3d TRIAL.c3d ... --project project.toml [--up y] [--rename a=b,c=d] [--edges a-b,b-c]
     mufasa-pose3d body-rig MODEL.blend OUT.rig.npz [--blender /path/to/blender]   # rig for body fitting
     mufasa-pose3d body-rig --virtual-rodent OUT.rig.npz [--girth 1.3]             # the built-in rat
+    mufasa-pose3d gait X_3d.parquet --out X_gait.parquet [--mass-g 450] [--fps 30]  # paws, loads, gait
     mufasa-pose3d body-fit RIG.rig.npz VIDEO POSE --out FIT.parquet [--start 0 --stop N --step 1 --workers 4]
         [--no-refine] [--smoothness 0.5] [--scale PX] [--overlay OUT.mp4 [--side-by-side]]
     mufasa-pose3d render-animation PATH.camera.json --pose X_3d.parquet [--video X.mp4] --out X_anim.mp4 \
@@ -145,6 +146,12 @@ def build_parser() -> argparse.ArgumentParser:
     ra.add_argument("--out", required=True, help=".mp4 or .avi")
     ra.add_argument("--size", type=int, nargs=2, metavar=("W", "H"), help="default: as saved")
     ra.add_argument("--fps", type=float, help="default: as saved")
+    ga = sub.add_parser("gait", help="paws, weight distribution and gait from a 3-D pose file (virtual rodent physics)")
+    ga.add_argument("pose3d")
+    ga.add_argument("--out", required=True, help="<video>_gait.parquet (steps go to <video>_steps.csv)")
+    ga.add_argument("--mass-g", type=float, help="weighed body mass (default: the model's, scaled by size³)")
+    ga.add_argument("--fps", type=float, help="default: from the file, else 30")
+    ga.add_argument("--size", type=float, help="the animal against the virtual rodent (default: from the back)")
     gc = sub.add_parser("gpu-check", help="is the GPU solver usable here? (synthetic run, CPU vs CUDA)")
     gc.add_argument("--frames", type=int, default=20000)
     s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file")
@@ -266,6 +273,14 @@ def main(argv: list[str] | None = None) -> int:
         if a.overlay:
             from mufasa.bodymodel.render import OverlayStyle, render_overlay_video
             render_overlay_video(out, a.overlay, style=OverlayStyle(side_by_side=a.side_by_side))
+        return 0
+    if a.cmd == "gait":
+        from mufasa.pose3d.gait import gait_from_pose3d, write_gait
+        res = gait_from_pose3d(a.pose3d, fps=a.fps, mass_g=a.mass_g, size=a.size)
+        g, s = write_gait(res, a.out, {"pose3d": str(a.pose3d)})
+        sm = res.summary
+        print(f"{sm['steps']} stances · size {sm['size_vs_model']}x · mass {sm['mass_g']} g · "
+              f"load share {sm['load_share']} -> {g}, {s}")
         return 0
     if a.cmd == "render-animation":
         import os

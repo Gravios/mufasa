@@ -207,7 +207,7 @@ def main() -> int:
         f"new addition)",
         # 122fj added two features forms, 122kf three 3-D forms,
         # 122kl the C3D import, 122kq the two Body model forms.
-        len(wired) == 13,
+        len(wired) == 14,  # 122kw: + pose3d_gait
         detail=(f"got {len(wired)} wired: {sorted(wired)}"),
     )
 
