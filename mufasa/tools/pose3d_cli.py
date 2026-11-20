@@ -151,7 +151,11 @@ def build_parser() -> argparse.ArgumentParser:
     ga.add_argument("--out", required=True, help="<video>_gait.parquet (steps go to <video>_steps.csv)")
     ga.add_argument("--mass-g", type=float, help="weighed body mass (default: the model's, scaled by size³)")
     ga.add_argument("--fps", type=float, help="default: from the file, else 30")
-    ga.add_argument("--size", type=float, help="the animal against the virtual rodent (default: from the back)")
+    ga.add_argument("--size", type=float, help="the animal against the virtual rodent (default: nose to tail base)")
+    ga.add_argument("--bounds", choices=["catwalk", "tactilearena"], default="catwalk",
+                    help="gait bounds: CatWalk rats, speed-dependent (default), or TactileArena's fixed ones")
+    ga.add_argument("--gait-scale", type=float, default=1.0,
+                    help="the animal against an adult rat: lengths × this, times × its square root")
     gc = sub.add_parser("gpu-check", help="is the GPU solver usable here? (synthetic run, CPU vs CUDA)")
     gc.add_argument("--frames", type=int, default=20000)
     s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file")
@@ -275,8 +279,9 @@ def main(argv: list[str] | None = None) -> int:
             render_overlay_video(out, a.overlay, style=OverlayStyle(side_by_side=a.side_by_side))
         return 0
     if a.cmd == "gait":
-        from mufasa.pose3d.gait import gait_from_pose3d, write_gait
-        res = gait_from_pose3d(a.pose3d, fps=a.fps, mass_g=a.mass_g, size=a.size)
+        from mufasa.pose3d.gait import bounds_preset, gait_from_pose3d, write_gait
+        res = gait_from_pose3d(a.pose3d, fps=a.fps, mass_g=a.mass_g, size=a.size,
+                               bounds=bounds_preset(a.bounds, a.gait_scale))
         g, s = write_gait(res, a.out, {"pose3d": str(a.pose3d)})
         sm = res.summary
         print(f"{sm['steps']} stances · size {sm['size_vs_model']}x · mass {sm['mass_g']} g · "

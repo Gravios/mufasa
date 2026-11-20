@@ -8,6 +8,41 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kx — Gait bounds from uninjured rats on a CatWalk; a stride clock.**
+The user attached Neckel et al.'s CatWalk data (Mendeley sg3d7dv345, MATLAB 7.3, in nine
+parts) to calibrate 122kw's bounds.
+* `scripts/calibrate_gait_catwalk.py` reads the file, or its split parts in place, takes the
+  pre-injury runs (108 rats, 5780 strides, 13–71 cm/s) and writes
+  `mufasa/assets/gait/catwalk_rat_reference.json`: laws, medians by speed, percentiles,
+  phases.
+* `BOUNDS` are now speed-dependent (`gait_laws`):
+  * stance a·v^b (0.41 s at 13 cm/s, 0.12 s at 70);
+  * swing about 0.14 s;
+  * stride 65 mm + 0.156 s × v;
+  * duty factor 0.75 → 0.5;
+  * base of support 23 / 29 mm.
+
+  TactileArena's demo agrees within the scatter; its fixed bounds stay available
+  (`bounds_preset("tactilearena")`). The bounds are adult-rat values; `scale` gives dynamic
+  similarity.
+* `estimate_gait`:
+  * a stride clock (one turn per stride, at speed ÷ stride) times lift-offs with the rats'
+    offsets (LH 0, RH ½, LF 0.39, RF 0.89), and touch-downs so that late paws catch up;
+  * paws land half a stance's travel ahead of the girdle (it was half a stride, beyond the
+    foreleg's reach at speed);
+  * steps off the clock must keep the extrapolated centre of mass over the support as it
+    will be when the paw lands (Hof 2008);
+  * the other side's paw must be down for (duty − ½) of a stride, not a whole minimum
+    stance; that wait had lengthened every stride;
+  * the summary's medians and phases use walking strides only (≥ 10 cm/s, ≤ 1 s).
+* Size from nose to tail base. The path along the back gave K7 1.4× the model (916 g): its
+  back labels sit unlike the model's, and noise lengthens the path. The new estimate is 1.2×.
+* Synthetic walks at 15, 30 and 50 cm/s (60 fps): strides 85/89, 110/112, 142/143 mm
+  (estimated/rats); left–right phases 0.5; hind→fore 0.39–0.43 (rats 0.39).
+* CLI `mufasa-pose3d gait --bounds {catwalk,tactilearena} --gait-scale K`; a *Bounds* choice on
+  the 3-D tab's gait form (recorded in run.toml); docs/pose3d.md's gait section.
+* `tests/smoke_122kx_gait_catwalk.py` (12 checks).
+
 **122kw — Gait: paw placement, weight distribution and the centre of mass from a physics model.**
 The user asked for a physics model of the body and limbs to estimate paw placement and gait,
 using weight distribution and momentum to minimise paw placements within physiological bounds

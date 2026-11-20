@@ -209,18 +209,26 @@ are inferred from what the body can do.
 * Each leg's reach, from girdle to paw over the joint ranges, is 86 mm
   for the hindlimbs and 65 mm for the forelimbs, at the model's size.
 
-**Paw placement.** Paws are placed as rarely as the body allows:
-* A planted paw stays put until its leg cannot reach it, or it has fallen
-  half a stride behind its place.
-* It lifts only after a minimum stance.
-* It lifts only if the body stays balanced on the other planted paws. The
+**Paw placement.** Paws are placed as rarely as the body allows, in the
+order and at the times rats use (patch 122kx):
+* A stride clock turns once per stride, at speed ÷ stride length, and
+  stands still when the body does. Each paw's stance takes the first
+  *duty factor* of its turn. The paws are offset as uninjured rats walk:
+  hind left 0, hind right ½, fore left 0.39, fore right 0.89 (a lateral
+  sequence: each forepaw lands about 0.39 of a stride after its hindpaw).
+* A planted paw lifts when its turn's stance is over, once the paw on the
+  other side has been down for (duty − ½) of a stride. It then swings
+  until its next turn comes round (0.08–0.24 s), so a late paw catches up.
+* It lands half a stance's travel ahead of its girdle, beside the midline
+  at half the base of support, so that its stance is centred on the
+  girdle. A still body's paws land under the girdles.
+* Steps off the clock: a paw also lifts once its leg cannot reach it, or
+  once it has fallen half a stance (at least a quarter of a stride) behind
+  its place. Such a step must keep the body balanced (Hof 2008): the
   extrapolated centre of mass (position + velocity / √(g/h), which takes
-  in momentum) must stay over their support polygon.
-* It lifts only when the paw on the other side has been down for a while;
-  left and right alternate.
-* It swings for a physiological time and lands half a stride ahead of
-  where its girdle will be, beside the midline at half the base of
-  support.
+  in momentum) must lie over the other planted paws and the place the paw
+  will land, as it will be when it lands.
+* No paw lifts before a minimum stance.
 * A girdle too high for its leg to reach the floor (forelimbs when
   rearing) keeps that paw in the air.
 
@@ -233,25 +241,45 @@ planted paws:
   whose forepaws rest on the wall, which the model does not know about),
   the stability margin is negative.
 
-**Bounds**, at the virtual rodent's size, scaled to the animal:
+**Bounds** come from 108 uninjured young adult female rats crossing a
+CatWalk: the pre-injury runs of Neckel et al. (2013), 5780 strides at
+13–71 cm/s. They depend on speed v (mm/s, held at 100–710):
 
-| Bound | Value | Source |
+| Bound | Value | Seen (5–95 %) |
 |---|---|---|
-| Stance | ≥ 0.12 s (shortest seen: 0.14 s) | TactileArena demo, rat |
-| Swing | 0.15 s (0.08–0.30) | TactileArena (0.09–0.29 s seen) |
-| Stride | 70 mm + 0.25 s × speed, ≤ 170 mm | TactileArena (100–135 mm at 13–25 cm/s) |
-| Duty factor | 0.6 forelimbs, 0.78 hindlimbs | TactileArena |
-| Base of support | 22 mm fore, 26 mm hind | TactileArena (17–33, 14–30 mm) |
-| Mouse, for reference | stance ≥ 50 ms, step 25–30 mm, duty 0.5 at 53 cm/s | Mendes et al. 2015 |
+| Stance, forelimbs | 13.9 · v^−0.723 s (0.41 s at 13 cm/s, 0.20 s at 35, 0.12 s at 70) | 0.12–0.35 s |
+| Stance, hindlimbs | 26.3 · v^−0.830 s | 0.12–0.36 s |
+| Swing | 0.366 · v^−0.164 s (fore), 0.151 · v^−0.019 s (hind): 0.13–0.16 s | 0.10–0.20 s |
+| Duty factor | stance ÷ (stance + swing): 0.7–0.75 at 13 cm/s, 0.6 at 35, 0.5 at 60 | 0.45–0.75 |
+| Stride | 65 mm + 0.156 s × v, ≤ 187 mm | 82–163 mm |
+| Interlimb phase | left–right ½; LH→LF 0.39; LH→RF 0.85 | 0.47–0.54; 0.33–0.45 |
+| Base of support | 23 mm fore, 29 mm hind | 12–34, 18–38 mm |
+| Shortest stance | 0.10 s | 2nd percentile |
 
-TactileArena (Lu et al. 2026) is a rat runway with a pressure floor and
-overhead video. The bounds come from its demo recording: 58 labelled
-stances in 5 bouts. Lengths scale with the animal's size; times scale
-with its square root (dynamic similarity). Speed-dependent norms (e.g.
-Neckel et al. 2013, CatWalk) would refine them.
+TactileArena's demo recording (Lu et al. 2026; one rat, 58 stances,
+13–25 cm/s) agrees within the CatWalk's scatter: strides within 10 mm and
+duty factors within 0.05 of the CatWalk laws at the same speed. Its fixed
+bounds remain available (*Bounds: TactileArena*; `--bounds tactilearena`).
+Mouse values (Mendes et al. 2015) are kept for reference.
+
+The bounds are adult-rat values. For a juvenile, a mouse or an unusually
+large rat, `--gait-scale k` scales lengths by k and times by √k (dynamic
+similarity). `scripts/calibrate_gait_catwalk.py` re-fits the laws from the
+Mendeley file (`Neckel_CatWalk_RRMPS.mat`, or its split parts) and writes
+`mufasa/assets/gait/catwalk_rat_reference.json`: the laws, medians by
+speed, percentiles and phases.
+
+On synthetic walks at 60 fps, the estimated gait reproduces the laws:
+strides within 8 mm and phases within 0.03 at 15, 30 and 50 cm/s. At
+30 fps, walking faster than about 45 cm/s is near the frame rate's
+limit: a 0.15 s stance is 4–5 frames.
 
 **Size and mass.** The animal's size against the model comes from the
-back's length seen from above. Its mass is the model's × size³ unless you
+straight distance from the nose to the tail's base, with the head low.
+(Patch 122kw used the path along the back. A dataset's back labels need
+not sit where the model's do, and noise lengthens a path through them;
+on K7 that gave 1.4× the model, 916 g. Nose to tail base gives 1.2×.)
+Size sets the body's geometry: the girdles, the legs' reach and the mass. Its mass is the model's × size³ unless you
 give the weighed mass, which gives forces in grams-force. Size³ is only a
 guess: weigh the animal.
 
@@ -277,6 +305,11 @@ inside, red outside).
 * The model knows only the floor: walls and climbing are unsupported.
 * Footfalls are inferred, not seen. Check them against a pressure floor or
   labelled paws where you can (TactileArena's data has both).
+* The timing follows rats walking straight along a runway at 13–71 cm/s.
+  Slower than that the duty factor is held at its slowest value and the
+  stride grows longer in time. Under about 2 cm/s (a stride longer than
+  4 s) the clock stops, and turning on the spot or shifting the weight is
+  stepped off the clock, by reach and balance alone.
 
 ## Camera animation
 

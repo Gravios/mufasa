@@ -13,7 +13,7 @@ physiological bounds." (Mendes et al. 2015; Neckel et al.; TactileArena.)
 * walking: every paw steps, strides and stances within the bounds, left and right alternate,
   the ZMP stays over the support;
 * rearing: the forelimbs cannot reach the floor, the hind paws carry the weight;
-* the animal's size from its back, mass as size³ or weighed; files; the 3-D viewer's overlay;
+* the animal's size (nose to tail base since 122kx), mass as size³ or weighed; files; the 3-D viewer's overlay;
   the 3-D tab's form and run; the CLI.
 """
 from __future__ import annotations
@@ -135,7 +135,7 @@ def main() -> int:
     names, xyz = synth(model, q0, fps, 60, size=1.3)
     r = G.estimate_gait(names, xyz, np.arange(60), fps, phys=phys)
     r2 = G.estimate_gait(names, xyz, np.arange(60), fps, phys=phys, mass_g=500)
-    check(f"size from the back {r.summary['size_vs_model']} (true 1.3); mass {r.summary['mass_g']} g = model × size³; "
+    check(f"size from nose to tail base {r.summary['size_vs_model']} (true 1.3); mass {r.summary['mass_g']} g = model × size³; "
           f"weighed mass used when given (forces in grams-force)",
           abs(r.summary["size_vs_model"] - 1.3) < 0.04
           and abs(r.summary["mass_g"] - phys.mass_kg * 1000 * r.summary["size_vs_model"] ** 3) < 1
