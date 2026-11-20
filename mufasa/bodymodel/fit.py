@@ -53,6 +53,9 @@ PARAMS = [
     ("lum_yaw", -5, 5), ("tho_yaw", -5, 5), ("cer_yaw", -5, 5), ("head_yaw", -30, 30),
     ("lum_pitch", -6, 6), ("tho_pitch", -5, 5), ("cer_pitch", -9, 9), ("head_pitch", -30, 30),
     ("tail_yaw_p", -20, 20), ("tail_yaw_d", -20, 20), ("tail_pitch", -20, 20),
+    # extra width of the trunk (patch 122kt; rigs with a widening shape, e.g. the virtual rodent;
+    # a rig's profile lists it among its posture values when it has one)
+    ("widen", None, None),
 ]
 PN = [p[0] for p in PARAMS]
 POSTURE = [p for p in PARAMS if p[1] is not None]
@@ -122,6 +125,9 @@ class Rig:
         self.tails = z["tails"].astype(float)
         self.V, self.F, self.W = z["V"].astype(float), z["F"].astype(int), z["W"].astype(np.float32)
         self.Vd, self.Fd, self.Wd = z["Vd"].astype(float), z["Fd"].astype(int), z["Wd"].astype(np.float32)
+        # displacement of each vertex per unit of "widen" (none: the rig cannot widen)
+        self.D = z["D"].astype(float) if "D" in z.files else np.zeros_like(self.V)
+        self.Dd = z["Dd"].astype(float) if "Dd" in z.files else np.zeros_like(self.Vd)
         self.face_rgb = z["face_rgb"] if "face_rgb" in z.files and z["face_rgb"].ndim == 2 else None
         import json
         prof = dict(HBP_PROFILE)
@@ -180,6 +186,12 @@ class Rig:
                 L[:3, 3] = self.heads[i] - R[n] @ self.heads[i]
             G[i] = L if self.parent[i] < 0 else G[self.parent[i]] @ L
         return self.global_transform(p) @ G
+
+    def verts(self, p: dict, decimated: bool = False) -> np.ndarray:
+        """Rest-pose vertices with the posture's widening."""
+        w = float(p.get("widen", 0.0))
+        V, D = (self.Vd, self.Dd) if decimated else (self.V, self.D)
+        return V + w * D if w else V
 
     @staticmethod
     def lbs(G, V, W):
@@ -370,7 +382,7 @@ class FrameProblem:
         rig, cfg = self.rig, self.cfg
         G = rig.skinning_matrices(p)
         parts = {}
-        Pm = Rig.lbs(G, rig.Vd, rig.Wd)
+        Pm = Rig.lbs(G, rig.verts(p, True), rig.Wd)
         below = np.clip(-Pm[:, 2] - 1.0, 0, None)
         parts["floor"] = float(np.mean(below ** 2)) * 5.0
         if self.mask is not None:
@@ -926,6 +938,7 @@ def fit_video(rig_path, video, pose_file, run: RunConfig, out_path, *, progress=
     rows = [FrameResult(**best[f][1]).row() for f in frames if f in best]
     df = pd.DataFrame(rows)
     df.attrs["scale"] = scale
+    area_ratio = body_area_ratio(rig, df)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     import json
@@ -934,14 +947,44 @@ def fit_video(rig_path, video, pose_file, run: RunConfig, out_path, *, progress=
     import pyarrow.parquet as pq
     tab = pa.Table.from_pandas(df, preserve_index=False)
     meta = {"rig": str(rig_path), "video": str(video), "pose": str(pose_file), "fps": fps, "scale_px_per_unit": scale,
-            "limits": rig.limits, "profile": rig.profile.get("name"), "config": {"start": run.start, "stop": stop, "step": run.step,
+            "limits": rig.limits, "profile": rig.profile.get("name"), "area_ratio": area_ratio, "config": {"start": run.start, "stop": stop, "step": run.step,
                                          "fit": fit_d, "mask": {k: list(v) if isinstance(v, tuple) else v
                                                                 for k, v in mask_d.items()}}}
     tab = tab.replace_schema_metadata({**(tab.schema.metadata or {}), b"mufasa_bodymodel": json.dumps(meta).encode()})
     pq.write_table(tab, out_path)
     say(f"fit -> {out_path}: median IoU {np.nanmedian(df['iou']):.2f} ({int(df['mask_used'].sum())} frames with "
         f"a usable mask), median label error {np.nanmedian(df['kp_rms_px']):.1f} px")
+    if area_ratio is not None and area_ratio > 1.15:
+        say(f"  the animal covers {area_ratio:.2f}x the model's area: a wider model would fit better"
+            + (f" (virtual rodent: girth about {suggest_girth(area_ratio):.2f})"
+               if str(rig.profile.get("name", "")).startswith("virtual rodent") else ""))
     return out_path
+
+
+def body_area_ratio(rig: Rig, df, n: int = 40) -> float | None:
+    """Median of the mask's area over the fitted body's area (seen from above, without the
+    tail), over up to ``n`` frames whose mask was used. Above 1: the animal is wider (or longer)
+    than the model."""
+    used = df[df["mask_used"].astype(bool) & (df["mask_area_px"] > 0)]
+    if len(used) < 3:
+        return None
+    used = used.iloc[np.unique(np.linspace(0, len(used) - 1, min(n, len(used))).astype(int))]
+    r = []
+    for _, row in used.iterrows():
+        p = {k: float(row[k]) for k in PN}
+        P = to_image(Rig.lbs(rig.skinning_matrices(p), rig.verts(p, True), rig.Wd), p)
+        off = P.min(0) - 2
+        img = np.zeros((int(np.ptp(P[:, 1]) + 6), int(np.ptp(P[:, 0]) + 6)), np.uint8)
+        fill_triangles(img, P[rig.body_faces_d] - off)
+        if img.sum() > 0:
+            r.append(row["mask_area_px"] / img.sum())
+    return float(np.median(r)) if r else None
+
+
+def suggest_girth(area_ratio: float) -> float:
+    """Virtual rodent: the girth whose extra area matches ``area_ratio`` (a girth of 1.3 adds
+    about 19% to the body's area seen from above), rounded to 0.05, within 1…2."""
+    return float(np.clip(round((1 + (area_ratio - 1) / 0.63) * 20) / 20, 1.0, 2.0))
 
 
 def read_fit(path):
@@ -960,15 +1003,15 @@ def params_at(df, frame: int) -> dict | None:
         return None
     k = int(np.searchsorted(f, frame))
     if f[k] == frame:
-        return {n: float(df[n].iloc[k]) for n in PN}
+        return {n: float(df[n].iloc[k]) if n in df else 0.0 for n in PN}
     a, b = df.iloc[k - 1], df.iloc[k]
     t = (frame - a["frame"]) / (b["frame"] - a["frame"])
-    p = {n: float(a[n] + t * (b[n] - a[n])) for n in PN}
+    p = {n: float(a[n] + t * (b[n] - a[n])) if n in df else 0.0 for n in PN}
     p["phi"] = float(a["phi"] + t * _wrap(b["phi"] - a["phi"]))
     return p
 
 
-__all__ = ["CHAIN", "HBP_PROFILE", "LIMITS", "PARAMS", "PN", "FitConfig", "FrameProblem", "FrameResult", "MaskConfig",
+__all__ = ["CHAIN", "HBP_PROFILE", "LIMITS", "body_area_ratio", "suggest_girth", "PARAMS", "PN", "FitConfig", "FrameProblem", "FrameResult", "MaskConfig",
            "Markers", "Rig", "RunConfig", "SequenceFitter", "animal_mask", "animal_polarity", "background", "fit_video",
            "load_labels", "neutral", "observed", "params_at", "read_fit", "search", "similarity_start",
            "to_image"]

@@ -95,6 +95,15 @@ class RigImportForm(OperationForm):
         f.addRow("Skin mesh object", self.skin)
         self.name = QLineEdit("mouse", self)
         f.addRow("Rig name", self.name)
+        self.girth = QDoubleSpinBox(self)
+        self.girth.setRange(0.8, 2.0)
+        self.girth.setDecimals(2)
+        self.girth.setSingleStep(0.05)
+        self.girth.setValue(1.0)
+        self.girth.setEnabled(False)
+        self.girth.setToolTip("Virtual rodent: the trunk widened sideways (1: as modelled, a slim rat standing; "
+                              "a heavy rat sitting or curled up covers more floor, e.g. 1.3)")
+        f.addRow("Girth", self.girth)
         self.blender = QLineEdit(self)
         self.blender.setPlaceholderText("optional: Blender executable (if bpy is not installed)")
         f.addRow("Blender", _browse_row(self, self.blender, folder=False, caption="Blender executable"))
@@ -108,6 +117,7 @@ class RigImportForm(OperationForm):
         rodent = self.source.currentData() == "rodent"
         for w in self._blend_rows:
             w.setEnabled(not rodent)
+        self.girth.setEnabled(rodent)
         if rodent and self.name.text().strip() in ("", "mouse"):
             self.name.setText("rat")
         elif not rodent and self.name.text().strip() == "rat":
@@ -119,18 +129,18 @@ class RigImportForm(OperationForm):
         if self.source.currentData() == "rodent":
             name = self.name.text().strip() or "rat"
             return dict(blend=None, out=str(rig_dir(self._root) / f"{name}.rig.npz"), armature=None, skin=None,
-                        blender_exe=None)
+                        blender_exe=None, girth=self.girth.value())
         b = self.blend.text().strip()
         if not b or not Path(b).is_file():
             raise ValueError("choose a .blend file")
         name = self.name.text().strip() or Path(b).stem
         return dict(blend=b, out=str(rig_dir(self._root) / f"{name}.rig.npz"), armature=self.armature.text().strip(),
-                    skin=self.skin.text().strip(), blender_exe=self.blender.text().strip() or None)
+                    skin=self.skin.text().strip(), blender_exe=self.blender.text().strip() or None, girth=1.0)
 
-    def target(self, *, blend, out, armature, skin, blender_exe) -> None:
+    def target(self, *, blend, out, armature, skin, blender_exe, girth=1.0) -> None:
         if blend is None:
             from mufasa.bodymodel.rodent_rig import export_rodent_rig
-            p = export_rodent_rig(out)
+            p = export_rodent_rig(out, girth=girth)
         else:
             p = export_rig(blend, out, armature=armature, skin=skin, blender_exe=blender_exe)
         print(f"rig -> {p}")

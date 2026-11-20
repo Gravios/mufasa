@@ -52,6 +52,7 @@ of the mouse's:
 | Head (atlas) | up/down −45…+5°; sideways ±30° | the model; sideways assumed |
 | Tail (29 joints) | ±8° per joint (the model allows ±15°); the first fixed | the model |
 | Body | rearing −10…60°, roll ±15° about the hind paws | assumed |
+| Width | `widen` 0…0.5 per frame (the trunk up to 1.5× wider) | for heavy rats; see *Width* |
 
 The labels sit where `mufasa.pose3d.rodent_model` puts them (the skin over
 the vertebrae, the crown for the ears, the hip joints, caudal vertebrae).
@@ -60,9 +61,29 @@ large rat's head is small for its body. The model is a slim rat standing
 on all fours. A rat curled up or lying flat covers more floor than the
 model, and the silhouette then overlaps less.
 
+**Width** (patch 122kt). The virtual rodent is a slim rat standing on all
+fours; a heavy rat sitting or curled up covers more floor. Two settings
+handle this:
+
+* *Girth* (Import rig; `body-rig --virtual-rodent --girth 1.3`) gives a
+  heavier base shape. The trunk is widened sideways from the thorax to the
+  pelvis, tapering at the neck and the tail base. The head, the tail, the
+  paws and the back's midline (where the labels sit) keep their size.
+* Each frame also has a posture value `widen` (0…0.5): the trunk up to
+  1.5× wider than the rig, with a weak pull back to the rig's width. A rat
+  that curls up can then widen without the whole video taking that width.
+
+After a fit, the log gives the mask's area against the fitted body's, and
+for the virtual rodent a girth to try when the animal covers more than
+1.15× the model. The value is also stored in the fit file's metadata as
+`area_ratio`. Width and scale trade off against each other. The labels fix
+the length, so they keep the two apart, but only as well as the labels
+are placed.
+
 Any rig can carry a profile: a `profile` entry in the `.rig.npz` (JSON)
 with `groups`, `head`, `trunk`, `tail`, `tail_hidden`, `paws`, `hips`,
-`posture` (name, low, high), `limits` and, optionally, `markers`. See
+`posture` (name, low, high; include `widen` if the rig stores a widening
+shape `D`/`Dd`), `prior_centre`, `limits` and, optionally, `markers`. See
 `mufasa.bodymodel.fit.HBP_PROFILE`. Rigs without one are taken to be the
 HBP mouse.
 

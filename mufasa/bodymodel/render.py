@@ -35,7 +35,7 @@ def draw_model(img, rig: Rig, p: dict, style: OverlayStyle | None = None, *, obs
     import cv2
     style = style or OverlayStyle()
     G = rig.skinning_matrices(p)
-    P3 = Rig.lbs(G, rig.V, rig.W)
+    P3 = Rig.lbs(G, rig.verts(p), rig.W)
     uv = to_image(P3, p)
     tri = P3[rig.F]
     n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])

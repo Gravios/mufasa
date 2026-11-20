@@ -11,7 +11,7 @@
     mufasa-pose3d gpu-check [--frames 20000]      # GPU solver: synthetic run, CPU vs CUDA
     mufasa-pose3d import-c3d TRIAL.c3d ... --project project.toml [--up y] [--rename a=b,c=d] [--edges a-b,b-c]
     mufasa-pose3d body-rig MODEL.blend OUT.rig.npz [--blender /path/to/blender]   # rig for body fitting
-    mufasa-pose3d body-rig --virtual-rodent OUT.rig.npz                           # the built-in rat
+    mufasa-pose3d body-rig --virtual-rodent OUT.rig.npz [--girth 1.3]             # the built-in rat
     mufasa-pose3d body-fit RIG.rig.npz VIDEO POSE --out FIT.parquet [--start 0 --stop N --step 1 --workers 4]
         [--no-refine] [--smoothness 0.5] [--scale PX] [--overlay OUT.mp4 [--side-by-side]]
     mufasa-pose3d render-animation PATH.camera.json --pose X_3d.parquet [--video X.mp4] --out X_anim.mp4 \
@@ -115,6 +115,8 @@ def build_parser() -> argparse.ArgumentParser:
     br.add_argument("blend", help=".blend file (or, with --virtual-rodent, the output)")
     br.add_argument("out", nargs="?")
     br.add_argument("--virtual-rodent", action="store_true", help="the built-in rat (DeepMind's virtual rodent)")
+    br.add_argument("--girth", type=float, default=1.0,
+                    help="virtual rodent: widen the trunk (1: as modelled; e.g. 1.3 for a heavy rat)")
     br.add_argument("--armature", default="Armature")
     br.add_argument("--skin", default="Skin")
     br.add_argument("--blender", help="Blender executable (if bpy is not installed)")
@@ -240,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if a.cmd == "body-rig" and a.virtual_rodent:
         from mufasa.bodymodel.rodent_rig import export_rodent_rig
-        export_rodent_rig(a.out or a.blend)
+        export_rodent_rig(a.out or a.blend, girth=a.girth)
         return 0
     if a.cmd == "body-rig":
         import subprocess

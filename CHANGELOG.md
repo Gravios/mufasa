@@ -8,6 +8,25 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kt — The rat's width: girth and per-frame widening.**
+In 122ks's K7 fits, rats that were curled up or sitting covered more floor than the slim virtual
+rodent.
+* `rodent_rig.widen`: the trunk is widened sideways about the midline, by the girth from the
+  thorax to the pelvis, tapering to 1 at the atlas and 15 mm behind the tail base. The head,
+  tail, paws (lowest 8 mm) and the midline keep their size. It is linear in the girth.
+* `export_rodent_rig(girth=…)` gives a heavier base shape; the profile name and the metadata
+  record it. The rig also stores the displacement per unit of widening (`D`, and `Dd` for the
+  fitting mesh).
+* A new posture value `widen` (in `PARAMS`; the rat's profile allows 0…0.5 and pulls weakly
+  towards 0): `Rig.verts(p)` applies it, and the silhouette and the renderer use it. Rigs
+  without `D` ignore it, the mouse's posture leaves it out, and `params_at` reads old fit files
+  as unwidened.
+* After a fit, `body_area_ratio` (the mask's area against the fitted body's, over up to 40
+  frames) is logged and stored as `area_ratio` in the metadata. For the virtual rodent, the
+  log suggests a girth (`suggest_girth`) when the ratio is above 1.15.
+* Import rig: *Girth* (virtual rodent only); CLI `body-rig --virtual-rodent --girth`.
+* Docs: `docs/bodymodel.md` (*Width*). Test: `tests/smoke_122kt_rat_width.py` (14 checks).
+
 **122ks — The rat in the Body model tab: the virtual rodent as a rig, rig profiles.**
 The plan's next step after 122kr ("looks good, continue").
 * `mufasa/bodymodel/rodent_rig.py`: `export_rodent_rig` builds a `.rig.npz`

@@ -30,7 +30,9 @@ bones of each region:
   joints −23…+35°, two bend joints ±35°;
 * head (atlas): up/down −45…+5°; sideways ±30° (assumed);
 * tail (29 joints; the first fixed): ±8° per joint (the model allows ±15°);
-* no thoracic bend (the model's thorax is rigid).
+* no thoracic bend (the model's thorax is rigid);
+* ``widen`` 0…0.5 per frame (patch 122kt): the trunk up to 1.5× wider
+  (see :func:`widen`), for a rat curled up or sitting.
 
 The labels sit where :mod:`mufasa.pose3d.rodent_model` puts them (dorsal
 skin points above the vertebrae, the crown for the ears, the hip joints,
@@ -55,7 +57,8 @@ NECK = ["vertebra_cervical_5", "vertebra_cervical_4", "vertebra_cervical_3", "ve
 POSTURE = [("rear", -10, 60), ("roll", -15, 15),
            ("lum_yaw", -10, 10), ("cer_yaw", -10, 10), ("head_yaw", -30, 30),
            ("lum_pitch", -15, 10), ("cer_pitch", -10, 15), ("head_pitch", -45, 5),
-           ("tail_yaw_p", -8, 8), ("tail_yaw_d", -8, 8), ("tail_pitch", -8, 8)]
+           ("tail_yaw_p", -8, 8), ("tail_yaw_d", -8, 8), ("tail_pitch", -8, 8),
+           ("widen", 0, 0.5)]
 LIMITS = {
     "lumbar (Spine1-6)": "sideways ±10°, up/down -15° (extension) … +10° (flexion) per joint "
                          "(virtual rodent: two bend joints ±30°, two extension joints -30…45°)",
@@ -67,6 +70,8 @@ LIMITS = {
     "body": "rearing -10…60° and roll ±15° about the hind paws, which stay on the floor (assumed)",
     "floor": "no part below the floor",
     "limbs": "rest pose",
+    "width": "the trunk up to 1.5x wider per frame (a rat curled up or sitting covers more floor), pulled "
+             "weakly towards the model's width",
 }
 
 
@@ -124,9 +129,10 @@ def _bones(model):
     return out
 
 
-def decimate(V, F, W, cell: float):
+def decimate(V, F, W, cell: float, extra=None):
     """Vertex clustering on a ``cell`` mm grid: vertices in a cell merge
-    (mean position and weights); faces that collapse are dropped."""
+    (mean position and weights, and the mean of ``extra``, per-vertex arrays,
+    if given: then returned fourth); faces that collapse are dropped."""
     key = np.floor(V / cell).astype(np.int64)
     _, inv = np.unique(key, axis=0, return_inverse=True)
     inv = inv.ravel()
@@ -139,11 +145,39 @@ def decimate(V, F, W, cell: float):
     Fd = Fd[ok]
     _, first = np.unique(np.sort(Fd, axis=1), axis=0, return_index=True)
     Fd = Fd[np.sort(first)]                                            # one of each, winding kept
+    if extra is not None:
+        E = np.stack([np.bincount(inv, extra[:, k], n) for k in range(extra.shape[1])], 1) / cnt[:, None]
+        return Vd, Fd, Wd, E
     return Vd, Fd, Wd
 
 
-def export_rodent_rig(out, *, cell: float = 3.0, model=None, say=print) -> Path:
-    """Write the virtual rodent as a ``.rig.npz`` for :class:`mufasa.bodymodel.fit.Rig`."""
+def widen(V, W, names, heads, tails, girth: float):
+    """The trunk widened sideways about the midline (patch 122kt): by ``girth`` from the thorax to
+    the pelvis, tapering to 1 at the atlas and just behind the tail base; the head, the tail and
+    the paws (the lowest 8 mm) keep their size. In the rig frame (facing -y, left +x)."""
+    if abs(girth - 1) < 1e-9:
+        return V
+    ix = {n: i for i, n in enumerate(names)}
+    y_atlas = heads[ix["Head"]][1]
+    y_thorax = (heads[ix["Spine6"]][1] + tails[ix["Spine6"]][1]) / 2
+    y_pelvis = tails[ix["Pelvis"]][1]                 # the last lumbar joint
+    y_base = heads[ix["Pelvis"]][1]                   # the tail base
+    knots = np.array([[y_atlas, 1.0], [y_thorax, girth], [y_pelvis, girth],
+                      [y_base, 1 + 0.6 * (girth - 1)], [y_base + 15.0, 1.0]])
+    f = np.interp(V[:, 1], knots[:, 0], knots[:, 1], left=1.0, right=1.0)
+    dom = W.argmax(1)
+    keep = np.isin(dom, [ix[n] for n in names if n == "Head" or n.startswith("Tail")])
+    f[keep] = 1.0
+    f = 1 + (f - 1) * np.clip((V[:, 2] - 1.0) / 7.0, 0, 1)
+    out = V.copy()
+    out[:, 0] *= f
+    return out
+
+
+def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, model=None, say=print) -> Path:
+    """Write the virtual rodent as a ``.rig.npz`` for :class:`mufasa.bodymodel.fit.Rig`.
+    ``girth`` widens the trunk (1: the model as it is; a heavy rat sitting or curled up
+    covers more floor, e.g. 1.3)."""
     from mufasa.pose3d.rodent_model import RodentModel
     model = model or RodentModel()
     bones = _bones(model)
@@ -168,10 +202,13 @@ def export_rodent_rig(out, *, cell: float = 3.0, model=None, say=print) -> Path:
     nrm = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
     if np.mean(np.einsum("ij,ij->i", nrm, tri.mean(1) - V.mean(0)) > 0) < 0.5:
         F = F[:, ::-1].copy()
-    Vd, Fd, Wd = decimate(V, F, W, cell)
     rest = np.tile(np.eye(4), (len(names), 1, 1))
     rest[:, :3, 3] = tf(np.array([b[3] for b in bones]))
     tails = tf(np.array([b[4] for b in bones]))
+    V = widen(V, W, names, rest[:, :3, 3], tails, girth)
+    # per frame, the fitter may widen it further: the displacement per unit of "widen" (doubling)
+    D = widen(V, W, names, rest[:, :3, 3], tails, 2.0) - V
+    Vd, Fd, Wd, Dd = decimate(V, F, W, cell, extra=D)
     parent = np.array([ix[b[2]] if b[2] else -1 for b in bones])
     assert all(parent[i] < i for i in range(len(names))), "bones must be parents first"
     rgb = np.full((len(F), 3), 215, np.uint8)
@@ -187,7 +224,7 @@ def export_rodent_rig(out, *, cell: float = 3.0, model=None, say=print) -> Path:
             pt = Tw[sp[1], :3, :3] @ sp[2] + Tw[sp[1], :3, 3]
             markers[n] = ["bone", names[body_bone[body]], tf(pt).tolist()]
     profile = {
-        "name": "virtual rodent (rat)",
+        "name": "virtual rodent (rat)" if girth == 1 else f"virtual rodent (rat, girth {girth:g})",
         "groups": {"lum": [f"Spine{i}" for i in range(1, 7)], "tho": [],
                    "cer": [f"Neck{i}" for i in range(1, 8)],
                    "tail_p": [f"Tail{i}" for i in range(2, 14)], "tail_d": [f"Tail{i}" for i in range(14, 31)]},
@@ -203,14 +240,14 @@ def export_rodent_rig(out, *, cell: float = 3.0, model=None, say=print) -> Path:
         "limits": LIMITS,
     }
     meta = {"source": "DeepMind virtual rodent (dm_control rodent.xml + rodent_walker_skin.skn, Apache 2.0)",
-            "units": "mm", "skin_scale": model.skin_scale, "decimate_cell_mm": cell}
+            "units": "mm", "skin_scale": model.skin_scale, "decimate_cell_mm": cell, "girth": girth}
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(out, names=np.array(names), parent=parent, rest=rest, tails=tails, V=V, F=F, W=W,
-                        Vd=Vd, Fd=Fd, Wd=Wd.astype(np.float32), face_rgb=rgb, meta=json.dumps(meta),
+                        Vd=Vd, Fd=Fd, Wd=Wd.astype(np.float32), D=D, Dd=Dd, face_rgb=rgb, meta=json.dumps(meta),
                         profile=json.dumps(profile))
     say(f"rig: {len(names)} bones, {len(V)} vertices ({len(Vd)} for fitting) -> {out}")
     return out
 
 
-__all__ = ["LIMITS", "POSTURE", "decimate", "export_rodent_rig"]
+__all__ = ["LIMITS", "POSTURE", "decimate", "export_rodent_rig", "widen"]
