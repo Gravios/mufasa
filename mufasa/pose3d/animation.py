@@ -19,7 +19,10 @@ import numpy as np
 
 EASINGS = ("Ease in-out", "Linear", "Spline")
 STYLE_KEYS = ("show_box", "show_shadows", "show_drops", "trail", "p_threshold", "show_video",
-              "video_opacity")
+              "video_opacity",
+              # 122kv: view options
+              "show_markers", "marker_scale", "show_names", "show_skeleton", "show_grid", "show_axes",
+              "ortho", "background")
 
 
 # --------------------------------------------------------------------------- #
@@ -192,9 +195,12 @@ def _qimage_bgr(img) -> np.ndarray:
 
 def render_animation(pose, path: CameraPath, out_path, *, video_path=None, size=(1280, 720),
                      fps: float = 30.0, style: dict | None = None, colors: dict | None = None,
-                     video_below: bool = False, frame_label: bool = False, progress=None) -> Path:
+                     video_below: bool = False, frame_label: bool = False, progress=None,
+                     models: list | None = None) -> Path:
     """Render ``path`` to a video file; returns its path. ``pose`` is a
     :class:`~mufasa.ui_qt.pose3d_viewer.Pose3D` (or a path to one).
+    ``models``: model objects or their specs (``spec()``, 122kv) to draw;
+    rigs are fitted to each rendered frame.
     ``progress(done, total)`` returning False stops (the partial file is
     kept)."""
     import cv2
@@ -215,6 +221,11 @@ def render_animation(pose, path: CameraPath, out_path, *, video_path=None, size=
             setattr(vol, k, v)
     if colors:
         vol.colors.update(colors)
+    if models:
+        from mufasa.pose3d.scene_models import model_from_spec
+        for m in models:
+            vol.add_model(model_from_spec(m, pose) if isinstance(m, dict) else m)
+        vol.sync_fit = True
     vol.show_label = bool(frame_label)
     video = _VideoFrames(video_path) if video_path else None
     if video is None:

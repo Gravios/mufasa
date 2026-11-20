@@ -3,6 +3,7 @@
 
     mufasa-view3d VIDEO [POSE3D]
     mufasa-view3d --pose POSE3D          # no video: the volume only
+    mufasa-view3d VIDEO POSE3D --model virtual_rodent --model arena.obj   # models (patch 122kv)
 
 POSE3D: parquet/CSV with ``<marker>_x/_y/_z`` (and optionally ``frame``,
 ``<marker>_likelihood`` and ``mufasa_pose3d`` metadata: box, camera, edges).
@@ -20,6 +21,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("video", nargs="?", help="the video (shown below the volume)")
     ap.add_argument("pose3d", nargs="?", help="3-D pose file")
     ap.add_argument("--pose", dest="pose_opt", help="3-D pose file (alternative to POSE3D)")
+    ap.add_argument("--model", action="append", default=[], metavar="PATH",
+                    help="a model to show: a body-model rig (.rig.npz, posed to the markers), "
+                         "'virtual_rodent' (the built-in rat), or a mesh (.obj .stl .ply); repeatable")
     return ap
 
 
@@ -47,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from mufasa.ui_qt.pose3d_viewer import open_pose3d_viewer
     app = QApplication.instance() or QApplication(sys.argv[:1])
-    w = open_pose3d_viewer(None, video, pose)
+    w = open_pose3d_viewer(None, video, pose, models=args.model)
     w.show()
     return app.exec()
 

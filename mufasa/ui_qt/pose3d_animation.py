@@ -297,7 +297,8 @@ class CameraAnimationPanel(QWidget):
     def settings(self) -> dict:
         return {"fps": self.fps_spin.value(), "size": [self.width_spin.value(), self.height_spin.value()],
                 "video_below": self.below_cb.isChecked(), "frame_label": self.label_cb.isChecked(),
-                "style": {k: getattr(self.vol, k) for k in STYLE_KEYS}}
+                "style": {k: getattr(self.vol, k) for k in STYLE_KEYS},
+                "models": [m.spec() for m in self.vol.models]}
 
     def default_path(self, suffix: str) -> Path:
         p = self.viewer.pose_path
@@ -340,7 +341,8 @@ class CameraAnimationPanel(QWidget):
         return render_animation(self.viewer.pose, self.path, out_path, video_path=self.viewer.video_path,
                                 size=st["size"], fps=st["fps"], style=st["style"],
                                 colors=dict(self.vol.colors), video_below=st["video_below"],
-                                frame_label=st["frame_label"], progress=progress)
+                                frame_label=st["frame_label"], progress=progress,
+                                models=list(self.vol.models))
 
     def render_dialog(self) -> None:
         from PySide6.QtWidgets import QApplication

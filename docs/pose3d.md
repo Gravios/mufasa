@@ -150,6 +150,45 @@ separate picture below (its playback controls stay). *Reprojection* still
 draws the 3-D markers on that picture — now with the lens distortion
 applied, so they also line up on distorted videos.
 
+## The 3-D viewer: view options and models
+
+*View & models* (patch 122kv) opens a panel below the volume.
+
+**View.**
+* Markers on or off, and their size.
+* Marker names, the skeleton, the floor grid and an x/y/z gizmo.
+* Perspective or orthographic projection, and the field of view.
+* The background: the theme's, dark, light, black or white.
+
+**Models.** Models are drawn in the volume. Each has a style (solid,
+transparent, wireframe or points), an opacity and a colour, and can be
+hidden by unticking it.
+
+* *Virtual rodent* adds the built-in rat (DeepMind's virtual rodent; see
+  *Anatomical limits*). *Load…* takes a body-model rig (`.rig.npz` from the
+  Body model tab). Either is **posed to the 3-D markers** of each frame,
+  using the markers it shares with the model (the rat's labels):
+  * heading and position, and the rig's posture values within their
+    limits, by least squares;
+  * scaled to the animal's size: the back's length seen from above,
+    against the model's.
+
+  A frame is posed shortly after it is shown, starting from the nearest
+  posed frame. *Fit all frames* poses all of them up front, for smooth
+  playback. The panel shows the marker error. A rat rearing upright goes
+  past the rig's 60° rearing limit and fits less well.
+* *Load…* also takes a mesh (`.obj`, `.stl` ASCII or binary, `.ply` ASCII
+  or binary): an arena, a nest, objects. It is placed with a scale (e.g.
+  1000 for a mesh in metres), a turn about the vertical and an offset in
+  x, y and z. Meshes over 20,000 faces are simplified.
+
+A saved camera animation keeps the view options and the models, and
+renders with them. On the command line:
+
+```
+mufasa-view3d VIDEO X_3d.parquet --model virtual_rodent --model arena.obj
+```
+
 ## Camera animation
 
 Tick **Animation** in the 3-D viewer to open the editor (patch 122kp).

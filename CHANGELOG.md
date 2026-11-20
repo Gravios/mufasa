@@ -8,6 +8,40 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122kv — 3-D viewer: a model loader and view options.**
+The user asked for a model loader and view options in the 3-D renderer.
+* `mufasa/pose3d/scene_models.py` (no Qt):
+  * `load_mesh` reads OBJ (polygons fanned), STL (ASCII or binary; shared vertices merged) and
+    PLY (ASCII or binary little-endian). `simplify` reduces meshes above 20,000 faces by vertex
+    clustering.
+  * `SceneMesh` has a scale, a turn about the vertical and an offset.
+  * `PosedRig` poses a body-model rig to the 3-D markers it shares with the rig's label points.
+    It fits heading, position (small height offset) and the rig's posture within its limits by
+    least squares, with a weak pull to the rest pose. Its size comes from the back's length seen
+    from above (median over frames with the head low), or from the median ratio of marker
+    distances. It starts from the nearest posed frame, else from a 2-D Procrustes start with
+    both headings, flat or rearing. Fits are cached per frame.
+  * `ModelLook` holds style (solid / transparent / wireframe / points), opacity, colour and
+    visibility.
+  * `load_model`, `model_from_spec` and `spec()` handle loading and saving; `builtin_rig_path()`
+    makes the virtual rodent once in the user cache.
+* `Volume3DWidget` draws models: back to front, flat-shaded towards the eye, as a wireframe or
+  as points. Rigs are posed 60 ms after a frame is shown (the nearest posed frame is drawn
+  meanwhile), or while painting with `sync_fit` (rendering). New view options:
+  `show_markers`, `marker_scale`, `show_names`, `show_skeleton`, `show_grid`, `show_axes`
+  (gizmo), `ortho` (orthographic, scaled to look as the target plane does in perspective) and
+  `background`. They are added to `STYLE_KEYS`, so saved animations keep them.
+* `mufasa/ui_qt/pose3d_models.py`: the *View & models* panel. *View*: markers and size, names,
+  skeleton, grid, axes, projection, field of view, background. *Models*: Load…, Virtual
+  rodent, Remove, Fit all frames; style, opacity and colour; scale, turn and offset for meshes;
+  the marker error of the frame.
+* Camera animations save the models (`settings()["models"]`). `render_animation(models=…)`
+  draws them (rigs posed per rendered frame); the CLI `render-animation` passes them.
+  `mufasa-view3d --model PATH` (repeatable; `virtual_rodent`) loads models at start.
+* K7: the virtual rodent posed to the 3-D markers at about 0.2 s per frame (median); marker
+  error 17–30 mm on walking and rearing frames.
+* Docs: `docs/pose3d.md`. Test: `tests/smoke_122kv_viewer_models.py`.
+
 **122ku — Body model: the scale from a single-camera 3-D run; the rat stands with tucked limbs.**
 In 122kt, the scale estimated from each stretch of K7 ranged 0.59–0.81 px per model mm, and
 width and scale traded off.

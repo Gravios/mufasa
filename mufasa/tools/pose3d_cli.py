@@ -283,6 +283,7 @@ def main(argv: list[str] | None = None) -> int:
         out = render_animation(a.pose, cp, a.out, video_path=a.video,
                                size=tuple(a.size or st.get("size", (1280, 720))),
                                fps=a.fps or st.get("fps", 30.0), style=st.get("style"),
+                               models=st.get("models"),
                                video_below=bool(st.get("video_below")) and bool(a.video),
                                frame_label=bool(st.get("frame_label")), progress=prog)
         print(f"wrote {out}")

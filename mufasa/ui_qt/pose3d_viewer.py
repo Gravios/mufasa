@@ -31,7 +31,19 @@ parallax. The **Camera** view renders through the calibration itself: the
 frame fills the view as recorded and every marker sits on the animal at any
 height (zoom and pan keep the alignment; dragging to orbit leaves it).
 
-Open from the feature viewer ("3-D…") or ``mufasa-view3d VIDEO [POSE3D]``.
+Patch 122kv: **models and view options.** *View & models* opens a panel.
+* **View:** markers on or off and their size, marker names, the skeleton,
+  the floor grid, an axes gizmo, perspective or orthographic projection,
+  the field of view and the background.
+* **Models:** load a body-model rig (``.rig.npz``) or the built-in virtual
+  rodent, posed to the 3-D markers of each frame, or a static mesh
+  (``.obj``, ``.stl``, ``.ply``; an arena, objects) with its own scale,
+  rotation and offset. Each model is drawn solid, transparent, as a
+  wireframe or as points, in a colour and opacity of its own.
+
+See :mod:`mufasa.pose3d.scene_models`.
+
+Open from the feature viewer ("3-D…") or ``mufasa-view3d VIDEO [POSE3D] [--model …]``.
 """
 from __future__ import annotations
 
@@ -42,8 +54,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QTransform
+from PySide6.QtCore import QPointF, Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPolygonF, QTransform
 from PySide6.QtWidgets import (
     QCheckBox,
     QDockWidget,
@@ -245,6 +257,22 @@ class Volume3DWidget(QWidget):
         self.cam_pan = np.zeros(2)
         self.show_label = True               # "frame N · …" text (off for rendered animations)
         self.cam_blend = 0.0                 # 122kp: 0 orbit … 1 recording camera (animation moves)
+        # 122kv: view options and models
+        self.show_markers = True
+        self.marker_scale = 1.0
+        self.show_names = False
+        self.show_skeleton = True
+        self.show_grid = True
+        self.show_axes = False
+        self.ortho = False
+        self.background = "theme"           # theme | dark | light | black | white
+        self.models: list = []               # scene_models.PosedRig / SceneMesh
+        self.sync_fit = False                # fit rigs while painting (offscreen rendering)
+        self.on_fitted = None                # called after rigs were posed to the current frame
+        self._fit_timer = QTimer(self)
+        self._fit_timer.setSingleShot(True)
+        self._fit_timer.setInterval(60)
+        self._fit_timer.timeout.connect(self._fit_now)
         self.reset_view()
         self._drag = None
 
@@ -422,6 +450,11 @@ class Volume3DWidget(QWidget):
         d = np.asarray(pts, float).reshape(-1, 3) - eye
         x, y, z = d @ right, d @ up, d @ fwd
         s = 0.5 * min(self.width(), self.height()) / math.tan(self.fov / 2)
+        if self.ortho:                                     # 122kv: as the target plane looks in perspective
+            so = s / max(self.dist, 1e-9)
+            px = self.width() / 2 + so * x
+            py = self.height() / 2 - so * y
+            return np.c_[px, py], z + 10 * self.dist       # all in front; depth keeps the order
         with np.errstate(divide="ignore", invalid="ignore"):
             px = self.width() / 2 + s * x / z
             py = self.height() / 2 - s * y / z
@@ -462,7 +495,11 @@ class Volume3DWidget(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         dark = self.palette().window().color().lightness() < 128
+        if self.background != "theme":
+            dark = self.background in ("dark", "black")
         bg = QColor("#1b1d21") if dark else QColor("#fafafa")
+        if self.background in ("black", "white"):
+            bg = QColor("#000000" if self.background == "black" else "#ffffff")
         ink = QColor("#c9ccd1") if dark else QColor("#3a3d42")
         faint = QColor("#3a3e45") if dark else QColor("#dcdfe3")
         p.fillRect(self.rect(), bg)
@@ -471,10 +508,11 @@ class Volume3DWidget(QWidget):
         # floor grid
         step = _nice_step(max(x1 - x0, y1 - y0) / 8)
         pen = QPen(faint, 1)
-        for gx in np.arange(math.ceil(x0 / step) * step, x1 + 1e-9, step):
-            self._line(p, (gx, y0, z0), (gx, y1, z0), pen)
-        for gy in np.arange(math.ceil(y0 / step) * step, y1 + 1e-9, step):
-            self._line(p, (x0, gy, z0), (x1, gy, z0), pen)
+        if self.show_grid:
+            for gx in np.arange(math.ceil(x0 / step) * step, x1 + 1e-9, step):
+                self._line(p, (gx, y0, z0), (gx, y1, z0), pen)
+            for gy in np.arange(math.ceil(y0 / step) * step, y1 + 1e-9, step):
+                self._line(p, (x0, gy, z0), (x1, gy, z0), pen)
         if self.show_box and self.pose.box is not None:
             pen = QPen(ink, 1.2)
             c = [(x, y, z) for z in (z0, z1) for y in (y0, y1) for x in (x0, x1)]
@@ -489,6 +527,7 @@ class Volume3DWidget(QWidget):
                 p.setBrush(Qt.NoBrush)
                 p.drawRect(int(cp[0]) - 5, int(cp[1]) - 4, 10, 8)
                 p.drawText(QPointF(cp[0] + 8, cp[1] + 4), "camera")
+        model_note = self._draw_models(p)
         X, i = self.current()
         if X is not None:
             names = self.pose.names
@@ -519,16 +558,23 @@ class Volume3DWidget(QWidget):
                 for j in np.flatnonzero(ok):
                     self._line(p, X[j], shadow[j], pen)
             pen = QPen(ink, 2)
-            for a, b in self.pose.edges:
-                ja, jb = names.index(a), names.index(b)
-                if ok[ja] and ok[jb]:
-                    self._line(p, X[ja], X[jb], pen)
+            if self.show_skeleton:
+                for a, b in self.pose.edges:
+                    ja, jb = names.index(a), names.index(b)
+                    if ok[ja] and ok[jb]:
+                        self._line(p, X[ja], X[jb], pen)
             pts, z = self.project(np.where(ok[:, None], X, 0.0))
-            for j in sorted(np.flatnonzero(ok & (z > 0)), key=lambda k: -z[k]):
-                r = max(3.0, min(9.0, 900.0 / max(z[j], 1e-6) * 4))
-                p.setPen(QPen(bg, 1))
-                p.setBrush(self.colors[names[j]])
-                p.drawEllipse(QPointF(*pts[j]), r, r)
+            if self.show_markers:
+                for j in sorted(np.flatnonzero(ok & (z > 0)), key=lambda k: -z[k]):
+                    r = 5.0 if self.ortho else max(3.0, min(9.0, 900.0 / max(z[j], 1e-6) * 4))
+                    r *= self.marker_scale
+                    p.setPen(QPen(bg, 1))
+                    p.setBrush(self.colors[names[j]])
+                    p.drawEllipse(QPointF(*pts[j]), r, r)
+            if self.show_names:
+                p.setPen(ink)
+                for j in np.flatnonzero(ok & (z > 0)):
+                    p.drawText(QPointF(pts[j][0] + 6, pts[j][1] - 6), names[j])
         # text
         p.setPen(ink)
         f = QFont(p.font())
@@ -539,6 +585,8 @@ class Volume3DWidget(QWidget):
             txt += "  · camera view"
         if self.show_video and self.video_img is not None and not video_drawn:
             txt += "  · video: turn the view to look down at the floor"
+        if model_note:
+            txt += "  · " + model_note
         if X is None:
             txt += "  · no 3-D data for this frame"
         else:
@@ -547,7 +595,100 @@ class Volume3DWidget(QWidget):
                 txt += f"  · height {np.nanmin(z):.0f}–{np.nanmax(z):.0f} {self.pose.units}"
         if self.show_label:
             p.drawText(10, 18, txt)
+        if self.show_axes:
+            self._draw_axes(p)
         p.end()
+
+    # -- 122kv: models and the axes gizmo -------------------------------- #
+    def add_model(self, model) -> None:
+        self.models.append(model)
+        self.update()
+
+    def _fit_now(self) -> None:
+        for m in self.models:
+            if getattr(m, "kind", "") == "rig" and m.look.visible and not m.cached(self.frame):
+                m.fit_frame(self.frame)
+        self.update()
+        if self.on_fitted is not None:
+            self.on_fitted()
+
+    def _draw_models(self, p: QPainter) -> str:
+        notes = []
+        for m in self.models:
+            if not m.look.visible:
+                continue
+            frame = self.frame
+            if getattr(m, "kind", "") == "rig":
+                if not m.cached(frame):
+                    if self.sync_fit:
+                        m.fit_frame(frame)
+                    else:
+                        near = m.nearest_cached(frame)
+                        self._fit_timer.start()
+                        if near is None:
+                            notes.append(f"{m.name}: fitting…")
+                            continue
+                        frame = near
+                if m.fit_frame(frame) is None:
+                    notes.append(f"{m.name}: too few markers")
+                    continue
+            V = m.world(frame)
+            if V is not None:
+                self._draw_mesh(p, V, m.faces(), m.look)
+        return ", ".join(notes)
+
+    def _draw_mesh(self, p: QPainter, V: np.ndarray, F: np.ndarray, look) -> None:
+        P, z = self.project(V)
+        okv = (z > 1e-6) & np.isfinite(P).all(1)
+        base = QColor(look.color)
+        if look.style == "points":
+            p.setPen(Qt.NoPen)
+            c = QColor(base)
+            c.setAlphaF(max(0.05, min(1.0, look.opacity)))
+            p.setBrush(c)
+            for j in np.flatnonzero(okv):
+                p.drawEllipse(QPointF(*P[j]), 1.3, 1.3)
+            return
+        F = F[okv[F].all(1)]
+        if not len(F):
+            return
+        if look.style == "wireframe":
+            E = np.sort(np.vstack([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]]), axis=1)
+            E = np.unique(E, axis=0)
+            c = QColor(base)
+            c.setAlphaF(max(0.05, min(1.0, look.opacity)))
+            p.setPen(QPen(c, 0.7))
+            for a, b in E:
+                p.drawLine(QPointF(*P[a]), QPointF(*P[b]))
+            return
+        # solid / transparent: back to front, flat shaded towards the eye
+        T = V[F]
+        n = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0])
+        n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+        eye, _, _, fwd = self._basis()
+        shade = 0.35 + 0.65 * np.abs(n @ (-fwd))
+        order = np.argsort(-z[F].mean(1))
+        alpha = max(0.05, min(1.0, look.opacity)) if look.style == "transparent" else 1.0
+        p.setPen(Qt.NoPen)
+        r0, g0, b0 = base.red(), base.green(), base.blue()
+        for k in order:
+            sh = shade[k]
+            c = QColor(int(r0 * sh), int(g0 * sh), int(b0 * sh))
+            c.setAlphaF(alpha)
+            p.setBrush(c)
+            a, b, cc = P[F[k]]
+            p.drawConvexPolygon(QPolygonF([QPointF(*a), QPointF(*b), QPointF(*cc)]))
+
+    def _draw_axes(self, p: QPainter) -> None:
+        """A small x/y/z gizmo in the lower left, turning with the view."""
+        eye, right, up, fwd = self._basis()
+        o = QPointF(40, self.height() - 40)
+        for v, name, col in ((np.array([1.0, 0, 0]), "x", "#e6194b"), (np.array([0, 1.0, 0]), "y", "#3cb44b"),
+                             (np.array([0, 0, 1.0]), "z", "#4363d8")):
+            d = QPointF(28 * float(v @ right), -28 * float(v @ up))
+            p.setPen(QPen(QColor(col), 2))
+            p.drawLine(o, o + d)
+            p.drawText(o + d * 1.2 + QPointF(-3, 4), name)
 
     # -- interaction ------------------------------------------------------ #
     def mousePressEvent(self, ev) -> None:  # noqa: ANN001, N802
@@ -655,7 +796,8 @@ def reprojection_overlay(pose: Pose3D, colors: dict):
 # Viewer: volume above (optionally with the video on its floor), video below
 # --------------------------------------------------------------------------- #
 class Pose3DViewerWidget(QWidget):
-    def __init__(self, video_path: str | None, pose_path, parent: QWidget | None = None) -> None:
+    def __init__(self, video_path: str | None, pose_path, parent: QWidget | None = None,
+                 models: list | None = None) -> None:
         super().__init__(parent)
         from mufasa.ui_qt.frame_scrubber import FrameScrubberWidget
         self.pose_path = Path(pose_path)
@@ -707,6 +849,10 @@ class Pose3DViewerWidget(QWidget):
         self.anim_cb.setToolTip("Camera animation: key views at frames, smooth moves between them, "
                                 "rendered to a video")
         bar.addWidget(self.anim_cb)
+        self.models_cb = QCheckBox("View && models", self)
+        self.models_cb.setToolTip("View options (markers, names, grid, projection, background) and models: "
+                                  "a body-model rig posed to the markers, or a mesh (arena, objects)")
+        bar.addWidget(self.models_cb)
         bar.addStretch()
         lay.addLayout(bar)
         split = QSplitter(Qt.Vertical, self)
@@ -722,6 +868,15 @@ class Pose3DViewerWidget(QWidget):
         self.animation.setVisible(False)
         self.anim_cb.toggled.connect(self.animation.setVisible)
         lay.addWidget(self.animation)
+        from mufasa.ui_qt.pose3d_models import ViewModelsPanel
+        self.models_panel = ViewModelsPanel(self, self)              # 122kv
+        self.models_panel.setVisible(False)
+        self.models_cb.toggled.connect(self.models_panel.setVisible)
+        lay.addWidget(self.models_panel)
+        for mp in models or ():
+            self.models_panel.add(mp)
+        if models:
+            self.models_cb.setChecked(True)
         self.info = QLabel(self._info_text(), self)
         self.info.setStyleSheet("color: palette(placeholder-text);")
         self.info.setWordWrap(True)
@@ -750,6 +905,7 @@ class Pose3DViewerWidget(QWidget):
 
     def _on_frame(self, frame: int) -> None:
         self.volume.set_frame(frame)
+        self.models_panel._update_info()
         if self.volume.show_video:
             self.volume.set_video_frame(self.scrubber.raw_frame())
 
@@ -774,6 +930,7 @@ class Pose3DViewerWidget(QWidget):
 
     def cleanup(self) -> None:
         self.animation.timer.stop()
+        self.volume._fit_timer.stop()
         try:
             self.scrubber.close_video()
         except Exception:
@@ -786,10 +943,11 @@ def choose_pose3d(parent: QWidget | None, start_dir: str = "") -> str | None:
     return path or None
 
 
-def open_pose3d_viewer(parent: QWidget | None, video_path: str | None, pose_path
+def open_pose3d_viewer(parent: QWidget | None, video_path: str | None, pose_path, models: list | None = None
                        ) -> QWidget:
-    """Show the viewer in a floating workbench dock (window fallback)."""
-    w = Pose3DViewerWidget(video_path, pose_path)
+    """Show the viewer in a floating workbench dock (window fallback). ``models``: paths of models
+    to load (``.rig.npz``, ``virtual_rodent``, ``.obj``/``.stl``/``.ply``)."""
+    w = Pose3DViewerWidget(video_path, pose_path, models=models)
     main = parent.window() if parent is not None else None
     title = f"3-D — {Path(pose_path).stem}"
     if isinstance(main, QMainWindow):
