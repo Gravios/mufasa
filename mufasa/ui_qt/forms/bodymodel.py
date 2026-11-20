@@ -32,7 +32,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
 )
 
-from mufasa.ui_qt.forms.pose3d import _browse_row, _kalman_runs, _root, _videos
+from mufasa.ui_qt.forms.pose3d import _browse_row, _kalman_runs, _pose3d_runs, _root, _videos
 from mufasa.ui_qt.workbench import OperationForm
 
 
@@ -199,8 +199,18 @@ class BodyFitForm(OperationForm):
         self.scale.setRange(0, 1000)
         self.scale.setDecimals(3)
         self.scale.setSpecialValueText("auto")
-        self.scale.setToolTip("px per model unit (mm for the mouse); auto: from the labels and a few frames")
+        self.scale.setToolTip("px per model unit (mm for the mouse); auto: from the labels and a few frames, "
+                              "or from a 3-D run (below)")
         f.addRow("Scale", self.scale)
+        self.scale_from = QComboBox(self)
+        self.scale_from.addItem("estimated from the video (labels and silhouette)", None)
+        for r in reversed(_pose3d_runs(self._root)):
+            self.scale_from.addItem(f"3-D run {r.name} (camera and the animal's size)", str(r))
+        self.scale_from.setToolTip(
+            "With 'auto' scale: take it from a single-camera 3-D run of this video — the camera's pixels per "
+            "mm at the back's height, times the animal's size against the model. Width and scale then stay "
+            "apart (the silhouette alone confuses a wider animal with a bigger one).")
+        f.addRow("Scale from", self.scale_from)
         self.polarity = QComboBox(self)
         for lab, v in (("auto (from the labels)", "auto"), ("darker than the background", "dark"),
                        ("lighter than the background", "light")):
@@ -243,11 +253,17 @@ class BodyFitForm(OperationForm):
         stop = self.stop.value() or None
         if stop is not None and stop <= self.start.value():
             raise ValueError("'to' must be after 'from'")
+        scale_from = None
+        if not self.scale.value() and self.scale_from.currentData():
+            p3 = Path(self.scale_from.currentData()) / f"{stem}_3d.parquet"
+            if not p3.is_file():
+                raise ValueError(f"3-D run {Path(self.scale_from.currentData()).name} has no {p3.name}")
+            scale_from = str(p3)
         return dict(rig=self.rig.currentData(), video=str(video), pose=str(pf), start=self.start.value(),
                     stop=stop, step=self.step.value(), refine=self.refine.isChecked(),
                     temporal=self.temporal.value() if self.refine.isChecked() else 0.0,
                     scale=self.scale.value() or None, workers=self.workers.value(),
-                    polarity=self.polarity.currentData(),
+                    polarity=self.polarity.currentData(), scale_from=scale_from,
                     render=self.render.isChecked(), side_by_side=self.sbs.isChecked())
 
     def target(self, **kw) -> None:
@@ -257,7 +273,7 @@ class BodyFitForm(OperationForm):
 
 def run_body_fit(root, *, rig, video, pose, start=0, stop=None, step=1, refine=True, temporal=0.5, scale=None,
                  workers=1, render=False, side_by_side=False, evals_warm=500, evals_first=2500,
-                 chunk=300, polarity="auto") -> Path:
+                 chunk=300, polarity="auto", scale_from=None) -> Path:
     from dataclasses import asdict
 
     from mufasa.bodymodel.fit import FitConfig, MaskConfig, RunConfig, fit_video
@@ -266,11 +282,11 @@ def run_body_fit(root, *, rig, video, pose, start=0, stop=None, step=1, refine=T
     out = ProjectPaths(root).stage_run_dir("bodymodel", run_id=rid)
     fcfg = FitConfig(scale=scale, temporal=temporal, refine=refine, evals_warm=evals_warm, evals_first=evals_first)
     run = RunConfig(start=start, stop=stop, step=step, workers=workers, chunk=chunk, fit=fcfg,
-                    mask=MaskConfig(polarity=polarity))
+                    mask=MaskConfig(polarity=polarity), scale_from=scale_from)
     stem = Path(video).stem
     fit_path = fit_video(rig, video, pose, run, out / f"{stem}_fit.parquet")
     params = {"rig": str(rig), "start": start, "stop": stop, "step": step, "workers": workers,
-              "polarity": run.mask.polarity,
+              "polarity": run.mask.polarity, "scale_from": scale_from,
               "fit": {k: v for k, v in asdict(fcfg).items() if k != "weights"}}
     results = {"fit": str(fit_path)}
     if render:
@@ -278,7 +294,7 @@ def run_body_fit(root, *, rig, video, pose, start=0, stop=None, step=1, refine=T
         ov = render_overlay_video(fit_path, out / f"{stem}_overlay.mp4",
                                   style=OverlayStyle(side_by_side=side_by_side))
         results["overlay"] = str(ov)
-    write_run_toml(out / "run.toml", stage="bodymodel", run_id=out.name, inputs=[str(video), str(pose), str(rig)],
+    write_run_toml(out / "run.toml", stage="bodymodel", run_id=out.name, inputs=[str(video), str(pose), str(rig)] + ([str(scale_from)] if scale_from else []),
                    params=params, results=results)
     return out
 

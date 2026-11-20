@@ -134,6 +134,8 @@ def build_parser() -> argparse.ArgumentParser:
     bf.add_argument("--scale", type=float, help="px per model unit (default: estimated)")
     bf.add_argument("--overlay", help="also render the model over the video to this file")
     bf.add_argument("--side-by-side", action="store_true")
+    bf.add_argument("--scale-from", metavar="VIDEO_3d.parquet",
+                    help="the scale from a single-camera 3-D run of this video (camera and the animal's size)")
     bf.add_argument("--animal", choices=["auto", "dark", "light"], default="auto",
                     help="the animal darker or lighter than the background (silhouette)")
     ra = sub.add_parser("render-animation", help="render a camera path saved from the 3-D viewer")
@@ -259,7 +261,8 @@ def main(argv: list[str] | None = None) -> int:
         cfg = FitConfig(scale=a.scale, refine=not a.no_refine, temporal=0.0 if a.no_refine else a.smoothness)
         out = fit_video(a.rig, a.video, a.pose, RunConfig(start=a.start, stop=a.stop, step=a.step,
                                                          workers=a.workers, fit=cfg,
-                                                         mask=MaskConfig(polarity=a.animal)), a.out)
+                                                         mask=MaskConfig(polarity=a.animal),
+                                                         scale_from=a.scale_from), a.out)
         if a.overlay:
             from mufasa.bodymodel.render import OverlayStyle, render_overlay_video
             render_overlay_video(out, a.overlay, style=OverlayStyle(side_by_side=a.side_by_side))

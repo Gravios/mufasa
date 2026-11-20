@@ -75,9 +75,32 @@ LIMITS = {
 }
 
 
-def _bones(model):
+# Patch 122ku: the limbs tucked under the body. In the model's zero pose they splay sideways,
+# up to 45 mm from the midline against the trunk's 33 mm. Seen from above, they then stick out
+# of a rat's silhouette. These angles (degrees, both sides alike, all within the joints' ranges)
+# came from a seeded search: they keep every limb inside the trunk's outline from above and
+# below the back, with the fore and hind paws on the floor and the angles small. The rig's rest
+# pose is this stance.
+STANCE = {"hip_supinate": -36.6, "hip_abduct": -13.6, "hip_extend": -46.1, "knee": -40.6, "ankle": 34.4,
+          "toe": 9.7, "scapula_supinate": -0.7, "scapula_abduct": -14.8, "scapula_extend": 0.6,
+          "shoulder": 6.2, "shoulder_sup": 8.3, "elbow": -35.8, "wrist": -13.5, "finger": 85.3}
+
+
+def stance_qpos(model, stance=STANCE):
+    """Joint angles (1, n) for ``stance`` ({joint without side: degrees}) on both sides."""
+    q = model.qpos()
+    for k, j in enumerate(model.joints):
+        for side in ("_L", "_R"):
+            if side in j.name:
+                key = j.name.replace(side + "_", "_").replace(side, "")
+                if key in stance:
+                    q[0, k] = np.clip(np.deg2rad(stance[key]), j.lo, j.hi)
+    return q
+
+
+def _bones(model, q0=None):
     """(name, rodent bodies, parent name, head point, tail point) in the rodent frame, mm."""
-    q0 = model.qpos()
+    q0 = model.qpos() if q0 is None else q0
     Tw = model.fk(q0)[0]
     org = {n: Tw[i, :3, 3] for n, i in model.body_index.items()}
 
@@ -174,16 +197,19 @@ def widen(V, W, names, heads, tails, girth: float):
     return out
 
 
-def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, model=None, say=print) -> Path:
+def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, stance: bool = True, model=None,
+                      say=print) -> Path:
     """Write the virtual rodent as a ``.rig.npz`` for :class:`mufasa.bodymodel.fit.Rig`.
     ``girth`` widens the trunk (1: the model as it is; a heavy rat sitting or curled up
-    covers more floor, e.g. 1.3)."""
+    covers more floor, e.g. 1.3). ``stance``: the limbs tucked under the body (:data:`STANCE`)
+    rather than the model's zero pose."""
     from mufasa.pose3d.rodent_model import RodentModel
     model = model or RodentModel()
-    bones = _bones(model)
+    q0 = stance_qpos(model) if stance else model.qpos()
+    bones = _bones(model, q0)
     names = [b[0] for b in bones]
     ix = {n: i for i, n in enumerate(names)}
-    V0 = model.skin_points(model.qpos())[0]
+    V0 = model.skin_points(q0)[0]
     floor = V0[:, 2].min()
 
     def tf(P):
@@ -214,7 +240,7 @@ def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, model=None,
     rgb = np.full((len(F), 3), 215, np.uint8)
     # where each label sits (as in mufasa.pose3d.rodent_model): skin vertices, or points on bones
     body_bone = {b: k for k, (_, bodies, *_r) in enumerate(bones) for b in bodies}
-    Tw = model.fk(model.qpos())[0]
+    Tw = model.fk(q0)[0]
     markers = {}
     for n, sp in model.label_points().items():
         if sp[0] == "vertex":
@@ -240,7 +266,8 @@ def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, model=None,
         "limits": LIMITS,
     }
     meta = {"source": "DeepMind virtual rodent (dm_control rodent.xml + rodent_walker_skin.skn, Apache 2.0)",
-            "units": "mm", "skin_scale": model.skin_scale, "decimate_cell_mm": cell, "girth": girth}
+            "units": "mm", "skin_scale": model.skin_scale, "decimate_cell_mm": cell, "girth": girth,
+            "stance": STANCE if stance else None}
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(out, names=np.array(names), parent=parent, rest=rest, tails=tails, V=V, F=F, W=W,
@@ -250,4 +277,4 @@ def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, model=None,
     return out
 
 
-__all__ = ["LIMITS", "POSTURE", "decimate", "export_rodent_rig", "widen"]
+__all__ = ["LIMITS", "POSTURE", "STANCE", "decimate", "export_rodent_rig", "stance_qpos", "widen"]

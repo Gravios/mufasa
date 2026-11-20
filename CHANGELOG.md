@@ -8,6 +8,25 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ku — Body model: the scale from a single-camera 3-D run; the rat stands with tucked limbs.**
+In 122kt, the scale estimated from each stretch of K7 ranged 0.59–0.81 px per model mm, and
+width and scale traded off.
+* `fit.scale_from_pose3d(rig, VIDEO_3d.parquet)` multiplies two numbers: the camera's pixels
+  per mm at the back's median height and place (the camera file named in the 3-D run's
+  metadata, or one given), and the animal's size against the model (the back's length from
+  above, `head_back` → `back_V2`, median over frames with the head low, over the same labels
+  on the model at rest).
+* `RunConfig.scale_from` is used when no scale is set. The log reports it, and the metadata
+  stores `scale_from` (px/mm, height, size, labels).
+* Fit form: *Scale from* (estimated from the video, or one of the project's 3-D runs, using
+  its file for this video). CLI: `body-fit --scale-from`.
+* The virtual rodent's rest pose tucks the limbs under the body (`rodent_rig.STANCE`,
+  `stance_qpos`; `export_rodent_rig(stance=False)` keeps the model's zero pose). In the zero
+  pose the legs splay 45 mm from the midline against the trunk's 33 mm. The angles came from a
+  seeded search (limbs inside the trunk's outline from above and under the back, fore and hind
+  paws on the floor, small angles) and lie within every range.
+* Docs: `docs/bodymodel.md`. Test: `tests/smoke_122ku_scale_from_pose3d.py` (11 checks).
+
 **122kt — The rat's width: girth and per-frame widening.**
 In 122ks's K7 fits, rats that were curled up or sitting covered more floor than the slim virtual
 rodent.

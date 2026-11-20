@@ -867,6 +867,8 @@ class RunConfig:
     overlap: int = 8
     fit: FitConfig = field(default_factory=FitConfig)
     mask: MaskConfig = field(default_factory=MaskConfig)
+    # the scale from a single-camera 3-D run of this video (patch 122ku; used when fit.scale is None)
+    scale_from: str | None = None
 
 
 def _chunk_job(args):
@@ -899,7 +901,15 @@ def fit_video(rig_path, video, pose_file, run: RunConfig, out_path, *, progress=
     # background from the whole video: over a short range a resting animal would stay in the median
     sf.ensure_background(list(range(0, n_video or stop)))
     say(f"{Path(video).name}: {len(frames)} frames ({run.start}–{stop - 1}, every {run.step})")
-    scale = sf.estimate_scale(frames, say=say) if run.fit.scale is None else run.fit.scale
+    scale_info = None
+    if run.fit.scale is not None:
+        scale = run.fit.scale
+    elif run.scale_from:
+        scale, scale_info = scale_from_pose3d(rig, run.scale_from, labels)
+        say(f"  from the 3-D run: {scale_info['px_per_mm']:.3f} px/mm at {scale_info['height_mm']:.0f} mm, "
+            f"the animal {scale_info['size_vs_model']:.2f}x the model")
+    else:
+        scale = sf.estimate_scale(frames, say=say)
     say(f"scale {scale:.3f} px per model unit")
     # chunks with overlap; each frame is taken from the chunk where it is furthest from an edge
     size, ov = max(20, run.chunk), max(0, run.overlap)
@@ -947,7 +957,8 @@ def fit_video(rig_path, video, pose_file, run: RunConfig, out_path, *, progress=
     import pyarrow.parquet as pq
     tab = pa.Table.from_pandas(df, preserve_index=False)
     meta = {"rig": str(rig_path), "video": str(video), "pose": str(pose_file), "fps": fps, "scale_px_per_unit": scale,
-            "limits": rig.limits, "profile": rig.profile.get("name"), "area_ratio": area_ratio, "config": {"start": run.start, "stop": stop, "step": run.step,
+            "limits": rig.limits, "profile": rig.profile.get("name"), "area_ratio": area_ratio,
+            "scale_from": scale_info, "config": {"start": run.start, "stop": stop, "step": run.step,
                                          "fit": fit_d, "mask": {k: list(v) if isinstance(v, tuple) else v
                                                                 for k, v in mask_d.items()}}}
     tab = tab.replace_schema_metadata({**(tab.schema.metadata or {}), b"mufasa_bodymodel": json.dumps(meta).encode()})
@@ -959,6 +970,52 @@ def fit_video(rig_path, video, pose_file, run: RunConfig, out_path, *, progress=
             + (f" (virtual rodent: girth about {suggest_girth(area_ratio):.2f})"
                if str(rig.profile.get("name", "")).startswith("virtual rodent") else ""))
     return out_path
+
+
+# the back's labels, head to tail base, for the animal's size (patch 122ku)
+BACK_CHAIN = ("head_back", "back_T4", "back_T8", "back_L2", "back_L6", "back_V2")
+
+
+def scale_from_pose3d(rig: Rig, pose3d, labels=None, camera=None, chain=BACK_CHAIN) -> tuple[float, dict]:
+    """The video's scale (px per model unit) from a single-camera 3-D run (patch 122ku): the
+    camera's pixels per mm at the back's typical height and place, times the animal's size
+    against the model — the back's length seen from above (head_back to back_V2, median over the
+    frames with the head low) over the same labels on the model at rest. No guessing from the silhouette, so width and
+    scale stay apart. ``pose3d``: a ``<video>_3d.parquet`` (its metadata names the camera file);
+    ``camera``: a Camera or camera file to use instead."""
+    from mufasa.pose3d.camera import Camera
+    from mufasa.pose3d.io import read_pose3d
+    df, meta = read_pose3d(pose3d)
+    if camera is None:
+        cf = meta.get("camera_file")
+        if not cf or not Path(cf).is_file():
+            raise ValueError(f"{Path(pose3d).name}: its camera file ({cf}) is not available")
+        camera = cf
+    cam = camera if isinstance(camera, Camera) else Camera.load(camera)
+    mk = Markers.build(rig, labels)
+    rest = mk.positions(rig, rig.skinning_matrices(neutral()))
+    names = [m for m in chain if m in rest and all(f"{m}_{a}" in df for a in "xyz")]
+    if len(names) < 3:
+        raise ValueError(f"{Path(pose3d).name}: needs at least three of {', '.join(chain)} in 3-D and on the model")
+    X = {m: df[[f"{m}_x", f"{m}_y", f"{m}_z"]].to_numpy(float) for m in names}
+    # from above (the heights of one camera are the least certain part), in frames with the head
+    # low (not rearing), as mono's own size estimate
+    path = sum(np.linalg.norm((X[b] - X[a])[:, :2], axis=1) for a, b in zip(names[:-1], names[1:]))
+    hz = X[names[0]][:, 2]
+    low = np.isfinite(path) & np.isfinite(hz) & (hz <= np.nanmedian(hz))
+    if low.sum() < 20:
+        raise ValueError(f"{Path(pose3d).name}: too few frames with the back's labels")
+    path_m = sum(float(np.linalg.norm((rest[b] - rest[a])[:2])) for a, b in zip(names[:-1], names[1:]))
+    size = float(np.median(path[low]) / path_m)
+    back = np.concatenate([X[m] for m in names if m.startswith("back_")] or [X[names[0]]])
+    z = float(np.nanmedian(back[:, 2]))
+    xy = np.nanmedian(back[:, :2], axis=0)
+    P = np.array([[xy[0], xy[1], z], [xy[0] + 10, xy[1], z], [xy[0], xy[1] + 10, z]])
+    u = cam.project(P)
+    ppmm = float((np.linalg.norm(u[1] - u[0]) + np.linalg.norm(u[2] - u[0])) / 20.0)
+    info = {"pose3d": str(pose3d), "px_per_mm": round(ppmm, 4), "height_mm": round(z, 1),
+            "size_vs_model": round(size, 4), "labels": names}
+    return ppmm * size, info
 
 
 def body_area_ratio(rig: Rig, df, n: int = 40) -> float | None:
@@ -1011,7 +1068,7 @@ def params_at(df, frame: int) -> dict | None:
     return p
 
 
-__all__ = ["CHAIN", "HBP_PROFILE", "LIMITS", "body_area_ratio", "suggest_girth", "PARAMS", "PN", "FitConfig", "FrameProblem", "FrameResult", "MaskConfig",
+__all__ = ["BACK_CHAIN", "CHAIN", "HBP_PROFILE", "LIMITS", "body_area_ratio", "scale_from_pose3d", "suggest_girth", "PARAMS", "PN", "FitConfig", "FrameProblem", "FrameResult", "MaskConfig",
            "Markers", "Rig", "RunConfig", "SequenceFitter", "animal_mask", "animal_polarity", "background", "fit_video",
            "load_labels", "neutral", "observed", "params_at", "read_fit", "search", "similarity_start",
            "to_image"]

@@ -54,6 +54,12 @@ of the mouse's:
 | Body | rearing −10…60°, roll ±15° about the hind paws | assumed |
 | Width | `widen` 0…0.5 per frame (the trunk up to 1.5× wider) | for heavy rats; see *Width* |
 
+The rig stands with its limbs tucked under the body (patch 122ku;
+`rodent_rig.STANCE`). In the model's own zero pose the legs splay sideways
+and stick out of a rat's outline seen from above. The angles are within
+every joint's range, with all four paws on the floor; the fitter keeps
+the limbs in this pose.
+
 The labels sit where `mufasa.pose3d.rodent_model` puts them (the skin over
 the vertebrae, the crown for the ears, the hip joints, caudal vertebrae).
 So the scale does not depend on the head's size; this matters because a
@@ -136,7 +142,21 @@ The limbs keep their rest pose.
 **Scale.** By default it is estimated per video: a first value from the
 labels (corrected by the animal's area in the masks when the two disagree
 by more than 15%), then a fit with the scale free on a few frames that
-have a usable mask, taking the median. You can also set it in px per model unit (the
+have a usable mask, taking the median. That estimate cannot tell a wider
+animal from a bigger one, and it varies with what the animal does in the
+frames it uses.
+
+*Scale from: 3-D run …* (patch 122ku; `--scale-from VIDEO_3d.parquet`)
+takes it from a single-camera 3-D run of the same video instead. It
+multiplies two numbers:
+
+* the camera's pixels per mm at the back's median height and place;
+* the animal's size against the model: the back's length seen from above
+  (`head_back` → `back_V2`, median over the frames with the head low)
+  over the same labels on the model.
+
+The 3-D run's camera file must still be where the run found it. The
+numbers used are stored in the fit file's metadata (`scale_from`). You can also set it in px per model unit (the
 mouse model is in mm).
 
 **Over time** (*Forwards and backwards*, *Smoothness*):
@@ -174,7 +194,7 @@ On the command line:
 ```
 mufasa-pose3d body-fit mouse.rig.npz VIDEO.mp4 LABELS.parquet --out fit.parquet \
     [--start 0 --stop 9000 --step 3 --workers 8] [--no-refine] [--smoothness 0.5] [--scale 4.9] \
-    [--overlay overlay.mp4 [--side-by-side]] [--animal auto|dark|light]
+    [--overlay overlay.mp4 [--side-by-side]] [--animal auto|dark|light] [--scale-from VIDEO_3d.parquet]
 ```
 
 In Python, `mufasa.bodymodel.fit.Rig.local_quaternions(params)` gives each
