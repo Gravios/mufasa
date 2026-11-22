@@ -48,6 +48,38 @@ def cuda_available() -> bool:
     return torch is not None and torch.cuda.is_available()
 
 
+INSTALL = ("pip install 'mufasa[pose3d]' (PyTorch; on Linux PyTorch 2.11+ from PyPI is a CUDA 13 build, "
+           "for a driver whose nvidia-smi shows CUDA 13; for an older driver: pip install torch "
+           "--index-url https://download.pytorch.org/whl/cu128)")
+
+
+def install_hint() -> str:
+    """Patch 122ld: what stands between this machine and the GPU solver, in a sentence; empty
+    when CUDA works with a build that has kernels for the GPU."""
+    import os
+    if torch is None:
+        return "PyTorch is not installed in this Python environment: " + INSTALL
+    if not torch.cuda.is_available():
+        if torch.version.cuda is None:
+            return (f"PyTorch {torch.__version__} is a CPU-only build: reinstall a CUDA build, "
+                    "pip install --force-reinstall torch (Linux, PyPI) or the cu128 index")
+        vis = os.environ.get("CUDA_VISIBLE_DEVICES")
+        if vis is not None and vis.strip() in ("", "-1"):
+            return f"CUDA_VISIBLE_DEVICES='{vis}' hides the GPU: unset it before starting Mufasa"
+        return (f"PyTorch {torch.__version__} (CUDA {torch.version.cuda}) sees no GPU: is the NVIDIA "
+                "driver loaded, and new enough for this CUDA (nvidia-smi shows its CUDA version)?")
+    try:
+        major, minor = torch.cuda.get_device_capability(0)
+        arch = f"sm_{major}{minor}"
+        archs = torch.cuda.get_arch_list()
+        if archs and not any(a.endswith(f"_{major}{minor}") for a in archs):
+            return (f"PyTorch {torch.__version__} has no kernels for {torch.cuda.get_device_name(0)} ({arch}): "
+                    "RTX 50xx (Blackwell) needs PyTorch 2.7+ built for CUDA 12.8 or later: " + INSTALL)
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 def resolve_device(spec: str) -> str:
     """``"cuda"``, ``"torch-cpu"`` or ``"auto"`` → a torch device string."""
     if torch is None:
@@ -523,7 +555,7 @@ def _np_rotm(e):
     return Rotation.from_euler("ZYX", e).as_matrix()
 
 
-__all__ = ["HEAD_SMOOTH_W", "SequenceResult", "available", "chain_residual_fn",
+__all__ = ["INSTALL", "install_hint", "HEAD_SMOOTH_W", "SequenceResult", "available", "chain_residual_fn",
            "cuda_available", "gpu_check", "head_residual_fn", "resolve_device", "solve_frames"]
 
 

@@ -313,12 +313,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if a.cmd == "gpu-check":
         from mufasa.pose3d import gpu
+        hint = gpu.install_hint()                       # 122ld: what is missing, and how to fix it
         if not gpu.available():
-            print("PyTorch is not installed: pip install torch (a CUDA build for the GPU)")
+            print(hint)
             return 1
         import torch
         print(f"PyTorch {torch.__version__}; CUDA available: {torch.cuda.is_available()}"
               + (f" ({torch.cuda.get_device_name(0)})" if torch.cuda.is_available() else ""))
+        if hint:
+            print(hint)
         out = gpu.gpu_check(a.frames)
         return 0 if ("cuda" not in out or out.get("max_difference", 1) < 1e-3) else 1
     if a.cmd == "smooth":

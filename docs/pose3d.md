@@ -487,6 +487,16 @@ The head and spine-chain fits (most of the time) run on
   per core;
 * **CPU (SciPy)** — the original.
 
+The two PyTorch solvers need PyTorch 2.7 or later in Mufasa's environment
+(`pip install "mufasa[pose3d]"`, or `".[qt,pose3d]"` from a checkout).
+Without it only SciPy is offered, and the greyed-out choices say why. On
+Linux, PyTorch 2.11+ from PyPI is a CUDA 13 build, which needs a driver
+whose `nvidia-smi` shows CUDA 13. With an older driver, first install
+`pip install torch --index-url https://download.pytorch.org/whl/cu128`.
+RTX 50xx (Blackwell) cards need 2.7+ built for CUDA 12.8 or later.
+`mufasa-pose3d gpu-check` names what is missing: PyTorch, a CUDA build,
+a hidden GPU (`CUDA_VISIBLE_DEVICES`), the driver, or kernels for the card.
+
 *Solver* (tab) / `--device auto|cuda|torch-cpu|cpu` (CLI) /
 `MonoConfig.device`; *auto* (default) takes the first available. The
 PyTorch solver is a port of SciPy's trust-region solver (same steps, exact

@@ -529,12 +529,16 @@ class Pose3DInferenceForm(OperationForm):
                            ("CPU (PyTorch)", "torch-cpu"), ("CPU (SciPy)", "cpu")):
             self.solver.addItem(label, dev)
         model = self.solver.model()
+        hint = gpu.install_hint()                       # 122ld: why a choice is off, and the fix
         if not gpu.cuda_available():
             model.item(1).setEnabled(False)
+            model.item(1).setToolTip(hint)
         if not gpu.available():
             model.item(2).setEnabled(False)
+            model.item(2).setToolTip(hint)
         self.solver.setToolTip("Head and spine solver. The PyTorch versions are a port of the SciPy "
-                               "solver: same results within rounding, faster; on the GPU much faster.")
+                               "solver: same results within rounding, faster; on the GPU much faster."
+                               + (f"\n\n{hint}" if hint else ""))
         f.addRow("Solver", self.solver)
         self.body_layout.addLayout(f)
         self.cal_dir.textChanged.connect(self.refresh)

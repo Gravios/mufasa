@@ -137,14 +137,15 @@ git clone https://github.com/Gravios/mufasa.git
 cd mufasa
 python3 -m venv .venv            # Python 3.11 or later
 source .venv/bin/activate
-pip install -e ".[qt]"
+pip install -e ".[qt]"            # add pose3d for 3-D pose: ".[qt,pose3d]"
 ```
 
 The `qt` extra installs PySide6, which the workbench needs. Native Cython kernels are compiled during install, so a C compiler must be available. Other extras:
 
 | Extra | Adds |
 |---|---|
-| `gpu` | CuPy for CUDA 12 (Numba's CUDA backend is used as well). |
+| `pose3d` | PyTorch (2.7+), for 3-D inference's faster solvers (CPU and GPU) and the 3-D viewer's posing. On Linux, PyTorch 2.11+ from PyPI is a CUDA 13 build; with an older NVIDIA driver, install `torch` from `https://download.pytorch.org/whl/cu128` first. `mufasa-pose3d gpu-check` says what is missing. |
+| `gpu` | CuPy for CUDA 12 and PyTorch (Numba's CUDA backend is used as well). |
 | `onnx` | ONNX export and onnxruntime inference for classifiers. |
 | `nvenc` | Marker only: hardware video encoding needs a system FFmpeg built with NVENC. |
 | `analysis` | `diptest`, for `mufasa-landscape`. |

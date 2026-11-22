@@ -8,6 +8,26 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ld — Install dependencies for 3-D pose; saying what is missing.**
+Mufasa said PyTorch CUDA was not available. PyTorch was not installed in the user's environment
+at all (an RTX 5070 Ti, driver showing CUDA 13.2), so 3-D inference had run the SciPy solver.
+* `pyproject.toml`: a `pose3d` extra, `torch>=2.7`, for 3-D inference's PyTorch solvers (CPU and
+  GPU), the viewer's batched posing and `gpu-check`. 2.7 is the first release with Blackwell
+  (RTX 50xx, sm_120) kernels, in its CUDA 12.8 builds. `gpu` and `all` move from `torch>=2.4`
+  to 2.7. On Linux, PyTorch 2.11+ from PyPI is a CUDA 13.0 build; with an older driver, install
+  from the cu128 index.
+* `gpu.install_hint()` names what is missing, with the fix:
+  * no PyTorch;
+  * a CPU-only build;
+  * the GPU hidden by `CUDA_VISIBLE_DEVICES`;
+  * no GPU seen (the driver);
+  * a build without kernels for the card.
+
+  `mufasa-pose3d gpu-check` prints it, and the 3-D form's greyed-out solver choices carry it as
+  a tooltip.
+* README (install line and extras table) and docs/pose3d.md (Solver).
+* `tests/smoke_122ld_install_deps.py` (10 checks).
+
 **122lc — One thread per 3-D inference worker.**
 The user's 39 videos on 8 workers ran for 14 hours: 10 done, "2500 minutes left". top showed
 load average 118, each worker at 100–270 % CPU, the CPU 98.6 % busy. The solver held PyTorch to
