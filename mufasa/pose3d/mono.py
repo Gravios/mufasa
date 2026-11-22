@@ -419,8 +419,8 @@ def _pool(workers: int, device: str = "cpu"):
     fork)."""
     if workers is None or workers <= 1 or resolve_device(device) == "cuda":
         return None
-    from concurrent.futures import ProcessPoolExecutor
-    return ProcessPoolExecutor(max_workers=int(workers))
+    from mufasa.pose3d.threads import worker_pool
+    return worker_pool(int(workers))                 # 122lc: one thread per worker
 
 
 def reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig | None = None,

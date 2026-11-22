@@ -242,7 +242,10 @@ def run_pose3d(jobs: list[Job], settings: RunSettings, out_dir, *, progress=None
     on_gpu = settings.mode == "mono" and resolve_device(settings.mono.device) == "cuda"
     if w > 1 and len(jobs) > 1:
         import multiprocessing
-        from concurrent.futures import ProcessPoolExecutor, as_completed
+        from concurrent.futures import as_completed
+        from concurrent.futures.process import BrokenProcessPool
+
+        from mufasa.pose3d.threads import worker_pool
         per = replace(settings, mono=replace(settings.mono, workers=1))
         n = min(w, len(jobs))
         ctx = None
@@ -255,10 +258,17 @@ def run_pose3d(jobs: list[Job], settings: RunSettings, out_dir, *, progress=None
         if progress:
             progress(f"{len(jobs)} videos on {n} workers" + (" sharing the GPU" if on_gpu else ""))
         t0 = time.time()
-        with ProcessPoolExecutor(max_workers=n, mp_context=ctx) as ex:
+        # 122lc: one thread per worker (8 workers with a thread per core each: load 118, the
+        # CPU spinning, 10 videos in about 14 hours instead of minutes)
+        with worker_pool(n, ctx) as ex:
             futs = [ex.submit(_run_job_quiet, (job, per, out_dir)) for job in jobs]
             for i, f in enumerate(as_completed(futs)):
-                stem, rep = f.result()
+                try:
+                    stem, rep = f.result()
+                except BrokenProcessPool as e:
+                    raise RuntimeError(
+                        f"a worker process died ({len(reports)} of {len(jobs)} videos done, in {out_dir}); "
+                        "out of memory, or stopped from outside? Run the others with fewer workers") from e
                 reports[stem] = rep
                 if progress:
                     left = (time.time() - t0) / (i + 1) * (len(jobs) - i - 1)

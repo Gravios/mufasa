@@ -506,7 +506,15 @@ mufasa-pose3d gpu-check
 *Workers* (tab) / `--workers` (CLI; default: all cores but one) /
 `RunSettings.workers`: several videos run at once, one process each; a
 single video splits its 6000-frame head and spine chunks over the
-workers instead. Each worker needs a few hundred MB.
+workers instead. Each worker needs about 1.5 GB for a 30-minute video.
+
+Each worker runs NumPy, SciPy and PyTorch with **one thread** (patch 122lc).
+Before 122lc each worker's libraries started a thread per core. 8 workers on
+a 16-thread machine reached a load average of 118, with the CPU busy but
+spinning: 10 videos took 14 hours instead of minutes. Launching Mufasa with
+`OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1` works around it
+on older versions. A worker that dies (out of memory, stopped from outside)
+ends the run with an error that says how many videos are done and where.
 
 ## Model data
 

@@ -519,8 +519,9 @@ class Pose3DInferenceForm(OperationForm):
         self.workers = QSpinBox(self)
         self.workers.setRange(1, max(1, os.cpu_count() or 1))
         self.workers.setValue(default_workers())
-        self.workers.setToolTip("Processes. Several videos run at once; a single video splits its "
-                                "6000-frame chunks over them. Each needs a few hundred MB.")
+        self.workers.setToolTip("Processes, one thread each. Several videos run at once; a single video "
+                                "splits its 6000-frame chunks over them. Each needs about 1.5 GB for a "
+                                "30-minute video.")
         f.addRow("Workers", self.workers)
         from mufasa.pose3d import gpu
         self.solver = QComboBox(self)

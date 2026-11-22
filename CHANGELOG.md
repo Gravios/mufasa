@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lc — One thread per 3-D inference worker.**
+The user's 39 videos on 8 workers ran for 14 hours: 10 done, "2500 minutes left". top showed
+load average 118, each worker at 100–270 % CPU, the CPU 98.6 % busy. The solver held PyTorch to
+one thread, but every other step let each worker's OpenBLAS, MKL, OpenMP and PyTorch pools start
+a thread per core, so the threads spun against each other.
+* `mufasa/pose3d/threads.py`: `one_thread()` sets the environment, `threadpoolctl` limits for
+  the pools already loaded, and PyTorch's threads. `worker_pool(n, ctx)` is a process pool with
+  it as the initializer. It serves the per-video pool (`pipeline.run_pose3d`) and the per-chunk
+  pool (`mono._pool`), forked or spawned. A single process keeps the defaults.
+* A worker that dies ends the run with an error: how many videos are done, where, and to try
+  fewer workers.
+* The *Workers* tooltip and docs give the real memory (about 1.5 GB per worker for a
+  30-minute video, measured) and the workaround for older versions.
+* `tests/smoke_122lc_worker_threads.py` (7 checks: every pool's workers at one thread in every
+  library, the parent unchanged, a dying worker).
+
 **122lb — The posed rig's frame cache, safe with the background fit (audit finding 2).**
 Second patch of the 3-D pipeline audit.
 * Since 122ky the background fit thread wrote posed frames into `PosedRig._cache`, a plain
