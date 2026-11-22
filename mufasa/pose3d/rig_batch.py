@@ -16,7 +16,9 @@ GPU (CUDA) or the CPU — the batched form of :meth:`mufasa.pose3d.scene_models.
   between from the nearest keyframe's solution, as the per-frame fit starts from a fitted
   neighbour, with the cold starts again where that is clearly worse;
 * then neighbours: frames still off by more than ``good_mm`` start from the frames next to
-  them and keep whichever fits best (smooth, and no heading flips between frames).
+  them and keep whichever fits best (smooth, and no heading flips between frames);
+* 122le: the floor probes' residuals and the clipped marker heights of
+  :mod:`mufasa.pose3d.rig_floor`, as the per-frame fit.
 
 Float64; chunks of frames so the memory stays bounded. ``fit_rig_frames`` returns per-frame
 parameters and marker RMS (mm), as the per-frame fit caches them.
@@ -71,10 +73,14 @@ class RigProblem:
             for b in rig.groups.get(g, ()):
                 rot[b] = (pi.get(yaw), pi.get("tail_pitch"))
         # only the bones the markers depend on, and their ancestors (in the rig's order)
+        from mufasa.pose3d.rig_floor import floor_probes, trunk_vertices
+        probes, trunk = floor_probes(rig), trunk_vertices(rig)
         need = set()
+        groups = [np.flatnonzero(rig.Wd[trunk].sum(0) > 0)]        # 122le: the trunk's bones (floor)
         for n in posed.names:
             m = mk.spec[n]
-            bones = np.flatnonzero(rig.W[list(m[1])].sum(0) > 0) if m[0] == "vert" else [m[1]]
+            groups.append(np.flatnonzero(rig.W[list(m[1])].sum(0) > 0) if m[0] == "vert" else [m[1]])
+        for bones in groups:
             for b in bones:
                 b = int(b)
                 while b >= 0 and b not in need:
@@ -118,6 +124,17 @@ class RigProblem:
         self.bi = torch.as_tensor(bi, dtype=torch.long, device=dev)
         self.bp = torch.as_tensor(np.array(bp), dtype=dt, device=dev)
         self.size = float(posed.size)
+        # 122le: floor probes (rest vertices of the drawn mesh, their widening and weights)
+        self.fw = torch.as_tensor(rig.Wd[probes].astype(float)[:, keep], dtype=dt, device=dev)
+        self.fv = torch.as_tensor(rig.Vd[probes], dtype=dt, device=dev)
+        self.fd = torch.as_tensor(rig.Dd[probes], dtype=dt, device=dev)
+        self.i_widen = pi.get("widen")
+        # the drawn mesh's trunk, for the exact lift after the solve
+        self.aw = torch.as_tensor(rig.Wd[trunk].astype(float)[:, keep], dtype=dt, device=dev)
+        self.av = torch.as_tensor(rig.Vd[trunk], dtype=dt, device=dev)
+        self.ad = torch.as_tensor(rig.Dd[trunk], dtype=dt, device=dev)
+        from mufasa.pose3d.rig_floor import FLOOR_SIGMA_MM, FLOOR_Z_MM
+        self.floor_z, self.floor_sigma = float(FLOOR_Z_MM), float(FLOOR_SIGMA_MM)
         lo = np.r_[-np.inf, -np.inf, -np.inf, -60.0, [p[1] for p in posed.posture]]
         hi = np.r_[np.inf, np.inf, np.inf, 60.0, [p[2] for p in posed.posture]]
         half = np.array([(p[2] - p[1]) / 2 or 1.0 for p in posed.posture])
@@ -149,6 +166,26 @@ class RigProblem:
 
     def markers(self, x):
         """World marker positions (M, 3) for one frame's parameters ``x`` (n,)."""
+        return self._world(x)[0]
+
+    def probe_z(self, x):
+        """122le: heights (mm) of the floor probes for one frame's parameters."""
+        return self._world(x)[1]
+
+    def mesh_z(self, x):
+        """122le: heights (mm) of every trunk vertex of the drawn mesh for one frame's parameters."""
+        R, T = self._bones(x)
+        return self._z(R, T, x, self.aw, self.av, self.ad)
+
+    def _z(self, R, T, x, W, V, D):
+        """Heights of skinned vertices (weights W, rest V, widening D): the heading does not
+        change heights, so only the z rows of the blend."""
+        V = V + (x[self.i_widen] * D if self.i_widen is not None else 0.0)
+        Rz = W @ R[:, 2, :]
+        return self.size * ((Rz * V).sum(1) + W @ T[:, 2]) + x[3]
+
+    def _bones(self, x):
+        """Each kept bone's world rotation (B, 3, 3) and translation (B, 3) in model units."""
         zero = x[0] * 0
         eye3 = torch.eye(3, dtype=x.dtype, device=x.device)
         Rs, ts = [], []
@@ -173,6 +210,11 @@ class RigProblem:
         T = torch.stack(ts)                                       # (B, 3)
         R = Rg @ R
         T = (Rg @ T.T).T + tg
+        return R, T
+
+    def _world(self, x):
+        """(markers (M, 3), floor-probe heights (P,)) for one frame's parameters."""
+        R, T = self._bones(x)
         # vertex markers: linear blend of the bones' transforms
         Rv = torch.einsum("mb,bij->mij", self.vw, R)
         Tv = self.vw @ T
@@ -183,12 +225,29 @@ class RigProblem:
         c, s = torch.cos(x[0]), torch.sin(x[0])
         Px = c * P[:, 0] - s * P[:, 1] + x[1]
         Py = s * P[:, 0] + c * P[:, 1] + x[2]
-        return torch.stack([Px, Py, P[:, 2] + x[3]], 1)
+        fz = self._z(R, T, x, self.fw, self.fv, self.fd)          # the floor probes
+        return torch.stack([Px, Py, P[:, 2] + x[3]], 1), fz
 
     def residual(self, x, Y, ok):
-        P = self.markers(x)
+        P, fz = self._world(x)
         r = ((P - Y) / 4.0) * ok[:, None]
-        return torch.cat([r.reshape(-1), 0.3 * (x[4:] - self.mid) / self.half, (x[3] / 30.0)[None]])
+        fl = torch.clamp(self.floor_z - fz, min=0.0) / self.floor_sigma
+        return torch.cat([r.reshape(-1), 0.3 * (x[4:] - self.mid) / self.half, (x[3] / 30.0)[None], fl])
+
+    def lift(self, x, Y, ok):
+        """122le: raise each row ``x`` (N, n) in place so its lowest floor probe is on the floor
+        (as :func:`mufasa.pose3d.rig_floor.lift`); returns the marker RMS (mm) after."""
+        dt, dev = torch.float64, self.device
+        xt = torch.as_tensor(x, dtype=dt, device=dev)
+        if self.fv.shape[0]:
+            for a in range(0, len(xt), 1024):                       # the whole trunk, in pieces
+                fz = vmap(self.mesh_z)(xt[a:a + 1024])
+                xt[a:a + 1024, 3] += torch.clamp(self.floor_z - fz.min(1).values, min=0.0)
+        Yt = torch.as_tensor(np.nan_to_num(Y), dtype=dt, device=dev)
+        okt = torch.as_tensor(ok, dtype=dt, device=dev)
+        d2 = ((vmap(self.markers)(xt) - Yt) ** 2).sum(2)
+        x[:] = xt.cpu().numpy()
+        return torch.sqrt((d2 * okt).sum(1) / torch.clamp(okt.sum(1), min=1)).cpu().numpy()
 
     # -- many frames ------------------------------------------------------ #
     def solve(self, x0, Y, ok, *, iters: int = 40, lam0: float = 1e-3):
@@ -257,7 +316,9 @@ def fit_rig_frames(posed, frames, *, device: str = "auto", chunk: int = 2048, it
     """{frame: (parameters, marker RMS mm)} for ``frames`` of ``posed`` (a PosedRig); frames
     with fewer than three markers are left out. ``progress(done, total)``; ``stop()`` → True
     ends early (what is done is returned)."""
+    from mufasa.pose3d.rig_floor import clip_targets
     prob = RigProblem(posed, device)
+    zlo, zhi = posed._zlo, posed._zhi
     pose = posed.pose
     frames = [int(f) for f in frames]
     rows = [(f, pose.row(f)) for f in frames]
@@ -272,7 +333,7 @@ def fit_rig_frames(posed, frames, *, device: str = "auto", chunk: int = 2048, it
             break
         part = rows[c0:c0 + chunk]
         idx = np.array([i for _, i in part])
-        Y = pose.xyz[idx][:, names_ix]
+        Y = clip_targets(pose.xyz[idx][:, names_ix], zlo, zhi)             # 122le
         ok = np.isfinite(Y).all(2)
         if pose.likelihood is not None:
             ok &= ~(pose.likelihood[idx][:, names_ix] < 0.5)
@@ -329,6 +390,7 @@ def fit_rig_frames(posed, frames, *, device: str = "auto", chunk: int = 2048, it
             Xn, Cn, Rn = prob.solve(xb[j[k]], Y[k], ok[k], iters=warm_iters)
             imp = Cn < cb[k] - 1e-9
             xb[k[imp]], cb[k[imp]], rb[k[imp]] = Xn[imp], Cn[imp], Rn[imp]
+        rb = prob.lift(xb, Y, ok)                                  # 122le: exactly above the floor
         xb[:, 0] = (xb[:, 0] + math.pi) % (2 * math.pi) - math.pi
         for f, xx, rr in zip(fr, xb, rb):
             out[f] = (xx.copy(), float(rr))

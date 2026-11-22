@@ -777,6 +777,8 @@ def smooth_run(run_dir, cfg, root=None) -> Path:
 
     from mufasa.pose3d.io import marker_names, read_pose3d, write_pose3d
     from mufasa.pose3d.kalman3d import smooth_pose3d_frame
+    from mufasa.pose3d.mono import camera_center_from_meta, enforce_heights
+    from mufasa.pose3d.pipeline import _label_map
     from mufasa.project_layout import ProjectPaths, generate_run_id, write_run_toml
     run_dir = Path(run_dir)
     rid = generate_run_id()
@@ -785,15 +787,16 @@ def smooth_run(run_dir, cfg, root=None) -> Path:
     files = sorted(run_dir.glob("*_3d.parquet"))
     for p in files:
         df, meta = read_pose3d(p)
-        center = None
-        P = (meta.get("camera") or {}).get("P")
-        if P is not None and "two cameras" not in meta.get("method", ""):
-            _, _, vt = np.linalg.svd(np.asarray(P, float))
-            c = vt[-1]
-            center = c[:3] / c[3]
+        center = camera_center_from_meta(meta)
         sm, info = smooth_pose3d_frame(df, marker_names(df), cfg, center)
         meta["method"] = meta.get("method", "") + f"; 3-D Kalman (RTS) smoothing σa={cfg.sigma_a:g}"
         meta.setdefault("report", {})["kalman3d"] = info
+        # 122le: smoothing can carry labels out of their height range or under the floor
+        anat = (meta.get("report") or {}).get("anatomy") or {}
+        meta["report"]["heights_fixed"] = enforce_heights(
+            sm, marker_names(sm), center=center, scale=float(anat.get("scale", 1.0)),
+            model=(anat.get("model") or "virtual_rodent") if anat and center is not None else None,
+            label_map=_label_map(marker_names(sm), anat))
         write_pose3d(sm, out / p.name, meta)
         print(f"{p.name}: moved {info['moved_mm_median']:.1f} mm median")
     write_run_toml(out / "run.toml", stage="pose3d", run_id=out.name, inputs=[str(p) for p in files],

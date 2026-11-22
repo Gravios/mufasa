@@ -304,6 +304,10 @@ class PosedRig:
         self.size = float(size) if size else self._estimate_size(rest)
         self._cache = PoseCache()                 # 122lb: shared with the background fit thread
         self.good_mm = 12.0                    # a start within this marker error ends the search
+        # 122le: the mesh stays above the floor; marker heights within the body's range
+        from mufasa.pose3d.rig_floor import floor_probes, target_z_range
+        self._probes = floor_probes(self.rig)
+        self._zlo, self._zhi = target_z_range(self.names, self.size)
 
     @property
     def name(self) -> str:
@@ -344,6 +348,15 @@ class PosedRig:
         P = self.size * np.array([pos[n] for n in self.names])
         return _yaw(P, phi) + np.array([tx, ty, tz]), G, p
 
+    def _probe_z(self, G, p, tz, every: bool = False):
+        """122le: heights (mm) of the floor probes (:func:`mufasa.pose3d.rig_floor.floor_probes`),
+        or of every trunk vertex of the drawn mesh."""
+        from mufasa.bodymodel.fit import Rig
+        from mufasa.pose3d.rig_floor import trunk_vertices
+        pr = trunk_vertices(self.rig) if every else self._probes
+        V = Rig.lbs(G, self.rig.verts(p, True)[pr], self.rig.Wd[pr])
+        return self.size * V[:, 2] + tz
+
     def _initial(self, Y, ok):
         """Heading and position from a 2-D Procrustes of the rest markers onto the data."""
         A, B = self.size * self._rest[ok, :2], Y[ok, :2]
@@ -362,7 +375,8 @@ class PosedRig:
         i = self.pose.row(frame)
         if i is None:
             return None
-        Y = self.pose.xyz[i, self._col]
+        from mufasa.pose3d.rig_floor import clip_targets, floor_residual
+        Y = clip_targets(self.pose.xyz[i, self._col], self._zlo, self._zhi)
         ok = np.isfinite(Y).all(1)
         if self.pose.likelihood is not None:
             ok &= ~(self.pose.likelihood[i, self._col] < 0.5)
@@ -375,9 +389,10 @@ class PosedRig:
         mid = np.array([self.rig.prior_centre.get(p[0], (p[1] + p[2]) / 2) for p in self.posture])
 
         def res(x):
-            P, _, _ = self._markers_world(x)
+            P, G, p = self._markers_world(x)
             r = ((P[ok] - Y[ok]) / 4.0).ravel()                      # 4 mm
-            return np.r_[r, 0.3 * (x[4:] - mid) / half, x[3] / 30.0]
+            fl = floor_residual(self._probe_z(G, p, x[3]))           # 122le: not under the floor
+            return np.r_[r, 0.3 * (x[4:] - mid) / half, x[3] / 30.0, fl]
         nf = self._cache.nearest(frame, 30)
         x0 = self._initial(Y, ok)
         flip = np.r_[math.pi, 0, 0, 0, [0] * len(self.posture)]
@@ -400,9 +415,12 @@ class PosedRig:
             # good enough: stop early (from a neighbour: unless clearly worse than the neighbour)
             if err < self.good_mm or (near and k == 0 and err < max(2 * nb_rms, 25.0)):
                 break
-        P, _, _ = self._markers_world(best.x)
-        rms = float(np.sqrt(np.mean(np.sum((P[ok] - Y[ok]) ** 2, 1))))
         x = best.x.copy()
+        from mufasa.pose3d.rig_floor import lift
+        P, G, p = self._markers_world(x)
+        x[3] += lift(self._probe_z(G, p, x[3], every=True))     # 122le: the trunk on the floor
+        P, _, _ = self._markers_world(x)
+        rms = float(np.sqrt(np.mean(np.sum((P[ok] - Y[ok]) ** 2, 1))))
         x[0] = (x[0] + math.pi) % (2 * math.pi) - math.pi
         self._cache[frame] = (x, rms)
         return (x, rms)
@@ -445,7 +463,8 @@ class PosedRig:
         p, phi, tx, ty, tz = self._x2p(x)
         from mufasa.bodymodel.fit import Rig
         V = Rig.lbs(self.rig.skinning_matrices(p), self.rig.verts(p, True), self.rig.Wd)
-        return _yaw(self.size * V, phi) + np.array([tx, ty, tz])
+        from mufasa.pose3d.rig_floor import rest_on_floor
+        return rest_on_floor(_yaw(self.size * V, phi) + np.array([tx, ty, tz]))   # 122le: limbs on the floor
 
     def info(self, frame: int | None = None) -> str:
         f = self.fit_frame(frame) if frame is not None else None

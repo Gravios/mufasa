@@ -133,6 +133,37 @@ the ray* vs *across the ray*), so smoothing evens out depth while points
 stay on their labels. Runs inside 3-D inference (checkbox) or on an
 existing run (*3-D Kalman smoothing* section, new run).
 
+## 5. Heights and the floor
+
+A single camera sees heights worst near the floor, where a few pixels
+along the line of sight are many millimetres of height. Patch 122le adds a
+last step to every 3-D run, after the Kalman smoothing: each label is kept
+within the height range the virtual rodent allows it (`head_nose`, the
+ears, the back and the hips, scaled to the animal, plus 10 %) and **never
+below the floor (z = 0)**. Labels the model has no range for, and
+two-camera runs, are kept above the floor only.
+
+* A single-camera label moves **along its camera ray**, so it still
+  reprojects onto its 2-D label. Without a camera it moves straight up or
+  down.
+* The head moves as one: if any head label would go under the floor or out
+  of its range, the whole head slides along the rays. The floor wins when
+  the ranges disagree. Before, only the ears' mean height was checked, and
+  K7's nose went under the floor in 5 % of frames.
+* `<marker>_z_fixed` marks the frames moved; the report's `heights_fixed`
+  counts them per marker.
+* The form's 3-D smoothing applies it after smoothing too.
+
+Files made before this need no rerun of 3-D inference:
+
+```
+mufasa-pose3d heights K7_3d.parquet --out K7_3d_h.parquet [--scale 1.17] [--model none] [--camera camera.toml]
+```
+
+It takes the camera and the scale from the file (the scale otherwise from
+nose to tail base). On K7 it moved the nose in 4.7 % of frames, `head_back`
+in 1.6 % and `back_T4` in 0.8 %.
+
 ## The 3-D viewer: video in the 3-D view
 
 With a camera in the file (every 3-D inference run has one) and a video,
@@ -205,6 +236,27 @@ hidden by unticking it.
   frame on a 2-core CPU against 220 ms. While it runs, the viewer shows the
   nearest posed frame instead of fitting frames itself. *Fit all frames*
   again stops it.
+* The rig stays on top of the floor (122le). Before, the fitted mesh went
+  under the floor in 97 % of K7's frames, by up to 10 cm. Mostly that was
+  the legs and the tail. The rig's legs cannot bend (they keep the tucked
+  stance), so when the spine flexes 3–5° a joint the forelimbs swing
+  30–40 mm into the floor. Now:
+  * **the trunk** (pelvis, spine, neck, head) never goes below the floor.
+    The fit has a penalty for 37 *floor probes*, the lowest trunk vertices
+    below z = 0, and after the solve the body is lifted by whatever trunk is
+    still under the floor;
+  * **the limbs and the tail** that reach the floor are drawn lying on it,
+    as a flexed leg or a dragged tail would. They do not lift the body off
+    its markers;
+  * marker heights are clipped to the body's range before fitting, so old
+    files pose sensibly too.
+
+  The per-frame and batched fits do the same (`mufasa/pose3d/rig_floor.py`).
+  On K7 the trunk never goes under the floor, and the marker error is
+  28.7 mm (median; 27.1 before). Lifting the whole body instead cost 37 mm.
+  The limbs or the tail reach the floor in 98 % of frames, 25 mm deep at
+  the median. Legs that bend to the floor would need leg inverse
+  kinematics, which the rig does not have yet.
 * The viewer works out the volume's extent once. It was recomputed over
   every frame on each paint (0.4 s a paint on a 108,000-frame recording).
 * The virtual rodent's mouth is closed. The skin was bound with the jaw
@@ -328,7 +380,8 @@ paw's mean load share, strides, stance times and duty factors, and the
 phases (LF→RF, LH→RH, LH→LF, LH→RF). In the 3-D viewer, *View & models →
 Load… → `<video>_gait.parquet`* draws the planted paws (sized by load),
 the support polygon, the centre of mass over the floor and the ZMP (green
-inside, red outside).
+inside, red outside). It is an overlay next to the virtual rodent. It does
+not move the model's legs, which stay in the rig's tucked stance.
 
 **Limits.**
 * A single camera's heights are uncertain, and the centre of mass and the
@@ -475,6 +528,7 @@ mufasa-pose3d infer --project project.toml [--video STEM ...] [--no-kalman] [--s
 mufasa-pose3d gpu-check
 mufasa-pose3d infer --pose labels.parquet --fallback kv2.parquet --camera camera_K7.toml --out K7_3d.parquet
 mufasa-pose3d smooth K7_3d.parquet --camera camera_K7.toml --out K7_3d_smooth.parquet
+mufasa-pose3d heights K7_3d.parquet --out K7_3d_h.parquet
 ```
 
 ## Solver: GPU, PyTorch or SciPy

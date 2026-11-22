@@ -484,7 +484,8 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
     anat = Anatomy.for_session(cfg, cam0, Uf, L, X) if cfg.anatomy else None
     if anat is not None:
         report["anatomy"] = {"model": cfg.anatomy, "scale": round(anat.scale, 3),
-                             "scale_from": anat.scale_from}
+                             "scale_from": anat.scale_from,
+                             "labels": {k: v for k, v in anat.names.items() if k != v}}   # 122le: project → model
         n_lo, n_hi = anat.limit_head(cam0, X, head)
         report["anatomy"]["head_frames_lowered"] = n_hi
         report["anatomy"]["head_frames_raised"] = n_lo
@@ -596,6 +597,55 @@ def _reconstruct_mono(pose: Pose2D, camera: Camera, cfg: MonoConfig, progress,
 # --------------------------------------------------------------------------- #
 # Anatomical limits (122kr)
 # --------------------------------------------------------------------------- #
+FLOOR_Z_MM = 0.0          # 122le: no label below the floor
+
+
+def camera_center_from_meta(meta: dict) -> np.ndarray | None:
+    """The camera centre of a single-camera 3-D file (its metadata's projection matrix), or None
+    (no camera, or two cameras)."""
+    P = (meta.get("camera") or {}).get("P")
+    if P is None or "two cameras" in str(meta.get("method", "")):
+        return None
+    _, _, vt = np.linalg.svd(np.asarray(P, float))
+    c = vt[-1]
+    return c[:3] / c[3] if abs(c[3]) > 1e-12 else None
+
+
+def enforce_heights(df, names: list[str], *, camera: Camera | None = None, center=None, scale: float = 1.0,
+                    model: str | None = "virtual_rodent", margin: float = 0.1, label_map: dict | None = None) -> dict:
+    """122le: every marker of a 3-D table within its body model's height range and above the floor,
+    moved along its camera ray — the line through the camera's centre (``camera`` or ``center``)
+    and the point, so it still reprojects onto its 2-D label — or, without a camera, straight up
+    or down. ``<m>_z_fixed`` marks the frames moved. Markers the model does not know, or no model
+    (``model=None``), are kept above the floor only. In place; returns {marker: frames moved}."""
+    from mufasa.pose3d import rodent_model
+    lim = rodent_model.load_limits() if model == "virtual_rodent" else {"label_heights": {}}
+    names_map = label_map or {m: m for m in names}
+    anat = Anatomy(lim, scale, names_map, margin=margin)
+    out = {}
+    for m in names:
+        X = df[[m + "_x", m + "_y", m + "_z"]].to_numpy(float)
+        lo, hi = anat.zrange_floor(m)
+        z = X[:, 2]
+        zc = np.clip(z, lo, hi)
+        moved = np.isfinite(z) & (np.abs(zc - z) > 1e-9)
+        C = camera.center if camera is not None else (None if center is None else np.asarray(center, float))
+        if moved.any():
+            if C is not None and np.all(np.isfinite(C)):
+                d = X - C
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    s = (zc - C[2]) / d[:, 2]
+                Xr = C + s[:, None] * d
+                X = np.where((moved & np.isfinite(s))[:, None], Xr, X)
+                X[moved & ~np.isfinite(s), 2] = zc[moved & ~np.isfinite(s)]
+            else:
+                X[moved, 2] = zc[moved]
+            df[m + "_x"], df[m + "_y"], df[m + "_z"] = X[:, 0], X[:, 1], X[:, 2]
+        df[m + "_z_fixed"] = moved
+        out[m] = int(moved.sum())
+    return out
+
+
 class Anatomy:
     """Height ranges of the labels and bend ranges of the spine from a body
     model (:mod:`mufasa.pose3d.rodent_model`), scaled to the session's rat.
@@ -649,6 +699,11 @@ class Anatomy:
         length = sum(np.linalg.norm((b - a)[:, :2], axis=1) for a, b in zip(P[:-1], P[1:]))
         return float(np.median(length) / model_path_mm), f"back length over {int(ok.sum())} frames"
 
+    def zrange_floor(self, name: str) -> tuple[float, float]:
+        """122le: the label's height range, and never below the floor (z = 0)."""
+        lo, hi = self.zrange(name)
+        return max(lo, FLOOR_Z_MM) if np.isfinite(lo) else FLOOR_Z_MM, hi
+
     def zrange(self, name: str) -> tuple[float, float]:
         """(lowest, highest) height in mm for a project label (±inf when the
         model has no limit for it)."""
@@ -659,21 +714,35 @@ class Anatomy:
 
     def limit_head(self, cam: Camera, X: dict, head: list[str]) -> tuple[int, int]:
         """Move the rigid head along the camera rays (scaling it about the
-        camera centre: it still reprojects onto its labels) so the ears are
-        within their height range. Returns (frames raised, frames lowered)."""
-        ears = [m for m in head if self.names.get(m) in ("head_left", "head_right")]
-        if len(ears) != 2:
-            return 0, 0
-        r = [self.zrange(m) for m in ears]
-        lo, hi = (r[0][0] + r[1][0]) / 2, (r[0][1] + r[1][1]) / 2
+        camera centre: it still reprojects onto its labels) so every head label
+        is within its height range and above the floor (122le: all of them, not
+        only the ears' mean; the nose went under the floor in 5 % of K7's
+        frames). When the ranges cannot all hold, the floor wins. Returns
+        (frames raised, frames lowered)."""
         C = cam.center
-        ez = (X[ears[0]][:, 2] + X[ears[1]][:, 2]) / 2
-        with np.errstate(invalid="ignore", divide="ignore"):
-            k = (C[2] - np.clip(ez, lo, hi)) / (C[2] - ez)
-        k = np.where(np.isfinite(k), k, 1.0)
+        N = len(next(iter(X.values())))
+        k_lo, k_hi = np.zeros(N), np.full(N, np.inf)       # allowed scale about the camera centre
+        any_range = False
+        for m in head:
+            lo, hi = self.zrange_floor(m)
+            z = X[m][:, 2]
+            ok = np.isfinite(z) & (C[2] - z > 1e-6)
+            if not ok.any():
+                continue
+            any_range = True
+            with np.errstate(invalid="ignore", divide="ignore"):
+                d = C[2] - z                                    # > 0: the camera is above
+                k_hi = np.where(ok, np.minimum(k_hi, (C[2] - lo) / d), k_hi)       # not below lo
+                if np.isfinite(hi):
+                    k_lo = np.where(ok, np.maximum(k_lo, (C[2] - hi) / d), k_lo)   # not above hi
+        if not any_range:
+            return 0, 0
+        k = np.clip(1.0, k_lo, np.inf)
+        k = np.minimum(k, k_hi)                                 # the floor wins a conflict
+        k = np.where(np.isfinite(k) & (k > 0), k, 1.0)
         for m in head:
             X[m] = C + k[:, None] * (X[m] - C)
-        return int((ez < lo).sum()), int((ez > hi).sum())
+        return int((k < 1 - 1e-9).sum()), int((k > 1 + 1e-9).sum())
 
     def clamp(self, cam: Camera, X: dict, names: list[str]) -> dict:
         """Keep labels within their height range, along their rays. Returns

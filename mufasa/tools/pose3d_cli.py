@@ -12,6 +12,7 @@
     mufasa-pose3d import-c3d TRIAL.c3d ... --project project.toml [--up y] [--rename a=b,c=d] [--edges a-b,b-c]
     mufasa-pose3d body-rig MODEL.blend OUT.rig.npz [--blender /path/to/blender]   # rig for body fitting
     mufasa-pose3d body-rig --virtual-rodent OUT.rig.npz [--girth 1.3]             # the built-in rat
+    mufasa-pose3d heights X_3d.parquet --out X_3d_h.parquet [--scale 1.17] [--model none]  # heights, floor
     mufasa-pose3d gait X_3d.parquet --out X_gait.parquet [--mass-g 450] [--fps 30]  # paws, loads, gait
     mufasa-pose3d body-fit RIG.rig.npz VIDEO POSE --out FIT.parquet [--start 0 --stop N --step 1 --workers 4]
         [--no-refine] [--smoothness 0.5] [--scale PX] [--overlay OUT.mp4 [--side-by-side]]
@@ -159,6 +160,15 @@ def build_parser() -> argparse.ArgumentParser:
                     help="the animal against an adult rat: lengths × this, times × its square root")
     gc = sub.add_parser("gpu-check", help="is the GPU solver usable here? (synthetic run, CPU vs CUDA)")
     gc.add_argument("--frames", type=int, default=20000)
+    hp = sub.add_parser("heights", help="labels within the body model's height range and above the floor "
+                                         "(along the camera rays)")
+    hp.add_argument("input")
+    hp.add_argument("--out", required=True)
+    hp.add_argument("--scale", type=float, help="the animal against the model (default: from the file's report, "
+                                                "else nose to tail base)")
+    hp.add_argument("--model", default="virtual_rodent", help="'virtual_rodent', or 'none' (the floor only)")
+    hp.add_argument("--camera", help="camera file (default: the file's own camera)")
+    hp.add_argument("--margin", type=float, default=0.1, help="slack on the model's ranges (0.1 = 10 %%)")
     s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file")
     s.add_argument("input")
     s.add_argument("--out", required=True)
@@ -324,6 +334,35 @@ def main(argv: list[str] | None = None) -> int:
             print(hint)
         out = gpu.gpu_check(a.frames)
         return 0 if ("cuda" not in out or out.get("max_difference", 1) < 1e-3) else 1
+    if a.cmd == "heights":
+        from mufasa.pose3d.io import marker_names, read_pose3d, write_pose3d
+        from mufasa.pose3d.mono import camera_center_from_meta, enforce_heights
+        df, meta = read_pose3d(a.input)
+        names = marker_names(df)
+        if a.camera:
+            from mufasa.pose3d.camera import Camera
+            center = Camera.load(a.camera).center
+        else:
+            center = camera_center_from_meta(meta)
+        anat = (meta.get("report") or {}).get("anatomy") or {}
+        scale = a.scale or anat.get("scale")
+        if not scale:
+            from mufasa.pose3d.gait import BodyPhysics, animal_size
+            xyz = np.stack([df[[f"{n}_x", f"{n}_y", f"{n}_z"]].to_numpy(float) for n in names], 1)
+            scale = animal_size(BodyPhysics.virtual_rodent(), names, xyz)
+        model = None if a.model == "none" else a.model
+        from mufasa.pose3d.pipeline import _label_map
+        fixed = enforce_heights(df, names, center=center, scale=float(scale), model=model, margin=a.margin,
+                                label_map=_label_map(names, anat))
+        meta.setdefault("report", {})["heights_fixed"] = fixed
+        meta["method"] = (meta.get("method", "") + "; heights within the body's range, above the floor").lstrip("; ")
+        write_pose3d(df, a.out, meta)
+        n = max(len(df), 1)
+        moved = {m: v for m, v in fixed.items() if v}
+        print(f"scale {float(scale):.2f}, {'along the camera rays' if center is not None else 'straight up/down'}; "
+              + (", ".join(f"{m} {v} ({100 * v / n:.1f} %)" for m, v in moved.items()) or "nothing moved")
+              + f"; wrote {a.out}")
+        return 0
     if a.cmd == "smooth":
         from mufasa.pose3d.camera import Camera
         from mufasa.pose3d.io import marker_names, read_pose3d, write_pose3d

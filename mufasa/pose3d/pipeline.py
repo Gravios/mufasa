@@ -140,6 +140,14 @@ def find_jobs(pose_dir, calibration_dir, fallback_dir=None, *, stems: list[str] 
     return jobs, problems
 
 
+def _label_map(names, anat: dict) -> dict:
+    """122le: project label → body-model label (the reconstruction's mapping; the same name
+    otherwise)."""
+    m = {n: n for n in names}
+    m.update({k: v for k, v in (anat.get("labels") or {}).items() if k in m})
+    return m
+
+
 def run_job(job: Job, settings: RunSettings, out_dir, progress=None) -> dict:
     say = progress or (lambda s: None)
     cam = Camera.load(job.camera)
@@ -170,6 +178,17 @@ def run_job(job: Job, settings: RunSettings, out_dir, progress=None) -> dict:
         df, kinfo = smooth_pose3d_frame(df, names, settings.kalman, center)
         rep["kalman3d"] = kinfo
         method += f"; 3-D Kalman (RTS) smoothing σa={settings.kalman.sigma_a:g}"
+    # 122le: every label within its height range and above the floor, along its ray (smoothing
+    # can carry labels out again; the reconstruction keeps only the trunk and the head in range)
+    from mufasa.pose3d.mono import enforce_heights
+    anat = rep.get("anatomy") or {}
+    mono_run = settings.mode != "stereo"
+    rep["heights_fixed"] = enforce_heights(
+        df, names, camera=cam if mono_run else None, scale=float(anat.get("scale", 1.0)),
+        model=(anat.get("model") or "virtual_rodent") if mono_run and anat else None,   # stereo: the floor
+        margin=settings.mono.anatomy_margin, label_map=_label_map(names, anat))
+    method += "; heights within the body's range, above the floor"
+    if settings.kalman is not None:
         if center is not None:
             import numpy as np
             for m in names:

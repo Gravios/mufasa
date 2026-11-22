@@ -8,6 +8,40 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122le — Heights the body can have, and the model on top of the floor.**
+The virtual rodent clipped through the floor in the 3-D viewer, and single-camera heights near
+the ground were sometimes impossible: K7's nose was under the floor in 5 % of frames, and
+`head_back` and `back_T4` were out of range in 2–3 %.
+* `mono.enforce_heights` is the last step of every 3-D run, after the Kalman smoothing. Each
+  label stays within the virtual rodent's height range for it, scaled to the animal plus 10 %,
+  and above the floor (z = 0).
+  * Single-camera labels move along their camera ray, so they still reproject onto the 2-D
+    label; without a camera they move straight up or down.
+  * Two-camera runs, and labels the model has no range for, are kept above the floor only.
+  * `<m>_z_fixed` flags the frames moved; the report's `heights_fixed` counts them.
+  * Project labels map to the model's through the run's anatomy report (now `labels`).
+* `Anatomy.limit_head` keeps every head label in range and above the floor, sliding the rigid
+  head along the rays. Before, it checked only the ears' mean. The floor wins a conflict.
+* The form's 3-D smoothing applies it too. `mono.camera_center_from_meta` replaces the form's
+  own copy of the computation.
+* `mufasa-pose3d heights IN --out OUT` fixes files already made, without rerunning 3-D
+  inference.
+* The viewer's rig fit (`pose3d/rig_floor.py`, shared by the per-frame and batched fits):
+  * the trunk (the profile's `trunk` bones) never goes below the floor: a penalty for 37 floor
+    probes (each trunk bone's lowest vertex plus the 32 lowest), and an exact lift after the
+    solve, measured on every trunk vertex;
+  * the limbs and the tail are drawn lying on the floor where they reach it. The rig's legs
+    cannot bend, and the forelimbs swing 30–40 mm into the floor at 3–5° of lumbar flexion
+    per joint; lifting the whole body for them cost 10 mm of marker error;
+  * marker targets clipped to the body's heights.
+
+  On K7 the mesh went under the floor in 97 % of frames, by up to 10 cm. Now the trunk never
+  does, and the marker error is 28.7 mm (median; 27.1 before). The limbs or the tail lie on the
+  floor in 98 % of frames, 25 mm deep at the median: leg IK is the real fix. Only the trunk's
+  bones are kept in the batched kinematics, as before.
+* docs/pose3d.md: *5. Heights and the floor*; the gait overlay does not move the model's legs.
+* `tests/smoke_122le_heights_floor.py` (13 checks).
+
 **122ld — Install dependencies for 3-D pose; saying what is missing.**
 Mufasa said PyTorch CUDA was not available. PyTorch was not installed in the user's environment
 at all (an RTX 5070 Ti, driver showing CUDA 13.2), so 3-D inference had run the SciPy solver.
