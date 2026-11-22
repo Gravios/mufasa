@@ -21,6 +21,13 @@ the body can do.
   back's frame. So the whole-body centre of mass follows whatever the
   markers do: crouching, rearing, the head turned, the tail swung.
 * **Reach.** Each limb's reach (girdle to paw) over its joints' ranges.
+* **Three sections** (patch 122lf): lower (pelvis, hind legs, tail; 212 g), mid (thorax and
+  lumbar spine; 74 g) and upper (shoulders, forelegs, neck, head; 52 g). Each has its centre of
+  mass, a heading from its stretch of the back seen from above (none when that stretch is
+  steeper than 60°, as when rearing: held from the frames either side), and its velocity and
+  momentum along and across that heading. The hips are moved by the lower section and half the
+  trunk, the shoulders by the thorax (:data:`LIMB_DRIVE`); stance, swing and stride follow that
+  forward speed, not speed in any direction.
 
 **The paws** (:func:`estimate_gait`) are placed as rarely as the body
 allows ("minimum placements"):
@@ -34,11 +41,15 @@ allows ("minimum placements"):
   lifts anyway.
 * A paw does not lift while its partner on the other side is in the air,
   unless it must.
-* It swings for a physiological time and lands ahead of its girdle,
-  where the girdle will be by then, by half a stride. When the girdle
-  is too high for the leg to reach the floor (rearing forelimbs), the
-  paw stays in the air until it can land. At mid-stance a paw is beside
-  the body's midline, at half the base of support.
+* It swings for a physiological time and lands where its girdle's place
+  will be at mid-stance, half a stance later, read from the body's actual
+  path (scanning forward). When the girdle is too high for the leg to
+  reach the floor (rearing forelimbs), the paw stays in the air until it
+  can land. A paw's place is beside the midline between its girdle pair,
+  half the base of support out across that girdle's heading.
+* Scanning backward: once every stance's timing is known, each paw is
+  moved to where it stays closest to its place over the whole stance,
+  within the leg's reach at every frame of it.
 
 **Weight distribution.** Each frame, the vertical load is m(g + a_z).
 It is shared among the planted paws so that their centre of pressure is
@@ -222,6 +233,89 @@ def _anchor(point, rest: dict, R, k: int = 3, allowed=ANCHORS) -> Anchor:
     return Anchor(tuple(near), w, off)
 
 
+# 122le+1 (122lf): the body in three sections, each with its own mass, heading and momentum
+SECTIONS = ("lower", "mid", "upper")
+SECTION_AXIS = {                       # (rear labels, front labels): the first present of each
+    "lower": (("back_V2", "back_L6"), ("back_L2", "back_T8")),        # pelvis and hindquarters
+    "mid": (("back_L2", "back_L6"), ("back_T4", "back_T8")),          # lumbar and thorax
+    "upper": (("back_T8", "back_T4"), ("head_back", "head_mid")),     # shoulders, neck, head
+}
+# what moves a girdle (K7, 3000 stances): the hips the pelvis's section and half the trunk; the
+# shoulders the thorax they sit on (the head and neck, scanning, swing on their own: taking them in
+# put the forepaws' left–right phase at 0.38, the whole body's momentum at 0.33; CatWalk 0.5)
+LIMB_DRIVE = {"H": {"lower": 1.0, "mid": 0.5}, "F": {"mid": 1.0}}
+TURN_DEG_S = 90.0              # the mid section turning faster than this: turning
+SIDESTEP_RATIO = 0.5           # sideways speed above this share of forward speed: stepping sideways
+LEVEL_RATIO = 0.5              # a section's axis seen from above at least this share of its length
+
+
+def body_section(body: str) -> str:
+    """lower (pelvis, hind legs, tail), mid (thorax, lumbar spine) or upper (shoulders, forelegs,
+    neck, head) for a virtual-rodent body."""
+    import re
+    if body == "pelvis" or body.startswith(("upper_leg", "lower_leg", "foot", "toe")) \
+            or re.fullmatch(r"vertebra_C\d+", body):
+        return "lower"
+    if body == "torso" or re.fullmatch(r"vertebra_\d+", body):
+        return "mid"
+    return "upper"
+
+
+def _first(P: dict, labels, T: int) -> np.ndarray:
+    """Per frame, the first of ``labels`` present (T, 3; NaN where none is)."""
+    out = np.full((T, 3), np.nan)
+    for m in labels:
+        if m in P:
+            take = ~np.isfinite(out).all(1) & np.isfinite(P[m]).all(1)
+            out[take] = P[m][take]
+    return out
+
+
+def body_frames(names, xyz) -> np.ndarray:
+    """:func:`body_frame` for every frame at once: (T, 3, 3), NaN where the back is missing."""
+    names = list(names)
+    xyz = np.asarray(xyz, float)
+    T = len(xyz)
+    P = {n: xyz[:, j] for j, n in enumerate(names)}
+    n_back = sum(np.isfinite(P[m]).all(1).astype(int) for m in TRUNK if m in P) if any(m in P for m in TRUNK) \
+        else np.zeros(T, int)
+    front = _first(P, ("back_T4", "back_T8", "head_back"), T)
+    rear = _first(P, ("back_V2", "back_L6", "back_L2"), T)
+    x = front - rear
+    n = np.linalg.norm(x, axis=1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        x = x / n[:, None]
+        y = np.stack([-x[:, 1], x[:, 0], np.zeros(T)], 1)              # z × x
+        ny = np.linalg.norm(y, axis=1)
+        y = y / ny[:, None]
+    R = np.stack([x, y, np.cross(x, y)], 2)
+    bad = ~(np.isfinite(n) & (n >= 1e-6) & np.isfinite(ny) & (ny >= 1e-6) & (np.asarray(n_back) >= 2))
+    R[bad] = np.nan
+    return R
+
+
+def section_headings(names, xyz) -> tuple[np.ndarray, np.ndarray]:
+    """Each section's heading seen from above, per frame: unit vectors (T, 3, 2) in
+    :data:`SECTIONS` order, and whether the section is level enough for one (T, 3): its axis
+    from above at least :data:`LEVEL_RATIO` of its length (a rearing back points up, and its
+    heading from above is noise). NaN where not."""
+    names = list(names)
+    xyz = np.asarray(xyz, float)
+    T = len(xyz)
+    P = {n: xyz[:, j] for j, n in enumerate(names)}
+    H = np.full((T, 3, 2), np.nan)
+    ok = np.zeros((T, 3), bool)
+    for k, s in enumerate(SECTIONS):
+        rear_l, front_l = SECTION_AXIS[s]
+        a = _first(P, front_l, T) - _first(P, rear_l, T)
+        h = np.linalg.norm(a[:, :2], axis=1)
+        L = np.linalg.norm(a, axis=1)
+        good = np.isfinite(h) & (h > 1.0) & (h >= LEVEL_RATIO * L)
+        H[good, k] = a[good, :2] / h[good, None]
+        ok[:, k] = good
+    return H, ok
+
+
 @dataclass
 class BodyPhysics:
     """The virtual rodent as a physics model: segment masses carried by the markers, and the
@@ -234,6 +328,12 @@ class BodyPhysics:
     back_path: float                 # head_back → back_V2 seen from above, standing (mm)
     nose_to_tail: float = 171.1      # head_nose → back_V2, standing (mm)
     check_mm: dict = field(default_factory=dict)   # anchored CoM / girdle error over sampled postures
+    sections: tuple = ()             # the section (SECTIONS) of each of ``segments``
+
+    @property
+    def section_mass(self) -> dict:
+        """kg per section, at the model's size."""
+        return {s: float(sum(mkg for (mkg, _), q in zip(self.segments, self.sections) if q == s)) for s in SECTIONS}
 
     @classmethod
     @lru_cache(maxsize=2)
@@ -246,10 +346,11 @@ class BodyPhysics:
         T0 = m.fk(q0)[0]
         rest = {k: v[0] for k, v in m.labels(q0, T0[None]).items()}
         o, R = body_frame(rest)
-        segs = []
+        segs, secs = [], []
         for bi in np.flatnonzero(mass > 0):
             c = T0[bi, :3, :3] @ com_local[bi] + T0[bi, :3, 3]
             segs.append((float(mass[bi]), _anchor(c, rest, R, allowed=_anchor_set(m.body_names[bi]))))
+            secs.append(body_section(m.body_names[bi]))
         girdles = {p: _anchor(T0[m.body_index[GIRDLE_BODY[p]], :3, 3], rest, R, allowed=TRUNK_SET) for p in PAWS}
         # reach: girdle → paw over the limb joints' full ranges
         rng = np.random.default_rng(seed)
@@ -267,7 +368,7 @@ class BodyPhysics:
         chain = ["head_back", "back_T4", "back_T8", "back_L2", "back_L6", "back_V2"]
         bp = sum(float(np.linalg.norm(rest[b][:2] - rest[a][:2])) for a, b in zip(chain[:-1], chain[1:]))
         nt = float(np.linalg.norm(rest["head_nose"] - rest["back_V2"]))
-        phys = cls(float(mass.sum()), segs, girdles, rmax, rmin, bp, nt)
+        phys = cls(float(mass.sum()), segs, girdles, rmax, rmin, bp, nt, sections=tuple(secs))
         # how well the anchored points follow the true ones over sampled spine postures
         ks = [m.joint_index[k] for k in SPINE_JOINTS]
         qs = np.tile(q0[0], (200, 1))
@@ -289,6 +390,45 @@ class BodyPhysics:
         if not all(k in P and np.isfinite(P[k]).all() for k in a.markers):
             return None
         return np.sum([w * P[k] for w, k in zip(a.weights, a.markers)], axis=0) + size * (R @ a.offset)
+
+    def _points(self, a: Anchor, P: dict, R, size: float) -> np.ndarray:
+        """:meth:`_point` for every frame: (T, 3), NaN where a marker or the frame is missing."""
+        if not all(k in P for k in a.markers):
+            return np.full((len(R), 3), np.nan)
+        return sum(w * P[k] for w, k in zip(a.weights, a.markers)) + size * np.einsum("tij,j->ti", R, a.offset)
+
+    def predict_all(self, names, xyz, size: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
+        """:meth:`predict` for every frame at once: (T, 5, 3) CoM and girdles, and the sections'
+        centres of mass (T, 3, 3) in :data:`SECTIONS` order (NaN where under 60 % of its mass is
+        seen)."""
+        names = list(names)
+        xyz = np.asarray(xyz, float)
+        T = len(xyz)
+        P = {n: xyz[:, j] for j, n in enumerate(names)}
+        R = body_frames(names, xyz)
+        tot, acc = np.zeros(T), np.zeros((T, 3))
+        st, sa = np.zeros((T, 3)), np.zeros((T, 3, 3))
+        secs = self.sections or ("mid",) * len(self.segments)
+        for (mkg, a), s in zip(self.segments, secs):
+            c = self._points(a, P, R, size)
+            ok = np.isfinite(c).all(1)
+            k = SECTIONS.index(s)
+            tot[ok] += mkg
+            acc[ok] += mkg * c[ok]
+            st[ok, k] += mkg
+            sa[ok, k] += mkg * c[ok]
+        Y = np.full((T, 5, 3), np.nan)
+        good = tot >= 0.6 * self.mass_kg
+        Y[good, 0] = acc[good] / tot[good, None]
+        for j, p in enumerate(PAWS):
+            g = self._points(self.girdles[p], P, R, size)
+            Y[good, 1 + j] = g[good]
+        S = np.full((T, 3, 3), np.nan)
+        sm = self.section_mass
+        for k, s in enumerate(SECTIONS):
+            ok = good & (st[:, k] >= 0.6 * sm[s]) & (sm[s] > 0)
+            S[ok, k] = sa[ok, k] / st[ok, k, None]
+        return Y, S
 
     def predict(self, P: dict, size: float = 1.0):
         """CoM and girdles LF RF LH RH (5, 3) in the world for one frame of markers {name: (3,)} of
@@ -397,6 +537,14 @@ class GaitResult:
     summary: dict
 
 
+def _unit_xy(v) -> np.ndarray:
+    """Rows scaled to unit length (NaN where zero or missing)."""
+    v = np.asarray(v, float)
+    n = np.linalg.norm(v, axis=-1, keepdims=True)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(n > 1e-9, v / n, np.nan)
+
+
 def _smooth(x: np.ndarray, fps: float, win_s: float = 0.15) -> np.ndarray:
     """NaN-tolerant smoothing (short gaps filled) with a Savitzky–Golay filter."""
     from scipy.signal import savgol_filter
@@ -446,75 +594,124 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
     bk = float(b.get("scale", 1.0) or 1.0)                    # bounds: adult rat × scale
     tsc = math.sqrt(bk)
     dt = 1.0 / fps
-    # body: CoM and girdles per frame
-    Y = np.full((T, 5, 3), np.nan)
-    for t in range(T):
-        P = {n: xyz[t, j] for j, n in enumerate(names)}
-        y = phys.predict(P, size)
-        if y is not None:
-            Y[t] = y
+    # body: CoM, girdles and the three sections per frame (122lf: all frames at once)
+    Y, Ysec = phys.predict_all(names, xyz, size)
     com = np.stack([_smooth(Y[:, 0, k], fps) for k in range(3)], 1)
     gird = np.stack([np.stack([_smooth(Y[:, 1 + i, k], fps, 0.1) for k in range(3)], 1) for i in range(4)], 1)
     vel = np.gradient(com, dt, axis=0)
     acc = np.stack([_smooth(np.gradient(vel[:, k], dt), fps, 0.2) for k in range(3)], 1)
     valid = np.isfinite(Y[:, 0, 0])
-    head = np.full((T, 2), np.nan)                           # body heading (x axis of the back frame)
-    for t in range(T):
-        fr = body_frame({n: xyz[t, j] for j, n in enumerate(names)})
-        if fr is not None:
-            head[t] = fr[1][:2, 0]
-    for k in range(2):
-        head[:, k] = _smooth(head[:, k], fps, 0.1)
-    head /= np.maximum(np.linalg.norm(head, axis=1, keepdims=True), 1e-9)
+    R = body_frames(names, xyz)
+    head0 = _unit_xy(np.stack([_smooth(R[:, c, 0], fps, 0.1) for c in range(2)], 1))   # the back's (fallback)
+    # 122lf: each section's centre of mass, velocity, heading (level frames only; the others filled
+    # from the frames either side) and turning rate
+    smass = phys.section_mass
+    mscale = mass / phys.mass_kg                             # the animal's mass against the model's
+    sec_m = np.array([smass[s] * mscale for s in SECTIONS])  # kg
+    H_raw, level = section_headings(names, xyz)
+    sec_com = np.full((T, 3, 3), np.nan)
+    sec_vel = np.full((T, 3, 3), np.nan)
+    sec_head = np.full((T, 3, 2), np.nan)
+    for k in range(3):
+        seen = np.isfinite(Ysec[:, k, 0])
+        if seen.sum() >= 5:
+            sec_com[:, k] = np.stack([_smooth(Ysec[:, k, c], fps) for c in range(3)], 1)
+            sec_com[~valid, k] = np.nan
+            sec_vel[:, k] = np.gradient(sec_com[:, k], dt, axis=0)
+        h = H_raw[:, k] if level[:, k].sum() >= 5 else head0
+        sec_head[:, k] = _unit_xy(np.stack([_smooth(h[:, c], fps, 0.1) for c in range(2)], 1))
+    sec_head = np.where(np.isfinite(sec_head), sec_head, head0[:, None, :])
+    yaw = np.stack([_smooth(np.gradient(np.unwrap(np.arctan2(sec_head[:, k, 1], sec_head[:, k, 0])), dt), fps)
+                    for k in range(3)], 1)                    # rad/s
+
+    def drive(weights):
+        """Mass-weighted velocity (T, 3) and heading (T, 2) of sections ``{name: weight}``,
+        leaving out a section not seen in a frame (the whole body's when none is)."""
+        w = np.array([weights.get(s, 0.0) for s in SECTIONS]) * sec_m
+        have = np.isfinite(sec_vel[:, :, 0]) * w[None, :]
+        tot = have.sum(1)
+        v = np.einsum("tk,tki->ti", have, np.nan_to_num(sec_vel)) / np.maximum(tot, 1e-12)[:, None]
+        h = _unit_xy(np.einsum("k,tki->ti", w, sec_head))
+        v[tot <= 0] = vel[tot <= 0]
+        return v, np.where(np.isfinite(h), h, head0)
+    head = drive({s: 1.0 for s in SECTIONS})[1]             # the body's heading: all three sections
+    limb_v, limb_h = {}, {}
+    for L in ("F", "H"):
+        limb_v[L], limb_h[L] = drive(LIMB_DRIVE[L])
+    lat_of = lambda h: np.stack([-h[:, 1], h[:, 0]], 1)         # noqa: E731 - to the animal's left
+    v_fwd = np.einsum("ti,ti->t", vel[:, :2], head)
+    v_lat = np.einsum("ti,ti->t", vel[:, :2], lat_of(head))
+    limb_fwd = {L: np.abs(np.einsum("ti,ti->t", limb_v[L][:, :2], limb_h[L])) for L in limb_v}
+    fwd_speed = np.abs(v_fwd)
     speed = np.linalg.norm(vel[:, :2], axis=1)
     omega0 = np.sqrt(G_MM / np.maximum(com[:, 2], 5.0))
     xcom = com[:, :2] + vel[:, :2] / omega0[:, None]
     reach = {p: phys.reach_max[p] * size for p in PAWS}
+    tt = frames * dt
+
+    def lsp(p, t):
+        """The forward speed of what moves paw p's girdle (its section and half the trunk)."""
+        s = limb_fwd[p[1]][t]
+        return float(s) if np.isfinite(s) else 0.0
 
     def stride_at(t):
-        """Physiological stride for the speed (CatWalk rats)."""
-        return gait_laws(speed[t], "F", b)["stride_mm"]
+        """Physiological stride for the body's forward speed (CatWalk rats)."""
+        return gait_laws(fwd_speed[t], "F", b)["stride_mm"]
     st_min = b["stance_min_s"] * tsc
     sw_min, sw_max = b["swing_min_s"] * tsc, b["swing_max_s"] * tsc
 
     def neutral_xy(p, t):
-        """Mid-stance: beside the midline between the girdle pair, half the base of support out."""
+        """Mid-stance: beside the midline between the girdle pair, half the base of support out
+        across the heading of what moves this girdle."""
         i, j = PAWS.index(p), PAWS.index(PARTNER[p])
         mid = (gird[t, i, :2] + gird[t, j, :2]) / 2
-        lat = np.array([-head[t, 1], head[t, 0]])                   # to the animal's left
+        h = limb_h[p[1]][t]
+        lat = np.array([-h[1], h[0]])                               # to the animal's left
         side = 1.0 if p[0] == "L" else -1.0
-        bos = b["base_of_support_fore_mm" if p[1] == "F" else "base_of_support_hind_mm"] * bk
-        return mid + lat * side * bos / 2
+        return mid + lat * side * bos_of(p) / 2
+
+    def bos_of(p):
+        return b["base_of_support_fore_mm" if p[1] == "F" else "base_of_support_hind_mm"] * bk
 
     def reachable(p, t, xy):
         g = gird[t, PAWS.index(p)]
         return np.linalg.norm(np.r_[xy, 0.0] - g) <= reach[p]
 
     def half_stance(p, t):
-        """Half the distance the body travels while a paw is planted (a stance centred on the
-        girdle lands this far ahead of it and lifts this far behind)."""
-        s = float(speed[t]) if np.isfinite(speed[t]) else 0.0
+        """Half the distance the girdle travels forward while a paw is planted (a stance centred
+        on the girdle lands this far ahead of it and lifts this far behind)."""
+        s = lsp(p, t)
         return 0.5 * s * gait_laws(s, p, b)["stance_s"]
 
+    def at(time_s, lo):
+        return int(min(max(np.searchsorted(tt, time_s), lo), T - 1))
+
     def land_target(p, t, ahead_s=0.0):
-        """Where paw p lands: half a stance ahead of mid-stance (under the girdle when still), as
-        the body will be ``ahead_s`` from now."""
-        v = vel[t, :2]
-        s = np.linalg.norm(v)
-        fwd = v / s if s > 1e-6 else head[t]
-        xy = neutral_xy(p, t) + fwd * half_stance(p, t) + (v * ahead_s if s > 1e-6 else 0.0)
-        g = gird[t, PAWS.index(p), :2] + (v * ahead_s if s > 1e-6 else 0.0)
+        """Where paw p lands ``ahead_s`` from now: where its girdle's neutral place will be at
+        mid-stance, half a stance later, read from the body's actual path (scanning forward;
+        the momentum carries it on past the end of the recording), pulled back within reach of
+        the girdle at touch-down."""
+        k = at(tt[t] + ahead_s, t)
+        half = 0.5 * gait_laws(lsp(p, k), p, b)["stance_s"]
+        km = at(tt[k] + half, k)
+        xy = neutral_xy(p, km)
+        short = tt[k] + half - tt[km]                       # past the last frame: carry on
+        if short > dt:
+            xy = xy + limb_v[p[1]][km, :2] * short
+        if not np.isfinite(xy).all():
+            xy = neutral_xy(p, k)
+        g = gird[k, PAWS.index(p)]
         for _ in range(8):                                     # pull back within reach
-            if np.linalg.norm(np.r_[xy - g, gird[t, PAWS.index(p), 2]]) <= reach[p]:
+            if np.linalg.norm(np.r_[xy - g[:2], g[2]]) <= reach[p]:
                 break
-            xy = g + 0.85 * (xy - g)
+            xy = g[:2] + 0.85 * (xy - g[:2])
         return xy
 
     def clock_lift_ok(p, t, now, period):
         """The other side's paw planted for (duty − ½) of a stride (CatWalk rats lift a paw that
         long after the other side's landed; at most a minimum stance); no condition once the
         duty factor is below ½ (both may be in the air)."""
-        duty = gait_laws(speed[t], p, b)["duty"]
+        duty = gait_laws(lsp(p, t), p, b)["duty"]
         if duty < 0.5:
             return True
         q = PARTNER[p]
@@ -543,24 +740,24 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
         if not (valid[t] and np.isfinite(gird[t]).all()):
             continue
         now = frames[t] * dt
-        if np.isfinite(speed[t]):
-            phi += (now - prev) * speed[t] / stride_at(t)
+        if np.isfinite(fwd_speed[t]):
+            phi += (now - prev) * fwd_speed[t] / stride_at(t)      # 122lf: forward progress drives it
         prev = now
         planted = {p: foot[p] for p in PAWS if state[p] == "stance"}
         # 1. lift-offs: forced first, then wanted (one at a time, keeping balance)
         want = []
         stride = stride_at(t)
-        period = stride / speed[t] if speed[t] > 1e-6 else np.inf
+        period = stride / fwd_speed[t] if fwd_speed[t] > 1e-6 else np.inf
         for p in list(planted):
             g = gird[t, PAWS.index(p)]
             d = np.linalg.norm(np.r_[foot[p], 0.0] - g)
-            behind = float(np.dot(foot[p] - neutral_xy(p, t), head[t]))
+            behind = float(np.dot(foot[p] - neutral_xy(p, t), limb_h[p[1]][t]))
             forced = d > reach[p]
             wanted = d > b["lift_reach"] * reach[p] or behind < -max(half_stance(p, t), 0.25 * stride)
             clock = False
             # the stride clock: past this paw's stance (duty) in its cycle, planted since before
             # (CatWalk rats: hind left 0, hind right ½, fore left 0.39, fore right 0.89)
-            duty = gait_laws(speed[t], p, b)["duty"]
+            duty = gait_laws(lsp(p, t), p, b)["duty"]
             psi = (phi - offs[p]) % 1.0
             if (np.isfinite(period) and period < 4.0 and psi >= duty and behind < 0
                     and since[p] <= now - (psi - duty) * period):
@@ -575,7 +772,7 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
             if soft and off_clock:
                 # dynamic balance (Hof 2008): the extrapolated CoM, when the paw lands one swing
                 # from now, over the other planted paws and the paw where it will land
-                sw = float(np.clip(gait_laws(speed[t], p, b)["swing_s"], sw_min, sw_max))
+                sw = float(np.clip(gait_laws(lsp(p, t), p, b)["swing_s"], sw_min, sw_max))
                 rest = np.array([planted[q] for q in planted if q != p] + [land_target(p, t, sw)])
                 ok_bal = (support_margin(xcom[t] + vel[t, :2] * sw, rest, b["paw_radius_mm"] * size)
                           >= -b["stability_tol_mm"] * size) if len(rest) > 1 else False
@@ -586,9 +783,9 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
             state[p], since[p] = "swing", now
             # swing: until the stride clock brings this paw's touch-down round (a late paw catches
             # up), within the swings seen; a paw lifted off the clock swings its usual time
-            dur = gait_laws(speed[t], p, b)["swing_s"]
+            dur = gait_laws(lsp(p, t), p, b)["swing_s"]
             psi = (phi - offs[p]) % 1.0
-            if np.isfinite(period) and period < 4.0 and psi >= gait_laws(speed[t], p, b)["duty"]:
+            if np.isfinite(period) and period < 4.0 and psi >= gait_laws(lsp(p, t), p, b)["duty"]:
                 dur = (1.0 - psi) * period
             land_at[p] = now + float(np.clip(dur, sw_min, sw_max))
         # 2. touch-downs
@@ -611,6 +808,21 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
     for p in PAWS:
         if state[p] == "stance" and stance_start[p] is not None:
             steps.append((p, stance_start[p], T - 1))
+    # 122lf: scanning backward. Each stance's timing is now known; its paw goes where it stays
+    # closest to its girdle's neutral place over the whole stance, within reach throughout
+    moved = []
+    for p, a, z in steps:
+        if a is None:
+            continue
+        i = PAWS.index(p)
+        on = np.arange(a, z + 1)
+        on = on[out_con[on, i] == 1]
+        if not len(on):
+            continue
+        new = _place_stance(np.array([neutral_xy(p, t) for t in on]), gird[on, i], reach[p])
+        if new is not None:
+            moved.append(float(np.linalg.norm(new - out_pos[on[0], i])))
+            out_pos[on, i] = new
     # 3. loads
     loads = np.zeros((T, 4))
     zmp = com[:, :2] - com[:, 2:3] * acc[:, :2] / np.maximum(G_MM + acc[:, 2:3], 0.2 * G_MM)
@@ -623,9 +835,29 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
         loads[t, on] = w
         margin[t] = support_margin(zmp[t], out_pos[t, on], b["paw_radius_mm"] * size)
     weight_g = mass * 1000.0 * np.clip(1 + acc[:, 2] / G_MM, 0, None)
+    yaw_mid = np.degrees(yaw[:, 1])
+    level_mid = level[:, 1]
+    turning = np.abs(yaw_mid) > TURN_DEG_S
+    sidestep = (speed > 50.0 * tsc) & (np.abs(v_lat) > SIDESTEP_RATIO * np.abs(v_fwd))
     cols = {"frame": frames, "valid": valid, "com_x": com[:, 0], "com_y": com[:, 1], "com_z": com[:, 2],
             "speed_mm_s": speed, "zmp_x": zmp[:, 0], "zmp_y": zmp[:, 1], "xcom_x": xcom[:, 0], "xcom_y": xcom[:, 1],
-            "zmp_margin_mm": margin, "n_support": (out_con == 1).sum(1)}
+            "zmp_margin_mm": margin, "n_support": (out_con == 1).sum(1),
+            # 122lf: the body's velocity along and across its heading, how fast it turns, and when
+            "v_fwd_mm_s": v_fwd, "v_lat_mm_s": v_lat, "yaw_rate_deg_s": yaw_mid,
+            "heading_ok": level_mid, "turning": turning, "sidestep": sidestep}
+    for k, s in enumerate(SECTIONS):
+        h = sec_head[:, k]
+        lt = lat_of(h)
+        v = sec_vel[:, k]
+        cols[f"{s}_com_x"], cols[f"{s}_com_y"], cols[f"{s}_com_z"] = sec_com[:, k].T
+        cols[f"{s}_heading_deg"] = np.degrees(np.arctan2(h[:, 1], h[:, 0]))
+        cols[f"{s}_yaw_rate_deg_s"] = np.degrees(yaw[:, k])
+        cols[f"{s}_v_fwd_mm_s"] = np.einsum("ti,ti->t", v[:, :2], h)
+        cols[f"{s}_v_lat_mm_s"] = np.einsum("ti,ti->t", v[:, :2], lt)
+        cols[f"{s}_v_z_mm_s"] = v[:, 2]
+        # momentum, mN·s (kg × mm/s), along the section's own heading
+        for c in ("fwd", "lat", "z"):
+            cols[f"{s}_p_{c}_mNs"] = sec_m[k] * cols[f"{s}_v_{c}_mm_s"]
     for i, p in enumerate(PAWS):
         cols[f"{p}_x"], cols[f"{p}_y"] = out_pos[:, i, 0], out_pos[:, i, 1]
         cols[f"{p}_contact"] = out_con[:, i]
@@ -633,21 +865,64 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
         cols[f"{p}_force_g"] = loads[:, i] * weight_g
         cols[f"{p}_girdle_x"], cols[f"{p}_girdle_y"], cols[f"{p}_girdle_z"] = gird[:, i].T
     fdf = pd.DataFrame(cols)
-    sdf = _steps_table(steps, frames, out_pos, fps)
+    straight = level_mid & ~turning & ~sidestep
+    sdf = _steps_table(steps, frames, out_pos, fps, straight=straight, v_fwd=v_fwd)
     summ = _summary(fdf, sdf, fps, size, mass, phys, b)
+    # flat: the run's record (run.toml) takes one level of tables
+    for k, s in enumerate(SECTIONS):
+        summ[f"{s}_mass_g"] = round(float(sec_m[k] * 1000), 1)
+        summ[f"{s}_median_v_fwd_mm_s"] = _r(np.nanmedian(fdf[f"{s}_v_fwd_mm_s"][valid])) if valid.any() else None
+        summ[f"{s}_median_abs_v_lat_mm_s"] = (_r(np.nanmedian(np.abs(fdf[f"{s}_v_lat_mm_s"][valid])))
+                                              if valid.any() else None)
+        summ[f"{s}_level"] = round(float(level[valid, k].mean()), 3) if valid.any() else None
+    summ["drive"] = "; ".join(f"{'hind' if L == 'H' else 'fore'}: " + " + ".join(
+        f"{w:g} {s}" for s, w in LIMB_DRIVE[L].items()) for L in ("H", "F"))
+    summ["turning"] = round(float(turning[valid].mean()), 3) if valid.any() else None
+    summ["sidestep"] = round(float(sidestep[valid].mean()), 3) if valid.any() else None
+    summ["replaced_mm"] = _r(np.median(moved)) if moved else None
     return GaitResult(fdf, sdf, summ)
 
 
-def _steps_table(steps, frames, pos, fps) -> pd.DataFrame:
+def _r(x, n=1):
+    return round(float(x), n) if np.isfinite(x) else None
+
+
+def _place_stance(neutral, girdle, reach, iters: int = 30):
+    """Where a planted paw should stand (2,): closest on average to its neutral places over the
+    stance (their mean), within the leg's reach of the girdle at every frame of it (alternating
+    projections onto the reachable discs). None when no point is within reach throughout."""
+    ok = np.isfinite(neutral).all(1) & np.isfinite(girdle).all(1)
+    if not ok.any():
+        return None
+    nb, gd = neutral[ok], girdle[ok]
+    r = np.sqrt(np.maximum(reach ** 2 - gd[:, 2] ** 2, 0.0))         # the reachable disc on the floor
+    xy = nb.mean(0)
+    for _ in range(iters):
+        d = xy - gd[:, :2]
+        n = np.linalg.norm(d, axis=1)
+        far = n > r
+        if not far.any():
+            return xy
+        k = int(np.argmax(n - r))
+        xy = gd[k, :2] + d[k] * (r[k] / max(n[k], 1e-9)) * 0.999
+    d = np.linalg.norm(xy - gd[:, :2], axis=1)
+    return xy if (d <= r + 0.5).all() else None             # none: the forward pass's place stays
+
+
+def _steps_table(steps, frames, pos, fps, *, straight=None, v_fwd=None) -> pd.DataFrame:
     rows = []
     for p, a, z in steps:
         if a is None:
             continue
         i = PAWS.index(p)
+        m = (a + z) // 2
         rows.append({"paw": p, "on_frame": int(frames[a]), "off_frame": int(frames[z]),
                      "on_s": frames[a] / fps, "off_s": frames[z] / fps,
-                     "stance_s": (frames[z] - frames[a]) / fps, "x": pos[a, i, 0], "y": pos[a, i, 1]})
-    df = pd.DataFrame(rows, columns=["paw", "on_frame", "off_frame", "on_s", "off_s", "stance_s", "x", "y"])
+                     "stance_s": (frames[z] - frames[a]) / fps, "x": pos[a, i, 0], "y": pos[a, i, 1],
+                     "v_fwd_mm_s": float(v_fwd[m]) if v_fwd is not None else np.nan,
+                     "straight": bool(straight[a:z + 1].mean() >= 0.5) if straight is not None else True})
+    df = pd.DataFrame(rows, columns=["paw", "on_frame", "off_frame", "on_s", "off_s", "stance_s", "x", "y",
+                                     "v_fwd_mm_s", "straight"])
     df = df.sort_values(["paw", "on_s"]).reset_index(drop=True)
     nxt = df.groupby("paw").shift(-1)
     df["stride_s"] = nxt["on_s"] - df["on_s"]
@@ -661,9 +936,12 @@ WALK_MIN_MM_S = 100.0      # strides slower than this, or longer than a second, 
 
 
 def _walking(sdf) -> pd.DataFrame:
-    """Strides of walking: at least WALK_MIN_MM_S, at most a second (the CatWalk's range)."""
+    """Strides of walking: at least WALK_MIN_MM_S, at most a second (the CatWalk's range), and
+    (122lf) straight: the stance mostly level, not turning and not stepping sideways."""
     w = sdf.dropna(subset=["stride_s"])
     w = w[(w.stride_s > 0) & (w.stride_s <= 1.0)]
+    if "straight" in w:
+        w = w[w.straight.astype(bool)]
     return w[w.stride_mm / w.stride_s >= WALK_MIN_MM_S]
 
 

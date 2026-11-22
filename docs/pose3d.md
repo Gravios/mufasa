@@ -292,6 +292,42 @@ are inferred from what the body can do.
 * Each leg's reach, from girdle to paw over the joint ranges, is 86 mm
   for the hindlimbs and 65 mm for the forelimbs, at the model's size.
 
+**The body in three sections** (patch 122lf): lower, mid and upper.
+
+| section | segments | mass (model) | heading from |
+|---|---|---|---|
+| lower | pelvis, hind legs, tail | 212 g | `back_V2` → `back_L2` |
+| mid | thorax, lumbar spine | 74 g | `back_L2` → `back_T4` |
+| upper | shoulders, forelegs, neck, head | 52 g | `back_T8` → `head_back` |
+
+* Each section has its own centre of mass, and its velocity and momentum
+  split along its heading (forward), across it (sideways, + to the
+  animal's left) and up.
+* A heading is taken only where that stretch of the back is level enough
+  to give one from above (within 60° of level). When the animal rears, the
+  heading is held from the frames on either side.
+* The hips move with the lower section and half the trunk. The shoulders
+  move with the thorax: the head and neck swing on their own while the
+  animal sniffs. Taking them in, or using one momentum for the whole body,
+  put the forepaws' left–right phase further from the CatWalk's 0.5.
+* Stance, swing and stride follow each girdle's **forward** speed, and the
+  stride clock the body's. Sideways drift, swaying and turning on the spot
+  no longer count as walking speed.
+
+New columns in `<video>_gait.parquet`, all in mm/s, mN·s (kg × mm/s), °
+and °/s:
+
+* the body: `v_fwd_mm_s`, `v_lat_mm_s`, `yaw_rate_deg_s`, and the flags
+  `heading_ok`, `turning` (over 90°/s) and `sidestep` (sideways speed over
+  half the forward speed);
+* per section: `<s>_com_x/y/z`, `<s>_heading_deg`, `<s>_yaw_rate_deg_s`,
+  `<s>_v_fwd_mm_s`, `<s>_v_lat_mm_s`, `<s>_v_z_mm_s` and
+  `<s>_p_fwd_mNs`, `<s>_p_lat_mNs`, `<s>_p_z_mNs`.
+
+Steps get `v_fwd_mm_s` and `straight`. The walking strides in the summary
+(stride, stance, duty factor, phases) are straight ones only: level, not
+turning, not stepping sideways.
+
 **Paw placement.** Paws are placed as rarely as the body allows, in the
 order and at the times rats use (patch 122kx):
 * A stride clock turns once per stride, at speed ÷ stride length, and
@@ -302,18 +338,43 @@ order and at the times rats use (patch 122kx):
 * A planted paw lifts when its turn's stance is over, once the paw on the
   other side has been down for (duty − ½) of a stride. It then swings
   until its next turn comes round (0.08–0.24 s), so a late paw catches up.
-* It lands half a stance's travel ahead of its girdle, beside the midline
-  at half the base of support, so that its stance is centred on the
-  girdle. A still body's paws land under the girdles.
+* **Scanning forward**, it lands where its girdle's place will be at
+  mid-stance, half a stance later, read from the body's actual path rather
+  than extrapolated from its speed. The place is beside the midline
+  between the girdle pair, half the base of support out across that
+  girdle's heading. A still body's paws land under the girdles.
+* **Scanning backward**, once every stance's start and end are known, each
+  paw is moved to where it stays closest to its place over the whole
+  stance (the mean of its places), within its leg's reach at every frame.
+  If no such point exists, the forward pass's place stays.
 * Steps off the clock: a paw also lifts once its leg cannot reach it, or
   once it has fallen half a stance (at least a quarter of a stride) behind
-  its place. Such a step must keep the body balanced (Hof 2008): the
+  its place along its girdle's heading. Such a step must keep the body balanced (Hof 2008): the
   extrapolated centre of mass (position + velocity / √(g/h), which takes
   in momentum) must lie over the other planted paws and the place the paw
   will land, as it will be when it lands.
 * No paw lifts before a minimum stance.
 * A girdle too high for its leg to reach the floor (forelimbs when
   rearing) keeps that paw in the air.
+
+On K7 (108 000 frames, mostly slow exploration), measured in each girdle
+pair's own frame at mid-stance:
+
+| | before (122kx) | 122lf |
+|---|---|---|
+| steps | 3138 | 3024 |
+| fore–aft offset from the girdle, spread (MAD) | 7.7 mm | 3.9 mm |
+| sideways offset from its place, 90th percentile | 28.4 mm | 12.8 mm |
+| paw past the midline | 21 % | 8.5 % |
+| hind → fore phase (CatWalk 0.39) | 0.33 | 0.39 |
+| fore left → right phase (CatWalk 0.5) | 0.32 | 0.40 |
+| ZMP outside the support | 72 % | 46 % |
+| time | 264 s | 116 s |
+
+What is left past the midline is mostly long, slow stances (1.1 s median)
+in which the body pivots over a planted paw. A lift whenever a paw drifted
+across was tried: it added 1300 short stances and left almost as many
+paws past the midline (221 against 259), so it was dropped.
 
 **Weight distribution.** The vertical load m(g + a_z) is shared among the
 planted paws:

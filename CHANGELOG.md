@@ -8,6 +8,46 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lf — Gait from the momentum of the lower, mid and upper body; paws placed scanning
+forward and backward.** Before this, gait used one speed in any direction, so sideways drift and
+turning on the spot counted as walking speed, and paws were placed by one whole-back heading and
+the current velocity.
+* `BodyPhysics` splits the virtual rodent into three sections:
+  * lower: pelvis, hind legs and tail (212 g);
+  * mid: thorax and lumbar spine (74 g);
+  * upper: shoulders, forelegs, neck and head (52 g).
+* Each section has its centre of mass, a heading from its stretch of the back seen from above,
+  its turning rate, and velocity and momentum along, across and up. A heading is taken only
+  within 60° of level; when the animal rears, it is held from the frames on either side.
+* The hips move with the lower section and half the trunk, the shoulders with the thorax
+  (`LIMB_DRIVE`). Stance, swing and stride follow each girdle's forward speed; the stride
+  clock follows the body's.
+* Scanning forward: a paw lands where its girdle's place will be at mid-stance, read from the
+  body's actual path.
+* Scanning backward: once the stances are known, each paw stands where it stays closest to its
+  place over the whole stance, within reach at every frame (`_place_stance`).
+* New columns: `v_fwd_mm_s`, `v_lat_mm_s`, `yaw_rate_deg_s`, the flags `heading_ok`, `turning`
+  and `sidestep`, and per section `<s>_com_*`, `<s>_heading_deg`, `<s>_yaw_rate_deg_s`,
+  `<s>_v_{fwd,lat,z}_mm_s` and `<s>_p_{fwd,lat,z}_mNs`. Steps get `v_fwd_mm_s` and `straight`.
+  Walking strides are straight ones only. The summary records section masses, speeds, the
+  drive and how often the animal turns or sidesteps (flat, for run.toml).
+* `predict_all` and `body_frames` compute the body for every frame at once, 75× faster than
+  frame by frame.
+* K7, before → after:
+  * steps 3138 → 3024;
+  * fore–aft spread at mid-stance 7.7 → 3.9 mm;
+  * sideways error 28.4 → 12.8 mm (90th percentile);
+  * paws past the midline 21 % → 8.5 %;
+  * phases hind→fore 0.33 → 0.39 (CatWalk 0.39) and fore left→right 0.32 → 0.40 (0.5);
+  * ZMP outside the support 72 % → 46 %;
+  * run time 264 → 116 s.
+* Tried and dropped:
+  * driving the forepaws with the head and neck, or one momentum for the whole body: worse
+    phases;
+  * lifting a paw whenever it drifted across the body: about 1300 extra stances, with almost
+    as many paws still past the midline.
+* `tests/smoke_122lf_gait_sections.py` (12 checks).
+
 **122le — Heights the body can have, and the model on top of the floor.**
 The virtual rodent clipped through the floor in the 3-D viewer, and single-camera heights near
 the ground were sometimes impossible: K7's nose was under the floor in 5 % of frames, and
