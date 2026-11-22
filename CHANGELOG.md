@@ -8,6 +8,27 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lg — A spine that goes from hunched to stretched.** On K7 the back's path from head to
+tail base spans 162–291 mm (5–95 %), but the fitted virtual rodent stayed at 173–184 mm. Its thorax
+is one rigid body and its bones keep their lengths, so bending barely changes its length. Marker
+error grew with the stretch: 34 mm on the longest tenth.
+* Lumbar limits corrected. The model's extension joints flex +45° and extend −30° (90° and 60°
+  in all), but the rig had them the wrong way round (+10° / −15° per joint), and hunched rats
+  sat at the flexion limit in 27 % of frames. Now ±15° per joint. Extension goes past the model's
+  60° for its rigid thorax: stretched rats held 60° in 28 % of frames.
+* `stretch` (−0.3…+0.4 per frame, pulled weakly to 0) slides each lumbar and cervical joint and
+  the atlas along its bone from its parent's, so the spine and neck are 30 % shorter … 40 %
+  longer. Nose to tail base goes from 0.8× to 1.27×; the pelvis, hind legs and tail stay put.
+  `Rig.skinning_matrices` and the batched kinematics (`rig_batch`) move the joints alike. A rig
+  opts in by listing `stretch` bones in its profile.
+* Rig version 3: the built-in rig is rebuilt the first time it is used.
+* K7: the model's length follows the animal's (148 → 226 mm across the length tenths). Marker
+  error is 25–28 mm at every length: the longest tenth 34 → 26 mm, the next 15 % 29 → 25 mm.
+* docs/bodymodel.md: *Length*, and the limits table. docs/pose3d.md.
+* `tests/smoke_122lg_spine_stretch.py` (9 checks): with physically valid hunched and stretched
+  rats, both fits pose them within 0.1 mm and recover stretch within 0.002. With the length
+  fixed, as before, they are off by 19 mm.
+
 **122lf — Gait from the momentum of the lower, mid and upper body; paws placed scanning
 forward and backward.** Before this, gait used one speed in any direction, so sideways drift and
 turning on the spot counted as walking speed, and paws were placed by one whole-back heading and

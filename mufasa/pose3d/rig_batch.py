@@ -91,6 +91,9 @@ class RigProblem:
         self.bone_rot = [rot.get(rig.names[b]) for b in keep]
         self.parent = [remap[int(rig.parent[b])] if rig.parent[b] >= 0 else -1 for b in keep]
         self.heads = torch.as_tensor(rig.heads[keep], dtype=dt, device=dev)
+        # 122lg: how far each joint slides along the spine per unit of "stretch"
+        self.soff = torch.as_tensor(getattr(rig, "stretch_offset", np.zeros((rig.B, 3)))[keep], dtype=dt, device=dev)
+        self.i_stretch = pi.get("stretch")
         self.n_bones = (len(keep), rig.B)
         self.pivot = torch.as_tensor(rig.pivot, dtype=dt, device=dev)
         self.i_rear, self.i_roll = pi.get("rear"), pi.get("roll")
@@ -197,6 +200,8 @@ class RigProblem:
                 pitch = x[r[1]] * DEG if r[1] is not None else zero
                 R = self._rz(yaw) @ self._rx(pitch)
             t = self.heads[i] - R @ self.heads[i]
+            if self.i_stretch is not None:
+                t = t + x[self.i_stretch] * self.soff[i]
             p = self.parent[i]
             if p >= 0:
                 R, t = Rs[p] @ R, Rs[p] @ t + ts[p]

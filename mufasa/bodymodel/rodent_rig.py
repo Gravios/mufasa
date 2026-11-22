@@ -23,16 +23,27 @@ The profile stored with the rig gives the fitter the spine regions and the
 posture limits, per joint, from the model's joint ranges spread over the
 bones of each region:
 
-* lumbar (6 joints): sideways ±10°, up/down −15° (extension) … +10°
-  (flexion) — the model's two bend joints ±30° and two extension joints
-  −30…+45°;
+* lumbar (6 joints): sideways ±10°, up/down ±15° — the model's two bend
+  joints ±30° and two extension joints −30…+45° (+ flexes: 90° of flexion
+  in all, as here; before 122lg the rig allowed 60°, the model's
+  extension range given to flexion). Extension is allowed past the
+  model's 60° to 90°: the model's thorax is rigid, and stretched rats
+  (K7) held the lumbar spine at 60° of extension in 28 % of frames;
 * cervical (7 bones): sideways ±10°, up/down −10…+15° — three extension
   joints −23…+35°, two bend joints ±35°;
 * head (atlas): up/down −45…+5°; sideways ±30° (assumed);
 * tail (29 joints; the first fixed): ±8° per joint (the model allows ±15°);
 * no thoracic bend (the model's thorax is rigid);
 * ``widen`` 0…0.5 per frame (patch 122kt): the trunk up to 1.5× wider
-  (see :func:`widen`), for a rat curled up or sitting.
+  (see :func:`widen`), for a rat curled up or sitting;
+* ``stretch`` (patch 122lg; :data:`STRETCH`): the spine and neck longer
+  or shorter, each lumbar and cervical joint and the atlas slid along its
+  bone from its parent's. The model's thorax is one rigid body and its
+  bones keep their lengths, so bending alone leaves the back's length
+  nearly fixed, while a rat's nose-to-tail-base distance changes a lot
+  between hunched and stretched (on K7 the back's path from head to tail
+  base spans 1.8×). Stretch stands in for what the rigid thorax, the
+  scapulae sliding and the neck's curve straightening do.
 
 The labels sit where :mod:`mufasa.pose3d.rodent_model` puts them (dorsal
 skin points above the vertebrae, the crown for the ears, the hip joints,
@@ -54,14 +65,16 @@ LUMBAR = ["vertebra_5", "vertebra_4", "vertebra_3", "vertebra_2", "vertebra_1", 
 NECK = ["vertebra_cervical_5", "vertebra_cervical_4", "vertebra_cervical_3", "vertebra_cervical_2",
         "vertebra_cervical_1", "vertebra_axis", "vertebra_atlant"]                          # Neck1..7
 
+STRETCH = (-0.3, 0.4)    # 122lg: the spine's joints 30 % closer … 40 % further apart
 POSTURE = [("rear", -10, 60), ("roll", -15, 15),
            ("lum_yaw", -10, 10), ("cer_yaw", -10, 10), ("head_yaw", -30, 30),
-           ("lum_pitch", -15, 10), ("cer_pitch", -10, 15), ("head_pitch", -45, 5),
+           ("lum_pitch", -15, 15), ("cer_pitch", -10, 15), ("head_pitch", -45, 5),
            ("tail_yaw_p", -8, 8), ("tail_yaw_d", -8, 8), ("tail_pitch", -8, 8),
-           ("widen", 0, 0.5)]
+           ("widen", 0, 0.5), ("stretch", *STRETCH)]
+STRETCH_BONES = [f"Spine{i}" for i in range(1, 7)] + [f"Neck{i}" for i in range(1, 8)] + ["Head"]
 LIMITS = {
-    "lumbar (Spine1-6)": "sideways ±10°, up/down -15° (extension) … +10° (flexion) per joint "
-                         "(virtual rodent: two bend joints ±30°, two extension joints -30…45°)",
+    "lumbar (Spine1-6)": "sideways ±10°, up/down ±15° per joint (virtual rodent: two bend joints ±30°, two "
+                         "extension joints -30…45°, + flexing; extension past the model's for its rigid thorax)",
     "thoracic": "rigid (virtual rodent)",
     "cervical (Neck1-7)": "sideways ±10°, up/down -10…15° per bone (virtual rodent: three extension joints "
                           "-23…35°, two bend joints ±35°)",
@@ -72,6 +85,8 @@ LIMITS = {
     "limbs": "rest pose",
     "width": "the trunk up to 1.5x wider per frame (a rat curled up or sitting covers more floor), pulled "
              "weakly towards the model's width",
+    "length": "the spine and neck 30 % shorter … 40 % longer per frame (hunched … stretched; the model's "
+              "thorax is rigid and its bones keep their lengths), pulled weakly towards the model's length",
 }
 
 
@@ -89,7 +104,7 @@ STANCE = {"hip_supinate": -36.6, "hip_abduct": -13.6, "hip_extend": -46.1, "knee
 # 122ky: the mouth closed. The skin was bound with the jaw open, wider than the joint's range
 # allows closing (−17°); at −40° the lower lip meets the upper one (−45° passes inside it).
 JAW_CLOSED_DEG = -40.0
-RIG_VERSION = 2          # 2: mouth closed (the built-in rig is rebuilt when this changes)
+RIG_VERSION = 3          # 2: mouth closed; 3: stretch, lumbar flexion (the built-in rig is rebuilt on a change)
 
 
 def stance_qpos(model, stance=STANCE, jaw_deg: float | None = JAW_CLOSED_DEG):
@@ -273,6 +288,7 @@ def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, stance: boo
         "posture": [list(p) for p in POSTURE],
         "prior_centre": {p[0]: 0.0 for p in POSTURE},          # the rest pose (ranges are lopsided)
         "limits": LIMITS,
+        "stretch": STRETCH_BONES,
     }
     meta = {"source": "DeepMind virtual rodent (dm_control rodent.xml + rodent_walker_skin.skn, Apache 2.0)",
             "units": "mm", "skin_scale": model.skin_scale, "decimate_cell_mm": cell, "girth": girth,
@@ -286,5 +302,6 @@ def export_rodent_rig(out, *, cell: float = 3.0, girth: float = 1.0, stance: boo
     return out
 
 
-__all__ = ["JAW_CLOSED_DEG", "LIMITS", "POSTURE", "RIG_VERSION", "STANCE", "decimate", "export_rodent_rig",
+__all__ = ["JAW_CLOSED_DEG", "LIMITS", "POSTURE", "RIG_VERSION", "STANCE", "STRETCH", "STRETCH_BONES", "decimate",
+           "export_rodent_rig",
            "stance_qpos", "widen"]

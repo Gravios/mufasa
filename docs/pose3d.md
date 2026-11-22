@@ -236,6 +236,13 @@ hidden by unticking it.
   frame on a 2-core CPU against 220 ms. While it runs, the viewer shows the
   nearest posed frame instead of fitting frames itself. *Fit all frames*
   again stops it.
+* The spine goes from hunched to stretched (122lg). Lumbar bending is
+  ±15° per joint: the virtual rodent's 90° of flexion, which the rig had
+  swapped with its extension. A `stretch` value (−0.3…+0.4 a frame)
+  slides the lumbar and cervical joints along the spine, so the model is
+  0.8× to 1.27× its length from nose to tail base. On K7 the model's
+  length now follows the animal's, and the stretched frames' marker error
+  fell from 34 to 26 mm (see *Length* in docs/bodymodel.md).
 * The rig stays on top of the floor (122le). Before, the fitted mesh went
   under the floor in 97 % of K7's frames, by up to 10 cm. Mostly that was
   the legs and the tail. The rig's legs cannot bend (they keep the tucked

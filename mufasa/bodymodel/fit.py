@@ -56,6 +56,9 @@ PARAMS = [
     # extra width of the trunk (patch 122kt; rigs with a widening shape, e.g. the virtual rodent;
     # a rig's profile lists it among its posture values when it has one)
     ("widen", None, None),
+    # 122lg: the spine and neck longer (+) or shorter (−) by this share, each joint moved along
+    # its bone from its parent's (rigs whose profile names ``stretch`` bones, e.g. the virtual rodent)
+    ("stretch", None, None),
 ]
 PN = [p[0] for p in PARAMS]
 POSTURE = [p for p in PARAMS if p[1] is not None]
@@ -139,6 +142,12 @@ class Rig:
         self.limits = dict(prof.get("limits") or LIMITS)
         # the weak posture prior pulls towards these (default: the middle of each range)
         self.prior_centre = dict(prof.get("prior_centre") or {})
+        # 122lg: the bones whose joints slide along the spine with "stretch", and by how far
+        self.stretch_offset = np.zeros((len(self.names), 3))
+        for b in prof.get("stretch") or ():
+            i = self.ix.get(b)
+            if i is not None and self.parent[i] >= 0:
+                self.stretch_offset[i] = self.heads[i] - self.heads[self.parent[i]]
         tail_bones = [self.ix[b] for b in prof["tail_hidden"] if b in self.ix]
         self.body_faces_d = self.Fd[~np.isin(self.Wd.argmax(1)[self.Fd[:, 0]], tail_bones)]
         paws = [self.ix[n] for n in prof["paws"] if n in self.ix]
@@ -178,12 +187,15 @@ class Rig:
 
     def skinning_matrices(self, p: dict) -> np.ndarray:
         R = self.joint_rotations(p)
+        k = float(p.get("stretch", 0.0))
         G = np.zeros((self.B, 4, 4))
         for i, n in enumerate(self.names):
             L = np.eye(4)
             if n in R:
                 L[:3, :3] = R[n]
                 L[:3, 3] = self.heads[i] - R[n] @ self.heads[i]
+            if k:
+                L[:3, 3] += k * self.stretch_offset[i]          # 122lg: the joint slid along the spine
             G[i] = L if self.parent[i] < 0 else G[self.parent[i]] @ L
         return self.global_transform(p) @ G
 

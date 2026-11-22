@@ -46,13 +46,14 @@ of the mouse's:
 
 | Joint | Limit | Source |
 |---|---|---|
-| Lumbar (6 joints) | sideways ±10°, up/down −15° (extension) … +10° (flexion) per joint | the model's two bend joints (±30°) and two extension joints (−30…45°) |
+| Lumbar (6 joints) | sideways ±10°, up/down ±15° per joint (+ flexes) | the model's two bend joints (±30°) and two extension joints (−30…45°, + flexing): 90° of flexion in all. Extension goes past the model's 60° to 90°, for its rigid thorax (patch 122lg) |
 | Thorax | rigid | the model |
 | Cervical (7 bones) | sideways ±10°, up/down −10…+15° | the model's three extension joints (−23…35°) and two bend joints (±35°) |
 | Head (atlas) | up/down −45…+5°; sideways ±30° | the model; sideways assumed |
 | Tail (29 joints) | ±8° per joint (the model allows ±15°); the first fixed | the model |
 | Body | rearing −10…60°, roll ±15° about the hind paws | assumed |
 | Width | `widen` 0…0.5 per frame (the trunk up to 1.5× wider) | for heavy rats; see *Width* |
+| Length | `stretch` −0.3…+0.4 per frame (the spine and neck 30 % shorter … 40 % longer) | hunched to stretched; see *Length* |
 
 The rig stands with its limbs tucked under the body (patch 122ku;
 `rodent_rig.STANCE`). In the model's own zero pose the legs splay sideways
@@ -79,6 +80,34 @@ handle this:
   1.5× wider than the rig, with a weak pull back to the rig's width. A rat
   that curls up can then widen without the whole video taking that width.
 
+**Length** (patch 122lg). The model's thorax is one rigid body and its
+bones keep their lengths, so bending alone barely changes how long it is.
+A rat's length changes a lot between hunched and stretched. On K7 the
+back's path from `head_back` to `back_V2` spans 162–291 mm (5–95 %), while
+the fitted model stayed at 173–184 mm. Its marker error grew with the
+stretch: 34 mm on the longest tenth, against 25 mm on the shortest.
+
+* Each frame has a posture value `stretch` (−0.3…+0.4), pulled weakly to
+  0. Each lumbar and cervical joint and the atlas slides along its bone
+  from its parent's joint, so the spine and neck are 30 % shorter … 40 %
+  longer. Nose to tail base goes from 0.8× to 1.27× the model's. The
+  pelvis, hind legs and tail stay where they are, and the forelegs move
+  with the thorax.
+* It stands in for what the model cannot do: bend its thorax, slide its
+  scapulae, straighten the curve of its neck.
+* Before this patch, the lumbar limits had the model's flexion and
+  extension the wrong way round (+10° flexion, −15° extension per joint).
+  Hunched rats sat at the flexion limit in 27 % of K7's frames.
+
+With both changes, the model's length on K7 follows the animal's (148 mm
+on the shortest tenth, 226 mm on the longest). Marker error is now
+25–28 mm whatever the length: 26 mm on the longest tenth (34 before), 25
+on the next 15 % (29 before).
+
+A rig opts in by listing the bones whose joints slide as `stretch` in its
+profile (the virtual rodent: `Spine1`–`Spine6`, `Neck1`–`Neck7`, `Head`)
+and `stretch` among its `posture` values. The HBP mouse has none.
+
 After a fit, the log gives the mask's area against the fitted body's, and
 for the virtual rodent a girth to try when the animal covers more than
 1.15× the model. The value is also stored in the fit file's metadata as
@@ -89,7 +118,8 @@ are placed.
 Any rig can carry a profile: a `profile` entry in the `.rig.npz` (JSON)
 with `groups`, `head`, `trunk`, `tail`, `tail_hidden`, `paws`, `hips`,
 `posture` (name, low, high; include `widen` if the rig stores a widening
-shape `D`/`Dd`), `prior_centre`, `limits` and, optionally, `markers`. See
+shape `D`/`Dd`, and `stretch` if it lists `stretch` bones), `prior_centre`,
+`limits` and, optionally, `stretch` and `markers`. See
 `mufasa.bodymodel.fit.HBP_PROFILE`. Rigs without one are taken to be the
 HBP mouse.
 
@@ -98,7 +128,7 @@ HBP mouse.
 Pick the rig, the video, and the 2-D labels: the imported ones, or a
 Kalman v2 run. Then set the frames: *from*, *to*, and *every* n-th frame.
 
-**Posture.** Each frame has 17 numbers:
+**Posture.** Each frame has these numbers:
 
 * position and heading on the floor;
 * the scale, which is one value per video;
@@ -106,7 +136,8 @@ Kalman v2 run. Then set the frames: *from*, *to*, and *every* n-th frame.
 * sideways and up/down bend of the lumbar, thoracic and cervical spine
   (the same angle at every joint of a region);
 * head yaw and pitch;
-* the tail: sideways for the near half and for the far half, plus up/down.
+* the tail: sideways for the near half and for the far half, plus up/down;
+* for rigs that have them, `widen` and `stretch`.
 
 The limbs keep their rest pose.
 
