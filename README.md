@@ -64,6 +64,7 @@ Docs: [workflows.md (Stages 5–8)](docs/workflows.md) · [workflow_recipes.md](
 | Command | What it does |
 |---|---|
 | `mufasa` | Opens the Qt workbench after checking the environment (OpenCV, FFmpeg, …) and reporting anything missing. |
+| `mufasa run <step>` | The 3-D pipeline from the command line, one step at a time: `calibrate box\|checkerboard`, `3d-inference`, `smooth`, `heights`, `gait-extrapolation`, `body-fit`, `dynamics` (the `mufasa-pose3d` commands under pipeline names). `mufasa run all --pose X.parquet --camera cam.toml` chains 3d-inference → heights → gait-extrapolation → dynamics, skips steps that are up to date, and records each run in `X_run.json`. `mufasa run --list` lists the steps. |
 | `mufasa-workbench` | Opens the workbench directly, without the environment check. |
 | `mufasa-preview` | Pose-overlay viewer: plays a video with its raw and smoothed markers, pairing files by session name (`--video`, or `--folder` to search a directory). |
 | `mufasa-landscape` | Exploratory map of a project: loads the Kalman v2 pose and features of every session, finds column pairs with multimodal joint distributions (dip-test splitting) and plots their joint PDFs, and runs t-SNE on a frame sample. Needs the `analysis` extra. |

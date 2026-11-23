@@ -45,6 +45,7 @@ After ``pip install -e .``::
     mufasa                    # launches the workbench
     mufasa --project /p.ini   # opens a project on launch
     mufasa --help             # forwards to workbench's argparse
+    mufasa run <step> ...     # the 3-D pipeline from the command line (mufasa.cli.run)
 
 Existing entry points remain available:
 
@@ -127,7 +128,12 @@ def _set_qt_platform_default() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Console-script entry. Forwards to ``workbench_app.main``."""
+    """Console-script entry. Forwards to ``workbench_app.main``; ``mufasa run ...`` runs pipeline
+    steps from the command line instead (:mod:`mufasa.cli.run`, no Qt needed)."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == "run":
+        from mufasa.cli.run import main as run_main
+        return run_main(args[1:])
     # Try the import upfront so we can produce a helpful error
     # message instead of a bare ImportError traceback if something
     # is misconfigured.

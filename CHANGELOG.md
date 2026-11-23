@@ -8,6 +8,21 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ll — `mufasa run`: the 3-D pipeline from the command line (`mufasa/cli/run.py`).**
+* `mufasa run <step>` runs the `mufasa-pose3d` command under its pipeline name, with the same
+  options: `calibrate box|checkerboard`, `3d-inference`, `smooth`, `heights`,
+  `gait-extrapolation`, `body-fit`, `dynamics`. `mufasa run --list` lists them. `mufasa` without
+  `run` still opens the workbench (the launcher dispatches before importing Qt).
+* `mufasa run all --pose X.parquet --camera cam.toml` (or `--pose3d X_3d.parquet`) chains
+  3d-inference → heights → gait-extrapolation → dynamics:
+  * files named from the stem, in one folder;
+  * make-like skipping of steps that are up to date;
+  * `--from` / `--to` / `--force` / `--dry-run`;
+  * per-step extra options;
+  * every run appended to `<stem>_run.json` (command, version, seconds, exit).
+* README, docs/pose3d.md; `tests/smoke_122ll_run_cli.py`: 11 checks, including `run all` on a
+  synthetic rat through to dynamics.
+
 **122lk — Whole movements re-solved for tracking, balance and effort (stage 4 of the
 biomechanical model; `mufasa/biomech/optimise.py`, `mufasa-pose3d dynamics --optimise`).**
 * Over windows of frames, every joint, the paws' forces and (with muscles) the hindlimb

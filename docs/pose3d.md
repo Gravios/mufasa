@@ -624,6 +624,27 @@ with an error.
 
 ## Command line
 
+The pipeline's steps under their pipeline names:
+
+```
+mufasa run --list
+mufasa run calibrate box marks.json --width 300 --camera-height 500 --out camera_K7.toml
+mufasa run 3d-inference --pose K7.parquet --camera camera_K7.toml --out K7_3d.parquet
+mufasa run gait-extrapolation K7_3d_heights.parquet --out K7_gait.parquet
+mufasa run all --pose K7.parquet --camera camera_K7.toml [--out-dir D] [--muscles rat.osim] [--optimise]
+               [--from heights] [--to gait-extrapolation] [--force] [--dry-run]
+```
+
+* Each `mufasa run <step>` takes the `mufasa-pose3d` command's options
+  (`mufasa run <step> --help`).
+* `mufasa run all` chains 3d-inference → heights → gait-extrapolation → dynamics for one video.
+  The files are `<stem>_3d.parquet`, `<stem>_3d_heights.parquet`, `<stem>_gait.parquet`
+  (with `<stem>_steps.csv`) and `<stem>_dynamics.parquet`, in one folder.
+* A step whose output is newer than its inputs is skipped. Every step run is appended to
+  `<stem>_run.json`: the command, mufasa's version, the time taken, the exit code.
+* `--pose3d X_3d.parquet` starts from a 3-D pose file instead of the 2-D labels. Each step's
+  extra options go in `--infer-args`, `--gait-args` and `--dynamics-args`, quoted.
+
 ```
 mufasa-pose3d calibrate-box marks.json --width 300 --camera-height 500 --out sources/calibration/camera_K7.toml
 mufasa-pose3d calibrate-checkerboard board.mp4 --pattern 9 6 --square-mm 20 --out lens.toml
