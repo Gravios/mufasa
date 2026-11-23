@@ -8,6 +8,17 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ls — The viewers' windows fit a screen: their tool rows wrap.**
+* User: "the 3d view port is too wide and I cannot change it's width below a certain point which
+  is wider than my screen".
+* `mufasa/ui_qt/flow_layout.py`: `FlowLayout`, a row layout that wraps. Its narrowest width is its
+  widest widget, and it asks for the height its rows take at the current width.
+* Used for the 3-D viewer's tool row, the playback controls (`FrameScrubberWidget`), and the
+  feature viewer's overlay and JPDF rows.
+* The 3-D viewer's window, with the features and the JPDF open, narrows from 1612 px to about
+  550 px. The feature viewer's, with the 3-D view, narrows from 1049 px to about 660 px.
+* docs/pose3d.md; `tests/smoke_122ls_narrow_windows.py`: 7 checks.
+
 **122lr — The 3-D viewer finds a 3-D file's video by itself.**
 * User: "The new viewer doesn't find the videos"; "It automatically found them before".
 * The project's videos come from subfolders of `sources/videos` too (`project_video_files`,

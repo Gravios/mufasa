@@ -32,7 +32,6 @@ import numpy as np
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QLabel,
     QPushButton,
     QSlider,
@@ -215,7 +214,8 @@ class FrameScrubberWidget(QWidget):
         self._slider.valueChanged.connect(self._on_slider)
         outer.addWidget(self._slider)
 
-        ctrl = QHBoxLayout()
+        from mufasa.ui_qt.flow_layout import FlowLayout
+        ctrl = FlowLayout()                    # 122ls: wraps when the window is narrow
         # Compact button padding is structural, not cosmetic — the
         # scrubber row has to fit six seek buttons plus play/pause
         # plus a frame counter inline, so we shave the default padding.

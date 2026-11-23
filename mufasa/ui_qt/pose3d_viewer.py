@@ -1039,7 +1039,8 @@ class Pose3DViewerWidget(QWidget):
         self.video_path = video_path
         lay = QVBoxLayout(self)
         lay.setContentsMargins(4, 4, 4, 4)
-        bar = QHBoxLayout()
+        from mufasa.ui_qt.flow_layout import FlowLayout
+        bar = FlowLayout()                     # 122ls: wraps onto more rows, not wider than the screen
         for name in (*VIEWS, "Camera"):
             b = QPushButton(name, self)
             b.setToolTip("Recording camera's view" if name == "Camera" else f"{name} view")

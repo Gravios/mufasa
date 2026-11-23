@@ -421,7 +421,8 @@ class FeatureViewerWidget(QWidget):
         self._encode_thread = None
         self.fdlc_path = find_fdlc_pose(self.config_path, self.video_name)
         self.kalman_path = find_kalman_pose(self.config_path, self.video_name)
-        bar = QHBoxLayout()
+        from mufasa.ui_qt.flow_layout import FlowLayout
+        bar = FlowLayout()                     # 122ls: wraps when the window is narrow
         self.fdlc_cb = QCheckBox("FDLC markers", self)
         self.kalman_cb = QCheckBox("Kalman markers", self)
         for cb, path, what in ((self.fdlc_cb, self.fdlc_path, "tracker (FDLC) pose under "
@@ -498,7 +499,8 @@ class FeatureViewerWidget(QWidget):
         from PySide6.QtWidgets import QCheckBox, QComboBox, QSpinBox
         self.jpdf = None
         self._pooled: dict = {}
-        bar = QHBoxLayout()
+        from mufasa.ui_qt.flow_layout import FlowLayout
+        bar = FlowLayout()                     # 122ls: wraps when the window is narrow
         self.jpdf_cb = QCheckBox("JPDF beside the video", self)
         self._jpdf_tip = (
             "Show the joint distribution of two features (all videos) to the right of "

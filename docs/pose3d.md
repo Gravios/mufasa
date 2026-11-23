@@ -235,6 +235,13 @@ It takes the camera and the scale from the file (the scale otherwise from
 nose to tail base). On K7 it moved the nose in 4.7 % of frames, `head_back`
 in 1.6 % and `back_T4` in 0.8 %.
 
+## Narrow windows (122ls)
+
+The tool rows of the 3-D viewer and the feature viewer, and the playback controls, wrap onto more
+rows when a window is narrowed. A window can be made as narrow as its widest control, instead of
+as wide as all its controls in one line. The 3-D viewer's window with the features and the JPDF
+open narrows to about 550 px.
+
 ## Which video the 3-D viewer shows (122lr)
 
 The tab's **3-D viewer** section lists, by default, every 3-D file in the project: the 3-D runs
