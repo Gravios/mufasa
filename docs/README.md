@@ -39,7 +39,7 @@ Read this when you have a real dataset and want to validate the patch series bef
 **Body model (patch 122kq).** The Body model tab and `mufasa-pose3d body-rig` / `body-fit`: a rigged model from Blender, fitted to top-down video from the silhouette and the 2-D labels within joint limits, forwards and backwards over time; output format and overlay video.
 
 ### `biomech.md`
-**Biomechanical model (patches 122lh, 122li).** The virtual rodent in MuJoCo and `mufasa-pose3d dynamics`: the legs bending to the gait's paws, label calibration (STAC), every joint fitted to the labels, then joint torques and ground forces by inverse dynamics, with the residual as the consistency check. Stages 3 and 4 (muscles, trajectory optimisation) are planned.
+**Biomechanical model (patches 122lh, 122li, 122lj).** The virtual rodent in MuJoCo and `mufasa-pose3d dynamics`: the legs bending to the gait's paws, label calibration (STAC), every joint fitted to the labels, then joint torques and ground forces by inverse dynamics, with the residual as the consistency check; the hindlimb muscles carried over from an OpenSim rat model and their forces by static optimisation. Stage 4 (trajectory optimisation) is planned.
 
 ### `roi_enhancements_proposal.md` (122dk)
 **ROI tool audit + proposed enhancements.** Honest status of the ROI tool's current capabilities (what's wired, what's fixed, what's missing). Two design proposals: "Apply to selected videos" subset-apply (122dk-future) and drag-to-adjust placed ROIs (122dl-future).

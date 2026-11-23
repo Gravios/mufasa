@@ -10,8 +10,10 @@ the marker and silhouette fits.
    (:mod:`.mjmodel`). All of its joints are fitted to the 3-D labels and the gait's paws
    (:mod:`.fit`). Inverse dynamics then gives the generalised forces, and ground forces at the
    planted paws explain the whole-body balance (:mod:`.dynamics`).
-3. Muscles: paths, moment arms, and loads shared out to produce those torques (planned;
-   hindlimbs first: Eng et al. 2008, Johnson et al. 2008).
+3. The hindlimbs' muscles (patch 122lj): read from an OpenSim rat hindlimb model (Johnson et
+   al. 2008) and carried onto the virtual rodent's bones (:mod:`.osim`; Eng et al. 2008's
+   architecture as an option), and their forces shared out to produce those torques by static
+   optimisation (:mod:`.muscle`).
 4. Simulation: trajectories optimised for tracking and effort (planned).
 
 MuJoCo is an optional dependency: ``pip install "mufasa[biomech]"``.

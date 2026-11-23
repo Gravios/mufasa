@@ -57,6 +57,7 @@ class RodentMJ:
     q_stance: np.ndarray                # hinge angles of the tucked stance
     mass_kg: float = 0.0
     paw_joints: dict = field(default_factory=dict)   # paw -> its leg's joint names
+    muscles: object = None              # the MuscleSet its tendons were made from (size 1)
 
     @property
     def nv(self) -> int:
@@ -66,8 +67,23 @@ class RodentMJ:
         return mujoco().MjData(self.model)
 
 
-def build(size: float = 1.0, mass_kg: float | None = None, sim_params: bool = False) -> RodentMJ:
-    """The virtual rodent in MuJoCo, ``size`` × the model (and weighing ``mass_kg``, if given)."""
+_BASE = None
+
+
+def base_model():
+    """``rodent.xml`` as it is (size 1, no added sites); landmarks for :mod:`.osim`."""
+    global _BASE
+    if _BASE is None:
+        from mufasa.pose3d.rodent_model import MODEL_DIR
+        _BASE = mujoco().MjModel.from_xml_path(str(MODEL_DIR / "rodent.xml"))
+    return _BASE
+
+
+def build(size: float = 1.0, mass_kg: float | None = None, sim_params: bool = False,
+          muscles=None) -> RodentMJ:
+    """The virtual rodent in MuJoCo, ``size`` × the model (and weighing ``mass_kg``, if given).
+    ``muscles`` (:class:`mufasa.biomech.osim.MuscleSet`): a spatial tendon per muscle through
+    sites on its path (122lj)."""
     mj = mujoco()
     from mufasa.bodymodel.rodent_rig import stance_qpos
     from mufasa.pose3d.leg_ik import CHAINS
@@ -111,6 +127,13 @@ def build(size: float = 1.0, mass_kg: float | None = None, sim_params: bool = Fa
             zs.append((Vs[v, 2] - floor) / 1000.0)
         sole_z[p] = np.array(zs) * size
 
+    if muscles is not None:
+        for mu in muscles.muscles:
+            t = spec.add_tendon(name=f"muscle_{mu.name}")
+            for k, (body, x) in enumerate(mu.path):
+                bodies[body].add_site(name=f"muscle_{mu.name}_{k}", pos=list(x), size=[0.0005, 0, 0])
+                t.wrap_site(f"muscle_{mu.name}_{k}")
+
     m = spec.compile()
     if size != 1.0:
         for a in (m.body_pos, m.body_ipos, m.jnt_pos, m.site_pos, m.geom_pos, m.geom_size):
@@ -143,7 +166,8 @@ def build(size: float = 1.0, mass_kg: float | None = None, sim_params: bool = Fa
         paw_joints[p] = [j.name for j in rm.joints if j.body in bis]
     return RodentMJ(m, float(size), {n: m.site(f"label_{n}").id for n in LABELS},
                     {p: (m.site(f"sole_{p}_0").id, m.site(f"sole_{p}_1").id) for p in PAWS}, sole_z, hinge, qadr,
-                    vadr, rng[:, 0].copy(), rng[:, 1].copy(), q_st, float(m.body_mass.sum()), paw_joints)
+                    vadr, rng[:, 0].copy(), rng[:, 1].copy(), q_st, float(m.body_mass.sum()), paw_joints,
+                    muscles)
 
 
-__all__ = ["RodentMJ", "SOLE_BODIES", "build", "mujoco"]
+__all__ = ["RodentMJ", "SOLE_BODIES", "base_model", "build", "mujoco"]

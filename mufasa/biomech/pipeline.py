@@ -25,9 +25,12 @@ from mufasa.pose3d.gait import PAWS
 
 
 def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None = None,
-                 mass_g: float | None = None, calibrate_frames: int = 400, progress=None) -> tuple[Path, dict]:
+                 mass_g: float | None = None, calibrate_frames: int = 400, muscles=None,
+                 progress=None) -> tuple[Path, dict]:
     """Joint torques for a 3-D pose file (and its gait file: the paws' targets and load split;
     without one, paws planted). ``frames``: (first, last) frame numbers, inclusive (default all).
+    ``muscles``: an OpenSim hindlimb model (``.osim``), a saved muscle set (``.json``) or a
+    :class:`.osim.MuscleSet`: the hindlimb muscles' forces too (122lj).
     Returns (the file written, its summary)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -45,7 +48,11 @@ def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None 
     xyz = np.stack([df[[f"{n}_x", f"{n}_y", f"{n}_z"]].to_numpy(float) for n in names], 1)
     allf = df["frame"].to_numpy(int) if "frame" in df else np.arange(len(df))
     size = animal_size(BodyPhysics.virtual_rodent(), names, xyz)
-    M = build(size=size, mass_kg=None if not mass_g else mass_g / 1000.0)
+    ms = None
+    if muscles is not None:
+        from mufasa.biomech.osim import MuscleSet, load_muscles
+        ms = muscles if isinstance(muscles, MuscleSet) else load_muscles(muscles)
+    M = build(size=size, mass_kg=None if not mass_g else mass_g / 1000.0, muscles=ms)
     say = progress or (lambda *_: None)
 
     good = np.flatnonzero(np.isfinite(xyz).all((1, 2)))
@@ -76,13 +83,25 @@ def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None 
     inv = D.inverse(M, Q, V, A, fit["modes"], shares)
     table = D.dynamics_table(M, allf[sel], Q, fit["rms_mm"], inv)
     summ = D.summarise(M, table)
+    if ms is not None:
+        import pandas as pd
+
+        from mufasa.biomech import muscle as MU
+        say(f"muscle forces: {len(ms.muscles)} muscles")
+        so = MU.static_optimisation(M, Q, V, inv["tau"])
+        table = pd.concat([table, pd.DataFrame(MU.muscle_columns(so))], axis=1)
+        summ.update(MU.summarise_muscles(so))
     summ.update({"size": round(float(size), 4), "fps": fps, "calibration_rms_mm": [round(x, 1) for x in cal["rms_mm"]],
                  "label_shift_mm": cal["shift_mm"], "gait": str(gait) if gait else None})
     out = Path(out) if out else pose3d.with_name(pose3d.stem.replace("_3d", "") + "_dynamics.parquet")
     sites = {n: M.model.site_pos[s].tolist() for n, s in M.labels.items()}
     tbl = pa.Table.from_pandas(table, preserve_index=False)
     md = dict(tbl.schema.metadata or {})
-    md[b"mufasa_dynamics"] = json.dumps({"summary": summ, "label_sites_m": sites, "joints": M.hinge,
+    extra = {}
+    if ms is not None:
+        extra = {"muscles": [m.name for m in ms.muscles], "muscle_source": ms.source,
+                 "f_max_N": dict(zip([m.name for m in ms.muscles], so["f_max"].round(3).tolist(), strict=True))}
+    md[b"mufasa_dynamics"] = json.dumps({"summary": summ, "label_sites_m": sites, "joints": M.hinge, **extra,
                                          "source": str(pose3d),
                                          "method": "virtual rodent (MuJoCo), labels calibrated (STAC), "
                                                    "inverse dynamics, ground forces at planted paws"}).encode()

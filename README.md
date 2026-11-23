@@ -144,7 +144,7 @@ The `qt` extra installs PySide6, which the workbench needs. Native Cython kernel
 
 | Extra | Adds |
 |---|---|
-| `biomech` | MuJoCo (3.2+), for the biomechanical model: joint torques and ground forces from 3-D poses (`mufasa-pose3d dynamics`). |
+| `biomech` | MuJoCo (3.2+), for the biomechanical model: joint torques, ground forces and hindlimb muscle forces from 3-D poses (`mufasa-pose3d dynamics`). |
 | `pose3d` | PyTorch (2.7+), for 3-D inference's faster solvers (CPU and GPU) and the 3-D viewer's posing. On Linux, PyTorch 2.11+ from PyPI is a CUDA 13 build; with an older NVIDIA driver, install `torch` from `https://download.pytorch.org/whl/cu128` first. `mufasa-pose3d gpu-check` says what is missing. |
 | `gpu` | CuPy for CUDA 12 and PyTorch (Numba's CUDA backend is used as well). |
 | `onnx` | ONNX export and onnxruntime inference for classifiers. |
@@ -243,7 +243,7 @@ and year only; their full reference has not been checked.
 * Dewan et al. (2010) and Shahrokni et al. (2012): spinal ranges of motion, via the HBP mouse
   model's joint table *(references to be confirmed)*. `mufasa/bodymodel/fit.py`
 
-**For the biomechanical model** (`mufasa/biomech`, docs/biomech.md; muscles and simulation in progress):
+**For the biomechanical model** (`mufasa/biomech`, docs/biomech.md; simulation in progress):
 
 * Todorov, E., Erez, T. & Tassa, Y. (2012). MuJoCo: A physics engine for model-based control.
   *IEEE/RSJ IROS 2012*, 5026–5033. Inverse dynamics.
@@ -255,15 +255,33 @@ and year only; their full reference has not been checked.
 * Savitzky, A. & Golay, M. J. E. (1964). Smoothing and differentiation of data by simplified
   least squares procedures. *Analytical Chemistry* 36, 1627–1639. Joint velocities and
   accelerations.
-
 * Eng, C. M., Smallwood, L. H., Rainiero, M. P., Lahey, M., Ward, S. R. & Lieber, R. L. (2008).
   Scaling of muscle architecture and fiber types in the rat hindlimb. *Journal of Experimental
-  Biology* 211, 2336–2345. Measured hindlimb muscle architecture and fibre types.
+  Biology* 211, 2336–2345. Hindlimb muscle architecture (Table 1): the `eng2008` option.
+  `mufasa/biomech/osim.py`
 * Johnson, W. L., Jindrich, D. L., Roy, R. R. & Edgerton, V. R. (2008). A three-dimensional
   model of the rat hindlimb: musculoskeletal geometry and muscle moment arms. *Journal of
-  Biomechanics*.
+  Biomechanics* 41, 610–619. The OpenSim rat hindlimb model the muscles are read from (not
+  shipped; SimTK `rat_hlimb_model`). `mufasa/biomech/osim.py`
+* Johnson, W. L., Jindrich, D. L., Zhong, H., Roy, R. R. & Edgerton, V. R. (2011). Application
+  of a rat hindlimb model: a prediction of force spaces reachable through stimulation of nerve
+  fascicles. *IEEE Transactions on Biomedical Engineering* 58, 3328–3338. Muscle parameters.
 * Young, F., Rode, C., Hunt, A. & Quinn, R. (2019). Analyzing moment arm profiles in a
-  full-muscle rat hindlimb model. *Biomimetics* 4, 10.
+  full-muscle rat hindlimb model. *Biomimetics* 4, 10. Muscle attachments of the bilateral
+  model (UVA MAMP Lab, github.com/UVA-MAMP-Lab/RatHindlimb).
+* Zajac, F. E. (1989). Muscle and tendon: properties, models, scaling, and application to
+  biomechanics and motor control. *Critical Reviews in Biomedical Engineering* 17, 359–411.
+  The Hill-type muscle with a rigid tendon. `mufasa/biomech/muscle.py`
+* Thelen, D. G. (2003). Adjustment of muscle mechanics model parameters to simulate dynamic
+  contractions in older adults. *Journal of Biomechanical Engineering* 125, 70–77. Force–length
+  curves.
+* Crowninshield, R. D. & Brand, R. A. (1981). A physiologically based criterion of muscle force
+  prediction in locomotion. *Journal of Biomechanics* 14, 793–801. Static optimisation.
+* Anderson, F. C. & Pandy, M. G. (2001). Static and dynamic optimization solutions for gait are
+  practically equivalent. *Journal of Biomechanics* 34, 153–161. Static optimisation for gait.
+* Powell, P. L., Roy, R. R., Kanim, P., Bello, M. A. & Edgerton, V. R. (1984). Predictability of
+  skeletal muscle tension from architectural determinations in guinea pig hindlimbs. *Journal of
+  Applied Physiology* 57, 1715–1721. Specific tension, 22.5 N/cm².
 * Mak, J. N. E. (2021). *Building a Biomechanical Model of a Rat Forelimb.* MSc thesis,
   Portland State University. https://doi.org/10.15760/etd.7690. Forelimb chain and Hill-type
   muscle parameters, predicted from dog data.

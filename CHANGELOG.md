@@ -8,6 +8,38 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lj — The hindlimbs' muscles (stage 3 of the biomechanical model; `mufasa/biomech/osim.py`,
+`muscle.py`, `mufasa-pose3d dynamics --muscles`).**
+* `osim.read_osim`: an OpenSim model's joints (CustomJoint spatial transforms, splines),
+  coordinates, muscles and path points, with its forward kinematics.
+* The model is not shipped (SimTK custom terms). Tested on the UVA MAMP Lab's
+  `rat_hindlimb_bilateral.osim`: Johnson 2008, Young 2019 attachments, Johnson 2011 parameters,
+  38 muscles a side.
+* `osim.register`: each bone's points carried over by a similarity fitted to joint centres and
+  axes (bones within 2 % of length).
+  * The knee: OpenSim's slides, the virtual rodent's is a hinge. The 17 muscles crossing it are
+    refitted near it to OpenSim's length curves: 0.6–1.7 → 0.02–0.26 mm rms. The quadriceps'
+    lever at a bent knee went from 0 to 3–4 mm.
+  * Tendon slack lengths are matched with both models in OpenSim's standing pose (quadriceps
+    shifted 8–9 mm).
+  * A one-legged model is mirrored.
+* `muscle.static_optimisation`: Hill-type muscles with rigid tendons (Gaussian force–length,
+  exponential passive, Hill force–velocity). Per frame and leg, min Σa² for the hip's 3 torques,
+  the knee's and the ankle's, with reported reserve torques.
+* `--architecture eng2008`: Eng et al. 2008's PCSAs (× 22.5 N/cm²), fibre lengths and
+  pennation. The muscles both cover total 196 N (Johnson 2011) vs 194 N (Eng) a leg.
+* Checks:
+  * standing on the hindpaws in OpenSim's pose (196 mN·m at the hip), the reserve is under
+    0.05 mN·m;
+  * the tucked stance, 99 % from muscles.
+* K7 walking: reserve 14 % of torque (median); 3.5 % in the frames with no leg joint at a limit.
+  Knees sit at the flexion stop in 57–83 % of frames: the inferred paws are too close under the
+  hips (stage 2's finding).
+* `mjmodel.build(muscles=)`: a spatial tendon per muscle; `base_model()`.
+* README: Johnson 2008/2011, Young 2019, Zajac, Thelen, Crowninshield & Brand, Anderson & Pandy,
+  Powell. docs/biomech.md stage 3.
+* `tests/smoke_122lj_muscles.py`: 12 checks, on a small OpenSim model the test writes.
+
 **122li — Joint torques and ground forces from the observed motion (stage 2 of the
 biomechanical model; `mufasa/biomech`, `mufasa-pose3d dynamics`, docs/biomech.md).**
 * `mjmodel.build`: the virtual rodent in MuJoCo, with these changes:

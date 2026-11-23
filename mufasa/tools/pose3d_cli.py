@@ -14,6 +14,7 @@
     mufasa-pose3d body-rig --virtual-rodent OUT.rig.npz [--girth 1.3]             # the built-in rat
     mufasa-pose3d heights X_3d.parquet --out X_3d_h.parquet [--scale 1.17] [--model none]  # heights, floor
     mufasa-pose3d dynamics X_3d.parquet --gait X_gait.parquet [--frames 30000:31000]       # joint torques
+    mufasa-pose3d dynamics X_3d.parquet --gait X_gait.parquet --muscles rat_hindlimb.osim  # + muscle forces
     mufasa-pose3d gait X_3d.parquet --out X_gait.parquet [--mass-g 450] [--fps 30]  # paws, loads, gait
     mufasa-pose3d body-fit RIG.rig.npz VIDEO POSE --out FIT.parquet [--start 0 --stop N --step 1 --workers 4]
         [--no-refine] [--smoothness 0.5] [--scale PX] [--overlay OUT.mp4 [--side-by-side]]
@@ -170,6 +171,11 @@ def build_parser() -> argparse.ArgumentParser:
     dp.add_argument("--fps", type=float, help="default: the gait's, else the file's, else 30")
     dp.add_argument("--mass-g", type=float, help="the animal's weight (default: the model's, scaled to its size)")
     dp.add_argument("--calibrate", type=int, default=400, help="frames to calibrate the labels on (default 400)")
+    dp.add_argument("--muscles", help="an OpenSim rat hindlimb model (.osim; e.g. rat_hindlimb_bilateral.osim) "
+                                      "or a saved muscle set (.json): the hindlimb muscles' forces too")
+    dp.add_argument("--save-muscles", help="save the muscles, carried onto the virtual rodent, to this .json")
+    dp.add_argument("--architecture", choices=("osim", "eng2008"), default="osim",
+                    help="muscle forces and fibre lengths: the OpenSim model's (default) or Eng et al. 2008's")
     hp = sub.add_parser("heights", help="labels within the body model's height range and above the floor "
                                          "(along the camera rays)")
     hp.add_argument("input")
@@ -350,11 +356,19 @@ def main(argv: list[str] | None = None) -> int:
         if a.frames:
             lo, hi = a.frames.split(":")
             fr = (int(lo), int(hi))
+        mus = None
+        if a.muscles:
+            from mufasa.biomech.osim import load_muscles
+            mus = load_muscles(a.muscles, a.architecture)
+            if a.save_muscles:
+                print(f"wrote {mus.to_json(a.save_muscles)}")
         out, s = run_dynamics(a.input, a.gait, a.out, frames=fr, fps=a.fps, mass_g=a.mass_g,
-                              calibrate_frames=a.calibrate, progress=lambda m: print(m, flush=True))
+                              calibrate_frames=a.calibrate, muscles=mus,
+                              progress=lambda m: print(m, flush=True))
         print(f"wrote {out}")
         for k in ("mass_g", "frames", "fit_rms_mm", "support_vs_weight", "residual_vs_weight_median",
-                  "torque_p90_1", "torque_p90_2", "torque_p90_3"):
+                  "torque_p90_1", "torque_p90_2", "torque_p90_3", "reserve_vs_torque_median",
+                  "activation_median_1", "activation_median_2", "activation_median_3"):
             print(f"  {k}: {s.get(k)}")
         return 0
     if a.cmd == "heights":
