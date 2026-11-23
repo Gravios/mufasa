@@ -8,6 +8,41 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122li — Joint torques and ground forces from the observed motion (stage 2 of the
+biomechanical model; `mufasa/biomech`, `mufasa-pose3d dynamics`, docs/biomech.md).**
+* `mjmodel.build`: the virtual rodent in MuJoCo, with these changes:
+  * a free root;
+  * scaled to the animal: lengths × size, masses × size³, inertias × size⁵, or rescaled to a
+    given mass;
+  * a site per label and two sole sites per paw;
+  * dm_control's springs, damping and armature off, and constraints off, so the torques are net
+    torques.
+  * Its kinematics equal `rodent_model.py`'s to 1e-13 mm.
+* `fit.calibrate` (STAC, Wu et al. 2013): the labels' places on their bodies, re-solved from
+  fitted poses. On K7, labels moved 6–35 mm; the held-out fit went from 31.6 to 24.2 mm.
+* `fit.fit_trajectory`: every joint, frame by frame, fitted to the labels and the gait's paws
+  (LM on MuJoCo's Jacobians, within the joint ranges).
+* `dynamics`:
+  * Savitzky–Golay derivatives (0.15 s);
+  * `mj_inverse`;
+  * paw forces solved to supply the root's six: no pulling, μ 0.8, torque rows on a 5 cm lever,
+    the gait's load split as a prior;
+  * the leftover is the **residual**.
+* Checks:
+  * standing: support = weight, residual 0;
+  * free fall: no torque;
+  * constant glide: no acceleration;
+  * known poses fitted to 0.14 mm;
+  * calibration 15 → 1.2 mm.
+* K7, walking: support 1.00 × weight; residual 0.41 × weight (median). The gait's inferred
+  paws do not keep the body balanced (its ZMP is outside the support in 46 % of frames).
+  Labelled paws, or stage 4, would fix it. While rearing, the forepaws cannot reach the floor in
+  43 % of frames.
+* `biomech` extra (`mujoco>=3.2`); README: MuJoCo, STAC, Aldarondo 2024, Savitzky–Golay.
+* Next: stage 3 (hindlimb muscles: Eng 2008 architecture), stage 4 (iLQR, forward and backward
+  sweeps), the PLM angle (Valdez 2018), paw labels in the gait.
+* `tests/smoke_122li_dynamics.py`: 10 checks.
+
 **122lh — The virtual rodent's legs bend, to the gait's paws (stage 1 of the biomechanical
 model); the gait's hips; scientific references.**
 * `mufasa/pose3d/leg_ik.py`: each leg bone moves by the model's own hinge joints, within their

@@ -138,6 +138,12 @@ pose3d = [
     "torch>=2.7",
 ]
 
+# Biomechanical model (patch 122li): MuJoCo for the virtual rodent's dynamics
+# (`mufasa-pose3d dynamics`; mufasa/biomech).
+biomech = [
+    "mujoco>=3.2",
+]
+
 # GPU acceleration via CUDA 12.x. Requires matching NVIDIA driver (see
 # LINUX_DEPLOYMENT.md). For RTX 5070 Ti / Blackwell workstations (CC 12.0)
 # ensure driver >=570 and nvidia-open kernel modules.
@@ -198,6 +204,8 @@ all = [
     # gpu, pose3d
     "cupy-cuda12x>=13.0",
     "torch>=2.7",
+    # biomech
+    "mujoco>=3.2",
     # onnx
     "onnx>=1.16",
     "onnxruntime>=1.18",

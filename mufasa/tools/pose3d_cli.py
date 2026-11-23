@@ -13,6 +13,7 @@
     mufasa-pose3d body-rig MODEL.blend OUT.rig.npz [--blender /path/to/blender]   # rig for body fitting
     mufasa-pose3d body-rig --virtual-rodent OUT.rig.npz [--girth 1.3]             # the built-in rat
     mufasa-pose3d heights X_3d.parquet --out X_3d_h.parquet [--scale 1.17] [--model none]  # heights, floor
+    mufasa-pose3d dynamics X_3d.parquet --gait X_gait.parquet [--frames 30000:31000]       # joint torques
     mufasa-pose3d gait X_3d.parquet --out X_gait.parquet [--mass-g 450] [--fps 30]  # paws, loads, gait
     mufasa-pose3d body-fit RIG.rig.npz VIDEO POSE --out FIT.parquet [--start 0 --stop N --step 1 --workers 4]
         [--no-refine] [--smoothness 0.5] [--scale PX] [--overlay OUT.mp4 [--side-by-side]]
@@ -160,6 +161,15 @@ def build_parser() -> argparse.ArgumentParser:
                     help="the animal against an adult rat: lengths × this, times × its square root")
     gc = sub.add_parser("gpu-check", help="is the GPU solver usable here? (synthetic run, CPU vs CUDA)")
     gc.add_argument("--frames", type=int, default=20000)
+    dp = sub.add_parser("dynamics", help="joint torques and ground forces: the virtual rodent in MuJoCo, fitted "
+                                          "to the labels and the gait's paws (needs mufasa[biomech])")
+    dp.add_argument("input")
+    dp.add_argument("--gait", help="the video's _gait.parquet (paw targets, load split; without: paws planted)")
+    dp.add_argument("--out", help="default: <video>_dynamics.parquet beside the input")
+    dp.add_argument("--frames", help="first:last frame numbers (default: all)")
+    dp.add_argument("--fps", type=float, help="default: the gait's, else the file's, else 30")
+    dp.add_argument("--mass-g", type=float, help="the animal's weight (default: the model's, scaled to its size)")
+    dp.add_argument("--calibrate", type=int, default=400, help="frames to calibrate the labels on (default 400)")
     hp = sub.add_parser("heights", help="labels within the body model's height range and above the floor "
                                          "(along the camera rays)")
     hp.add_argument("input")
@@ -334,6 +344,19 @@ def main(argv: list[str] | None = None) -> int:
             print(hint)
         out = gpu.gpu_check(a.frames)
         return 0 if ("cuda" not in out or out.get("max_difference", 1) < 1e-3) else 1
+    if a.cmd == "dynamics":
+        from mufasa.biomech.pipeline import run_dynamics
+        fr = None
+        if a.frames:
+            lo, hi = a.frames.split(":")
+            fr = (int(lo), int(hi))
+        out, s = run_dynamics(a.input, a.gait, a.out, frames=fr, fps=a.fps, mass_g=a.mass_g,
+                              calibrate_frames=a.calibrate, progress=lambda m: print(m, flush=True))
+        print(f"wrote {out}")
+        for k in ("mass_g", "frames", "fit_rms_mm", "support_vs_weight", "residual_vs_weight_median",
+                  "torque_p90_1", "torque_p90_2", "torque_p90_3"):
+            print(f"  {k}: {s.get(k)}")
+        return 0
     if a.cmd == "heights":
         from mufasa.pose3d.io import marker_names, read_pose3d, write_pose3d
         from mufasa.pose3d.mono import camera_center_from_meta, enforce_heights

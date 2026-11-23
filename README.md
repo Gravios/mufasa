@@ -68,7 +68,7 @@ Docs: [workflows.md (Stages 5–8)](docs/workflows.md) · [workflow_recipes.md](
 | `mufasa-preview` | Pose-overlay viewer: plays a video with its raw and smoothed markers, pairing files by session name (`--video`, or `--folder` to search a directory). |
 | `mufasa-landscape` | Exploratory map of a project: loads the Kalman v2 pose and features of every session, finds column pairs with multimodal joint distributions (dip-test splitting) and plots their joint PDFs, and runs t-SNE on a frame sample. Needs the `analysis` extra. |
 | `mufasa-landscape-animate` | Animated GIF (and MP4) of a `mufasa-landscape` run for presentations: the sampled frames glide from the t-SNE map into the joint scatter of each chosen feature pair and back, coloured by their position in the t-SNE map. |
-| `mufasa-pose3d` | 3-D pose from the command line: camera calibration from marked box edges or a checkerboard, single-camera or stereo 3-D inference, 3-D Kalman smoothing (see [`docs/pose3d.md`](docs/pose3d.md)); `body-rig` / `body-fit` fit a rigged body model to video (see [`docs/bodymodel.md`](docs/bodymodel.md)). |
+| `mufasa-pose3d` | 3-D pose from the command line: camera calibration from marked box edges or a checkerboard, single-camera or stereo 3-D inference, 3-D Kalman smoothing (see [`docs/pose3d.md`](docs/pose3d.md)); `body-rig` / `body-fit` fit a rigged body model to video (see [`docs/bodymodel.md`](docs/bodymodel.md)); `dynamics` gives joint torques and ground forces (see [`docs/biomech.md`](docs/biomech.md)). |
 | `mufasa-view3d` | 3-D marker viewer with the video below the reconstruction volume. |
 | `mufasa-relink` | Makes a project's file links (imported videos) relative, so they survive mounting the project elsewhere (sshfs, NFS); finds the targets through the mount offset when run on the mount. The workbench does this when it opens a project. |
 
@@ -144,6 +144,7 @@ The `qt` extra installs PySide6, which the workbench needs. Native Cython kernel
 
 | Extra | Adds |
 |---|---|
+| `biomech` | MuJoCo (3.2+), for the biomechanical model: joint torques and ground forces from 3-D poses (`mufasa-pose3d dynamics`). |
 | `pose3d` | PyTorch (2.7+), for 3-D inference's faster solvers (CPU and GPU) and the 3-D viewer's posing. On Linux, PyTorch 2.11+ from PyPI is a CUDA 13 build; with an older NVIDIA driver, install `torch` from `https://download.pytorch.org/whl/cu128` first. `mufasa-pose3d gpu-check` says what is missing. |
 | `gpu` | CuPy for CUDA 12 and PyTorch (Numba's CUDA backend is used as well). |
 | `onnx` | ONNX export and onnxruntime inference for classifiers. |
@@ -242,7 +243,18 @@ and year only; their full reference has not been checked.
 * Dewan et al. (2010) and Shahrokni et al. (2012): spinal ranges of motion, via the HBP mouse
   model's joint table *(references to be confirmed)*. `mufasa/bodymodel/fit.py`
 
-**For the biomechanical model** (muscles, joint torques, simulation; in progress):
+**For the biomechanical model** (`mufasa/biomech`, docs/biomech.md; muscles and simulation in progress):
+
+* Todorov, E., Erez, T. & Tassa, Y. (2012). MuJoCo: A physics engine for model-based control.
+  *IEEE/RSJ IROS 2012*, 5026–5033. Inverse dynamics.
+* Wu, T., Tassa, Y., Kumar, V., Movellan, J. & Todorov, E. (2013). STAC: Simultaneous tracking
+  and calibration. *IEEE-RAS Humanoids 2013*. Label calibration. `mufasa/biomech/fit.py`
+* Aldarondo, D., Merel, J., Marshall, J. D. et al. (2024). A virtual rodent predicts the
+  structure of neural activity across behaviours. *Nature* 632, 594–602. STAC on the virtual
+  rodent.
+* Savitzky, A. & Golay, M. J. E. (1964). Smoothing and differentiation of data by simplified
+  least squares procedures. *Analytical Chemistry* 36, 1627–1639. Joint velocities and
+  accelerations.
 
 * Eng, C. M., Smallwood, L. H., Rainiero, M. P., Lahey, M., Ward, S. R. & Lieber, R. L. (2008).
   Scaling of muscle architecture and fiber types in the rat hindlimb. *Journal of Experimental

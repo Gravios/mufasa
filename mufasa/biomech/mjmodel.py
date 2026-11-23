@@ -1,0 +1,149 @@
+"""
+mufasa.biomech.mjmodel
+======================
+
+Patch 122li: the virtual rodent (dm_control ``rodent.xml``, as :mod:`mufasa.pose3d.rodent_model`
+reads it; Merel et al. 2020) as a MuJoCo model for dynamics:
+
+* a free root joint on its root body (the torso), so the whole body moves and the ground must
+  hold it up;
+* scaled to the animal: lengths × ``size``, masses × size³, inertias × size⁵ (the same body,
+  bigger; ``mass_kg`` rescales the masses to a weighed animal instead);
+* a site per 3-D label (:data:`mufasa.pose3d.rodent_model.LABELS`), on the body it sits on.
+  Labels that are skin vertices go on the vertex's main body, at its place in the model's zero
+  pose;
+* two sole sites per paw, the lowest skin points of the foot and the toes (the hand and the
+  fingers) in the stance, with their heights in it (the model stands on its digits);
+* without dm_control's joint springs (39 joints), damping and armature (an added inertia): they
+  steady its controllers but are not the rat's, so the torques found are each joint's net torque,
+  muscles and passive tissue together; and without MuJoCo's constraints (joint limits, contacts),
+  which inverse dynamics would read as forces (``sim_params=True`` keeps all of these).
+
+SI units inside MuJoCo (m, kg, s); 3-D poses are in mm.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+import numpy as np
+
+from mufasa.pose3d.gait import PAWS
+
+SOLE_BODIES = {"F": ("hand", "finger"), "H": ("foot", "toe")}
+
+
+def mujoco():
+    try:
+        import mujoco as mj
+    except ImportError as e:  # pragma: no cover - optional
+        raise ImportError('MuJoCo is needed for the biomechanical model: pip install "mufasa[biomech]" '
+                          "(or pip install mujoco)") from e
+    return mj
+
+
+@dataclass
+class RodentMJ:
+    """The MuJoCo virtual rodent, scaled, with label and sole sites."""
+    model: object
+    size: float
+    labels: dict                        # label -> site id
+    soles: dict                         # paw -> (heel site id, toe site id)
+    sole_z: dict                        # paw -> (2,) stance heights of the sole points (m, scaled)
+    hinge: list                         # hinge joint names, in qpos order after the free root
+    qadr: dict                          # joint name -> qpos address
+    vadr: dict                          # joint name -> dof address
+    lo: np.ndarray                      # hinge ranges (rad)
+    hi: np.ndarray
+    q_stance: np.ndarray                # hinge angles of the tucked stance
+    mass_kg: float = 0.0
+    paw_joints: dict = field(default_factory=dict)   # paw -> its leg's joint names
+
+    @property
+    def nv(self) -> int:
+        return int(self.model.nv)
+
+    def data(self):
+        return mujoco().MjData(self.model)
+
+
+def build(size: float = 1.0, mass_kg: float | None = None, sim_params: bool = False) -> RodentMJ:
+    """The virtual rodent in MuJoCo, ``size`` × the model (and weighing ``mass_kg``, if given)."""
+    mj = mujoco()
+    from mufasa.bodymodel.rodent_rig import stance_qpos
+    from mufasa.pose3d.leg_ik import CHAINS
+    from mufasa.pose3d.rodent_model import LABELS, MODEL_DIR, RodentModel
+    rm = RodentModel()
+    spec = mj.MjSpec.from_file(str(MODEL_DIR / "rodent.xml"))
+    root = spec.worldbody.bodies[0]
+    root.add_freejoint(name="root")
+    bodies = {b.name: b for b in spec.bodies}
+
+    # label sites (model units mm → m), on the zero pose
+    q0 = rm.qpos()
+    T0 = rm.fk(q0)[0]
+    lp = rm.label_points()
+    V0 = rm.skin_points(q0, Tw=T0[None])[0]
+    for name in LABELS:
+        s = lp[name]
+        if s[0] == "vertex":
+            bi = int(rm.weights[s[1]].argmax())
+            local = np.linalg.solve(T0[bi], np.r_[V0[s[1]], 1.0])[:3]
+        else:
+            bi, local = s[1], np.asarray(s[2], float)
+        bodies[rm.body_names[bi]].add_site(name=f"label_{name}", pos=local / 1000.0, size=[0.002, 0, 0])
+
+    # sole sites: each paw's two lowest skin points in the stance
+    qs = stance_qpos(rm)
+    Ts = rm.fk(qs)[0]
+    Vs = rm.skin_points(qs, Tw=Ts[None])[0]
+    floor = float(Vs[:, 2].min())
+    own = rm.weights.argmax(1)
+    sole_z = {}
+    for p in PAWS:
+        side = "L" if p[0] == "L" else "R"
+        zs = []
+        for k, body in enumerate(SOLE_BODIES[p[1]]):
+            bi = rm.body_index[f"{body}_{side}"]
+            ix = np.flatnonzero(own == bi)
+            v = ix[np.argmin(Vs[ix, 2])]
+            local = np.linalg.solve(Ts[bi], np.r_[Vs[v], 1.0])[:3]
+            bodies[rm.body_names[bi]].add_site(name=f"sole_{p}_{k}", pos=local / 1000.0, size=[0.002, 0, 0])
+            zs.append((Vs[v, 2] - floor) / 1000.0)
+        sole_z[p] = np.array(zs) * size
+
+    m = spec.compile()
+    if size != 1.0:
+        for a in (m.body_pos, m.body_ipos, m.jnt_pos, m.site_pos, m.geom_pos, m.geom_size):
+            a *= size
+        m.body_mass[:] *= size ** 3
+        m.body_inertia[:] *= size ** 5
+    if mass_kg:
+        k = float(mass_kg) / float(m.body_mass.sum())
+        m.body_mass[:] *= k
+        m.body_inertia[:] *= k
+    if not sim_params:
+        m.jnt_stiffness[:] = 0.0
+        m.dof_damping[:] = 0.0
+        m.dof_armature[:] = 0.0
+        # rigid-body inverse dynamics: joint limits are the fit's business, and the ground's
+        # forces are solved for (mufasa.biomech.dynamics); MuJoCo's soft constraints would read
+        # a joint resting at its limit as a constraint force
+        m.opt.disableflags |= int(mj.mjtDisableBit.mjDSBL_CONSTRAINT)
+    mj.mj_setConst(m, mj.MjData(m))
+
+    hinge = [m.joint(i).name for i in range(m.njnt) if m.jnt_type[i] == mj.mjtJoint.mjJNT_HINGE]
+    qadr = {m.joint(i).name: int(m.jnt_qposadr[i]) for i in range(m.njnt)}
+    vadr = {m.joint(i).name: int(m.jnt_dofadr[i]) for i in range(m.njnt)}
+    rng = np.array([m.jnt_range[m.joint(n).id] for n in hinge])
+    q_st = np.clip(np.array([qs[0, rm.joint_index[n]] for n in hinge]), rng[:, 0], rng[:, 1])
+    paw_joints = {}
+    for p in PAWS:
+        side = "L" if p[0] == "L" else "R"
+        bis = {rm.body_index[f"{b}_{side}"] for _, b in CHAINS[p[1]]}
+        paw_joints[p] = [j.name for j in rm.joints if j.body in bis]
+    return RodentMJ(m, float(size), {n: m.site(f"label_{n}").id for n in LABELS},
+                    {p: (m.site(f"sole_{p}_0").id, m.site(f"sole_{p}_1").id) for p in PAWS}, sole_z, hinge, qadr,
+                    vadr, rng[:, 0].copy(), rng[:, 1].copy(), q_st, float(m.body_mass.sum()), paw_joints)
+
+
+__all__ = ["RodentMJ", "SOLE_BODIES", "build", "mujoco"]
