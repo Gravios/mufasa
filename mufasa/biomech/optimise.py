@@ -48,7 +48,7 @@ from mufasa.pose3d.gait import PAWS
 WINDOW, STEP = 40, 30          # frames per window, frames between windows
 PIN = 2                        # frames each window holds from the one before
 SIG = {"label_mm": 4.0, "sole_mm": 1.0, "slide_mm": 1.0, "root": 0.02, "muscle_Nm": 0.002,
-       "rate": 0.1, "smooth_rad": 0.1, "smooth_root_m": 0.002}
+       "rate": 0.1, "smooth_rad": 0.1, "smooth_root_m": 0.002, "anchor_mm": 3.0}
 TAU_REF, EFFORT_W = 0.05, 0.3  # N·m; weight of the net torques' cost
 PRIOR = 0.3                    # pull towards the stance, per joint, per its range (as the fit)
 MU = 0.8
@@ -59,7 +59,7 @@ class _Window:
     """One window: its variables, residuals and sparse Jacobian."""
 
     def __init__(self, M: RodentMJ, sites, obs, Qref, modes, fps, use_muscles, physics=True,
-                 label_sigma=None, smooth_rad=None):
+                 label_sigma=None, smooth_rad=None, anchors=None):
         self.M, self.m = M, M.model
         self.d = M.data()
         self.sites = np.asarray(sites)
@@ -85,6 +85,7 @@ class _Window:
         self.physics = physics
         self.sl = (label_sigma or SIG["label_mm"]) / 1000.0
         self.ss = smooth_rad or SIG["smooth_rad"]
+        self.anchors = None if anchors is None else np.asarray(anchors, float)   # (T, 4, 2) m, NaN: none
         self.lw = np.ones(obs.shape[:2])                # per label and frame: robust weights
         self.jac = np.zeros((3, nv))
 
@@ -199,6 +200,12 @@ class _Window:
                     add(pen, [(t, 0, Jpen)], "soles")
             mids.append(mt)
             Jmid.append(Jt)
+            # 122lo: a planted paw that was seen stays where it was seen
+            if self.anchors is not None:
+                sa = SIG["anchor_mm"] / 1000.0
+                for k in range(4):
+                    if self.down[t, k] and np.isfinite(self.anchors[t, k]).all():
+                        add((mt[k][:2] - self.anchors[t, k]) / sa, [(t, 0, Jt[k][:2] / sa)], "seen paws")
             # planted paws do not slide
             if t > 0:
                 for k in range(4):
@@ -405,7 +412,7 @@ def _tendon_J(m, d):
 def optimise_window(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=None, A0=None,
                     muscles: bool = True, iters: int = 40, pinned: int = 0, physics: bool = True,
                     label_sigma: float | None = None, robust: float | None = None,
-                    smooth_rad: float | None = None) -> dict:
+                    smooth_rad: float | None = None, anchors=None) -> dict:
     """One window. ``xyz_mm`` (T, L, 3) labels; ``Qref`` (T, nq) the fitted poses to start from;
     ``modes`` per frame {paw: "stance" | "swing" | ...}; ``F0`` (T, 4, 3) N and ``A0`` (T, n)
     starting forces and activations; the first ``pinned`` frames' poses and activations held as
@@ -418,7 +425,8 @@ def optimise_window(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=N
     fitter = PoseFitter(M, names)
     col = [list(names).index(n) for n in fitter.names]
     obs = np.asarray(xyz_mm, float)[:, col] / 1000.0
-    w = _Window(M, fitter.sites, obs, Qref, modes, fps, muscles and physics, physics, label_sigma, smooth_rad)
+    w = _Window(M, fitter.sites, obs, Qref, modes, fps, muscles and physics, physics, label_sigma, smooth_rad,
+                anchors)
     T = w.T
     F0 = np.zeros((T, 4, 3)) if F0 is None else np.nan_to_num(np.asarray(F0, float))
     F0 = F0 * w.down[:, :, None]
@@ -466,7 +474,7 @@ def optimise_window(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=N
 
 def optimise_trajectory(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=None, A0=None,
                         muscles: bool = True, window: int = WINDOW, step: int = STEP, iters: int = 40,
-                        progress=None, **kw) -> dict:
+                        progress=None, anchors=None, **kw) -> dict:
     """:func:`optimise_window` over windows of ``window`` frames, ``step`` apart, one after
     another: each starts from the one before's last solved frames, held (:data:`PIN` of them),
     and its own frames replace the one before's from there on."""
@@ -488,7 +496,8 @@ def optimise_trajectory(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, 
                 A0[a:a + pin] = out["act"][a:a + pin]
         o = optimise_window(M, names, xyz_mm[a:b], Qref[a:b], modes[a:b], fps,
                             F0=None if F0 is None else F0[a:b], A0=None if A0 is None else A0[a:b],
-                            muscles=muscles, iters=iters, pinned=pin, **kw)
+                            muscles=muscles, iters=iters, pinned=pin,
+                            anchors=None if anchors is None else anchors[a:b], **kw)
         if not out:
             for k in keys:
                 if o.get(k) is not None:

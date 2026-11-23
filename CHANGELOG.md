@@ -8,6 +8,21 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lo — Labelled paws anchor the gait and stage 4 (`mufasa/pose3d/gait.py`, `optimise.py`).**
+* `paw_labels`: `paw_LF/RF/LH/RH`, `forepaw_left`, `hindpaw_R` and the like, any case.
+* `paw_observations`: a paw is seen where its 2-D likelihood is ≥ 0.9. It is planted where it is
+  slower than 40 mm/s (× √size) and no higher than 12 mm (× size), with runs under 3 frames
+  merged.
+* `estimate_gait`: seen paws are used as seen. Their stances are the seen ones, at the mean seen
+  place, and they are lifted where seen moving; the backward re-placement leaves them alone. The
+  rules still decide the unseen paws, and take a paw over when it is lost. The output gains
+  `<paw>_observed` columns and `<paw>_seen` in the summary.
+* Stage 4: a seen, planted paw is held within 3 mm (σ) of where it was seen (`anchors`, read from
+  the gait file by `run_dynamics`).
+* Synthetic walk: stance/swing 100 % as seen away from transition frames (68 % inferred);
+  planted hindpaws exact (26 mm inferred); stage 4 within 0.4 mm.
+* docs/pose3d.md (labelled paws); `tests/smoke_122lo_paw_anchors.py`: 6 checks.
+
 **122ln — The rat's leg ranges; an animal calibrated once (`mufasa-pose3d animal`,
 `--animal`, `--limits rat`).**
 * `mjmodel.build(limits="rat")`: knees −50…79° and ankles 18…80° in the virtual rodent's angles.

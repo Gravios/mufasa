@@ -91,6 +91,17 @@ PAWS = ("LF", "RF", "LH", "RH")
 GIRDLE_BODY = {"LH": "upper_leg_L", "RH": "upper_leg_R", "LF": "upper_arm_L", "RF": "upper_arm_R"}
 PAW_BODY = {"LH": "toe_L", "RH": "toe_R", "LF": "finger_L", "RF": "finger_R"}
 PARTNER = {"LF": "RF", "RF": "LF", "LH": "RH", "RH": "LH"}
+# 122lo: labelled paws, where they are seen, anchor the gait. Accepted names (any case):
+PAW_LABELS = {
+    "LF": ("paw_LF", "forepaw_left", "left_forepaw", "forepaw_L", "front_left_paw", "paw_front_left", "LF_paw"),
+    "RF": ("paw_RF", "forepaw_right", "right_forepaw", "forepaw_R", "front_right_paw", "paw_front_right", "RF_paw"),
+    "LH": ("paw_LH", "hindpaw_left", "left_hindpaw", "hindpaw_L", "hind_left_paw", "paw_hind_left", "LH_paw"),
+    "RH": ("paw_RH", "hindpaw_right", "right_hindpaw", "hindpaw_R", "hind_right_paw", "paw_hind_right", "RH_paw"),
+}
+OBS_STANCE_MM_S = 40.0      # a seen paw slower than this (× √size) is planted ...
+OBS_FLOOR_MM = 12.0         # ... if no higher than this above the floor (× size)
+OBS_MIN_FRAMES = 3          # stances and swings seen shorter than this are merged into their neighbours
+PAW_MIN_LIKELIHOOD = 0.9    # a paw's 2-D label below this is not seen
 TRUNK = ("back_T4", "back_T8", "back_L2", "back_L6", "back_V2")
 
 # uninjured adult rats on a CatWalk (Neckel et al. 2013, pre-injury runs: 108 rats, 5780 strides;
@@ -590,6 +601,50 @@ def _smooth(x: np.ndarray, fps: float, win_s: float = 0.15) -> np.ndarray:
     return savgol_filter(x, w, 2) if w >= 5 else x
 
 
+def paw_labels(names) -> dict:
+    """{paw: index in ``names``} of the labelled paws (:data:`PAW_LABELS`)."""
+    low = {n.lower(): i for i, n in enumerate(names)}
+    out = {}
+    for p, alts in PAW_LABELS.items():
+        for a in alts:
+            if a.lower() in low:
+                out[p] = low[a.lower()]
+                break
+    return out
+
+
+def paw_observations(names, xyz, fps: float, size: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
+    """Where each labelled paw is seen: positions (T, 4, 3) mm (NaN unseen) and states (T, 4):
+    1 planted (slow and low), 0 in the air, -1 not seen or not labelled."""
+    xyz = np.asarray(xyz, float)
+    T = len(xyz)
+    pos = np.full((T, 4, 3), np.nan)
+    state = np.full((T, 4), -1, int)
+    for p, j in paw_labels(names).items():
+        i = PAWS.index(p)
+        P = xyz[:, j]
+        seen = np.isfinite(P).all(1)
+        if seen.sum() < OBS_MIN_FRAMES:
+            continue
+        pos[:, i] = P
+        idx = np.flatnonzero(seen)
+        S = np.stack([_smooth(np.interp(np.arange(T), idx, P[idx, c]), fps, 0.04) for c in range(3)], 1)
+        v = np.linalg.norm(np.gradient(S[:, :2], 1.0 / fps, axis=0), axis=1)
+        low = S[:, 2] <= OBS_FLOOR_MM * size
+        st = ((v <= OBS_STANCE_MM_S * math.sqrt(size)) & low).astype(int)
+        k = 0                                                  # short runs merged into their neighbours
+        while k < T:
+            e = k
+            while e + 1 < T and st[e + 1] == st[k]:
+                e += 1
+            if e - k + 1 < OBS_MIN_FRAMES and k > 0:
+                st[k:e + 1] = st[k - 1]
+            k = e + 1
+        st[~seen] = -1
+        state[:, i] = st
+    return pos, state
+
+
 def animal_size(phys: BodyPhysics, names, xyz) -> float:
     """The animal's size against the model: the straight distance from the nose to the tail's
     base (back_V2) with the head low (median), against the standing model's. Straight distances
@@ -749,6 +804,10 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
         lag = (duty - 0.5) * period if np.isfinite(period) else st_min
         return state[q] == "stance" and now - since[q] >= min(st_min, max(lag, dt))
 
+    obs_pos, obs_state = paw_observations(names, xyz, fps, size)
+    obs_start = set()                                       # (paw, frame) stances that were seen
+    obs_sum = {p: np.zeros(2) for p in PAWS}
+    obs_n = {p: 0 for p in PAWS}
     state = {p: "air" for p in PAWS}
     foot = {p: np.full(2, np.nan) for p in PAWS}
     since = {p: -1e9 for p in PAWS}
@@ -775,11 +834,34 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
             phi += (now - prev) * fwd_speed[t] / stride_at(t)      # 122lf: forward progress drives it
         prev = now
         planted = {p: foot[p] for p in PAWS if state[p] == "stance"}
+        # 0. 122lo: paws seen are where they are seen, planted or not
+        seen_now = {p for i, p in enumerate(PAWS) if obs_state[t, i] >= 0}
+        for p in seen_now:
+            i = PAWS.index(p)
+            xy = obs_pos[t, i, :2]
+            if obs_state[t, i] == 1:
+                if state[p] != "stance":
+                    state[p], since[p], land_at[p], stance_start[p] = "stance", now, None, t
+                    obs_start.add((p, t))
+                    obs_sum[p], obs_n[p] = np.zeros(2), 0
+                obs_sum[p] = obs_sum[p] + xy
+                obs_n[p] += 1
+                foot[p] = obs_sum[p] / obs_n[p]                 # the seen stance's mean place
+                planted[p] = foot[p]
+            elif state[p] == "stance":
+                planted.pop(p, None)
+                steps.append((p, stance_start[p], t))
+                state[p], since[p] = "swing", now
+                land_at[p] = now + sw_max                       # seen again before then, normally
+            else:
+                state[p] = "swing"
         # 1. lift-offs: forced first, then wanted (one at a time, keeping balance)
         want = []
         stride = stride_at(t)
         period = stride / fwd_speed[t] if fwd_speed[t] > 1e-6 else np.inf
         for p in list(planted):
+            if p in seen_now:
+                continue
             g = gird[t, PAWS.index(p)]
             d = np.linalg.norm(np.r_[foot[p], 0.0] - g)
             behind = float(np.dot(foot[p] - neutral_xy(p, t), limb_h[p[1]][t]))
@@ -821,6 +903,8 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
             land_at[p] = now + float(np.clip(dur, sw_min, sw_max))
         # 2. touch-downs
         for p in PAWS:
+            if p in seen_now:
+                continue
             if state[p] in ("swing", "air") and (land_at[p] is None or now >= land_at[p]):
                 if now - since[p] < sw_min and state[p] == "swing":
                     continue
@@ -843,7 +927,7 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
     # closest to its girdle's neutral place over the whole stance, within reach throughout
     moved = []
     for p, a, z in steps:
-        if a is None:
+        if a is None or (p, a) in obs_start:                # a seen stance stays where it was seen
             continue
         i = PAWS.index(p)
         on = np.arange(a, z + 1)
@@ -892,6 +976,7 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
     for i, p in enumerate(PAWS):
         cols[f"{p}_x"], cols[f"{p}_y"] = out_pos[:, i, 0], out_pos[:, i, 1]
         cols[f"{p}_contact"] = out_con[:, i]
+        cols[f"{p}_observed"] = obs_state[:, i] >= 0
         cols[f"{p}_load"] = loads[:, i]
         cols[f"{p}_force_g"] = loads[:, i] * weight_g
         cols[f"{p}_girdle_x"], cols[f"{p}_girdle_y"], cols[f"{p}_girdle_z"] = gird[:, i].T
@@ -911,6 +996,8 @@ def estimate_gait(names, xyz: np.ndarray, frames, fps: float, *, size: float | N
     summ["turning"] = round(float(turning[valid].mean()), 3) if valid.any() else None
     summ["sidestep"] = round(float(sidestep[valid].mean()), 3) if valid.any() else None
     summ["replaced_mm"] = _r(np.median(moved)) if moved else None
+    for i, p in enumerate(PAWS):                              # 122lo
+        summ[f"{p}_seen"] = round(float((obs_state[valid, i] >= 0).mean()), 3) if valid.any() else 0.0
     return GaitResult(fdf, sdf, summ)
 
 
@@ -1020,6 +1107,12 @@ def gait_from_pose3d(path, *, fps: float | None = None, **kw) -> GaitResult:
     names = marker_names(df)
     xyz = np.stack([df[[f"{n}_x", f"{n}_y", f"{n}_z"]].to_numpy(float) for n in names], 1)
     frames = df["frame"].to_numpy(int) if "frame" in df else np.arange(len(df))
+    # 122lo: a labelled paw counts as seen only where its 2-D label was confident (3-D inference
+    # fills the frames in between, and puts an unplaced label on the floor)
+    for p, j in paw_labels(names).items():
+        lk = f"{names[j]}_likelihood"
+        if lk in df:
+            xyz[df[lk].to_numpy(float) < PAW_MIN_LIKELIHOOD, j] = np.nan
     # 122kz: what the file breaks of its contract travels with the result
     warn = [w for w in check_pose3d(df, meta) if not (fps and w.startswith("no frame rate"))]
     if not (fps or meta.get("fps")):

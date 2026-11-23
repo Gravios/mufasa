@@ -367,6 +367,36 @@ the paws are, how the weight is shared between them, and the gait. It
 works from the 3-D body markers alone: the paws are not labelled, so they
 are inferred from what the body can do.
 
+### Labelled paws (122lo)
+
+Labelled paws anchor the gait where they are seen.
+
+* **Names:** `paw_LF`, `paw_RF`, `paw_LH`, `paw_RH`, or `forepaw_left` / `left_forepaw` /
+  `hindpaw_R` and the like, any case. Label the pad's centre when the paw is visible, and leave it
+  unlabelled (or at low likelihood) when it is hidden.
+* **Seen:** a paw counts as seen where its 2-D likelihood is at least 0.9. 3-D inference puts
+  every frame of it somewhere, and an unplaced label on the floor along its camera ray, so the
+  likelihood decides.
+* **Planted:** a seen paw is planted where it moves slower than 40 mm/s and is no higher than
+  12 mm, both scaled by the animal's size. With one camera the paws sit on the floor along their
+  rays, so speed alone decides. Stances and swings shorter than 3 frames are merged into their
+  neighbours.
+* **Where it is seen, it is used as seen:** its stances are the seen ones, planted at their mean
+  seen place, and it is lifted where it is seen moving. The rules (reach, the stride clock,
+  balance) still decide the paws that are not seen, and when a seen paw is lost the rules take it
+  over.
+* **In the gait file:** a column `<paw>_observed`; in the summary, `<paw>_seen` (the share of
+  frames).
+* **Stage 4** (`dynamics --optimise`) keeps a seen, planted paw within 3 mm (σ) of where it was
+  seen, instead of placing it freely.
+
+On a synthetic walk (`tests/smoke_122lo_paw_anchors.py`):
+
+* stance or swing agrees with the truth in every frame away from the frame either side of a
+  lift-off or touch-down, against 68 % inferred;
+* the planted hindpaws sit where they were planted, against 26 mm off inferred;
+* stage 4 keeps them within 0.4 mm.
+
 **The physics model** is DeepMind's virtual rodent:
 * Each segment's mass comes from its collision shapes (density × volume):
   338 g in all, heaviest at the pelvis and abdomen. Each segment's centre

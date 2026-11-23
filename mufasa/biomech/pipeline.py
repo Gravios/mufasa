@@ -80,13 +80,19 @@ def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None 
     if frames is not None:
         a, b = frames
         sel = np.flatnonzero((allf >= a) & (allf <= b))
-    targets, shares = None, None
+    targets, shares, anchors = None, None, None
     if gait is not None:
         gf, gmeta = read_gait(gait)
         tg = GaitTargets(gf, size=size)
         targets = [tg.at(int(f)) for f in allf[sel]]
         g = gf.set_index("frame")
         shares = g.reindex(allf[sel])[[f"{p}_load" for p in PAWS]].to_numpy(float)
+        if all(f"{p}_observed" in g for p in PAWS) and g[[f"{p}_observed" for p in PAWS]].to_numpy().any():
+            gs = g.reindex(allf[sel])                       # 122lo: seen paws anchor stage 4
+            anchors = np.full((len(sel), 4, 2), np.nan)
+            for k, p in enumerate(PAWS):
+                on = gs[f"{p}_observed"].fillna(False).to_numpy(bool) & (gs[f"{p}_contact"].to_numpy() == 1)
+                anchors[on, k] = gs.loc[on, [f"{p}_x", f"{p}_y"]].to_numpy(float) / 1000.0
         fps = fps or (gmeta.get("summary") or {}).get("fps")
     fps = float(fps or meta.get("fps") or 30.0)
     say(f"fitting {len(sel)} frames")
@@ -109,6 +115,7 @@ def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None 
         say(f"optimising {len(sel)} frames in windows of {OP.WINDOW}")
         op = OP.optimise_trajectory(M, names, xyz[sel], Q, fit["modes"], fps, F0=inv["grf"],
                                     A0=None if so is None else so["act"], muscles=so is not None, iters=iters,
+                                    anchors=anchors,
                                     progress=(lambda i, n: say(f"optimising: window {i}/{n}")) if progress else None)
         Q, V, A, rms = op["qpos"], op["V"], op["A"], op["rms_mm"]
         inv = {"tau": op["tau"], "grf": op["grf"], "res_f": op["res_f"], "res_t": op["res_t"], "down": op["down"]}
