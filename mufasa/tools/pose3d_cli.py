@@ -190,7 +190,7 @@ def build_parser() -> argparse.ArgumentParser:
     hp.add_argument("--model", default="virtual_rodent", help="'virtual_rodent', or 'none' (the floor only)")
     hp.add_argument("--camera", help="camera file (default: the file's own camera)")
     hp.add_argument("--margin", type=float, default=0.1, help="slack on the model's ranges (0.1 = 10 %%)")
-    s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file")
+    s = sub.add_parser("smooth", help="3-D Kalman smoothing of a 3-D pose file (--model: with the body)")
     s.add_argument("input")
     s.add_argument("--out", required=True)
     s.add_argument("--camera")
@@ -198,6 +198,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--sigma-perp", type=float, default=2.0)
     s.add_argument("--sigma-ray", type=float, default=25.0)
     s.add_argument("--fps", type=float, default=30.0)
+    s.add_argument("--model", action="store_true",
+                   help="smooth with the body instead (the virtual rodent: bones keep their lengths, joints stay in "
+                        "range, gaps filled, labels that disagree with the body flagged; needs mufasa[biomech])")
+    s.add_argument("--calibrate", type=int, default=400, help="--model: frames to calibrate the labels on")
+    s.add_argument("--label-sigma", type=float, default=8.0, help="--model: the labels' noise, mm (default 8)")
+    s.add_argument("--joints-out", help="--model: also write the joint angles to this .parquet")
     return ap
 
 
@@ -409,6 +415,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"scale {float(scale):.2f}, {'along the camera rays' if center is not None else 'straight up/down'}; "
               + (", ".join(f"{m} {v} ({100 * v / n:.1f} %)" for m, v in moved.items()) or "nothing moved")
               + f"; wrote {a.out}")
+        return 0
+    if a.cmd == "smooth" and a.model:
+        from mufasa.biomech.smoother import smooth_pose3d
+        s = smooth_pose3d(a.input, a.out, fps=a.fps, calibrate_frames=a.calibrate, joints_out=a.joints_out,
+                          label_sigma=a.label_sigma, progress=lambda msg: print(msg, flush=True))
+        print(f"labels {s['model_mm_median']} mm from the body (median), {100 * s['flagged']:.2f} % flagged, "
+              f"{s['filled']} gaps filled; wrote {a.out}" + (f" and {a.joints_out}" if a.joints_out else ""))
         return 0
     if a.cmd == "smooth":
         from mufasa.pose3d.camera import Camera

@@ -133,6 +133,56 @@ the ray* vs *across the ray*), so smoothing evens out depth while points
 stay on their labels. Runs inside 3-D inference (checkbox) or on an
 existing run (*3-D Kalman smoothing* section, new run).
 
+The Kalman smoother has no body: each label is smoothed on its own. Bones can stretch, a
+joint can bend the wrong way, and two labels swapped for a few frames go unseen.
+
+### Smoothing with the body (`--model`)
+
+```
+mufasa-pose3d smooth K7_3d.parquet --out K7_3d_body.parquet --model [--joints-out K7_joints.parquet]
+mufasa run smooth K7_3d.parquet --out K7_3d_body.parquet --model
+```
+
+The labels are explained by the virtual rodent (`mufasa/biomech/smoother.py`; needs
+`mufasa[biomech]`):
+
+1. Its label sites are calibrated on 400 frames (STAC, as for the dynamics), and every joint is
+   fitted frame by frame.
+2. Then stretches of 150 frames are re-solved together:
+   * the labels (σ 8 mm), robustly: a label far off the body hardly pulls on it (Cauchy weights,
+     2.5 σ), so a swap or a wild label does not drag the body;
+   * every joint's and the root's motion smooth (second differences, σ 0.03 rad a frame²);
+   * a weak pull to the stance, every joint within its range;
+   * the paws above the floor.
+
+Out come:
+
+* the model's labels in every frame, gaps filled, on a body whose bones keep their lengths;
+* for each label, its distance from the body (`<label>_model_mm`);
+* a flag where it disagreed (`<label>_flag`: more than 4 σ off and 3× its own median): an
+  outlier or a swap;
+* the joint angles, if asked for (`q_<joint>_deg`, the root's position and orientation).
+
+A synthetic rat, its labels with 3 mm noise, a 12-frame gap, the hips swapped for 10 frames and
+one wild label (`tests/smoke_122lm_skeletal_smoother.py`):
+
+* the body's labels sit 1.4 mm from the truth, against 4.7 mm for the noisy labels and 4.2 mm
+  for the per-marker Kalman;
+* the head's distances are constant;
+* the gap is filled within 2.6 mm;
+* the swap and the wild label are flagged, with nothing else flagged.
+
+On K7, 3000 frames:
+
+* the labels sit 12 mm from the body (median). The head's sit 2–5 mm away; the back's 8–19 mm
+  (the model's spine is not the labeller's); the tail's 27–45 mm (it bends more than the
+  model's tail).
+* The labels' frame-to-frame acceleration falls from 1.4 to 0.6 mm/frame² (the Kalman's: 1.3).
+  The hips' distance apart varied by 6.6 mm (sd); it is now constant.
+* 3.2 % of labels are flagged, most often head_right (13 %) and head_nose (9 %): likely
+  left/right confusions in the 2-D labels.
+* 0.055 s a frame: about 1.7 hours for K7's 108 000 frames on one core.
+
 ## 5. Heights and the floor
 
 A single camera sees heights worst near the floor, where a few pixels

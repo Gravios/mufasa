@@ -48,7 +48,7 @@ from mufasa.pose3d.gait import PAWS
 WINDOW, STEP = 40, 30          # frames per window, frames between windows
 PIN = 2                        # frames each window holds from the one before
 SIG = {"label_mm": 4.0, "sole_mm": 1.0, "slide_mm": 1.0, "root": 0.02, "muscle_Nm": 0.002,
-       "rate": 0.1, "smooth_rad": 0.1}
+       "rate": 0.1, "smooth_rad": 0.1, "smooth_root_m": 0.002}
 TAU_REF, EFFORT_W = 0.05, 0.3  # N·m; weight of the net torques' cost
 PRIOR = 0.3                    # pull towards the stance, per joint, per its range (as the fit)
 MU = 0.8
@@ -58,7 +58,8 @@ F_REG = 0.02                   # a little cost on the ground forces (N), so thei
 class _Window:
     """One window: its variables, residuals and sparse Jacobian."""
 
-    def __init__(self, M: RodentMJ, sites, obs, Qref, modes, fps, use_muscles):
+    def __init__(self, M: RodentMJ, sites, obs, Qref, modes, fps, use_muscles, physics=True,
+                 label_sigma=None, smooth_rad=None):
         self.M, self.m = M, M.model
         self.d = M.data()
         self.sites = np.asarray(sites)
@@ -81,6 +82,10 @@ class _Window:
             self.leg = {M.vadr[d.format(S=S)] for S in "LR" for d in LEG_DOFS}
         self.nm = 0 if self.mt is None else len(self.mt.names)
         self.nb = nv + 12 + self.nm                     # variables per frame
+        self.physics = physics
+        self.sl = (label_sigma or SIG["label_mm"]) / 1000.0
+        self.ss = smooth_rad or SIG["smooth_rad"]
+        self.lw = np.ones(obs.shape[:2])                # per label and frame: robust weights
         self.jac = np.zeros((3, nv))
 
     # variables ---------------------------------------------------------------------------
@@ -131,47 +136,57 @@ class _Window:
         tags = []
 
         def add(r, blocks=(), tag=""):
-            """Residuals ``r`` with their Jacobian ``blocks``: [(frame, column offset, dense)]."""
+            """Residuals ``r`` with their Jacobian ``blocks``: [(frame, column offset, B)], B a
+            dense array or (rows, cols, values)."""
             r = np.atleast_1d(np.asarray(r, float))
             i0 = nrow[0]
             res.append(r)
             if want_jac:
                 for t, c0, B in blocks:
-                    B = np.atleast_2d(B)
-                    ii, jj = np.nonzero(B)
+                    if isinstance(B, tuple):
+                        ii, jj, vv = B
+                    else:
+                        B = np.atleast_2d(B)
+                        ii, jj = np.nonzero(B)
+                        vv = B[ii, jj]
                     rows.append(ii + i0)
                     cols.append(jj + t * nb + c0)
-                    vals.append(B[ii, jj])
+                    vals.append(vv)
             nrow[0] += len(r)
             tags.append((tag, len(r)))
 
         diff = lambda a, b: _diff(m, a, b)            # noqa: E731
-        sl = SIG["label_mm"] / 1000.0
+        sl = self.sl
         ss, sd = SIG["sole_mm"] / 1000.0, SIG["slide_mm"] / 1000.0
         sF, sT = SIG["root"] * self.W, SIG["root"] * self.W * 0.05
         mids, Jmid = [], []
+        nh = len(self.hv)
+        Jpost = (np.arange(nh), self.hv, PRIOR / self.span)
         for t in range(T):
             d.qpos[:] = Q[t]
             mj.mj_kinematics(m, d)
             mj.mj_comPos(m, d)
             # labels
-            ok = np.isfinite(self.obs[t]).all(1)
-            for k in np.flatnonzero(ok):
-                s = self.sites[k]
-                mj.mj_jacSite(m, d, self.jac, None, int(s))
-                add((d.site_xpos[s] - self.obs[t, k]) / sl, [(t, 0, self.jac / sl)], "labels")
+            ok = np.flatnonzero(np.isfinite(self.obs[t]).all(1))
+            if len(ok):
+                w = np.repeat(np.sqrt(self.lw[t, ok]) / sl, 3)
+                JL = np.zeros((3 * len(ok), nv))
+                if want_jac:
+                    for i, k in enumerate(ok):
+                        mj.mj_jacSite(m, d, self.jac, None, int(self.sites[k]))
+                        JL[3 * i:3 * i + 3] = self.jac
+                add((d.site_xpos[self.sites[ok]] - self.obs[t, ok]).ravel() * w, [(t, 0, JL * w[:, None])], "labels")
             # posture
             pr = PRIOR * (Q[t, self.hq] - M.q_stance) / self.span
-            Jp = np.zeros((len(self.hq), nv))
-            Jp[np.arange(len(self.hq)), self.hv] = PRIOR / self.span
-            add(pr, [(t, 0, Jp)], "posture")
+            add(pr, [(t, 0, Jpost)], "posture")
             # soles
             mt, Jt = [], []
             for k, p in enumerate(PAWS):
                 h, s = M.soles[p]
                 Jh, Js = np.zeros((3, nv)), np.zeros((3, nv))
-                mj.mj_jacSite(m, d, Jh, None, h)
-                mj.mj_jacSite(m, d, Js, None, s)
+                if want_jac or self.physics:                # the ground's forces act through them
+                    mj.mj_jacSite(m, d, Jh, None, h)
+                    mj.mj_jacSite(m, d, Js, None, s)
                 ph, ps = d.site_xpos[h].copy(), d.site_xpos[s].copy()
                 mt.append((ph + ps) / 2)
                 Jt.append((Jh + Js) / 2)
@@ -216,15 +231,21 @@ class _Window:
         wr = np.r_[np.full(3, 1 / sF), np.full(3, 1 / sT)]
         self.last = {"tau": np.full((T, len(self.hv)), np.nan), "res_f": np.full((T, 3), np.nan),
                      "res_t": np.full((T, 3), np.nan), "V": np.full((T, nv), np.nan), "A": np.full((T, nv), np.nan)}
-        nh = len(self.hv)
-        Js = np.zeros((nh, nv))
-        Js[np.arange(nh), self.hv] = 1.0 / SIG["smooth_rad"]
+        wroot = 1.0 / np.r_[np.full(3, SIG["smooth_root_m"]), np.full(3, self.ss)]
+        Jroot = (np.arange(6), np.arange(6), wroot)
+        Jroot2 = (Jroot[0], Jroot[1], -2 * wroot)
+        Js = (np.arange(nh), self.hv, np.full(nh, 1.0 / self.ss))
+        Js2 = (Js[0], Js[1], -2 * Js[2])
         for t in range(1, T - 1):
             dm, dp = diff(Q[t - 1], Q[t]), diff(Q[t], Q[t + 1])
             v, a = (dm + dp) / (2 * dt), (dp - dm) / dt ** 2
             # joints change smoothly: their second difference (the model has redundant joints,
             # the neck's twists among them, that nothing else holds still)
-            add((dp - dm)[self.hv] / SIG["smooth_rad"], [(t - 1, 0, Js), (t, 0, -2 * Js), (t + 1, 0, Js)], "smooth")
+            add((dp - dm)[self.hv] / self.ss, [(t - 1, 0, Js), (t, 0, Js2), (t + 1, 0, Js)], "smooth")
+            if not self.physics:
+                # kinematics only: the root moves smoothly too, and that is all
+                add((dp - dm)[:6] * wroot, [(t - 1, 0, Jroot), (t, 0, Jroot2), (t + 1, 0, Jroot)], "smooth")
+                continue
             d.qpos[:], d.qvel[:], d.qacc[:] = Q[t], v, a
             mj.mj_inverse(m, d)
             f = d.qfrc_inverse.copy()
@@ -286,6 +307,18 @@ class _Window:
         return r, J
 
 
+def _label_err(w, Q, obs):
+    """(T, L) distance of each seen label from its site, m (NaN unseen)."""
+    mj, d = mujoco(), w.d
+    E = np.full(obs.shape[:2], np.nan)
+    for t in range(len(Q)):
+        d.qpos[:] = Q[t]
+        mj.mj_kinematics(w.m, d)
+        ok = np.isfinite(obs[t]).all(1)
+        E[t, ok] = np.linalg.norm(d.site_xpos[w.sites[ok]] - obs[t, ok], axis=1)
+    return E
+
+
 def _breakdown(r, tags) -> dict:
     out, i = {}, 0
     for tag, n in tags:
@@ -298,7 +331,6 @@ def _lm(evaluate, x, lo, hi, iters: int, progress=None):
     """Projected Levenberg–Marquardt with a sparse direct solve: each step solves the whole
     window's normal equations at once. Variables at a bound and pushed outwards are held."""
     import scipy.sparse as sp
-    from scipy.sparse.linalg import spsolve
     x = np.clip(x, lo, hi)
     r, J = evaluate(x, True)
     cost = float(r @ r)
@@ -315,13 +347,14 @@ def _lm(evaluate, x, lo, hi, iters: int, progress=None):
         while lam < 1e10:
             K = Af + sp.diags(lam * (dg + 1e-6 * (dg.max() if len(dg) else 1.0)))
             step = np.zeros_like(x)
-            step[free] = -spsolve(K.tocsc(), g[free])
+            step[free] = -_solve_sym(K, g[free])
             xn = np.clip(x + step, lo, hi)
-            rn, Jn = evaluate(xn, True)
+            rn, _ = evaluate(xn, False)
             n_eval += 1
             cn = float(rn @ rn)
             if cn < cost:
                 rel = (cost - cn) / max(cost, 1e-12)
+                rn, Jn = evaluate(xn, True)
                 x, r, J, cost = xn, rn, Jn, cn
                 lam = max(lam / 3.0, 1e-9)
                 improved = True
@@ -332,6 +365,27 @@ def _lm(evaluate, x, lo, hi, iters: int, progress=None):
         if not improved or rel < 1e-5:
             break
     return x, r, n_eval
+
+
+def _solve_sym(K, b):
+    """K x = b for the window's normal equations: symmetric, positive definite and banded
+    (frames couple only to their near neighbours), so a banded Cholesky (LAPACK) unless the
+    band is too wide for it to pay."""
+    from scipy.linalg import LinAlgError, solveh_banded
+    from scipy.sparse.linalg import spsolve
+    C = K.tocoo()
+    up = C.col >= C.row
+    r, c, v = C.row[up], C.col[up], C.data[up]
+    bw = int((c - r).max()) if len(r) else 0
+    n = K.shape[0]
+    if bw and bw * bw * n < 4e9:
+        ab = np.zeros((bw + 1, n))
+        ab[bw + r - c, c] = v
+        try:
+            return solveh_banded(ab, b, check_finite=False)
+        except LinAlgError:
+            pass
+    return spsolve(K.tocsc(), b, permc_spec="NATURAL")
 
 
 def _diff(m, a, b):
@@ -349,17 +403,22 @@ def _tendon_J(m, d):
 
 
 def optimise_window(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=None, A0=None,
-                    muscles: bool = True, iters: int = 40, pinned: int = 0) -> dict:
+                    muscles: bool = True, iters: int = 40, pinned: int = 0, physics: bool = True,
+                    label_sigma: float | None = None, robust: float | None = None,
+                    smooth_rad: float | None = None) -> dict:
     """One window. ``xyz_mm`` (T, L, 3) labels; ``Qref`` (T, nq) the fitted poses to start from;
     ``modes`` per frame {paw: "stance" | "swing" | ...}; ``F0`` (T, 4, 3) N and ``A0`` (T, n)
     starting forces and activations; the first ``pinned`` frames' poses and activations held as
-    given (the window before's, so the motion carries on smoothly). Returns poses, forces,
-    activations, torques, the residual and the costs before and after."""
+    given (the window before's, so the motion carries on smoothly). ``physics=False``: the
+    kinematics alone (labels, smooth joints, posture, the floor; :mod:`.smoother`).
+    ``label_sigma`` (mm): the labels' σ (default :data:`SIG`). ``robust`` (σ): labels further
+    off than this are down-weighted (Huber, iterated twice) and reported in ``label_err_mm``.
+    Returns poses, forces, activations, torques, the residual and the costs before and after."""
     from mufasa.biomech.fit import PoseFitter
     fitter = PoseFitter(M, names)
     col = [list(names).index(n) for n in fitter.names]
     obs = np.asarray(xyz_mm, float)[:, col] / 1000.0
-    w = _Window(M, fitter.sites, obs, Qref, modes, fps, muscles)
+    w = _Window(M, fitter.sites, obs, Qref, modes, fps, muscles and physics, physics, label_sigma, smooth_rad)
     T = w.T
     F0 = np.zeros((T, 4, 3)) if F0 is None else np.nan_to_num(np.asarray(F0, float))
     F0 = F0 * w.down[:, :, None]
@@ -378,6 +437,14 @@ def optimise_window(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=N
     r0 = w.evaluate(x0, False)[0]
     parts0 = _breakdown(r0, w.tags)
     xs, rs, nfev = _lm(w.evaluate, x0, lo, hi, iters)
+    if robust:
+        for _ in range(2):
+            err = _label_err(w, w.unpack(xs)[0], obs)
+            z = err / w.sl
+            w.lw = 1.0 / (1.0 + (z / robust) ** 2)          # Cauchy: a label far off hardly pulls
+            w.lw[~np.isfinite(z)] = 1.0
+            xs, rs, n2 = _lm(w.evaluate, xs, lo, hi, iters)
+            nfev += n2
     Q, F, A = w.unpack(xs)
     parts = _breakdown(w.evaluate(xs, False)[0], w.tags)
     out = dict(w.last)
@@ -390,7 +457,8 @@ def optimise_window(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=N
         ok = np.isfinite(obs[t]).all(1)
         if ok.any():
             rms[t] = float(np.sqrt(np.mean(np.sum((d.site_xpos[w.sites[ok]] - obs[t, ok]) ** 2, 1)))) * 1000
-    out.update({"qpos": Q, "grf": F, "act": A, "down": w.down, "rms_mm": rms, "cost0": float(r0 @ r0),
+    out.update({"qpos": Q, "grf": F, "act": A, "down": w.down, "rms_mm": rms,
+                "label_err_mm": _label_err(w, Q, obs) * 1000.0, "label_weight": w.lw.copy(), "cost0": float(r0 @ r0),
                 "cost": float(rs @ rs), "nfev": int(nfev), "muscles": w.nm > 0,
                 "parts0": parts0, "parts": parts})
     return out
@@ -398,7 +466,7 @@ def optimise_window(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=N
 
 def optimise_trajectory(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, F0=None, A0=None,
                         muscles: bool = True, window: int = WINDOW, step: int = STEP, iters: int = 40,
-                        progress=None) -> dict:
+                        progress=None, **kw) -> dict:
     """:func:`optimise_window` over windows of ``window`` frames, ``step`` apart, one after
     another: each starts from the one before's last solved frames, held (:data:`PIN` of them),
     and its own frames replace the one before's from there on."""
@@ -406,7 +474,7 @@ def optimise_trajectory(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, 
     starts = list(range(0, max(T - window, 0) + 1, step))
     if not starts or starts[-1] + window < T:
         starts.append(max(T - window, 0))
-    keys = ("qpos", "grf", "act", "tau", "res_f", "res_t", "V", "A", "rms_mm")
+    keys = ("qpos", "grf", "act", "tau", "res_f", "res_t", "V", "A", "rms_mm", "label_err_mm", "label_weight")
     out = {}
     Qref = np.array(Qref, float)
     A0 = None if A0 is None else np.array(A0, float)
@@ -420,7 +488,7 @@ def optimise_trajectory(M: RodentMJ, names, xyz_mm, Qref, modes, fps: float, *, 
                 A0[a:a + pin] = out["act"][a:a + pin]
         o = optimise_window(M, names, xyz_mm[a:b], Qref[a:b], modes[a:b], fps,
                             F0=None if F0 is None else F0[a:b], A0=None if A0 is None else A0[a:b],
-                            muscles=muscles, iters=iters, pinned=pin)
+                            muscles=muscles, iters=iters, pinned=pin, **kw)
         if not out:
             for k in keys:
                 if o.get(k) is not None:

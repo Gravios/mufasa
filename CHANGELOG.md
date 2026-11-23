@@ -8,6 +8,30 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lm — Smoothing 3-D labels with the body (`mufasa-pose3d smooth --model`,
+`mufasa/biomech/smoother.py`).**
+* The 3-D Kalman smoother is per marker, with no skeleton. `--model` explains the labels with
+  the virtual rodent instead:
+  * label sites calibrated (STAC);
+  * frame-by-frame fits;
+  * then windows of 150 frames re-solved (stage 4's solver without physics): robust labels
+    (Cauchy, 2.5 σ), smooth joints and root, posture, joint ranges, the floor.
+* Out: the model's labels in every frame (gaps filled, rigid bones), `<label>_model_mm`,
+  `<label>_flag` (outliers, swaps), and optionally the joint angles (`--joints-out`).
+* Synthetic rat: 1.4 mm from the truth, against 4.7 noisy and 4.2 per-marker Kalman. The swap
+  and the wild label are flagged; a 12-frame gap is filled within 2.6 mm.
+* K7, 3000 frames: labels 12 mm from the body (the head 2–5, the tail 27–45). Acceleration
+  1.4 → 0.6 mm/frame²; hip distance constant; 3.2 % flagged (head_right 13 %).
+  0.055 s a frame.
+* `optimise.py` speedups (stage 4 unchanged, to the digit):
+  * a banded Cholesky (LAPACK) for the window's normal equations;
+  * trial steps without Jacobians;
+  * labels' Jacobians in one block;
+  * sparse blocks for diagonal terms.
+* Its new options are `physics`, `label_sigma`, `robust`, `smooth_rad`, and `label_err_mm` /
+  `label_weight` in its output.
+* `tests/smoke_122lm_skeletal_smoother.py`: 7 checks.
+
 **122ll — `mufasa run`: the 3-D pipeline from the command line (`mufasa/cli/run.py`).**
 * `mufasa run <step>` runs the `mufasa-pose3d` command under its pipeline name, with the same
   options: `calibrate box|checkerboard`, `3d-inference`, `smooth`, `heights`,
