@@ -92,7 +92,7 @@ def smooth_kinematics(M: RodentMJ, names, xyz_mm, fps: float, *, window: int = W
 
 
 def smooth_pose3d(path, out, *, fps: float | None = None, calibrate_frames: int = 400, joints_out=None,
-                  progress=None, **kw) -> dict:
+                  limits: str = "model", animal=None, progress=None, **kw) -> dict:
     """A 3-D pose file smoothed with the body: the model's labels in place of the observed
     ones, with ``<label>_model_mm`` and ``<label>_flag``; ``joints_out``: the joint angles too
     (``q_<joint>_deg``, the root's position mm and orientation). Returns a summary."""
@@ -108,8 +108,14 @@ def smooth_pose3d(path, out, *, fps: float | None = None, calibrate_frames: int 
     names = marker_names(df)
     xyz = np.stack([df[[f"{k}_x", f"{k}_y", f"{k}_z"]].to_numpy(float) for k in names], 1)
     fps = float(fps or meta.get("fps") or 30.0)
-    size = animal_size(BodyPhysics.virtual_rodent(), names, xyz)
-    M = build(size)
+    if animal is not None:
+        from mufasa.biomech.animal import build_for
+        M = build_for(animal)
+        size = M.size
+        calibrate_frames = 0                          # the animal file's labels are calibrated
+    else:
+        size = animal_size(BodyPhysics.virtual_rodent(), names, xyz)
+        M = build(size, limits=limits)
     use = [k for k in names if k in M.labels]
     if len(use) < 4:
         raise ValueError(f"{Path(path).name}: under 4 labels the virtual rodent has ({use})")

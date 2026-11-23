@@ -16,6 +16,7 @@
     mufasa-pose3d dynamics X_3d.parquet --gait X_gait.parquet [--frames 30000:31000]       # joint torques
     mufasa-pose3d dynamics X_3d.parquet --gait X_gait.parquet --muscles rat_hindlimb.osim  # + muscle forces
     mufasa-pose3d dynamics X_3d.parquet --gait X_gait.parquet --muscles ... --optimise     # + re-solved motion
+    mufasa-pose3d animal K7_a_3d.parquet K7_b_3d.parquet --out K7.animal.json             # calibrate once
     mufasa-pose3d gait X_3d.parquet --out X_gait.parquet [--mass-g 450] [--fps 30]  # paws, loads, gait
     mufasa-pose3d body-fit RIG.rig.npz VIDEO POSE --out FIT.parquet [--start 0 --stop N --step 1 --workers 4]
         [--no-refine] [--smoothness 0.5] [--scale PX] [--overlay OUT.mp4 [--side-by-side]]
@@ -179,6 +180,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="then re-solve the motion, paw forces and muscle activations together over windows "
                          "of frames, for tracking, balance and effort (stage 4; about a second a frame)")
     dp.add_argument("--iters", type=int, default=40, help="optimisation steps per window (default 40)")
+    dp.add_argument("--animal", help="an animal file (mufasa-pose3d animal): its size, mass, label places; "
+                                     "no calibration")
+    dp.add_argument("--limits", choices=("model", "rat"), default="model",
+                    help="the knees' and ankles' ranges: the virtual rodent's (default) or the rat's (narrower)")
     dp.add_argument("--architecture", choices=("osim", "eng2008"), default="osim",
                     help="muscle forces and fibre lengths: the OpenSim model's (default) or Eng et al. 2008's")
     hp = sub.add_parser("heights", help="labels within the body model's height range and above the floor "
@@ -204,6 +209,20 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--calibrate", type=int, default=400, help="--model: frames to calibrate the labels on")
     s.add_argument("--label-sigma", type=float, default=8.0, help="--model: the labels' noise, mm (default 8)")
     s.add_argument("--joints-out", help="--model: also write the joint angles to this .parquet")
+    s.add_argument("--animal", help="--model: an animal file (mufasa-pose3d animal): its body and labels, no "
+                                    "calibration")
+    s.add_argument("--limits", choices=("model", "rat"), default="model",
+                   help="--model: the knees' and ankles' ranges, the virtual rodent's (default) or the rat's")
+    an = sub.add_parser("animal", help="calibrate the virtual rodent to an animal once, from one or more of its "
+                                       "3-D pose files (size, label places); dynamics and smooth --model take it")
+    an.add_argument("files", nargs="+", help="the animal's 3-D pose files")
+    an.add_argument("--out", required=True, help="<animal>.animal.json")
+    an.add_argument("--frames", type=int, default=600, help="frames to calibrate on, shared out over the files")
+    an.add_argument("--mass-g", type=float, help="the animal's weighed mass")
+    an.add_argument("--name", help="the animal's name (default: from --out)")
+    an.add_argument("--size", type=float, help="the animal against the virtual rodent (default: nose to tail base)")
+    an.add_argument("--limits", choices=("model", "rat"), default="model",
+                    help="the knees' and ankles' ranges: the virtual rodent's (default) or the rat's (narrower)")
     return ap
 
 
@@ -375,6 +394,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"wrote {mus.to_json(a.save_muscles)}")
         out, s = run_dynamics(a.input, a.gait, a.out, frames=fr, fps=a.fps, mass_g=a.mass_g,
                               calibrate_frames=a.calibrate, muscles=mus, optimise=a.optimise, iters=a.iters,
+                              limits=a.limits, animal=a.animal,
                               progress=lambda m: print(m, flush=True))
         print(f"wrote {out}")
         for k in ("mass_g", "frames", "fit_rms_mm", "support_vs_weight", "residual_vs_weight_median",
@@ -416,10 +436,18 @@ def main(argv: list[str] | None = None) -> int:
               + (", ".join(f"{m} {v} ({100 * v / n:.1f} %)" for m, v in moved.items()) or "nothing moved")
               + f"; wrote {a.out}")
         return 0
+    if a.cmd == "animal":
+        from mufasa.biomech.animal import calibrate_animal
+        d = calibrate_animal(a.files, a.out, frames=a.frames, mass_g=a.mass_g, name=a.name, limits=a.limits, size=a.size,
+                             progress=lambda msg: print(msg, flush=True))
+        print(f"{d['name']}: size {d['size']} (sessions {d['session_sizes']}), {len(d['labels'])} labels, "
+              f"fit {d['calibration_rms_mm'][0]} → {min(d['calibration_rms_mm'])} mm; wrote {a.out}")
+        return 0
     if a.cmd == "smooth" and a.model:
         from mufasa.biomech.smoother import smooth_pose3d
         s = smooth_pose3d(a.input, a.out, fps=a.fps, calibrate_frames=a.calibrate, joints_out=a.joints_out,
-                          label_sigma=a.label_sigma, progress=lambda msg: print(msg, flush=True))
+                          label_sigma=a.label_sigma, limits=a.limits, animal=a.animal,
+                          progress=lambda msg: print(msg, flush=True))
         print(f"labels {s['model_mm_median']} mm from the body (median), {100 * s['flagged']:.2f} % flagged, "
               f"{s['filled']} gaps filled; wrote {a.out}" + (f" and {a.joints_out}" if a.joints_out else ""))
         return 0

@@ -26,13 +26,17 @@ from mufasa.pose3d.gait import PAWS
 
 def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None = None,
                  mass_g: float | None = None, calibrate_frames: int = 400, muscles=None,
-                 optimise: bool = False, iters: int = 40, progress=None) -> tuple[Path, dict]:
+                 optimise: bool = False, iters: int = 40, limits: str = "model", animal=None,
+                 progress=None) -> tuple[Path, dict]:
     """Joint torques for a 3-D pose file (and its gait file: the paws' targets and load split;
     without one, paws planted). ``frames``: (first, last) frame numbers, inclusive (default all).
     ``muscles``: an OpenSim hindlimb model (``.osim``), a saved muscle set (``.json``) or a
     :class:`.osim.MuscleSet`: the hindlimb muscles' forces too (122lj). ``optimise``: then the
     motion, the paws' forces and the activations re-solved together over windows of frames, for
     tracking, balance and effort (:mod:`.optimise`, 122lk; about a second a frame).
+    ``limits``: "model" (the virtual rodent's ranges, default) or "rat" (the rat's knees and
+    ankles, narrower). ``animal``: an animal file (:mod:`.animal`): its size, mass, limits and label
+    places, and no calibration here (122ln).
     Returns (the file written, its summary)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -49,21 +53,28 @@ def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None 
     names = marker_names(df)
     xyz = np.stack([df[[f"{n}_x", f"{n}_y", f"{n}_z"]].to_numpy(float) for n in names], 1)
     allf = df["frame"].to_numpy(int) if "frame" in df else np.arange(len(df))
-    size = animal_size(BodyPhysics.virtual_rodent(), names, xyz)
     ms = None
     if muscles is not None:
         from mufasa.biomech.osim import MuscleSet, load_muscles
         ms = muscles if isinstance(muscles, MuscleSet) else load_muscles(muscles)
-    M = build(size=size, mass_kg=None if not mass_g else mass_g / 1000.0, muscles=ms)
     say = progress or (lambda *_: None)
-
-    good = np.flatnonzero(np.isfinite(xyz).all((1, 2)))
-    if len(good) < 20:
-        raise ValueError(f"{pose3d.name}: under 20 frames with every label; nothing to calibrate on")
-    rng = np.random.default_rng(0)
-    pick = rng.choice(good, min(calibrate_frames, len(good)), replace=False)
-    say(f"calibrating the labels on {len(pick)} frames")
-    cal = F.calibrate(M, names, xyz[pick])
+    if animal is not None:
+        from mufasa.biomech.animal import build_for, load_animal
+        an = animal if isinstance(animal, dict) else load_animal(animal)
+        M = build_for(an, muscles=ms, **({"mass_kg": mass_g / 1000.0} if mass_g else {}))
+        size = M.size
+        say(f"animal {an.get('name')}: size {size:.3f}, labels as calibrated on {an.get('frames')} frames")
+        cal = {"rms_mm": an.get("calibration_rms_mm", []), "shift_mm": an.get("label_shift_mm", {})}
+    else:
+        size = animal_size(BodyPhysics.virtual_rodent(), names, xyz)
+        M = build(size=size, mass_kg=None if not mass_g else mass_g / 1000.0, muscles=ms, limits=limits)
+        good = np.flatnonzero(np.isfinite(xyz).all((1, 2)))
+        if len(good) < 20:
+            raise ValueError(f"{pose3d.name}: under 20 frames with every label; nothing to calibrate on")
+        rng = np.random.default_rng(0)
+        pick = rng.choice(good, min(calibrate_frames, len(good)), replace=False)
+        say(f"calibrating the labels on {len(pick)} frames")
+        cal = F.calibrate(M, names, xyz[pick])
 
     sel = np.arange(len(df))
     if frames is not None:
@@ -116,7 +127,8 @@ def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None 
         summ["activation_change_per_frame"] = round(float(np.nanmean(np.abs(np.diff(a, axis=0)))), 4)
     if before is not None:
         summ["before_optimising"] = before
-    summ.update({"size": round(float(size), 4), "fps": fps, "calibration_rms_mm": [round(x, 1) for x in cal["rms_mm"]],
+    summ.update({"size": round(float(size), 4), "fps": fps, "limits": M.limits,
+                 "animal": (an.get("name") if animal is not None else None), "calibration_rms_mm": [round(x, 1) for x in cal["rms_mm"]],
                  "label_shift_mm": cal["shift_mm"], "gait": str(gait) if gait else None})
     out = Path(out) if out else pose3d.with_name(pose3d.stem.replace("_3d", "") + "_dynamics.parquet")
     sites = {n: M.model.site_pos[s].tolist() for n, s in M.labels.items()}

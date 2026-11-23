@@ -20,6 +20,7 @@ gait-extrapolation     paws, steps and loads from the body's motion             
 body-fit               a rigged body fitted to a top-down video                         ``body-fit``
 dynamics               joint torques, ground and muscle forces (``--muscles``,          ``dynamics``
                        ``--optimise``)
+animal                 the body model calibrated to an animal once (``--animal``)       ``animal``
 =====================  ===============================================================  =========================
 
 ``mufasa run all`` chains 3d-inference → heights → gait-extrapolation → dynamics for one video
@@ -50,6 +51,7 @@ STEPS = {   # pipeline name -> (mufasa-pose3d command, what)
     "gait-extrapolation": ("gait", "paws, steps and loads from the body's motion"),
     "body-fit": ("body-fit", "a rigged body fitted to a top-down video"),
     "dynamics": ("dynamics", "joint torques, ground forces, muscle forces (--muscles), re-solved motion (--optimise)"),
+    "animal": ("animal", "calibrate the body model to an animal once, from its sessions (--animal for the rest)"),
 }
 CALIBRATE = {"box": "calibrate-box", "checkerboard": "calibrate-checkerboard"}
 CHAIN = ("3d-inference", "heights", "gait-extrapolation", "dynamics")
@@ -101,6 +103,7 @@ def _all_parser() -> argparse.ArgumentParser:
     ap.add_argument("--muscles", help="dynamics: OpenSim hindlimb model (.osim) or saved muscles (.json)")
     ap.add_argument("--optimise", action="store_true", help="dynamics: re-solve the motion (stage 4)")
     ap.add_argument("--frames", help="dynamics: first:last frame numbers")
+    ap.add_argument("--animal", help="dynamics: the animal file (mufasa run animal)")
     ap.add_argument("--infer-args", default="", help="more options for 3d-inference, quoted")
     ap.add_argument("--gait-args", default="", help="more options for gait-extrapolation, quoted")
     ap.add_argument("--dynamics-args", default="", help="more options for dynamics, quoted")
@@ -147,6 +150,9 @@ def plan(a) -> list[dict]:
         dyn.append("--optimise")
     if a.frames:
         dyn += ["--frames", a.frames]
+    if a.animal:
+        dyn += ["--animal", a.animal]
+        inputs.append(Path(a.animal))
     steps.append({"step": "dynamics", "inputs": inputs, "output": fd, "argv": dyn + shlex.split(a.dynamics_args)})
     names = [s["step"] for s in steps]
     i0 = names.index(a.first) if a.first and a.first in names else 0

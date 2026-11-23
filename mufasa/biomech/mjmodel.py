@@ -31,6 +31,15 @@ from mufasa.pose3d.gait import PAWS
 
 SOLE_BODIES = {"F": ("hand", "finger"), "H": ("foot", "toe")}
 
+# The rat's own leg ranges (122ln), in the virtual rodent's joint angles (deg). Johnson et al.
+# (2008)'s rat hindlimb model gives the knee -150..-20 deg and the ankle -30..60 deg (its flexion
+# coordinates); carried onto the virtual rodent through 122lj's bone registration (both models'
+# bones posed alike, each end of each range), they become these. The virtual rodent's own ranges
+# let the knee fold to 33 deg between thigh and shank (the rat's: 38) and the ankle bend 26 deg
+# further than the rat's. The hip's ranges map to a box wider than the virtual rodent's: kept.
+RAT_LIMITS_DEG = {"knee_{S}": (-50.0, 79.0), "ankle_{S}": (18.0, 80.0)}
+LIMITS = ("model", "rat")
+
 
 def mujoco():
     try:
@@ -58,6 +67,7 @@ class RodentMJ:
     mass_kg: float = 0.0
     paw_joints: dict = field(default_factory=dict)   # paw -> its leg's joint names
     muscles: object = None              # the MuscleSet its tendons were made from (size 1)
+    limits: str = "model"               # "model": the virtual rodent's joint ranges; "rat": the rat's legs
 
     @property
     def nv(self) -> int:
@@ -80,10 +90,13 @@ def base_model():
 
 
 def build(size: float = 1.0, mass_kg: float | None = None, sim_params: bool = False,
-          muscles=None) -> RodentMJ:
+          muscles=None, limits: str = "model") -> RodentMJ:
     """The virtual rodent in MuJoCo, ``size`` × the model (and weighing ``mass_kg``, if given).
     ``muscles`` (:class:`mufasa.biomech.osim.MuscleSet`): a spatial tendon per muscle through
-    sites on its path (122lj)."""
+    sites on its path (122lj). ``limits="rat"``: the knees' and ankles' ranges narrowed to the
+    rat's (:data:`RAT_LIMITS_DEG`; 122ln)."""
+    if limits not in LIMITS:
+        raise ValueError(f"limits: one of {LIMITS}, not {limits!r}")
     mj = mujoco()
     from mufasa.bodymodel.rodent_rig import stance_qpos
     from mufasa.pose3d.leg_ik import CHAINS
@@ -154,6 +167,12 @@ def build(size: float = 1.0, mass_kg: float | None = None, sim_params: bool = Fa
         m.opt.disableflags |= int(mj.mjtDisableBit.mjDSBL_CONSTRAINT)
     mj.mj_setConst(m, mj.MjData(m))
 
+    if limits == "rat":
+        for pat, (lo, hi) in RAT_LIMITS_DEG.items():
+            for S in "LR":
+                j = m.joint(pat.format(S=S)).id
+                r = m.jnt_range[j]
+                m.jnt_range[j] = [max(r[0], np.radians(lo)), min(r[1], np.radians(hi))]
     hinge = [m.joint(i).name for i in range(m.njnt) if m.jnt_type[i] == mj.mjtJoint.mjJNT_HINGE]
     qadr = {m.joint(i).name: int(m.jnt_qposadr[i]) for i in range(m.njnt)}
     vadr = {m.joint(i).name: int(m.jnt_dofadr[i]) for i in range(m.njnt)}
@@ -167,7 +186,7 @@ def build(size: float = 1.0, mass_kg: float | None = None, sim_params: bool = Fa
     return RodentMJ(m, float(size), {n: m.site(f"label_{n}").id for n in LABELS},
                     {p: (m.site(f"sole_{p}_0").id, m.site(f"sole_{p}_1").id) for p in PAWS}, sole_z, hinge, qadr,
                     vadr, rng[:, 0].copy(), rng[:, 1].copy(), q_st, float(m.body_mass.sum()), paw_joints,
-                    muscles)
+                    muscles, limits)
 
 
-__all__ = ["RodentMJ", "SOLE_BODIES", "base_model", "build", "mujoco"]
+__all__ = ["LIMITS", "RAT_LIMITS_DEG", "RodentMJ", "SOLE_BODIES", "base_model", "build", "mujoco"]

@@ -8,6 +8,22 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ln — The rat's leg ranges; an animal calibrated once (`mufasa-pose3d animal`,
+`--animal`, `--limits rat`).**
+* `mjmodel.build(limits="rat")`: knees −50…79° and ankles 18…80° in the virtual rodent's angles.
+  These are Johnson et al. 2008's ranges carried over through 122lj's bone registration; the
+  ankle's mapping is rough (11–29°).
+* On K7 the rat's ranges raise the stage-4 residual (0.08 → 0.16 × weight): the labelled trunk
+  sits low for the scaled legs. So the default stays the virtual rodent's ranges; limb lengths
+  per animal come next.
+* `animal.py`: `calibrate_animal`, which calibrates on frames from several sessions and writes
+  JSON (size, mass, limits, label bodies and places at size 1, sessions, fit). Also `load_animal`
+  and `build_for`.
+* `dynamics --animal` and `smooth --model --animal` skip their calibration. Also
+  `mufasa run animal`.
+* K7: 600 frames, fit 27.2 → 23.7 mm, 18 s.
+* `tests/smoke_122ln_animal_limits.py`: 7 checks.
+
 **122lm — Smoothing 3-D labels with the body (`mufasa-pose3d smooth --model`,
 `mufasa/biomech/smoother.py`).**
 * The 3-D Kalman smoother is per marker, with no skeleton. `--model` explains the labels with

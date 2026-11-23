@@ -268,4 +268,53 @@ bouts, not whole recordings.
 * The muscle pattern becomes a stance pattern: ankle extensors and knee extensors carry the
   body, where frame by frame the solver had leaned on hip rotators and the ankle's flexor.
 * The knees still reach their stop in part of the stance. The virtual rodent's knee bends
-  further than the rat's (to 33° between thigh and shank, against OpenSim's 49°).
+  further than the rat's: to 33° between thigh and shank, against 38° in Johnson et al.'s
+  model's range. See *The rat's leg ranges* below.
+
+## The animal file
+
+```
+mufasa-pose3d animal K7_day1_3d.parquet K7_day2_3d.parquet --out K7.animal.json [--mass-g 450] [--limits rat]
+mufasa run animal ...                               (the same)
+mufasa-pose3d dynamics K7_day3_3d.parquet --gait K7_day3_gait.parquet --animal K7.animal.json
+mufasa-pose3d smooth K7_day3_3d.parquet --out K7_day3_body.parquet --model --animal K7.animal.json
+```
+
+An animal's size and where its labels sit on its body do not change between sessions. The
+animal file (`animal.py`) holds them:
+
+* The virtual rodent is calibrated once (STAC) on frames drawn evenly from every session given.
+  More sessions bring more behaviour, and a better-placed set of labels.
+* The size is the median of the sessions' nose-to-tail estimates, or `--size`.
+* The file is JSON:
+  * each label's body and place on it (at size 1, so it scales with the model);
+  * the size, and the weighed mass if given;
+  * the joint ranges used;
+  * the sessions, and the calibration's fit.
+* `dynamics --animal` and `smooth --model --animal` use the same body and labels in every
+  session, and skip their own calibration.
+* K7: 600 frames, the fit from 27.2 to 23.7 mm, in 18 s.
+
+## The rat's leg ranges (`--limits rat`)
+
+The virtual rodent's knees and ankles reach further than a rat's. `--limits rat` (`dynamics`,
+`smooth --model`, `animal`) narrows them:
+
+* the source is Johnson et al. 2008's model: knee −150…−20°, ankle −30…60° (its flexion
+  coordinates);
+* they are carried onto the virtual rodent through stage 3's bone registration, posing both
+  models' bones alike at each end;
+* in the virtual rodent's angles: knee −50…79° (from −70…88°), ankle 18…80° (from −8…80°).
+
+The ankle's mapping is the rougher one. The two ankles are not the same joint (OpenSim's has
+three axes, the virtual rodent's one), and the posed bones differ by 11–29° beyond the hinge.
+
+On K7 (the stage 4 window above), the rat's ranges make things worse, not better:
+
+* residual 0.08 → 0.16 × weight;
+* support 0.98 → 0.89 × weight;
+* the legs sit at the new stops much of the time (ankles 38–47 % of frames).
+
+K7's labelled trunk is low (60 mm) for the virtual rodent's legs at its size. Either K7's legs
+are shorter than the scaled model's, or the trunk labels sit lower than the model's spine.
+Until limb lengths are calibrated per animal, the virtual rodent's own ranges stay the default.
