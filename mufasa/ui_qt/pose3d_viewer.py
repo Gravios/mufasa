@@ -88,6 +88,7 @@ class Pose3D:
     camera: dict | None = None
     units: str = "mm"
     meta: dict = field(default_factory=dict)
+    box_tilt_deg: float = 0.0               # 122lq: the walls flare outward this much
 
     def row(self, frame: int) -> int | None:
         """Row for a video frame (None when the file has no such frame)."""
@@ -201,8 +202,10 @@ def load_pose3d(path) -> Pose3D:
     box = None
     if all(k in meta for k in ("box_x", "box_y", "box_z")):
         box = tuple(tuple(float(v) for v in meta[k]) for k in ("box_x", "box_y", "box_z"))
-    return Pose3D(names, xyz[order], frames[order], lk, edges, box,
+    pose = Pose3D(names, xyz[order], frames[order], lk, edges, box,
                   meta.get("camera"), meta.get("units", "mm"), meta)
+    object.__setattr__(pose, "box_tilt_deg", float(meta.get("box_tilt_deg", 0.0) or 0.0))   # 122lq
+    return pose
 
 
 def find_pose3d(video_path: str | None, config_path: str | None = None) -> Path | None:
@@ -525,7 +528,10 @@ class Volume3DWidget(QWidget):
                 self._line(p, (x0, gy, z0), (x1, gy, z0), pen)
         if self.show_box and self.pose.box is not None:
             pen = QPen(ink, 1.2)
-            c = [(x, y, z) for z in (z0, z1) for y in (y0, y1) for x in (x0, x1)]
+            fl = math.tan(math.radians(self.pose.box_tilt_deg or 0.0))         # 122lq: flaring walls
+            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+            c = [(x + np.sign(x - cx) * fl * z, y + np.sign(y - cy) * fl * z, z)
+                 for z in (z0, z1) for y in (y0, y1) for x in (x0, x1)]
             for a, b in ((0, 1), (2, 3), (0, 2), (1, 3), (4, 5), (6, 7), (4, 6), (5, 7),
                          (0, 4), (1, 5), (2, 6), (3, 7)):
                 self._line(p, c[a], c[b], pen)

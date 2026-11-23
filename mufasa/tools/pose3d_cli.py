@@ -72,6 +72,9 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--camera-height", type=float)
     b.add_argument("--intrinsics", help="lens calibration (calibrate-checkerboard output)")
     b.add_argument("--trust", choices=["auto", "width", "length"], default="auto")
+    b.add_argument("--wall-tilt", metavar="DEG|auto",
+                   help="the walls flare outward this many degrees, or 'auto': fitted from the marked corner edges "
+                        "(the box's limits then widen with height)")
     b.add_argument("--out", required=True)
     c = sub.add_parser("calibrate-checkerboard", help="lens calibration")
     c.add_argument("source")
@@ -251,7 +254,8 @@ def main(argv: list[str] | None = None) -> int:
             m["floor_corners"], floor_length_mm=a.length, floor_width_mm=a.width,
             wall_height_mm=a.wall_height, vertical_edges_px=m.get("vertical_edges"),
             camera_height_mm=a.camera_height, image_size=tuple(m.get("image_size", (0, 0))),
-            K=K, dist=dist, trust=a.trust)
+            K=K, dist=dist, trust=a.trust,
+            wall_tilt_deg=None if a.wall_tilt is None else ("auto" if a.wall_tilt == "auto" else float(a.wall_tilt)))
         cam.notes += "\n" + rep.text()
         cam.save(a.out)
         print(rep.text())

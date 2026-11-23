@@ -21,7 +21,11 @@ The prior keeps a random subsample of frames (all subjects) with:
 * ``bend_*`` — percentiles of the spine bends at SpineM and SpineF by
   head height (deg; + = bending upward/backward).
 
-    python scripts/build_rat7m_prior.py /path/to/mocap_dir [--rows 80000]
+    python scripts/build_rat7m_prior.py /path/to/mocap_dir [--rows 80000] [--per-rat] [--workers 8]
+
+122lq: ``--per-rat`` takes an equal share of the rows from every rat (a rat with more sessions
+no longer outweighs the others); ``--pattern`` / ``--subject-regex`` read other file names;
+``--workers`` reads the files in parallel.
 """
 from __future__ import annotations
 
@@ -71,37 +75,64 @@ def rows_from(X: np.ndarray) -> dict:
                 bendM=elev(sM, sF) - elev(sL, sM), bendF=elev(sF, hb) - elev(sM, sF))
 
 
+def _one(args):
+    p, rx = args
+    X = load_mocap(p)
+    ok = np.isfinite(X[:, NEED]).all((1, 2))
+    r = rows_from(X[ok])
+    m = re.search(rx, os.path.basename(p))
+    if m is None:
+        raise ValueError(f"{os.path.basename(p)}: no rat number (subject regex {rx!r})")
+    r["subject"] = np.full(ok.sum(), int(m.group(1)), np.int16)
+    return p, int(ok.sum()), r
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mocap_dir")
     ap.add_argument("--rows", type=int, default=80000)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--pattern", default="mocap-s*-d*.mat", help="the files to read (glob, in mocap_dir and below)")
+    ap.add_argument("--subject-regex", default=r"-s(\d+)-", help="the rat's number in a file's name (group 1)")
+    ap.add_argument("--per-rat", action="store_true", help="an equal share of the rows from every rat")
+    ap.add_argument("--workers", type=int, default=1, help="files read at once")
     ap.add_argument("--out", default=os.path.join(
         os.path.dirname(__file__), "..", "mufasa", "assets", "models", "pose3d",
         "rat7m_trunk_prior.npz"))
     a = ap.parse_args(argv)
-    files = sorted(glob.glob(os.path.join(a.mocap_dir, "mocap-s*-d*.mat")))
+    files = sorted(glob.glob(os.path.join(a.mocap_dir, "**", a.pattern), recursive=True))
     if not files:
-        print("no mocap-s*-d*.mat files found", file=sys.stderr)
+        print(f"no {a.pattern} files found", file=sys.stderr)
         return 2
+    jobs = [(p, a.subject_regex) for p in files]
+    if a.workers > 1:
+        from concurrent.futures import ProcessPoolExecutor
+        with ProcessPoolExecutor(a.workers) as ex:
+            done = list(ex.map(_one, jobs))
+    else:
+        done = [_one(j) for j in jobs]
     parts = []
-    for p in files:
-        X = load_mocap(p)
-        ok = np.isfinite(X[:, NEED]).all((1, 2))
-        r = rows_from(X[ok])
-        r["subject"] = np.full(ok.sum(), int(re.search(r"-s(\d+)-", p).group(1)), np.int8)
+    for p, n, r in done:
         parts.append(r)
-        print(f"{os.path.basename(p)}: {ok.sum()} usable frames")
+        print(f"{os.path.basename(p)}: {n} usable frames (rat {int(r['subject'][0]) if n else '?'})")
     allr = {k: np.concatenate([p[k] for p in parts]) for k in parts[0]}
     hb = allr["features"][:, 0]
     bend = {}
     for key in ("bendM", "bendF"):
-        tab = np.array([[np.percentile(allr[key][(hb >= BEND_EDGES[i]) & (hb < BEND_EDGES[i + 1])], q)
-                         for q in BEND_PCTS] for i in range(len(BEND_EDGES) - 1)])
+        tab = np.array([[np.percentile(v, q) if v.size else np.nan for q in BEND_PCTS]
+                        for v in (allr[key][(hb >= BEND_EDGES[i]) & (hb < BEND_EDGES[i + 1])]
+                                  for i in range(len(BEND_EDGES) - 1))])
         bend[key] = tab
     rng = np.random.default_rng(a.seed)
-    pick = np.sort(rng.choice(len(hb), min(a.rows, len(hb)), replace=False))
+    if a.per_rat:
+        rats = np.unique(allr["subject"])
+        share = a.rows // len(rats)
+        pick = np.sort(np.concatenate([rng.choice(ix, min(share, len(ix)), replace=False)
+                                       for ix in (np.flatnonzero(allr["subject"] == s) for s in rats)]))
+        print(f"{len(rats)} rats, up to {share} rows each")
+    else:
+        pick = np.sort(rng.choice(len(hb), min(a.rows, len(hb)), replace=False))
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     np.savez_compressed(
         a.out,

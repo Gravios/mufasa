@@ -236,7 +236,9 @@ def _box_hinge(X: np.ndarray, box: dict | None, margin: float = 0.0) -> list:
     beyond each wall."""
     out = [np.maximum(0, -X[..., 2])]
     if box:
-        (x0, x1), (y0, y1), (_, z1) = box["x"], box["y"], box["z"]
+        from mufasa.pose3d.camera import box_xy_at
+        x0, x1, y0, y1 = box_xy_at(box, X[..., 2])       # 122lq: flaring walls widen with height
+        z1 = box["z"][1]
         out += [np.maximum(0, X[..., 0] - x1 + margin), np.maximum(0, x0 + margin - X[..., 0]),
                 np.maximum(0, X[..., 1] - y1 + margin), np.maximum(0, y0 + margin - X[..., 1]),
                 np.maximum(0, X[..., 2] - z1)]

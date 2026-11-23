@@ -202,6 +202,8 @@ def run_job(job: Job, settings: RunSettings, out_dir, progress=None) -> dict:
             "camera_file": str(job.camera), "report": _jsonable(rep)}
     if cam.box:
         meta.update(box_x=cam.box["x"], box_y=cam.box["y"], box_z=[0, min(cam.box["z"][1], 2000)])
+        if cam.box.get("tilt_deg"):
+            meta["box_tilt_deg"] = float(cam.box["tilt_deg"])             # 122lq
     out = write_pose3d(df, Path(out_dir) / f"{job.stem}_3d.parquet", meta)
     rep["output"] = str(out)
     rep["seconds_total"] = round(time.time() - t0, 1)

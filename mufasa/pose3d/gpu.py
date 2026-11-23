@@ -430,8 +430,9 @@ def head_residual_fn(cam, T, box, *, sigma: float, roll_sd_deg: float, wall_tole
     tol = float(wall_tolerance_mm)
     bx = None
     if box:
+        from mufasa.pose3d.camera import box_flare
         (x0, x1), (y0, y1), (_, z1) = box["x"], box["y"], box["z"]
-        bx = (float(x0), float(x1), float(y0), float(y1), float(z1))
+        bx = (float(x0), float(x1), float(y0), float(y1), float(z1), box_flare(box))
 
     def f(p, uv, wt):
         Rm = _rotm_zyx(p[3:])
@@ -442,9 +443,10 @@ def head_residual_fn(cam, T, box, *, sigma: float, roll_sd_deg: float, wall_tole
         r = [((pr - uv) / sigma * wt[:, None]).reshape(-1)]
         h = [torch.relu(-Xw[:, 2])]
         if bx is not None:
-            x0, x1, y0, y1, z1 = bx
-            h += [torch.relu(Xw[:, 0] - x1 - tol), torch.relu(x0 - tol - Xw[:, 0]),
-                  torch.relu(Xw[:, 1] - y1 - tol), torch.relu(y0 - tol - Xw[:, 1]),
+            x0, x1, y0, y1, z1, fl = bx
+            w = fl * torch.relu(Xw[:, 2])                       # 122lq: flaring walls
+            h += [torch.relu(Xw[:, 0] - x1 - w - tol), torch.relu(x0 - w - tol - Xw[:, 0]),
+                  torch.relu(Xw[:, 1] - y1 - w - tol), torch.relu(y0 - w - tol - Xw[:, 1]),
                   torch.relu(Xw[:, 2] - z1)]
         r.append(torch.cat(h) / 2.0)
         r.append((p[5] / roll_sd)[None])

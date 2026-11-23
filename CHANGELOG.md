@@ -8,6 +8,21 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lq — Cage walls that flare outward; the Rat7M builder per rat and in parallel.**
+* `calibrate_from_box_marks(wall_tilt_deg=DEG|"auto")`; `calibrate-box --wall-tilt`; the
+  calibration form's *Walls flare outward* (degrees, or *fit from the corner edges*).
+* `fit_corner_edges`: a flaring corner edge runs from `q` along `(q − p) + f·tan(tilt)·σ`. It
+  fits the point below the camera, and with `auto` the flare too. The report gives both fits.
+* The box keeps `tilt_deg` (saved with the camera; 3-D files carry `box_tilt_deg`).
+  `box_xy_at` / `box_flare` widen the limits by `z·tan(tilt)`, both in single-camera inference's
+  `_box_hinge` and in the GPU solver. The viewer draws the box flaring (`Pose3D.box_tilt_deg`).
+* Synthetic 12° box: fitted 12.0°, principal point 0.3 px off (2.0 px assuming vertical walls).
+  K7's marks: about 7°, edges 7.3 → 5.0 px rms (soft without lens calibration). The user
+  entered floor dimensions, so K7's floor-aspect mismatch is not the flare.
+* `scripts/build_rat7m_prior.py`: `--per-rat` (equal rows per rat), `--pattern` and
+  `--subject-regex` (other names, subfolders), `--workers`. Empty head-height bins give NaN.
+* docs/pose3d.md; `tests/smoke_122lq_flared_walls.py`: 11 checks.
+
 **122lp — The JPDF beside the 3-D view; feature histograms; the 3-D view in the feature viewer's
 window; features in the 3-D viewer; the viewers in windows of their own
 (`mufasa/ui_qt/feature_panels.py`).**

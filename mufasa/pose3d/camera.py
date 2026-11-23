@@ -149,7 +149,8 @@ class Camera:
              "t": self.t.tolist(), "image_size": list(self.image_size),
              "center_mm": self.center.round(3).tolist(), "notes": self.notes}
         if self.box:
-            d["box"] = {k: [float(x) for x in v] for k, v in self.box.items()}
+            d["box"] = {k: ([float(x) for x in v] if isinstance(v, (list, tuple, np.ndarray)) else float(v))
+                        for k, v in self.box.items()}
         return d
 
     @classmethod
@@ -157,7 +158,8 @@ class Camera:
         box = d.get("box")
         return cls(np.array(d["K"]), np.array(d["R"]), np.array(d["t"]),
                    np.array(d.get("dist", [0] * 5)), tuple(d.get("image_size", (0, 0))),
-                   {k: list(v) for k, v in box.items()} if box else None, d.get("notes", ""))
+                   {k: (list(v) if isinstance(v, (list, tuple)) else float(v)) for k, v in box.items()}
+                   if box else None, d.get("notes", ""))
 
     def save(self, path) -> Path:
         path = Path(path)
@@ -275,6 +277,8 @@ class BoxCalibrationReport:
     height_mm: float
     method: str
     warnings: list[str] = field(default_factory=list)
+    wall_tilt_deg: float | None = None          # 122lq: the walls flare outward this much
+    tilt_note: str = ""
 
     def text(self) -> str:
         s = [f"method: {self.method}",
@@ -286,7 +290,53 @@ class BoxCalibrationReport:
              f"camera height {self.height_mm:.0f} mm"]
         if self.vp_residual_px is not None:
             s.append(f"wall-corner edges miss their common point by {self.vp_residual_px:.1f} px (rms)")
+        if self.wall_tilt_deg is not None:
+            s.append(f"walls flare outward {self.wall_tilt_deg:.1f}°" + (f" ({self.tilt_note})" if self.tilt_note else ""))
         return "\n".join(s + [f"warning: {w}" for w in self.warnings])
+
+
+def box_flare(box: dict | None) -> float:
+    """tan of the walls' outward flare (0 for vertical walls)."""
+    if not box:
+        return 0.0
+    return float(np.tan(np.radians(float(box.get("tilt_deg", 0.0) or 0.0))))
+
+
+def box_xy_at(box: dict, z) -> tuple:
+    """The box's (x0, x1, y0, y1) at heights ``z`` (mm): walls flaring outward widen it by
+    ``z · tan(tilt)`` on every side (122lq)."""
+    w = box_flare(box) * np.maximum(np.asarray(z, float), 0.0)
+    (x0, x1), (y0, y1) = box["x"], box["y"]
+    return x0 - w, x1 + w, y0 - w, y1 + w
+
+
+def fit_corner_edges(quad, edges, kappa: float | None = None) -> tuple[np.ndarray, float, float]:
+    """122lq: the point below a straight-down camera from the box's marked corner edges, for walls
+    flaring outward. A floor corner ``q`` with outward signs ``σ`` (from the floor's centre) has an
+    edge whose image runs from ``q`` along ``(q − p) + κ σ``, with ``κ = f · tan(tilt)`` (px; f the
+    focal length in px): vertical walls (κ = 0) meet at the point ``p``. ``kappa`` given: only
+    ``p`` is fitted; else both. Returns (p, κ, rms px of the marked points from their lines)."""
+    from scipy.optimize import least_squares
+    q = order_quad(quad)
+    fc = q.mean(0)
+    E = [np.asarray(e, float) for e in edges if len(e) >= 2]
+    assoc = [int(np.argmin([np.min(np.linalg.norm(e - qk, axis=1)) for qk in q])) for e in E]
+
+    def res(x):
+        p = x[:2]
+        kap = x[2] if kappa is None else kappa
+        out = []
+        for e, k in zip(E, assoc, strict=True):
+            d = (q[k] - p) + kap * np.sign(q[k] - fc)
+            d = d / max(np.linalg.norm(d), 1e-9)
+            v = e - q[k]
+            out.append(v[:, 0] * d[1] - v[:, 1] * d[0])
+        return np.concatenate(out)
+    vp, _ = vanishing_point(E)
+    x0 = np.r_[vp, 0.0] if kappa is None else vp
+    r = least_squares(res, x0)
+    kap = float(r.x[2]) if kappa is None else float(kappa)
+    return r.x[:2], kap, float(np.sqrt(np.mean(r.fun ** 2)))
 
 
 def calibrate_from_box_marks(floor_corners_px, *, floor_length_mm: float | None = None,
@@ -295,7 +345,7 @@ def calibrate_from_box_marks(floor_corners_px, *, floor_length_mm: float | None 
                              vertical_edges_px: list | None = None,
                              camera_height_mm: float | None = None,
                              image_size=(0, 0), K=None, dist=None,
-                             trust: str = "auto") -> tuple[Camera, BoxCalibrationReport]:
+                             trust: str = "auto", wall_tilt_deg=None) -> tuple[Camera, BoxCalibrationReport]:
     """Camera from one image of the box.
 
     ``floor_corners_px`` — the four floor corners (any order); the long
@@ -311,6 +361,10 @@ def calibrate_from_box_marks(floor_corners_px, *, floor_length_mm: float | None 
 
     With ``K`` (and ``dist``) from a checkerboard: the full pose from the
     four corners (perspective-n-point), including the camera height.
+
+    ``wall_tilt_deg`` (122lq): walls flaring outward this many degrees (a number), or ``"auto"``
+    to fit it from the marked corner edges (straight-down camera only; :func:`fit_corner_edges`).
+    The box keeps it (``tilt_deg``): its limits widen with height (:func:`box_xy_at`).
     """
     import cv2
     warnings: list[str] = []
@@ -330,6 +384,10 @@ def calibrate_from_box_marks(floor_corners_px, *, floor_length_mm: float | None 
             raise RuntimeError("could not solve the camera pose from the floor corners")
         R = cv2.Rodrigues(rvec)[0]
         box = {"x": [-L / 2, L / 2], "y": [-W / 2, W / 2], "z": [0.0, float(wall_height_mm or 0) or 1e9]}
+        tilt_cb = None
+        if wall_tilt_deg not in (None, "auto"):
+            tilt_cb = float(wall_tilt_deg)
+            box["tilt_deg"] = tilt_cb
         cam = Camera(K, R, tvec.ravel(), dist, tuple(int(v) for v in image_size), box,
                      "box corners + checkerboard intrinsics (solvePnP)")
         err = np.linalg.norm(cam.project(obj) - q, axis=1)
@@ -337,7 +395,10 @@ def calibrate_from_box_marks(floor_corners_px, *, floor_length_mm: float | None 
                                    (L, W), float(top / left if top > left else left / top), L / W,
                                    0.0, None, cam.height, "checkerboard intrinsics + box corners",
                                    [f"corner reprojection rms {np.sqrt(np.mean(err ** 2)):.1f} px"]
-                                   if np.sqrt(np.mean(err ** 2)) > 3 else [])
+                                   if np.sqrt(np.mean(err ** 2)) > 3 else [],
+                                   tilt_cb, "as given" if tilt_cb is not None else "")
+        if wall_tilt_deg == "auto":
+            rep.warnings.append("the walls' flare is fitted for a straight-down camera only; give it in degrees")
         return cam, rep
     if not camera_height_mm:
         raise ValueError("camera_height_mm is needed without a checkerboard calibration "
@@ -381,6 +442,29 @@ def calibrate_from_box_marks(floor_corners_px, *, floor_length_mm: float | None 
         raise ValueError("give the floor length and/or width")
     s = (long_px / Lg + short_px / Wg) / 2                    # px per mm at the floor
     f = s * camera_height_mm
+    # 122lq: walls flaring outward — the corner edges do not meet at the point below the camera
+    tilt, tilt_note = None, ""
+    if wall_tilt_deg is not None:
+        if vertical_edges_px and len(vertical_edges_px) >= (3 if wall_tilt_deg == "auto" else 2):
+            if wall_tilt_deg == "auto":
+                p0, _, rms0 = fit_corner_edges(q, vertical_edges_px, kappa=0.0)
+                principal, kap, rms1 = fit_corner_edges(q, vertical_edges_px)
+                tilt = float(np.degrees(np.arctan(kap / f)))
+                tilt_note = (f"fitted from the corner edges, {rms0:.1f} → {rms1:.1f} px rms; vertical walls would "
+                             f"put the camera above ({p0[0]:.0f}, {p0[1]:.0f}) px")
+                if not 0.0 <= tilt <= 30.0:
+                    warnings.append(f"the fitted flare ({tilt:.1f}°) is implausible: check the edge marks, or "
+                                    "calibrate the lens (its distortion bends the edges)")
+            else:
+                tilt = float(wall_tilt_deg)
+                principal, _, rms1 = fit_corner_edges(q, vertical_edges_px, kappa=f * np.tan(np.radians(tilt)))
+                tilt_note = f"as given; the corner edges fit it to {rms1:.1f} px rms"
+            vp_res = None
+        else:
+            tilt = None if wall_tilt_deg == "auto" else float(wall_tilt_deg)
+            tilt_note = "as given" if tilt is not None else ""
+            if wall_tilt_deg == "auto":
+                warnings.append("fitting the walls' flare needs three or more marked corner edges")
     # floor centre → world origin; camera above (cx, cy) of the principal point
     fc = q.mean(0)
     off = (fc - principal) / s                                # mm, image axes
@@ -390,13 +474,16 @@ def calibrate_from_box_marks(floor_corners_px, *, floor_length_mm: float | None 
     box = {"x": [-((top + bot) / 2) / s / 2, ((top + bot) / 2) / s / 2],
            "y": [-((lef + rig) / 2) / s / 2, ((lef + rig) / 2) / s / 2],
            "z": [0.0, float(wall_height_mm or 1e9)]}
+    if tilt is not None:
+        box["tilt_deg"] = round(tilt, 2)
     cam = Camera.straight_down(principal, f, camera_height_mm, image_size, center_xy, dist,
                                box, "straight-down camera from marked box edges")
     rep = BoxCalibrationReport((float(principal[0]), float(principal[1])), float(s),
                                (float(Lg), float(Wg)), float(aspect), given, float(keystone),
                                vp_res, float(camera_height_mm),
                                "straight down; principal point from wall-corner edges"
-                               if vp_res is not None else "straight down", warnings)
+                               if vp_res is not None or tilt_note.startswith(("fitted", "as given;"))
+                               else "straight down", warnings, tilt, tilt_note)
     return cam, rep
 
 

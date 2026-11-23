@@ -33,6 +33,27 @@ and width, the wall height and the camera height above the floor.
 * Marks and the floor fix the scale at the floor but **not the camera
   height** — measure it.
 
+**Walls that flare outward (122lq).** Many cages are wider at the top. *Walls flare outward*
+(`calibrate-box --wall-tilt DEG`) gives the angle. *fit from the corner edges*
+(`--wall-tilt auto`) estimates it from three or more marked corner edges (straight-down
+camera).
+
+* Flaring walls' corner edges do not meet below the camera. For a floor corner `q` the edge
+  runs from `q` along `(q − p) + f·tan(tilt)·σ` (σ: the corner's outward signs, `f` the focal
+  length in px). So the point below the camera, `p`, is fitted with the flare.
+* The report gives the flare, the edges' fit with and without it, and where vertical walls would
+  have put the camera.
+* The camera keeps the flare (`[camera.box] tilt_deg`), and so does every 3-D file inferred with
+  it (`box_tilt_deg`).
+* 3-D inference's wall limits widen with height by `z · tan(tilt)`, in both the SciPy and the
+  GPU solvers. A head rearing against a flaring wall is no longer pushed inward.
+* The 3-D viewer draws the box flaring.
+* A synthetic box flaring 12°: fitted 12.0°, the point below the camera 0.3 px off (vertical
+  walls: 2.0 px).
+* K7's marks: about 7°, and the edges' fit improves from 7.3 to 5.0 px rms. Without a lens
+  calibration that is rough, since lens distortion bends the edges too. If the angle is known,
+  give it.
+
 **With a checkerboard (lens).** Give a video or image folder of a
 checkerboard (inner corners, square size). The lens (focal length,
 distortion) is calibrated (adapted from rpimocap), then the camera pose —
@@ -825,7 +846,14 @@ ends the run with an error that says how many videos are done and where.
 
 `mufasa/assets/models/pose3d/rat7m_trunk_prior.npz` — 80 000 frames of
 Rat7M motion capture (Dunn et al. 2021, *Nature Methods*; CC BY 4.0),
-rebuilt by `scripts/build_rat7m_prior.py`.
+rebuilt by `scripts/build_rat7m_prior.py <mocap dir>`. It runs on the CPU in seconds (7 files,
+1.06 million frames: 4 s). Its options:
+
+* `--per-rat`: an equal share of the rows from each rat;
+* `--pattern` / `--subject-regex`: other file names (default `mocap-s*-d*.mat`, the rat from
+  `-s<n>-`), searched in subfolders too;
+* `--workers N`: reads the files in parallel;
+* `--rows N`.
 `mufasa/assets/models/pose3d/virtual_rodent/` — DeepMind's virtual rodent
 (dm_control `rodent.xml` and skin, Apache 2.0) and the limits worked out
 from it (`scripts/build_virtual_rodent_limits.py`). See

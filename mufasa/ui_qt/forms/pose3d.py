@@ -321,6 +321,18 @@ class CameraCalibrationForm(OperationForm):
         f.addRow("Floor length", self.length)
         f.addRow("Floor width", self.width)
         f.addRow("Wall height", self.wall)
+        # 122lq: walls flaring outward
+        trow = QHBoxLayout()
+        self.tilt = spin(0, 0, 45, "°", 1)
+        self.tilt.setSpecialValueText("vertical")
+        self.tilt.setToolTip("How far the walls lean outward from vertical (the box widens with height)")
+        self.tilt_fit = QCheckBox("fit from the corner edges", self)
+        self.tilt_fit.setToolTip("Estimate the walls' flare from the marked corner edges (three or more; "
+                                 "a straight-down camera); the angle above is then ignored")
+        self.tilt_fit.toggled.connect(lambda on: self.tilt.setEnabled(not on))
+        trow.addWidget(self.tilt)
+        trow.addWidget(self.tilt_fit, 1)
+        f.addRow("Walls flare outward", trow)
         f.addRow("Camera height (above floor)", self.height)
         self.trust = QComboBox(self)
         self.trust.addItems(["width", "length"])
@@ -399,13 +411,14 @@ class CameraCalibrationForm(OperationForm):
         n = self.name.text().strip()
         return dict(marks=self._marks, length=self.length.value() or None, width=self.width.value() or None,
                     wall=self.wall.value() or None, height=self.height.value() or None,
+                    tilt="auto" if self.tilt_fit.isChecked() else (self.tilt.value() or None),
                     trust=self.trust.currentText(), checkerboard=cb or None,
                     pattern=(self.cb_cols.value(), self.cb_rows.value()), square=self.cb_sq.value(),
                     out=str(self._cal_dir() / (f"camera_{n}.toml" if n else "camera.toml")),
                     marks_out=str(self._marks_path()))
 
     def target(self, *, marks, length, width, wall, height, trust, checkerboard, pattern, square,
-               out, marks_out) -> None:
+               out, marks_out, tilt=None) -> None:
         from mufasa.pose3d.camera import calibrate_checkerboard, calibrate_from_box_marks
         K = dist = None
         lens = ""
@@ -415,7 +428,8 @@ class CameraCalibrationForm(OperationForm):
         cam, rep = calibrate_from_box_marks(
             marks["floor_corners"], floor_length_mm=length, floor_width_mm=width, wall_height_mm=wall,
             vertical_edges_px=marks.get("vertical_edges"), camera_height_mm=height,
-            image_size=tuple(marks.get("image_size", (0, 0))), K=K, dist=dist, trust=trust)
+            image_size=tuple(marks.get("image_size", (0, 0))), K=K, dist=dist, trust=trust,
+            wall_tilt_deg=tilt)
         cam.notes += "\n" + lens + rep.text()
         Path(marks_out).parent.mkdir(parents=True, exist_ok=True)
         Path(marks_out).write_text(json.dumps(marks, indent=1))
