@@ -14,7 +14,9 @@ the marker and silhouette fits.
    al. 2008) and carried onto the virtual rodent's bones (:mod:`.osim`; Eng et al. 2008's
    architecture as an option), and their forces shared out to produce those torques by static
    optimisation (:mod:`.muscle`).
-4. Simulation: trajectories optimised for tracking and effort (planned).
+4. Whole movements re-solved (patch 122lk): every joint, the paws' forces and the muscles'
+   activations over windows of frames, for tracking, balance and effort, the activations smooth
+   in time (:mod:`.optimise`).
 
 MuJoCo is an optional dependency: ``pip install "mufasa[biomech]"``.
 """

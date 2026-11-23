@@ -26,11 +26,13 @@ from mufasa.pose3d.gait import PAWS
 
 def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None = None,
                  mass_g: float | None = None, calibrate_frames: int = 400, muscles=None,
-                 progress=None) -> tuple[Path, dict]:
+                 optimise: bool = False, iters: int = 40, progress=None) -> tuple[Path, dict]:
     """Joint torques for a 3-D pose file (and its gait file: the paws' targets and load split;
     without one, paws planted). ``frames``: (first, last) frame numbers, inclusive (default all).
     ``muscles``: an OpenSim hindlimb model (``.osim``), a saved muscle set (``.json``) or a
-    :class:`.osim.MuscleSet`: the hindlimb muscles' forces too (122lj).
+    :class:`.osim.MuscleSet`: the hindlimb muscles' forces too (122lj). ``optimise``: then the
+    motion, the paws' forces and the activations re-solved together over windows of frames, for
+    tracking, balance and effort (:mod:`.optimise`, 122lk; about a second a frame).
     Returns (the file written, its summary)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -81,16 +83,39 @@ def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None 
                            progress=(lambda t, n: say(f"fitting: {t}/{n}")) if progress else None)
     Q, V, A = D.derivatives(M, fit["qpos"], fps)
     inv = D.inverse(M, Q, V, A, fit["modes"], shares)
-    table = D.dynamics_table(M, allf[sel], Q, fit["rms_mm"], inv)
-    summ = D.summarise(M, table)
+    so = None
     if ms is not None:
-        import pandas as pd
-
         from mufasa.biomech import muscle as MU
         say(f"muscle forces: {len(ms.muscles)} muscles")
         so = MU.static_optimisation(M, Q, V, inv["tau"])
+    rms = fit["rms_mm"]
+    before = None
+    if optimise:
+        from mufasa.biomech import optimise as OP
+        before = D.summarise(M, D.dynamics_table(M, allf[sel], Q, rms, inv))
+        if so is not None:
+            before.update(MU.summarise_muscles(so))
+        say(f"optimising {len(sel)} frames in windows of {OP.WINDOW}")
+        op = OP.optimise_trajectory(M, names, xyz[sel], Q, fit["modes"], fps, F0=inv["grf"],
+                                    A0=None if so is None else so["act"], muscles=so is not None, iters=iters,
+                                    progress=(lambda i, n: say(f"optimising: window {i}/{n}")) if progress else None)
+        Q, V, A, rms = op["qpos"], op["V"], op["A"], op["rms_mm"]
+        inv = {"tau": op["tau"], "grf": op["grf"], "res_f": op["res_f"], "res_t": op["res_t"], "down": op["down"]}
+        for k in range(4):
+            inv["grf"][~op["down"][:, k], k] = 0.0
+        if so is not None:
+            so = OP.muscle_outputs(M, Q, V, op["act"], op["tau"])
+    table = D.dynamics_table(M, allf[sel], Q, rms, inv)
+    table = _with_paws(M, table, Q)
+    summ = D.summarise(M, table)
+    if so is not None:
+        import pandas as pd
         table = pd.concat([table, pd.DataFrame(MU.muscle_columns(so))], axis=1)
         summ.update(MU.summarise_muscles(so))
+        a = so["act"]
+        summ["activation_change_per_frame"] = round(float(np.nanmean(np.abs(np.diff(a, axis=0)))), 4)
+    if before is not None:
+        summ["before_optimising"] = before
     summ.update({"size": round(float(size), 4), "fps": fps, "calibration_rms_mm": [round(x, 1) for x in cal["rms_mm"]],
                  "label_shift_mm": cal["shift_mm"], "gait": str(gait) if gait else None})
     out = Path(out) if out else pose3d.with_name(pose3d.stem.replace("_3d", "") + "_dynamics.parquet")
@@ -104,9 +129,29 @@ def run_dynamics(pose3d, gait=None, out=None, *, frames=None, fps: float | None 
     md[b"mufasa_dynamics"] = json.dumps({"summary": summ, "label_sites_m": sites, "joints": M.hinge, **extra,
                                          "source": str(pose3d),
                                          "method": "virtual rodent (MuJoCo), labels calibrated (STAC), "
-                                                   "inverse dynamics, ground forces at planted paws"}).encode()
+                                                   "inverse dynamics, ground forces at planted paws"
+                                                   + ("; optimised over windows for tracking, balance and "
+                                                      "effort" if optimise else "")}).encode()
     pq.write_table(tbl.replace_schema_metadata(md), out)
     return out, summ
+
+
+def _with_paws(M, table, Q):
+    """Each paw's sole (the middle of its two sole points), mm, per frame."""
+    from mufasa.biomech.mjmodel import mujoco
+    mj, d = mujoco(), M.data()
+    P = np.full((len(Q), 4, 3), np.nan)
+    for t in range(len(Q)):
+        if not np.isfinite(Q[t]).all():
+            continue
+        d.qpos[:] = Q[t]
+        mj.mj_kinematics(M.model, d)
+        for k, p in enumerate(PAWS):
+            P[t, k] = d.site_xpos[list(M.soles[p])].mean(0) * 1000.0
+    for k, p in enumerate(PAWS):
+        for c, ax in enumerate("xyz"):
+            table[f"{p}_paw_{ax}_mm"] = P[:, k, c]
+    return table
 
 
 def read_dynamics(path):

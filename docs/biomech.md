@@ -8,7 +8,7 @@ and silhouette fits. It works in stages; each is useful on its own.
 | 1 | the legs bend to the gait's paws | `mufasa/pose3d/leg_ik.py`, the 3-D viewer | 122lh |
 | 2 | joint torques and ground forces from the observed motion | `mufasa/biomech`, `mufasa-pose3d dynamics` | 122li |
 | 3 | hindlimb muscles: paths, moment arms, forces shared out to give the torques | `mufasa/biomech/osim.py`, `muscle.py`, `--muscles` | 122lj |
-| 4 | trajectories optimised for tracking and effort (iterative LQR, forward and backward sweeps) | planned | |
+| 4 | whole movements re-solved for tracking, balance and effort; muscle activations smooth in time | `mufasa/biomech/optimise.py`, `--optimise` | 122lk |
 
 Install: `pip install "mufasa[biomech]"` (MuJoCo 3.2+).
 
@@ -192,3 +192,80 @@ reserve (median), 15 % with Eng's architecture.
 So the muscle model is consistent, and the legs' kinematics are what limit it on K7. Labelled
 paws, or stage 4's optimisation (which keeps joints in range and the body balanced), are the
 remedy.
+
+## Stage 4: the movement re-solved
+
+```
+mufasa-pose3d dynamics K7_3d.parquet --gait K7_gait.parquet --muscles rat_hindlimb_bilateral.osim \
+    --optimise [--iters 40] --frames 30137:30256
+```
+
+Stages 2 and 3 take the motion as fitted and ask what forces it needs, so a fit that is off
+gives impossible forces. Here the motion is changed as well (`optimise.py`). Over a window of
+frames, these are solved together:
+
+* every joint of every frame;
+* the paws' forces;
+* with muscles, every hindlimb muscle's activation.
+
+The costs:
+
+| cost | σ / weight | |
+|---|---|---|
+| labels | 4 mm | tracking, as in the fit |
+| stance paws on the floor | 1 mm | on the gait's stance/swing timing |
+| stance paws not sliding | 1 mm a frame | *where* a paw is planted is free: it goes where the body balances |
+| swing paws above the floor | 1 mm | and bearing nothing |
+| the root's residual | 2 % of the weight | the motion's accelerations must be supplied by the ground (pushing, μ 0.8) |
+| joint torques | 50 mN·m, weight 0.3 | effort |
+| muscle torques = leg torques | 2 mN·m | with muscles |
+| activations | Σa² | with muscles |
+| activation rates | 0.1 a frame | with muscles: loads stay correlated in time |
+| smooth joints | 0.1 rad a frame² | the model's redundant joints (the neck's twists) jitter otherwise |
+| posture | as the fit | a weak pull to the stance; every joint within its range (bounds) |
+
+**Forward and backward sweeps.**
+
+* Velocities and accelerations are central differences, so each frame is coupled to its
+  neighbours. The planted paws and the activation rates couple them too.
+* Each step is Levenberg–Marquardt on the whole window. It solves one sparse linear system
+  (joint Jacobians from MuJoCo's `mj_jacSite` and `mjd_inverseFD`; forces and activations enter
+  linearly).
+* Each solve passes information both ways through the window. That is the work iterated
+  forward and backward sweeps (iLQR, DDP) would do, done at once.
+* Windows are 40 frames, 30 apart. Each holds the previous window's last 2 solved frames, so
+  velocities, accelerations and activations carry on across the joins.
+
+Speed: about 1 s a frame with 76 muscles, 0.4 s without (one CPU core). That suits walking
+bouts, not whole recordings.
+
+**Checks** (`tests/smoke_122lk_optimise.py`).
+
+* A disturbed stance (a leg folded, the body 3 mm up, the neck's twists jittering ±17°) is
+  re-solved:
+  * soles on the floor within 0.1 mm;
+  * the ground carries the weight;
+  * residual 3 % of the weight;
+  * neck still;
+  * labels within 1.3 mm.
+* Gliding on planted paws, stitched windows match one window over the whole.
+
+### On K7
+
+120 frames of walking from frame 30137, with muscles (2 min):
+
+| | stages 2 + 3 | stage 4 |
+|---|---|---|
+| label fit (median) | 20.4 mm | 19.6 mm |
+| residual at the root (median) | 0.37 × weight | 0.08 × weight |
+| reserve beyond the muscles | 21 % of the leg torques | 1.8 % |
+| activation change a frame (mean) | 0.104 | 0.021 |
+| knees at the flexion stop (L, R) | 54 %, 92 % | 23 %, 57 % |
+| leg torques, 90th percentile | 104 mN·m | 75 mN·m |
+| most active muscles (median) | tibialis anterior 0.82, obturator internus 0.66 | lateral gastrocnemius 0.57, rectus femoris 0.55, medial gastrocnemius 0.50, vastus lateralis 0.49 |
+
+* The stance paws moved from the gait's placements by 6–18 mm (median), up to about 60 mm.
+* The muscle pattern becomes a stance pattern: ankle extensors and knee extensors carry the
+  body, where frame by frame the solver had leaned on hip rotators and the ankle's flexor.
+* The knees still reach their stop in part of the stance. The virtual rodent's knee bends
+  further than the rat's (to 33° between thigh and shank, against OpenSim's 49°).

@@ -8,6 +8,38 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lk — Whole movements re-solved for tracking, balance and effort (stage 4 of the
+biomechanical model; `mufasa/biomech/optimise.py`, `mufasa-pose3d dynamics --optimise`).**
+* Over windows of frames, every joint, the paws' forces and (with muscles) the hindlimb
+  activations are solved together.
+* The costs:
+  * labels;
+  * stance paws on the floor and not sliding, with their placement free;
+  * swing paws clear;
+  * the root's residual (2 % of the weight);
+  * joint torques;
+  * muscle torques = leg torques;
+  * Σa² and activation rates (0.1 a frame);
+  * smooth joints (the neck's redundant twists jittered otherwise);
+  * posture, with joints held within their ranges.
+* Projected Levenberg–Marquardt with one sparse direct solve a step over the whole window
+  (MuJoCo's `mj_jacSite`, `mjd_inverseFD`). This does the work of iterated forward and backward
+  sweeps. scipy's `trf` / `lsmr` converged far slower: root cost 151k → 17k in 150 evaluations,
+  against 31 in 16 s.
+* Windows of 40 frames, 30 apart, each holding the one before's last 2 frames.
+* About 1 s a frame with 76 muscles.
+* K7 walking (120 frames), stages 2 + 3 → stage 4:
+  * residual 0.37 → 0.08 × weight;
+  * reserve 21 % → 1.8 %;
+  * activation change 0.104 → 0.021 a frame;
+  * knees at the stop 54/92 → 23/57 %;
+  * fit 20.4 → 19.6 mm.
+  * The stance muscles are now the gastrocnemii and quadriceps.
+* The table gains each paw's sole position (`<paw>_paw_x/y/z_mm`), and the summary
+  `before_optimising`.
+* README: Li & Todorov 2004, Ackermann & van den Bogert 2010.
+* `tests/smoke_122lk_optimise.py`: 7 checks.
+
 **122lj — The hindlimbs' muscles (stage 3 of the biomechanical model; `mufasa/biomech/osim.py`,
 `muscle.py`, `mufasa-pose3d dynamics --muscles`).**
 * `osim.read_osim`: an OpenSim model's joints (CustomJoint spatial transforms, splines),

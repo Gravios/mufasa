@@ -243,7 +243,7 @@ and year only; their full reference has not been checked.
 * Dewan et al. (2010) and Shahrokni et al. (2012): spinal ranges of motion, via the HBP mouse
   model's joint table *(references to be confirmed)*. `mufasa/bodymodel/fit.py`
 
-**For the biomechanical model** (`mufasa/biomech`, docs/biomech.md; simulation in progress):
+**For the biomechanical model** (`mufasa/biomech`, docs/biomech.md):
 
 * Todorov, E., Erez, T. & Tassa, Y. (2012). MuJoCo: A physics engine for model-based control.
   *IEEE/RSJ IROS 2012*, 5026–5033. Inverse dynamics.
@@ -282,6 +282,12 @@ and year only; their full reference has not been checked.
 * Powell, P. L., Roy, R. R., Kanim, P., Bello, M. A. & Edgerton, V. R. (1984). Predictability of
   skeletal muscle tension from architectural determinations in guinea pig hindlimbs. *Journal of
   Applied Physiology* 57, 1715–1721. Specific tension, 22.5 N/cm².
+* Li, W. & Todorov, E. (2004). Iterative linear quadratic regulator design for nonlinear
+  biological movement systems. *ICINCO 2004*, 222–229. Forward and backward sweeps (iLQR); the
+  whole-window solve does their work at once. `mufasa/biomech/optimise.py`
+* Ackermann, M. & van den Bogert, A. J. (2010). Optimality principles for model-based
+  prediction of human gait. *Journal of Biomechanics* 43, 1055–1060. Tracking and effort
+  optimised together over a movement.
 * Mak, J. N. E. (2021). *Building a Biomechanical Model of a Rat Forelimb.* MSc thesis,
   Portland State University. https://doi.org/10.15760/etd.7690. Forelimb chain and Hill-type
   muscle parameters, predicted from dog data.
