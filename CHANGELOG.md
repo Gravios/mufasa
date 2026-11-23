@@ -8,6 +8,27 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lt — Recording every visible panel into the video.**
+* User: "I would like each of the visible panels rendered in the video, such as if I have 3d,
+  video, and jpdf, then I want all of them".
+* `mufasa/ui_qt/panel_capture.py`:
+  * `compose` draws the panels shown as they sit on the screen, cropped to them, at the video's
+    own resolution: the video panel holds the frame's pixels, and the other panels are rendered
+    again at that scale (at most 3×).
+  * `PanelRecorder` keeps one such picture per video frame, all the first frame's size, and
+    encodes the video in the background.
+* Feature viewer: Record with **All panels** (on by default) records:
+  * the video, with its overlays and the JPDF beside it;
+  * the 3-D view beside it, with its JPDF and features;
+  * the traces and histograms.
+
+  The 3-D view is drawn at the frame before it is kept. *All panels* off records the video
+  picture alone, as before.
+* 3-D viewer window: its own **● Record** records the 3-D view, the JPDF, the video panel and the
+  feature traces and histograms, into the project's `derived/frames/`.
+* docs/pose3d.md. `tests/smoke_122lt_record_all_panels.py`: 8 checks. 122ju and 122jv record with
+  *All panels* off (what they test).
+
 **122ls — The viewers' windows fit a screen: their tool rows wrap.**
 * User: "the 3d view port is too wide and I cannot change it's width below a certain point which
   is wider than my screen".

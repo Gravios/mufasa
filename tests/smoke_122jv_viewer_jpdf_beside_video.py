@@ -151,6 +151,7 @@ V.set_jpdf_pair(G, F)
 check("changing the pair redraws", V.jpdf.x == G and V.jpdf.y == F)
 V.trail_spin.setValue(5)
 check("trail length applied", V.jpdf.trail == 5)
+V.all_panels_cb.setChecked(False)        # 122lt: the video picture alone (All panels: tested in 122lt)
 V.record_btn.setChecked(True)
 for f in range(9, 20):
     V.scrubber.seek(f)

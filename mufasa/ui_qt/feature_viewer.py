@@ -476,6 +476,12 @@ class FeatureViewerWidget(QWidget):
         self.keep_frames_cb.setToolTip("Keep the extracted PNG frames after the video "
                                        "is made")
         bar.addWidget(self.keep_frames_cb)
+        self.all_panels_cb = QCheckBox("All panels", self)                # 122lt
+        self.all_panels_cb.setChecked(True)
+        self.all_panels_cb.setToolTip("Record every panel shown (the video, the 3-D view, the JPDFs, the "
+                                      "traces and histograms) as one picture, laid out as on the screen, at "
+                                      "the video's resolution; off: the video picture alone")
+        bar.addWidget(self.all_panels_cb)
         self.record_btn = QPushButton("● Record", self)
         self.record_btn.setCheckable(True)
         self.record_btn.setToolTip(
@@ -659,46 +665,52 @@ class FeatureViewerWidget(QWidget):
         self.scrubber.set_overlay(ov if want and ov is not None else None)
 
     def _toggle_record(self, on: bool) -> None:
-        from mufasa.ui_qt.pose_overlay import FrameRecorder
+        from mufasa.ui_qt.panel_capture import PanelRecorder
         if on:
-            self.recorder = FrameRecorder(self.config_path, self.video_name,
-                                          self.scrubber.fps,
-                                          keep_frames=self.keep_frames_cb.isChecked())
+            self.recorder = PanelRecorder(
+                self, self.record_panels, self.config_path, self.video_name, self.scrubber.fps,
+                keep_frames=self.keep_frames_cb.isChecked(), all_panels=self.all_panels_cb.isChecked(),
+                video=self.scrubber._display, frame_source=lambda: self.scrubber.last_display_frame)
             self.record_btn.setText("■ Stop")
             self.record_btn.setStyleSheet("color: #d03030; font-weight: bold;")
-            self.recorder.add(self.scrubber.last_display_frame, self.scrubber.current_frame)
+            self.all_panels_cb.setEnabled(False)
+            self.recorder.capture(self.scrubber.current_frame)
             self.rec_status.setText(f"Recording → {self.recorder.frames_dir}")
             return
         rec, self.recorder = self.recorder, None
         self.record_btn.setText("● Record")
         self.record_btn.setStyleSheet("")
+        self.all_panels_cb.setEnabled(True)
         if rec is None:
             return
         self.rec_status.setText(f"Making the video from {rec.n} frame(s)…")
         self.record_btn.setEnabled(False)
-        import threading
-        result: dict = {}
-        t = threading.Thread(target=lambda: result.update(r=rec.stop()), daemon=True)
-        t.start()
-        from PySide6.QtCore import QTimer
-        timer = QTimer(self)
 
-        def poll() -> None:
-            if t.is_alive():
-                return
-            timer.stop()
-            ok, msg = result.get("r", (False, "encoding failed"))
+        def done(ok: bool, msg: str) -> None:
             self.rec_status.setText(("Saved: " if ok else "Recording failed: ") + msg)
             self.record_btn.setEnabled(True)
             self.last_recording = rec.video_path if ok else None
 
-        timer.timeout.connect(poll)
-        timer.start(100)
-        self._encode_thread = t
+        rec.stop(done, self)
+        self._encode_thread = rec.thread
+
+    def record_panels(self) -> list:
+        """122lt: the panels a recording shows, those hidden left out: the video (with the JPDF
+        beside it), the 3-D view and its JPDF and feature traces, this viewer's traces and
+        histograms."""
+        out = [self.scrubber._display]
+        v = self.view3d
+        if v is not None and v.isVisible():
+            out += [v.volume, v.jpdf]
+            if v.features is not None and v.features.isVisible():
+                out += [v.features.traces, v.features.hist]
+        return out + [self.plot, self.hist]
 
     def _record_frame(self, f: int) -> None:
         if self.recorder is not None:
-            self.recorder.add(self.scrubber.last_display_frame, f)
+            if self.view3d is not None and self.view3d.isVisible():
+                self.view3d._on_frame(f)            # drawn before it is kept (it hears the frame later)
+            self.recorder.capture(f)
             if self.recorder.n % 25 == 0:
                 self.rec_status.setText(f"Recording → {self.recorder.frames_dir} · "
                                         f"{self.recorder.n} frame(s)")

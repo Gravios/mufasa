@@ -138,6 +138,7 @@ check("rotation applies after the overlay (markers rotate with the video)",
       V.scrubber.last_display_frame.shape[:2] == (W, H))
 V.scrubber.reset_orientation()
 
+V.all_panels_cb.setChecked(False)        # 122lt: the video picture alone (All panels: tested in 122lt)
 V.record_btn.setChecked(True)
 rec = V.recorder
 check("record: frames folder under derived/frames/extracted",

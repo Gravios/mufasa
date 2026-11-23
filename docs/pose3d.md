@@ -235,6 +235,20 @@ It takes the camera and the scale from the file (the scale otherwise from
 nose to tail base). On K7 it moved the nose in 4.7 % of frames, `head_back`
 in 1.6 % and `back_T4` in 0.8 %.
 
+## Recording what is shown (122lt)
+
+**Record** in the feature viewer, and in the 3-D viewer's own window, saves every panel shown as
+one picture per video frame, laid out as on the screen. That includes the video (with its overlays
+and the JPDF beside it), the 3-D view, the 3-D viewer's JPDF, and the feature traces and
+histograms. Toolbars and lists are left out.
+
+* It is drawn at the video's own resolution: the video panel holds the video's pixels, and the
+  other panels are drawn again at that scale, so they stay sharp.
+* A panel hidden while recording is left out of later frames.
+* Resizing the window keeps the recording's size.
+* *All panels* off (feature viewer) records the video picture alone, as before.
+* Recordings go under `derived/frames/annotated/`; the frames go under `derived/frames/extracted/`.
+
 ## Narrow windows (122ls)
 
 The tool rows of the 3-D viewer and the feature viewer, and the playback controls, wrap onto more

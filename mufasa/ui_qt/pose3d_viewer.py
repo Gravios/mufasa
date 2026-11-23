@@ -1101,6 +1101,15 @@ class Pose3DViewerWidget(QWidget):
         self.jpdf_cb.setToolTip("Beside the 3-D view: the joint PDF of two features (this file's and the "
                                 "gait / dynamics files beside it), the current frame's point and its path")
         bar.addWidget(self.jpdf_cb)
+        self.record_btn = QPushButton("● Record", self)              # 122lt
+        self.record_btn.setCheckable(True)
+        self.record_btn.setToolTip("Record what is shown while it plays: every panel (the 3-D view, the "
+                                   "video, the JPDF, the feature traces) as one picture, laid out as on the "
+                                   "screen, at the video's resolution; saved under derived/frames/annotated")
+        self.record_btn.setVisible(self._own_scrubber)            # in the feature viewer: its Record
+        self.record_btn.toggled.connect(self._toggle_record)
+        bar.addWidget(self.record_btn)
+        self.recorder = None
         bar.addStretch()
         lay.addLayout(bar)
         # 122lp: the JPDF's two features and its trail
@@ -1179,6 +1188,7 @@ class Pose3DViewerWidget(QWidget):
         self.reproj_cb.toggled.connect(self._reproj_changed)
         self.box_cb.setEnabled(self.pose.box is not None)
         self.scrubber.frame_changed.connect(self._on_frame)
+        self.scrubber.frame_changed.connect(self._record_frame)     # after the panels have drawn it
         can_video = bool(video_path) and self.pose.projection_matrix() is not None
         self.video3d_cb.setEnabled(can_video)
         self.opacity_spin.setEnabled(can_video)
@@ -1314,7 +1324,51 @@ class Pose3DViewerWidget(QWidget):
             s += f" · {m['method']}"
         return s
 
+    # 122lt: recording every panel shown
+    def record_panels(self) -> list:
+        out = ([self.scrubber._display] if self.video_path else []) + [self.volume, self.jpdf]
+        if self.features is not None and self.features.isVisible():
+            out += [self.features.traces, self.features.hist]
+        return out
+
+    def _toggle_record(self, on: bool) -> None:
+        from mufasa.ui_qt.panel_capture import PanelRecorder
+        if on:
+            root = project_root_of(self.pose_path)
+            where = root / "project.toml" if root else self.pose_path     # its parent holds derived/frames
+            name = Path(self.video_path).stem if self.video_path else self.pose_path.stem
+            self.recorder = PanelRecorder(
+                self, self.record_panels, where, name, self.scrubber.fps or 30.0, video=self.scrubber._display,
+                frame_source=(lambda: self.scrubber.last_display_frame) if self.video_path else None)
+            self.record_btn.setText("■ Stop")
+            self.record_btn.setStyleSheet("color: #d03030; font-weight: bold;")
+            self.recorder.capture(self.scrubber.current_frame)
+            self.info.setText(f"Recording → {self.recorder.frames_dir}")
+            return
+        rec, self.recorder = self.recorder, None
+        self.record_btn.setText("● Record")
+        self.record_btn.setStyleSheet("")
+        if rec is None:
+            return
+        self.info.setText(f"Making the video from {rec.n} frame(s)…")
+        self.record_btn.setEnabled(False)
+
+        def done(ok: bool, msg: str) -> None:
+            self.info.setText(("Saved: " if ok else "Recording failed: ") + msg)
+            self.record_btn.setEnabled(True)
+            self.last_recording = rec.video_path if ok else None
+
+        rec.stop(done, self)
+
+    def _record_frame(self, f: int) -> None:
+        if self.recorder is not None:
+            self.recorder.capture(f)
+            if self.recorder.n % 25 == 0:
+                self.info.setText(f"Recording → {self.recorder.frames_dir} · {self.recorder.n} frame(s)")
+
     def cleanup(self) -> None:
+        if self.recorder is not None:
+            self.record_btn.setChecked(False)
         self.animation.timer.stop()
         self.volume._fit_timer.stop()
         self.models_panel.stop_fitting()
