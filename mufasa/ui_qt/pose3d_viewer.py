@@ -614,7 +614,16 @@ class Volume3DWidget(QWidget):
     # -- 122kv: models and the axes gizmo -------------------------------- #
     def add_model(self, model) -> None:
         self.models.append(model)
+        self.link_gait()
         self.update()
+
+    def link_gait(self) -> None:
+        """122lh: rigs' legs follow the first gait file among the models (paws planted under the
+        body without one)."""
+        gait = next((m for m in self.models if getattr(m, "kind", "") == "gait"), None)
+        for m in self.models:
+            if hasattr(m, "set_gait"):
+                m.set_gait(gait)
 
     def _fit_now(self) -> None:
         for m in self.models:

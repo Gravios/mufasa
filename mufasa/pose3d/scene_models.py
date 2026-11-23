@@ -308,6 +308,13 @@ class PosedRig:
         from mufasa.pose3d.rig_floor import floor_probes, target_z_range
         self._probes = floor_probes(self.rig)
         self._zlo, self._zhi = target_z_range(self.names, self.size)
+        # 122lh: legs that bend by the model's joints (virtual rodent), to a gait file's paws
+        from mufasa.pose3d.leg_ik import Limbs
+        self.limbs = Limbs.for_rig(self.rig)
+        self.bend_legs = True                     # False: the legs stay tucked, as before 122lh
+        self.gait = None
+        self._targets = None
+        self._legs: dict = {}
 
     @property
     def name(self) -> str:
@@ -315,6 +322,19 @@ class PosedRig:
 
     # -- size ------------------------------------------------------------- #
     def _estimate_size(self, rest) -> float:
+        """The animal against the rig. The virtual rodent (122lh): as the gait analysis measures it
+        (nose to tail base, :func:`mufasa.pose3d.gait.animal_size`), so the hips and shoulders it
+        poses are where the gait put the paws for; with the spine's stretch (122lg) the markers fit
+        as well at that size (K7: 26.5 mm at 1.17×, 26.0 at the back path's 1.44×). Other rigs, or
+        without those labels: the back's path."""
+        prof = getattr(self.rig, "profile", None) or {}
+        names = set(self.pose.names)
+        if "virtual rodent" in str(prof.get("name", "")) and "back_V2" in names \
+                and names & {"head_nose", "head_back"}:
+            from mufasa.pose3d.gait import BodyPhysics, animal_size
+            s = animal_size(BodyPhysics.virtual_rodent(), self.pose.names, self.pose.xyz)
+            if np.isfinite(s) and s > 0:
+                return float(s)
         from mufasa.bodymodel.fit import BACK_CHAIN
         X = self.pose.xyz
         chain = [n for n in BACK_CHAIN if n in self.names]
@@ -455,6 +475,69 @@ class PosedRig:
     def faces(self):
         return self.rig.Fd
 
+    def set_gait(self, overlay) -> None:
+        """122lh: the legs follow this gait file's paws (a :class:`GaitOverlay`; None: paws planted
+        under the body)."""
+        if overlay is self.gait:
+            return
+        self.gait = overlay
+        if overlay is not None and self.limbs is not None:
+            from mufasa.pose3d.leg_ik import GaitTargets
+            self._targets = GaitTargets(overlay.df, size=self.size)
+        else:
+            self._targets = None
+        self._legs = {}
+
+    LEG_BLOCK = 32                                # frames whose legs are solved together
+
+    def legs(self, frame: int) -> dict | None:
+        """122lh: the legs' joint angles for a frame ({paw: radians, in :attr:`leg_names` order});
+        None for a rig without legs to bend or a frame not posed. Solved with the posed frames
+        after it, a block at a time."""
+        if self.limbs is None or not self.bend_legs:
+            return None
+        frame = int(frame)
+        if frame not in self._legs:
+            if self.fit_frame(frame) is None:
+                return None
+            block = [frame] + [f for f in range(frame + 1, frame + self.LEG_BLOCK)
+                               if f not in self._legs and self.cached(f) and self.fit_frame(f) is not None]
+            self.solve_legs(block)
+        hit = self._legs.get(frame)
+        return None if hit is None else hit[0]
+
+    def solve_legs(self, frames) -> int:
+        """122lh: solve the legs of posed ``frames`` together (cached); returns how many."""
+        if self.limbs is None:
+            return 0
+        store, tg = self._legs, self._targets        # a gait file swapped meanwhile starts a new store
+        rows = [(int(f), self.fit_frame(f)) for f in frames]
+        rows = [(f, h) for f, h in rows if h is not None]
+        if not rows:
+            return 0
+        Gs, phi, t = [], [], []
+        for _f, h in rows:
+            p, ph, tx, ty, tz = self._x2p(h[0])
+            Gs.append(self.rig.skinning_matrices(p))
+            phi.append(ph)
+            t.append((tx, ty, tz))
+        targets = [tg.at(f) if tg is not None else {} for f, _ in rows]
+        q, err, modes = self.limbs.solve(np.array(Gs), (np.array(phi), np.array(t), self.size), targets,
+                                         frames=[f for f, _ in rows])
+        for k, (f, _) in enumerate(rows):
+            store[f] = ({p: q[p][k] for p in q}, {p: float(err[p][k]) for p in q}, {p: modes[p][k] for p in q})
+        return len(rows)
+
+    def leg_info(self, frame: int) -> dict | None:
+        """{paw: (mode, residual mm)} of the legs' last solve for a frame."""
+        hit = self._legs.get(int(frame))
+        return None if hit is None else {p: (hit[2].get(p, "plant"), hit[1][p]) for p in hit[0]}
+
+    @property
+    def leg_names(self) -> dict:
+        """{paw: the model's joint names}, the order :meth:`legs` gives angles in."""
+        return {} if self.limbs is None else {p: leg.names for p, leg in self.limbs.legs.items()}
+
     def world(self, frame: int | None = None) -> np.ndarray | None:
         f = self.fit_frame(frame) if frame is not None else None
         if f is None:
@@ -462,7 +545,11 @@ class PosedRig:
         x = f[0]
         p, phi, tx, ty, tz = self._x2p(x)
         from mufasa.bodymodel.fit import Rig
-        V = Rig.lbs(self.rig.skinning_matrices(p), self.rig.verts(p, True), self.rig.Wd)
+        G = self.rig.skinning_matrices(p)
+        q = self.legs(frame)
+        if q is not None:
+            G = self.limbs.apply(G, q)                       # 122lh: the legs bent
+        V = Rig.lbs(G, self.rig.verts(p, True), self.rig.Wd)
         from mufasa.pose3d.rig_floor import rest_on_floor
         return rest_on_floor(_yaw(self.size * V, phi) + np.array([tx, ty, tz]))   # 122le: limbs on the floor
 
@@ -471,6 +558,12 @@ class PosedRig:
         s = f"{len(self.names)} markers, size {self.size:.2f}x the model"
         if f is not None:
             s += f", marker error {f[1]:.1f} mm"
+            li = self.leg_info(frame)
+            if li:                                         # 122lh: what the legs are doing
+                words = {"stance": "on the floor", "swing": "stepping", "plant": "planted", "free": "off the floor"}
+                s += " · legs: " + ", ".join(f"{p} {words.get(md, md)}"
+                                             + (f" ({e:.0f} mm off)" if md in ("stance", "swing") and e >= 5 else "")
+                                             for p, (md, e) in li.items())
         return s
 
     def spec(self) -> dict:

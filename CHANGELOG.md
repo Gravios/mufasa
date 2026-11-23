@@ -8,6 +8,39 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lh — The virtual rodent's legs bend, to the gait's paws (stage 1 of the biomechanical
+model); the gait's hips; scientific references.**
+* `mufasa/pose3d/leg_ik.py`: each leg bone moves by the model's own hinge joints, within their
+  ranges: hip (3), knee, ankle and toes; scapula (3), shoulder (2), elbow, wrist and fingers.
+  A bone's transform relative to its parent is `C · J(q) · J(q_stance)⁻¹ · C⁻¹`. This matches
+  the model's kinematics to 1e-13 mm and composes with the rig's trunk posture.
+* A batched Levenberg–Marquardt solve per leg:
+  * stance: the paw on the floor as in the stance, at the gait's position;
+  * swing: on an arc from lift-off to landing (6 / 8 mm high, assumed);
+  * no gait loaded: planted where it stands;
+  * always: nothing under the floor, and a weak pull towards the stance.
+* Consecutive frames: solved, smoothed (Gaussian, 1.5 frames), solved again pulled towards the
+  smoothed angles, twice. On K7 the worst joint's change in rate fell from 43° to 8.6° in one
+  frame of ten.
+* `PosedRig.legs`, `solve_legs`, `set_gait`, `leg_info`, `leg_names`. The viewer links a loaded
+  gait file to the rigs. The background fit solves the legs too. A *Bend the legs* switch, and
+  the legs' state in the model's info.
+* The virtual rodent's size is now the gait's (nose to tail base). With the spine's stretch,
+  the markers fit as well at that size: K7 26.5 mm at 1.17×, against 26.0 at the back path's
+  1.44×.
+* Gait: the hips sit the model's hip width apart (23 mm), either side of the hip labels'
+  midpoint, along their own axis (`BodyPhysics.hip_half_width`). K7's hip labels are 55 mm apart, on the skin over
+  the thighs, and its hips had come out as wide. Placement is unchanged; each leg's reach
+  is not.
+* K7, walking: stance paws are 2 mm from the gait's position and swing paws 7 mm (medians),
+  about 20 ms a frame.
+* README: *Scientific references*, every source the code cites, plus those for the
+  biomechanical model (Eng et al. 2008, Johnson et al. 2008, Young et al. 2019, Mak 2021,
+  Valdez et al. 2018, the rat anatomy manual). Six are cited in the code by author and year
+  only and are marked *to be confirmed*.
+* docs/pose3d.md: *The legs*, the hips.
+* `tests/smoke_122lh_legs.py` (11 checks).
+
 **122lg — A spine that goes from hunched to stretched.** On K7 the back's path from head to
 tail base spans 162–291 mm (5–95 %), but the fitted virtual rodent stayed at 173–184 mm. Its thorax
 is one rigid body and its bones keep their lengths, so bending barely changes its length. Marker

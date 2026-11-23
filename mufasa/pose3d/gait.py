@@ -261,6 +261,18 @@ def body_section(body: str) -> str:
     return "upper"
 
 
+def _hip_axis(P: dict, back_left) -> np.ndarray:
+    """Unit vectors (N, 3) from the right hip label to the left one (the hips' own axis, whatever
+    the labels' spread); the back's left axis where a hip label is missing."""
+    out = np.array(back_left, float, copy=True)
+    if "hip_left" in P and "hip_right" in P:
+        d = np.asarray(P["hip_left"], float) - np.asarray(P["hip_right"], float)
+        n = np.linalg.norm(d, axis=-1)
+        ok = np.isfinite(n) & (n > 1e-6)
+        out[ok] = d[ok] / n[ok, None]
+    return out
+
+
 def _first(P: dict, labels, T: int) -> np.ndarray:
     """Per frame, the first of ``labels`` present (T, 3; NaN where none is)."""
     out = np.full((T, 3), np.nan)
@@ -329,6 +341,10 @@ class BodyPhysics:
     nose_to_tail: float = 171.1      # head_nose → back_V2, standing (mm)
     check_mm: dict = field(default_factory=dict)   # anchored CoM / girdle error over sampled postures
     sections: tuple = ()             # the section (SECTIONS) of each of ``segments``
+    # 122lh: half the distance between the hip joints (mm, model). The hips are placed this far
+    # either side of the hip labels' midpoint, so labels put on the skin over the thighs (K7:
+    # 55 mm apart, the model's joints 23 mm) do not spread them
+    hip_half_width: float = 0.0
 
     @property
     def section_mass(self) -> dict:
@@ -368,7 +384,9 @@ class BodyPhysics:
         chain = ["head_back", "back_T4", "back_T8", "back_L2", "back_L6", "back_V2"]
         bp = sum(float(np.linalg.norm(rest[b][:2] - rest[a][:2])) for a, b in zip(chain[:-1], chain[1:]))
         nt = float(np.linalg.norm(rest["head_nose"] - rest["back_V2"]))
-        phys = cls(float(mass.sum()), segs, girdles, rmax, rmin, bp, nt, sections=tuple(secs))
+        hw = 0.5 * float(np.linalg.norm(T0[m.body_index[GIRDLE_BODY["LH"]], :3, 3]
+                                         - T0[m.body_index[GIRDLE_BODY["RH"]], :3, 3]))
+        phys = cls(float(mass.sum()), segs, girdles, rmax, rmin, bp, nt, sections=tuple(secs), hip_half_width=hw)
         # how well the anchored points follow the true ones over sampled spine postures
         ks = [m.joint_index[k] for k in SPINE_JOINTS]
         qs = np.tile(q0[0], (200, 1))
@@ -423,6 +441,7 @@ class BodyPhysics:
         for j, p in enumerate(PAWS):
             g = self._points(self.girdles[p], P, R, size)
             Y[good, 1 + j] = g[good]
+        self._hips_apart(Y[:, 1:], _hip_axis(P, R[:, :, 1]), size)
         S = np.full((T, 3, 3), np.nan)
         sm = self.section_mass
         for k, s in enumerate(SECTIONS):
@@ -452,7 +471,19 @@ class BodyPhysics:
             g = self._point(self.girdles[p], P, R, size)
             if g is not None:
                 out[1 + j] = g
+        self._hips_apart(out[None, 1:], _hip_axis({k: np.asarray(v, float)[None] for k, v in P.items()}, R[None, :, 1]),
+                         size)
         return out
+
+    def _hips_apart(self, G, left, size: float) -> None:
+        """In place on girdles (N, 4, 3): the hips at their midpoint ± the model's half hip width
+        along ``left`` (N, 3, unit: right hip → left hip), scaled."""
+        if self.hip_half_width <= 0:
+            return
+        i, j = PAWS.index("LH"), PAWS.index("RH")
+        mid = 0.5 * (G[:, i] + G[:, j])
+        off = left * (self.hip_half_width * size)
+        G[:, i], G[:, j] = mid + off, mid - off
 
 
 # --------------------------------------------------------------------------- #

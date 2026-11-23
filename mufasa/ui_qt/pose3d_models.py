@@ -141,6 +141,13 @@ class ViewModelsPanel(QWidget):
         self.bg_fit_cb.setToolTip("Start posing a rig to every frame as soon as it is added, nearest the "
                                   "frame shown first, so playback runs in real time")
         left.addWidget(self.bg_fit_cb)
+        self.legs_cb = QCheckBox("Bend the legs", box)                 # 122lh
+        self.legs_cb.setChecked(True)
+        self.legs_cb.setToolTip("The virtual rodent's legs bend by its own joints: paws planted under the body, "
+                                "or where a loaded gait file puts them (stance on the floor, swing on an arc). "
+                                "Off: the legs stay tucked")
+        self.legs_cb.toggled.connect(self._legs_toggled)
+        left.addWidget(self.legs_cb)
         self._fit_thread = None
         outer.addLayout(left, 2)
         right = QGridLayout()
@@ -204,6 +211,8 @@ class ViewModelsPanel(QWidget):
         except Exception as e:                                 # noqa: BLE001
             QMessageBox.warning(self, "Load model", f"{type(e).__name__}: {e}")
             return None
+        if hasattr(m, "bend_legs"):
+            m.bend_legs = self.legs_cb.isChecked()
         self.vol.add_model(m)
         kind = {"rig": "posed to the markers", "mesh": "mesh", "gait": "paws and balance"}[m.kind]
         it = QListWidgetItem(f"{m.name} ({kind})")
@@ -222,10 +231,17 @@ class ViewModelsPanel(QWidget):
         if fn:
             self.add(fn)
 
+    def _legs_toggled(self, on: bool) -> None:
+        for m in self.vol.models:
+            if hasattr(m, "bend_legs"):
+                m.bend_legs = bool(on)
+        self.vol.update()
+
     def remove_selected(self) -> None:
         r = self.list.currentRow()
         if 0 <= r < len(self.vol.models):
             self.vol.models.pop(r)
+            self.vol.link_gait()                          # 122lh: a removed gait file frees the legs
             self.list.takeItem(r)
             self.vol.update()
             self._selected_changed()
@@ -368,6 +384,12 @@ class FitThread(QThread):
             a = max(0, min(i - size // 4, len(rest) - size))      # mostly ahead of the frame shown
             ch, rest = rest[a:a + size], rest[:a] + rest[a + size:]
             self.model.fit_frames(ch, device=dev, stop=self.isInterruptionRequested)
+            if getattr(self.model, "limbs", None) is not None and self.model.bend_legs:   # 122lh: the legs too
+                todo = [f for f in ch if f not in self.model._legs]
+                for k in range(0, len(todo), 256):
+                    if self.isInterruptionRequested():
+                        break
+                    self.model.solve_legs(todo[k:k + 256])
             done += len(ch)
             self.progress.emit(done, total, self.device)
             size = self.chunk

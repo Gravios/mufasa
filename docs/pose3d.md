@@ -243,6 +243,36 @@ hidden by unticking it.
   0.8× to 1.27× its length from nose to tail base. On K7 the model's
   length now follows the animal's, and the stretched frames' marker error
   fell from 34 to 26 mm (see *Length* in docs/bodymodel.md).
+* **The legs** (patch 122lh): the virtual rodent's legs bend by its own
+  joints and within their ranges: hip (3 hinges), knee, ankle and toes;
+  scapula (3), shoulder (2), elbow, wrist and fingers.
+  * Without a gait file, each paw is planted on the floor below the body,
+    as it stands in the model's stance (on its toes and fingers).
+  * With a gait file loaded (*Load… → `<video>_gait.parquet`*), each stance
+    paw stands at the gait's position, and each swing paw follows an arc
+    from where it lifted to where it lands (6 mm high for forepaws, 8 mm
+    for hindpaws, at the model's size; assumed).
+  * Nothing of a leg goes under the floor, and a weak pull keeps each joint
+    near its stance angle.
+  * Consecutive frames are smoothed over time: solved, their angles
+    smoothed (Gaussian, 1.5 frames), solved again pulled towards them.
+    Solved alone, the worst joint's change of rate was 43° in one frame
+    of ten on K7; smoothed, 8.6°.
+  * *Bend the legs* (on by default) switches it off, back to the tucked
+    stance. The background fit solves the legs too, at about 20 ms a frame.
+  * On K7 while walking, stance paws are 2 mm from the gait's position
+    (median) and swing paws 7 mm. One in ten is 20–30 mm off: its target
+    is out of the leg's reach from where the fitted body put the hip or
+    shoulder.
+  * The model's size is now the gait's (nose to tail base, 1.19× on K7),
+    so the body and the gait agree. With the spine's stretch, the markers
+    fit as well at that size: 26.5 mm, against 26.0 mm at the back
+    path's 1.44×.
+
+  This is stage 1 of a biomechanical model (then joint torques, muscle
+  loads, simulation in MuJoCo). The angles are kept under the model's
+  joint names (`hip_L_extend`, `knee_L`…; `PosedRig.legs`,
+  `PosedRig.leg_names`) for those stages.
 * The rig stays on top of the floor (122le). Before, the fitted mesh went
   under the floor in 97 % of K7's frames, by up to 10 cm. Mostly that was
   the legs and the tail. The rig's legs cannot bend (they keep the tucked
@@ -392,6 +422,12 @@ planted paws:
   whose forepaws rest on the wall, which the model does not know about),
   the stability margin is negative.
 
+**The hips** (patch 122lh) sit the model's hip width apart (23 mm at its
+size), either side of the hip labels' midpoint. K7's hip labels are 55 mm
+apart (43–73 mm), on the skin over the thighs, and the hips taken from
+them were as wide. Paw placement is measured from the midline between
+each pair and does not change; each leg's reach does.
+
 **Bounds** come from 108 uninjured young adult female rats crossing a
 CatWalk: the pre-injury runs of Neckel et al. (2013), 5780 strides at
 13–71 cm/s. They depend on speed v (mm/s, held at 100–710):
@@ -448,8 +484,8 @@ paw's mean load share, strides, stance times and duty factors, and the
 phases (LF→RF, LH→RH, LH→LF, LH→RF). In the 3-D viewer, *View & models →
 Load… → `<video>_gait.parquet`* draws the planted paws (sized by load),
 the support polygon, the centre of mass over the floor and the ZMP (green
-inside, red outside). It is an overlay next to the virtual rodent. It does
-not move the model's legs, which stay in the rig's tucked stance.
+inside, red outside). With the virtual rodent loaded too, its legs follow
+the gait (patch 122lh; see *The legs* below).
 
 **Limits.**
 * A single camera's heights are uncertain, and the centre of mass and the
