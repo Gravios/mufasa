@@ -58,11 +58,9 @@ from PySide6.QtCore import QPointF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPen, QPolygonF, QTransform
 from PySide6.QtWidgets import (
     QCheckBox,
-    QDockWidget,
     QFileDialog,
     QHBoxLayout,
     QLabel,
-    QMainWindow,
     QPushButton,
     QSpinBox,
     QSplitter,
@@ -916,9 +914,12 @@ def reprojection_overlay(pose: Pose3D, colors: dict):
 # --------------------------------------------------------------------------- #
 class Pose3DViewerWidget(QWidget):
     def __init__(self, video_path: str | None, pose_path, parent: QWidget | None = None,
-                 models: list | None = None) -> None:
+                 models: list | None = None, scrubber=None) -> None:
+        """``scrubber``: another viewer's video and playback to follow (122lp: the feature
+        viewer's, the 3-D view beside its video); else this viewer has its own."""
         super().__init__(parent)
         from mufasa.ui_qt.frame_scrubber import FrameScrubberWidget
+        self._own_scrubber = scrubber is None
         self.pose_path = Path(pose_path)
         self.pose = load_pose3d(self.pose_path)
         self.video_path = video_path
@@ -968,20 +969,69 @@ class Pose3DViewerWidget(QWidget):
         self.anim_cb.setToolTip("Camera animation: key views at frames, smooth moves between them, "
                                 "rendered to a video")
         bar.addWidget(self.anim_cb)
+        self.features_cb = QCheckBox("Features", self)               # 122lp
+        self.features_cb.setToolTip("Traces and histograms of the numbers that go with this file: its own "
+                                    "(heights, pelvis pitch, …) and the gait, dynamics and joint files "
+                                    "beside it")
         self.models_cb = QCheckBox("View && models", self)
         self.models_cb.setToolTip("View options (markers, names, grid, projection, background) and models: "
                                   "a body-model rig posed to the markers, or a mesh (arena, objects)")
         bar.addWidget(self.models_cb)
+        bar.addWidget(self.features_cb)
+        self.jpdf_cb = QCheckBox("JPDF", self)                       # 122lp
+        self.jpdf_cb.setToolTip("Beside the 3-D view: the joint PDF of two features (this file's and the "
+                                "gait / dynamics files beside it), the current frame's point and its path")
+        bar.addWidget(self.jpdf_cb)
         bar.addStretch()
         lay.addLayout(bar)
+        # 122lp: the JPDF's two features and its trail
+        from PySide6.QtWidgets import QComboBox
+        self.jpdf_bar = QWidget(self)
+        jb = QHBoxLayout(self.jpdf_bar)
+        jb.setContentsMargins(0, 0, 0, 0)
+        jb.addWidget(QLabel("JPDF  x", self.jpdf_bar))
+        self.jpdf_x = QComboBox(self.jpdf_bar)
+        jb.addWidget(self.jpdf_x, 1)
+        jb.addWidget(QLabel("y", self.jpdf_bar))
+        self.jpdf_y = QComboBox(self.jpdf_bar)
+        jb.addWidget(self.jpdf_y, 1)
+        jb.addWidget(QLabel("Trail", self.jpdf_bar))
+        self.jpdf_trail = QSpinBox(self.jpdf_bar)
+        self.jpdf_trail.setRange(0, 600)
+        self.jpdf_trail.setValue(30)
+        self.jpdf_trail.setSuffix(" fr")
+        jb.addWidget(self.jpdf_trail)
+        for cb in (self.jpdf_x, self.jpdf_y):
+            cb.setEditable(True)
+            cb.setInsertPolicy(QComboBox.NoInsert)
+            cb.setMinimumContentsLength(18)
+        self.jpdf_bar.setVisible(False)
+        lay.addWidget(self.jpdf_bar)
         split = QSplitter(Qt.Vertical, self)
-        self.volume = Volume3DWidget(self.pose, split)
-        split.addWidget(self.volume)
-        self.scrubber = FrameScrubberWidget(split)
-        split.addWidget(self.scrubber)
+        self.split = split
+        self.view_split = QSplitter(Qt.Horizontal, split)            # 122lp: the volume | the JPDF
+        self.volume = Volume3DWidget(self.pose, self.view_split)
+        self.view_split.addWidget(self.volume)
+        from mufasa.ui_qt.feature_panels import JpdfView
+        self.jpdf = JpdfView(self.view_split)
+        self.view_split.addWidget(self.jpdf)
+        self.jpdf.setVisible(False)
+        split.addWidget(self.view_split)
+        if scrubber is None:
+            self.scrubber = FrameScrubberWidget(split)
+            split.addWidget(self.scrubber)
+        else:
+            self.scrubber = scrubber
         split.setStretchFactor(0, 3)
         split.setStretchFactor(1, 2)
         lay.addWidget(split, 1)
+        self.features = None
+        self._table = None
+        self.features_cb.toggled.connect(self._features_toggled)
+        self.jpdf_cb.toggled.connect(self._jpdf_toggled)
+        self.jpdf_x.currentIndexChanged.connect(self._jpdf_pair)
+        self.jpdf_y.currentIndexChanged.connect(self._jpdf_pair)
+        self.jpdf_trail.valueChanged.connect(self.jpdf.set_trail)
         from mufasa.ui_qt.pose3d_animation import CameraAnimationPanel
         self.animation = CameraAnimationPanel(self, self)          # 122kp
         self.animation.setVisible(False)
@@ -1005,20 +1055,23 @@ class Pose3DViewerWidget(QWidget):
         self.drop_cb.toggled.connect(lambda v: self._set("show_drops", v))
         self.trail_spin.valueChanged.connect(lambda v: self._set("trail", int(v)))
         self._reproj = reprojection_overlay(self.pose, self.volume.colors)
-        self.reproj_cb.setEnabled(self._reproj is not None)
+        # the reprojection is drawn on this viewer's own video only (another's has its own overlays)
+        self.reproj_cb.setEnabled(self._reproj is not None and self._own_scrubber)
         self.reproj_cb.toggled.connect(self._reproj_changed)
         self.box_cb.setEnabled(self.pose.box is not None)
         self.scrubber.frame_changed.connect(self._on_frame)
         can_video = bool(video_path) and self.pose.projection_matrix() is not None
         self.video3d_cb.setEnabled(can_video)
         self.opacity_spin.setEnabled(can_video)
-        self.panel_cb.setEnabled(bool(video_path))
+        self.panel_cb.setEnabled(bool(video_path) and self._own_scrubber)
         self.video3d_cb.toggled.connect(self._video3d_changed)
         self.opacity_spin.valueChanged.connect(lambda v: self._set("video_opacity", v / 100.0))
         self.panel_cb.toggled.connect(self.scrubber.set_picture_visible)
-        if video_path:
+        if video_path and self._own_scrubber:
             self.scrubber.load(str(video_path))
             self.scrubber.seek(int(self.pose.frames[0]))
+        elif not self._own_scrubber:
+            self._on_frame(self.scrubber.current_frame)
         if can_video:
             self.video3d_cb.setChecked(True)
 
@@ -1026,7 +1079,65 @@ class Pose3DViewerWidget(QWidget):
         self.models_panel.stop_fitting()                 # 122ky: no thread left running
         super().closeEvent(ev)
 
+    def session_table(self):
+        """The numbers that go with this file, by frame (read once)."""
+        if self._table is None:
+            from mufasa.ui_qt.feature_panels import session_features
+            self._table = session_features(self.pose_path, self.scrubber.total_frames or None)
+        return self._table
+
+    def _jpdf_toggled(self, on: bool) -> None:
+        """122lp: the JPDF beside the 3-D view."""
+        if on and self.jpdf_x.count() == 0:
+            cols = list(self.session_table().columns)
+            for cb in (self.jpdf_x, self.jpdf_y):
+                cb.blockSignals(True)
+                cb.addItems(cols)
+                cb.blockSignals(False)
+            pick = [c for c in ("gait:speed_mm_s", "3d:pelvis_pitch_deg", "3d:head_nose height") if c in cols]
+            pick += [c for c in cols if c not in pick]
+            if len(pick) >= 2:
+                self.set_jpdf_pair(pick[0], pick[1])
+            self._jpdf_pair()
+        self.jpdf_bar.setVisible(bool(on))
+        self.jpdf.setVisible(bool(on))
+        if on:
+            h = self.view_split.height()
+            self.view_split.setSizes([max(200, self.view_split.width() - h), h])
+            self.jpdf.set_current_frame(self.scrubber.current_frame)
+
+    def set_jpdf_pair(self, x: str, y: str) -> None:
+        """The JPDF's two features, by name."""
+        for cb, name in ((self.jpdf_x, x), (self.jpdf_y, y)):
+            i = cb.findText(name)
+            if i >= 0:
+                cb.blockSignals(True)
+                cb.setCurrentIndex(i)
+                cb.blockSignals(False)
+        self._jpdf_pair()
+
+    def _jpdf_pair(self, *_a) -> None:
+        x, y = self.jpdf_x.currentText(), self.jpdf_y.currentText()
+        self.jpdf.set_pair(self.session_table(), x, y, trail=self.jpdf_trail.value())
+
+    def _features_toggled(self, on: bool) -> None:
+        """122lp: the numbers that go with this file, as traces with histograms."""
+        if on and self.features is None:
+            from mufasa.ui_qt.feature_panels import FeaturePanel
+            table = self.session_table()
+            pre = [c for c in table.columns if c in ("gait:speed_mm_s", "3d:pelvis_pitch_deg",
+                                                     "3d:spine_length_mm")][:3]
+            self.features = FeaturePanel(table, fps=self.scrubber.fps or 30.0, parent=self.split, preselect=pre)
+            self.split.addWidget(self.features)
+            self.features.frame_clicked.connect(self.scrubber.seek)
+            self.features.set_current_frame(self.scrubber.current_frame)
+        if self.features is not None:
+            self.features.setVisible(bool(on))
+
     def _on_frame(self, frame: int) -> None:
+        if self.features is not None and self.features.isVisible():
+            self.features.set_current_frame(frame)
+        self.jpdf.set_current_frame(frame)
         self.volume.set_frame(frame)
         self.models_panel._update_info()
         if self.volume.show_video:
@@ -1054,6 +1165,9 @@ class Pose3DViewerWidget(QWidget):
     def cleanup(self) -> None:
         self.animation.timer.stop()
         self.volume._fit_timer.stop()
+        self.models_panel.stop_fitting()
+        if not self._own_scrubber:
+            return                                        # the video is the other viewer's
         try:
             self.scrubber.close_video()
         except Exception:
@@ -1068,29 +1182,11 @@ def choose_pose3d(parent: QWidget | None, start_dir: str = "") -> str | None:
 
 def open_pose3d_viewer(parent: QWidget | None, video_path: str | None, pose_path, models: list | None = None
                        ) -> QWidget:
-    """Show the viewer in a floating workbench dock (window fallback). ``models``: paths of models
-    to load (``.rig.npz``, ``virtual_rodent``, ``.obj``/``.stl``/``.ply``)."""
+    """Show the viewer in a window of its own (122lp: not docked in the workbench). ``models``:
+    paths of models to load (``.rig.npz``, ``virtual_rodent``, ``.obj``/``.stl``/``.ply``)."""
+    from mufasa.ui_qt.feature_panels import open_window
     w = Pose3DViewerWidget(video_path, pose_path, models=models)
-    main = parent.window() if parent is not None else None
-    title = f"3-D — {Path(pose_path).stem}"
-    if isinstance(main, QMainWindow):
-        dock = QDockWidget(title, main)
-        dock.setWidget(w)
-        dock.setFloating(True)
-        dock.resize(1000, 900)
-        main.addDockWidget(Qt.RightDockWidgetArea, dock)
-        orig = dock.closeEvent
-
-        def _close(ev):  # noqa: ANN001
-            w.cleanup()
-            orig(ev)
-        dock.closeEvent = _close
-        dock.show()
-        return dock
-    w.setWindowTitle(title)
-    w.resize(1000, 900)
-    w.show()
-    return w
+    return open_window(w, f"3-D — {Path(pose_path).stem}", (1050, 950))
 
 
 __all__ = ["Pose3D", "Pose3DViewerWidget", "Volume3DWidget", "VIEWS", "find_pose3d",

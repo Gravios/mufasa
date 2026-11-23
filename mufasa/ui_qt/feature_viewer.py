@@ -12,8 +12,9 @@ video has any. Left-click / drag seeks (as in the labeller's label plot);
 the mouse wheel widens or narrows the window.
 
 :class:`FeatureViewerWidget` puts a :class:`FrameScrubberWidget` above the
-traces; :func:`open_feature_viewer` shows it in a floating dock of the
-workbench (or a dialog without one).
+traces, with each feature's histogram beside its trace and the video's 3-D
+view beside the video (patch 122lp); :func:`open_feature_viewer` shows it in
+a window of its own.
 """
 from __future__ import annotations
 
@@ -24,12 +25,9 @@ import pandas as pd
 from PySide6.QtCore import QPointF, QRect, Qt, Signal
 from PySide6.QtGui import QColor, QFontMetrics, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
-    QDialog,
-    QDockWidget,
     QDoubleSpinBox,
     QHBoxLayout,
     QLabel,
-    QMainWindow,
     QVBoxLayout,
     QWidget,
 )
@@ -63,6 +61,7 @@ class FeatureTracePlot(QWidget):
 
     frame_clicked = Signal(int)
     window_changed = Signal(float)
+    changed = Signal()          # 122lp: data, labels, frame or window changed (the histograms follow)
 
     LANE_H = 46
     LABEL_LANE_H = 14
@@ -90,16 +89,19 @@ class FeatureTracePlot(QWidget):
         self._ranges = {c: robust_range(v) for c, v in self._data.items()}
         self._update_height()
         self.update()
+        self.changed.emit()
 
     def set_labels(self, labels: dict[str, np.ndarray]) -> None:
         self._labels = {k: np.asarray(v) for k, v in labels.items()
                         if np.nansum(np.asarray(v, dtype=float) == 1) > 0}
         self._update_height()
         self.update()
+        self.changed.emit()
 
     def set_current_frame(self, f: int) -> None:
         self._frame = int(f)
         self.update()
+        self.changed.emit()
 
     def set_fps(self, fps: float) -> None:
         self._fps = float(fps) if fps and fps > 0 else 30.0
@@ -108,6 +110,7 @@ class FeatureTracePlot(QWidget):
     def set_window_seconds(self, s: float) -> None:
         self._window_s = float(min(600.0, max(0.5, s)))
         self.update()
+        self.changed.emit()
 
     def window_seconds(self) -> float:
         return self._window_s
@@ -298,9 +301,13 @@ class FeatureViewerWidget(QWidget):
         self.video_name = Path(video_path).stem
         lay = QVBoxLayout(self)
         lay.setContentsMargins(6, 6, 6, 6)
-        self.scrubber = FrameScrubberWidget(self)
+        from PySide6.QtWidgets import QSplitter
+        self.top_split = QSplitter(Qt.Horizontal, self)       # 122lp: the video | the 3-D view
+        self.scrubber = FrameScrubberWidget(self.top_split)
         self.scrubber.load(video_path)
-        lay.addWidget(self.scrubber, 3)
+        self.top_split.addWidget(self.scrubber)
+        lay.addWidget(self.top_split, 3)
+        self.view3d = None
         self.video_path = video_path
         self._build_overlay_bar(lay)
         bar = QHBoxLayout()
@@ -318,6 +325,11 @@ class FeatureViewerWidget(QWidget):
         self.follow_cb.setToolTip("Update the traces when features are ticked or "
                                   "unticked in Feature Visualization")
         bar.addWidget(self.follow_cb)
+        self.hist_cb = QCheckBox("Histograms", self)          # 122lp
+        self.hist_cb.setChecked(True)
+        self.hist_cb.setToolTip("Each feature's distribution beside its trace: the whole video, the window, "
+                                "each behaviour, and the current value")
+        bar.addWidget(self.hist_cb)
         self.info = QLabel("", self)
         self.info.setStyleSheet("color: palette(placeholder-text);")
         bar.addWidget(self.info, 1)
@@ -328,7 +340,17 @@ class FeatureViewerWidget(QWidget):
         self.features: list[str] = []
         self.set_feature_columns(features)
         self.plot.set_labels(self._labels())
-        lay.addWidget(self.plot, 2)
+        from mufasa.ui_qt.feature_panels import FeatureHistogramPlot
+        self.hist = FeatureHistogramPlot(self.plot, self)
+        self.hist.setFixedWidth(FeatureHistogramPlot.W)
+        lanes = QHBoxLayout()
+        lanes.setSpacing(2)
+        lanes.addWidget(self.plot, 1)
+        lanes.addWidget(self.hist)
+        lay.addLayout(lanes, 2)
+        self.hist_cb.toggled.connect(self.hist.setVisible)
+        self.hist.frame_clicked.connect(self._seek)
+        self.hist._refresh()
         self.window_spin.valueChanged.connect(self.plot.set_window_seconds)
         self.plot.window_changed.connect(self._sync_spin)
         self.plot.frame_clicked.connect(self._seek)
@@ -439,12 +461,13 @@ class FeatureViewerWidget(QWidget):
         self.style_btn.clicked.connect(self.open_style_dialog)
         self._style_dlg = None
         bar.addWidget(self.style_btn)
-        # Patch 122ke: 3-D marker viewer (volume above, this video below)
+        # Patch 122ke: 3-D marker viewer; 122lp: beside the video, in this window
         self.view3d_btn = QPushButton("3-D…", self)
+        self.view3d_btn.setCheckable(True)
         self.view3d_btn.setToolTip(
-            "Open the 3-D marker viewer for this video (a <video>*3d*.parquet beside "
+            "Show the 3-D view of this video beside it (a <video>*3d*.parquet beside "
             "the video or under derived/pose3d/; otherwise choose a file)")
-        self.view3d_btn.clicked.connect(lambda: self.open_3d())
+        self.view3d_btn.toggled.connect(self._toggle_3d)
         bar.addWidget(self.view3d_btn)
         bar.addStretch()
         self.keep_frames_cb = QCheckBox("Keep frames", self)
@@ -679,17 +702,37 @@ class FeatureViewerWidget(QWidget):
                                         f"{self.recorder.n} frame(s)")
 
     def open_3d(self, pose_path: str | None = None):
-        """Patch 122ke: the 3-D viewer for this video (found, given, or chosen)."""
-        from mufasa.ui_qt.pose3d_viewer import choose_pose3d, find_pose3d, open_pose3d_viewer
+        """Patch 122ke: the 3-D view of this video (found, given, or chosen); 122lp: beside the
+        video in this window, on the same playback."""
+        from mufasa.ui_qt.pose3d_viewer import Pose3DViewerWidget, choose_pose3d, find_pose3d
+        if self.view3d is not None:
+            self.view3d.setVisible(True)
+            return self.view3d
         path = pose_path or find_pose3d(self.video_path, self.config_path)
         if path is None:
             path = choose_pose3d(self, str(Path(self.video_path).parent))
         if not path:
             return None
-        self._view3d = open_pose3d_viewer(self, self.video_path, path)
-        return self._view3d
+        self.view3d = Pose3DViewerWidget(self.video_path, path, scrubber=self.scrubber)
+        self.top_split.addWidget(self.view3d)
+        self.top_split.setSizes([1, 1])
+        self.view3d_btn.blockSignals(True)
+        self.view3d_btn.setChecked(True)
+        self.view3d_btn.blockSignals(False)
+        return self.view3d
+
+    def _toggle_3d(self, on: bool) -> None:
+        if on:
+            if self.open_3d() is None:
+                self.view3d_btn.blockSignals(True)
+                self.view3d_btn.setChecked(False)
+                self.view3d_btn.blockSignals(False)
+        elif self.view3d is not None:
+            self.view3d.setVisible(False)
 
     def cleanup(self) -> None:
+        if self.view3d is not None:
+            self.view3d.cleanup()
         if self.recorder is not None:
             self.record_btn.setChecked(False)
         try:
@@ -700,38 +743,11 @@ class FeatureViewerWidget(QWidget):
 
 def open_feature_viewer(parent: QWidget, config_path: str, video_path: str,
                         features: list[str], start_frame: int = 0) -> QWidget:
-    """Show the viewer in a floating workbench dock (dialog fallback)."""
+    """Show the viewer in a window of its own (122lp: not docked in the workbench); the window's
+    ``viewer`` is the :class:`FeatureViewerWidget`."""
+    from mufasa.ui_qt.feature_panels import open_window
     w = FeatureViewerWidget(config_path, video_path, features, start_frame)
-    main = parent.window() if parent is not None else None
-    title = f"Features — {w.video_name}"
-    if isinstance(main, QMainWindow):
-        dock = QDockWidget(title, main)
-        dock.setWidget(w)
-        dock.setAllowedAreas(Qt.AllDockWidgetAreas)
-        dock.setFloating(True)
-        dock.resize(1150, 780)
-        main.addDockWidget(Qt.RightDockWidgetArea, dock)
-        orig = dock.closeEvent
-
-        def _close(ev):  # noqa: ANN001
-            w.cleanup()
-            orig(ev)
-
-        dock.closeEvent = _close
-        dock.viewer = w
-        if not hasattr(main, "_feature_viewer_docks"):
-            main._feature_viewer_docks = []
-        main._feature_viewer_docks.append(dock)
-        dock.show()
-        return dock
-    dlg = QDialog(parent)
-    dlg.setWindowTitle(title)
-    QVBoxLayout(dlg).addWidget(w)
-    dlg.resize(1150, 780)
-    dlg.finished.connect(lambda *_: w.cleanup())
-    dlg.viewer = w
-    dlg.show()
-    return dlg
+    return open_window(w, f"Features — {w.video_name}", (1250, 850))
 
 
 __all__ = [

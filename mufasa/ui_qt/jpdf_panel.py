@@ -82,7 +82,7 @@ class JpdfPanel:
     def __init__(self, config_path, x: str, y: str, x_values, y_values,
                  *, trail: int = 30, pooled: pd.DataFrame | None = None,
                  bins: int = 90, outliers: str = "percentile",
-                 outlier_value: float = 0.5) -> None:
+                 outlier_value: float = 0.5, title: str = "all videos") -> None:
         from mufasa.utils.feature_names import (
             display,
             load_jitter,
@@ -90,6 +90,7 @@ class JpdfPanel:
             load_scales,
         )
         self.config_path, self.x, self.y = config_path, x, y
+        self.title = title                       # 122lp: "this video" when not pooled
         self.trail = int(trail)
         # Patch 122jx: density bins per axis and outlier handling
         self.bins = int(bins)
@@ -150,7 +151,7 @@ class JpdfPanel:
         ax.set_ylabel(self.name_y, fontsize=fs)
         ax.tick_params(labelsize=fs * 0.85)
         drop = (f" ({self.n_outliers:,} outliers left out)" if self.n_outliers else "")
-        ax.set_title(f"all videos · {n_all - self.n_outliers:,} frames{drop} · "
+        ax.set_title(f"{self.title} · {n_all - self.n_outliers:,} frames{drop} · "
                      f"{self.bins} bins", fontsize=fs * 0.85, loc="left", color="#555555")
         fig.canvas.draw()
         rgba = np.asarray(fig.canvas.buffer_rgba())

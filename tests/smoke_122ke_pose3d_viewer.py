@@ -98,9 +98,11 @@ W = V.Pose3DViewerWidget(str(video), pose_path)
 W.resize(700, 700)
 W.show()
 app.processEvents()
+# 122lp: the volume shares its row with the JPDF (a horizontal splitter), above the scrubber
 check("layout: volume above, video scrubber below (one splitter)",
-      W.volume.parent() is W.scrubber.parent() and
-      W.volume.parent().indexOf(W.volume) == 0 and W.volume.parent().indexOf(W.scrubber) == 1)
+      W.volume.parent() is W.view_split and W.view_split.parent() is W.scrubber.parent() and
+      W.split.indexOf(W.view_split) == 0 and W.split.indexOf(W.scrubber) == 1
+      and W.view_split.indexOf(W.volume) == 0)
 check("opens at the first 3-D frame", W.scrubber.current_frame == 5 and W.volume.frame == 5)
 W.scrubber.seek(20)
 app.processEvents()
@@ -143,8 +145,9 @@ check("mufasa-view3d without a file: error code 2",
 toml = (REPO / "pyproject.toml").read_text()
 check("entry point mufasa-view3d", 'mufasa-view3d    = "mufasa.tools.view3d:main"' in toml)
 fv = (REPO / "mufasa/ui_qt/feature_viewer.py").read_text()
+# 122lp: the 3-D view opens beside the video in the feature viewer's own window
 check("feature viewer: 3-D… button opens the viewer for its video",
-      'QPushButton("3-D…", self)' in fv and "open_pose3d_viewer(self, self.video_path, path)" in fv)
+      'QPushButton("3-D…", self)' in fv and "Pose3DViewerWidget(self.video_path, path, scrubber=self.scrubber)" in fv)
 
 failed = [n for n, ok in checks if not ok]
 for n, ok in checks:

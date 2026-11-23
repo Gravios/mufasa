@@ -214,6 +214,42 @@ It takes the camera and the scale from the file (the scale otherwise from
 nose to tail base). On K7 it moved the nose in 4.7 % of frames, `head_back`
 in 1.6 % and `back_T4` in 0.8 %.
 
+## The viewers' windows, histograms and features (122lp)
+
+The feature viewer (*Feature Visualization* → *Open with video*) and the 3-D viewer each open in a
+window of their own, not docked in the workbench.
+
+* **Histograms.** Beside each feature's trace, on the same row, is its distribution over the
+  trace's range:
+  * the whole video (filled);
+  * the window around the current frame (outline);
+  * each behaviour's frames (dashed);
+  * the current value (red).
+
+  Click a bin to move to the next frame with a value in it. *Histograms* shows or hides them.
+* **3-D beside the video.** In the feature viewer, *3-D…* shows the video's 3-D view beside the
+  video, in the same window and on the same playback. Press it again to hide it. The
+  reprojection overlay stays with the 3-D viewer's own window (the feature viewer's video has its
+  own overlays).
+* **Features in the 3-D viewer.** *Features* lists the numbers that go with the 3-D file, by
+  frame:
+  * the file's own (`3d:`): pelvis pitch, spine length, each marker's height;
+  * the gait file beside it (`gait:`): speed, paw contacts and loads, the sections' momentum;
+  * the dynamics file (`dynamics:`): joint angles and torques, ground forces, muscle activations
+    and forces, the residual;
+  * the joint angles saved by `smooth --model --joints-out <video>_joints.parquet` (`joints:`).
+
+  Filter the list and tick up to 12; they show as traces with histograms, following the playback.
+  A click in them moves it.
+* **JPDF beside the 3-D view.** In the 3-D viewer, *JPDF* puts the joint density of two of those
+  numbers to the right of the volume:
+  * the density over this video's frames (grey, log scale);
+  * the current frame's point (red);
+  * its recent path, a fading trail of *Trail* frames.
+
+  Choose x and y from the same list (typing filters it). In the feature viewer, the project
+  features' JPDF stays beside the video (*JPDF beside the video*), pooled over every video.
+
 ## The 3-D viewer: video in the 3-D view
 
 With a camera in the file (every 3-D inference run has one) and a video,

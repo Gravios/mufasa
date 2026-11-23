@@ -8,6 +8,32 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lp — The JPDF beside the 3-D view; feature histograms; the 3-D view in the feature viewer's
+window; features in the 3-D viewer; the viewers in windows of their own
+(`mufasa/ui_qt/feature_panels.py`).**
+* 3-D viewer: *JPDF* (`JpdfView`) puts the joint density of two features to the right of the
+  volume (a horizontal splitter):
+  * the density over this video's frames, log scale (`JpdfPanel(title=…)`);
+  * the current frame's point, and a fading trail of *Trail* frames.
+
+  The x/y choosers list the same numbers as *Features* (editable, typing filters);
+  `set_jpdf_pair`.
+* `FeatureHistogramPlot`: beside each trace, lane for lane. It shows the distribution over the
+  whole video (filled), the window around the current frame (outline), each behaviour's frames
+  (dashed) and the current value (red). Clicking a bin goes to the next frame with a value in it.
+  A *Histograms* switch shows or hides them. `FeatureTracePlot.changed` keeps them in step.
+* Feature viewer:
+  * *3-D…* shows the 3-D view beside the video in the same window, on one playback
+    (`Pose3DViewerWidget(scrubber=…)`; no reprojection overlay there). Toggled, kept when hidden.
+  * Videos and traces sit in a horizontal splitter.
+* 3-D viewer: *Features* (`FeaturePanel`, `session_features`). It lists, by frame, the 3-D file's
+  derived columns and marker heights, plus the gait, dynamics and joints files beside it. They
+  can be filtered and ticked (up to 12) into traces with histograms, and a click seeks.
+* `open_feature_viewer` and `open_pose3d_viewer` return a `ViewerWindow` (its own window, `.viewer`,
+  cleaned up on close) instead of a floating workbench dock.
+* `smoke_122ke`'s source check is updated for the embedded 3-D view.
+* `tests/smoke_122lp_viewer_histograms.py`: 16 checks.
+
 **122lo — Labelled paws anchor the gait and stage 4 (`mufasa/pose3d/gait.py`, `optimise.py`).**
 * `paw_labels`: `paw_LF/RF/LH/RH`, `forepaw_left`, `hindpaw_R` and the like, any case.
 * `paw_observations`: a paw is seen where its 2-D likelihood is ≥ 0.9. It is planted where it is
