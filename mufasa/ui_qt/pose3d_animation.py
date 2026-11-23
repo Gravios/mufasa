@@ -139,7 +139,15 @@ class CameraAnimationPanel(QWidget):
         self.below_cb.setToolTip("Put the video frame under the 3-D view in the output")
         self.below_cb.setEnabled(bool(viewer.video_path))
         self.label_cb = QCheckBox("Frame label", self)
-        for w in (self.below_cb, self.label_cb):
+        self.panels_cb = QCheckBox("All panels", self)                   # 122lu
+        self.panels_cb.setChecked(True)
+        self.panels_cb.setToolTip("Render every panel shown (the 3-D view, the video, the JPDF, the feature "
+                                  "traces and histograms) laid out as on the screen; the width sets the 3-D "
+                                  "view's width, the rest follows the window. Off: the 3-D view alone at "
+                                  "width × height (and the video below, if ticked)")
+        self.panels_cb.toggled.connect(lambda on: (self.below_cb.setEnabled(not on and bool(viewer.video_path)),
+                                                  self.height_spin.setEnabled(not on)))
+        for w in (self.below_cb, self.label_cb, self.panels_cb):
             rrow.addWidget(w)
         rrow.addStretch()
         self.render_btn = QPushButton("Render video…", self)
@@ -149,6 +157,8 @@ class CameraAnimationPanel(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
         self.fps_spin.valueChanged.connect(lambda v: self.timer.setInterval(int(1000 / max(v, 1))))
+        self.below_cb.setEnabled(False)
+        self.height_spin.setEnabled(False)
         self._refresh()
 
     # -- helpers --------------------------------------------------------
@@ -338,11 +348,69 @@ class CameraAnimationPanel(QWidget):
 
     def render_to(self, out_path, progress=None) -> Path:
         st = self.settings()
+        if self.panels_cb.isChecked():
+            return self.render_panels_to(out_path, progress)
         return render_animation(self.viewer.pose, self.path, out_path, video_path=self.viewer.video_path,
                                 size=st["size"], fps=st["fps"], style=st["style"],
                                 colors=dict(self.vol.colors), video_below=st["video_below"],
                                 frame_label=st["frame_label"], progress=progress,
                                 models=list(self.vol.models))
+
+    def render_panels_to(self, out_path, progress=None) -> Path:
+        """122lu: render the camera path with every panel shown (:mod:`mufasa.ui_qt.panel_capture`):
+        the viewer is played through the path's frames and views, and each frame drawn as laid out on
+        the screen; the 3-D view at the chosen width. The view and frame are put back after."""
+        import cv2
+
+        from mufasa.pose3d.animation import _writer
+        from mufasa.ui_qt.panel_capture import compose
+        win = self.viewer.window()
+        host = getattr(win, "viewer", None)
+        if host is None or not hasattr(host, "record_panels"):
+            host = self.viewer
+        sc = host.scrubber
+        has_video = bool(getattr(host, "video_path", None)) and sc.total_frames > 0
+        st = self.settings()
+        vol = self.vol
+        keep_view, keep_frame, keep_label = vol.view_state(), int(vol.frame), vol.show_label
+        vol.show_label = bool(st["frame_label"])
+        scale = max(0.5, min(4.0, st["size"][0] / max(1, vol.width())))
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        total = self.path.n_output()
+        writer, size = None, None
+        try:
+            for n in range(total):
+                f = int(self.path.frame_at(n))
+                if has_video:
+                    sc.seek(f)
+                if int(vol.frame) != f:                 # no video (or past its end): the 3-D file alone
+                    self.viewer._on_frame(f)
+                vol.set_view_state(self.path.state_at(n))
+                img = compose(host, host.record_panels(), video=sc._display,
+                              frame=sc.last_display_frame if has_video else None, scale=scale)
+                if img is None:
+                    continue
+                if size is None:
+                    h, w = img.shape[:2]
+                    size = (w - w % 2, h - h % 2)
+                    writer = _writer(out_path, st["fps"], size)
+                if img.shape[1::-1] != size:
+                    img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
+                writer.write(img)
+                if progress is not None and progress(n + 1, total) is False:
+                    break
+        finally:
+            if writer is not None:
+                writer.release()
+            vol.show_label = keep_label
+            if has_video:
+                sc.seek(keep_frame)
+            self.viewer._on_frame(keep_frame)
+            vol.set_view_state(keep_view)
+        if writer is None:
+            raise ValueError("nothing to render: no panel is shown")
+        return out_path
 
     def render_dialog(self) -> None:
         from PySide6.QtWidgets import QApplication

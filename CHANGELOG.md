@@ -8,6 +8,21 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lu — The camera animation's *Render video…* renders every panel shown.**
+* User: "I ran render videos, but still only see the 3d view".
+* `CameraAnimationPanel.render_panels_to` plays the viewer through the camera path. Each output
+  frame is the panels shown, laid out as on the screen (`panel_capture.compose`):
+  * the 3-D view along the path;
+  * the video at that frame;
+  * the JPDF;
+  * the feature traces and histograms;
+  * inside the feature viewer, its own traces as well.
+* The width sets the 3-D view's width. The view and frame are put back afterwards.
+* **All panels** is on by default. Off: the 3-D view alone at width × height (*Video below*), as
+  before (`render_animation`, also used by `mufasa-pose3d render-animation`).
+* docs/pose3d.md. `tests/smoke_122lu_animation_all_panels.py`: 5 checks. 122kp renders with
+  *All panels* off (what it tests).
+
 **122lt — Recording every visible panel into the video.**
 * User: "I would like each of the visible panels rendered in the video, such as if I have 3d,
   video, and jpdf, then I want all of them".

@@ -176,6 +176,7 @@ def main() -> int:
 
         # ---- rendering -------------------------------------------------- #
         import cv2
+        a.panels_cb.setChecked(False)          # 122lu: the 3-D view alone (All panels: tested in 122lu)
         a.width_spin.setValue(320)
         a.height_spin.setValue(240)
         a.below_cb.setChecked(True)

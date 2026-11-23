@@ -249,6 +249,22 @@ histograms. Toolbars and lists are left out.
 * *All panels* off (feature viewer) records the video picture alone, as before.
 * Recordings go under `derived/frames/annotated/`; the frames go under `derived/frames/extracted/`.
 
+### The camera animation renders every panel too (122lu)
+
+In the 3-D viewer's *Animation*, **Render video…** with **All panels** (on by default) plays the
+viewer through the camera path. Each frame holds every panel shown, laid out as on the screen:
+
+* the 3-D view, moving along the path;
+* the video at that frame;
+* the JPDF;
+* the feature traces and histograms;
+* inside the feature viewer, its own traces and histograms as well.
+
+The width sets the 3-D view's width, and the rest follows the window. The view and frame are put
+back afterwards. With *All panels* off, it renders the 3-D view alone at width × height (and
+*Video below*), as before. `mufasa-pose3d render-animation`, which runs without the GUI, renders
+that way too.
+
 ## Narrow windows (122ls)
 
 The tool rows of the 3-D viewer and the feature viewer, and the playback controls, wrap onto more
