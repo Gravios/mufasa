@@ -49,7 +49,8 @@ from PySide6.QtWidgets import (
 
 from mufasa.ui_qt.workbench import OperationForm
 
-VIDEO_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".m4v")
+VIDEO_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v", ".mpg", ".mpeg")
+AUTO = "__auto__"                  # 122lr: the 3-D file's own video
 
 
 # --------------------------------------------------------------------------- #
@@ -65,11 +66,30 @@ def _root(config_path) -> Path | None:
         return None
 
 
-def _videos(root: Path | None) -> list[Path]:
-    d = root / "sources" / "videos" if root else None
-    if not d or not d.is_dir():
+def _videos(root: Path | None, config_path=None) -> list[Path]:
+    """The project's videos, in subfolders too (122lr)."""
+    from mufasa.ui_qt.pose3d_viewer import project_video_files
+    return project_video_files(config_path, root)
+
+
+def _pose3d_files(root: Path | None) -> list[Path]:
+    """122lr: every 3-D file of the project, newest run first: the 3-D runs, imported motion
+    capture, and those ``mufasa run`` wrote beside the 2-D labels (``sources/pose``)."""
+    if root is None:
         return []
-    return sorted(p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS)
+    files = []
+    for r in reversed(_pose3d_runs(root)):
+        files += sorted(r.glob("*.parquet"))
+    for d in (root / "sources" / "pose3d", root / "sources" / "pose", root / "derived" / "pose3d"):
+        if d.is_dir():
+            files += sorted(p for p in d.glob("*.parquet") if d.name == "pose3d" or "_3d" in p.name)
+    from mufasa.ui_qt.pose3d_viewer import is_pose3d_file
+    out, seen = [], set()
+    for p in files:
+        if p.resolve() not in seen and p.is_file() and is_pose3d_file(p):
+            seen.add(p.resolve())
+            out.append(p)
+    return out
 
 
 def _kalman_runs(root: Path | None) -> list[Path]:
@@ -292,7 +312,7 @@ class CameraCalibrationForm(OperationForm):
         self._marks: dict | None = None
         f = QFormLayout()
         self.video = QComboBox(self)
-        for v in _videos(self._root):
+        for v in _videos(self._root, self.config_path):
             self.video.addItem(v.name, str(v))
         self.video.setEditable(True)
         f.addRow("Video", self.video)
@@ -831,12 +851,20 @@ class Pose3DViewerLauncher(QWidget):
         lay = QFormLayout(self)
         lay.setContentsMargins(12, 8, 12, 8)
         self.video = QComboBox(self)
-        for v in _videos(self._root):
-            self.video.addItem(v.name, str(v))
+        # 122lr: by default every 3-D file, each with the video it was made from (found by name)
+        self.video.addItem("(the 3-D file's own video)", AUTO)
+        for v in _videos(self._root, config_path):
+            self.video.addItem(str(v.relative_to(self._root)) if self._root and v.is_relative_to(self._root)
+                               else v.name, str(v))
         self.video.addItem("(no video)", None)          # e.g. motion capture (122kl)
+        self.video.setToolTip("A video, to list its 3-D files; or each 3-D file with the video whose name "
+                              "it begins with (in the project's videos, subfolders too, or beside it)")
+        self.found = QLabel(self)
+        self.found.setStyleSheet("color: palette(placeholder-text);")
         self.file = QComboBox(self)
         lay.addRow("Video", self.video)
         lay.addRow("3-D file", self.file)
+        lay.addRow("", self.found)
         row = QHBoxLayout()
         self.refresh_btn = QPushButton("Refresh", self)
         self.open_btn = QPushButton("Open 3-D viewer", self)
@@ -845,28 +873,45 @@ class Pose3DViewerLauncher(QWidget):
         row.addWidget(self.open_btn)
         lay.addRow(row)
         self.video.currentIndexChanged.connect(self.refresh)
+        self.file.currentIndexChanged.connect(self._show_found)
         self.refresh_btn.clicked.connect(self.refresh)
         self.open_btn.clicked.connect(self.open)
         self.refresh()
 
     def refresh(self) -> None:
+        self.file.blockSignals(True)
         self.file.clear()
-        stem = Path(self.video.currentText()).stem if self.video.currentData() else ""
-        files = []
-        for r in reversed(_pose3d_runs(self._root)):
-            files += [p for p in sorted(r.glob("*.parquet")) if not stem or p.name.startswith(stem)]
-        mocap = self._root / "sources" / "pose3d" if self._root else None
-        if mocap and mocap.is_dir():                    # imported motion capture
-            files += [p for p in sorted(mocap.glob("*.parquet")) if not stem or p.name.startswith(stem)]
-        for p in files:
-            self.file.addItem(f"{p.parent.name}/{p.name}", str(p))
+        v = self.video.currentData()
+        stem = Path(v).stem.lower() if v and v != AUTO else ""
+        for p in _pose3d_files(self._root):
+            if not stem or p.name.lower().startswith(stem):
+                self.file.addItem(f"{p.parent.name}/{p.name}", str(p))
+        self.file.blockSignals(False)
         self.open_btn.setEnabled(self.file.count() > 0)
+        self._show_found()
+
+    def video_for(self, pose_path) -> str | None:
+        """The video to show with this 3-D file: the one chosen, or (by default) its own."""
+        v = self.video.currentData()
+        if v != AUTO:
+            return v
+        from mufasa.ui_qt.pose3d_viewer import find_video
+        found = find_video(pose_path, self.config_path) if pose_path else None
+        return str(found) if found else None
+
+    def _show_found(self) -> None:
+        if self.video.currentData() != AUTO or not self.file.currentData():
+            self.found.setText("")
+            return
+        v = self.video_for(self.file.currentData())
+        self.found.setText(f"Video: {Path(v).name}" if v else
+                           "No video found by name (the viewer's Video… picks one)")
 
     def open(self):
         from mufasa.ui_qt.pose3d_viewer import open_pose3d_viewer
         if not self.file.currentData():
             return None
-        return open_pose3d_viewer(self, self.video.currentData(), self.file.currentData())
+        return open_pose3d_viewer(self, self.video_for(self.file.currentData()), self.file.currentData())
 
 
 __all__ = ["BoxMarkDialog", "C3DImportForm", "CameraCalibrationForm", "Pose3DInferenceForm",

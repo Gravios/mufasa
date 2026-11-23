@@ -164,7 +164,7 @@ class BodyFitForm(OperationForm):
             self.rig.addItem(r.name.removesuffix(".rig.npz"), str(r))
         f.addRow("Rig", self.rig)
         self.video = QComboBox(self)
-        for v in _videos(self._root):
+        for v in _videos(self._root, self.config_path):
             self.video.addItem(v.name, str(v))
         f.addRow("Video", self.video)
         self.labels = QComboBox(self)

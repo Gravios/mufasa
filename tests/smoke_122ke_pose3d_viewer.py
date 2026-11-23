@@ -139,7 +139,9 @@ from mufasa.tools import view3d  # noqa: E402
 a = view3d.build_parser().parse_args([str(video)])
 check("mufasa-view3d VIDEO finds the 3-D file", view3d.resolve(a)[1] == str(pose_path))
 a = view3d.build_parser().parse_args([str(pose_path)])
-check("mufasa-view3d POSE3D alone: volume only", view3d.resolve(a)[:2] == (None, str(pose_path)))
+b = view3d.build_parser().parse_args([str(pose_path), "--no-video"])
+check("mufasa-view3d POSE3D alone: its video found by name (122lr); --no-video: volume only",
+      view3d.resolve(a)[:2] == (str(video), str(pose_path)) and view3d.resolve(b)[:2] == (None, str(pose_path)))
 check("mufasa-view3d without a file: error code 2",
       view3d.main([str(tmp / "other.mp4")]) == 2)
 toml = (REPO / "pyproject.toml").read_text()

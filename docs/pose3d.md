@@ -235,6 +235,22 @@ It takes the camera and the scale from the file (the scale otherwise from
 nose to tail base). On K7 it moved the nose in 4.7 % of frames, `head_back`
 in 1.6 % and `back_T4` in 0.8 %.
 
+## Which video the 3-D viewer shows (122lr)
+
+The tab's **3-D viewer** section lists, by default, every 3-D file in the project: the 3-D runs
+(`derived/pose3d/`), imported motion capture (`sources/pose3d/`) and those `mufasa run` wrote
+beside the 2-D labels (`sources/pose/`). It leaves out the gait, dynamics and joint files written
+beside them. Each opens with the video it was made from, found by name: the video whose name the
+3-D file's name begins with, or its 2-D labels' name (`K7_cam.mp4` for
+`K7_camDLC_resnet50…_3d.parquet`). The longest such name wins, so `K7_cam_2…` goes with
+`K7_cam_2.mp4`. Videos are looked for beside the file and in the project's videos, subfolders
+included. The section shows which video it found.
+
+* Choose a video to list only its 3-D files.
+* Choose *(no video)* for motion capture alone.
+* In the viewer, **Video…** shows another video (or one, when none was found).
+* `mufasa-view3d --pose X_3d.parquet` finds the video the same way; `--no-video` leaves it out.
+
 ## The viewers' windows, histograms and features (122lp)
 
 The feature viewer (*Feature Visualization* → *Open with video*) and the 3-D viewer each open in a

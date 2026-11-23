@@ -209,8 +209,8 @@ def main() -> int:
               (root / "sources" / "pose3d" / "c_3d.parquet").is_file() and args["rename"] == {"head_nose": "nose"})
         lau = Pose3DViewerLauncher(config_path=cfg)
         items = [lau.file.itemText(i) for i in range(lau.file.count())]
-        check("3-D viewer section: '(no video)' lists the imported motion capture",
-              lau.video.currentText() == "(no video)" and "pose3d/c_3d.parquet" in items and lau.open_btn.isEnabled())
+        check("3-D viewer section: by default (122lr: each file's own video) it lists the imported motion capture",
+              lau.video.currentData() == "__auto__" and "pose3d/c_3d.parquet" in items and lau.open_btn.isEnabled())
         from mufasa.ui_qt.pose3d_viewer import find_pose3d, load_pose3d
         check("viewer finds motion capture beside a video of the same name",
               find_pose3d(str(root / "sources" / "videos" / "yup.mp4"), cfg) == root / "sources" / "pose3d" / "yup_3d.parquet")

@@ -8,6 +8,27 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lr — The 3-D viewer finds a 3-D file's video by itself.**
+* User: "The new viewer doesn't find the videos"; "It automatically found them before".
+* The project's videos come from subfolders of `sources/videos` too (`project_video_files`,
+  using the project's `video_dir`; old projects' `videos/`). This also applies to the calibration
+  and body-model forms.
+* `find_video(pose_path, config_path)`: the video named in the 3-D file's metadata, else the
+  longest video name that the 3-D file's name (less `_3d`, `_3d_smoothed`, …) or its 2-D labels'
+  name begins with. It looks beside the file and in the project's videos.
+* The launcher's default *(the 3-D file's own video)* lists every 3-D file:
+  * runs;
+  * `sources/pose3d`;
+  * `mufasa run`'s `*_3d*.parquet` in `sources/pose`.
+
+  It leaves out the `_gait` / `_dynamics` / `_joints` files beside them (`is_pose3d_file`) and
+  says which video it found.
+* `open_pose3d_viewer(..., video_path="auto")`. The viewer's **Video…** button and `set_video`.
+  `mufasa-view3d --pose` finds the video (`--no-video` to leave it out).
+* `find_pose3d` skips the gait file written after a 3-D file. It no longer takes `K7_cam_2…` for
+  `K7_cam`, and it looks in `sources/pose` too.
+* docs/pose3d.md; `tests/smoke_122lr_viewer_videos.py`: 10 checks.
+
 **122lq — Cage walls that flare outward; the Rat7M builder per rat and in parallel.**
 * `calibrate_from_box_marks(wall_tilt_deg=DEG|"auto")`; `calibrate-box --wall-tilt`; the
   calibration form's *Walls flare outward* (degrees, or *fit from the corner edges*).

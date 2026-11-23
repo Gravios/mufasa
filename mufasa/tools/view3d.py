@@ -2,7 +2,8 @@
 ``mufasa-view3d`` — 3-D marker viewer with the video below (patch 122ke).
 
     mufasa-view3d VIDEO [POSE3D]
-    mufasa-view3d --pose POSE3D          # no video: the volume only
+    mufasa-view3d --pose POSE3D          # the video it was made from, found by name (122lr)
+    mufasa-view3d --pose POSE3D --no-video   # the volume only
     mufasa-view3d VIDEO POSE3D --model virtual_rodent --model arena.obj   # models (patch 122kv)
 
 POSE3D: parquet/CSV with ``<marker>_x/_y/_z`` (and optionally ``frame``,
@@ -21,6 +22,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("video", nargs="?", help="the video (shown below the volume)")
     ap.add_argument("pose3d", nargs="?", help="3-D pose file")
     ap.add_argument("--pose", dest="pose_opt", help="3-D pose file (alternative to POSE3D)")
+    ap.add_argument("--no-video", action="store_true",
+                    help="without a video (by default the video the 3-D file was made from is found by name)")
     ap.add_argument("--model", action="append", default=[], metavar="PATH",
                     help="a model to show: a body-model rig (.rig.npz, posed to the markers), "
                          "'virtual_rodent' (the built-in rat), or a mesh (.obj .stl .ply); repeatable")
@@ -38,6 +41,10 @@ def resolve(args) -> tuple[str | None, str | None, str | None]:
         pose = str(p) if p else None
     if pose is None:
         return video, None, "no 3-D pose file given or found beside the video"
+    if video is None and not getattr(args, "no_video", False):     # 122lr: the file's own video
+        from mufasa.ui_qt.pose3d_viewer import find_video
+        v = find_video(pose)
+        video = str(v) if v else None
     return video, pose, None
 
 

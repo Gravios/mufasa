@@ -218,11 +218,119 @@ def find_pose3d(video_path: str | None, config_path: str | None = None) -> Path 
     hits = list(v.parent.glob(f"{stem}*3d*.parquet")) if v.parent.is_dir() else []
     if config_path:
         for d in (Path(config_path).parent / "derived" / "pose3d",
-                  Path(config_path).parent / "sources" / "pose3d"):    # + motion capture (122kl)
+                  Path(config_path).parent / "sources" / "pose3d",     # + motion capture (122kl)
+                  Path(config_path).parent / "sources" / "pose"):      # + `mufasa run`'s (122lr)
             if d.is_dir():
-                hits += list(d.rglob(f"{stem}*.parquet"))
-    hits = [h for h in hits if h.is_file()]
+                hits += [h for h in d.rglob(f"{stem}*.parquet") if d.name == "pose3d" or "_3d" in h.name]
+    hits = [h for h in hits if h.is_file() and is_pose3d_file(h)]
+    # 122lr: not another video's whose name begins the same (K7_cam_2… for K7_cam)
+    own = [h for h in hits if (f := find_video(h, config_path)) is None or f.resolve() == v.resolve()]
+    hits = own or hits
     return max(hits, key=lambda h: h.stat().st_mtime) if hits else None
+
+
+VIDEO_EXTS = (".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v", ".mpg", ".mpeg")
+_POSE_SUFFIXES = ("_3d_heights", "_3d_smoothed", "_3d", "_smoothed", "_gait", "_dynamics", "_joints", "_body")
+NOT_POSE3D = ("_gait.parquet", "_dynamics.parquet", "_joints.parquet", "_steps.csv")   # beside a 3-D file
+
+
+def is_pose3d_file(path) -> bool:
+    """122lr: a 3-D pose file, not the gait / dynamics / joint numbers written beside one."""
+    n = Path(path).name.lower()
+    return n.endswith((".parquet", ".csv")) and not n.endswith(NOT_POSE3D)
+
+
+def project_root_of(path) -> Path | None:
+    """122lr: the project a file sits in (the nearest folder above it with ``project.toml``)."""
+    for d in Path(path).resolve().parents:
+        if (d / "project.toml").is_file():
+            return d
+    return None
+
+
+def project_video_files(config_path=None, root=None) -> list[Path]:
+    """122lr: every video of the project, in subfolders too: the project's video folder
+    (``sources/videos``, or ``videos`` in an old project)."""
+    dirs = []
+    if config_path:
+        try:
+            from mufasa.project_layout import project_paths_from_config
+            vd = project_paths_from_config(str(config_path)).get("video_dir")
+            if vd:
+                dirs.append(Path(vd))
+        except Exception:
+            pass
+        root = root or project_root_of(config_path)
+    if root:
+        dirs += [Path(root) / "sources" / "videos", Path(root) / "videos"]
+    out, seen = [], set()
+    for d in dirs:
+        if not d.is_dir():
+            continue
+        for v in sorted(d.rglob("*")):
+            if (v.suffix.lower() in VIDEO_EXTS and not v.name.startswith(".") and v.is_file()
+                    and v.resolve() not in seen):
+                seen.add(v.resolve())
+                out.append(v)
+    return out
+
+
+def _pose_stems(pose_path) -> list[str]:
+    """The names a 3-D file's video may go by: the file's own (less ``_3d`` and the like) and its
+    2-D labels' (from its metadata)."""
+    p = Path(pose_path)
+    stems = [p.name.rsplit(".", 1)[0]]
+    try:
+        meta = load_pose3d_meta(p)
+        if meta.get("video"):
+            stems.insert(0, Path(meta["video"]).stem)
+        if meta.get("source_pose"):
+            stems.append(Path(meta["source_pose"]).name.split(".")[0])
+    except Exception:
+        pass
+    out = []
+    for s in stems:
+        for suf in _POSE_SUFFIXES:
+            if s.endswith(suf):
+                s = s[: -len(suf)]
+        out.append(s)
+    return out
+
+
+def find_video(pose_path, config_path=None) -> Path | None:
+    """122lr: the video a 3-D file was made from: named in its metadata, or the video whose name
+    the 3-D file's (or its 2-D labels') name begins with (``K7_cam_1.mp4`` for
+    ``K7_cam_1DLC_resnet50…_3d.parquet``); the longest such name wins. Looked for beside the file
+    and in the project's videos (subfolders too)."""
+    p = Path(pose_path)
+    try:
+        meta = load_pose3d_meta(p)
+    except Exception:
+        meta = {}
+    if meta.get("video") and Path(meta["video"]).is_file():
+        return Path(meta["video"])
+    root = project_root_of(config_path) if config_path else None
+    root = root or project_root_of(p)
+    cands = [v for v in sorted(p.parent.iterdir()) if v.suffix.lower() in VIDEO_EXTS and v.is_file()] \
+        if p.parent.is_dir() else []
+    cands += project_video_files(config_path, root)
+    stems = [s.lower() for s in _pose_stems(p)]
+    best, n = None, 0
+    for v in cands:
+        vs = v.stem.lower()
+        if len(vs) > n and any(s == vs or s.startswith(vs) for s in stems):
+            best, n = v, len(vs)
+    return best
+
+
+def load_pose3d_meta(path) -> dict:
+    """The ``mufasa_pose3d`` metadata of a 3-D parquet file, without reading its columns."""
+    path = Path(path)
+    if path.suffix.lower() != ".parquet":
+        return {}
+    import pyarrow.parquet as pq
+    raw = (pq.read_schema(path).metadata or {}).get(META_KEY)
+    return json.loads(raw) if raw else {}
 
 
 # --------------------------------------------------------------------------- #
@@ -968,7 +1076,11 @@ class Pose3DViewerWidget(QWidget):
         self.panel_cb = QCheckBox("Video panel", self)
         self.panel_cb.setToolTip("The video picture below the volume (the playback controls stay)")
         self.panel_cb.setChecked(True)
-        for w in (self.video3d_cb, self.opacity_spin, self.panel_cb):
+        self.video_btn = QPushButton("Video…", self)                  # 122lr
+        self.video_btn.setToolTip("The video to show with the 3-D file")
+        self.video_btn.setVisible(self._own_scrubber)
+        self.video_btn.clicked.connect(self._choose_video)
+        for w in (self.video_btn, self.video3d_cb, self.opacity_spin, self.panel_cb):
             bar.addWidget(w)
         bar.addSpacing(12)
         self.anim_cb = QCheckBox("Animation", self)
@@ -1080,6 +1192,39 @@ class Pose3DViewerWidget(QWidget):
             self._on_frame(self.scrubber.current_frame)
         if can_video:
             self.video3d_cb.setChecked(True)
+        self._video_label()
+
+    def _video_label(self) -> None:
+        if self.video_path:
+            self.video_btn.setText(f"Video: {Path(self.video_path).name}")
+            self.video_btn.setToolTip(f"{self.video_path}\nClick to show another video")
+        else:
+            self.video_btn.setText("Video…")
+            self.video_btn.setToolTip("No video found for this 3-D file: choose one")
+
+    def _choose_video(self) -> None:
+        start = str(Path(self.video_path).parent) if self.video_path else str(self.pose_path.parent)
+        path, _ = QFileDialog.getOpenFileName(self, "Video", start,
+                                              "Videos (" + " ".join("*" + e for e in VIDEO_EXTS) + ")")
+        if path:
+            self.set_video(path)
+
+    def set_video(self, video_path) -> None:
+        """122lr: show this video with the 3-D file (the viewer's own playback)."""
+        if not self._own_scrubber or not video_path:
+            return
+        self.video_path = str(video_path)
+        self.scrubber.load(self.video_path)
+        self.scrubber.seek(int(self.pose.frames[0]))
+        can = self.pose.projection_matrix() is not None
+        self.video3d_cb.setEnabled(can)
+        self.opacity_spin.setEnabled(can)
+        self.panel_cb.setEnabled(True)
+        self._table = None
+        if can:
+            self.video3d_cb.setChecked(True)
+            self._video3d_changed(True)
+        self._video_label()
 
     def closeEvent(self, ev) -> None:  # noqa: ANN001, N802
         self.models_panel.stop_fitting()                 # 122ky: no thread left running
@@ -1186,14 +1331,19 @@ def choose_pose3d(parent: QWidget | None, start_dir: str = "") -> str | None:
     return path or None
 
 
-def open_pose3d_viewer(parent: QWidget | None, video_path: str | None, pose_path, models: list | None = None
-                       ) -> QWidget:
+def open_pose3d_viewer(parent: QWidget | None, video_path: str | None, pose_path, models: list | None = None,
+                       config_path=None) -> QWidget:
     """Show the viewer in a window of its own (122lp: not docked in the workbench). ``models``:
-    paths of models to load (``.rig.npz``, ``virtual_rodent``, ``.obj``/``.stl``/``.ply``)."""
+    paths of models to load (``.rig.npz``, ``virtual_rodent``, ``.obj``/``.stl``/``.ply``).
+    ``video_path`` ``"auto"`` (122lr): the video the 3-D file was made from (:func:`find_video`)."""
     from mufasa.ui_qt.feature_panels import open_window
+    if video_path == "auto":
+        v = find_video(pose_path, config_path)
+        video_path = str(v) if v else None
     w = Pose3DViewerWidget(video_path, pose_path, models=models)
     return open_window(w, f"3-D — {Path(pose_path).stem}", (1050, 950))
 
 
 __all__ = ["Pose3D", "Pose3DViewerWidget", "Volume3DWidget", "VIEWS", "find_pose3d",
-           "load_pose3d", "open_pose3d_viewer", "reprojection_overlay"]
+           "find_video", "is_pose3d_file", "load_pose3d", "load_pose3d_meta", "open_pose3d_viewer", "project_video_files",
+           "reprojection_overlay"]
