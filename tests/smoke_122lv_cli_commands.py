@@ -129,7 +129,7 @@ check("mufasa list models, from inside the project: the project's Kalman body mo
       "virtual rodent and height prior",
       rc == 0 and "the current folder's" in out and "rat_body" in out and "rat_body.npz" in out
       and "lab_default" in out and "global" in out and "rear" in out and "yolo_rat" in out
-      and "K7" in out and "410 g" in out and "38 muscles" in out and "virtual_rodent" in out
+      and "K7, 410 g" in out and "38 muscles" in out and "virtual_rodent" in out
       and "rat7m_trunk_prior" in out and "Kalman body model v2, fitted at 30 fps" in out)
 rc, out, _ = mufasa("list", "models", "--kind", "smoothing", "--json", "--project", str(root))
 js = json.loads(out)
@@ -177,6 +177,10 @@ check("mufasa info: a 3-D file (labels, box, flare), a video (frames, fps), a mo
       rc == 0 and "3-D pose" in out and "2: nose, tail" in out and "walls flaring 12.0°" in out
       and "45" in out and "64x48" in out and "Kalman body model v2" in out and "/data/train/rat_body.npz" in out
       and "500 mm above the floor" in out)
+rc, out, _ = mufasa("info", str(run / "K7_camDLC_3d.parquet"))
+rc2, out2, _ = mufasa("info", str(bio / "K7.animal.json"))
+check("info on a 3-D file names the video it was made from; on an animal file, its fields",
+      rc == 0 and "rat6/K7_cam.mp4" in out and rc2 == 0 and "mass_g" in out2 and "410" in out2)
 rc, out, err = mufasa("info", str(tmp / "nope.mp4"))
 check("info on a missing file: says so (exit 1)", rc == 1 and "no such file" in err)
 rc, out, _ = mufasa("project", cwd=inside)
@@ -210,8 +214,10 @@ check("the commands load without Qt; the launcher knows them all",
       out.strip() == "False" and set(WL.COMMANDS) == set(C.COMMANDS))
 
 doc = (REPO / "docs" / "cli.md").read_text()
-check("docs/cli.md: the commands", all(s in doc for s in ("mufasa help", "mufasa list models", "mufasa info",
-                                                          "mufasa project", "mufasa doctor")))
+check("docs/cli.md: the commands, with examples, scripting, recipes, exit codes, troubleshooting (122lx)",
+      all(s in doc for s in ("mufasa help", "mufasa list models", "mufasa info", "mufasa project", "mufasa doctor",
+                             "## Quick start", "## Recipes", "## Exit codes", "## Troubleshooting", "jq -r",
+                             "mufasa run all", "Project: /data/K7_project (the current folder's)")))
 
 for name, ok in checks:
     print(("PASS  " if ok else "FAIL  ") + name)

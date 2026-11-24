@@ -8,6 +8,26 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lx — The command line's documentation: explanations and examples.**
+* User: "Can you update the documentation with explanations and examples".
+* `docs/cli.md` rewritten. The examples are real output from a sample project. It covers:
+  * a quick start;
+  * how the project is chosen;
+  * each command and each `mufasa list` subject: what it shows, where it looks, its options,
+    with an example;
+  * `mufasa run` step by step (calibrate the box, 3-D, heights, gait, dynamics), `run all` and
+    its options, one animal over several sessions;
+  * `mufasa doctor` and how to read it;
+  * scripting with `--json` (`jq` and Python, and calling the functions directly);
+  * recipes, exit codes and troubleshooting.
+* `docs/pose3d.md` and the README point to it.
+* `mufasa info`:
+  * on a 3-D file, it names the video it was made from (as the viewer finds it);
+  * on an animal or other JSON file, it shows the fields (empty ones as —) and counts the lists.
+* `mufasa list models`: a calibrated animal reads "K7, 410 g, size 1.19" (no empty mass). The
+  virtual rodent no longer says "built in" twice.
+* `tests/smoke_122lv_cli_commands.py`: 24 checks.
+
 **122lw — Follow-ups to 122lv.**
 * `mufasa/cli/commands.py` no longer names the old config file. This was the 122eg invariant
   (checked by 122eg, 122eh, 122ei, 122eq), which 122lv broke. It now says "old-layout `.ini`

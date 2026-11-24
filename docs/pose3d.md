@@ -814,7 +814,9 @@ with an error.
 
 ## Command line
 
-The pipeline's steps under their pipeline names:
+The pipeline's steps under their pipeline names. [`docs/cli.md`](cli.md#mufasa-run) walks through
+them with worked examples (one step at a time, all of it, one animal over several sessions, a
+loop over every session), alongside `mufasa list`, `info`, `project` and `doctor`.
 
 ```
 mufasa run --list

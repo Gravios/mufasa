@@ -171,7 +171,10 @@ def collect_models(cfg: Path | None, include_global: bool = True) -> list[dict]:
             elif n.endswith(".animal.json"):
                 try:
                     d = json.loads(p.read_text())
-                    det = f"calibrated animal: {d.get('name', '')} {d.get('mass_g', '') or ''} g".strip()
+                    det = "calibrated animal: " + ", ".join(
+                        x for x in (str(d.get("name") or ""), f"{d['mass_g']:g} g" if d.get("mass_g") else "",
+                                    f"size {d['size']:.2f}" if isinstance(d.get("size"), (int, float)) else "")
+                        if x)
                 except Exception:
                     det = "calibrated animal"
                 add("body", n.removesuffix(".animal.json"), p, det)
@@ -190,7 +193,7 @@ def collect_models(cfg: Path | None, include_global: bool = True) -> list[dict]:
             pass
     vr = ASSETS / "models" / "pose3d" / "virtual_rodent"
     if vr.is_dir():
-        add("body", "virtual_rodent", vr / "rodent.xml", "the virtual rodent (MuJoCo), built in", where="built in")
+        add("body", "virtual_rodent", vr / "rodent.xml", "the virtual rodent (MuJoCo)", where="built in")
     for p in sorted((ASSETS / "models" / "pose3d").glob("*.npz")):
         add("prior", p.stem, p, _npz_info(p), where="built in")
     return out
@@ -535,9 +538,12 @@ def describe(path: Path) -> list[tuple[str, str]]:
             if meta.get("camera"):
                 cam = meta["camera"]
                 out.append(("camera", f"{cam.get('height_mm', '?')} mm up, focal {cam.get('focal_px', '?')} px"))
-            for k in ("source_pose", "video", "method"):
+            for k in ("source_pose", "method"):
                 if meta.get(k):
                     out.append((k.replace("_", " "), str(meta[k])))
+            from mufasa.pose3d.files import find_video
+            v = find_video(p)
+            out.append(("video", str(v) if v else "(none found by name)"))
         elif n.endswith("_gait.parquet"):
             out += [("kind", "gait"), ("columns", ", ".join(cols[:14]) + ("…" if len(cols) > 14 else ""))]
         elif n.endswith("_dynamics.parquet"):
@@ -555,7 +561,17 @@ def describe(path: Path) -> list[tuple[str, str]]:
             d = json.loads(p.read_text())
             kind = ("calibrated animal" if n.endswith(".animal.json") else "muscle set" if n.endswith(".muscles.json")
                     else "camera path" if n.endswith(".camera.json") else "JSON")
-            out += [("kind", kind), ("keys", ", ".join(list(d)[:14]) if isinstance(d, dict) else f"list of {len(d)}")]
+            out.append(("kind", kind))
+            if isinstance(d, dict):
+                simple = {k: ("—" if v is None else v) for k, v in d.items()
+                          if v is None or isinstance(v, (str, int, float, bool))}
+                out += [(str(k), str(v)) for k, v in list(simple.items())[:12]]
+                more = [f"{k} ({len(v)})" if isinstance(v, (list, dict)) else str(k) for k, v in d.items()
+                        if k not in simple]
+                if more:
+                    out.append(("also", ", ".join(more[:12]) + ("…" if len(more) > 12 else "")))
+            else:
+                out.append(("holds", f"a list of {len(d)}"))
         except Exception as e:
             out.append(("kind", f"unreadable JSON ({type(e).__name__})"))
     elif n == "project.toml" or n.endswith(".ini"):
