@@ -8,6 +8,12 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lw — Follow-ups to 122lv.**
+* `mufasa/cli/commands.py` no longer names the old config file. This was the 122eg invariant
+  (checked by 122eg, 122eh, 122ei, 122eq), which 122lv broke. It now says "old-layout `.ini`
+  config"; `docs/cli.md` matches.
+* The 3-D tab uses `mufasa/pose3d/files.py` for its 3-D files and runs, instead of its own copy.
+
 **122lv — The command line: `mufasa help`, `mufasa list …`, `info`, `project`, `doctor`, `version`.**
 * User: "I will need a "mufasa help" command. "mufasa list models" and other useful calls".
 * `mufasa/cli/commands.py` needs no Qt. The `mufasa` launcher sends these commands there and

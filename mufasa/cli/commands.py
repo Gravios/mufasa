@@ -44,9 +44,9 @@ SKIP_DIRS = {"frames", ".git", "__pycache__", "logs", ".ipynb_checkpoints"}
 # the project
 # --------------------------------------------------------------------------- #
 def resolve_project(arg: str | None) -> tuple[Path | None, str]:
-    """The project's config and how it was found: ``--project`` (a ``project.toml``, an old
-    ``project_config.ini`` or a folder in a project), else the current folder's project, else the
-    last one opened in the workbench."""
+    """The project's config and how it was found: ``--project`` (a ``project.toml``, an old-layout
+    ``.ini`` config, or a folder in a project), else the current folder's project, else the last
+    one opened in the workbench."""
     from mufasa.project_layout import PROJECT_CONFIG_FILENAME, find_project_config
     if arg:
         p = Path(arg).expanduser()
@@ -604,7 +604,7 @@ def _project_fields(cfg: Path) -> list[tuple[str, str]]:
     except Exception as e:
         return [("metadata", f"unreadable ({e})")]
     bp = m.get("body_parts", [])
-    out += [("root", str(_root(cfg))), ("layout", "project.toml" if cfg.suffix == ".toml" else "old (project_config.ini)"),
+    out += [("root", str(_root(cfg))), ("layout", "project.toml" if cfg.suffix == ".toml" else "old (.ini config)"),
             ("animals", f"{m.get('animal_count', '')}" + (f" ({', '.join(m['animal_ids'])})" if m.get("animal_ids") else "")),
             ("body parts", f"{len(bp)}: {', '.join(bp[:12])}" + ("…" if len(bp) > 12 else "")),
             ("behaviours", ", ".join(m.get("classifier_targets", [])) or "(none)"),

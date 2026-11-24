@@ -73,23 +73,8 @@ def _videos(root: Path | None, config_path=None) -> list[Path]:
 
 
 def _pose3d_files(root: Path | None) -> list[Path]:
-    """122lr: every 3-D file of the project, newest run first: the 3-D runs, imported motion
-    capture, and those ``mufasa run`` wrote beside the 2-D labels (``sources/pose``)."""
-    if root is None:
-        return []
-    files = []
-    for r in reversed(_pose3d_runs(root)):
-        files += sorted(r.glob("*.parquet"))
-    for d in (root / "sources" / "pose3d", root / "sources" / "pose", root / "derived" / "pose3d"):
-        if d.is_dir():
-            files += sorted(p for p in d.glob("*.parquet") if d.name == "pose3d" or "_3d" in p.name)
-    from mufasa.ui_qt.pose3d_viewer import is_pose3d_file
-    out, seen = [], set()
-    for p in files:
-        if p.resolve() not in seen and p.is_file() and is_pose3d_file(p):
-            seen.add(p.resolve())
-            out.append(p)
-    return out
+    from mufasa.pose3d.files import pose3d_files  # 122lv: one copy, Qt-free
+    return pose3d_files(root)
 
 
 def _kalman_runs(root: Path | None) -> list[Path]:
@@ -100,10 +85,8 @@ def _kalman_runs(root: Path | None) -> list[Path]:
 
 
 def _pose3d_runs(root: Path | None) -> list[Path]:
-    if root is None:
-        return []
-    from mufasa.project_layout import ProjectPaths
-    return ProjectPaths(root).list_runs("pose3d")
+    from mufasa.pose3d.files import pose3d_runs
+    return pose3d_runs(root)
 
 
 def background_frame(video: str, n: int = 60) -> np.ndarray:

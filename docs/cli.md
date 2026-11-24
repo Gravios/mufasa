@@ -19,7 +19,7 @@ mufasa version               mufasa's version
 
 Commands that look into a project use the first of these that applies:
 
-* `--project` (`-p`): its `project.toml`, an old `project_config.ini`, or any folder inside it;
+* `--project` (`-p`): its `project.toml`, an old-layout `.ini` config, or any folder inside it;
 * the project the current folder is in (up to six folders up);
 * the last project opened in the workbench.
 
