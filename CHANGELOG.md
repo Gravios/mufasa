@@ -8,6 +8,30 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lz — `scripts/import_tactilearena.py`: TactileArena runway recordings filed under the lab's naming.**
+* User: "I would like to unzip, rename, convert and move the files" to
+  `/cloud/server/source/tactile-grid/thakorN/thakorN-wl-<ratid>/thakorN-wl-<ratid>-<date>/thakorN-wl-<ratid>-<date>-<time>.M200_T700.tactile-grid.parquet`
+  and `/cloud/server/source/video/thakorN/…/thakorN-wl-<ratid>-<date>-<time>.cam0.mp4`.
+* For each zip (`3-23-2026_rat2.zip` with `3-23-2026/runway/rat2/runway_tactile_data_*.mat` and
+  `camera_K_*.mp4`), the script unzips to a staging folder beside the destination, converts the
+  `.mat`, and moves the video. It names them from:
+  * the rat;
+  * the date, YYYYMMDD, from the folder;
+  * the time, from the video's start (the session's start; the `.mat`'s name holds the time it was
+    saved, at the end);
+  * the camera, and M and T.
+* The tactile-grid parquet has one row per board per frame: board, hardware `board_id`, frame,
+  `t` on the shared clock, and lists of the non-zero pixels and their values. Frames with nothing
+  pressed keep their row.
+  * Its metadata holds the rest of the `.mat`: M, threshold, digipot, duration, start time, buffer
+    overflows, and both cameras' timestamps, indices and counts, for syncing.
+  * A 1.07 GB `.mat` becomes a 38 MB file in about 30 s, checked equal to the `.mat`.
+  * `read_tactile_grid()` reads it back, and `--show` summarises one.
+* `--dry-run`, `--overwrite` and `--workers`. Already-filed sessions are skipped, and a zip that
+  isn't a recording is refused with a reason. Outputs are written to a staging name and renamed
+  when complete. Each run is logged in `<tactile-root>/<lab>/import_manifest.csv`.
+* `tests/smoke_122lz_import_tactilearena.py`: 9 checks.
+
 **122ly — The user guide: `docs/guide/`, every current feature, for users and developers.**
 * User: "Can you add a docs folder and document the current features?" (a user guide in a new
   folder; for both users and developers).
