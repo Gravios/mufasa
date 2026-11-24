@@ -44,7 +44,11 @@ After ``pip install -e .``::
 
     mufasa                    # launches the workbench
     mufasa --project /p.ini   # opens a project on launch
-    mufasa --help             # forwards to workbench's argparse
+    mufasa help               # the commands (mufasa.cli.commands); also --help
+    mufasa list models        # and videos, pose, 3d, runs, calibrations, steps, tools, projects
+    mufasa info FILE          # what a file holds
+    mufasa project            # the current project's summary
+    mufasa doctor             # the environment
     mufasa run <step> ...     # the 3-D pipeline from the command line (mufasa.cli.run)
 
 Existing entry points remain available:
@@ -127,13 +131,23 @@ def _set_qt_platform_default() -> None:
         pass
 
 
+# 122lv: the commands that open no window (mufasa.cli.commands.COMMANDS; kept here so the launcher
+# imports nothing more until one is asked for)
+COMMANDS = ("help", "list", "info", "project", "run", "doctor", "version")
+
+
 def main(argv: list[str] | None = None) -> int:
     """Console-script entry. Forwards to ``workbench_app.main``; ``mufasa run ...`` runs pipeline
     steps from the command line instead (:mod:`mufasa.cli.run`, no Qt needed)."""
     args = list(sys.argv[1:] if argv is None else argv)
-    if args and args[0] == "run":
-        from mufasa.cli.run import main as run_main
-        return run_main(args[1:])
+    # 122lv: `mufasa help`, `mufasa list …`, `info`, `project`, `doctor`, `version`, `run …`
+    # (mufasa.cli.commands); `-h` / `--help` give the overview, the workbench's options in it
+    if args and (args[0] in COMMANDS or args[0] in ("-h", "--help", "-V", "--version")):
+        from mufasa.cli.commands import main as commands_main
+        return commands_main(args)
+    if args and not args[0].startswith("-"):
+        print(f"mufasa: no command '{args[0]}' (`mufasa help` lists them)", file=sys.stderr)
+        return 2
     # Try the import upfront so we can produce a helpful error
     # message instead of a bare ImportError traceback if something
     # is misconfigured.

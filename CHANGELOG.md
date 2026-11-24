@@ -8,6 +8,34 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122lv — The command line: `mufasa help`, `mufasa list …`, `info`, `project`, `doctor`, `version`.**
+* User: "I will need a "mufasa help" command. "mufasa list models" and other useful calls".
+* `mufasa/cli/commands.py` needs no Qt. The `mufasa` launcher sends these commands there and
+  `run` to `mufasa.cli.run`, opens the workbench otherwise, and refuses an unknown command instead
+  of opening a window.
+* `mufasa help` (also `--help`) lists the commands, `list`'s subjects and the other tools.
+  `mufasa help <command>` gives a command's options.
+* `mufasa list models` covers:
+  * Kalman body models (the project's, with their `card.toml` source, and the global library's);
+  * classifiers;
+  * YOLO detectors;
+  * 3-D bodies: the virtual rodent, rigs, calibrated animals with mass, muscle sets;
+  * the built-in height prior.
+
+  `--kind` lists one kind; `--project-only` leaves out the global library.
+* `mufasa list videos` (subfolders; `--details`), `pose`, `3d` (each with its video), `runs` (by
+  stage; `--stage`), `calibrations` (each camera in a line), `steps`, `tools`, `projects`.
+  Every list takes `--json`.
+* `mufasa info FILE…`: videos, 3-D / gait / dynamics files, models, cameras, animal and muscle
+  files, projects.
+* `mufasa project [PATH]`, `mufasa doctor` (packages, CUDA and GPUs, FFmpeg/NVENC, the display;
+  exit 1 if a required package is missing), `mufasa version`.
+* The project is `--project`, else the current folder's, else the last one opened in the
+  workbench.
+* The 3-D file helpers moved to `mufasa/pose3d/files.py`, which needs no Qt. `pose3d_viewer`
+  keeps the names.
+* `docs/cli.md`, README, docs index. `tests/smoke_122lv_cli_commands.py`: 23 checks.
+
 **122lu — The camera animation's *Render video…* renders every panel shown.**
 * User: "I ran render videos, but still only see the 3d view".
 * `CameraAnimationPanel.render_panels_to` plays the viewer through the camera path. Each output
