@@ -8,6 +8,48 @@ to pick up next time. Keep entries dated and grouped by patch series so
 
 ## Session 2026-07-17 — marker names are case-sensitive; the model's layout wins
 
+**122ly — The user guide: `docs/guide/`, every current feature, for users and developers.**
+* User: "Can you add a docs folder and document the current features?" (a user guide in a new
+  folder; for both users and developers).
+* `docs/guide/README.md` is the index, with a map of the pipeline and the chapters.
+* Fourteen user chapters, page by page in the order an experiment goes through them:
+  1. getting started;
+  2. projects;
+  3. importing data;
+  4. preprocessing;
+  5. 3-D pose;
+  6. body model and dynamics;
+  7. ROIs;
+  8. features;
+  9. classifiers;
+  10. YOLO pose;
+  11. analysis and visualizations;
+  12. video processing, add-ons and tools;
+  13. the command line;
+  14. troubleshooting.
+
+  Each chapter says what a section is for and when to use it, gives its options (as the
+  workbench names them), what it writes and where, and examples. It links the topic docs
+  (`pose3d.md`, `biomech.md`, `cli.md`, …) for depth.
+* Three developer chapters:
+  * architecture: the package, how data moves, the `project_layout` API, provenance, the
+    workbench, the command line;
+  * extending Mufasa: a form, a page, a feature family, a command, a pipeline step, a tracker
+    format, with code;
+  * testing and patches: the smoke tests, running them, lint, the invariants, how a patch is
+    made.
+* `docs/README.md` and the README point to it.
+* Fix found while writing it: `mufasa.cli.commands` read the project's root under the wrong key
+  (`project_path` for `project_root`). It fell back to the config's folder, which is the same for
+  `project.toml` projects but not for old-layout ones.
+* `tests/smoke_122ly_user_guide.py`: 8 checks, which keep the guide matched to the code:
+  * every chapter is in the index;
+  * every link and anchor resolves;
+  * every workbench page and all 72 sections are named;
+  * every **Page › Section** named is real;
+  * every command, list subject, tool and pipeline step is covered;
+  * the 25 APIs the developer chapters name exist.
+
 **122lx — The command line's documentation: explanations and examples.**
 * User: "Can you update the documentation with explanations and examples".
 * `docs/cli.md` rewritten. The examples are real output from a sample project. It covers:

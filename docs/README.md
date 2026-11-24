@@ -17,6 +17,13 @@ Index of documents in `docs/`. Three tracks: **workflow / user-facing**, **Tk â†
 
 If you're new to Mufasa, start here.
 
+### `guide/` â€” the user guide (122ly)
+**[The Mufasa user guide](guide/README.md).** Every feature, page by page, in the order an experiment
+goes through them, from installing and the first project to 3-D pose, dynamics, classifiers,
+analysis and the command line, with troubleshooting. It ends with three chapters for developers:
+architecture, extending Mufasa (forms, pages, feature families, commands, pipeline steps), and
+testing and patches. The other docs below go deeper on single topics; the guide links to them.
+
 ### `v1_project_layout.md` (122df)
 **v1 project layout reference.** What a v1 project looks like on disk, run-id semantics, the path-abstraction layer (`mufasa.project_layout.project_paths_from_config`) for backend code, and how to create a fresh v1 project.
 

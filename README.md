@@ -159,7 +159,9 @@ Run `mufasa` to open the workbench.
 
 ## Documentation
 
-Doc index: [`docs/README.md`](docs/README.md).
+Start with the **[user guide](docs/guide/README.md)**: every feature, page by page, with examples,
+from installing to analysis, and chapters for developers. The doc index is
+[`docs/README.md`](docs/README.md).
 
 User-facing:
 

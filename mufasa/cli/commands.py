@@ -72,7 +72,7 @@ def resolve_project(arg: str | None) -> tuple[Path | None, str]:
 def _root(cfg: Path) -> Path:
     from mufasa.project_layout import project_paths_from_config
     try:
-        return Path(project_paths_from_config(str(cfg))["project_path"])
+        return Path(project_paths_from_config(str(cfg))["project_root"])
     except Exception:
         return cfg.parent
 
